@@ -54,8 +54,14 @@ foldedCases.push(['connection health survives rejected visitor codes but require
     assert.equal(r.provider.requests.filter(x => x.uri.endsWith('/token')).length, before + 1, 'consumed state never retries the exchange');
     await health(true);
   };
-  await rejectCode('invented-code');
-  await rejectCode(first.code);
+  await runCases(t, [
+    ["rejected authorization codes: case 1", async t => {
+      await rejectCode('invented-code');
+    }],
+    ["rejected authorization codes: case 2", async t => {
+      await rejectCode(first.code);
+    }]
+  ]);
   const grantError = { error: 'invalid_grant', error_description: 'private-provider-detail', error_uri: 'https://private.example' };
   r.provider.options.transport = async uri => uri.endsWith('/token') ? Response.json(grantError, { status: 400 }) : null;
   await rejectCode('another-invented-code'); // Only the sanitized error reaches the visitor.

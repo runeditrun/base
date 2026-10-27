@@ -49,8 +49,14 @@ foldedCases.push(['cancelInvitation invalidates all links, retains operator/hist
     assert.deepEqual(await db.prepare('SELECT * FROM test_history').first(), { id: 'recorded-invitation', operator_id: pending.row.id });
     assert.deepEqual(await db.prepare('SELECT * FROM oa_bootstrap').first(), bootstrap);
     assert.equal((await db.prepare('SELECT count(*) AS n FROM oa_sessions WHERE operator_id=?').bind(pending.row.id).first()).n, 0);
-    await invalidLink(t, r, first.token);
-    await invalidLink(t, r, pending.token);
+    await runCases(t, [
+    ["cancelled invitation links: case 1", async t => {
+      await invalidLink(t, r, first.token);
+    }],
+    ["cancelled invitation links: case 2", async t => {
+      await invalidLink(t, r, pending.token);
+    }]
+  ]);
     assert.equal((await r.call('/auth/invite/cancel', post({ operatorId: pending.row.id }, owner))).status, 409);
     assert.equal((await r.call('/auth/invite/cancel', post({ operatorId: bootstrap.claim_id }, owner))).status, 409);
     const lastOwner = await r.call('/auth/operator/status', post({ operatorId: bootstrap.claim_id, status: 'inactive' }, owner));

@@ -69,17 +69,33 @@ foldedCases.push(['invalid envelopes/settings fail before dispatch; missing and 
 await assert.rejects(sender.send(bad), redacted);
 }]));
   assert.equal(calls, 0);
-  assert.throws(() => createMailSender({ ...config(), apiKey: 'SENSITIVE' }), redacted);
-  assert.throws(() => createMailSender({ ...config(), serviceOrigin: 'https://messaging.example.test/path' }), redacted);
-  assert.throws(() => createMailSender(config(), { serviceBinding: { fetch() {} }, fetch() {} }), redacted);
+  await runCases(t, [
+    ["messaging configuration inputs: case 1", async t => {
+      assert.throws(() => createMailSender({ ...config(), apiKey: 'SENSITIVE' }), redacted);
+    }],
+    ["messaging configuration inputs: case 2", async t => {
+      assert.throws(() => createMailSender({ ...config(), serviceOrigin: 'https://messaging.example.test/path' }), redacted);
+    }],
+    ["messaging configuration inputs: case 3", async t => {
+      assert.throws(() => createMailSender(config(), { serviceBinding: { fetch() {} }, fetch() {} }), redacted);
+    }]
+  ]);
   await runCases(t, Array.from(['sendgrid', 'resend'], (provider, rowIndex) => [`${t.name}: provider row ${rowIndex + 1}`, async t => {
     const direct = createMailSender({ provider, mode: 'test', apiKey: 'test-key' }, { fetch: async () => { calls++; throw Error('unexpected'); } });
     await assert.rejects(direct.send(message()), redacted);
 }]));
   assert.equal(calls, 0);
-  assert.equal(await sender.reconcile('not-found'), null);
-  await assert.rejects(sender.erase('Reader@example.test'), redacted);
-  await assert.rejects(sender.erase('Reader <Reader@example.test>'), redacted);
+  await runCases(t, [
+    ["messaging operation inputs: case 1", async t => {
+      assert.equal(await sender.reconcile('not-found'), null);
+    }],
+    ["messaging operation inputs: case 2", async t => {
+      await assert.rejects(sender.erase('Reader@example.test'), redacted);
+    }],
+    ["messaging operation inputs: case 3", async t => {
+      await assert.rejects(sender.erase('Reader <Reader@example.test>'), redacted);
+    }]
+  ]);
 }]);
 foldedCases.push(['one network attempt covers error, redirect, missing response, hanging fetch and hanging body', async (t) => {
   await runCases(t, Array.from([async () => { throw Error('SENSITIVE'); }, async () => new Response('SENSITIVE', { status: 503 }),

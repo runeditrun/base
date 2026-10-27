@@ -136,14 +136,30 @@ assert.throws(()=>createOperatorAuth({...options,...injection}),/adapter/);
 }]));
   const partial=nativeFixture(options.db,Date.now,{noDependencies:true});
   const nativeAuth=createOperatorAuth({...options,...partial});
-  await assert.rejects(nativeAuth.authorizeDependencySetup(new Request(ORIGIN),{token:SETUP}),{code:'native_capability_unavailable',status:501});
-  assert.throws(()=>createOperatorAuth({...options,...partial,config:{...options.config,dependencies:true}}),/native_dependency_capability_required/);
-  assert.throws(()=>createOperatorAuth({...options,...partial,accounts:{...partial.accounts,bootstrap:'invalid'}}),/invalid_native_adapter/);
-  assert.throws(()=>createOperatorAuth({...options,...partial,proofs:{...partial.proofs,consumeLink:null}}),/invalid_native_adapter/);
+  await runCases(t, [
+    ["native capability inputs: case 1", async t => {
+      await assert.rejects(nativeAuth.authorizeDependencySetup(new Request(ORIGIN),{token:SETUP}),{code:'native_capability_unavailable',status:501});
+    }],
+    ["native capability inputs: case 2", async t => {
+      assert.throws(()=>createOperatorAuth({...options,...partial,config:{...options.config,dependencies:true}}),/native_dependency_capability_required/);
+    }],
+    ["native capability inputs: case 3", async t => {
+      assert.throws(()=>createOperatorAuth({...options,...partial,accounts:{...partial.accounts,bootstrap:'invalid'}}),/invalid_native_adapter/);
+    }],
+    ["native capability inputs: case 4", async t => {
+      assert.throws(()=>createOperatorAuth({...options,...partial,proofs:{...partial.proofs,consumeLink:null}}),/invalid_native_adapter/);
+    }]
+  ]);
   const persistence={...partial.proofs,authenticate(){},requiredProvider(){},byEmail(){},authorizedLink(){}};
   const direct={...options,persistence,hash:async()=> 'digest',hooks:{afterConfirm(){throw new Error('veto');}}};
-  assert.throws(()=>createEmailLinkLifecycle(direct),/invalid_confirmation_hooks/,'a veto without revocation authority refuses construction');
-  assert.throws(()=>createEmailLinkLifecycle({...direct,afterConfirm:async(_request,value)=>value}),/invalid_confirmation_hooks/,'a wrapper cannot silently replace a supplied veto');
+  await runCases(t, [
+    ["confirmation hook inputs: case 1", async t => {
+      assert.throws(()=>createEmailLinkLifecycle(direct),/invalid_confirmation_hooks/,'a veto without revocation authority refuses construction');
+    }],
+    ["confirmation hook inputs: case 2", async t => {
+      assert.throws(()=>createEmailLinkLifecycle({...direct,afterConfirm:async(_request,value)=>value}),/invalid_confirmation_hooks/,'a wrapper cannot silently replace a supplied veto');
+    }]
+  ]);
   await runCases(t, Array.from(['https://foreign.example/callback','https://user:pass@app.example/callback',ORIGIN+'/callback?q=1',ORIGIN+'/callback#hash',ORIGIN+'/auth/oidc/incumbent/start',ORIGIN+'/auth/owner-claim',ORIGIN+'/auth/dev/enter',ORIGIN+'/__dev/personas',ORIGIN+'/__dev/key'], (redirectUri, rowIndex) => [`${t.name}: redirectUri row ${rowIndex + 1}`, async t => {
     assert.throws(()=>createOidcProviders({db:options.db,admission:{admit:async()=>{}},clientIp:options.clientIp,config:{origin:ORIGIN,transactionSecret:'fixture-transactions-secret-32-bytes',providers:[{...provider,redirectUri}]}}),/configuration/);
 }]));
@@ -199,6 +215,7 @@ test('direct lifecycle and composed native/OA services run one completion hook a
 });
 
 test("native server-verified seams preserve association, policy and binding authority without an OIDC transaction pin", async t => {
+  await runCases(t, [['independent input groups', async t => {
   await runCases(t, [["native server-verified seams preserve association, policy and binding authority without an OIDC transaction pin", async t=>{
   const legacyIssuer='https://legacy.example';
   const r=await runtime(t,setup({providers:[],fakes:[],core:{externalIssuers:[legacyIssuer]},legacy:{issuer:legacyIssuer,subjectEmails:{'legacy-contact':'contact@example.com'}}}));
@@ -234,9 +251,17 @@ assert.equal((await post(r,path,{...principal,emailVerified:true,emailVerifiedAt
 }]));
   assert.equal((await post(r,'/test/verified',{...verified,email:'contact@example.com'})).status,403,'a changed claim cannot move an existing binding');
   await r.db.prepare("INSERT INTO domains VALUES('example.com','incumbent')").run();
-  assert.equal((await post(r,'/test/association',associated)).status,403);
-  assert.equal((await post(r,'/test/verified',{...verified,subject:'new-contact',email:'contact@example.com'})).status,403);
-  assert.equal((await post(r,'/test/verified',verified)).status,303,'owner remains domain-exempt');
+  await runCases(t, [
+    ["native domain policy inputs: case 1", async t => {
+      assert.equal((await post(r,'/test/association',associated)).status,403);
+    }],
+    ["native domain policy inputs: case 2", async t => {
+      assert.equal((await post(r,'/test/verified',{...verified,subject:'new-contact',email:'contact@example.com'})).status,403);
+    }],
+    ["native domain policy inputs: case 3", async t => {
+      assert.equal((await post(r,'/test/verified',verified)).status,303,'owner remains domain-exempt');
+    }]
+  ]);
   await r.db.prepare("DELETE FROM domains").run();
   await r.db.prepare("UPDATE people SET version=version+1 WHERE id='native-contact'").run();
   assert.equal((await r.call('/auth/session',{cookie})).status,401,'current native person version fences the old cookie');
@@ -254,6 +279,8 @@ assert.equal((await post(r,path,principal)).status,403);
   assert.equal((await r.call('/auth/session',{cookie:old})).status,200);
   await noOa(t, r);
 }], ...conformanceGroups.oidc]);
+
+  }]]);
 });
 
 

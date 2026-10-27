@@ -73,8 +73,14 @@ foldedCases.push(['configured product policy can grant members admin invitations
       assert.equal((await r.call('/auth/confirm', post({ token: value }))).status, 400);
 
 }]));
-    await unconsumed(r, 'pending-admin@example.com');
-    await unconsumed(r, 'pending-member@example.com');
+    await runCases(t, [
+    ["unconsumed invitation inputs: case 1", async t => {
+      await unconsumed(r, 'pending-admin@example.com');
+    }],
+    ["unconsumed invitation inputs: case 2", async t => {
+      await unconsumed(r, 'pending-member@example.com');
+    }]
+  ]);
     assert.equal((await r.call('/auth/session', { cookie: member.cookie })).status, 200);
     // Restore the product's authorization with unchanged operator versions.
     r.options.policy = 'member-invites-admin';

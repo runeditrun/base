@@ -24,6 +24,7 @@ async function core(t, extra = {}) {
 }
 
 test('associations are immutable issuer-scoped configuration, and identity fields cannot opt into linking', async t => {
+  await runCases(t, [['independent input groups', async t => {
   const { auth, request, bindings } = await core(t);
   const [issuer] = issuers;
   await auth.admitVerifiedIdentity(request(), { issuer, subject: 'owner-subject', email: 'owner@example.com', emailVerified: true });
@@ -32,13 +33,23 @@ test('associations are immutable issuer-scoped configuration, and identity field
   subjectEmails.configured = 'owner@example.com'; subjectEmails.injected = 'owner@example.com';
   const session = await admit(request(), { issuer, subject: 'configured', email: 'owner@example.com', emailVerified: false });
   assert.equal(session.operator.id, 'member');
-  await assert.rejects(admit(request(), { issuer: issuers[1], subject: 'configured' }));
-  await assert.rejects(admit(request(), { issuer, subject: 'injected', email: 'owner@example.com', emailVerified: true }));
-  await assert.rejects(auth.admitVerifiedIdentity(request(), { issuer, subject: 'injected', email: 'owner@example.com', emailVerified: true, associatedEmail: 'owner@example.com' }));
+  await runCases(t, [
+    ["untrusted identity inputs: case 1", async t => {
+      await assert.rejects(admit(request(), { issuer: issuers[1], subject: 'configured' }));
+    }],
+    ["untrusted identity inputs: case 2", async t => {
+      await assert.rejects(admit(request(), { issuer, subject: 'injected', email: 'owner@example.com', emailVerified: true }));
+    }],
+    ["untrusted identity inputs: case 3", async t => {
+      await assert.rejects(auth.admitVerifiedIdentity(request(), { issuer, subject: 'injected', email: 'owner@example.com', emailVerified: true, associatedEmail: 'owner@example.com' }));
+    }]
+  ]);
   await runCases(t, Array.from([{ issuer: 'https://unconfigured.example' }, { issuer, subjectEmails: [] }, { issuer, subjectEmails: { '': 'owner@example.com' } }, { issuer, subjectEmails: { configured: 'invalid' } }], (input, rowIndex) => [`${t.name}: input row ${rowIndex + 1}`, async t => {
     assert.throws(() => auth.createIdentityAdmission(input), e => e.code === 'invalid_configuration');
 }]));
   assert.deepEqual(bindings().map(b => b.subject), ['configured', 'owner-subject']);
+
+  }]]);
 });
 
 test('trusted maps never move a bound principal; token roles grant nothing; status, role versions and the allow-list still govern', async t => {

@@ -49,15 +49,35 @@ foldedCases.push(['malformed inputs and injection fail before dispatch', async (
   await runCases(t, Array.from(['victim@example.net\r\nBcc: secret@example.net', 'a@example.net,b@example.net', 'bad..local@example.net', 'x@-bad.example', 'SENSITIVE', `a${' '.repeat(996)}<`, `${'<'.repeat(997)}>`], (address, rowIndex) => [`${t.name}: address row ${rowIndex + 1}`, async t => {
 rejects(() => parseAddress(address), 'invalid_address');
 }]));
-  rejects(() => validateMessage({ ...message(), to: [] }), 'invalid_recipients');
-  rejects(() => validateMessage({ ...message(), text: undefined }), 'body_required');
-  rejects(() => validateMessage({ ...message(), html: false }), 'invalid_body');
-  rejects(() => validateMessage({ ...message(), subject: 'SENSITIVE\nBcc' }), 'invalid_subject');
-  rejects(() => validateMessage({ ...message(), surprise: true }), 'invalid_message');
-  rejects(() => validateHeaders({ 'X-Trace': 'SENSITIVE\nBcc:x' }), 'invalid_header_value');
-  rejects(() => validateHeaders({ 'X-Trace': '1', 'x-trace': '2' }), 'reserved_or_duplicate_header');
-  rejects(() => validateHeaders({ To: 'other@example.net' }), 'reserved_or_duplicate_header');
-  rejects(() => validateHeaders({ 'X Bad': 'x' }), 'invalid_header_name');
+  await runCases(t, [
+    ["malformed message inputs: case 1", async t => {
+      rejects(() => validateMessage({ ...message(), to: [] }), 'invalid_recipients');
+    }],
+    ["malformed message inputs: case 2", async t => {
+      rejects(() => validateMessage({ ...message(), text: undefined }), 'body_required');
+    }],
+    ["malformed message inputs: case 3", async t => {
+      rejects(() => validateMessage({ ...message(), html: false }), 'invalid_body');
+    }],
+    ["malformed message inputs: case 4", async t => {
+      rejects(() => validateMessage({ ...message(), subject: 'SENSITIVE\nBcc' }), 'invalid_subject');
+    }],
+    ["malformed message inputs: case 5", async t => {
+      rejects(() => validateMessage({ ...message(), surprise: true }), 'invalid_message');
+    }],
+    ["malformed message inputs: case 6", async t => {
+      rejects(() => validateHeaders({ 'X-Trace': 'SENSITIVE\nBcc:x' }), 'invalid_header_value');
+    }],
+    ["malformed message inputs: case 7", async t => {
+      rejects(() => validateHeaders({ 'X-Trace': '1', 'x-trace': '2' }), 'reserved_or_duplicate_header');
+    }],
+    ["malformed message inputs: case 8", async t => {
+      rejects(() => validateHeaders({ To: 'other@example.net' }), 'reserved_or_duplicate_header');
+    }],
+    ["malformed message inputs: case 9", async t => {
+      rejects(() => validateHeaders({ 'X Bad': 'x' }), 'invalid_header_name');
+    }]
+  ]);
 }]);
 foldedCases.push(['SendGrid custom argument limits count UTF-8 bytes and reserve correlation', async (t) => {
   await runCases(t, Array.from(['rer_delivery_id', 'event', 'email', 'timestamp', 'sg_event_id', 'sg_message_id'], (name, rowIndex) => [`${t.name}: name row ${rowIndex + 1}`, async t => {
@@ -66,10 +86,20 @@ rejects(() => validateMessage({ ...message(), customArgs: { [name]: 'replacement
   const overhead = new TextEncoder().encode(JSON.stringify({ x: '', rer_delivery_id: 'command-7' })).length;
   const exact = { ...message(), customArgs: { x: 'a'.repeat(10000 - overhead) } };
   assert.equal(validateMessage(exact, 'sendgrid'), exact);
-  rejects(() => validateMessage({ ...message(), customArgs: { x: 'a'.repeat(10001 - overhead) } }, 'sendgrid'), 'custom_args_too_large');
-  rejects(() => validateMessage({ ...message(), customArgs: { x: '界'.repeat(4000) } }, 'sendgrid'), 'custom_args_too_large');
-  rejects(() => validateMessage({ ...message(), asmGroupId: 0 }, 'sendgrid'), 'invalid_asm_group');
-  rejects(() => validateMessage({ ...message(), subscriptionTracking: 1 }, 'sendgrid'), 'invalid_subscription_tracking');
+  await runCases(t, [
+    ["provider setting inputs: case 1", async t => {
+      rejects(() => validateMessage({ ...message(), customArgs: { x: 'a'.repeat(10001 - overhead) } }, 'sendgrid'), 'custom_args_too_large');
+    }],
+    ["provider setting inputs: case 2", async t => {
+      rejects(() => validateMessage({ ...message(), customArgs: { x: '界'.repeat(4000) } }, 'sendgrid'), 'custom_args_too_large');
+    }],
+    ["provider setting inputs: case 3", async t => {
+      rejects(() => validateMessage({ ...message(), asmGroupId: 0 }, 'sendgrid'), 'invalid_asm_group');
+    }],
+    ["provider setting inputs: case 4", async t => {
+      rejects(() => validateMessage({ ...message(), subscriptionTracking: 1 }, 'sendgrid'), 'invalid_subscription_tracking');
+    }]
+  ]);
   await runCases(t, Array.from(['resend', 'cloudflare'], (provider, rowIndex) => [`${t.name}: provider row ${rowIndex + 1}`, async t => {
 await runCases(t, Array.from([{ customArgs: {} }, { asmGroupId: 1 }, { subscriptionTracking: false }], (setting, rowIndex) => [`${t.name}: setting row ${rowIndex + 1}`, async t => {
 rejects(() => validateMessage({ ...message(), ...setting }, provider), 'unsupported_provider_setting');
@@ -95,11 +125,24 @@ rejects(() => validateMessage({ ...message(), unsubscribe: { url } }), 'invalid_
 
 
 
-test('result contract forbids false remote acceptance and unsafe identifiers', () => {
+test('result contract forbids false remote acceptance and unsafe identifiers', async (t) => {
+  await runCases(t, [['independent input groups', async t => {
   const valid = { provider: 'sendgrid', status: 'accepted', providerMessageId: null };
   assert.equal(validateSendResult(valid, 'sendgrid'), valid);
-  rejects(() => validateSendResult({ ...valid, provider: 'development' }, 'development'), 'invalid_send_result');
-  rejects(() => validateSendResult({ ...valid, status: 'delivered' }, 'sendgrid'), 'invalid_send_result');
-  rejects(() => validateSendResult({ ...valid, providerMessageId: 'SENSITIVE\n' }, 'sendgrid'), 'invalid_provider_message_id');
-  rejects(() => validateSendResult({ ...valid, recipientResults: [{ recipient: 'a@example.net', status: 'delivered' }] }, 'sendgrid'), 'invalid_recipient_status');
+  await runCases(t, [
+    ["invalid result inputs: case 1", async t => {
+      rejects(() => validateSendResult({ ...valid, provider: 'development' }, 'development'), 'invalid_send_result');
+    }],
+    ["invalid result inputs: case 2", async t => {
+      rejects(() => validateSendResult({ ...valid, status: 'delivered' }, 'sendgrid'), 'invalid_send_result');
+    }],
+    ["invalid result inputs: case 3", async t => {
+      rejects(() => validateSendResult({ ...valid, providerMessageId: 'SENSITIVE\n' }, 'sendgrid'), 'invalid_provider_message_id');
+    }],
+    ["invalid result inputs: case 4", async t => {
+      rejects(() => validateSendResult({ ...valid, recipientResults: [{ recipient: 'a@example.net', status: 'delivered' }] }, 'sendgrid'), 'invalid_recipient_status');
+    }]
+  ]);
+
+  }]]);
 });

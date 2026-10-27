@@ -6,6 +6,7 @@ import { credentials, oldCookie, SETUP, NOW } from './fixtures/pre-ledger/owner-
 import { oldTables, snapshot, authoritySnapshot, operator, owner, invite, error, session, deniedLink, conflict, accept } from './pre-ledger-assertions.mjs';
 
 test('static populated pre-ledger store upgrades without rewriting any old table and retains usable authority', async (t) => {
+  await runCases(t, [['independent input groups', async t => {
   await runCases(t, [['independent journey rows', async t => {
   const r = await runtime();
   try {
@@ -37,16 +38,26 @@ assert.ok(before[table].length, `${table} has preservation evidence`);
     await r.restart();
     assert.deepEqual(await snapshot(r), before, 'Every old row persists across runtime restart');
     assert.deepEqual((await (await r.db).prepare('SELECT * FROM oa_invitation_cancellations').all()).results, []);
-    await session(r, owner, 'owner', 1);
-    await session(r, oldCookie('active'), 'active', 2);
-    await error(await r.call('/auth/session', { cookie: oldCookie('inactive') }), 401, 'unauthenticated');
+    await runCases(t, [
+    ["upgraded session inputs: case 1", async t => {
+      await session(r, owner, 'owner', 1);
+    }],
+    ["upgraded session inputs: case 2", async t => {
+      await session(r, oldCookie('active'), 'active', 2);
+    }],
+    ["upgraded session inputs: case 3", async t => {
+      await error(await r.call('/auth/session', { cookie: oldCookie('inactive') }), 401, 'unauthenticated');
+    }]
+  ]);
     const authBefore = await authoritySnapshot(r);
     await error(await r.call('/auth/bootstrap', post({ token: SETUP, displayName: 'Replacement owner' })), 409, 'already_initialized');
     assert.deepEqual(await authoritySnapshot(r), authBefore);
-    for (const name of ['active', 'inactive', 'cancelled']) {
+    await runCases(t, Array.from(['active', 'inactive', 'cancelled'], (name, rowIndex) => [`legacy identity row ${rowIndex + 1}`, async t => {
+
       await conflict(r, name);
       await deniedLink(t, r, credentials[`${name}Link`]);
-    }
+
+}]));
     const accepted = [];
     await runCases(t, Array.from(['pending', 'expired'], (name, rowIndex) => [`${t.name}: name row ${rowIndex + 1}`, async t => {
       const old = await operator(r, name);
@@ -62,15 +73,27 @@ assert.ok(before[table].length, `${table} has preservation evidence`);
       accepted.push([name, await accept(t, r, token, name, 2, returnTo)]);
 }]));
     await r.restart();
-    for (const [name, cookie] of accepted) {
+    await runCases(t, Array.from(accepted, ([name, cookie], rowIndex) => [`accepted session row ${rowIndex + 1}`, async t => {
+
       await session(r, cookie, name, 2);
       await deniedLink(t, r, credentials[`${name}Link`]);
-    }
-    await session(r, owner, 'owner', 1);
-    await session(r, oldCookie('active'), 'active', 2);
-    await error(await r.call('/auth/session', { cookie: oldCookie('inactive') }), 401, 'unauthenticated');
+
+}]));
+    await runCases(t, [
+    ["restarted session inputs: case 1", async t => {
+      await session(r, owner, 'owner', 1);
+    }],
+    ["restarted session inputs: case 2", async t => {
+      await session(r, oldCookie('active'), 'active', 2);
+    }],
+    ["restarted session inputs: case 3", async t => {
+      await error(await r.call('/auth/session', { cookie: oldCookie('inactive') }), 401, 'unauthenticated');
+    }]
+  ]);
     assert.deepEqual((await snapshot(r)).oa_bootstrap, before.oa_bootstrap);
   } finally { await r.close(); }
+
+  }]]);
 
   }]]);
 });

@@ -62,7 +62,7 @@ foldedCases.push(['DNS malformed or contradictory resolver results are errors, n
     assert.equal(result.evidence.state, 'error');
 }]));
 }]);
-foldedCases.push(['fixed DNS-over-HTTPS request decodes chunked TXT and refuses redirects/errors', async () => {
+foldedCases.push(['fixed DNS-over-HTTPS request decodes chunked TXT and refuses redirects/errors', async (t) => {
   const query = { name: 'mail.example.com', type: 'TXT', signal: new AbortController().signal };
   const result = await resolveDns(query, async (url, init) => {
     assert.equal(url.origin, 'https://cloudflare-dns.com');
@@ -72,9 +72,17 @@ foldedCases.push(['fixed DNS-over-HTTPS request decodes chunked TXT and refuses 
     return Response.json({ Status: 0, Answer: [{ type: 16, name: 'mail.example.com.', data: '"v=spf1 " "-all"' }] });
   });
   assert.equal(result.records[0].value, 'v=spf1 -all');
-  assert.equal((await resolveDns(query, async () => new Response(null, { status: 302 }))).status, 'error');
-  assert.equal((await resolveDns(query, async () => Response.json({ Status: 2 }))).status, 'error');
-  assert.equal((await resolveDns(query, async () => Response.json({ Status: 3 }))).status, 'missing');
+  await runCases(t, [
+    ["DNS response inputs: case 1", async t => {
+      assert.equal((await resolveDns(query, async () => new Response(null, { status: 302 }))).status, 'error');
+    }],
+    ["DNS response inputs: case 2", async t => {
+      assert.equal((await resolveDns(query, async () => Response.json({ Status: 2 }))).status, 'error');
+    }],
+    ["DNS response inputs: case 3", async t => {
+      assert.equal((await resolveDns(query, async () => Response.json({ Status: 3 }))).status, 'missing');
+    }]
+  ]);
 }]);
 foldedCases.push(['TXT presentation escape handling rejects malformed data', async (t) => {
   assert.equal(decodeTxt('"v=DKIM1; " "p=ab\\099"'), 'v=DKIM1; p=abc');

@@ -76,13 +76,23 @@ foldedCases.push(['rejects route drift, missing credentials and unsafe or malfor
     destinationUrl: 'https://hooks.example.com/events',
     secrets: { CUSTOMER_WEBHOOK_SIGNING_KEY: 'base64-signing-key' },
   };
-  assert.throws(() => validateEgressConfiguration(result, { ...config, providerId: 'other-provider' }), /provider does not match/);
-  assert.throws(() => validateEgressConfiguration(result, { ...config, destinationId: 'other-destination' }), /destination does not match/);
-  assert.throws(() => validateEgressConfiguration(result, { ...config, secrets: {} }), /CUSTOMER_WEBHOOK_SIGNING_KEY/);
-  assert.throws(() => validateEgressConfiguration(result, {
+  await runCases(t, [
+    ["configuration refusal inputs: case 1", async t => {
+      assert.throws(() => validateEgressConfiguration(result, { ...config, providerId: 'other-provider' }), /provider does not match/);
+    }],
+    ["configuration refusal inputs: case 2", async t => {
+      assert.throws(() => validateEgressConfiguration(result, { ...config, destinationId: 'other-destination' }), /destination does not match/);
+    }],
+    ["configuration refusal inputs: case 3", async t => {
+      assert.throws(() => validateEgressConfiguration(result, { ...config, secrets: {} }), /CUSTOMER_WEBHOOK_SIGNING_KEY/);
+    }],
+    ["configuration refusal inputs: case 4", async t => {
+      assert.throws(() => validateEgressConfiguration(result, {
     ...config,
     secrets: { CUSTOMER_WEBHOOK_SIGNING_KEY: 'bad\nheader' },
   }), /CUSTOMER_WEBHOOK_SIGNING_KEY/);
+    }]
+  ]);
   await runCases(t, Array.from([
     'http://hooks.example.com/events',
     'https://localhost/events',
@@ -93,8 +103,10 @@ foldedCases.push(['rejects route drift, missing credentials and unsafe or malfor
     assert.throws(() => validateEgressConfiguration(result, { ...config, destinationUrl }), /Invalid public HTTPS egress destination/);
 }]));
 }]);
-foldedCases.push(['rejects incomplete declarations before they can become external promises', () => {
-  assert.throws(() => declareEgress({
+foldedCases.push(['rejects incomplete declarations before they can become external promises', async (t) => {
+  await runCases(t, [
+    ["incomplete declaration inputs: case 1", async t => {
+      assert.throws(() => declareEgress({
     id: 'custom-hook',
     required: false,
     provider: { id: 'custom-hook', name: 'Custom receiver' },
@@ -104,7 +116,9 @@ foldedCases.push(['rejects incomplete declarations before they can become extern
     adapters: ['integrations.webhook.v1'],
     custody: [],
   }), /requiredWhen/);
-  assert.throws(() => declareEgress({
+    }],
+    ["incomplete declaration inputs: case 2", async t => {
+      assert.throws(() => declareEgress({
     id: 'custom-hook',
     required: true,
     provider: { id: 'custom-hook', name: 'Custom receiver' },
@@ -114,7 +128,9 @@ foldedCases.push(['rejects incomplete declarations before they can become extern
     adapters: ['not-a-versioned-adapter'],
     custody: [],
   }), /adapter IDs/);
-  assert.throws(() => declareEgress({
+    }],
+    ["incomplete declaration inputs: case 3", async t => {
+      assert.throws(() => declareEgress({
     id: 'custom-hook',
     required: true,
     provider: { id: 'custom-hook', name: 'Custom receiver' },
@@ -124,6 +140,8 @@ foldedCases.push(['rejects incomplete declarations before they can become extern
     adapters: ['integrations.webhook.v1'],
     custody: [{ name: 'not_an_ENV', purpose: 'signs event body' }],
   }), /secret declaration/);
+    }]
+  ]);
 }]);
 foldedCases.push(['represents a non-replaceable external with the schema-supported empty adapters list', () => {
   const nonReplaceable = declareEgress({

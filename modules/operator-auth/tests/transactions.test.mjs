@@ -94,7 +94,7 @@ foldedCases.push(['configuration narrowing and disabling review immediately deny
     assert.equal((await r.call('/auth/bootstrap', post({ token: SETUP, displayName: 'Owner' }))).status, 403);
   } finally { await r.close(); }
 }]);
-foldedCases.push(['role mutation expires existing sessions and last-owner trigger protects direct SQL too', async () => {
+foldedCases.push(['role mutation expires existing sessions and last-owner trigger protects direct SQL too', async (t) => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -106,8 +106,14 @@ foldedCases.push(['role mutation expires existing sessions and last-owner trigge
     assert.equal((await r.call('/auth/operator/role', post({ operatorId: member.operator.id, role: 'admin' }, owner))).status, 200);
     assert.equal((await r.call('/auth/session', { cookie: memberCookie })).status, 401);
     const db = await r.db;
-    await assert.rejects(db.prepare("DELETE FROM oa_operators WHERE role='owner'").run(), /last_owner/);
-    await assert.rejects(db.prepare("UPDATE oa_operators SET role='member' WHERE role='owner'").run(), /last_owner/);
+    await runCases(t, [
+    ["last owner constraint inputs: case 1", async t => {
+      await assert.rejects(db.prepare("DELETE FROM oa_operators WHERE role='owner'").run(), /last_owner/);
+    }],
+    ["last owner constraint inputs: case 2", async t => {
+      await assert.rejects(db.prepare("UPDATE oa_operators SET role='member' WHERE role='owner'").run(), /last_owner/);
+    }]
+  ]);
     assert.equal((await r.call('/auth/session', { cookie: owner })).status, 200);
   } finally { await r.close(); }
 }]);

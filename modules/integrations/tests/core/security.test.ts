@@ -33,7 +33,8 @@ test('production transport cannot reach a real private listener or redirect cred
   } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 });
 
-test('replay claims race atomically and reject conflicting validly signed identity reuse', async () => {
+test('replay claims race atomically and reject conflicting validly signed identity reuse', async (t) => {
+  await runCases(t, [['independent input groups', async t => {
   const store = await database(), key = crypto.getRandomValues(new Uint8Array(32)), now = Date.now();
   const p = createWebhookProtocol({ resolveDestination: async () => 'https://example.com/', signingKey: async () => key });
   const envelope = { id: 'e', tenant: 'tenant', destinationId: 'dest', event: 'created', protocol: 'webhook', body: '{}' };
@@ -43,7 +44,15 @@ test('replay claims race atomically and reject conflicting validly signed identi
     assert.equal(result.filter(Boolean).length, 1);
     const changedWire = await p.prepare({ ...envelope, body: '{"changed":true}' }, now);
     const changed = await verifyWebhook({ ...changedWire, key, tenant: 'tenant', destinationId: 'dest', now });
-    await assert.rejects(store.repo().acceptReplay(changed), /conflict/);
-    await assert.rejects(store.repo('other').acceptReplay(verified), /namespace/);
+    await runCases(t, [
+    ["replay refusal inputs: case 1", async t => {
+      await assert.rejects(store.repo().acceptReplay(changed), /conflict/);
+    }],
+    ["replay refusal inputs: case 2", async t => {
+      await assert.rejects(store.repo('other').acceptReplay(verified), /namespace/);
+    }]
+  ]);
   } finally { await store.close(); }
+
+  }]]);
 });

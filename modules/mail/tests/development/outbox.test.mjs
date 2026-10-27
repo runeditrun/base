@@ -78,17 +78,37 @@ await runCases(t, Array.from([0, -1, 1.5, NaN, Infinity, '10', Number.MAX_SAFE_I
     assert.throws(() => createD1DevelopmentOutbox({ db, [key]: value }), /retention/);
 }]));
 }]));
-  assert.throws(() => createD1DevelopmentOutbox(), /configuration/);
-  assert.throws(() => createD1DevelopmentOutbox({ db, clock: 3 }), /configuration/);
+  await runCases(t, [
+    ["outbox configuration inputs: case 1", async t => {
+      assert.throws(() => createD1DevelopmentOutbox(), /configuration/);
+    }],
+    ["outbox configuration inputs: case 2", async t => {
+      assert.throws(() => createD1DevelopmentOutbox({ db, clock: 3 }), /configuration/);
+    }]
+  ]);
   await runCases(t, Array.from([-1, NaN, Infinity, '100', 1.1, 8_640_000_000_000_001], (time, rowIndex) => [`${t.name}: time row ${rowIndex + 1}`, async t => {
     const outbox = createD1DevelopmentOutbox({ db, clock: () => time });
-    await assert.rejects(outbox.put(message('bad')), /clock/);
-    await assert.rejects(outbox.list(), /clock/);
-    await assert.rejects(outbox.get('id'), /clock/);
+    await runCases(t, [
+    ["invalid clock operations: case 1", async t => {
+      await assert.rejects(outbox.put(message('bad')), /clock/);
+    }],
+    ["invalid clock operations: case 2", async t => {
+      await assert.rejects(outbox.list(), /clock/);
+    }],
+    ["invalid clock operations: case 3", async t => {
+      await assert.rejects(outbox.get('id'), /clock/);
+    }]
+  ]);
 }]));
   const outbox = createD1DevelopmentOutbox({ db });
-  await assert.rejects(outbox.put({ ...message('unprepared'), unsubscribe: { url: 'https://example.test/leave' } }), error => error.code === 'unsubscribe_not_assembled');
-  await assert.rejects(outbox.put({ ...message('invalid'), attachments: [{ content: 'not raw bytes' }] }));
+  await runCases(t, [
+    ["invalid outbox messages: case 1", async t => {
+      await assert.rejects(outbox.put({ ...message('unprepared'), unsubscribe: { url: 'https://example.test/leave' } }), error => error.code === 'unsubscribe_not_assembled');
+    }],
+    ["invalid outbox messages: case 2", async t => {
+      await assert.rejects(outbox.put({ ...message('invalid'), attachments: [{ content: 'not raw bytes' }] }));
+    }]
+  ]);
   await runCases(t, Array.from(['', null, 'x'.repeat(129)], (id, rowIndex) => [`${t.name}: id row ${rowIndex + 1}`, async t => {
 await assert.rejects(outbox.get(id), /ID/);
 }]));

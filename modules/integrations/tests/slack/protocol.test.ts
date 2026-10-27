@@ -78,9 +78,17 @@ await assert.rejects(create(), error => !String(error).includes(botToken) && !St
   const wire = await protocol.prepare(bot(), 0); assert.equal(wire.url, 'https://slack.com/api/chat.postMessage');
   const rotated = createSlackBotProtocol({ resolveDestination: async () => ({ token: `xoxe.${botToken}`, channel }) });
   assert.equal((await rotated.prepare(bot(), 0)).headers.authorization, `Bearer xoxe.${botToken}`);
-  await assert.rejects(protocol.prepare({ ...bot(), body: serializeSlackMessage(message, 'CEVIL') }, 0), /options/);
-  await assert.rejects(protocol.prepare({ ...bot(), body: JSON.stringify({ ...JSON.parse(bot().body), token: botToken }) }, 0), /Unsupported/);
-  await assert.rejects(createSlackBotProtocol({ resolveDestination: async () => ({ token: botToken + '\r\nX-Injected: yes', channel }) }).prepare(bot(), 0), /configuration/);
+  await runCases(t, [
+    ["bot refusal inputs: case 1", async t => {
+      await assert.rejects(protocol.prepare({ ...bot(), body: serializeSlackMessage(message, 'CEVIL') }, 0), /options/);
+    }],
+    ["bot refusal inputs: case 2", async t => {
+      await assert.rejects(protocol.prepare({ ...bot(), body: JSON.stringify({ ...JSON.parse(bot().body), token: botToken }) }, 0), /Unsupported/);
+    }],
+    ["bot refusal inputs: case 3", async t => {
+      await assert.rejects(createSlackBotProtocol({ resolveDestination: async () => ({ token: botToken + '\r\nX-Injected: yes', channel }) }).prepare(bot(), 0), /configuration/);
+    }]
+  ]);
 }]);
 foldedCases.push(['destination drift and channel drift reject preflight before real transport', async t => {
   const fixture = await wireFixture(t), db = durableFixture(t); let url = webhookUrl, configuredChannel = channel;

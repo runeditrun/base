@@ -6,14 +6,14 @@ import { requestProvider, classifyHttpStatus, safeProviderMessageId, sendResult 
 test("one provider attempt preserves redirect safety and conservative result evidence", async t => {
   const foldedCases = [];
 foldedCases.push(['status classification conservatively preserves ambiguous attempts', async (t) => {
-  await runCases(t, Array.from([0, 101, 301, 302, 307, 308, 408, 500, 503], (status, rowIndex) => [`${t.name}: status row ${rowIndex + 1}`, async t => {
+  await runCases(t, Array.from([0, 101, 301, 302, 307, 308, 408, 500, 503], (status, rowIndex) => [`${t.name}: status ${status} row ${rowIndex + 1}`, async t => {
 assert.equal(classifyHttpStatus(status), 'uncertain');
 }]));
-  await runCases(t, Array.from([400, 401, 403, 404, 409, 422], (status, rowIndex) => [`${t.name}: status row ${rowIndex + 1}`, async t => {
+  await runCases(t, Array.from([400, 401, 403, 404, 409, 422], (status, rowIndex) => [`${t.name}: status ${status} row ${rowIndex + 1}`, async t => {
 assert.equal(classifyHttpStatus(status), 'rejected');
 }]));
   assert.equal(classifyHttpStatus(429), 'rate_limited');
-  await runCases(t, Array.from([200, 202, 204], (status, rowIndex) => [`${t.name}: status row ${rowIndex + 1}`, async t => {
+  await runCases(t, Array.from([200, 202, 204], (status, rowIndex) => [`${t.name}: status ${status} row ${rowIndex + 1}`, async t => {
 assert.equal(classifyHttpStatus(status), null);
 }]));
 }]);
@@ -32,14 +32,30 @@ foldedCases.push(['one request forces manual redirects and an abort signal', asy
 }]);
 foldedCases.push(['network failures and malformed transports reveal no secrets or synthetic receipt', async (t) => {
   let calls = 0;
-  assert.equal(await requestProvider('https://api.example.test/send', {}, { fetch() { calls++; throw new Error('SENSITIVE key and body'); } }), null);
-  assert.equal(calls, 1);
-  assert.equal(await requestProvider('https://api.example.test/send', {}, { fetch: async () => ({ status: 202 }) }), null);
+  await runCases(t, [
+    ["throwing transport result: case 1", async t => {
+      assert.equal(await requestProvider('https://api.example.test/send', {}, { fetch() { calls++; throw new Error('SENSITIVE key and body'); } }), null);
+    }],
+    ["throwing transport result: case 2", async t => {
+      assert.equal(calls, 1);
+    }]
+  ]);
+  await runCases(t, [
+    ["malformed transport result: case 1", async t => {
+      assert.equal(await requestProvider('https://api.example.test/send', {}, { fetch: async () => ({ status: 202 }) }), null);
+    }]
+  ]);
   await runCases(t, Array.from([null, undefined, '', ' \t', 'id\r\ninjected', 'x'.repeat(1025)], (input, rowIndex) => [`${t.name}: input row ${rowIndex + 1}`, async t => {
 assert.equal(safeProviderMessageId(input), null);
 }]));
-  assert.equal(safeProviderMessageId(' real-id '), 'real-id');
-  assert.deepEqual(sendResult('sendgrid', 'uncertain', null, 'transport_uncertain'), { provider: 'sendgrid', status: 'uncertain', providerMessageId: null, code: 'transport_uncertain' });
+  await runCases(t, [
+    ["safe result inputs: case 1", async t => {
+      assert.equal(safeProviderMessageId(' real-id '), 'real-id');
+    }],
+    ["safe result inputs: case 2", async t => {
+      assert.deepEqual(sendResult('sendgrid', 'uncertain', null, 'transport_uncertain'), { provider: 'sendgrid', status: 'uncertain', providerMessageId: null, code: 'transport_uncertain' });
+    }]
+  ]);
 }]);
   await runCases(t, foldedCases);
 });

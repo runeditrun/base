@@ -17,15 +17,20 @@ function declarationFixture() { return declareEgress({ id: 'incident-notificatio
   async function visit(url: URL) {
     if (seen.has(url.href)) return; seen.add(url.href);
     const source = await readFile(url, 'utf8');
-    for (const match of source.matchAll(/^(?:import|export)\s+(?:[^\n;]*?\sfrom\s+)?['"]([^'"]+)['"]/gm)) {
+    const dependencies = Array.from(source.matchAll(/^(?:import|export)\s+(?:[^\n;]*?\sfrom\s+)?['"]([^'"]+)['"]/gm));
+    if (dependencies.length) await runCases(t, Array.from(dependencies, (match, rowIndex) => [`module dependency row ${rowIndex + 1} in ${url.pathname}`, async t => {
+
       const dependency = match[1]!;
-      assert.ok(dependency.startsWith('.'), `Nonportable dependency: ${dependency} in ${url.pathname}`);
-      await visit(new URL(dependency, url));
-    }
+      try {
+        assert.ok(dependency.startsWith('.'), `Nonportable dependency: ${dependency} in ${url.pathname}`);
+      } finally { await visit(new URL(dependency, url)); }
+
+}]));
   }
   await visit(new URL('../../index.ts', import.meta.url));
-  for (const entry of ['core/index.ts', 'slack/index.ts', 'egress/index.ts'])
-    assert.ok(seen.has(new URL(`../../${entry}`, import.meta.url).href));
+  await runCases(t, Array.from(['core/index.ts', 'slack/index.ts', 'egress/index.ts'], (entry, rowIndex) => [`public entry row ${rowIndex + 1}`, async t => {
+assert.ok(seen.has(new URL(`../../${entry}`, import.meta.url).href));
+}]));
 }],
 ['public egress declaration fields', async t => {
 const declaration=declarationFixture();

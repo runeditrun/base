@@ -48,8 +48,8 @@ foldedCases.push(['HTTPS-only assembly omits one-click and retains matching cust
   assert.equal(prepared.headers['List-Unsubscribe-Post'], undefined);
   assert.equal(prepared.headers['X-Trace'], 'trace-7');
 }]);
-foldedCases.push(['unsafe URL and mailbox inputs fail closed', () => {
-  for (const url of [
+foldedCases.push(['unsafe URL and mailbox inputs fail closed', async (t) => {
+  await runCases(t, Array.from([
     'http://example.com/u',
     'javascript:alert(1)',
     'https://user:fake-pass@example.com/u',
@@ -59,39 +59,53 @@ foldedCases.push(['unsafe URL and mailbox inputs fail closed', () => {
     'https://example.com/%3cBcc%3e',
     'https://example.com/<Bcc>',
     'https://example.com\\@attacker.example/u',
-  ]) {
-    rejectsCode(() => applyUnsubscribeHeaders(message({ unsubscribe: { url } })), 'invalid_unsubscribe_url');
-  }
+  ], (url, rowIndex) => [`unsafe url input row ${rowIndex + 1}`, async t => {
 
-  for (const mailto of [
+    rejectsCode(() => applyUnsubscribeHeaders(message({ unsubscribe: { url } })), 'invalid_unsubscribe_url');
+
+}]));
+
+  await runCases(t, Array.from([
     'person@example.com\r\nBcc:attacker@example.net',
     'person@example.com%0d%0aBcc:attacker',
     'person@example.com%25250dBcc:attacker',
     '<person@example.com>',
     'person@example.com,attacker@example.net',
     'person@example.com?subject=leave',
-  ]) {
+  ], (mailto, rowIndex) => [`unsafe mailto input row ${rowIndex + 1}`, async t => {
+
     rejectsValidation(() => applyUnsubscribeHeaders(message({ unsubscribe: { url: 'https://example.com/u', mailto } })));
-  }
+
+}]));
 }]);
-foldedCases.push(['custom list headers must agree with the structured unsubscribe request', () => {
-  rejectsCode(() => applyUnsubscribeHeaders(message({
+foldedCases.push(['custom list headers must agree with the structured unsubscribe request', async (t) => {
+  await runCases(t, [
+    ["list header conflicts: case 1", async t => {
+      rejectsCode(() => applyUnsubscribeHeaders(message({
     headers: { 'List-Unsubscribe': '<https://other.example/u>' },
     unsubscribe: { url: 'https://example.com/u' },
   })), 'unsubscribe_header_conflict');
-  rejectsCode(() => applyUnsubscribeHeaders(message({
+    }],
+    ["list header conflicts: case 2", async t => {
+      rejectsCode(() => applyUnsubscribeHeaders(message({
     headers: { 'list-unsubscribe-post': 'List-Unsubscribe=One-Click' },
     unsubscribe: { url: 'https://example.com/u' },
   })), 'invalid_list_unsubscribe_post');
-  rejectsCode(() => applyUnsubscribeHeaders(message({
+    }],
+    ["list header conflicts: case 3", async t => {
+      rejectsCode(() => applyUnsubscribeHeaders(message({
     headers: { 'List-Unsubscribe': '<https://example.com/u>', 'list-unsubscribe': '<https://example.com/u>' },
     unsubscribe: { url: 'https://example.com/u' },
   })), 'reserved_or_duplicate_header');
-  rejectsCode(() => applyUnsubscribeHeaders(message({
+    }],
+    ["list header conflicts: case 4", async t => {
+      rejectsCode(() => applyUnsubscribeHeaders(message({
     headers: { 'List-Unsubscribe': '<https://example.com/u>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click; extra=value' },
   })), 'invalid_list_unsubscribe_post');
+    }]
+  ]);
 }]);
-foldedCases.push(['header conflicts and duplicate names fail before the development outbox is called', async () => {
+foldedCases.push(['header conflicts and duplicate names fail before the development outbox is called', async (t) => {
   let writes = 0;
   const outbox = { async put() { writes += 1; } };
   const dispatch = async input => sendDevelopment(
@@ -100,27 +114,33 @@ foldedCases.push(['header conflicts and duplicate names fail before the developm
     { outbox },
   );
 
-  await rejectsPromiseCode(dispatch(message({
+  await runCases(t, [
+    ["outbox header conflicts: case 1", async t => {
+      await rejectsPromiseCode(dispatch(message({
     headers: { 'List-Unsubscribe': '<https://other.example/u>' },
     unsubscribe: { url: 'https://example.com/u' },
   })), 'unsubscribe_header_conflict');
-  await rejectsPromiseCode(dispatch(message({
+    }],
+    ["outbox header conflicts: case 2", async t => {
+      await rejectsPromiseCode(dispatch(message({
     headers: {
       'List-Unsubscribe': '<https://example.com/u>',
       'list-unsubscribe': '<https://example.com/u>',
     },
     unsubscribe: { url: 'https://example.com/u' },
   })), 'reserved_or_duplicate_header');
+    }]
+  ]);
   assert.equal(writes, 0);
 }]);
-foldedCases.push(['valid custom list headers are preserved, while malformed or injected values fail', () => {
+foldedCases.push(['valid custom list headers are preserved, while malformed or injected values fail', async (t) => {
   const custom = {
     'List-Unsubscribe': '<https://example.com/u?a=1,2>, <mailto:leave@example.com>',
     'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
   };
   assert.deepEqual(applyUnsubscribeHeaders(message({ headers: custom })).headers, custom);
 
-  for (const headers of [
+  await runCases(t, Array.from([
     { 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
     { 'List-Unsubscribe': '<http://example.com/u>' },
     { 'List-Unsubscribe': '<https://example.com/u%0d%0aBcc:attacker>' },
@@ -128,9 +148,11 @@ foldedCases.push(['valid custom list headers are preserved, while malformed or i
     { 'List-Unsubscribe': '<javascript:alert(1)>' },
     { 'List-Unsubscribe': '<https://example.com/u>, ' },
     { 'List-Unsubscribe': '<https://example.com/u> <https://other.example/u>' },
-  ]) {
+  ], (headers, rowIndex) => [`unsafe headers input row ${rowIndex + 1}`, async t => {
+
     rejectsCode(() => applyUnsubscribeHeaders(message({ headers })), headers['List-Unsubscribe-Post'] ? 'invalid_list_unsubscribe_post' : 'invalid_list_unsubscribe');
-  }
+
+}]));
 }]);
   await runCases(t, foldedCases);
 });

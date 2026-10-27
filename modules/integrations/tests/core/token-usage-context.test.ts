@@ -17,15 +17,31 @@ foldedCases.push(['allowed and denied usage binds caller request/resource across
     let tokens = new TokenService(store.repo(), nativeAuthority(store.db), () => now);
     const { token, credential } = await tokens.issue(owner, { name: 'app', scopes: ['read', 'read'], expiresAt: now + 1000 });
     assert.match(token, /^int_[a-f0-9]{64}$/); assert.deepEqual(credential.scopes, ['read']);
-    await assert.rejects(tokens.issue(owner, { name: 'app', scopes: ['admin'] }), /rejected/);
-    await assert.rejects(tokens.issue({ principal: 'visitor' }, { name: 'app', scopes: ['read'] }), /Forbidden/);
-    assert.equal((await tokens.authorize(token, ['read'], context('allow')))!.id, credential.id);
-    assert.equal(await tokens.authorize(token, ['write'], context('scope-denied', 'tickets/43')), null);
-    assert.equal(await tokens.authorize('unknown', ['read'], context('unknown')), null);
+    await runCases(t, [
+    ["issuance refusal inputs: case 1", async t => {
+      await assert.rejects(tokens.issue(owner, { name: 'app', scopes: ['admin'] }), /rejected/);
+    }],
+    ["issuance refusal inputs: case 2", async t => {
+      await assert.rejects(tokens.issue({ principal: 'visitor' }, { name: 'app', scopes: ['read'] }), /Forbidden/);
+    }]
+  ]);
+    await runCases(t, [
+    ["authorization contexts: case 1", async t => {
+      assert.equal((await tokens.authorize(token, ['read'], context('allow')))!.id, credential.id);
+    }],
+    ["authorization contexts: case 2", async t => {
+      assert.equal(await tokens.authorize(token, ['write'], context('scope-denied', 'tickets/43')), null);
+    }],
+    ["authorization contexts: case 3", async t => {
+      assert.equal(await tokens.authorize('unknown', ['read'], context('unknown')), null);
+    }]
+  ]);
+    await runCases(t, [['authorization contexts: tenant boundary', async t => {
     const otherTenant = new TokenService(store.repo('other'), nativeAuthority(store.db, 'other'), () => now);
     assert.equal(await otherTenant.authorize(token, ['read'], context('other')), null);
     const otherRows = await store.repo('other').query('SELECT * FROM integration_token_usage WHERE namespace=?');
     assert.equal(otherRows[0]!.token_id, null); assert.equal(otherRows[0]!.request_id, 'other');
+    }]]);
     await runCases(t, Array.from([() => tokens.list({ principal: 'visitor' }), () => tokens.usage({ principal: 'visitor' }), () => tokens.revoke({ principal: 'visitor' }, credential.id)], (operation, rowIndex) => [`${t.name}: operation row ${rowIndex + 1}`, async t => {
 await assert.rejects(operation(), /Forbidden/);
 }]));
@@ -86,8 +102,14 @@ assert.match(String(row.token_hash), /^[a-f0-9]{64}$/);
 }]));
     assert.equal(JSON.stringify(await tokens.list(owner)).includes('token_hash'), false);
     store.db.migrate("CREATE TRIGGER fail_usage_v2 BEFORE INSERT ON integration_token_usage BEGIN SELECT RAISE(ABORT,'usage unavailable'); END;");
-    await assert.rejects(tokens.authorize(issued[0]!.token, ['read'], context('failed-allowed')), /usage unavailable/);
-    await assert.rejects(tokens.authorize('invalid', ['read'], context('failed-denied')), /usage unavailable/);
+    await runCases(t, [
+    ["usage failure contexts: case 1", async t => {
+      await assert.rejects(tokens.authorize(issued[0]!.token, ['read'], context('failed-allowed')), /usage unavailable/);
+    }],
+    ["usage failure contexts: case 2", async t => {
+      await assert.rejects(tokens.authorize('invalid', ['read'], context('failed-denied')), /usage unavailable/);
+    }]
+  ]);
     assert.deepEqual(await tokens.usage(owner), []);
   } finally { await store.close(); }
 }]);

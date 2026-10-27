@@ -14,11 +14,17 @@ function twoAttachments(provider) {
 }
 test("inbound normalization preserves exact aggregate limits and rejects malformed encodings", async t => {
   const foldedCases = [];
-for (const provider of ['cloudflare', 'resend', 'sendgrid']) foldedCases.push([`${provider} validates aggregate decoded bytes and attachment count across files`, async () => {
+for (const provider of ['cloudflare', 'resend', 'sendgrid']) foldedCases.push([`${provider} validates aggregate decoded bytes and attachment count across files`, async (t) => {
   const parsed = await normalizeInbound(twoAttachments(provider), { ...limits, maxAttachments: 2, maxAttachmentBytes: 6, maxTotalAttachmentBytes: 12 });
   assert.equal(parsed.attachments.length, 2);
-  await assert.rejects(normalizeInbound(twoAttachments(provider), { ...limits, maxTotalAttachmentBytes: 11 }), { code: 'inbound_attachments_limit' });
-  await assert.rejects(normalizeInbound(twoAttachments(provider), { ...limits, maxAttachments: 1 }), { code: 'inbound_attachment_count' });
+  await runCases(t, [
+    ["attachment limit inputs: case 1", async t => {
+      await assert.rejects(normalizeInbound(twoAttachments(provider), { ...limits, maxTotalAttachmentBytes: 11 }), { code: 'inbound_attachments_limit' });
+    }],
+    ["attachment limit inputs: case 2", async t => {
+      await assert.rejects(normalizeInbound(twoAttachments(provider), { ...limits, maxAttachments: 1 }), { code: 'inbound_attachment_count' });
+    }]
+  ]);
 }]);
 foldedCases.push(['MIME decodes legacy charset and counts resulting UTF-8 body bytes', async () => {
   const input = () => cloudflare(encoder.encode('From: sender@example.test\r\nTo: receiver@example.test\r\nContent-Type: text/plain; charset=iso-8859-1\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\ncaf=E9'));

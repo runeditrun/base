@@ -109,19 +109,37 @@ foldedCases.push(['timestamped-body signing refuses short or non-byte keys from 
 }]));
 }]));
   const failure = new Error('fixture resolver failure');
-  await assert.rejects(makeProtocol({ ...additional, signingKey: async () => { throw failure; } }).prepare(envelope, now), error => error === failure);
-  await assert.rejects(makeProtocol(additional).prepare({ ...envelope, body: '\ud800' }, now), /valid UTF-8/);
+  await runCases(t, [
+    ["signing failures: case 1", async t => {
+      await assert.rejects(makeProtocol({ ...additional, signingKey: async () => { throw failure; } }).prepare(envelope, now), error => error === failure);
+    }],
+    ["signing failures: case 2", async t => {
+      await assert.rejects(makeProtocol(additional).prepare({ ...envelope, body: '\ud800' }, now), /valid UTF-8/);
+    }]
+  ]);
 }]);
 foldedCases.push(['timestamped-body headers reject illegal tokens, duplicates and case-insensitive Base or transport header overrides', async (t) => {
   const invalidNames = ['', 'x space', ' x-leading', 'x-trailing ', 'x:colon', 'x\r\ninjected', 'x\n', 'café', 'x\t', 'x/invalid', null, undefined, 42];
   await runCases(t, Array.from(invalidNames, (name, rowIndex) => [`${t.name}: name row ${rowIndex + 1}`, async t => {
-    assert.throws(() => makeProtocol({ ...additional, timestampHeader: name as string }), /header name/);
-    assert.throws(() => makeProtocol({ ...additional, signatureHeader: name as string }), /header name/);
+    await runCases(t, [
+    ["invalid header roles: case 1", async t => {
+      assert.throws(() => makeProtocol({ ...additional, timestampHeader: name as string }), /header name/);
+    }],
+    ["invalid header roles: case 2", async t => {
+      assert.throws(() => makeProtocol({ ...additional, signatureHeader: name as string }), /header name/);
+    }]
+  ]);
 }]));
   await runCases(t, Array.from(['content-type', 'webhook-id', 'webhook-tenant', 'webhook-destination', 'webhook-event', 'webhook-timestamp', 'webhook-signature',
     'host', 'connection', 'content-length', 'transfer-encoding', 'proxy-authorization', 'authorization', 'keep-alive', 'proxy-connection', 'te', 'trailer', 'upgrade'], (name, rowIndex) => [`${t.name}: name row ${rowIndex + 1}`, async t => {
-    assert.throws(() => makeProtocol({ ...additional, timestampHeader: name.toUpperCase() }), /cannot replace Base headers/);
-    assert.throws(() => makeProtocol({ ...additional, signatureHeader: name.toUpperCase() }), /cannot replace Base headers/);
+    await runCases(t, [
+    ["reserved header roles: case 1", async t => {
+      assert.throws(() => makeProtocol({ ...additional, timestampHeader: name.toUpperCase() }), /cannot replace Base headers/);
+    }],
+    ["reserved header roles: case 2", async t => {
+      assert.throws(() => makeProtocol({ ...additional, signatureHeader: name.toUpperCase() }), /cannot replace Base headers/);
+    }]
+  ]);
 }]));
   await runCases(t, Array.from(['X-Same', 'x-same'], (signatureHeader, rowIndex) => [`${t.name}: signatureHeader row ${rowIndex + 1}`, async t => {
 assert.throws(() => makeProtocol({ timestampHeader: 'X-Same', signatureHeader }), /distinct/);

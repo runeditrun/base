@@ -15,6 +15,7 @@ const schemaOf = async db => (await db.prepare("SELECT type,name,tbl_name FROM s
 const status = async (r, letter) => (await r.call('/auth/session', { cookie: cookieFor(letter.repeat(43)) })).status;
 
 test('a populated store upgrades with identical rows; native sessions survive and legacy OIDC needs new provider admission', async (t) => {
+  await runCases(t, [['independent input groups', async t => {
   await runCases(t, [['independent journey rows', async t => {
   const r = await runtime([...await Promise.all(priorMain.map(seedMigration)), await read('./fixtures/dev-sessions/rows.sql')], { externalIssuers: ['https://idp.example.com'] });
   try {
@@ -46,16 +47,28 @@ assert.equal(await status(r, letter), 401, `the ${letter} session stays revoked,
 }]));
     // Constraints survive the rebuild: CHECK, UNIQUE token hash and source link, and foreign keys.
     const row = before.oa_sessions.find(s => s.id === 's-native');
-    await assert.rejects(r.db.prepare("INSERT INTO oa_sessions(id,token_hash,operator_id,operator_version,kind,created_at,expires_at) VALUES('x','y','owner',1,'bogus',1,2)").run(), /CHECK/);
-    await assert.rejects(r.db.prepare("INSERT INTO oa_sessions(id,token_hash,operator_id,operator_version,kind,created_at,expires_at) VALUES('x',?,'owner',1,'native',1,2)").bind(row.token_hash).run(), /UNIQUE/);
-    await assert.rejects(r.db.prepare("INSERT INTO oa_sessions(id,token_hash,operator_id,operator_version,kind,source_token_id,created_at,expires_at) VALUES('x','y','owner',1,'native','t-magic',1,2)").run(), /UNIQUE/);
-    await assert.rejects(r.db.prepare("INSERT INTO oa_sessions(id,token_hash,operator_id,operator_version,kind,created_at,expires_at) VALUES('x','y','nobody',1,'native',1,2)").run(), /FOREIGN KEY/);
+    await runCases(t, [
+    ["session constraint inputs: case 1", async t => {
+      await assert.rejects(r.db.prepare("INSERT INTO oa_sessions(id,token_hash,operator_id,operator_version,kind,created_at,expires_at) VALUES('x','y','owner',1,'bogus',1,2)").run(), /CHECK/);
+    }],
+    ["session constraint inputs: case 2", async t => {
+      await assert.rejects(r.db.prepare("INSERT INTO oa_sessions(id,token_hash,operator_id,operator_version,kind,created_at,expires_at) VALUES('x',?,'owner',1,'native',1,2)").bind(row.token_hash).run(), /UNIQUE/);
+    }],
+    ["session constraint inputs: case 3", async t => {
+      await assert.rejects(r.db.prepare("INSERT INTO oa_sessions(id,token_hash,operator_id,operator_version,kind,source_token_id,created_at,expires_at) VALUES('x','y','owner',1,'native','t-magic',1,2)").run(), /UNIQUE/);
+    }],
+    ["session constraint inputs: case 4", async t => {
+      await assert.rejects(r.db.prepare("INSERT INTO oa_sessions(id,token_hash,operator_id,operator_version,kind,created_at,expires_at) VALUES('x','y','nobody',1,'native',1,2)").run(), /FOREIGN KEY/);
+    }]
+  ]);
     // The upgraded store admits a real dev session behind the key gate.
     const entered = await r.call('/auth/dev/enter?as=owner', { key: DEV_KEY });
     assert.equal(entered.status, 303);
     assert.equal((await r.db.prepare("SELECT count(*) AS n FROM oa_sessions WHERE kind='dev'").first()).n, 1);
     assert.equal((await r.call('/auth/session', { cookie: cookies(entered) })).status, 200);
   } finally { await r.close(); }
+
+  }]]);
 
   }]]);
 });

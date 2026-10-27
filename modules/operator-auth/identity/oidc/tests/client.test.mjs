@@ -39,11 +39,23 @@ foldedCases.push(['parallel callback claims once and maintains independent brows
 }]);
 foldedCases.push(['wrong/missing/duplicate binding, duplicate state, swapped state cannot consume a valid login', async t => {
   const r = await fixture(t); await r.bootstrap(); const f = await r.flow(); const other = await r.flow();
-  await denied(await r.finish(f, { cookie: undefined }));
-  await denied(await r.finish(f, { cookie: other.cookie }));
-  await denied(await r.finish(f, { cookie: `${f.cookie}; ${f.cookie}` }));
-  await denied(await r.finish({ ...f, path: f.path + `&state=${f.state}` }));
-  await denied(await r.finish({ ...f, path: f.path + `&code=${f.code}` }));
+  await runCases(t, [
+    ["callback binding inputs: case 1", async t => {
+      await denied(await r.finish(f, { cookie: undefined }));
+    }],
+    ["callback binding inputs: case 2", async t => {
+      await denied(await r.finish(f, { cookie: other.cookie }));
+    }],
+    ["callback binding inputs: case 3", async t => {
+      await denied(await r.finish(f, { cookie: `${f.cookie}; ${f.cookie}` }));
+    }],
+    ["callback binding inputs: case 4", async t => {
+      await denied(await r.finish({ ...f, path: f.path + `&state=${f.state}` }));
+    }],
+    ["callback binding inputs: case 5", async t => {
+      await denied(await r.finish({ ...f, path: f.path + `&code=${f.code}` }));
+    }]
+  ]);
   assert.equal((await r.finish(f)).status, 303);
 }]);
 foldedCases.push(['returnTo is saved and cannot be overwritten by callback', async t => {
@@ -150,8 +162,14 @@ foldedCases.push(['start requires exact Origin, host, POST; callback exact route
   await denied(await r.call('/auth/oidc/unknown/start', { method: 'POST', body: {} }), 404);
 }],
 ['callback method and host refusals preserve one-use completion', async t => {
-  const f = await r.flow(); await denied(await r.finish(f, { method: 'HEAD' }), 405);
-  await denied(await r.finish(f, { headers: { Host: 'attacker.example' } }), 403);
+  const f = await r.flow(); await runCases(t, [
+    ["callback route inputs: case 1", async t => {
+      await denied(await r.finish(f, { method: 'HEAD' }), 405);
+    }],
+    ["callback route inputs: case 2", async t => {
+      await denied(await r.finish(f, { headers: { Host: 'attacker.example' } }), 403);
+    }]
+  ]);
   assert.equal((await r.finish(f)).status, 303);
 }]
   ]);
@@ -167,8 +185,14 @@ foldedCases.push(['discovery and requests enforce trust, size, redirects, timeou
 }]);
 foldedCases.push(['rate limiting is durable and request bodies bounded', async t => {
   const r = await fixture(t, undefined, { identityStartLimit: 1 }); assert.equal((await r.begin()).status, 303); r.restart();
-  await denied(await r.begin(), 429);
-  await denied(await r.call('/auth/oidc/auth/start', { method: 'POST', body: 'x'.repeat(4097) }), 413);
+  await runCases(t, [
+    ["start refusal inputs: case 1", async t => {
+      await denied(await r.begin(), 429);
+    }],
+    ["start refusal inputs: case 2", async t => {
+      await denied(await r.call('/auth/oidc/auth/start', { method: 'POST', body: 'x'.repeat(4097) }), 413);
+    }]
+  ]);
 }]);
 foldedCases.push(['providers are pinned to their presets: only HTTPS issuers, tenant issuers, preset algorithms and methods, no GitHub', async t => {
   const r = await fixture(t);
@@ -178,8 +202,14 @@ foldedCases.push(['providers are pinned to their presets: only HTTPS issuers, te
     { id: 'Bad Id' }, { privateKey: { ...clientKey.ES256.private, kid: undefined } }, { minimumVersion: '0.9.0' }, { preset: 'microsoft', tenant: 'common', issuer: undefined }, { preset: 'google', issuer: 'https://evil.example' }], (invalid, rowIndex) => [`${t.name}: invalid row ${rowIndex + 1}`, async t => {
     assert.throws(() => createOperatorAuth({ db: r.db, clientIp: () => '192.0.2.1', config: { ...base, providers: [{ ...good, ...invalid }] } }).providers, e => e.code === 'oidc_invalid_configuration', JSON.stringify(invalid));
 }]));
-  assert.throws(() => createOperatorAuth({ db: r.db, clientIp: () => '192.0.2.1', config: { ...base, OIDC_TRANSACTION_SECRET: undefined, providers: [good] } }), e => e.code === 'invalid_configuration');
-  assert.throws(() => createOperatorAuth({ db: r.db, clientIp: () => '192.0.2.1', config: { ...base, providers: [good, good] } }), e => e.code === 'oidc_invalid_configuration');
+  await runCases(t, [
+    ["provider configuration inputs: case 1", async t => {
+      assert.throws(() => createOperatorAuth({ db: r.db, clientIp: () => '192.0.2.1', config: { ...base, OIDC_TRANSACTION_SECRET: undefined, providers: [good] } }), e => e.code === 'invalid_configuration');
+    }],
+    ["provider configuration inputs: case 2", async t => {
+      assert.throws(() => createOperatorAuth({ db: r.db, clientIp: () => '192.0.2.1', config: { ...base, providers: [good, good] } }), e => e.code === 'oidc_invalid_configuration');
+    }]
+  ]);
   const local = createOperatorAuth({ db: r.db, clientIp: () => '192.0.2.1', fetch: r.provider.fetch, config: { ...base, local: true, origin: 'http://localhost:4321', providers: [good] } });
   const headers = { Host: 'localhost:4321', Origin: 'http://localhost:4321', 'Content-Type': 'application/json' };
   const ok = await local.providers.begin(new Request('http://localhost:4321/auth/oidc/auth/start', { method: 'POST', headers, body: '{}' }), 'auth');

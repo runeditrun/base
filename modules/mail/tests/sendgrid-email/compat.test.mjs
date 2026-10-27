@@ -50,8 +50,14 @@ foldedCases.push(['validation failures are rejections that never echo input valu
       return true;
     });
 }]));
-  assert.throws(() => serializeSendGridMessage({ ...message(), to: [] }), SendGridSendError);
-  assert.throws(() => serializeSendGridMessage(null), SendGridSendError);
+  await runCases(t, [
+    ["compatibility refusal inputs: case 1", async t => {
+      assert.throws(() => serializeSendGridMessage({ ...message(), to: [] }), SendGridSendError);
+    }],
+    ["compatibility refusal inputs: case 2", async t => {
+      assert.throws(() => serializeSendGridMessage(null), SendGridSendError);
+    }]
+  ]);
 }]);
 foldedCases.push(['a blank or malformed API key is rejected before any request', async (t) => {
   await runCases(t, Array.from(['', '   ', 'two words', undefined], (apiKey, rowIndex) => [`${t.name}: apiKey row ${rowIndex + 1}`, async t => {

@@ -76,6 +76,7 @@ assert.deepEqual(body[field], input[field]);
 
 
 test("Cloudflare refuses unsafe requests before any transport effect", async t => {
+  await runCases(t, [['independent input groups', async t => {
   // Each row keeps its original assertions and reports its own failure name.
   await runCases(t, [
     ['direct calls validate configuration and fixed account path before transport', async (t) => {
@@ -92,11 +93,23 @@ await denied(message(), undefined, settings);
   await runCases(t, Array.from([{ customArgs: {} }, { asmGroupId: 7 }, { subscriptionTracking: false }], (field, rowIndex) => [`${t.name}: field row ${rowIndex + 1}`, async t => {
     await denied(message(field), 'unsupported_provider_setting');
 }]));
-  await denied(message({ unsubscribe: { url: 'https://example.com/unsubscribe' } }), 'unsubscribe_requires_facade');
-  await denied(message({ unsubscribe: undefined }), 'unsubscribe_requires_facade');
-  await denied(message({ attachments: [{ filename: 'a', contentType: 'text/plain', content: new Uint8Array(), contentId: 'part' }] }), 'cloudflare_unsupported_attachment_content_id');
-  await denied(message({ attachments: [{ filename: 'a', contentType: 'text/plain', content: new Uint8Array(), disposition: 'attachment', contentId: 'part' }] }), 'cloudflare_unsupported_attachment_content_id');
-  await denied(message({ unknownFeature: true }), 'invalid_message');
+  await runCases(t, [
+    ["unsupported message inputs: case 1", async t => {
+      await denied(message({ unsubscribe: { url: 'https://example.com/unsubscribe' } }), 'unsubscribe_requires_facade');
+    }],
+    ["unsupported message inputs: case 2", async t => {
+      await denied(message({ unsubscribe: undefined }), 'unsubscribe_requires_facade');
+    }],
+    ["unsupported message inputs: case 3", async t => {
+      await denied(message({ attachments: [{ filename: 'a', contentType: 'text/plain', content: new Uint8Array(), contentId: 'part' }] }), 'cloudflare_unsupported_attachment_content_id');
+    }],
+    ["unsupported message inputs: case 4", async t => {
+      await denied(message({ attachments: [{ filename: 'a', contentType: 'text/plain', content: new Uint8Array(), disposition: 'attachment', contentId: 'part' }] }), 'cloudflare_unsupported_attachment_content_id');
+    }],
+    ["unsupported message inputs: case 5", async t => {
+      await denied(message({ unknownFeature: true }), 'invalid_message');
+    }]
+  ]);
 }],
     ['header and address injection, malformed bodies and attachments cannot cause a send', async (t) => {
   await runCases(t, Array.from([
@@ -190,4 +203,6 @@ await denied(message({ headers }), 'cloudflare_invalid_unsubscribe_header');
   ]);
 }],
   ]);
+
+  }]]);
 });

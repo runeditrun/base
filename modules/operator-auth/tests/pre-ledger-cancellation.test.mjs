@@ -57,8 +57,14 @@ foldedCases.push(['post-upgrade witnessed cancellation remains guarded through r
     await r.restart();
     await session(r, cookie, original.id, 4);
     assert.equal(await marker(r, 'guarded'), null);
-    await deniedLink(t, r, oldLink);
-    await deniedLink(t, r, freshLink);
+    await runCases(t, [
+    ["accepted guarded links: case 1", async t => {
+      await deniedLink(t, r, oldLink);
+    }],
+    ["accepted guarded links: case 2", async t => {
+      await deniedLink(t, r, freshLink);
+    }]
+  ]);
   } finally { await r.close(); }
 }]);
 foldedCases.push(['owner deliberate removal and reinvitation replaces an unrecorded legacy cancellation', async t => {
@@ -102,8 +108,14 @@ foldedCases.push(['owner deliberate removal and reinvitation replaces an unrecor
     const cookie = await accept(t, r, freshLink, replacement.id, 2, returnTo);
     await r.restart();
     await session(r, cookie, replacement.id, 2);
-    await deniedLink(t, r, credentials.cancelledLink);
-    await deniedLink(t, r, freshLink);
+    await runCases(t, [
+    ["accepted replacement links: case 1", async t => {
+      await deniedLink(t, r, credentials.cancelledLink);
+    }],
+    ["accepted replacement links: case 2", async t => {
+      await deniedLink(t, r, freshLink);
+    }]
+  ]);
     await session(r, owner, 'owner', 1);
   } finally { await r.close(); }
 }]);

@@ -18,28 +18,56 @@ async function refuses(input, expectedCode, settings = config) {
 
 test("Resend refuses unsafe or unsupported requests before transport", async t => {
   const foldedCases = [];
-foldedCases.push(['standalone validation rejects missing credentials, mismatched providers and endpoint overrides', async () => {
-  await refuses(message(), 'api_key_required', { provider: 'resend', mode: 'production' });
-  await refuses(message(), 'invalid_provider', { ...config, provider: 'sendgrid' });
-  await refuses(message(), 'invalid_config', { ...config, endpoint: 'https://untrusted.example' });
-  await refuses(message(), 'invalid_mode', { ...config, mode: undefined });
-  await refuses(message(), 'invalid_api_key', { ...config, apiKey: 'SENSITIVE\r\nInjected: x' });
+foldedCases.push(['standalone validation rejects missing credentials, mismatched providers and endpoint overrides', async (t) => {
+  await runCases(t, [
+    ["Resend configuration inputs: case 1", async t => {
+      await refuses(message(), 'api_key_required', { provider: 'resend', mode: 'production' });
+    }],
+    ["Resend configuration inputs: case 2", async t => {
+      await refuses(message(), 'invalid_provider', { ...config, provider: 'sendgrid' });
+    }],
+    ["Resend configuration inputs: case 3", async t => {
+      await refuses(message(), 'invalid_config', { ...config, endpoint: 'https://untrusted.example' });
+    }],
+    ["Resend configuration inputs: case 4", async t => {
+      await refuses(message(), 'invalid_mode', { ...config, mode: undefined });
+    }],
+    ["Resend configuration inputs: case 5", async t => {
+      await refuses(message(), 'invalid_api_key', { ...config, apiKey: 'SENSITIVE\r\nInjected: x' });
+    }]
+  ]);
 }]);
 foldedCases.push(['unsupported requests cannot silently disappear before sending', async (t) => {
   await runCases(t, Array.from([{ customArgs: {} }, { asmGroupId: 1 }, { subscriptionTracking: false }], (field, rowIndex) => [`${t.name}: field row ${rowIndex + 1}`, async t => {
 await refuses({ ...message(), ...field }, 'unsupported_provider_setting');
 }]));
-  await refuses({ ...message(), unsubscribe: { url: 'https://example.net/leave' } }, 'unsubscribe_requires_facade');
-  await refuses({ ...message(), scheduledAt: '2030-01-01' }, 'invalid_message');
-  await refuses({ ...message(), attachments: [{ filename: 'x', contentType: 'text/plain', content: new Uint8Array(), contentId: 'x', disposition: 'attachment' }] }, 'unsupported_resend_attachment_disposition');
-  await refuses({ ...message(), attachments: [{ filename: 'x', contentType: 'text/plain', content: new Uint8Array(), disposition: 'inline' }] }, 'inline_content_id_required');
+  await runCases(t, [
+    ["Resend message inputs: case 1", async t => {
+      await refuses({ ...message(), unsubscribe: { url: 'https://example.net/leave' } }, 'unsubscribe_requires_facade');
+    }],
+    ["Resend message inputs: case 2", async t => {
+      await refuses({ ...message(), scheduledAt: '2030-01-01' }, 'invalid_message');
+    }],
+    ["Resend message inputs: case 3", async t => {
+      await refuses({ ...message(), attachments: [{ filename: 'x', contentType: 'text/plain', content: new Uint8Array(), contentId: 'x', disposition: 'attachment' }] }, 'unsupported_resend_attachment_disposition');
+    }],
+    ["Resend message inputs: case 4", async t => {
+      await refuses({ ...message(), attachments: [{ filename: 'x', contentType: 'text/plain', content: new Uint8Array(), disposition: 'inline' }] }, 'inline_content_id_required');
+    }]
+  ]);
 }]);
 foldedCases.push(['invalid idempotency keys and recipient limits fail before transport', async (t) => {
   await runCases(t, Array.from(['x'.repeat(257), '界', ' padded', 'padded ', 'bad\nkey', ''], (deliveryId, rowIndex) => [`${t.name}: deliveryId row ${rowIndex + 1}`, async t => {
 await refuses({ ...message(), deliveryId });
 }]));
-  await refuses({ ...message(), to: Array.from({ length: 51 }, (_, i) => `r${i}@example.net`) }, 'resend_recipient_limit');
-  await refuses({ ...message(), to: [] }, 'invalid_recipients');
+  await runCases(t, [
+    ["Resend recipient inputs: case 1", async t => {
+      await refuses({ ...message(), to: Array.from({ length: 51 }, (_, i) => `r${i}@example.net`) }, 'resend_recipient_limit');
+    }],
+    ["Resend recipient inputs: case 2", async t => {
+      await refuses({ ...message(), to: [] }, 'invalid_recipients');
+    }]
+  ]);
 }]);
 foldedCases.push(['injection, reserved headers and malformed attachment bytes fail closed', async (t) => {
   await runCases(t, Array.from(['from', 'replyTo'], (field, rowIndex) => [`${t.name}: field row ${rowIndex + 1}`, async t => {
@@ -54,8 +82,14 @@ await refuses({ ...message(), [field]: ['SENSITIVE@example.net\nInjected:x'] });
   ], (headers, rowIndex) => [`${t.name}: headers row ${rowIndex + 1}`, async t => {
 await refuses({ ...message(), headers });
 }]));
-  await refuses({ ...message(), subject: 'SENSITIVE\r\nInjected:x' });
-  await refuses({ ...message(), text: '', html: undefined }, 'body_required');
+  await runCases(t, [
+    ["Resend content inputs: case 1", async t => {
+      await refuses({ ...message(), subject: 'SENSITIVE\r\nInjected:x' });
+    }],
+    ["Resend content inputs: case 2", async t => {
+      await refuses({ ...message(), text: '', html: undefined }, 'body_required');
+    }]
+  ]);
   await runCases(t, Array.from([{ content: 'Zm9v' }, { contentType: 'text/plain\r\nInjected:x' }, { filename: 'SENSITIVE\nname' }, { path: 'https://untrusted.example' }, { disposition: 'inline', contentId: 'bad\nid' }], (extra, rowIndex) => [`${t.name}: extra row ${rowIndex + 1}`, async t => {
     await refuses({ ...message(), attachments: [{ filename: 'x.txt', contentType: 'text/plain', content: Uint8Array.of(1), ...extra }] });
 }]));

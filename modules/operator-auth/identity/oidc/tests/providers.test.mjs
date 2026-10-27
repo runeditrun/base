@@ -27,10 +27,20 @@ test("preset OIDC callbacks bind issuer, audience, algorithm, key and one-time s
   const foldedCases = [];
 foldedCases.push(['each preset signs in on its happy path, and linking pins issuer, JWKS URI, client id and the preset algorithm', async t => {
   const r = await runtime(t); const owner = await r.bootstrap(); await r.operator('member@example.com');
-  await signedIn(r, await r.login('auth'), 'owner@example.com');
-  await signedIn(r, await r.login('google'), 'owner@example.com');
-  await signedIn(r, await r.login('microsoft'), 'member@example.com');
-  await signedIn(r, await r.login('okta'), 'member@example.com');
+  await runCases(t, [
+    ["provider login inputs: case 1", async t => {
+      await signedIn(r, await r.login('auth'), 'owner@example.com');
+    }],
+    ["provider login inputs: case 2", async t => {
+      await signedIn(r, await r.login('google'), 'owner@example.com');
+    }],
+    ["provider login inputs: case 3", async t => {
+      await signedIn(r, await r.login('microsoft'), 'member@example.com');
+    }],
+    ["provider login inputs: case 4", async t => {
+      await signedIn(r, await r.login('okta'), 'member@example.com');
+    }]
+  ]);
   const pins = Object.fromEntries((await json(await r.call('/auth/providers', { cookie: owner }))).body.map(p => [p.id, p]));
   assert.deepEqual(Object.keys(pins).sort(), ['auth', 'google', 'microsoft', 'okta']);
   assert.deepEqual([pins.auth.issuer, pins.auth.jwks, pins.auth.clientId, pins.auth.algorithms, pins.auth.tokenAuthMethod, pins.auth.interfaceVersion],
@@ -49,9 +59,17 @@ foldedCases.push(['mix-up: an authorization response from provider A replayed at
   const r = await runtime(t); await r.bootstrap();
   const a = await r.flow('auth'); const b = await r.flow('okta');
   // A's code and state at B's callback, with B's browser binding and then with A's.
-  await refused(r, await r.call(`/auth/oidc/okta/callback?state=${a.state}&code=${a.code}`, { cookie: b.cookie }), 400, 'oidc_invalid_correlation');
-  await refused(r, await r.call(`/auth/oidc/okta/callback?state=${a.state}&code=${a.code}`, { cookie: a.cookie }), 400, 'oidc_invalid_correlation');
-  await refused(r, await r.call(`/auth/oidc/okta/callback?state=${a.state}&code=${a.code}&iss=${encodeURIComponent('https://id.example')}`, { cookie: a.cookie }), 400);
+  await runCases(t, [
+    ["callback provider inputs: case 1", async t => {
+      await refused(r, await r.call(`/auth/oidc/okta/callback?state=${a.state}&code=${a.code}`, { cookie: b.cookie }), 400, 'oidc_invalid_correlation');
+    }],
+    ["callback provider inputs: case 2", async t => {
+      await refused(r, await r.call(`/auth/oidc/okta/callback?state=${a.state}&code=${a.code}`, { cookie: a.cookie }), 400, 'oidc_invalid_correlation');
+    }],
+    ["callback provider inputs: case 3", async t => {
+      await refused(r, await r.call(`/auth/oidc/okta/callback?state=${a.state}&code=${a.code}&iss=${encodeURIComponent('https://id.example')}`, { cookie: a.cookie }), 400);
+    }]
+  ]);
   assert.equal(await sessions(r), 0);
   // No code reached B's token endpoint; A's transaction is untouched.
   assert.equal((await r.requests('https://corp.okta.example')).filter(x => x.uri.endsWith('/token')).length, 0);
@@ -62,9 +80,17 @@ foldedCases.push(['mix-up: an authorization response from provider A replayed at
 }]);
 foldedCases.push(['a wrong ID-token iss or aud is refused', async t => {
   const r = await runtime(t); await r.bootstrap();
-  await refused(r, await r.login('auth', { iss: 'https://corp.okta.example' }), 400, 'oidc_issuer_mismatch');
-  await refused(r, await r.login('auth', { aud: 'app-at-okta' }), 400, 'oidc_audience_mismatch');
-  await refused(r, await r.login('google', { aud: ['app-at-google', 'someone-else'], azp: 'app-at-google' }), 400, 'oidc_audience_mismatch');
+  await runCases(t, [
+    ["issuer and audience inputs: case 1", async t => {
+      await refused(r, await r.login('auth', { iss: 'https://corp.okta.example' }), 400, 'oidc_issuer_mismatch');
+    }],
+    ["issuer and audience inputs: case 2", async t => {
+      await refused(r, await r.login('auth', { aud: 'app-at-okta' }), 400, 'oidc_audience_mismatch');
+    }],
+    ["issuer and audience inputs: case 3", async t => {
+      await refused(r, await r.login('google', { aud: ['app-at-google', 'someone-else'], azp: 'app-at-google' }), 400, 'oidc_audience_mismatch');
+    }]
+  ]);
   assert.equal(await sessions(r), 0);
 }]);
 foldedCases.push(['alg none, HS256 and an algorithm the link did not pin are refused before any key is used', async t => {
@@ -136,12 +162,23 @@ foldedCases.push(['production refuses amr dev and emails under .localhost, .test
 foldedCases.push(['email trust: unverified, stale (31 days) and unproven emails are refused; a 29-day proof and Google with hd or @gmail.com count', async t => {
   const r = await runtime(t); await r.bootstrap(); await r.operator('member@example.com'); await r.operator(gmail);
   const now = Math.floor(Date.now() / 1000);
-  await refused(r, await r.login('auth', { sub: 'u1', email: 'member@example.com', email_verified: false }), 403);
-  await refused(r, await r.login('auth', { sub: 'u2', email: 'member@example.com', email_verified_at: now - 31 * day }), 403);
-  await refused(r, await r.login('auth', { sub: 'u3', email: 'member@example.com', email_verified_at: null }), 403);
-  // Google without hd for a non-Gmail address, and Okta's verified email without an association, prove nothing.
-  await refused(r, await r.login('google', { sub: 'g1', email: 'member@example.com', hd: null }), 403);
-  await refused(r, await r.login('okta', { sub: 'unmapped', email: 'member@example.com', email_verified: true }), 403);
+  await runCases(t, [
+    ["unproven identity inputs: case 1", async t => {
+      await refused(r, await r.login('auth', { sub: 'u1', email: 'member@example.com', email_verified: false }), 403);
+    }],
+    ["unproven identity inputs: case 2", async t => {
+      await refused(r, await r.login('auth', { sub: 'u2', email: 'member@example.com', email_verified_at: now - 31 * day }), 403);
+    }],
+    ["unproven identity inputs: case 3", async t => {
+      await refused(r, await r.login('auth', { sub: 'u3', email: 'member@example.com', email_verified_at: null }), 403);
+    }],
+    ["unproven identity inputs: case 4", async t => {
+      await refused(r, await r.login('google', { sub: 'g1', email: 'member@example.com', hd: null }), 403);
+    }],
+    ["unproven identity inputs: case 5", async t => {
+      await refused(r, await r.login('okta', { sub: 'unmapped', email: 'member@example.com', email_verified: true }), 403);
+    }]
+  ]);
   assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM oa_external_identities').first()).n, 0, 'nothing unproven was bound');
   await signedIn(r, await r.login('auth', { sub: 'u4', email: 'member@example.com', email_verified_at: now - 29 * day }), 'member@example.com');
   await signedIn(r, await r.login('google', { sub: 'g2', email: gmail, hd: null }), gmail);
@@ -155,9 +192,14 @@ foldedCases.push(['bindings on (iss, sub) are never silently rebound; a proven e
   assert.equal((await r.call('/test/private', { cookie: passwordCookie })).status, 401, 'the earlier password session ended');
   assert.equal((await json(await r.call('/test/password', { method: 'POST', input: { operatorId: 'member' } }))).body.error, 'password_revoked');
   // Another subject at the same issuer presenting the same proven email cannot join.
-  await refused(r, await r.login('auth', { sub: 'member-b', email: 'member@example.com' }), 403);
-  // The bound subject presenting someone else's email still cannot move.
-  await refused(r, await r.login('auth', { sub: 'member-a', email: 'owner@example.com' }), 403);
+  await runCases(t, [
+    ["binding conflict inputs: case 1", async t => {
+      await refused(r, await r.login('auth', { sub: 'member-b', email: 'member@example.com' }), 403);
+    }],
+    ["binding conflict inputs: case 2", async t => {
+      await refused(r, await r.login('auth', { sub: 'member-a', email: 'owner@example.com' }), 403);
+    }]
+  ]);
   // Another issuer with a proven email binds its own principal.
   await signedIn(r, await r.login('google', { sub: 'google-member', email: 'member@example.com' }), 'member@example.com');
   // Concurrent first sign-ins at one issuer bind exactly one principal.
@@ -187,9 +229,17 @@ foldedCases.push(['domain rule: a required provider refuses every other route fo
   assert.deepEqual(asked, { status: 202, body: { status: 'accepted', requiredProvider: 'okta' } });
   assert.equal((await r.mails()).length, mails);
   // Another provider, and the password seam, are refused; the required provider admits.
-  await refused(r, await r.login('auth', { sub: 'member-auth', email: 'member@example.com' }), 403, 'oidc_provider_required');
-  await refused(r, await r.login('microsoft'), 403, 'oidc_provider_required');
-  assert.equal((await json(await r.call('/test/password', { method: 'POST', input: { operatorId: 'member' } }))).body.error, 'provider_required');
+  await runCases(t, [
+    ["required provider inputs: case 1", async t => {
+      await refused(r, await r.login('auth', { sub: 'member-auth', email: 'member@example.com' }), 403, 'oidc_provider_required');
+    }],
+    ["required provider inputs: case 2", async t => {
+      await refused(r, await r.login('microsoft'), 403, 'oidc_provider_required');
+    }],
+    ["required provider inputs: case 3", async t => {
+      assert.equal((await json(await r.call('/test/password', { method: 'POST', input: { operatorId: 'member' } }))).body.error, 'provider_required');
+    }]
+  ]);
   await signedIn(r, await r.login('okta'), 'member@example.com');
   // The owner, in the same domain, keeps every route.
   assert.equal((await r.call('/auth/magic-link', { method: 'POST', input: { email: 'owner@example.com' } })).status, 202);
@@ -215,14 +265,26 @@ foldedCases.push(['bound subjects still need current email proof; explicit and l
     await refused(r, await r.login('auth', { ...claims, ...changed }), 403);
     assert.equal(await sessions(r), n, 'no session was created');
 }]));
-  await signedIn(r, await r.login('auth', { ...claims, email_verified_at: now - 29 * day }), claims.email);
-  await refused(r, await r.login('auth', { ...claims, email: 'owner@example.com' }), 403);
+  await runCases(t, [
+    ["bound identity freshness inputs: case 1", async t => {
+      await signedIn(r, await r.login('auth', { ...claims, email_verified_at: now - 29 * day }), claims.email);
+    }],
+    ["bound identity freshness inputs: case 2", async t => {
+      await refused(r, await r.login('auth', { ...claims, email: 'owner@example.com' }), 403);
+    }]
+  ]);
   for (let i = 0; i < 2; i++) {
     await signedIn(r, await r.login('auth', { sub: 'mapped', email: 'owner@example.com', email_verified: false, email_verified_at: stale }), 'mapped@example.com');
     await signedIn(r, await r.call('/test/association', { method: 'POST', input: { issuer: 'https://legacy.example', subject: 'legacy', emailVerified: false, emailVerifiedAt: stale * 1000 } }), 'legacy@example.com');
   }
-  await refused(r, await r.login('auth', { sub: 'mapped', email_verified: true, email_verified_at: stale }), 403);
-  await refused(r, await r.call('/test/association', { method: 'POST', input: { issuer: 'https://legacy.example', subject: 'legacy', emailVerified: true, emailVerifiedAt: stale * 1000 } }), 403);
+  await runCases(t, [
+    ["stale identity inputs: case 1", async t => {
+      await refused(r, await r.login('auth', { sub: 'mapped', email_verified: true, email_verified_at: stale }), 403);
+    }],
+    ["stale identity inputs: case 2", async t => {
+      await refused(r, await r.call('/test/association', { method: 'POST', input: { issuer: 'https://legacy.example', subject: 'legacy', emailVerified: true, emailVerifiedAt: stale * 1000 } }), 403);
+    }]
+  ]);
   // A changed configured association cannot move an existing binding.
   await r.configure('auth', { subjectEmails: { mapped: 'owner@example.com' } });
   await refused(r, await r.login('auth', { sub: 'mapped' }), 403);
@@ -297,8 +359,14 @@ foldedCases.push(['step-up is demanded for each listed action and is not satisfi
   // The proof completes only in the session that asked for it.
   assert.equal((await r.call('/auth/step-up', { method: 'POST', input: { action: 'export' }, cookie: provider })).status, 202);
   const token = await r.link();
-  await refused(r, await r.call('/auth/confirm', { method: 'POST', input: { token }, cookie: setupSession }), 400);
-  await refused(r, await r.call('/auth/confirm', { method: 'POST', input: { token } }), 400);
+  await runCases(t, [
+    ["step-up session inputs: case 1", async t => {
+      await refused(r, await r.call('/auth/confirm', { method: 'POST', input: { token }, cookie: setupSession }), 400);
+    }],
+    ["step-up session inputs: case 2", async t => {
+      await refused(r, await r.call('/auth/confirm', { method: 'POST', input: { token } }), 400);
+    }]
+  ]);
   const confirmed = await r.call('/auth/confirm', { method: 'POST', input: { token }, cookie: provider });
   assert.equal(confirmed.status, 303); assert.equal(r.session(confirmed), undefined, 'a step-up proof issues no new session');
   assert.deepEqual(await outcomes(setupSession), guarded.map(() => 403), 'another session of the same owner is still unproven');
@@ -344,8 +412,14 @@ assert.equal((await invite(`${role}@example.com`, role)).status, 202);
   const token = await r.link();
   await r.clock(11 * 60000);
   const mails = (await r.mails()).length;
-  await refused(r, await invite('new-owner@example.com'), 403, 'step_up_required');
-  await refused(r, await invite('other-owner@example.com'), 403, 'step_up_required');
+  await runCases(t, [
+    ["expired owner invitation inputs: case 1", async t => {
+      await refused(r, await invite('new-owner@example.com'), 403, 'step_up_required');
+    }],
+    ["expired owner invitation inputs: case 2", async t => {
+      await refused(r, await invite('other-owner@example.com'), 403, 'step_up_required');
+    }]
+  ]);
   assert.equal((await r.mails()).length, mails, 'refusal sent no invitation');
   assert.equal(await sessions(r), n, 'invitation and proof do not mint sessions');
   // The invitation issued with local proof can still complete and become an owner.

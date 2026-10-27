@@ -69,9 +69,17 @@ await rejected(r, `/auth/confirm?${query}`, { method }, token);
     await runCases(t, Array.from(bodies(token), (input, rowIndex) => [`${t.name}: input row ${rowIndex + 1}`, async t => {
 await rejected(r, '/auth/confirm', input, token);
 }]));
-    await rejected(r, '/auth/confirm?%74oken=invalid', post({ token }), token);
-    await rejected(r, `/auth/confirm?token=${token}`, post({ token: 'invalid' }), token);
-    await rejected(r, '/auth/confirm', json(`{"token":"${token}","metadata":{"x":1,"\\u0078":2}}`), token);
+    await runCases(t, [
+    ["ambiguous confirmation inputs: case 1", async t => {
+      await rejected(r, '/auth/confirm?%74oken=invalid', post({ token }), token);
+    }],
+    ["ambiguous confirmation inputs: case 2", async t => {
+      await rejected(r, `/auth/confirm?token=${token}`, post({ token: 'invalid' }), token);
+    }],
+    ["ambiguous confirmation inputs: case 3", async t => {
+      await rejected(r, '/auth/confirm', json(`{"token":"${token}","metadata":{"x":1,"\\u0078":2}}`), token);
+    }]
+  ]);
     const before = await snapshot(r);
     const preview = await r.call(`/auth/confirm?%74oken=${token}`);
     assert.equal(preview.status, 200);
