@@ -39,6 +39,22 @@ test('health that settles from 404 and 503 inside the window passes, with bounde
   assert.equal(calls,5);
 });
 
+test('standalone health verification recovers from each transient HTTP status', async t => {
+  for (const status of [404,503]) {
+    const {args,state,clock,sleeps} = setup(t);
+    const receipt = await deploy(args);
+    let calls = 0;
+    const fetch = (url,init) => {
+      if (new URL(url).hostname.endsWith('.workers.dev')) calls++;
+      return args.fetch(url,init);
+    };
+    sequence(state,[status]);
+    assert.equal((await verifyHealth({...args,receipt,fetch,...clock})).ok,true, `standalone ${status} recovers`);
+    assert.equal(calls,2, `standalone ${status} retries once`);
+    assert.deepEqual(sleeps,[2000], `standalone ${status} waits within the window`);
+  }
+});
+
 test('health that never settles fails with the deploy-kit code at the deadline', async t => {
   const {args,state,clock,sleeps} = setup(t);
   const receipt = await deploy(args);

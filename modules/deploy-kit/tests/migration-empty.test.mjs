@@ -1,3 +1,4 @@
+import { runCase } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateMigrations, migrate } from '../migrations.mjs';
@@ -6,6 +7,9 @@ import { defaultStagePlan } from '../default-stage.mjs';
 import { cloudflare } from '../provider.mjs';
 import { hash } from '../validation.mjs';
 import { providerFixture } from './provider-fixture.mjs';
+
+const emptyCaseRows = [];
+const emptyCase = (name, run) => emptyCaseRows.push({name,run});
 
 const migration = (sql, name = '0002_empty.sql') => ({ name, sql, sha256: hash(sql) });
 const schema = migration('CREATE TABLE retained(value TEXT);', '0001_schema.sql');
@@ -20,7 +24,7 @@ const cases = [
 ];
 
 for (const [label, sql] of cases) {
-  test(`deployment rejects ${label} before any provider request or migration claim`, async t => {
+  emptyCase(`deployment rejects ${label} before any provider request or migration claim`, async t => {
     const fixture = providerFixture();
     t.after(() => fixture.close());
     const api = cloudflare(fixture);
@@ -47,3 +51,7 @@ for (const [label, sql] of cases) {
     assert.deepEqual(fixture.state.databases, []);
   });
 }
+
+test('comment-only migrations are refused before any provider request or claim', async () => {
+  for (const {name,run} of emptyCaseRows) await runCase(name,run);
+});
