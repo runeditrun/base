@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.ge628089b",
+  "cliVersion": "0.2.83-dev.gaaed0a7b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -54,6 +54,10 @@
     "busy.mjs": {
       "source": "onboarding/busy.mjs",
       "sha256": "9934cb0d2cd006f52e4fd67a4f6a8d1df32069815f70b9fcb9fc0698dbf92ea9"
+    },
+    "case-row.ts": {
+      "source": "onboarding/case-row.ts",
+      "sha256": "5c0f36cd25cc0810b5d6be29d5c7fae85ba17079462e94fdd626dff2520b09d4"
     },
     "command-custody.mjs": {
       "source": "onboarding/command-custody.mjs",
