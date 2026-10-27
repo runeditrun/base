@@ -5,7 +5,7 @@ const literal = node => node?.type === 'StringLiteral' ? node.value :
 const unwrap = node => ['TSAsExpression', 'TSTypeAssertion', 'TSNonNullExpression', 'TSInstantiationExpression', 'ParenthesizedExpression'].includes(node?.type) ? unwrap(node.expression) : node;
 const property = node => node?.computed ? literal(node.property) : node?.property?.name;
 const member = node => ['MemberExpression', 'OptionalMemberExpression'].includes(node?.type);
-const call = node => ['CallExpression', 'OptionalCallExpression'].includes(node?.type);
+const call = node => ['CallExpression', 'OptionalCallExpression', 'NewExpression'].includes(node?.type);
 function* nodes(root) {
   const pending = [root];
   while (pending.length) {
@@ -42,11 +42,11 @@ export function dependencies(source, filename = 'module.mjs') {
   }
   const requireFunction = node => {
     node = unwrap(node);
-    return identifier(node, loaders) || call(node) && factory(node.callee) || member(node) && property(node) === 'require' && node.object?.type === 'Identifier' && node.object.name === 'module';
+    return identifier(node, loaders) || call(node) && (factory(node.callee) || member(node.callee) && property(node.callee) === 'bind' && requireFunction(node.callee.object)) || member(node) && property(node) === 'require' && node.object?.type === 'Identifier' && node.object.name === 'module';
   };
   const factory = node => {
     node = unwrap(node);
-    return identifier(node, factories) || member(node) && property(node) === 'createRequire' && (identifier(node.object, moduleNamespaces) || moduleRequest(node.object));
+    return identifier(node, factories) || call(node) && member(node.callee) && property(node.callee) === 'bind' && factory(node.callee.object) || member(node) && property(node) === 'createRequire' && (identifier(node.object, moduleNamespaces) || moduleRequest(node.object));
   };
   // Static aliases reach a fixed point, independently of declaration order.
   let changed;
@@ -80,6 +80,10 @@ export function dependencies(source, filename = 'module.mjs') {
     else if (node.type === 'ImportExpression') add(node.source, 'import');
     else if (call(node)) {
       let callee = unwrap(node.callee), argument = node.arguments[0];
+      if (member(callee) && property(callee) === 'bind' && requireFunction(callee.object)) { add(node.arguments[1], 'require'); continue; }
+      if (member(callee) && callee.object?.type === 'Identifier' && callee.object.name === 'Reflect' && ['apply', 'construct'].includes(property(callee)) && requireFunction(node.arguments[0])) {
+        add(node.arguments[property(callee) === 'apply' ? 2 : 1]?.elements?.[0], 'require'); continue;
+      }
       if (callee?.type === 'Import') { add(argument, 'import'); continue; }
       if (member(callee) && ['call', 'apply'].includes(property(callee))) {
         argument = property(callee) === 'apply' ? node.arguments[1]?.elements?.[0] : node.arguments[1];
