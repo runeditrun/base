@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83",
+  "cliVersion": "0.2.83-dev.g605e9186",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -403,7 +403,7 @@
     },
     "cli/bounded.mjs": {
       "source": "cli/bounded.mjs",
-      "sha256": "17b4fb00aef63e77b5fb8c8efb3b103682daafd7aeaaa2b00c8781d28da4200a"
+      "sha256": "21bb69fafd2531e185c62fd88609218b12a591eed9c1bce0f31f3ed740bdee21"
     },
     "cli/browser-runtime.mjs": {
       "source": "cli/browser-runtime.mjs",
@@ -927,7 +927,7 @@
     },
     "cli/output.mjs": {
       "source": "cli/output.mjs",
-      "sha256": "484697e1c08b24ffa732410bdda42ba421d0aad923d10b2fd0ab3d4e1aca36bd"
+      "sha256": "4f8fdb7021765ab59fb95d2f21caea0484996f22d985dda4b5ab6a6ba4e2ef3e"
     },
     "cli/package-calls.mjs": {
       "source": "cli/package-calls.mjs",

@@ -1,4 +1,5 @@
 import { plainErrors } from './fixtures/plain-errors.mjs';
+import { printer } from '../global/launch/render.mjs';
 import { humanError } from './human-error.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,6 +14,10 @@ const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
 
 test('plain packed CLI failures preserve machine diagnostics and large JSON reports drain at both CLI entries', async t => {
  await plainErrors(t, base);
+ const stderr = [];
+ const capture = t.mock.method(process.stderr, 'write', text => { stderr.push(text); return true; });
+ try { printer({json:false}).failure({exitCode:1,event:{code:'launch_failed'},message:'TypeError: Synthetic failure\n    at synthetic-base-1:1'}); } finally { capture.mock.restore(); }
+ assert.equal(stderr.join(''), 'Synthetic failure\nRun the same command with --json for details.\n');
  assert.equal(humanError({ code: 'launch_failed', message: 'TypeError: Synthetic failure\n    at synthetic-base-1:1' }), 'Synthetic failure\nRun the same command with --json for details.');
  assert.equal(humanError({ code: 'command_failed', message: 'Synthetic failure' }), 'Synthetic failure\nRun the same command with --json for details.');
  const root = await mkdtemp(join(tmpdir(), 'rer-output-'));

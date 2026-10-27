@@ -37,7 +37,7 @@ snapshots:
  await writeFile(join(root, 'scripts/rer.mjs'), `import {main} from ${source('cli/main.mjs')}; process.exitCode=await main();`);
  await writeFile(join(root, 'adapter.mjs'), `import {localInstaller} from ${source('onboarding/adapter.mjs')}; import {commandAdapter as declare} from ${source('cli/adapter.mjs')}; export const commandAdapter=declare(localInstaller({}),{portability:{import:async()=>({}),export:async()=>({})}});`);
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'synthetic-base-1', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['install', 'dev', 'import'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: [], effects: 'Synthetic diagnostic.' }])) }));
- const invoke = args => run('env', ['-i', `PATH=${process.env.PATH}`, `HOME=${home}`, 'CI=true', 'RER_NO_UPDATE_CHECK=1', 'npm_config_fetch_retries=0', process.execPath, entry, ...args, '--cwd', root], { cwd: root });
+ const invoke = (args, executable = entry) => run('env', ['-i', `PATH=${process.env.PATH}`, `HOME=${home}`, `RER_JOBS_DIR=${join(directory, 'queue')}`, 'RER_NO_UPDATE_CHECK=1', 'npm_config_fetch_retries=0', process.execPath, executable, ...args, '--cwd', root], { cwd: root });
  const human = async (args, code, expected) => {
   const result = await invoke(args);
   t.diagnostic(`${args.join(' ')}: exit ${result.code}\n${result.stdout}${result.stderr}`);
@@ -51,6 +51,12 @@ snapshots:
  assert.equal(port.code, 2);
  assert.equal(port.stdout, '');
  assert.equal(port.stderr, 'Port must be a decimal integer from 1 to 65535.\n');
+ const direct = await invoke(['dev', '--port', '99999'], join(pkg, 'bin/rer.mjs'));
+ assert.equal(direct.code, 2);
+ assert.match(direct.stderr, /Port \"99999\" is invalid[\s\S]*rer dev --port 4800/);
+ const directData = await invoke(['dev', '--port', '99999', '--json'], join(pkg, 'bin/rer.mjs'));
+ assert.equal(directData.code, 2);
+ assert.equal(directData.stdout, JSON.stringify({version:1,verb:'dev',event:'error',code:'invalid_invocation',message:'Port must be a decimal integer from 1 to 65535.',exitCode:2})+'\n'+JSON.stringify({version:1,verb:'dev',event:'result',ok:false,exitCode:2})+'\n');
  const args = ['import', '--input', '../old.rer', '--journal', '../latest.rer', '--yes'];
  await human(args, 4, /--input "\.\.\/old\.rer" must stay inside this checkout[\s\S]*\.rer\/recovery\/<name>\.rer[\s\S]*rer import --input '\.rer\/recovery\/old\.rer' --journal '\.rer\/recovery\/latest\.rer' --yes/);
  const machine = await invoke([...args, '--json']);
@@ -70,5 +76,5 @@ snapshots:
  const message = `${stepFailureText(error.step)}\nCorrect the cause, then run rer dev --cwd '${root}' again.`;
  assert.equal(errorLine, JSON.stringify({ version: 1, verb: 'install', event: 'error', code: 'install_step_failed', message, exitCode: 1, step: error.step }));
  assert.equal(lines.at(-1), JSON.stringify({ version: 1, verb: 'dev', event: 'result', ok: false, exitCode: 1 }));
- assert.match(await readFile(join(root, '.seed/installer/install.log'), 'utf8'), /FetchError/);
+ assert.match(await readFile(join(root, error.step.log), 'utf8'), /FetchError/);
 }
