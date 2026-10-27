@@ -77,7 +77,10 @@ export class DatabaseSync extends NativeDatabaseSync {
         try {
           const result = value.apply(target, args);
           if (key === 'iterate') return (function* () {
-            for (const row of result) { d1ResultPreflight([row]); yield row; }
+            // SQLite steps lazily, after the outer call restores its guards.
+            db.guard(schemaEdit(sql));
+            try { for (const row of result) { d1ResultPreflight([row]); yield row; } }
+            finally { db.guard(); }
           })();
           if (checked) { d1ResultPreflight(key === 'get' ? result ? [result] : [] : result); exec('RELEASE rer_d1_result'); }
           return result === target ? proxy : result;

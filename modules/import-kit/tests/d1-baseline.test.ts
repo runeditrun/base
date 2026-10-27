@@ -129,6 +129,13 @@ test('shared D1 reset removes prior-case state and restores seeded schema and pr
       try {
         schemaDb.exec("BEGIN; CREATE TABLE synthetic_base_1(a TEXT,b TEXT); INSERT INTO synthetic_base_1 VALUES('retained',NULL); ALTER TABLE synthetic_base_1 DROP COLUMN b; COMMIT; -- trailing comment");
         assert.equal(schemaDb.prepare('SELECT a FROM synthetic_base_1').get()?.a, 'retained');
+        const addColumn = schemaDb.prepare('ALTER TABLE synthetic_base_1 ADD COLUMN b TEXT').iterate();
+        assert.equal(schemaDb.prepare('PRAGMA table_info(synthetic_base_1)').all().length, 1);
+        assert.deepEqual(Array.from(addColumn), []);
+        const dropColumn = schemaDb.prepare('ALTER TABLE synthetic_base_1 DROP COLUMN b').iterate();
+        assert.equal(schemaDb.prepare('PRAGMA table_info(synthetic_base_1)').all().length, 2);
+        assert.deepEqual(Array.from(dropColumn), []);
+        assert.equal(schemaDb.prepare('PRAGMA table_info(synthetic_base_1)').all().length, 1);
         assert.throws(()=>schemaDb.exec('ALTER TABLE synthetic_base_1 ADD COLUMN b TEXT; SELECT * FROM synthetic_base_missing'), /no such table/);
         assert.equal(schemaDb.prepare('PRAGMA table_info(synthetic_base_1)').all().length, 2);
         assert.throws(()=>schemaDb.exec("ALTER TABLE synthetic_base_1 DROP COLUMN b; INSERT INTO synthetic_base_1 VALUES(printf('%.*c',1999996,'x'))"), /table row bytes maximum 2000000, measured 2000001/);

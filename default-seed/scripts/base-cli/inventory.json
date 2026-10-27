@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.g314a408e",
+  "cliVersion": "0.2.83-dev.g6a17277e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1291,7 +1291,7 @@
     },
     "modules/container/adapters/d1-sqlite.mjs": {
       "source": "modules/container/adapters/d1-sqlite.mjs",
-      "sha256": "6cb070047656feca2802534f19c57e9eb9bd970957d083987142b288570fefae"
+      "sha256": "905fb42bcdcc0d468f185906cb12a6326e9d62276a9903c712006953785c802b"
     },
     "modules/container/adapters/d1-workerd-preload.mjs": {
       "source": "modules/container/adapters/d1-workerd-preload.mjs",
