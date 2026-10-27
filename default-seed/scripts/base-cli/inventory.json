@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.ge628089b",
+  "cliVersion": "0.2.83",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -371,7 +371,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "65c73bb486d2ef124b4cd64e16f0374623546b53af9a89feeddcf0ac8e02af3f"
+      "sha256": "a3deff4ee42d41c287176804b34912d6a0b17bb64fdaf885e9d61a9aa2ec57f0"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -655,7 +655,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "9b1b0dbd375a311a07d60b6cde973c4a3e1584ff26da4655008ae23977959624"
+      "sha256": "b4b1a389aaaf8289320fb680d4511b7374384d27fc26bcf45fbbdd1c3df58830"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -879,7 +879,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "d1599705962888376ac2c2ff66ab31608745fdbcf2a171be00244dde6dd5407c"
+      "sha256": "46f7e1d2391352f7787c0b9b14b84a440c0e6ecacb8787e8eba63c4814cbcb5f"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
@@ -903,7 +903,11 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "cbcc6f6dbececcee319cee9b6a842f52b74e98d5093b1d103973b1d1ebbbe1eb"
+      "sha256": "23914b9bbf60f740c1f52de3bc0b391e0c904c93845b595bba85f6c55cde5c78"
+    },
+    "cli/native-owner-entry.mjs": {
+      "source": "cli/native-owner-entry.mjs",
+      "sha256": "5fdda051d4757b45f49c2beed4a221b646d3167b66968db418aaa792adce94fa"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -999,7 +1003,7 @@
     },
     "cli/runtime-front-door.mjs": {
       "source": "cli/runtime-front-door.mjs",
-      "sha256": "9be225f807a0fd94a07fde9d85e69cba46c24af11f05727361c838195f87bd1b"
+      "sha256": "41141f9920b72f0dd7958ee49f3a4e473c526d06a560eec12d4a5e0db9b00360"
     },
     "cli/scheduled.mjs": {
       "source": "cli/scheduled.mjs",
@@ -1015,11 +1019,11 @@
     },
     "cli/server-proxy.mjs": {
       "source": "cli/server-proxy.mjs",
-      "sha256": "78527672b718d443a6c753e7f12fdeef5bf0c272732e6e634674df990b22b7c5"
+      "sha256": "ec156dbe854583c21fdf7bee2df2823e77221828f497b4ea85f0c7af0b9f60c5"
     },
     "cli/server-registry.mjs": {
       "source": "cli/server-registry.mjs",
-      "sha256": "dc0fd0f89a2e046393845f17b354194ea9a143879629b89b8506621eecda5647"
+      "sha256": "5d332c3d579bd8a3556d9dc8f8022fb41138a545fe5e55b1e0e664da305942c8"
     },
     "cli/server-resources.mjs": {
       "source": "cli/server-resources.mjs",

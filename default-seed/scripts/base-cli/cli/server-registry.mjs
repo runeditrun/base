@@ -206,7 +206,7 @@ export async function serverRegistry(root,{env=process.env,memory=availableMemor
   }
   throw refuse('The existing server is still starting. Wait for its ready output.');
  }
- return {checkout,existing,stop,reserve,serve,update,updateActivity,waitReady,custodyToken:()=>owned?.token,
+ return {checkout,existing,stop,reserve,serve,update,updateActivity,waitReady,ownerEntry:record=>request(record,'owner-entry'),custodyToken:()=>owned?.token,
   // The sockets close even when the record cannot be removed (its registry
   // deleted under it, say): an open listener would keep this process alive.
   close(){return closing??=(async()=>{

@@ -522,3 +522,8 @@ sealing-capable Base version after restoring D1; rolling code back cannot decryp
 the rows. The CLI has no old-Base capability receipt or code rollback command,
 so it cannot preflight an out-of-band provider rollback. Current Base rejects a
 sealed key passed to its plaintext signing path with `installation_key_sealed_rollback`.
+
+On loopback, `rer preview` prints `RER_OPEN` for native owner entry.
+`rer demo` keeps its persona link and also prints `RER_OWNER_OPEN` for a native
+owner session in its isolated demo data. These native entry links work once,
+expire within 15 minutes and are never saved. Restarting retires them.

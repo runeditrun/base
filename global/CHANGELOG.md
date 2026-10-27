@@ -1,5 +1,7 @@
 # Changelog
 
+- Local preview now prints a single-use native owner entry. Demo keeps its persona and adds a separate native owner entry, using the existing fragment gate and native owner grant. Links expire within 15 minutes and are never saved.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.

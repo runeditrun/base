@@ -1,3 +1,4 @@
+import { nativeOwnerEntry } from './native-owner-entry.mjs';
 import { prepareLiveModels } from './ai-local.mjs';
 import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
@@ -19,15 +20,16 @@ import { readDevKey,requireDevKey,refuseManagedInstallation,resolvePersona,openU
 import { announceDoorRoute,claimSavedName,moveCheckout,routeRunning,verifyDoorFor } from './door-mode.mjs';
 
 // Dev opens through the local identity exchange. Preview serves production output.
-export function ready(out,url,dev,json=false,siteUrl,demo){
- if(json){out.event('ready',{url,...(dev?{signedInAs:dev.signedInAs??null,openUrl:dev.openUrl}:{}),...(siteUrl?{siteUrl}:{}),...(demo?{demo}:{})});return;}
+export function ready(out,url,dev,json=false,siteUrl,demo,ownerOpenUrl){
+ if(json){out.event('ready',{url,...(dev?{signedInAs:dev.signedInAs??null,openUrl:dev.openUrl}:{}),...(ownerOpenUrl?{ownerOpenUrl}:{}),...(siteUrl?{siteUrl}:{}),...(demo?{demo}:{})});return;}
  out.human(`RER_READY ${url}`);
  if(dev){
   if(dev.signedInAs)out.human(`RER_SIGNED_IN ${dev.signedInAs}`);
   else if(dev.ownerLeft)out.human('No active owner remains in this app. Use rer dev --as PERSONA with an active operator, or rer reset --yes and rer setup for a new owner.');
   out.human(`RER_OPEN ${dev.openUrl}`);
-  out.human("Open that link on this computer. Its fragment holds this checkout's dev key, which the page keeps only as a cookie; never share the link.");
+  if(!dev.native)out.human("Open that link on this computer. Its fragment holds this checkout's dev key, which the page keeps only as a cookie; never share the link.");
  }
+ if(ownerOpenUrl){out.human(`RER_OWNER_OPEN ${ownerOpenUrl}`);out.human('Native owner entry: open on this computer once within 15 minutes. The link is not saved.');}
  if(siteUrl)out.human(`RER_SITE ${siteUrl}`);
  if(demo){out.human(`RER_DEMO_ENDS_ON_STOP ${demo.state}`);out.human(`This demo runs on its own data in that folder, which is deleted when it stops: rer demo --stop, Ctrl-C, or at its end (${demo.ends.slice(11,16)}). Public reads and checks run for real. This checkout's own data is untouched.`);}
 }
@@ -35,7 +37,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
  const registry=await serverRegistry(project.root),controller=new AbortController();
  // A demo registers as its own mode: `rer dev --stop` never stops it by accident.
  const mode=options.demo?'demo':options.verb;
- let store,operation,proxy,activity,app,termination,reason,cleanupPromise,finished,selected,cleaned,site,demo,demoEnd;
+ let store,operation,proxy,activity,app,termination,reason,cleanupPromise,finished,selected,cleaned,site,demo,demoEnd,ownerEntry;
  const scheduling=new AbortController();
  let activityWrites=Promise.resolve(),pendingActivity,activityWriting=false,infrastructureFailure;
  function recordActivity(fields){
@@ -44,7 +46,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
  }
  const stopped=new Promise(resolve=>{finished=resolve;});
  const cleanupDone=new Promise(resolve=>{cleaned=resolve;});
- const cleanup=()=>cleanupPromise??=(async()=>{scheduling.abort();clearTimeout(demoEnd);activity?.close();await site?.close();await store?.closeCommands();if(demo)await rm(demo.state,{recursive:true,force:true});await proxy?.close();await operation?.release();})();
+ const cleanup=()=>cleanupPromise??=(async()=>{scheduling.abort();clearTimeout(demoEnd);activity?.close();await site?.close();await ownerEntry?.close();await store?.closeCommands();if(demo)await rm(demo.state,{recursive:true,force:true});await proxy?.close();await operation?.release();})();
  const stop=async why=>{reason??=why;controller.abort();finished();await cleanupDone;return {};};
  const handlers=new Map(['SIGINT','SIGTERM'].map(name=>[name,()=>{termination=name;void stop(name);} ]));
  for(const [name,handler]of handlers)process.on(name,handler);
@@ -77,10 +79,11 @@ export async function managedServer(project,options,out,{clock={}}={}){
    // A key is sent (or printed) for a door origin only once the door proves it is ours.
    if(devIdentity)await verifyDoorFor(running.url);
    const dev=devIdentity&&options.verb==='dev'&&await devReady(running.url,devKey,options,controller.signal);
-   await emitReady(out,options,project.root,running.url,dev,running.siteUrl,running.demo);return {reused:true};
+   await emitReady(out,options,project.root,running.url,dev,running.siteUrl,running.demo,(await registry.ownerEntry(running)).ownerOpenUrl);return {reused:true};
   }
   await registry.serve(async action=>{
    if(action==='status')return {...activity?.snapshot(),url:selected?.url,probe:proxy?.probe,siteUrl:site?.url,demo};
+   if(action==='owner-entry')return ownerEntry?{ownerOpenUrl:ownerEntry.issue()}:{};
    if(action==='stop')return stop('explicit stop');
    throw Error('Unknown management operation');
   });
@@ -97,7 +100,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
   if(!selected.door)await availablePort(selected.host,selected.port,{root:project.root,saved:!selected.explicitPort&&selected.savedOrigin!==undefined,verb:options.verb});
   if(!selected.vars[keys.email])throw missing('Private owner settings are missing. Run rer setup first.');
   if(devIdentity&&!devKey)devKey=await requireDevKey(project.root);
-  if(devIdentity&&options.verb==='dev')refuseManagedInstallation(selected.vars,process.env);
+  if(devIdentity&&['dev','preview'].includes(options.verb))refuseManagedInstallation(selected.vars,process.env);
   if(options.demo)demo=await demoPreflight(project,selected.vars,options.idleTimeout);
   const prerequisites=async()=>{
    if(!demo&&project.adapter.localPrerequisites&&!await project.adapter.localPrerequisites({root:project.root,vars:selected.vars,email:selected.vars[keys.email],demo:false}))throw missing('Local migrations, owner or local authentication/mail settings are missing. Run rer setup first.');
@@ -115,7 +118,8 @@ export async function managedServer(project,options,out,{clock={}}={}){
   activity=activityClock({...clock,seconds:options.idleTimeout,onIdle:()=>void stop('idle timeout'),onChange:recordActivity});
   if(demo)demoEnd=setTimeout(()=>void stop('demo ended'),Math.min(Date.parse(demo.ends)-Date.now(),2**31-1));
   const crons=project.adapter.scheduled!==false?await declaredCrons(project.root,project.adapter).catch(error=>{throw refuse(`The declared scheduled triggers cannot run locally: ${error.message}`);}):[];
-  proxy=await runtimeFrontDoor({host:selected.host,port:selected.port,activity,door:selected.door,devKey:devKey??undefined,origin:selected.url});const internal=proxy.runtimePort;
+  if(devIdentity&&(options.verb==='preview'||demo))ownerEntry=nativeOwnerEntry({origin:selected.url,state:demo?.state??join(project.root,'.wrangler','state'),store,demo:!!demo,devKey});
+  proxy=await runtimeFrontDoor({host:selected.host,port:selected.port,activity,door:selected.door,devKey:devKey??undefined,origin:selected.url,ownerEntry:(req,res)=>ownerEntry?.handle(req,res)});const internal=proxy.runtimePort;
   if(selected.door)await announceDoorRoute(selected,proxy,registry);
   const modelsLive = options.verb==='dev' ? await prepareLiveModels(project.root,options,store,controller.signal) : undefined;
   const adapterOptions={modelsLive,demo,selectedOrigin:selected.url,operationToken:operation.token,privateSettings:project.adapter.settings,runtimePort:internal,devKey:devKey??undefined,devLogin:false,scheduled:crons.length>0,beforeStart:options.verb==='dev'?prerequisites:undefined};
@@ -144,7 +148,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
     if(options.json)out.event('warning',{code:error.code,message});else out.progress(`Warning: ${message}\n`);
    }
   }
-  activity.ready();await emitReady(out,options,project.root,selected.url,dev,site?.url,demo);
+  activity.ready();await emitReady(out,options,project.root,selected.url,dev,site?.url,demo,ownerEntry?.issue());
   if(crons.length){
    out.progress(`Running ${crons.length===1?'the scheduled trigger':'the scheduled triggers'} locally: ${crons.join(' | ')}\n`);
    void runScheduled({crons,url:`http://127.0.0.1:${internal}`,path:options.verb==='preview'?'/cdn-cgi/local/scheduled':undefined,signal:scheduling.signal,report:run=>reportScheduled(out,options,run)});
@@ -164,12 +168,12 @@ function reportScheduled(out,options,run){
 // dev also keeps its RER_OPEN link in owner-only .rer/local/open-url (0600),
 // which reset removes with the rest of .rer/local, for a person or agent that
 // did not keep the terminal output.
-async function emitReady(out,options,root,url,dev,siteUrl,demo){
+async function emitReady(out,options,root,url,dev,siteUrl,demo,ownerOpenUrl){
  if(options.verb==='dev'&&dev?.openUrl){
   const {privateDirectory,writePrivateFile}=await shared('private-files.mjs');
   await writePrivateFile(join(await privateDirectory(root,['.rer','local']),'open-url'),dev.openUrl+'\n');
  }
- ready(out,url,dev||undefined,options.json,siteUrl,demo);
+ ready(out,url,dev||(ownerOpenUrl?{openUrl:ownerOpenUrl,native:true}:undefined),options.json,siteUrl,demo,ownerOpenUrl);
 }
 async function devReady(url,key,options,signal){
  const as=options.as??'owner',persona=await resolvePersona(url,key,as,signal);

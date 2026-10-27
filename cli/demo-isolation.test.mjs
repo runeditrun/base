@@ -1,3 +1,4 @@
+import { nativeOwnerBrowser } from './fixtures/native-owner-entry.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { access, readFile, readdir, stat, writeFile } from 'node:fs/promises';
@@ -78,6 +79,8 @@ commandAdapter.localPrerequisites = async ({root, email}) => {
   while (!child.stdoutText.includes('"event":"ready"') && child.exitCode === null && child.signalCode === null && Date.now() < deadline) await pause(100);
   const ready = events(child).find(event => event.event === 'ready');
   assert.ok(ready, 'the real demo reaches readiness');
+  assert.ok(ready.openUrl, 'demo retains its persona entry');
+  await nativeOwnerBrowser(f, 'demo', ready, 'demo-owner@example.test');
   assert.equal((await fetch(ready.url + '/health')).status, 200);
   const directory = join(ready.demo.state, 'v3/d1/miniflare-D1DatabaseObject');
   let isolated = false;
