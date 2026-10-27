@@ -116,7 +116,8 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
  const beforeOccupied=await databaseBytes();
  const occupied=await zipTarget.text(['import','--input','exports/managed.zip','--yes'],4);
  assert.match(occupied.stderr,/target_not_empty/);
- assert.deepEqual(await databaseBytes(),beforeOccupied,'occupied refusal leaves database bytes unchanged');
+ const afterOccupied=await databaseBytes();
+ assert.ok(afterOccupied.length===beforeOccupied.length && afterOccupied.every(([name,bytes],i)=>name===beforeOccupied[i][0] && bytes.equals(beforeOccupied[i][1])),'occupied refusal leaves database bytes unchanged');
  assert.deepEqual((await zipTarget.data('SELECT id,total FROM computed_entries'))[0].results,[{id:'synthetic-base-1',total:375}]);
  await zipTarget.data("UPDATE computed_entries SET quantity=4 WHERE id='synthetic-base-1'");
  assert.deepEqual((await zipTarget.data('SELECT id,label,total FROM computed_entries ORDER BY id'))[0].results,[
