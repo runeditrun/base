@@ -42,6 +42,7 @@ export async function nativeApprovalJourney(t, r,issuer,cookie,ownerRole) {
     'approval issuer':()=>r.db.prepare("UPDATE rer_dependency_pending SET issuer='https://another.example'").run(),
     'approval callbacks':()=>r.db.prepare("UPDATE rer_dependency_pending SET callbacks='[]'").run(),
   };
+  // A row drains its paused callback before restoring the shared native authority.
   await runCases(t, Array.from(['before callback','during redemption'], (timing, rowIndex) => [`approval timing row ${rowIndex + 1}`, async t => {
     await runCases(t, Array.from(Object.entries(changes), ([name,change], rowIndex) => [`native authority change row ${rowIndex + 1}`, async t => {
       let pending;

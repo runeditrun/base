@@ -12,6 +12,7 @@ test('production transport checks every DNS answer before any HTTPS connection',
   let answers: { address: string; family: number }[] = [], connects = 0, lookups = 0;
   const reachedConnection = new Error('Test connection boundary reached');
   const host = 'receiver.example.com';
+  // Each leaf owns the network module bindings and counters.
   async function withAnswers(run: () => Promise<void>) {
     answers = []; connects = 0; lookups = 0;
     dns.lookup = (async (hostname: string, options: unknown) => {

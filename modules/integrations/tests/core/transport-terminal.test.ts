@@ -10,6 +10,7 @@ import { database } from './support.ts';
 test('real TLS terminal response failures cannot resolve success or authorize an automatic resend', async t => {
   let calls = 0;
   let receiver: Awaited<ReturnType<typeof tlsReceiver>>;
+  // Each row closes its receiver even when a response expectation fails.
   async function receive(run: () => Promise<void>) {
     calls = 0;
     receiver = await tlsReceiver((req, res) => {
