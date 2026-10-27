@@ -102,7 +102,19 @@ The runner validates the module/export before applying data migrations. The
 native transfer worker imports that same seed-owned entry point, preserving
 functions and module-local closures. Modules should have no top-level effects:
 preflight and transfer each load them in a separate process. Archive metadata
-never selects executable policy. Invalid paths, missing/invalid default exports,
+never selects executable policy. A module may also export
+`createPolicy({db, buckets})` to bind payload producers and consumers to the
+current transfer's database and buckets. Its default policy is validated during
+preflight; the factory's policy is validated when the bindings are available.
+Managed intake supplies its disposable source bindings to the same factory, so
+its payloads come from the ZIP's own staged data. Intake compares source schema
+objects with a fresh replay of the destination migrations. Portable tables must
+exist there; retired or replaced objects require a matching historical definition
+and the migration that removes it. The receipt groups those objects by type and
+migration, with counts and hashes of sorted names. Unknown objects refuse before
+native restore; the destination retains its own schema. Native runners can use
+`requireEmptyTables` before creating a restore job; finalization still enforces
+the atomic empty-table guards. Invalid paths, missing/invalid default exports,
 and declaring both `policy` and `policyModule` fail closed. Serializable object
 `policy` declarations remain supported; inline functions (including nested
 schema-upgrade and payload callbacks) are refused instead of being dropped by

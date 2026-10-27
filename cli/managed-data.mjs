@@ -6,7 +6,8 @@ import { RerError } from './errors.mjs';
 import { randomUUID } from 'node:crypto';
 import { isManagedDataZip, readManagedDataZip } from './managed-data-zip.mjs';
 import { loadPolicy } from './portability-policy.mjs';
-import { mapMigrationLedger, appliedMigrations, platformMigrationDeclaration } from './portability-migrations.mjs';
+import { managedSchema } from './managed-data-schema.mjs';
+import { mapMigrationLedger, appliedMigrations, platformMigrationDeclaration, migrationInventory } from './portability-migrations.mjs';
 import { createPortability, PortabilityError } from '../modules/portability/index.mjs';
 import { readLedger } from '../modules/portability/ledgers.mjs';
 import { exportArchive } from '../modules/portability/files.mjs';
@@ -39,7 +40,7 @@ async function intake(context, declaration, restore) {
  const database = manifest.databases[0];
  await mapMigrationLedger({ root, binding, platformMigrations, entries: database.migrationLedger });
  check(database.migrationLedger.length > 0, 'missing_ledger');
- const policy = await loadPolicy(root, inputPolicy, policyModule);
+ let policy = await loadPolicy(root, inputPolicy, policyModule);
  const { migrationReplay } = await import('../modules/portability/migration-history.mjs');
  const { getPlatformProxy, unstable_splitSqlQuery } = createRequire(join(root, 'package.json'))('wrangler');
  const directory = await mkdtemp(join(tmpdir(), 'rer-managed-data-'));
@@ -61,10 +62,10 @@ async function intake(context, declaration, restore) {
     // No attach, extension, transaction or arbitrary query statements. Workerd
     // supplies the independent SQL limits and has no filesystem SQL functions.
     check(head[0] === 'create' && ['table', 'index', 'unique', 'view', 'trigger'].includes(head[1]) || head[0] === 'insert' && head[1] === 'into' || tokens.map(token => token.text.toLowerCase()).join('') === 'pragmadefer_foreign_keys=on', 'sql_refused');
-    const values = tokens.findIndex(token => token.type === 'keyword' && token.text.toLowerCase() === 'values');
+    const values = head[0] === 'insert' ? tokens.findIndex(token => token.type === 'keyword' && token.text.toLowerCase() === 'values') : -1;
     check(!tokens.some(token => token.type === 'variable') && (head[0] !== 'insert' || values >= 0), 'sql_refused');
-    // Platform's restore parser binds string literals after VALUES before
-    // applying D1's SQL budget. A large cell is data, not statement framing.
+    // Bind cells only in a top-level INSERT. DDL stays literal, including
+    // VALUES inside trigger bodies, where SQLite forbids bind parameters.
     let sql = '', offset = 0;
     const params = [];
     for (const token of values < 0 ? [] : tokens.slice(values + 1)) if (token.type === 'string') {
@@ -87,14 +88,17 @@ async function intake(context, declaration, restore) {
    context.signal?.throwIfAborted();
    await proxy.env[bucket.binding].put(object.key, entries.get(object.path), { httpMetadata: object.httpMetadata ?? {}, customMetadata: object.customMetadata ?? {} });
   }
+  const boundBuckets = Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]]));
+  policy = await loadPolicy(root, inputPolicy, policyModule, { db, buckets: boundBuckets });
+  const schema = await managedSchema(db, await migrationInventory(root, binding, platformMigrationDeclaration(platformMigrations), unstable_splitSqlQuery), policy);
   await ensurePortabilitySchema(db, await portabilityPlan(unstable_splitSqlQuery));
   const migrations = async () => migrationReplay(await appliedMigrations(root, db, binding, platformMigrationDeclaration(platformMigrations), unstable_splitSqlQuery), policy, platformMigrationDeclaration(platformMigrations));
-  const service = await createPortability({ db, buckets: Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]])), policy, migrations });
+  const service = await createPortability({ db, buckets: boundBuckets, policy, migrations });
   const path = join(directory, 'native.rer');
   await exportArchive(service, path, transient);
   // Native import rechecks the complete archive and keeps all destination
   // emptiness, migration, erasure, row-safety and atomic publication checks.
   const result = await restore({ ...context, path });
-  return result && typeof result === 'object' && Object.hasOwn(result, 'input') ? { ...result, input: relative(root, context.path) } : result;
+  return result && typeof result === 'object' ? { ...result, ...(Object.hasOwn(result, 'input') ? { input: relative(root, context.path) } : {}), managedSchema: schema } : result;
  } finally { try { await proxy?.dispose(); } finally { await rm(directory, { recursive: true, force: true }); } }
 }

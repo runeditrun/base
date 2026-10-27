@@ -2,6 +2,7 @@ import { portabilityPlan, ensurePortabilitySchema } from '../modules/container/p
 import { exportArchive, importArchive, fileRecords } from '../modules/portability/files.mjs';
 import { readLegacyArchive } from '../modules/portability/format.mjs';
 import { recoverLegacyArchive } from '../modules/portability/legacy-files.mjs';
+import { requireEmptyTables } from '../modules/portability/restore-empty.mjs';
 import { legacyTargetState, requireLegacyEmpty } from '../modules/portability/legacy-safety.mjs';
 import { migrationReplay } from '../modules/portability/migration-history.mjs';
 import { join } from 'node:path';
@@ -35,7 +36,8 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
   for await (const record of fileRecords(path,legacyRecovery?readLegacyArchive:readArchive)) {}
   if(journal)for await(const record of fileRecords(journal)) {}
  }
- policy = await loadPolicy(root, policy, policyModule);
+ const inputPolicy = policy;
+ policy = await loadPolicy(root, inputPolicy, policyModule);
  const declaration=platformMigrationDeclaration(platformMigrations);
  if (direction === 'policy-preflight') return { checkedPolicy: true };
  const { getPlatformProxy, unstable_splitSqlQuery } = createRequire(join(root, 'package.json'))('wrangler');
@@ -47,13 +49,16 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
   proxy = await getPlatformProxy({ configPath, persist: { path: join(root, '.wrangler/state/v3') }, remoteBindings: false });
   if(direction==='migration-preflight')return await nativeMigrationPreflight({root,db:proxy.env[binding],binding,platformMigrations});
   const migrations=async()=>migrationReplay(await appliedMigrations(root,proxy.env[binding],binding,declaration,unstable_splitSqlQuery),policy,declaration);
-  const options={ db: proxy.env[binding], buckets: Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]])), policy, migrations };
+  const boundBuckets = Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]]));
+  policy = await loadPolicy(root, inputPolicy, policyModule, { db: proxy.env[binding], buckets: boundBuckets });
+  const options={ db: proxy.env[binding], buckets: boundBuckets, policy, migrations };
   if(direction==='legacy-preflight') {
    await requireLegacyEmpty(options,await legacyTargetState(options.db,options.migrations));
    return {checkedEmpty:true};
   }
   await ensurePortabilitySchema(proxy.env[binding], await portabilityPlan(unstable_splitSqlQuery));
   if(legacyRecovery)return await recoverLegacyArchive(options,path,legacyRecovery.output,transient,legacyRecovery.acknowledged);
+  if (direction === 'import') await requireEmptyTables(options);
   const service = await createPortability(options);
   // This checkout's operation lock means no other import can be running. Abort
   // the recorded abandoned job, dropping only its exact staging copies and

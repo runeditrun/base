@@ -3,6 +3,19 @@ import { createHash } from 'node:crypto';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const quote = name => '"' + name.replaceAll('"', '""') + '"';
+export const managedTriggerSQL = `
+-- A comment with VALUES('synthetic-base-3'); does not start a statement.
+CREATE TRIGGER computed_entries_update AFTER UPDATE OF quantity ON computed_entries
+BEGIN
+ INSERT INTO computed_entries(id,quantity,unit_price,label)
+ VALUES(NEW.id || '-synthetic-base-3',1,2,'synthetic-base-4'';synthetic-base-5');
+ /* The body continues after its first semicolon. */
+ UPDATE computed_entries SET label='synthetic-base-6' WHERE id=NEW.id;
+END;
+CREATE TABLE synthetic_facts (id TEXT PRIMARY KEY, fact TEXT NOT NULL);
+CREATE TRIGGER synthetic_facts_legacy AFTER INSERT ON synthetic_facts BEGIN SELECT 1; END;
+CREATE VIEW computed_entries_view AS SELECT id,label || ';synthetic-base-8' AS label FROM computed_entries;
+`;
 function crc32(bytes) {
  let result = 0xffffffff;
  for (const byte of bytes) { result ^= byte; for (let i = 0; i < 8; i++) result = (result >>> 1) ^ (result & 1 ? 0xedb88320 : 0); }
@@ -44,3 +57,18 @@ export async function managedEntries(source) {
  const manifest = { schema: 1, kind: 'runeditrun-app-data', installationId: 'synthetic-base-1', appName: 'synthetic-base-1', generatedAt: '2026-10-27T00:00:00.000Z', databases: [database], buckets: [], notIncluded: [] };
  return [['data/d1/DB.sql', data], ['data/d1/DB.json', JSON.stringify(database)], ['data/d1/DB-migrations.json', JSON.stringify(migrationLedger)], ['README.txt', 'synthetic-base-1'], ['manifest.json', JSON.stringify(manifest)]];
 }
+
+export const managedPolicyModule = `
+import { portabilityPolicy } from '../../src/core/platform/portability-policy.mjs';
+const policy = { ...portabilityPolicy, excludeTables: [...portabilityPolicy.excludeTables, 'synthetic_facts'] };
+export default policy;
+export function createPolicy({ db }) {
+ return { ...policy, extraPayloads: { 'synthetic-base-9': {
+  async produce() { return JSON.stringify((await db.prepare('SELECT * FROM synthetic_facts ORDER BY id').all()).results); },
+  async consume(stream) {
+   const rows = await new Response(stream).json();
+   for (const row of rows) await db.prepare('INSERT INTO synthetic_facts(id,fact) VALUES(?,?)').bind(row.id,row.fact).run();
+  },
+ } } };
+}
+`;
