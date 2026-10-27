@@ -2,6 +2,7 @@
 
 ## 0.2.83
 
+- Bound the publication email exemption to a package's own quoted deprecation scalar in `pnpm-lock.yaml`, tracking scalar starts, indentation and flow nesting so nested fields and literal quotes in plain text cannot hide authored addresses; ambiguous structure retains findings.
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.
 - Show Assisted at US$10/month and Managed at US$100/month, labelled early access, with global billing on the Run chooser.
 - Keep seed CI Chromium and apt caches under the runner temporary directory, prepare them before sudo, and require the apt helper cache directory to exist so it cannot create runner HOME directories as root.

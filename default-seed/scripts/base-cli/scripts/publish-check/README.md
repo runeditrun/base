@@ -144,3 +144,16 @@ those digest value locations qualify. Extra fields, malformed paths or digests
 retain findings. The live-proof controller still independently checks all copied
 file bytes against the pinned source before execution; the scanner does not claim
 to fetch that source. Provider tokens and known environment values remain findings.
+
+`pnpm_lock.py` grants the email exemption only to a single or double quoted
+scalar at an unquoted `deprecated` key (allowing spaces before the colon), at
+four-space field indentation of a two-space package entry in the top-level
+`packages:` block mapping of any file named `pnpm-lock.yaml`, including nested
+paths.
+It consumes escaped multiline quotes only at scalar starts, plain and block
+scalar continuations by indentation and nested flow collections; nested fields,
+quoted keys, plain or block values, other sections (including `snapshots:`),
+comments, trailing text and other filenames retain inspection.
+Unsupported or ambiguous structure, including anchors, aliases, structural tabs, unterminated
+quotes or inconsistent indentation, disables all exemptions in that file, and
+other rules always apply.

@@ -18,7 +18,129 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
         return self.assert_fails(rule, path)
 
     def test_email_in_history(self):
+        clean = self.git('rev-parse', 'HEAD')
         self.deleted('contact.txt', 'person' + '@' + 'gmail.com', 'hygiene.email')
+        self.git('reset', '-q', '--hard', clean)
+        address = ''.join(('synthetic-base-1', '@', 'base-fixture.test-host'))
+
+        def lockfile(value, key='deprecated', section='packages'):
+            return ("lockfileVersion: '9.0'\n\n" + section + ':\n\n'
+                    '  synthetic-package@1.0.0:\n    ' + key + ': ' + value + '\n')
+
+        def publication():
+            result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo)],
+                                    capture_output=True, text=True, timeout=30)
+            report = json.loads(result.stdout)
+            self.assertTrue(report['complete'])
+            self.assertNotIn(address, result.stdout + result.stderr)
+            return result.returncode, report
+
+        quoted = "'Contact " + address + " for support'"
+        self.write('pnpm-lock.yaml', lockfile(quoted))
+        self.write('nested/pnpm-lock.yaml', lockfile('"Contact \\"support\\" at ' + address + '"'))
+        self.write('single/pnpm-lock.yaml', lockfile("'Maintainer''s contact: " + address + "'"))
+        self.write('reserved.txt', ''.join(('synthetic', '@', 'scanner-fixture.invalid')))
+        self.write('reserved/pnpm-lock.yaml',
+                   lockfile("'" + ''.join(('synthetic', '@', 'scanner-fixture.invalid')) + "'", key='author'))
+        self.write('quoted-tab/pnpm-lock.yaml', lockfile("'Contact\t" + address + "'"))
+        self.write('crlf/pnpm-lock.yaml', lockfile(quoted).replace('\n', '\r\n'))
+        self.write('long/pnpm-lock.yaml', lockfile("'" + 'x' * (70 * 1024) + ' ' + address + "'"))
+        self.write('multiline-value/pnpm-lock.yaml', lockfile("'Contact\n      " + address + "\n      support'"))
+        self.write('multiline-double-value/pnpm-lock.yaml', lockfile('"Contact\n      ' + address + '\n      support"'))
+        self.write('key-spaces/pnpm-lock.yaml', lockfile(quoted, key='deprecated  '))
+        self.write('after-plain/pnpm-lock.yaml',
+                   lockfile('text with a stray "\n      continued', key='description')
+                   + '    deprecated: ' + quoted + '\n')
+        self.write('after-flow/pnpm-lock.yaml',
+                   lockfile('{node: [">=18", {optional: true}]}', key='engines')
+                   + '    deprecated: ' + quoted + '\n')
+        self.write('after-sequence-map/pnpm-lock.yaml',
+                   lockfile('\n      - name: first\n        note: plain\n'
+                            '      - name: second\n        note: "quoted"', key='maintainers')
+                   + '    deprecated: ' + quoted + '\n')
+        self.write('after-sequence/pnpm-lock.yaml',
+                   lockfile('\n      - "first\n        continued"\n      - plain', key='maintainers')
+                   + '    deprecated: ' + quoted + '\n')
+        self.commit()
+        code, report = publication()
+        self.assertEqual(code, 0)
+        self.assertEqual(report['status'], 'PASS')
+        self.assertEqual(report['findings'], [])
+
+        cases = {
+            'resolution/pnpm-lock.yaml': lockfile('{tarball: ' + quoted + '}', key='resolution'),
+            'engines/pnpm-lock.yaml': lockfile('{node: ' + quoted + '}', key='engines'),
+            'description/pnpm-lock.yaml': lockfile(quoted, key='description'),
+            'author/pnpm-lock.yaml': lockfile(quoted, key='author'),
+            'package.json': json.dumps({'description': address}),
+            'contact.txt': address,
+            'elsewhere/pnpm-lock.yaml.backup': lockfile(quoted),
+            'elsewhere/pnpm-lock.yml': lockfile(quoted),
+            'other.yaml': lockfile(quoted),
+            'comment/pnpm-lock.yaml': lockfile("'Obsolete' # Contact " + address),
+            'trailing/pnpm-lock.yaml': lockfile("'Obsolete' " + address),
+            'unquoted/pnpm-lock.yaml': lockfile(address),
+            'unclosed/pnpm-lock.yaml': lockfile("'Contact " + address),
+            'encoded-quotes/pnpm-lock.yaml': lockfile('%27' + address + '%27'),
+            'multiline-double/pnpm-lock.yaml': lockfile('"Text\n    deprecated: ' + quoted + '\n    end"', key='description'),
+            'multiline-single/pnpm-lock.yaml': lockfile("'Text\n    deprecated: \"" + address + "\"\n    end'", key='description'),
+            'nested-key/pnpm-lock.yaml': lockfile('obsolete:\n      deprecated: ' + quoted, key='engines'),
+            'importers/pnpm-lock.yaml': lockfile(quoted, section='importers'),
+            'snapshots/pnpm-lock.yaml': lockfile(quoted, section='snapshots'),
+            'no-entry/pnpm-lock.yaml': 'packages:\n    deprecated: ' + quoted + '\n',
+            'root/pnpm-lock.yaml': 'deprecated: ' + quoted + '\n',
+            'duplicate/pnpm-lock.yaml': lockfile(quoted) + '    author: ' + quoted + '\n',
+            'quote-end/pnpm-lock.yaml': lockfile("'Obsolete' # '" + address + "'"),
+            'flow-resolution/pnpm-lock.yaml': lockfile("{\n    deprecated: " + quoted + "\n    }", key='resolution'),
+            'flow-engines/pnpm-lock.yaml': lockfile("{\n    deprecated: " + quoted + "\n    }", key='engines'),
+            'flow-sequence/pnpm-lock.yaml': lockfile("[{\n    deprecated: " + quoted + "\n    }]", key='engines'),
+            'plain-quote/pnpm-lock.yaml':
+                lockfile('text with a stray "\n      continued', key='description')
+                + '    author: "Text\n    deprecated: ' + quoted + '\n    end"\n',
+            'plain-single-quote/pnpm-lock.yaml':
+                lockfile("text with a stray '\n      continued", key='description')
+                + "    author: 'Text\n    deprecated: \"" + address + "\"\n    end'\n",
+            'maintainers/pnpm-lock.yaml': lockfile('[' + quoted + ']', key='maintainers'),
+            'folded/pnpm-lock.yaml': lockfile('>\n      Contact ' + address),
+            'literal/pnpm-lock.yaml': lockfile('|\n      Contact ' + address),
+            'block-resolution/pnpm-lock.yaml': lockfile('\n      deprecated: ' + quoted, key='resolution'),
+            'package-sequence/pnpm-lock.yaml': 'packages:\n  - name: synthetic-package\n    deprecated: ' + quoted + '\n',
+            'sequence-key/pnpm-lock.yaml': lockfile('\n      - deprecated: ' + quoted, key='engines'),
+            'sequence-scalar/pnpm-lock.yaml':
+                lockfile('\n      - "Text\n    deprecated: ' + quoted + '\n        end"', key='maintainers'),
+            'complex-key/pnpm-lock.yaml': 'packages:\n  ? synthetic-package@1.0.0:\n    deprecated: ' + quoted + '\n',
+            'nested-quoted-key/pnpm-lock.yaml': lockfile('\n      "deprecated": ' + quoted, key='resolution'),
+            'quoted-key/pnpm-lock.yaml': lockfile(quoted, key='"deprecated"'),
+            'nested-key-spaces/pnpm-lock.yaml': lockfile('\n      deprecated  : ' + quoted, key='resolution'),
+            'anchor/pnpm-lock.yaml': lockfile('&notice ' + quoted),
+            'alias/pnpm-lock.yaml': lockfile('&notice ' + quoted, key='author')
+                                  + '    deprecated: *notice\n',
+            'tab/pnpm-lock.yaml': lockfile(quoted).replace('    deprecated', '\tdeprecated'),
+            'later-quote/pnpm-lock.yaml': lockfile(quoted) + '    author: "unfinished\n',
+            'later-flow/pnpm-lock.yaml': lockfile(quoted) + '    engines: {node: [unfinished}\n',
+            'mixed-collection/pnpm-lock.yaml':
+                'packages:\n  synthetic-package@1.0.0:\n    - name: item\n    deprecated: ' + quoted + '\n',
+            'inconsistent/pnpm-lock.yaml': lockfile(quoted) + '     author: plain\n',
+            'bad-key-escape/pnpm-lock.yaml': lockfile(quoted) + '    "\\q": plain\n',
+            'bad-escape/pnpm-lock.yaml': lockfile('"Contact \\q ' + address + '"'),
+        }
+        for path, data in cases.items():
+            self.write(path, data)
+        # Exercise uncommitted files, then the selected tree and retained history.
+        code, report = publication()
+        self.assertEqual(code, 1)
+        self.assertEqual(report['status'], 'FAIL')
+        self.assertEqual({(item['rule'], item['path']) for item in report['findings']},
+                         {('hygiene.email', path) for path in cases})
+        self.commit()
+        for path in cases:
+            (self.repo / path).unlink()
+        self.commit()
+        code, report = publication()
+        self.assertEqual(code, 1)
+        for path in cases:
+            with self.subTest(path=path):
+                self.assertIn(('hygiene.email', path), {(item['rule'], item['path']) for item in report['findings']})
 
     def test_reserved_domains_are_not_personal_email(self):
         self.write('personas.txt', 'admin' + '@' + 'dev.localhost owner' + '@' + 'example.com')
