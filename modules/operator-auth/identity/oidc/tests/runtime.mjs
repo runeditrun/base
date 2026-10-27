@@ -1,6 +1,6 @@
 // Node SQLite harness for the protocol tests: the real composed operator auth,
 // its HTTP adapter and pinned providers, with fake providers at the network edge.
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../../../container/adapters/d1-sqlite.mjs';
 import { readFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

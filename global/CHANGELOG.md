@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.85 (unreleased)
+
+- Enforce D1 query limits in local test stand-ins on the pinned Node 22 runtime, using shared preflight and native driver options. Native demo SQLite bindings use the same helper. Refresh brings checks for SQL bytes, parameters, function arguments, pattern bytes, bound values and encoded table rows; tests may now fail for queries that production would reject. Expression depth 100 is OBSERVED-NOT-DOCUMENTED, with an estimated parser-tree check proved against workerd at 100 and 101. Invocation query counts and provider deadlines require provider verification.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.

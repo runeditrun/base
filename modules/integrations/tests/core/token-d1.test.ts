@@ -1,3 +1,4 @@
+import { installD1Preflight } from '../../../container/adapters/d1-workerd-setup.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -9,7 +10,9 @@ import { installIssuer, nativeAuthority, owner } from './token-authority-fixture
 
 // Resolve an already installed Miniflare, optionally through a shared dependency cache.
 // A missing dependency is an error, never a skipped check or fake D1 implementation.
-const { Miniflare } = await import(process.env.INTEGRATIONS_MINIFLARE_MODULE ?? 'miniflare');
+const miniflare = await import(process.env.INTEGRATIONS_MINIFLARE_MODULE ?? 'miniflare');
+installD1Preflight(miniflare.D1_PLUGIN);
+const { Miniflare } = miniflare;
 
 test('actual local D1 fixed batches bind grants and usage, roll back audit failures and persist after restart', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'integrations-d1-'));

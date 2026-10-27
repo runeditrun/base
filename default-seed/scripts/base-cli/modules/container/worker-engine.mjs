@@ -1,4 +1,4 @@
-import { Miniflare, convertV4MiniflareOptions, coupleWebSocket } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions, coupleWebSocket } from './adapters/d1-workerd.mjs';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { rootCertificates } from 'node:tls';

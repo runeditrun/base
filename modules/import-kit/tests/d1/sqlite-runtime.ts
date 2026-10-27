@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../../container/adapters/d1-sqlite.mjs';
 import { d1Preflight, d1NativeLimits } from '../../../container/adapters/d1-limits.mjs';
 import { sqliteRows } from './sqlite-text.ts';
 import { mkdtempSync, rmSync } from 'node:fs';

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../container/adapters/d1-sqlite.mjs';
 import { validateMigrations, migrate } from '../migrations.mjs';
 import { ledgerShapeQuery, migrationLedgerShape } from '../migration-ledger.mjs';
 import { hash } from '../validation.mjs';
