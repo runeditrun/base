@@ -33,7 +33,8 @@ export function editionMigrations(record, {tree, read, revision, base, recordPat
   const missing = applicable.filter(step => !consent.includes(step.id));
   if (missing.length) {
     const cli = fileURLToPath(new URL('./cli.mjs', import.meta.url));
-    const command = `${quote(process.execPath)} ${quote(cli)} refresh-base ${revision} --base ${quote(base)} --record ${quote(recordPath)}${offline ? ' --offline' : ''}${applicable.map(step => ' --edition-migration ' + step.id).join('')}`;
+    // Keep automatic acquisition automatic: its temporary checkout closes on refusal.
+    const command = `${quote(process.execPath)} ${quote(cli)} refresh-base ${revision}${base ? ' --base ' + quote(base) : ''} --record ${quote(recordPath)}${offline ? ' --offline' : ''}${applicable.map(step => ' --edition-migration ' + step.id).join('')}`;
     throw Error(`Edition migrations require consent before planning:\n${missing.map(step => `${step.id}: ${step.copies.join(', ')}; ${step.guide}: ${step.edit}`).join('\n')}\nReview the guides and repeat exactly: ${command}\nRefresh will leave these edition-owned edits owed; no files were refreshed.`);
   }
   return applicable;

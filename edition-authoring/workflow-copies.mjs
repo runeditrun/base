@@ -60,8 +60,22 @@ export function adoptWorkflowTemplates(root, plans, {tree, read, revision, files
   return {templateAdoptions, notices};
 }
 
-// Over-approximate shell words, then require a source in the caller's template
-// namespace. Command position cannot hide helpers behind wrappers or flags.
+function runScalar(value) {
+  const single = /^'((?:''|[^'])*)'\s*(?:#.*)?$/.exec(value);
+  if (single) return single[1].replace(/''/g, "'");
+  const double = /^"((?:\\.|[^"\\])*)"\s*(?:#.*)?$/.exec(value);
+  if (!double) return value;
+  const escapes = {'0': '\0', a: '\x07', b: '\b', t: '\t', '\t': '\t', n: '\n', v: '\v', f: '\f', r: '\r', e: '\x1b',
+    ' ': ' ', '"': '"', '/': '/', '\\': '\\', N: '\u0085', _: '\u00a0', L: '\u2028', P: '\u2029'};
+  return double[1].replace(/\\(?:x([\da-fA-F]{2})|u([\da-fA-F]{4})|U([\da-fA-F]{8})|([\s\S]))/g, (_, x, u, U, character) => {
+    if (x || u || U) return String.fromCodePoint(parseInt(x ?? u ?? U, 16));
+    if (!Object.hasOwn(escapes, character)) throw Error(`Unsupported YAML escape in workflow run scalar: \\${character}`);
+    return escapes[character];
+  });
+}
+
+// Decode the YAML scalar before over-approximating shell words, then require a
+// source in the caller's template namespace. Wrappers and flags may invoke helpers.
 function invocations(text) {
   const names = new Set();
   const add = word => {
@@ -78,8 +92,8 @@ function invocations(text) {
     const run = /^\s*(?:-\s*)?run:\s*(.*)$/.exec(line);
     let command = blockIndent !== null ? line : '';
     if (run) {
-      if (/^[|>][-+]?\s*(?:#.*)?$/.test(run[1])) blockIndent = line.indexOf('run:');
-      else command = run[1];
+      if (/^[|>](?:[1-9][-+]?|[-+][1-9]?)?\s*(?:#.*)?$/.test(run[1])) blockIndent = line.indexOf('run:');
+      else command = runScalar(run[1]);
     }
     const uses = /^\s*(?:-\s*)?uses:\s*['"]?\.\/(.*?)['"]?\s*(?:#.*)?$/.exec(line);
     if (uses) add(uses[1]);
@@ -96,7 +110,7 @@ function invocations(text) {
 
 function candidates(source, invoked) {
   if (invoked.startsWith('.github/workflows/')) return ['export/' + path.posix.basename(invoked), 'default-seed/' + invoked];
-  if (source.startsWith('default-seed/')) return ['default-seed/' + invoked];
+  if (source.startsWith('default-seed/')) return ['default-seed/' + invoked, 'export/' + invoked.replace(/^scripts\//, '')];
   if (source.startsWith('export/')) return ['export/' + invoked.replace(/^scripts\//, ''), 'default-seed/' + invoked,
     ...(invoked.startsWith('scripts/') ? [invoked.slice(8)] : [])].filter(name => !name.startsWith('scripts/') && !name.startsWith('.github/workflows/'));
   return [];

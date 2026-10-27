@@ -1,7 +1,7 @@
 // All recorded code uses the same source graph and seed ownership boundary.
 import fs from 'node:fs';
 import path from 'node:path';
-import {raw, safe, requirePhysical, testSource} from './files.mjs';
+import {raw, safe, requirePhysical, testSource, freedEntries} from './files.mjs';
 import {specifiers, resolve, bindings, lexicalExports} from './runtime-dependencies.mjs';
 const code = name => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(name) && !testSource(name);
 const inside = (name, prefix) => prefix === '.' ? !name.startsWith('../') && !path.posix.isAbsolute(name) : name === prefix || name.startsWith(prefix + '/');
@@ -16,12 +16,12 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   const blob = entry => read.blobs([entry.object]).get(entry.object).toString('utf8');
   const local = target => fs.readFileSync(path.join(root, target), 'utf8');
   const refuse = (target, reason, recovery) => { throw Error(`Cannot refresh module ${target}: ${reason}. Run ${recovery}, then repeat refresh-base; no files were refreshed.`); };
-  const removedObjects = new Set();
+  const removedObjects = freedEntries(root);
   for (const plan of plans) for (const target of plan.removed) {
     const stat = requirePhysical(root, target, {cache}).stat;
-    if (stat) removedObjects.add(stat.nlink > 1 ? target : `${stat.dev}:${stat.ino}`);
+    if (stat) removedObjects.add(target, stat);
   }
-  const inspect = target => requirePhysical(root, safe(target), {cache, freed: (relative, stat) => stat.isFile() && removedObjects.has(stat.nlink > 1 ? relative : `${stat.dev}:${stat.ino}`)});
+  const inspect = target => requirePhysical(root, safe(target), {cache, freed: removedObjects.has});
   function enqueue(plan, source, entry, adapted = false) {
     const target = mapped(source, plan.copy);
     if (!adapted) planned.set(target, {plan, source, entry});
@@ -54,9 +54,12 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     if (owner) return;
     if (index.has(target)) {
       if (!physical.stat) refuse(target, 'tracked edition source is missing', `git restore -- ${quote(target)}`);
-      return;
+      // Equal incoming bytes can be recorded without changing owner source.
+      // Otherwise it remains an independent implementation of this edge.
+      const entry = tree.get(source);
+      if (!entry || local(target) !== blob(entry)) return;
     }
-    if (physical.stat) refuse(target, 'existing file has no Base copy record or Git index entry', `git add -f -- ${quote(target)}`);
+    if (physical.stat && !index.has(target)) refuse(target, 'existing file has no Base copy record or Git index entry', `git add -f -- ${quote(target)}`);
     let plan = plans.find(plan => inside(target, plan.copy.path));
     if (plan && mapped(source, plan.copy) !== target) refuse(target, 'conflicting directory mapping', '${EDITOR:-vi} base-copies.json');
     if (!plan) {
@@ -94,20 +97,20 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     const {destination} = edge(item.source, item.target, specifier);
     if (destination) incoming.add(destination);
   }
-  function exportsAt(target, seen = new Set()) {
+  function exportsAt(target, types = false, seen = new Set()) {
     if (seen.has(target)) return new Set();
     seen.add(target); inspect(target);
     if (!disk.has(target)) return null;
     const result = lexicalExports(local(target), specifier => {
       const next = resolve(disk, target, specifier);
-      return next ? exportsAt(next, seen) : null;
-    });
+      return next ? exportsAt(next, types, seen) : null;
+    }, types);
     if (result === null) return null;
     const declaration = target.replace(/\.mjs$/, '.d.mts').replace(/\.js$/, '.d.ts');
-    if (declaration !== target && disk.has(declaration)) {
-      const types = exportsAt(declaration, seen);
-      if (types === null) return null;
-      for (const name of types) result.add(name);
+    if (types && declaration !== target && disk.has(declaration)) {
+      const declared = exportsAt(declaration, true, seen);
+      if (declared === null) return null;
+      for (const name of declared) result.add(name);
     }
     return result;
   }
@@ -120,14 +123,20 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     const before = Object.hasOwn(plan.copy.files, target) && disk.has(target) ? local(target) : '';
     const baseline = new Set(specifiers(before));
     const imports = bindings(bytes), oldBindings = bindings(before);
+    const typeImports = bindings(bytes, true), oldTypes = bindings(before, true);
     const edges = specifiers(bytes).map(specifier => edge(source, target, specifier));
     const declaration = source.replace(/\.mjs$/, '.d.mts').replace(/\.cjs$/, '.d.cts');
     if (declaration !== source && tree.has(declaration)) edges.push({dependency: declaration, destination: target.replace(/\.mjs$/, '.d.mts').replace(/\.cjs$/, '.d.cts')});
     const novel = directoryAdditions.has(target) && !required.has(target) && !incoming.has(target);
+    // Preserve a pre-existing unresolved edge only when Base cannot place it.
+    // Recorded removals and witnessed missing helpers must still be checked.
+    const preserved = ({specifier, dependency, destination}) => specifier && baseline.has(specifier) &&
+      !resolve(disk, target, specifier) && !recorded.has(destination) &&
+      (!dependency || !witness(destination, dependency));
     let hold;
     for (const edge of edges) {
       const {specifier, dependency, destination, satisfied} = edge;
-      if (specifier && baseline.has(specifier) && !resolve(disk, target, specifier)) continue;
+      if (preserved(edge)) continue;
       if (satisfied) continue;
       if (!dependency) refuse(target, `no Base source for ${specifier}`, `\${EDITOR:-vi} ${quote(target)}`);
       if (!witness(destination, dependency)) {
@@ -139,14 +148,17 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
       plan.sources = plan.sources.filter(([name]) => name !== source);
       planned.delete(target); withheld.push(hold); continue;
     }
-    for (const {specifier, dependency, destination} of edges) {
-      if (specifier && baseline.has(specifier) && !resolve(disk, target, specifier)) continue;
+    for (const edge of edges) {
+      const {specifier, dependency, destination} = edge;
+      if (preserved(edge)) continue;
       include(dependency, destination);
       const owner = recorded.get(destination);
       if (!adapted && !planned.has(destination) && (index.has(destination) || owner?.copy.adapted?.[destination])) {
-        const exported = exportsAt(destination);
-        for (const name of imports.get(specifier) ?? []) if (exported && !exported.has(name) && !oldBindings.get(specifier)?.has(name)) {
-          refuse(target, `${destination} does not export ${name}; merge Base ${dependency} at ${revision} into that seed-owned file`, `git -C ${quote(base)} show ${quote(revision + ':' + dependency)} > ${quote(destination + '.base')}`);
+        for (const [types, current, previous] of [[false, imports, oldBindings], [true, typeImports, oldTypes]]) {
+          const exported = exportsAt(destination, types);
+          for (const name of current.get(specifier) ?? []) if (exported && !exported.has(name) && !previous.get(specifier)?.has(name)) {
+            refuse(target, `${destination} does not export ${name}; merge Base ${dependency} at ${revision} into that seed-owned file`, `git -C ${quote(base)} show ${quote(revision + ':' + dependency)} > ${quote(destination + '.base')}`);
+          }
         }
       }
     }

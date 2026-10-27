@@ -27,6 +27,15 @@ test('Base and delivered workflow templates parse with their local reusable work
   // on Actions YAML, expressions, contexts and reusable-workflow contracts.
   const result = spawnSync('actionlint', ['-shellcheck=', '-pyflakes=', ...files.map(name => join(workflows, name))], { cwd: project, encoding: 'utf8' });
   assert.equal(result.status, 0, `${source}: ${result.error?.message ?? ''}\n${result.stdout ?? ''}${result.stderr ?? ''}\nInstall with bash scripts/install-actionlint.sh and add its directory to PATH.`);
+  if (source === 'export') for (const name of files) {
+   const text = await readFile(join(workflows, name), 'utf8');
+   for (const block of text.matchAll(/^([ \t]*)path:\s*\|\s*\n((?:\1[ \t]+[^\n]*\n)+)/gm)) {
+    for (const entry of block[2].trim().split('\n').map(line => line.trim())) {
+     const expanded = entry.replaceAll('${{ runner.temp }}', join(project, 'runner-temp')).replace(/^~(?=\/)/, project).replaceAll('$HOME', project).replaceAll('${HOME}', project);
+     assert.equal(expanded === project || expanded.startsWith(project + '/') && !expanded.startsWith(join(project, 'runner-temp') + '/'), false, `${source}/${name}: cache must stay outside HOME: ${entry}`);
+    }
+   }
+  }
  }
 });
 // Public GitHub responses recorded 2026-10-23: runeditrun/base Verify run

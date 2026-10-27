@@ -351,7 +351,8 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
   try {
     const read = reader(origin);
     const next = read.tree(revision);
-    const migrations = editionMigrations(record, {tree: next, read, revision, base: origin.repository, recordPath, offline, consent: editionMigration});
+    const migrations = editionMigrations(record, {tree: next, read, revision, base: base ? origin.repository : null, recordPath, offline, consent: editionMigration});
+    const index = new Set(raw(root, 'ls-files', '-z').toString('utf8').split('\0').filter(Boolean));
     for (const name of record.copies.flatMap(copy => Object.keys(copy.files))) requirePhysical(root, name);
     const upstream = read.digests([...next.values()].map(({object}) => object));
     const local = name => files.get(name)?.regular ? hash(files.get(name).read()) : null;
@@ -388,14 +389,14 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       const pinned = read.tree(copy.revision);
       if (retired) return {copy, sources: [], retired, removed: [copy.path]};
       const tests = Object.keys(copy.files).some(name => testSource(mapped(name, copy.path, copy.originPath)));
-      const sources = [...next].filter(([name]) => {
+      const sources = [...next].filter(([name, entry]) => {
         if (!within(name, copy.originPath)) return false;
         const target = mapped(name, copy.originPath, copy.path), actual = local(target);
         if (Object.hasOwn(copy.adapted || {}, target)) return false;
         if (Object.hasOwn(copy.files, target)) {
           return Boolean(actual);
         }
-        if (actual) return false; // Tracked, unrecorded files remain seed-owned, even when equal.
+        if (actual) return index.has(target) && actual === upstream.get(entry.object);
         return !pinned.has(name) && (tests || !testSource(name));
       });
       if (!sources.length && !Object.keys(copy.adapted || {}).length) throw Error(`No Base source at ${copy.originPath} in ${revision}`);
@@ -408,18 +409,14 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       deliveries: migrations.flatMap(step => step.deliver.map(source => ({source, origin: step.origin, importers: step.copies})))});
     // Closure may add individually recorded siblings when the seed originally
     // selected runtime files one at a time instead of copying the directory.
-    record.copies = plans.map(plan => plan.copy).sort((a, b) => a.path.localeCompare(b.path));
     // A migration a database may already have applied is never rewritten in place:
     // the schema change it brings belongs in a new migration of the seed's own.
     const applied = plans.flatMap(({copy, sources}) => sources.map(([source, {object}]) => [mapped(source, copy.originPath, copy.path), object])
       .filter(([name, object]) => name.split('/').slice(0, -1).includes('migrations') && local(name) && local(name) !== upstream.get(object)).map(([name]) => name));
     if (applied.length) throw Error(`Refusing to rewrite migrations that may already be applied: ${applied.join(', ')}. Base changed these files after they were copied; keep them as they are, drop them from ${recordPath}, and add a new migration for the change instead.`);
     const bytes = read.blobs(plans.flatMap(plan => plan.sources.map(([, {object}]) => object)));
-    preflightRefresh(root, plans, recordPath, files);
     const changes = [];
-    writing = true;
     for (const {copy, sources, removed} of plans) {
-      for (const name of removed) { noLinks(root, name); fs.rmSync(path.join(root, name), {force: true}); }
       const recorded = {}, modes = {}, added = [];
       for (const name of Object.keys(copy.adapted || {})) {
         recorded[name] = copy.files[name];
@@ -429,10 +426,6 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
         const name = safe(mapped(source, copy.originPath, copy.path));
         noLinks(root, name);
         if (!Object.hasOwn(copy.files, name)) added.push(name);
-        const target = path.join(root, name);
-        fs.mkdirSync(path.dirname(target), {recursive: true});
-        fs.writeFileSync(target, bytes.get(object));
-        fs.chmodSync(target, mode === '100755' ? 0o755 : 0o644);
         recorded[name] = upstream.get(object); modes[name] = mode;
       }
       changes.push({path: copy.path, from: copy.revision, files: sources.length, added, removed});
@@ -441,6 +434,19 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     record.copies = plans.filter(plan => !plan.retired).map(plan => plan.copy);
     delete record.repository;
     validate(record);
+    preflightRefresh(root, plans, recordPath, files);
+    writing = true;
+    for (const {copy, sources, removed} of plans) {
+      for (const name of removed) { noLinks(root, name); fs.rmSync(path.join(root, name), {force: true}); }
+      for (const [source, {object, mode}] of sources) {
+        const name = safe(mapped(source, copy.originPath, copy.path));
+        noLinks(root, name);
+        const target = path.join(root, name);
+        fs.mkdirSync(path.dirname(target), {recursive: true});
+        fs.writeFileSync(target, bytes.get(object));
+        fs.chmodSync(target, mode === '100755' ? 0o755 : 0o644);
+      }
+    }
     fs.writeFileSync(filename, json(record));
     return {refreshed: revision, record: recordPath, copies: changes, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, withheld, editionMigrations: migrations.map(({id, guide, edit, copies}) => ({id, guide, edit, copies})), ...templates, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
   } catch (error) {

@@ -43,7 +43,7 @@ export function resolve(tree, source, specifier) {
 const tokens = source => [...source.matchAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|`(?:\\[\s\S]|[^`\\])*`|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"|[\w$]+|[^\s]/g)]
   .map(match => match[0]).filter(token => !/^(?:\/\/|\/\*|`)/.test(token));
 const unquote = value => /^['"]/.test(value ?? '') ? value.slice(1, -1) : null;
-export function bindings(source) {
+export function bindings(source, types = false) {
   const t = tokens(source), result = new Map();
   for (let i = 0; i < t.length; i++) {
     if (!['import', 'export'].includes(t[i]) || ['.', '('].includes(t[i + 1])) continue;
@@ -54,29 +54,36 @@ export function bindings(source) {
     if (!specifier?.startsWith('.')) continue;
     const names = new Set(result.get(specifier) ?? []);
     let start = i + 1;
-    if (t[start] === 'type') start++;
-    if (t[i] === 'import' && /^[\w$]+$/.test(t[start] ?? '') && t[start] !== 'from') names.add('default');
+    const declarationType = t[start] === 'type';
+    if (declarationType) start++;
+    if (declarationType === types && t[i] === 'import' && /^[\w$]+$/.test(t[start] ?? '') && t[start] !== 'from') names.add('default');
     const open = t.indexOf('{', start);
     if (open >= 0 && open < end) for (let j = open + 1; j < end && t[j] !== '}'; j++) {
-      if (t[j] === ',' || t[j] === 'type') continue;
-      names.add(unquote(t[j]) ?? t[j]);
+      if (t[j] === ',') continue;
+      const inlineType = t[j] === 'type' && /^[\w$]+$/.test(t[j + 1] ?? '') && t[j + 1] !== 'as';
+      if (inlineType) j++;
+      if ((declarationType || inlineType) === types) names.add(unquote(t[j]) ?? t[j]);
       if (t[j + 1] === 'as') j += 2;
     }
     result.set(specifier, names);
   }
   return result;
 }
-export function lexicalExports(source, star) {
+export function lexicalExports(source, star, types = false) {
   const t = tokens(source), names = new Set();
   for (let i = 0; i < t.length; i++) {
     if (t[i] !== 'export') continue;
     let j = i + 1;
     if (t[j] === 'default') { names.add('default'); continue; }
-    if (t[j] === 'declare') j++;
+    const declared = t[j] === 'declare';
+    if (declared) j++;
     if (t[j] === 'async') j++;
     if (['const', 'let', 'var'].includes(t[j]) && ['{', '['].includes(t[j + 1])) return null;
     if (['const', 'let', 'var', 'function', 'class', 'interface', 'type', 'enum', 'namespace'].includes(t[j]) && t[j + 1] !== '{') {
-      names.add(t[j + 1]);
+      if (!types && (declared || ['interface', 'type'].includes(t[j]))) continue;
+      const name = t[j] === 'function' && t[j + 1] === '*' ? t[j + 2] : t[j + 1];
+      if (!/^[\w$]+$/.test(name ?? '')) return null;
+      names.add(name);
       if (['const', 'let', 'var'].includes(t[j])) {
         let depth = 0;
         for (let k = j + 2; k < t.length; k++) {
@@ -91,7 +98,11 @@ export function lexicalExports(source, star) {
       }
       continue;
     }
-    if (t[j] === 'type') j++;
+    const declarationType = t[j] === 'type';
+    if (declarationType) {
+      if (!types) continue;
+      j++;
+    }
     if (t[j] === '*') {
       if (t[j + 1] === 'as') { names.add(t[j + 2]); continue; }
       const specifier = unquote(t[j + 2]);
@@ -101,7 +112,9 @@ export function lexicalExports(source, star) {
       for (const name of inherited) if (name !== 'default') names.add(name);
     }
     if (t[j] === '{') for (j++; j < t.length && t[j] !== '}'; j++) {
-      if ([',', 'type'].includes(t[j])) continue;
+      if (t[j] === ',') continue;
+      const inlineType = t[j] === 'type' && /^[\w$]+$/.test(t[j + 1] ?? '') && t[j + 1] !== 'as';
+      if (inlineType) { j++; if (!types) { if (t[j + 1] === 'as') j += 2; continue; } }
       if (t[j + 1] === 'as') { names.add(unquote(t[j + 2]) ?? t[j + 2]); j += 2; }
       else names.add(unquote(t[j]) ?? t[j]);
     }

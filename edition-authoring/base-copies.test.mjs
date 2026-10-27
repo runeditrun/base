@@ -322,6 +322,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
     {name: 'mirror-origin helper record', mirrorRecord: true},
     {name: 'adapted root imports', adapted: true},
     {name: 'removed recorded helper', removed: true},
+    {name: 'pre-existing partial bootstrap', bootstrap: true},
   ];
   for (const row of cases) {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-authoring-'));
@@ -331,8 +332,8 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       const root = 'scripts/edition-authoring/refresh.mjs';
       const helper = 'scripts/edition-authoring/helper.mjs';
       const leaf = 'scripts/edition-authoring/leaf.mjs';
-      const rootBytes = 'export const refresh = "synthetic-base";\n';
       const incomingBytes = 'import {helper} from "./helper.mjs";\nexport const refresh = helper;\n';
+      const rootBytes = row.removed || row.bootstrap ? incomingBytes : 'export const refresh = "synthetic-base";\n';
       const initialHelper = 'export const helper = true;\n';
       const helperBytes = 'export {leaf as helper} from "./leaf.mjs";\n';
       const leafBytes = 'export const leaf = "synthetic-base-leaf";\n';
@@ -382,6 +383,9 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
         assert.deepEqual(snapshotTree(seed), before, `${row.name}: refusal preserves all bytes, modes and records`);
         if (row.removed) {
           assert.match(result.error, /restore|adapt/i);
+          git(seed, 'restore', '--', helper);
+          ok(seed, 'refresh-base', next, '--base', base);
+          assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
           continue;
         }
         const recovery = `git add -f -- '${helper}'`;
@@ -413,19 +417,20 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       assert.equal(ok(seed, 'verify-base', '--base', base).ok, true, row.name);
     } finally { fs.rmSync(temp, {recursive: true, force: true}); }
   }
-  for (const row of ['named', 'default', 'type', 'declaration', 'multi', 'star', 'unknown', 'baseline', 'mapped', 'extensionless', 'withhold', 'witness', 'unplaceable']) {
+  for (const row of ['named', 'default', 'type', 'declaration', 'type-declaration', 'generator', 'equal', 'multi', 'star', 'unknown', 'baseline', 'mapped', 'extensionless', 'withhold', 'withhold-last', 'witness', 'unplaceable']) {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-module-'));
     try {
       const {base, seed, revision} = fixture(temp);
       const target = 'vendor/sample/index.mjs';
       ok(seed, 'record-base', ['mapped', 'extensionless'].includes(row) ? target : 'vendor/sample', ['mapped', 'extensionless'].includes(row) ? 'modules/sample/index.mjs' : 'modules/sample', revision, '--base', base);
       const specifier = row === 'extensionless' ? './helper.server' : row === 'witness' || row === 'unplaceable' ? '../shared/helper.mjs' : './helper.mjs';
-      const imported = row === 'default' ? 'import missing from' : row === 'type' ? 'import type {Missing} from' : 'import {missing} from';
+      const imported = row === 'default' ? 'import missing from' : row === 'type' ? 'import type {Missing} from' : row === 'type-declaration' ? 'import type {missing} from' : 'import {missing} from';
       const incoming = `${imported} "${specifier}?raw";\nexport const sample = 2;\n`;
       write(base, row === 'extensionless' ? 'modules/sample/helper.server.ts' : row === 'witness' || row === 'unplaceable' ? 'modules/shared/helper.mjs' : 'modules/sample/helper.mjs', 'export const missing = true;\n');
-      if (row === 'withhold') {
+      if (row === 'withhold' || row === 'withhold-last') {
         write(base, 'modules/sample/new.mjs', 'import {missing} from "../shared/helper.mjs";\n');
         write(base, 'modules/shared/helper.mjs', 'export const missing = true;\n');
+        if (row === 'withhold-last') for (const name of ['index.mjs', 'lib/util.mjs', 'helper.mjs', 'tests/sample.test.mjs']) fs.rmSync(path.join(base, 'modules/sample', name));
       } else write(base, 'modules/sample/index.mjs', incoming);
       if (row === 'witness') {
         write(base, 'modules/shared/witness.mjs', 'export const witness = true;\n');
@@ -433,8 +438,8 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
         write(seed, 'vendor/shared/witness.mjs', 'export const witness = true;\n');
         ok(seed, 'record-base', 'vendor/shared/witness.mjs', 'modules/shared/witness.mjs', witness, '--base', base);
       }
-      if (!['withhold', 'witness', 'unplaceable', 'extensionless'].includes(row)) {
-        write(seed, 'vendor/sample/helper.mjs', row === 'star' ? 'export * from "./leaf.mjs";\n' : row === 'multi' ? 'export const first = 1, missing = 2;\n' : row === 'unknown' ? 'export * from "synthetic-package";\n' : 'export const custom = true;\n');
+      if (!['withhold', 'withhold-last', 'witness', 'unplaceable', 'extensionless'].includes(row)) {
+        write(seed, 'vendor/sample/helper.mjs', row === 'star' ? 'export * from "./leaf.mjs";\n' : row === 'generator' ? 'export function* missing(){yield 1;}\n' : row === 'equal' ? 'export const missing = true;\n' : row === 'multi' ? 'export const first = 1, missing = 2;\n' : row === 'unknown' ? 'export * from "synthetic-package";\n' : 'export const custom = true;\n');
         if (row === 'mapped') {
           const bytes = 'export const missing = true;\n';
           write(base, 'other/helper.mjs', bytes);
@@ -442,7 +447,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
           ok(seed, 'record-base', 'vendor/sample/helper.mjs', 'other/helper.mjs', commit(base), '--base', base);
         }
         if (row === 'star') write(seed, 'vendor/sample/leaf.mjs', 'export const missing = true;\n');
-        if (row === 'declaration') write(seed, 'vendor/sample/helper.d.mts', 'export const missing: boolean;\n');
+        if (row === 'declaration' || row === 'type-declaration') write(seed, 'vendor/sample/helper.d.mts', 'export type missing = boolean;\n');
         if (row === 'baseline') {
           write(base, 'modules/sample/index.mjs', incoming);
           const baseline = commit(base);
@@ -455,10 +460,10 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
         }
         commit(seed);
       }
-      write(base, 'modules/sample/index.mjs', fs.readFileSync(path.join(base, 'modules/sample/index.mjs'), 'utf8') + '// incoming revision\n');
+      if (row !== 'withhold-last') write(base, 'modules/sample/index.mjs', fs.readFileSync(path.join(base, 'modules/sample/index.mjs'), 'utf8') + '// incoming revision\n');
       const next = commit(base), before = snapshotTree(seed);
       const result = run(seed, 'refresh-base', next, '--base', base);
-      const refused = ['named', 'default', 'type', 'unplaceable'].includes(row);
+      const refused = ['named', 'default', 'type', 'declaration', 'unplaceable', 'withhold-last'].includes(row);
       assert.equal(result.status, refused ? 1 : 0, `${row}: ${result.error}`);
       if (refused) assert.deepEqual(snapshotTree(seed), before, row);
       else if (row === 'withhold') {
@@ -467,6 +472,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       } else if (row === 'extensionless') assert.ok(fs.existsSync(path.join(seed, 'vendor/sample/helper.server.ts')));
       else if (row === 'witness') assert.ok(fs.existsSync(path.join(seed, 'vendor/shared/helper.mjs')));
       else assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/helper.mjs'), 'utf8'), before['vendor/sample/helper.mjs'].bytes ? Buffer.from(before['vendor/sample/helper.mjs'].bytes, 'hex').toString() : '');
+      if (row === 'equal') assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
     } finally { fs.rmSync(temp, {recursive: true, force: true}); }
   }
 
@@ -482,24 +488,33 @@ test('refresh-base checks file and directory transitions after each plan removes
     {from: 'part/index.mjs', to: 'part', removeDirectory: true},
     {from: 'part.mjs', to: 'Part.mjs'},
     {from: 'part/index.mjs', to: 'Part/index.mjs', directoryCase: true},
+    {from: 'part/a.mjs', to: 'Part/a.mjs', directoryCase: true, imports: true},
   ];
-  for (const {from, to, refuses, removeDirectory, directoryCase} of cases) {
+  for (const {from, to, refuses, removeDirectory, directoryCase, imports} of cases) {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-transition-'));
     try {
       const {base, seed} = fixture(temp);
       git(base, 'config', 'core.ignorecase', 'false');
       git(seed, 'config', 'core.ignorecase', 'false');
-      write(base, `modules/sample/${from}`, 'old transition file\n');
-      write(seed, `vendor/sample/${from}`, 'old transition file\n');
+      const oldBytes = imports ? 'import {b} from "./b.mjs"; export const a=b;\n' : 'old transition file\n';
+      const newBytes = imports ? 'import {b} from "./b.mjs"; export const a=b+1;\n' : 'new transition file\n';
+      write(base, `modules/sample/${from}`, oldBytes);
+      write(seed, `vendor/sample/${from}`, oldBytes);
+      if (imports) for (const [root, prefix] of [[base, 'modules/sample'], [seed, 'vendor/sample']]) write(root, `${prefix}/part/b.mjs`, 'export const b=1;\n');
       const revision = commit(base);
       commit(seed);
       ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
       ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
+      if (imports) {
+        git(base, 'mv', 'modules/sample/part', 'modules/sample/intermediate');
+        git(base, 'mv', 'modules/sample/intermediate', 'modules/sample/Part');
+      } else {
       fs.rmSync(path.join(base, 'modules/sample', from));
       git(base, 'rm', '--cached', '--', `modules/sample/${from}`);
       // Git does not track the now-empty source directories.
       if (from.includes('/')) fs.rmSync(path.join(base, 'modules/sample', from.split('/')[0]), {recursive: true});
-      write(base, `modules/sample/${to}`, 'new transition file\n');
+      }
+      write(base, `modules/sample/${to}`, newBytes);
       write(base, 'tools/helper.mjs', 'updated earlier copy\n');
       const next = commit(base);
       if (removeDirectory) {
@@ -514,7 +529,8 @@ test('refresh-base checks file and directory transitions after each plan removes
         assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), 'export const helper = true;\n');
         assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample', from), 'utf8'), 'old transition file\n');
       } else {
-        assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample', to), 'utf8'), 'new transition file\n');
+        assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample', to), 'utf8'), newBytes);
+        if (imports) execFileSync(process.execPath, [path.join(seed, 'vendor/sample', to)]);
         if (from !== to && from.toLowerCase() === to.toLowerCase()) git(seed, 'rm', '--cached', '--', `vendor/sample/${from}`);
         git(seed, 'add', '-A');
         // On insensitive filesystems mkdir reuses the old directory spelling.

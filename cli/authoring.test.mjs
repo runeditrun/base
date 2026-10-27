@@ -44,7 +44,7 @@ async function fixture(t) {
  old('record-base', 'vendor', 'module', revision, '--base', source);
  old('record-base', 'one.mjs', 'singleton.mjs', revision, '--base', source);
  commit(seed);
- return {seed, source, revision, run, result, old};
+ return {seed, source, revision, run, result, old, env, pkg};
 }
 
 test('a package-pinned seed adopts authoring and refreshes through the packed public commands', async t => {
@@ -111,6 +111,23 @@ test('packed authoring preserves source and provenance on invalid adoption and r
  const recipe = fs.readFileSync(path.join(seed, 'edition.json'));
  assert.equal(run('adopt-edition').status, 4);
  assert.deepEqual(fs.readFileSync(path.join(seed, 'edition.json')), recipe);
+ for (const acquisition of ['automatic', 'checkout', 'offline']) {
+  const {seed, source, old, pkg, env} = await fixture(t);
+  write(source, 'singleton.mjs', 'export const singleton = "migration";\n');
+  const introduced = commit(source);
+  write(source, 'foundation/edition-migrations.json', JSON.stringify({schemaVersion: 1, migrations: [{id: 'fixture-edit', introduced, origin: 'singleton.mjs', deliver: [], guide: 'export/guide.md', edit: 'Review edition data.'}]}));
+  const next = commit(source);
+  const flags = acquisition === 'automatic' ? [] : ['--base', source, ...(acquisition === 'offline' ? ['--offline'] : [])];
+  const before = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  const refused = spawnSync(process.execPath, [path.join(pkg, 'edition-authoring/cli.mjs'), 'refresh-base', next, ...flags], {cwd: seed, env, encoding: 'utf8'});
+  assert.equal(refused.status, 1, refused.stderr);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), before);
+  const command = refused.stderr.match(/repeat exactly: (.+)/)?.[1];
+  assert.ok(command, acquisition);
+  const recovered = spawnSync('bash', ['-c', command], {cwd: seed, env, encoding: 'utf8'});
+  assert.equal(recovered.status, 0, recovered.stderr);
+  assert.equal(old('verify-base', '--base', source).ok, true);
+ }
 });
 
 test('packed refresh delivers and adopts templates with their helpers atomically', async t => {
@@ -161,6 +178,28 @@ test('packed refresh delivers and adopts templates with their helpers atomically
   git(seed, 'add', '-A');
  }
 
+ for (const [origin, scalar] of [
+  ['default-seed/.github/workflows/literal.yml', 'node scripts/literal-helper.mjs'],
+  ['export/literal.yml', '"bash -c \'node scripts/literal-helper.mjs\'"'],
+  ['export/literal.yml', '|2\n          node scripts/literal-helper.mjs'],
+ ]) {
+  const {seed, source, old, result} = await fixture(t);
+  const target = '.github/workflows/literal.yml';
+  write(source, origin, 'jobs:\n  check:\n    steps:\n      - run: echo before\n');
+  const pin = commit(source);
+  write(seed, target, fs.readFileSync(path.join(source, origin)));
+  old('record-base', target, origin, pin, '--base', source);
+  commit(seed);
+  write(source, origin, `jobs:\n  check:\n    steps:\n      - run: ${scalar}\n`);
+  write(source, 'export/literal-helper.mjs', 'export const helper = true;\n');
+  const next = commit(source);
+  result('refresh-base', '--ref', next, '--base', source);
+  assert.equal(fs.readFileSync(path.join(seed, 'scripts/literal-helper.mjs'), 'utf8'), 'export const helper = true;\n');
+  const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json')));
+  assert.equal(record.copies.filter(copy => Object.hasOwn(copy.files, 'scripts/literal-helper.mjs')).length, 1);
+  assert.equal(old('verify-base', '--base', source).ok, true);
+ }
+
 
  for (const historyRoot of ['export', 'default-seed']) {
  for (const ownership of ['tracked', 'diverged', 'untracked', 'ignored', 'adapted']) {
@@ -196,7 +235,8 @@ test('packed refresh delivers and adopts templates with their helpers atomically
    assert.deepEqual(fs.readFileSync(path.join(seed, workflow)), before);
    assert.equal(refreshed.notices.length, 1);
    assert.ok(refreshed.notices[0].includes(workflow));
-   assert.ok(refreshed.notices[0].includes('record-base'));
+   const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json'), 'utf8'));
+   assert.equal(record.copies.some(copy => Object.hasOwn(copy.files, workflow) && !copy.adapted?.[workflow]), false);
    assert.equal(fs.existsSync(path.join(seed, 'scripts/future-helper.py')), false);
   }
   const after = fs.readFileSync(path.join(seed, 'base-copies.json'));

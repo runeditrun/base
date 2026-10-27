@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {git, raw, safe, noLinks, requirePhysical} from './files.mjs';
+import {git, raw, safe, noLinks, requirePhysical, freedEntries} from './files.mjs';
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 
 // -v marks assume-unchanged; -f marks fsmonitor-valid. Read them separately
@@ -73,27 +73,14 @@ export function requireMaterializedCopies(root, record, files) {
 // created directories, or two new names differing only in case on an insensitive
 // volume. Only earlier removals are remembered; no future directory is modelled.
 export function preflightRefresh(root, plans, recordPath, seedFiles) {
-  const uid = process.geteuid?.(), freed = new Set();
-  const identity = (name, stat) => stat.nlink > 1 ? name : `${stat.dev}:${stat.ino}`;
+  const uid = process.geteuid?.(), freed = freedEntries(root);
   const writable = (target, stat, directory = false) => {
     if (uid === 0 && !(stat.mode & 0o222)) throw Error('no write permission bits');
     fs.accessSync(target, fs.constants.W_OK | (directory ? fs.constants.X_OK : 0));
   };
   const cache = new Map();
-  function freedEntry(relative, stat, parent) {
-    if (stat.isFile()) return freed.has(identity(relative, stat));
-    if (!parent || !stat.isDirectory() || !freed.size) return false;
-    let found = false;
-    const empty = directory => fs.readdirSync(directory).every(name => {
-      const absolute = path.join(directory, name), child = fs.lstatSync(absolute);
-      if (child.isDirectory()) return empty(absolute);
-      const removed = child.isFile() && freed.has(identity(path.relative(root, absolute), child));
-      found ||= removed; return removed;
-    });
-    return empty(path.join(root, relative)) && found;
-  }
   function inspect(name) {
-    return requirePhysical(root, name, {cache, freed: freedEntry});
+    return requirePhysical(root, name, {cache, freed: freed.has});
   }
   function check(name, operation) {
     try {
@@ -102,7 +89,7 @@ export function preflightRefresh(root, plans, recordPath, seedFiles) {
         if (!stat) return;
         writable(parent, parentStat, true);
         if (uid !== undefined && uid !== 0 && (parentStat.mode & 0o1000) && uid !== parentStat.uid && uid !== stat.uid) throw Error('sticky parent and file are owned by another user');
-        freed.add(identity(name, stat));
+        freed.add(name, stat);
       } else if (stat) {
         if (operation !== 'record' && !seedFiles.has(name)) throw Error('existing destination is ignored');
         writable(target, stat);

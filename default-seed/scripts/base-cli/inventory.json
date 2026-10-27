@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.gd27459c4",
+  "cliVersion": "0.2.83-dev.g8cc6f175",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1175,7 +1175,7 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "2a4a3a238d7b22f9d807a3dca394c1c5de483e38dd8365994151459196372084"
+      "sha256": "aca40bc76e6121ba4f1995ded28d0d23ed35dbcab2809d7d4e54be63af938ea7"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
@@ -1183,15 +1183,15 @@
     },
     "edition-authoring/copy-checkout.mjs": {
       "source": "edition-authoring/copy-checkout.mjs",
-      "sha256": "161fbfbd76297d7c469fbdccc0f049b3e68a214d39e9363c55d581cf4ec387a1"
+      "sha256": "20c76c63ddfbac3ebaf668f79df3bbd74735e01594d050909d98a10098b51e3d"
     },
     "edition-authoring/edition-migrations.mjs": {
       "source": "edition-authoring/edition-migrations.mjs",
-      "sha256": "56aafcef0f4b9918179aa9ecb170ca6cf1300237c124578cef8b2cf20bf3c11a"
+      "sha256": "06bd0265a1ea1910d5982ecb7d6c22f48435c67caab3e067e24f724b10856eeb"
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
-      "sha256": "d7ae0e5dc877e9ac307f52809ea830591b078a2891afd85be9663ee74d9884f9"
+      "sha256": "42447f805447abbea8c8b7bdd89ae423e1e5ce2f44b8e405fd57cf0b1386ad1c"
     },
     "edition-authoring/lock.mjs": {
       "source": "edition-authoring/lock.mjs",
@@ -1203,7 +1203,7 @@
     },
     "edition-authoring/module-closure.mjs": {
       "source": "edition-authoring/module-closure.mjs",
-      "sha256": "a9bf2619eea1bd7fc2c17c374a5ef4f84090f2926d7d3f8821f5b6a01c424c83"
+      "sha256": "1d0b984f95ab62432e7a88e9fe044fd4c9753cb08a4abc6e6687dcc19c8a5766"
     },
     "edition-authoring/offline-git.mjs": {
       "source": "edition-authoring/offline-git.mjs",
@@ -1223,7 +1223,7 @@
     },
     "edition-authoring/runtime-dependencies.mjs": {
       "source": "edition-authoring/runtime-dependencies.mjs",
-      "sha256": "a4c8d63940532e81b3cb862f7461eb5d9cb9d96d35f1c5c9d386e14c1e7a89f2"
+      "sha256": "b8d0f93649963bb96366f68c68dcd54bd399a75fcabdeffceee865d7aa8941c4"
     },
     "edition-authoring/sources.mjs": {
       "source": "edition-authoring/sources.mjs",
@@ -1235,7 +1235,7 @@
     },
     "edition-authoring/workflow-copies.mjs": {
       "source": "edition-authoring/workflow-copies.mjs",
-      "sha256": "830a3d3566a3f67b04c83b31d19ada076a310814bc06b4e600349feafbb437b9"
+      "sha256": "9426d05779bc0af56c63a867f70064c6a754ee2a7eff92164b891477f33c8106"
     },
     "foundation/runtime/seed-contract.mjs": {
       "source": "foundation/runtime/seed-contract.mjs",

@@ -40,6 +40,26 @@ export function safe(name) {
 }
 // One physical spelling/type check for refresh writes and dependencies. Cache
 // directory entries only for one read-only planning pass; removals take priority.
+export function freedEntries(root) {
+  const removed = new Set();
+  const identity = (name, stat) => stat.nlink > 1 ? name : `${stat.dev}:${stat.ino}`;
+  return {
+    add: (name, stat) => removed.add(identity(name, stat)),
+    has(relative, stat, parent) {
+      if (stat.isFile()) return removed.has(identity(relative, stat));
+      if (!parent || !stat.isDirectory() || !removed.size) return false;
+      let found = false;
+      const empty = directory => fs.readdirSync(directory).every(name => {
+        const absolute = path.join(directory, name), child = fs.lstatSync(absolute);
+        if (child.isDirectory()) return empty(absolute);
+        const freed = child.isFile() && removed.has(identity(path.relative(root, absolute), child));
+        found ||= freed;
+        return freed;
+      });
+      return empty(path.join(root, relative)) && found;
+    },
+  };
+}
 export function physicalEntry(root, name, {cache = new Map(), freed = () => false} = {}) {
   let parent = root, parentStat = fs.lstatSync(root);
   const parts = safe(name).split('/');
