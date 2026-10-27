@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix two starters both taking over a stale local operation lock by keeping its inode pinned through exclusive takeover and checking the owner token before release.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.
