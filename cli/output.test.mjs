@@ -37,6 +37,11 @@ test('CLI human readiness, phase timing and machine output stay distinct; large 
   stdout.length = 0; ready(output, details.url, details, false, details.siteUrl);
   assert.equal(stdout[0], `Your app is ready, open it: ${details.openUrl}\n`);
   assert.equal(stdout.join('').split('\n').filter(line=>line.startsWith('RER_')).join('\n'), machine);
+  stdout.length = 0; printer({json:false,keyless:true}).ready(details, {});
+  assert.equal(stdout.join('').split('\n')[0], `Your app is ready, open it: ${details.url}`);
+  assert.ok(!stdout.join('').includes(details.openUrl), 'front-door logs keep the private link out of the new lead line too');
+  stdout.length = 0; ready(output, details.url);
+  assert.equal(stdout.join(''), `Your app is ready, open it: ${details.url}\nRER_READY ${details.url}\n`);
  } finally { for (const mock of mocks) mock.mock.restore(); }
 
  const root = await mkdtemp(join(tmpdir(), 'rer-output-'));
