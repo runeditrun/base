@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import unittest
 from test_repo import ROOT, RepositoryFixture, resolving, LICENSE, generic_credential
+from hygiene_config import EMAIL
 
 
 class HygieneTests(RepositoryFixture, unittest.TestCase):
@@ -100,6 +101,39 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
         self.assertEqual(report['status'], 'FAIL')
         self.assertEqual({f['path'] for f in report['findings'] if f['rule'] == 'hygiene.email'},
                          {'fonts/b/LICENSE.txt', 'fonts/c/NOTICE.txt', 'fonts/d/README.txt', 'fonts/e/LICENSE.txt', 'fonts/f/LICENSE.txt'})
+
+    def test_third_party_licence_notice_is_public_only_as_the_listed_bytes(self):
+        # The vendored yaml licence: Base lists these exact bytes, whose upstream
+        # copyright notice carries the maintainer's address.
+        notice = (ROOT / 'edition-authoring/vendor/yaml/LICENSE').read_bytes()
+        maintainer = EMAIL.search(notice.decode()).group()
+        self.write('vendor/yaml/LICENSE', notice)
+        self.commit()
+        blob = self.git('hash-object', 'vendor/yaml/LICENSE')
+        # Historical, release-tree and untracked working-tree copies alike.
+        (self.repo / 'vendor/yaml/LICENSE').rename(self.repo / 'vendor/yaml/LICENSE.md')
+        self.commit()
+        self.write('vendor/copy/COPYING', notice)
+        report = self.report()
+        self.assertEqual(report['status'], 'PASS')
+        notices = {(n['path'], n['blob'], n['package']) for n in report['thirdPartyNotices']}
+        self.assertEqual(notices, {(path, blob, 'yaml') for path in ('vendor/yaml/LICENSE', 'vendor/yaml/LICENSE.md', 'vendor/copy/COPYING')})
+        # Negative controls: one changed byte, the exact bytes under other
+        # names, another licence text, plain text, an unrelated second address
+        # and the same address in a commit message.
+        self.write('vendor/a/LICENSE', notice.replace(b'Permission', b'permission', 1))
+        self.write('vendor/b/NOTICE', notice)
+        self.write('vendor/c/README', notice)
+        self.write('vendor/d/LICENSE', 'Copyright (c) Someone <' + maintainer + '>\n')
+        self.write('notes.txt', 'Maintainer: ' + maintainer)
+        self.write('CONTACT.txt', 'person' + '@' + 'gmail.com')
+        self.git('add', '.')
+        self.git('commit', '-qm', 'Vendor yaml; ask ' + maintainer)
+        report = self.report()
+        self.assertEqual(report['status'], 'FAIL')
+        self.assertEqual({f['path'] for f in report['findings'] if f['rule'] == 'hygiene.email'},
+                         {'vendor/a/LICENSE', 'vendor/b/NOTICE', 'vendor/c/README', 'vendor/d/LICENSE', 'notes.txt', 'CONTACT.txt', '@commit-message'})
+        self.assertEqual({(n['path'], n['blob'], n['package']) for n in report['thirdPartyNotices']}, notices)
 
     def test_ca_email_is_public_only_inside_a_pinned_trust_anchor_subject(self):
         # The real egress bundle: a Mozilla trust anchor's subject Name in the

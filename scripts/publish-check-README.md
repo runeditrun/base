@@ -143,6 +143,17 @@ in selected `PUBLISH-EXCEPTIONS.json` or Base's `license-exceptions.json`, bound
 to the exact licence bytes with `rule`, `path`, `holder`, `date`, `sha256`, and
 `reason`. This checks publication policy, not legal validity.
 
+Base's [`third-party-notices.json`](./publish-check/third-party-notices.json)
+lists the exact Git blob IDs of upstream licence texts whose copyright notice
+carries a third-party maintainer's address, with package, version, licence,
+source and reason. A `hygiene.email` match is suppressed only in a file named
+exactly `LICENSE`, `LICENCE`, `LICENSE.md`, `LICENSE.txt` or `COPYING` whose
+complete bytes have a listed blob ID, in history, the selected tree and working
+files alike; the address anywhere else, a licence file with any other bytes, the
+same bytes under another name, and every other rule still apply. Each suppressed
+match is listed in the report's `thirdPartyNotices` with its path, blob, package
+and version. Seed configuration cannot extend the list.
+
 ## Reviewed findings
 
 A selected `.publish-check/reviewed.json` may contain exact rule/path/blob

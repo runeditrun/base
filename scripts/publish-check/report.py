@@ -1,6 +1,7 @@
 """Caller-compatible, value-free publication reports."""
 from policy import safe_path
 from reviewed import FORBIDDEN
+from third_party_notices import RULE as NOTICE
 
 
 def new_report(public_base=False):
@@ -8,20 +9,23 @@ def new_report(public_base=False):
                 scanner=dict(name='gitleaks', version='8.30.1'),
                 history=dict(scope='selected-and-public-base' if public_base else 'all-local-refs-and-selected-commit',
                              commits=0, trees=0, blobs=0, commitMessages=0, tagMessages=0),
-                findings=[], preExisting=[], warnings=[], fixtures=[], reviewed=[], info=[],
+                findings=[], preExisting=[], warnings=[], fixtures=[], reviewed=[], info=[], thirdPartyNotices=[],
                 guarantees=dict(historyScanned=False, visualRecognition=False, environmentChecked=False))
 
 
 class Findings:
-    def __init__(self, report, reviewed, env_hashes):
+    def __init__(self, report, reviewed, env_hashes, notices=None):
         self.report, self.reviewed, self.env_hashes = report, reviewed, env_hashes
+        self.notices = notices or {}
         self.seen = {}
 
     def add(self, rule, path, commit=None, oid=None, scope='newly-public', bucket=None, scanner_rule=None):
         bucket = bucket or ('preExisting' if scope == 'pre-existing' and rule != 'secret.env-match' else 'findings')
         if rule in ('pending-public-destination', 'provenance.declared-source'):
             bucket = 'info'
-        if (rule, path, oid) in self.reviewed and bucket != 'info':
+        if rule == NOTICE:
+            bucket = 'thirdPartyNotices'
+        if (rule, path, oid) in self.reviewed and bucket not in ('info', 'thirdPartyNotices'):
             if rule in FORBIDDEN:
                 self.add('reviewed.forbidden', path, commit, oid, scope)
             else:
@@ -41,6 +45,8 @@ class Findings:
             item['scannerRule'] = scanner_rule
         if bucket == 'info':
             item['severity'] = 'INFO'
+        if bucket == 'thirdPartyNotices':
+            item.update(package=self.notices[oid]['package'], version=self.notices[oid]['version'])
         self.seen[key] = item
         self.report[bucket].append(item)
 

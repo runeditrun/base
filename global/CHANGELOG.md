@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The publication scan accepts the upstream copyright notice of a Base-listed third-party licence text only under an exact licence file name with the listed Git blob ID (initially the vendored yaml 2.9.1 `LICENSE`) and reports each in `thirdPartyNotices`; Base's per-path review records for it are removed, so scans of the unpacked rer tarball and of refreshed seeds pass without review records.
 - Refresh resolves every runtime import form without declaration files, reads workflow run steps from a YAML AST, preserves equal-byte tracked siblings as edition-owned discovery exceptions, and keeps ordinary baseline-unresolved imports unresolved. Local package conditions are selected by Node itself, excluding types for runtime edges. JavaScript runtime paths follow Node's explicit-file rules; TypeScript source resolution is retained.
 
 - Fix the Verify template's unavailable job-level runner context, lint delivered workflows in Base Verify, and upgrade unchanged historical Verify templates and their helper closure during refresh.
