@@ -58,7 +58,13 @@ export type CaseRow = [name: string, run: (context: CaseRowContext) => unknown];
 // leaf must not throw through its enclosing loop and suppress the remaining rows.
 const failures = new WeakMap<TestContext, unknown[]>();
 
-/** A table row owns the same cleanup and mock boundary as its former registration. */
+/**
+ * A table row owns the same cleanup and mock boundary as its former registration.
+ * Return, await or defer owned work. Nested runner work is drained automatically;
+ * detached rejections are observed for two event-loop turns and a microtask flush.
+ * Arbitrary fulfilled orphan promises remain undetectable. Later rejections still
+ * reach the test runner, so use defer for work beyond the observation window.
+ */
 export function caseRow(t: TestContext, name: string, run: CaseRow[1]): Promise<void> {
   const pending = collectRow(t, name, run);
   // Nested runner work belongs to its parent even when the caller omits await.
