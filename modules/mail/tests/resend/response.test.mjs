@@ -22,12 +22,18 @@ foldedCases.push(['only HTTP 200 with a real usable body ID establishes acceptan
   for (const body of ['', '{"id":', '<html>SENSITIVE</html>']) await responseCase(new Response(body), 'uncertain', 'invalid_provider_response');
   for (const status of [201, 202, 204, 206, 299]) await responseCase(new Response(status === 204 ? null : JSON.stringify({ id: receipt }), { status }), 'uncertain', 'unexpected_response');
 }]);
-foldedCases.push(['HTTP failure matrix never reports delivery or follows redirect instructions', async () => {
-  for (const status of [301, 302, 303, 307, 308, 408, 500, 502, 503, 504]) {
-    await responseCase(new Response('SENSITIVE provider details', { status, headers: { Location: 'https://untrusted.example/steal' } }), 'uncertain', 'unexpected_response');
-  }
-  for (const status of [400, 401, 403, 404, 413, 422]) await responseCase(new Response('SENSITIVE provider details', { status }), 'rejected', 'provider_rejected');
-  await responseCase(new Response('SENSITIVE provider details', { status: 429, headers: { 'Retry-After': '0' } }), 'rate_limited', 'rate_limited');
+foldedCases.push(['HTTP failure matrix never reports delivery or follows redirect instructions', async t => {
+  await runCases(t, [
+    ...[301, 302, 303, 307, 308, 408, 500, 502, 503, 504].map(status => [`HTTP ${status} remains uncertain without following redirects`, async () => {
+      await responseCase(new Response('SENSITIVE provider details', { status, headers: { Location: 'https://untrusted.example/steal' } }), 'uncertain', 'unexpected_response');
+    }]),
+    ...[400, 401, 403, 404, 413, 422].map(status => [`HTTP ${status} rejects delivery`, async () => {
+      await responseCase(new Response('SENSITIVE provider details', { status }), 'rejected', 'provider_rejected');
+    }]),
+    ['HTTP 429 reports rate limiting', async () => {
+      await responseCase(new Response('SENSITIVE provider details', { status: 429, headers: { 'Retry-After': '0' } }), 'rate_limited', 'rate_limited');
+    }],
+  ]);
 }]);
 foldedCases.push(['idempotency conflicts distinguish payload mismatch from an in-progress request', async () => {
   await responseCase(Response.json({ name: 'invalid_idempotent_request', message: 'SENSITIVE' }, { status: 409 }), 'rejected', 'idempotency_conflict');
