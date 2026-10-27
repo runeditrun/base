@@ -26,7 +26,7 @@ function snapshot(root) {
 function imports(seed, record, dependencies, resolve) {
  const disk = {has: name => { try { return lstatSync(join(seed, name)).isFile(); } catch (error) { if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return false; throw error; } }};
  return record.copies.flatMap(copy => Object.keys(copy.files)).filter(name => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(name) && disk.has(name))
-  .flatMap(name => dependencies(readFileSync(join(seed, name), 'utf8'), name).map(request => ({path: name, ...request, target: resolve(disk, name, request.specifier, request)})));
+  .flatMap(name => dependencies(readFileSync(join(seed, name), 'utf8'), name).filter(request => request.specifier.startsWith('.')).map(request => ({path: name, ...request, target: resolve(disk, name, request.specifier, request)})));
 }
 export async function refreshSmoke({root, installed, base, ref, run, output}) {
  const cli = join(installed, 'edition-authoring/cli.mjs');

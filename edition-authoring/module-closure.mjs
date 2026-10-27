@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {raw, safe, requirePhysical, testSource, freedEntries} from './files.mjs';
-import {dependencies, resolve, bindings, lexicalExports} from './runtime-dependencies.mjs';
+import {dependencies, resolve, external, bindings, lexicalExports} from './runtime-dependencies.mjs';
 const code = name => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(name) && !testSource(name);
 const inside = (name, prefix) => prefix === '.' ? !name.startsWith('../') && !path.posix.isAbsolute(name) : name === prefix || name.startsWith(prefix + '/');
 const mapped = (source, copy) => copy.path + source.slice(copy.originPath.length);
@@ -88,16 +88,33 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     has: name => planned.has(name) || recorded.has(name) || index.has(name) && disk.has(name),
     read: name => planned.has(name) ? blob(planned.get(name).entry) : local(name),
   };
+  function requests(bytes, source, target) {
+    return dependencies(bytes, source).filter(request => {
+      const origin = {}, localScope = {};
+      resolve(tree, source, request.specifier, {...request, package: origin});
+      resolve(disk, target, request.specifier, {...request, package: localScope});
+      return request.specifier.startsWith('.') || origin.managed || localScope.managed;
+    });
+  }
   function edge(source, target, request) {
     const {specifier} = request;
-    const destination = resolve(view, target, specifier, request);
-    if (destination) {
-      const owner = recorded.get(destination);
-      const dependency = planned.get(destination)?.source ?? (owner && owner.copy.originPath + destination.slice(owner.copy.path.length)) ?? resolve(tree, source, specifier, request);
-      return {...request, dependency, destination, satisfied: true};
+    const originScope = {}, targetScope = {}, manifests = new Set();
+    const dependency = resolve(tree, source, specifier, {...request, manifests, package: originScope});
+    const destination = resolve(view, target, specifier, {...request, package: targetScope});
+    if (!specifier.startsWith('.')) {
+      if (originScope.external && targetScope.external && originScope.value === targetScope.value) return {...request, external: true};
+      if (!targetScope.managed || originScope.external || targetScope.external) return {...request, reason: 'runtime package scope differs from its Base source'};
+      if (destination && !dependency) return {...request, external: true};
+      const expected = originScope.target && path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), originScope.target));
+      if (expected !== targetScope.target || expected && ['.js', '.ts', '.jsx', '.tsx'].includes(path.posix.extname(expected)) && originScope.type !== targetScope.type) {
+        return {...request, reason: 'runtime package target or format differs from its Base namespace'};
+      }
     }
-    const manifests = new Set();
-    const dependency = resolve(tree, source, specifier, {...request, manifests});
+    if (destination && destination !== external) {
+      const owner = recorded.get(destination);
+      const source = planned.get(destination)?.source ?? (owner && owner.copy.originPath + destination.slice(owner.copy.path.length)) ?? dependency;
+      return {...request, dependency: source, destination, satisfied: true};
+    }
     return {...request, manifests, dependency, destination: dependency && path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency))};
   }
   const key = (target, request) => JSON.stringify([target, request.kind, request.types, request.specifier]);
@@ -107,7 +124,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   const baseline = new Set();
   for (const {plan, source, target} of queue) {
     if (!Object.hasOwn(plan.copy.files, target) || !disk.has(target) || bootstrap(source)) continue;
-    for (const request of dependencies(local(target), source)) {
+    for (const request of requests(local(target), source, target)) {
       const candidate = edge(source, target, request);
       if (!resolve(disk, target, request.specifier, request) && !recorded.has(candidate.destination)) baseline.add(key(target, request));
     }
@@ -115,7 +132,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   // Do not let an optional directory addition incidentally fill an old edge.
   for (const {plan, source, target} of queue) {
     if (!Object.hasOwn(plan.copy.files, target) || !disk.has(target)) continue;
-    for (const request of dependencies(local(target), source)) if (baseline.has(key(target, request))) {
+    for (const request of requests(local(target), source, target)) if (baseline.has(key(target, request))) {
       const destination = resolve(view, target, request.specifier, request);
       if (!directoryAdditions.has(destination)) continue;
       const addition = planned.get(destination);
@@ -125,7 +142,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     }
   }
   const incoming = new Set();
-  for (const item of queue) for (const request of dependencies(item.adapted ? local(item.target) : blob(item.entry), item.source)) {
+  for (const item of queue) for (const request of requests(item.adapted ? local(item.target) : blob(item.entry), item.source, item.target)) {
     if (baseline.has(key(item.target, request))) continue;
     const {destination} = edge(item.source, item.target, request);
     if (destination) incoming.add(destination);
@@ -135,6 +152,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     seen.add(target); inspect(target);
     if (!disk.has(target)) return null;
     if (!types && /\.d\.[cm]?ts$/.test(target)) return new Set();
+    if (target.endsWith('.json')) return new Set(['default']);
     const result = lexicalExports(local(target), specifier => {
       const next = resolve(disk, target, specifier, {types});
       return next ? exportsAt(next, types, seen) : null;
@@ -157,7 +175,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     const before = Object.hasOwn(plan.copy.files, target) && disk.has(target) ? local(target) : '';
     const imports = bindings(bytes), oldBindings = bindings(before);
     const typeImports = bindings(bytes, true), oldTypes = bindings(before, true);
-    const edges = dependencies(bytes, source).map(request => edge(source, target, request));
+    const edges = requests(bytes, source, target).map(request => edge(source, target, request));
     for (const {manifests = []} of [...edges]) for (const dependency of manifests) {
       edges.push({dependency, destination: path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency))});
     }
@@ -168,9 +186,9 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     let hold;
     for (const edge of edges) {
       const {specifier, dependency, destination, satisfied} = edge;
-      if (preserved(edge)) continue;
+      if (edge.external || preserved(edge)) continue;
       if (satisfied) continue;
-      if (!dependency) refuse(target, `no Base source for ${specifier}`, `\${EDITOR:-vi} ${quote(target)}`);
+      if (!dependency) refuse(target, edge.reason ?? `no Base source for ${specifier}`, `\${EDITOR:-vi} ${quote(target)}`);
       if (!witness(destination, dependency)) {
         if (novel) { hold = {path: target, originPath: source, dependency}; break; }
         refuse(target, `no copy mapping witnesses ${destination} from ${dependency}`, '${EDITOR:-vi} base-copies.json');
@@ -182,7 +200,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     }
     for (const edge of edges) {
       const {specifier, dependency, destination} = edge;
-      if (preserved(edge)) continue;
+      if (edge.external || preserved(edge)) continue;
       include(dependency, destination);
       const owner = recorded.get(destination);
       if (!adapted && !planned.has(destination) && (index.has(destination) || owner?.copy.adapted?.[destination])) {
@@ -200,7 +218,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   const final = {has: name => planned.has(name) || !removed.has(name) && disk.has(name), read: view.read};
   for (const {plan, source, target, entry, adapted} of queue) {
     if (!adapted && !plan.sources.some(([name]) => name === source)) continue;
-    for (const request of dependencies(adapted ? local(target) : blob(entry), source)) {
+    for (const request of requests(adapted ? local(target) : blob(entry), source, target)) {
       const id = key(target, request);
       if (!baseline.has(id)) continue;
       expected.add(id);

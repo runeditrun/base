@@ -1,4 +1,6 @@
 import path from 'node:path';
+import {packageTarget} from './package-target.mjs';
+export const external = Symbol('external package target');
 
 const declaration = name => /\.d\.[cm]?ts$/.test(name);
 const sourceExtensions = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs', '.json'];
@@ -7,12 +9,15 @@ const sourceExtensions = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', 
 // rules; source TS also recognizes filenames produced by its compiler. An
 // erased type edge is the only route that can resolve a declaration file.
 // Package-name imports belong to the edition's package manager, not this graph.
-export function resolve(tree, source, specifier, {types = false, kind = 'import', manifests = new Set()} = {}) {
-  if (!specifier.startsWith('.')) return;
+export function resolve(tree, source, specifier, {types = false, kind = 'import', manifests = new Set(), package: packageState = {}} = {}) {
   types ||= declaration(source);
+  const packaged = !specifier.startsWith('.');
+  const packagePath = packaged && packageTarget(tree, source, specifier, {kind, types, package: packageState});
+  if (packageState.external) return external;
+  if (packaged && !packagePath) return;
   const relative = kind === 'require' ? specifier : specifier.split(/[?#]/)[0];
   if (kind !== 'require' && /%2f|%5c/i.test(relative)) throw Error(`Invalid encoded separator in module specifier ${specifier}`);
-  const name = path.posix.normalize(path.posix.join(path.posix.dirname(source), kind === 'require' ? relative : decodeURIComponent(relative)));
+  const name = packaged ? packagePath : path.posix.normalize(path.posix.join(path.posix.dirname(source), kind === 'require' ? relative : decodeURIComponent(relative)));
   const sourceModule = /\.(?:[cm]?ts|[jt]sx)$/.test(source);
   const file = candidate => (types || !declaration(candidate)) && tree.has(candidate) ? candidate : undefined;
   if (!types && declaration(name)) return;
@@ -27,6 +32,9 @@ export function resolve(tree, source, specifier, {types = false, kind = 'import'
       if (found) return found;
     }
   }
+  // Exports/imports targets are exact files; require's legacy directory and
+  // extension searches do not apply to a package export target.
+  if (packaged) return;
   if (sourceModule || types || kind === 'require') {
     const suffixes = sourceModule || types ? [...sourceExtensions, ...(types ? ['.d.ts', '.d.mts', '.d.cts'] : [])] : ['.js', '.json', '.node'];
     for (const suffix of suffixes) {

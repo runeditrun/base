@@ -266,7 +266,10 @@ form resolve independently of declaration-only files;
 only erased type imports may use declarations. TypeScript sources retain
 emitted-filename substitutions and extensionless bundler resolution; JavaScript
 runtime imports require an explicit filename, as in Node. Relative `require` directory
-lookups use `package.json`'s runtime `main`, never its type metadata.
+lookups use `package.json`'s runtime `main`, never its type metadata. Local package
+self-references and `imports` maps use Node's actual resolver and active runtime
+conditions; `types` is enabled only for erased edges. Export targets are exact
+files for both loaders. Unknown external packages remain package-manager inputs.
 Imports already unresolved in that same file before refresh remain untouched,
 except for missing authoring-toolkit bootstrap siblings and recorded removals.
 Refresh compares the retained ordinary unresolved set before writing.

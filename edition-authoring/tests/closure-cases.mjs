@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {packageClasses} from './package-cases.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -47,6 +48,7 @@ export function closureClasses({init, write, commit, git, run, ok, snapshotTree}
     assert.equal(run(seed, 'refresh-base', next, '--base', base).status, 1, `runtime form ${i}`);
     assert.deepEqual(snapshotTree(seed), before);
   });
+  packageClasses({fixture, write, commit, ok, run, snapshotTree});
   // R3: equal bytes never grant ownership, for either selection shape or mode.
   for (const directory of [false, true]) for (const mode of [0o644, 0o755]) fixture(({base, seed}) => {
     const bytes = '#!/usr/bin/env node\nexport const value=731;\n';

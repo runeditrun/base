@@ -1,5 +1,5 @@
 import {tokens, unquote} from './module-syntax.mjs';
-export {resolve} from './module-resolution.mjs';
+export {resolve, external} from './module-resolution.mjs';
 
 export {dependencies} from './module-edges.mjs';
 
@@ -12,7 +12,7 @@ export function bindings(source, types = false) {
     while (end < t.length && ![';', 'import', 'export'].includes(t[end]) && t[end] !== 'from') end++;
     if (t[end] !== 'from') continue;
     const specifier = unquote(t[end + 1])?.split(/[?#]/)[0];
-    if (!specifier?.startsWith('.')) continue;
+    if (!specifier) continue;
     const names = new Set(result.get(specifier) ?? []);
     let start = i + 1;
     const declarationType = t[start] === 'type' && start + 1 < end && t[start + 1] !== ',';

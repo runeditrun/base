@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.ge5ca23a8",
+  "cliVersion": "0.2.83-dev.g6c282c8b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -807,7 +807,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "7468e0af2b5878954455b07d6a582adae8feb7748b0455afdff76cb20b0b6937"
+      "sha256": "2d315019b9751ce7e2a30043e2f7b14d19b83d6c82eed9cf3a28ef3488fafbcd"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1203,15 +1203,15 @@
     },
     "edition-authoring/module-closure.mjs": {
       "source": "edition-authoring/module-closure.mjs",
-      "sha256": "ea176dbfd67c4ce750458c66afc7ab8aa202c526c309cd6a30cfaa57766496cd"
+      "sha256": "2a5538671c9354175be1a12dc59f0e912613870ba8867f6f8734b0abb16493a1"
     },
     "edition-authoring/module-edges.mjs": {
       "source": "edition-authoring/module-edges.mjs",
-      "sha256": "04db07d4c56caee955568004589047625a187948640351ad0d14e1ac69097741"
+      "sha256": "e2e2972a17113bcd50f304dcaa0c02f06309c9e9e94f4f14eeade81b4762e6fa"
     },
     "edition-authoring/module-resolution.mjs": {
       "source": "edition-authoring/module-resolution.mjs",
-      "sha256": "b2b8b52d07cbc72b3b73b6dcaf2ecac3a6c7c85262291b08c49ca2ae7cacd0bf"
+      "sha256": "00b141ae3d33029fe6fe2eeb2eacc5dbe0a5a02b744ac7182efc74737197df7b"
     },
     "edition-authoring/module-syntax.mjs": {
       "source": "edition-authoring/module-syntax.mjs",
@@ -1220,6 +1220,10 @@
     "edition-authoring/offline-git.mjs": {
       "source": "edition-authoring/offline-git.mjs",
       "sha256": "ef86d89a1c7df9fef306b24032629c2e8e60b589376ccddbe9b4e3c91d11543c"
+    },
+    "edition-authoring/package-target.mjs": {
+      "source": "edition-authoring/package-target.mjs",
+      "sha256": "f0d3168d7fffcc86cd9f0ac385dcaa73bd0312bf20da5ff096d9a93091d1db76"
     },
     "edition-authoring/parent-comparison.mjs": {
       "source": "edition-authoring/parent-comparison.mjs",
@@ -1235,7 +1239,7 @@
     },
     "edition-authoring/runtime-dependencies.mjs": {
       "source": "edition-authoring/runtime-dependencies.mjs",
-      "sha256": "9b2e39d3ea7abb23915b7594a02f8a7a042b3244f75d7a15d681cbf961c0d9bc"
+      "sha256": "b837d4e1843bff217e54d3e9ca6d0f0a258ffcbe842fbfc3c2b8224ab2029e6a"
     },
     "edition-authoring/sources.mjs": {
       "source": "edition-authoring/sources.mjs",
