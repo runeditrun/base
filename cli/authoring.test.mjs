@@ -185,6 +185,7 @@ test('packed refresh delivers and adopts templates with their helpers atomically
   ['default-seed/.github/workflows/literal.yml', 'node scripts/literal-helper.mjs', 'literal-helper.mjs'],
   ['export/literal.yml', 'node scripts/literal\\ helper.mjs', 'export/literal helper.mjs', 'scripts/literal helper.mjs'],
   ['export/literal.yml', 'node\n          scripts/literal-helper.mjs'],
+  ['export/literal.yml', 'curl --doh-url https://cloudflare-dns.com/dns-query; node scripts/literal-helper.mjs'],
   ['export/literal.yml', '>2-\n          node scripts/literal-helper.mjs'],
   ['export/literal.yml', '\'node "scripts/literal-helper.mjs"\''],
   ['export/literal.yml', '"node scripts/literal-helper.mjs"', 'export/literal-helper.mjs', 'scripts/literal-helper.mjs', true],

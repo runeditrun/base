@@ -63,7 +63,14 @@ export function adoptWorkflowTemplates(root, plans, {tree, read, revision, files
 
 function invocations(text) {
   const {scripts, uses} = workflowScripts(text);
-  return [...new Set([...uses.map(name => safe(name.slice(2))), ...scripts.flatMap(literalPaths).map(safe)])];
+  const paths = scripts.flatMap(literalPaths).flatMap(name => {
+    try { return [safe(name)]; }
+    catch (error) {
+      if (name.startsWith('scripts/') || name.startsWith('.github/workflows/')) throw error;
+      return []; // A URL or command option is not a relative helper path.
+    }
+  });
+  return [...new Set([...uses.map(name => safe(name.slice(2))), ...paths])];
 }
 
 function candidates(invoked) {

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.g18cef277",
+  "cliVersion": "0.2.83-dev.gf0faf5d2",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1547,7 +1547,7 @@
     },
     "edition-authoring/workflow-copies.mjs": {
       "source": "edition-authoring/workflow-copies.mjs",
-      "sha256": "fa7ba744cae9f7499c2cea9967174c8a49db82cb099233d058a544b5e6489f42"
+      "sha256": "f547ecff71a5d8da41dc5c12a0183c4dcc098ecdfeecaf0c3b06a21651db2e5f"
     },
     "edition-authoring/workflow-scripts.mjs": {
       "source": "edition-authoring/workflow-scripts.mjs",
