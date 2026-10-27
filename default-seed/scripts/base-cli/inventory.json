@@ -807,7 +807,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "58181b3574bdd2d447ae32f73ed2145e8e81f14890ee13c10551e0b45fca3e0b"
+      "sha256": "4605930680aaaa294fbf4992903bcc53efcbc093e6ed18c5891271320126aa87"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1224,6 +1224,10 @@
     "edition-authoring/updates.mjs": {
       "source": "edition-authoring/updates.mjs",
       "sha256": "54e7246025a618ed16ee042c22dc9a8dc27b06175c30f81c4c6568992ed04799"
+    },
+    "foundation/runtime/contract-docs.mjs": {
+      "source": "foundation/runtime/contract-docs.mjs",
+      "sha256": "9c1d8f38c42cd18539792f71bda94cbcd6ebe30e25c884eb6af51de1dccabdfd"
     },
     "foundation/runtime/seed-contract.mjs": {
       "source": "foundation/runtime/seed-contract.mjs",
