@@ -191,7 +191,7 @@ test('module reference check rejects private, missing and unreviewed repositorie
 
 
 test('relocated copy regressions reject source declarations and stated README repositories', async t => {
-  await caseRows(t, ['js', 'ts'].map(extension => [extension, t => {
+  await caseRows(t, [...['js', 'ts'].map(extension => [extension, t => {
     const file = `src/base/modules/import-kit/tests/mutation.${extension}`
     const repository = `fixture-${randomBytes(8).toString('hex')}/source`
     const { run, report, references } = scanModuleCopy(t, ['modules/import-kit/schema/importers.schema.json'],
@@ -200,8 +200,8 @@ test('relocated copy regressions reject source declarations and stated README re
     assert.equal(run.status, 1)
     assert.equal(report.status, 'FAIL')
     assert.deepEqual(references.map(f => `${f.rule} ${f.path}`), [`hygiene.github-private ${file}`])
-  }]));
-  await caseRows(t, [['README relocation: a root path names a repository only with GitHub context', t => {
+  }]),
+  ['README relocation: a root path names a repository only with GitHub context', t => {
     const file = 'src/base/modules/sendgrid-email/README.md'
     const original = readFileSync(join(root, 'modules/sendgrid-email/README.md'), 'utf8')
     const states = { 'modules/sendgrid-email': 'missing' }
