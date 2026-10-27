@@ -1,23 +1,27 @@
 // Generated from Babel v7.29.8 (MIT); see README.md.
-const lineBreak = /\r\n|[\r\n\u2028\u2029]/, lineBreakG = new RegExp(lineBreak.source, "g");
+const lineBreak = /\r\n|[\r\n\u2028\u2029]/;
+const lineBreakG = new RegExp(lineBreak.source, "g");
 function isNewLine(code) {
   switch (code) {
     case 10:
     case 13:
     case 8232:
     case 8233:
-      return !0;
+      return true;
     default:
-      return !1;
+      return false;
   }
 }
 function hasNewLine(input, start, end) {
-  for (let i = start; i < end; i++)
-    if (isNewLine(input.charCodeAt(i)))
-      return !0;
-  return !1;
+  for (let i = start; i < end; i++) {
+    if (isNewLine(input.charCodeAt(i))) {
+      return true;
+    }
+  }
+  return false;
 }
-const skipWhiteSpace = /(?:\s|\/\/.*|\/\*[^]*?\*\/)*/g, skipWhiteSpaceInLine = /(?:[^\S\n\r\u2028\u2029]|\/\/.*|\/\*.*?\*\/)*/g;
+const skipWhiteSpace = /(?:\s|\/\/.*|\/\*[^]*?\*\/)*/g;
+const skipWhiteSpaceInLine = /(?:[^\S\n\r\u2028\u2029]|\/\/.*|\/\*.*?\*\/)*/g;
 function isWhitespace(code) {
   switch (code) {
     case 9:
@@ -41,9 +45,9 @@ function isWhitespace(code) {
     case 8287:
     case 12288:
     case 65279:
-      return !0;
+      return true;
     default:
-      return !1;
+      return false;
   }
 }
 export {

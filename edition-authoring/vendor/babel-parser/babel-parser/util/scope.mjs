@@ -20,7 +20,8 @@ class ScopeHandler {
   inModule;
   undefinedExports = /* @__PURE__ */ new Map();
   constructor(parser, inModule) {
-    this.parser = parser, this.inModule = inModule;
+    this.parser = parser;
+    this.inModule = inModule;
   }
   get inTopLevel() {
     return (this.currentScope().flags & ScopeFlag.PROGRAM) > 0;
@@ -49,10 +50,12 @@ class ScopeHandler {
       const {
         flags
       } = this.scopeStack[i];
-      if (flags & ScopeFlag.STATIC_BLOCK)
-        return !0;
-      if (flags & (ScopeFlag.VAR | ScopeFlag.CLASS_BASE))
-        return !1;
+      if (flags & ScopeFlag.STATIC_BLOCK) {
+        return true;
+      }
+      if (flags & (ScopeFlag.VAR | ScopeFlag.CLASS_BASE)) {
+        return false;
+      }
     }
   }
   get inNonArrowFunction() {
@@ -71,7 +74,8 @@ class ScopeHandler {
     this.scopeStack.push(this.createScope(flags));
   }
   exit() {
-    return this.scopeStack.pop().flags;
+    const scope = this.scopeStack.pop();
+    return scope.flags;
   }
   treatFunctionsAsVarInScope(scope) {
     return !!(scope.flags & (ScopeFlag.FUNCTION_BASE | ScopeFlag.STATIC_BLOCK) || !this.parser.inModule && scope.flags & ScopeFlag.PROGRAM);
@@ -81,32 +85,62 @@ class ScopeHandler {
     if (bindingType & BindingFlag.SCOPE_LEXICAL || bindingType & BindingFlag.SCOPE_FUNCTION) {
       this.checkRedeclarationInScope(scope, name, bindingType, loc);
       let type = scope.names.get(name) || 0;
-      bindingType & BindingFlag.SCOPE_FUNCTION ? type = type | NameType.Function : (scope.firstLexicalName || (scope.firstLexicalName = name), type = type | NameType.Lexical), scope.names.set(name, type), bindingType & BindingFlag.SCOPE_LEXICAL && this.maybeExportDefined(scope, name);
-    } else if (bindingType & BindingFlag.SCOPE_VAR)
-      for (let i = this.scopeStack.length - 1; i >= 0 && (scope = this.scopeStack[i], this.checkRedeclarationInScope(scope, name, bindingType, loc), scope.names.set(name, (scope.names.get(name) || 0) | NameType.Var), this.maybeExportDefined(scope, name), !(scope.flags & ScopeFlag.VAR)); --i)
-        ;
-    this.parser.inModule && scope.flags & ScopeFlag.PROGRAM && this.undefinedExports.delete(name);
+      if (bindingType & BindingFlag.SCOPE_FUNCTION) {
+        type = type | NameType.Function;
+      } else {
+        if (!scope.firstLexicalName) {
+          scope.firstLexicalName = name;
+        }
+        type = type | NameType.Lexical;
+      }
+      scope.names.set(name, type);
+      if (bindingType & BindingFlag.SCOPE_LEXICAL) {
+        this.maybeExportDefined(scope, name);
+      }
+    } else if (bindingType & BindingFlag.SCOPE_VAR) {
+      for (let i = this.scopeStack.length - 1; i >= 0; --i) {
+        scope = this.scopeStack[i];
+        this.checkRedeclarationInScope(scope, name, bindingType, loc);
+        scope.names.set(name, (scope.names.get(name) || 0) | NameType.Var);
+        this.maybeExportDefined(scope, name);
+        if (scope.flags & ScopeFlag.VAR) break;
+      }
+    }
+    if (this.parser.inModule && scope.flags & ScopeFlag.PROGRAM) {
+      this.undefinedExports.delete(name);
+    }
   }
   maybeExportDefined(scope, name) {
-    this.parser.inModule && scope.flags & ScopeFlag.PROGRAM && this.undefinedExports.delete(name);
+    if (this.parser.inModule && scope.flags & ScopeFlag.PROGRAM) {
+      this.undefinedExports.delete(name);
+    }
   }
   checkRedeclarationInScope(scope, name, bindingType, loc) {
-    this.isRedeclaredInScope(scope, name, bindingType) && this.parser.raise(Errors.VarRedeclaration, loc, {
-      identifierName: name
-    });
+    if (this.isRedeclaredInScope(scope, name, bindingType)) {
+      this.parser.raise(Errors.VarRedeclaration, loc, {
+        identifierName: name
+      });
+    }
   }
   isRedeclaredInScope(scope, name, bindingType) {
-    if (!(bindingType & BindingFlag.KIND_VALUE)) return !1;
-    if (bindingType & BindingFlag.SCOPE_LEXICAL)
+    if (!(bindingType & BindingFlag.KIND_VALUE)) return false;
+    if (bindingType & BindingFlag.SCOPE_LEXICAL) {
       return scope.names.has(name);
+    }
     const type = scope.names.get(name) || 0;
-    return bindingType & BindingFlag.SCOPE_FUNCTION ? (type & NameType.Lexical) > 0 || !this.treatFunctionsAsVarInScope(scope) && (type & NameType.Var) > 0 : (type & NameType.Lexical) > 0 && !(scope.flags & ScopeFlag.SIMPLE_CATCH && scope.firstLexicalName === name) || !this.treatFunctionsAsVarInScope(scope) && (type & NameType.Function) > 0;
+    if (bindingType & BindingFlag.SCOPE_FUNCTION) {
+      return (type & NameType.Lexical) > 0 || !this.treatFunctionsAsVarInScope(scope) && (type & NameType.Var) > 0;
+    }
+    return (type & NameType.Lexical) > 0 && !(scope.flags & ScopeFlag.SIMPLE_CATCH && scope.firstLexicalName === name) || !this.treatFunctionsAsVarInScope(scope) && (type & NameType.Function) > 0;
   }
   checkLocalExport(id) {
     const {
       name
     } = id;
-    this.scopeStack[0].names.has(name) || this.undefinedExports.set(name, id.loc.start);
+    const topLevelScope = this.scopeStack[0];
+    if (!topLevelScope.names.has(name)) {
+      this.undefinedExports.set(name, id.loc.start);
+    }
   }
   currentScope() {
     return this.scopeStack[this.scopeStack.length - 1];
@@ -116,8 +150,9 @@ class ScopeHandler {
       const {
         flags
       } = this.scopeStack[i];
-      if (flags & ScopeFlag.VAR)
+      if (flags & ScopeFlag.VAR) {
         return flags;
+      }
     }
   }
   currentThisScopeFlags() {
@@ -125,8 +160,9 @@ class ScopeHandler {
       const {
         flags
       } = this.scopeStack[i];
-      if (flags & (ScopeFlag.VAR | ScopeFlag.CLASS_BASE) && !(flags & ScopeFlag.ARROW))
+      if (flags & (ScopeFlag.VAR | ScopeFlag.CLASS_BASE) && !(flags & ScopeFlag.ARROW)) {
         return flags;
+      }
     }
   }
 }

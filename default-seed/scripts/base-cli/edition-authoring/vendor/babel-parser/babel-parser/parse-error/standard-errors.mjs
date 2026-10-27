@@ -64,7 +64,7 @@ var stdin_default = {
     importName
   }) => `A string literal cannot be used as an imported binding.
 - Did you mean \`import { "${importName}" as foo }\`?`,
-  ImportCallArity: "`import()` requires exactly one or two arguments.",
+  ImportCallArity: `\`import()\` requires exactly one or two arguments.`,
   ImportCallNotNewExpression: "Cannot use new with import(...).",
   ImportCallSpreadArgument: "`...` is not allowed in `import()`.",
   ImportJSONBindingNotDefault: "A JSON module can only be imported with `default`.",

@@ -15,7 +15,8 @@ var ScopeFlag = {
   FUNCTION: 514,
   CLASS: 576,
   VAR: 1667
-}, BindingFlag = {
+};
+var BindingFlag = {
   KIND_VALUE: 1,
   KIND_TYPE: 2,
   SCOPE_VAR: 4,
@@ -46,7 +47,8 @@ var ScopeFlag = {
   TYPE_TS_TYPE_IMPORT: 4098,
   TYPE_TS_VALUE_IMPORT: 4096,
   TYPE_FLOW_DECLARE_FN: 2048
-}, ClassElementType = {
+};
+var ClassElementType = {
   OTHER: 0,
   FLAG_STATIC: 4,
   KIND_GETTER: 2,

@@ -2,8 +2,8 @@
 import { Position } from "./util/location.mjs";
 function defineHidden(obj, key, value) {
   Object.defineProperty(obj, key, {
-    enumerable: !1,
-    configurable: !0,
+    enumerable: false,
+    configurable: true,
     value
   });
 }
@@ -23,11 +23,21 @@ function toParseErrorConstructor({
       SetAccessorCannotHaveRestParameter: "SetAccesorCannotHaveRestParameter",
       SetAccessorCannotHaveReturnType: "SetAccesorCannotHaveReturnType"
     };
-    oldReasonCodes[reasonCode] && (reasonCode = oldReasonCodes[reasonCode]);
+    if (oldReasonCodes[reasonCode]) {
+      reasonCode = oldReasonCodes[reasonCode];
+    }
   }
   return function constructor(loc, details) {
     const error = new SyntaxError();
-    return error.code = code, error.reasonCode = reasonCode, error.loc = loc, error.pos = loc.index, error.syntaxPlugin = syntaxPlugin, hasMissingPlugin && (error.missingPlugin = details.missingPlugin), defineHidden(error, "clone", function(overrides = {}) {
+    error.code = code;
+    error.reasonCode = reasonCode;
+    error.loc = loc;
+    error.pos = loc.index;
+    error.syntaxPlugin = syntaxPlugin;
+    if (hasMissingPlugin) {
+      error.missingPlugin = details.missingPlugin;
+    }
+    defineHidden(error, "clone", function clone(overrides = {}) {
       const {
         line,
         column,
@@ -37,34 +47,41 @@ function toParseErrorConstructor({
         ...details,
         ...overrides.details
       });
-    }), defineHidden(error, "details", details), Object.defineProperty(error, "message", {
-      configurable: !0,
+    });
+    defineHidden(error, "details", details);
+    Object.defineProperty(error, "message", {
+      configurable: true,
       get() {
         const message = `${toMessage(details)} (${loc.line}:${loc.column})`;
-        return this.message = message, message;
+        this.message = message;
+        return message;
       },
       set(value) {
         Object.defineProperty(this, "message", {
           value,
-          writable: !0
+          writable: true
         });
       }
-    }), error;
+    });
+    return error;
   };
 }
 function ParseErrorEnum(argument, syntaxPlugin) {
-  if (Array.isArray(argument))
+  if (Array.isArray(argument)) {
     return (parseErrorTemplates) => ParseErrorEnum(parseErrorTemplates, argument[0]);
+  }
   const ParseErrorConstructors = {};
   for (const reasonCode of Object.keys(argument)) {
-    const template = argument[reasonCode], {
+    const template = argument[reasonCode];
+    const {
       message,
       ...rest
-    } = typeof template == "string" ? {
+    } = typeof template === "string" ? {
       message: () => template
-    } : typeof template == "function" ? {
+    } : typeof template === "function" ? {
       message: template
-    } : template, toMessage = typeof message == "string" ? () => message : message;
+    } : template;
+    const toMessage = typeof message === "string" ? () => message : message;
     ParseErrorConstructors[reasonCode] = toParseErrorConstructor({
       code: "BABEL_PARSER_SYNTAX_ERROR",
       reasonCode,

@@ -40,15 +40,18 @@ class ExpressionScopeHandler {
     this.stack.pop();
   }
   recordParameterInitializerError(toParseError, node) {
-    const origin = node.loc.start, {
+    const origin = node.loc.start;
+    const {
       stack
     } = this;
-    let i = stack.length - 1, scope = stack[i];
-    for (; !scope.isCertainlyParameterDeclaration(); ) {
-      if (scope.canBeArrowParameterDeclaration())
+    let i = stack.length - 1;
+    let scope = stack[i];
+    while (!scope.isCertainlyParameterDeclaration()) {
+      if (scope.canBeArrowParameterDeclaration()) {
         scope.recordDeclarationError(toParseError, origin);
-      else
+      } else {
         return;
+      }
       scope = stack[--i];
     }
     this.parser.raise(toParseError, origin);
@@ -56,31 +59,44 @@ class ExpressionScopeHandler {
   recordArrowParameterBindingError(error, node) {
     const {
       stack
-    } = this, scope = stack[stack.length - 1], origin = node.loc.start;
-    if (scope.isCertainlyParameterDeclaration())
+    } = this;
+    const scope = stack[stack.length - 1];
+    const origin = node.loc.start;
+    if (scope.isCertainlyParameterDeclaration()) {
       this.parser.raise(error, origin);
-    else if (scope.canBeArrowParameterDeclaration())
+    } else if (scope.canBeArrowParameterDeclaration()) {
       scope.recordDeclarationError(error, origin);
-    else
+    } else {
       return;
+    }
   }
   recordAsyncArrowParametersError(at) {
     const {
       stack
     } = this;
-    let i = stack.length - 1, scope = stack[i];
-    for (; scope.canBeArrowParameterDeclaration(); )
-      scope.type === 2 && scope.recordDeclarationError(Errors.AwaitBindingIdentifier, at), scope = stack[--i];
+    let i = stack.length - 1;
+    let scope = stack[i];
+    while (scope.canBeArrowParameterDeclaration()) {
+      if (scope.type === 2) {
+        scope.recordDeclarationError(Errors.AwaitBindingIdentifier, at);
+      }
+      scope = stack[--i];
+    }
   }
   validateAsPattern() {
     const {
       stack
-    } = this, currentScope = stack[stack.length - 1];
-    currentScope.canBeArrowParameterDeclaration() && currentScope.iterateErrors(([toParseError, loc]) => {
+    } = this;
+    const currentScope = stack[stack.length - 1];
+    if (!currentScope.canBeArrowParameterDeclaration()) return;
+    currentScope.iterateErrors(([toParseError, loc]) => {
       this.parser.raise(toParseError, loc);
-      let i = stack.length - 2, scope = stack[i];
-      for (; scope.canBeArrowParameterDeclaration(); )
-        scope.clearDeclarationError(loc.index), scope = stack[--i];
+      let i = stack.length - 2;
+      let scope = stack[i];
+      while (scope.canBeArrowParameterDeclaration()) {
+        scope.clearDeclarationError(loc.index);
+        scope = stack[--i];
+      }
     });
   }
 }

@@ -260,7 +260,9 @@ A delivered `.mjs` also brings its Base declaration sibling. A dependency keeps
 its relative destination only when an existing copy mapping witnesses that
 namespace. Tracked unrecorded dependencies stay seed-owned and stop traversal;
 new imports from refreshed files must find their named, type and default exports.
-Runtime imports of every form resolve independently of declaration-only files;
+A JavaScript/TypeScript AST discovers imports, re-exports and literal runtime
+calls, including optional calls, templates and JSX. Runtime imports of every
+form resolve independently of declaration-only files;
 only erased type imports may use declarations. TypeScript sources retain
 emitted-filename substitutions and extensionless bundler resolution; JavaScript
 runtime imports require an explicit filename, as in Node. Relative `require` directory

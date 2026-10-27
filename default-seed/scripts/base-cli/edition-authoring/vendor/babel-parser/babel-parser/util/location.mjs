@@ -4,7 +4,9 @@ class Position {
   column;
   index;
   constructor(line, col, index) {
-    this.line = line, this.column = col, this.index = index;
+    this.line = line;
+    this.column = col;
+    this.index = index;
   }
 }
 class SourceLocation {
@@ -13,7 +15,8 @@ class SourceLocation {
   filename;
   identifierName;
   constructor(start, end) {
-    this.start = start, this.end = end;
+    this.start = start;
+    this.end = end;
   }
 }
 function createPositionWithColumnOffset(position, columnOffset) {

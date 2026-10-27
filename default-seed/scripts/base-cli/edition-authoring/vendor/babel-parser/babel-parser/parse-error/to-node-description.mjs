@@ -23,7 +23,8 @@ const NodeDescriptions = {
   },
   VariableDeclarator: "variable declaration",
   YieldExpression: "yield expression"
-}, toNodeDescription = (node) => node.type === "UpdateExpression" ? NodeDescriptions.UpdateExpression[`${node.prefix}`] : NodeDescriptions[node.type];
+};
+const toNodeDescription = (node) => node.type === "UpdateExpression" ? NodeDescriptions.UpdateExpression[`${node.prefix}`] : NodeDescriptions[node.type];
 var stdin_default = toNodeDescription;
 export {
   stdin_default as default

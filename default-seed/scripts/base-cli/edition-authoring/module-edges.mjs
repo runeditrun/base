@@ -19,9 +19,13 @@ function* nodes(root) {
   }
 }
 
+const parsed = new Map();
+
 // Parsing, including erased TS edges and calls nested in templates/JSX, precedes
 // resolution. Every resulting edge uses the same virtual Node resolver.
 export function dependencies(source, filename = 'module.mjs') {
+  let versions = parsed.get(filename);
+  if (versions?.has(source)) return versions.get(source);
   const plugins = ['decorators-legacy', 'deprecatedImportAssert'];
   if (/\.[cm]?tsx?$/.test(filename)) plugins.push(['typescript', {dts: /\.d\.[cm]?ts$/.test(filename)}]);
   if (/\.[jt]sx$/.test(filename)) plugins.push('jsx');
@@ -85,5 +89,7 @@ export function dependencies(source, filename = 'module.mjs') {
       if (requireFunction(callee)) add(argument, 'require');
     }
   }
+  if (!versions) parsed.set(filename, versions = new Map());
+  versions.set(source, result);
   return result;
 }

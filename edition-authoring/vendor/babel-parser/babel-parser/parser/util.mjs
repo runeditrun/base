@@ -10,15 +10,23 @@ import ProductionParameterHandler, { ParamKind } from "../util/production-parame
 import { Errors } from "../parse-error.mjs";
 import { OptionFlags } from "../options.mjs";
 class UtilParser extends Tokenizer {
-  addExtra(node, key, value, enumerable = !0) {
+  addExtra(node, key, value, enumerable = true) {
     if (!node) return;
     let {
       extra
     } = node;
-    extra == null && (extra = {}, node.extra = extra), enumerable ? extra[key] = value : Object.defineProperty(extra, key, {
-      enumerable,
-      value
-    });
+    if (extra == null) {
+      extra = {};
+      node.extra = extra;
+    }
+    if (enumerable) {
+      extra[key] = value;
+    } else {
+      Object.defineProperty(extra, key, {
+        enumerable,
+        value
+      });
+    }
   }
   isContextual(token) {
     return this.state.type === token && !this.state.containsEsc;
@@ -28,19 +36,24 @@ class UtilParser extends Tokenizer {
       const nextCh = this.input.charCodeAt(nameStart + name.length);
       return !(isIdentifierChar(nextCh) || (nextCh & 64512) === 55296);
     }
-    return !1;
+    return false;
   }
   isLookaheadContextual(name) {
     const next = this.nextTokenStart();
     return this.isUnparsedContextual(next, name);
   }
   eatContextual(token) {
-    return this.isContextual(token) ? (this.next(), !0) : !1;
+    if (this.isContextual(token)) {
+      this.next();
+      return true;
+    }
+    return false;
   }
   expectContextual(token, toParseError) {
     if (!this.eatContextual(token)) {
-      if (toParseError != null)
+      if (toParseError != null) {
         throw this.raise(toParseError, this.state.startLoc);
+      }
       this.unexpected(null, token);
     }
   }
@@ -56,11 +69,14 @@ class UtilParser extends Tokenizer {
   isLineTerminator() {
     return this.eat(tt.semi) || this.canInsertSemicolon();
   }
-  semicolon(allowAsi = !0) {
-    (allowAsi ? this.isLineTerminator() : this.eat(tt.semi)) || this.raise(Errors.MissingSemicolon, this.state.lastTokEndLoc);
+  semicolon(allowAsi = true) {
+    if (allowAsi ? this.isLineTerminator() : this.eat(tt.semi)) return;
+    this.raise(Errors.MissingSemicolon, this.state.lastTokEndLoc);
   }
   expect(type, loc) {
-    this.eat(type) || this.unexpected(loc, type);
+    if (!this.eat(type)) {
+      this.unexpected(loc, type);
+    }
   }
   tryParse(fn, oldState = this.state.clone()) {
     const abortSignal = {
@@ -68,58 +84,80 @@ class UtilParser extends Tokenizer {
     };
     try {
       const node = fn((node2 = null) => {
-        throw abortSignal.node = node2, abortSignal;
+        abortSignal.node = node2;
+        throw abortSignal;
       });
       if (this.state.errors.length > oldState.errors.length) {
         const failState = this.state;
-        return this.state = oldState, this.state.tokensLength = failState.tokensLength, {
+        this.state = oldState;
+        this.state.tokensLength = failState.tokensLength;
+        return {
           node,
           error: failState.errors[oldState.errors.length],
-          thrown: !1,
-          aborted: !1,
+          thrown: false,
+          aborted: false,
           failState
         };
       }
       return {
         node,
         error: null,
-        thrown: !1,
-        aborted: !1,
+        thrown: false,
+        aborted: false,
         failState: null
       };
     } catch (error) {
       const failState = this.state;
-      if (this.state = oldState, error instanceof SyntaxError)
+      this.state = oldState;
+      if (error instanceof SyntaxError) {
         return {
           node: null,
           error,
-          thrown: !0,
-          aborted: !1,
+          thrown: true,
+          aborted: false,
           failState
         };
-      if (error === abortSignal)
+      }
+      if (error === abortSignal) {
         return {
           node: abortSignal.node,
           error: null,
-          thrown: !1,
-          aborted: !0,
+          thrown: false,
+          aborted: true,
           failState
         };
+      }
       throw error;
     }
   }
   checkExpressionErrors(refExpressionErrors, andThrow) {
-    if (!refExpressionErrors) return !1;
+    if (!refExpressionErrors) return false;
     const {
       shorthandAssignLoc,
       doubleProtoLoc,
       privateKeyLoc,
       optionalParametersLoc,
       voidPatternLoc
-    } = refExpressionErrors, hasErrors = !!shorthandAssignLoc || !!doubleProtoLoc || !!optionalParametersLoc || !!privateKeyLoc || !!voidPatternLoc;
-    if (!andThrow)
+    } = refExpressionErrors;
+    const hasErrors = !!shorthandAssignLoc || !!doubleProtoLoc || !!optionalParametersLoc || !!privateKeyLoc || !!voidPatternLoc;
+    if (!andThrow) {
       return hasErrors;
-    shorthandAssignLoc != null && this.raise(Errors.InvalidCoverInitializedName, shorthandAssignLoc), doubleProtoLoc != null && this.raise(Errors.DuplicateProto, doubleProtoLoc), privateKeyLoc != null && this.raise(Errors.UnexpectedPrivateField, privateKeyLoc), optionalParametersLoc != null && this.unexpected(optionalParametersLoc), voidPatternLoc != null && this.raise(Errors.InvalidCoverDiscardElement, voidPatternLoc);
+    }
+    if (shorthandAssignLoc != null) {
+      this.raise(Errors.InvalidCoverInitializedName, shorthandAssignLoc);
+    }
+    if (doubleProtoLoc != null) {
+      this.raise(Errors.DuplicateProto, doubleProtoLoc);
+    }
+    if (privateKeyLoc != null) {
+      this.raise(Errors.UnexpectedPrivateField, privateKeyLoc);
+    }
+    if (optionalParametersLoc != null) {
+      this.unexpected(optionalParametersLoc);
+    }
+    if (voidPatternLoc != null) {
+      this.raise(Errors.InvalidCoverDiscardElement, voidPatternLoc);
+    }
   }
   isLiteralPropertyName() {
     return tokenIsLiteralPropertyName(this.state.type);
@@ -146,30 +184,51 @@ class UtilParser extends Tokenizer {
     this.exportedIdentifiers = /* @__PURE__ */ new Set();
     const oldInModule = this.inModule;
     this.inModule = inModule;
-    const oldScope = this.scope, ScopeHandler = this.getScopeHandler();
+    const oldScope = this.scope;
+    const ScopeHandler = this.getScopeHandler();
     this.scope = new ScopeHandler(this, inModule);
     const oldProdParam = this.prodParam;
     this.prodParam = new ProductionParameterHandler();
     const oldClassScope = this.classScope;
     this.classScope = new ClassScopeHandler(this);
     const oldExpressionScope = this.expressionScope;
-    return this.expressionScope = new ExpressionScopeHandler(this), () => {
-      this.state.labels = oldLabels, this.exportedIdentifiers = oldExportedIdentifiers, this.inModule = oldInModule, this.scope = oldScope, this.prodParam = oldProdParam, this.classScope = oldClassScope, this.expressionScope = oldExpressionScope;
+    this.expressionScope = new ExpressionScopeHandler(this);
+    return () => {
+      this.state.labels = oldLabels;
+      this.exportedIdentifiers = oldExportedIdentifiers;
+      this.inModule = oldInModule;
+      this.scope = oldScope;
+      this.prodParam = oldProdParam;
+      this.classScope = oldClassScope;
+      this.expressionScope = oldExpressionScope;
     };
   }
   enterInitialScopes() {
     let paramFlags = ParamKind.PARAM;
-    (this.inModule || this.optionFlags & OptionFlags.AllowAwaitOutsideFunction) && (paramFlags |= ParamKind.PARAM_AWAIT), this.optionFlags & OptionFlags.AllowYieldOutsideFunction && (paramFlags |= ParamKind.PARAM_YIELD);
+    if (this.inModule || this.optionFlags & OptionFlags.AllowAwaitOutsideFunction) {
+      paramFlags |= ParamKind.PARAM_AWAIT;
+    }
+    if (this.optionFlags & OptionFlags.AllowYieldOutsideFunction) {
+      paramFlags |= ParamKind.PARAM_YIELD;
+    }
     const isCommonJS = !this.inModule && this.options.sourceType === "commonjs";
-    (isCommonJS || this.optionFlags & OptionFlags.AllowReturnOutsideFunction) && (paramFlags |= ParamKind.PARAM_RETURN), this.prodParam.enter(paramFlags);
+    if (isCommonJS || this.optionFlags & OptionFlags.AllowReturnOutsideFunction) {
+      paramFlags |= ParamKind.PARAM_RETURN;
+    }
+    this.prodParam.enter(paramFlags);
     let scopeFlags = isCommonJS ? ScopeFlag.FUNCTION : ScopeFlag.PROGRAM;
-    this.optionFlags & OptionFlags.AllowNewTargetOutsideFunction && (scopeFlags |= ScopeFlag.NEW_TARGET), this.scope.enter(scopeFlags);
+    if (this.optionFlags & OptionFlags.AllowNewTargetOutsideFunction) {
+      scopeFlags |= ScopeFlag.NEW_TARGET;
+    }
+    this.scope.enter(scopeFlags);
   }
   checkDestructuringPrivate(refExpressionErrors) {
     const {
       privateKeyLoc
     } = refExpressionErrors;
-    privateKeyLoc !== null && this.expectPlugin("destructuringPrivate", privateKeyLoc);
+    if (privateKeyLoc !== null) {
+      this.expectPlugin("destructuringPrivate", privateKeyLoc);
+    }
   }
 }
 class ExpressionErrors {

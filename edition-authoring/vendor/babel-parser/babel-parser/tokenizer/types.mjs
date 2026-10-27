@@ -1,6 +1,11 @@
 // Generated from Babel v7.29.8 (MIT); see README.md.
 import { types as tc } from "./context.mjs";
-const beforeExpr = !0, startsExpr = !0, isLoop = !0, isAssign = !0, prefix = !0, postfix = !0;
+const beforeExpr = true;
+const startsExpr = true;
+const isLoop = true;
+const isAssign = true;
+const prefix = true;
+const postfix = true;
 class ExportedTokenType {
   label;
   keyword;
@@ -13,14 +18,27 @@ class ExportedTokenType {
   postfix;
   binop;
   constructor(label, conf = {}) {
-    this.label = label, this.keyword = conf.keyword, this.beforeExpr = !!conf.beforeExpr, this.startsExpr = !!conf.startsExpr, this.rightAssociative = !!conf.rightAssociative, this.isLoop = !!conf.isLoop, this.isAssign = !!conf.isAssign, this.prefix = !!conf.prefix, this.postfix = !!conf.postfix, this.binop = conf.binop != null ? conf.binop : null, this.updateContext = null;
+    this.label = label;
+    this.keyword = conf.keyword;
+    this.beforeExpr = !!conf.beforeExpr;
+    this.startsExpr = !!conf.startsExpr;
+    this.rightAssociative = !!conf.rightAssociative;
+    this.isLoop = !!conf.isLoop;
+    this.isAssign = !!conf.isAssign;
+    this.prefix = !!conf.prefix;
+    this.postfix = !!conf.postfix;
+    this.binop = conf.binop != null ? conf.binop : null;
+    {
+      this.updateContext = null;
+    }
   }
 }
 const keywords = /* @__PURE__ */ new Map();
 function createKeyword(name, options = {}) {
   options.keyword = name;
   const token = createToken(name, options);
-  return keywords.set(name, token), token;
+  keywords.set(name, token);
+  return token;
 }
 function createBinop(name, binop) {
   return createToken(name, {
@@ -29,12 +47,32 @@ function createBinop(name, binop) {
   });
 }
 let tokenTypeCounter = -1;
-const tokenTypes = [], tokenLabels = [], tokenBinops = [], tokenBeforeExprs = [], tokenStartsExprs = [], tokenPrefixes = [];
+const tokenTypes = [];
+const tokenLabels = [];
+const tokenBinops = [];
+const tokenBeforeExprs = [];
+const tokenStartsExprs = [];
+const tokenPrefixes = [];
 function createToken(name, options = {}) {
-  return ++tokenTypeCounter, tokenLabels.push(name), tokenBinops.push(options.binop ?? -1), tokenBeforeExprs.push(options.beforeExpr ?? !1), tokenStartsExprs.push(options.startsExpr ?? !1), tokenPrefixes.push(options.prefix ?? !1), tokenTypes.push(new ExportedTokenType(name, options)), tokenTypeCounter;
+  ++tokenTypeCounter;
+  tokenLabels.push(name);
+  tokenBinops.push(options.binop ?? -1);
+  tokenBeforeExprs.push(options.beforeExpr ?? false);
+  tokenStartsExprs.push(options.startsExpr ?? false);
+  tokenPrefixes.push(options.prefix ?? false);
+  tokenTypes.push(new ExportedTokenType(name, options));
+  return tokenTypeCounter;
 }
 function createKeywordLike(name, options = {}) {
-  return ++tokenTypeCounter, keywords.set(name, tokenTypeCounter), tokenLabels.push(name), tokenBinops.push(options.binop ?? -1), tokenBeforeExprs.push(options.beforeExpr ?? !1), tokenStartsExprs.push(options.startsExpr ?? !1), tokenPrefixes.push(options.prefix ?? !1), tokenTypes.push(new ExportedTokenType("name", options)), tokenTypeCounter;
+  ++tokenTypeCounter;
+  keywords.set(name, tokenTypeCounter);
+  tokenLabels.push(name);
+  tokenBinops.push(options.binop ?? -1);
+  tokenBeforeExprs.push(options.beforeExpr ?? false);
+  tokenStartsExprs.push(options.startsExpr ?? false);
+  tokenPrefixes.push(options.prefix ?? false);
+  tokenTypes.push(new ExportedTokenType("name", options));
+  return tokenTypeCounter;
 }
 const tt = {
   bracketL: createToken("[", {
@@ -185,7 +223,7 @@ const tt = {
   exponent: createToken("**", {
     beforeExpr,
     binop: 11,
-    rightAssociative: !0
+    rightAssociative: true
   }),
   _in: createKeyword("in", {
     beforeExpr,
@@ -495,17 +533,26 @@ function getExportedToken(token) {
   return tokenTypes[token];
 }
 function isTokenType(obj) {
-  return typeof obj == "number";
+  return typeof obj === "number";
 }
-tokenTypes[tt.braceR].updateContext = (context) => {
-  context.pop();
-}, tokenTypes[tt.braceL].updateContext = tokenTypes[tt.braceHashL].updateContext = tokenTypes[tt.dollarBraceL].updateContext = (context) => {
-  context.push(tc.brace);
-}, tokenTypes[tt.backQuote].updateContext = (context) => {
-  context[context.length - 1] === tc.template ? context.pop() : context.push(tc.template);
-}, tokenTypes[tt.jsxTagStart].updateContext = (context) => {
-  context.push(tc.j_expr, tc.j_oTag);
-};
+{
+  tokenTypes[tt.braceR].updateContext = (context) => {
+    context.pop();
+  };
+  tokenTypes[tt.braceL].updateContext = tokenTypes[tt.braceHashL].updateContext = tokenTypes[tt.dollarBraceL].updateContext = (context) => {
+    context.push(tc.brace);
+  };
+  tokenTypes[tt.backQuote].updateContext = (context) => {
+    if (context[context.length - 1] === tc.template) {
+      context.pop();
+    } else {
+      context.push(tc.template);
+    }
+  };
+  tokenTypes[tt.jsxTagStart].updateContext = (context) => {
+    context.push(tc.j_expr, tc.j_oTag);
+  };
+}
 export {
   ExportedTokenType,
   getExportedToken,

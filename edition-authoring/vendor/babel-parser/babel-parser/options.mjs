@@ -22,43 +22,56 @@ function createDefaultOptions() {
     startIndex: 0,
     startColumn: 0,
     startLine: 1,
-    allowAwaitOutsideFunction: !1,
-    allowReturnOutsideFunction: !1,
-    allowNewTargetOutsideFunction: !1,
-    allowImportExportEverywhere: !1,
-    allowSuperOutsideMethod: !1,
-    allowUndeclaredExports: !1,
-    allowYieldOutsideFunction: !1,
+    allowAwaitOutsideFunction: false,
+    allowReturnOutsideFunction: false,
+    allowNewTargetOutsideFunction: false,
+    allowImportExportEverywhere: false,
+    allowSuperOutsideMethod: false,
+    allowUndeclaredExports: false,
+    allowYieldOutsideFunction: false,
     plugins: [],
     strictMode: void 0,
-    ranges: !1,
-    tokens: !1,
-    createImportExpressions: !1,
-    createParenthesizedExpressions: !1,
-    errorRecovery: !1,
-    attachComment: !0,
-    annexB: !0
+    ranges: false,
+    tokens: false,
+    createImportExpressions: false,
+    createParenthesizedExpressions: false,
+    errorRecovery: false,
+    attachComment: true,
+    annexB: true
   };
 }
 function getOptions(opts) {
   const options = createDefaultOptions();
-  if (opts == null)
+  if (opts == null) {
     return options;
-  if (opts.annexB != null && opts.annexB !== !1)
+  }
+  if (opts.annexB != null && opts.annexB !== false) {
     throw new Error("The `annexB` option can only be set to `false`.");
-  for (const key of Object.keys(options))
-    opts[key] != null && (options[key] = opts[key]);
-  if (options.startLine === 1)
-    opts.startIndex == null && options.startColumn > 0 ? options.startIndex = options.startColumn : opts.startColumn == null && options.startIndex > 0 && (options.startColumn = options.startIndex);
-  else if ((opts.startColumn == null || opts.startIndex == null) && opts.startIndex != null)
-    throw new Error("With a `startLine > 1` you must also specify `startIndex` and `startColumn`.");
+  }
+  for (const key of Object.keys(options)) {
+    if (opts[key] != null) options[key] = opts[key];
+  }
+  if (options.startLine === 1) {
+    if (opts.startIndex == null && options.startColumn > 0) {
+      options.startIndex = options.startColumn;
+    } else if (opts.startColumn == null && options.startIndex > 0) {
+      options.startColumn = options.startIndex;
+    }
+  } else if (opts.startColumn == null || opts.startIndex == null) {
+    if (opts.startIndex != null || false) {
+      throw new Error("With a `startLine > 1` you must also specify `startIndex` and `startColumn`.");
+    }
+  }
   if (options.sourceType === "commonjs") {
-    if (opts.allowAwaitOutsideFunction != null)
+    if (opts.allowAwaitOutsideFunction != null) {
       throw new Error("The `allowAwaitOutsideFunction` option cannot be used with `sourceType: 'commonjs'`.");
-    if (opts.allowReturnOutsideFunction != null)
+    }
+    if (opts.allowReturnOutsideFunction != null) {
       throw new Error("`sourceType: 'commonjs'` implies `allowReturnOutsideFunction: true`, please remove the `allowReturnOutsideFunction` option or use `sourceType: 'script'`.");
-    if (opts.allowNewTargetOutsideFunction != null)
+    }
+    if (opts.allowNewTargetOutsideFunction != null) {
       throw new Error("`sourceType: 'commonjs'` implies `allowNewTargetOutsideFunction: true`, please remove the `allowNewTargetOutsideFunction` option or use `sourceType: 'script'`.");
+    }
   }
   return options;
 }

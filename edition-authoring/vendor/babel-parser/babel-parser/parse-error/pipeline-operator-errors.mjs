@@ -14,12 +14,14 @@ var stdin_default = {
   }) => `Hack-style pipe body cannot be an unparenthesized ${toNodeDescription({
     type
   })}; please wrap it in parentheses.`,
-  PipelineBodyNoArrow: 'Unexpected arrow "=>" after pipeline body; arrow function in pipeline body must be parenthesized.',
-  PipelineBodySequenceExpression: "Pipeline body may not be a comma-separated sequence expression.",
-  PipelineHeadSequenceExpression: "Pipeline head should not be a comma-separated sequence expression.",
-  PipelineTopicUnused: "Pipeline is in topic style but does not use topic reference.",
-  PrimaryTopicNotAllowed: "Topic reference was used in a lexical context without topic binding.",
-  PrimaryTopicRequiresSmartPipeline: 'Topic reference is used, but the pipelineOperator plugin was not passed a "proposal": "hack" or "smart" option.'
+  ...{
+    PipelineBodyNoArrow: 'Unexpected arrow "=>" after pipeline body; arrow function in pipeline body must be parenthesized.',
+    PipelineBodySequenceExpression: "Pipeline body may not be a comma-separated sequence expression.",
+    PipelineHeadSequenceExpression: "Pipeline head should not be a comma-separated sequence expression.",
+    PipelineTopicUnused: "Pipeline is in topic style but does not use topic reference.",
+    PrimaryTopicNotAllowed: "Topic reference was used in a lexical context without topic binding.",
+    PrimaryTopicRequiresSmartPipeline: 'Topic reference is used, but the pipelineOperator plugin was not passed a "proposal": "hack" or "smart" option.'
+  }
 };
 export {
   UnparenthesizedPipeBodyDescriptions,

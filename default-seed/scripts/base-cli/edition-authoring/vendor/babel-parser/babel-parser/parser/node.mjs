@@ -4,19 +4,28 @@ import { SourceLocation } from "../util/location.mjs";
 import { OptionFlags } from "../options.mjs";
 class Node {
   constructor(parser, pos, loc) {
-    this.start = pos, this.end = 0, this.loc = new SourceLocation(loc), parser?.optionFlags & OptionFlags.Ranges && (this.range = [pos, 0]), parser?.filename && (this.loc.filename = parser.filename);
+    this.start = pos;
+    this.end = 0;
+    this.loc = new SourceLocation(loc);
+    if (parser?.optionFlags & OptionFlags.Ranges) this.range = [pos, 0];
+    if (parser?.filename) this.loc.filename = parser.filename;
   }
   type = "";
 }
 const NodePrototype = Node.prototype;
-NodePrototype.__clone = function() {
-  const newNode = new Node(void 0, this.start, this.loc.start), keys = Object.keys(this);
-  for (let i = 0, length = keys.length; i < length; i++) {
-    const key = keys[i];
-    key !== "leadingComments" && key !== "trailingComments" && key !== "innerComments" && (newNode[key] = this[key]);
-  }
-  return newNode;
-};
+{
+  NodePrototype.__clone = function() {
+    const newNode = new Node(void 0, this.start, this.loc.start);
+    const keys = Object.keys(this);
+    for (let i = 0, length = keys.length; i < length; i++) {
+      const key = keys[i];
+      if (key !== "leadingComments" && key !== "trailingComments" && key !== "innerComments") {
+        newNode[key] = this[key];
+      }
+    }
+    return newNode;
+  };
+}
 class NodeUtils extends UtilParser {
   startNode() {
     const loc = this.state.startLoc;
@@ -32,19 +41,31 @@ class NodeUtils extends UtilParser {
     return this.finishNodeAt(node, type, this.state.lastTokEndLoc);
   }
   finishNodeAt(node, type, endLoc) {
-    return node.type = type, node.end = endLoc.index, node.loc.end = endLoc, this.optionFlags & OptionFlags.Ranges && (node.range[1] = endLoc.index), this.optionFlags & OptionFlags.AttachComment && this.processComment(node), node;
+    node.type = type;
+    node.end = endLoc.index;
+    node.loc.end = endLoc;
+    if (this.optionFlags & OptionFlags.Ranges) node.range[1] = endLoc.index;
+    if (this.optionFlags & OptionFlags.AttachComment) {
+      this.processComment(node);
+    }
+    return node;
   }
   resetStartLocation(node, startLoc) {
-    node.start = startLoc.index, node.loc.start = startLoc, this.optionFlags & OptionFlags.Ranges && (node.range[0] = startLoc.index);
+    node.start = startLoc.index;
+    node.loc.start = startLoc;
+    if (this.optionFlags & OptionFlags.Ranges) node.range[0] = startLoc.index;
   }
   resetEndLocation(node, endLoc = this.state.lastTokEndLoc) {
-    node.end = endLoc.index, node.loc.end = endLoc, this.optionFlags & OptionFlags.Ranges && (node.range[1] = endLoc.index);
+    node.end = endLoc.index;
+    node.loc.end = endLoc;
+    if (this.optionFlags & OptionFlags.Ranges) node.range[1] = endLoc.index;
   }
   resetStartLocationFromNode(node, locationNode) {
     this.resetStartLocation(node, locationNode.loc.start);
   }
   castNodeTo(node, type) {
-    return node.type = type, node;
+    node.type = type;
+    return node;
   }
   cloneIdentifier(node) {
     const {
@@ -54,8 +75,16 @@ class NodeUtils extends UtilParser {
       loc,
       range,
       name
-    } = node, cloned = Object.create(NodePrototype);
-    return cloned.type = type, cloned.start = start, cloned.end = end, cloned.loc = loc, cloned.range = range, cloned.name = name, node.extra && (cloned.extra = node.extra), cloned;
+    } = node;
+    const cloned = Object.create(NodePrototype);
+    cloned.type = type;
+    cloned.start = start;
+    cloned.end = end;
+    cloned.loc = loc;
+    cloned.range = range;
+    cloned.name = name;
+    if (node.extra) cloned.extra = node.extra;
+    return cloned;
   }
   cloneStringLiteral(node) {
     const {
@@ -65,8 +94,16 @@ class NodeUtils extends UtilParser {
       loc,
       range,
       extra
-    } = node, cloned = Object.create(NodePrototype);
-    return cloned.type = type, cloned.start = start, cloned.end = end, cloned.loc = loc, cloned.range = range, cloned.extra = extra, cloned.value = node.value, cloned;
+    } = node;
+    const cloned = Object.create(NodePrototype);
+    cloned.type = type;
+    cloned.start = start;
+    cloned.end = end;
+    cloned.loc = loc;
+    cloned.range = range;
+    cloned.extra = extra;
+    cloned.value = node.value;
+    return cloned;
   }
 }
 export {
