@@ -118,7 +118,7 @@ export const commandAdapter = declare(localInstaller({ tools: [] }), { scheduled
  t.diagnostic(`Stale packed install: ${failed.code}\n${failed.stdout}${failed.stderr}`);
  assert.equal(failed.code, 1);
  assert.match(failed.stderr, /pnpm-lock.yaml does not match package.json/);
- assert.doesNotMatch(failed.stdout + failed.stderr, /ERR_PNPM_|Last 20|Command:|Exit code:/);
+ assert.match(failed.stderr, /pnpm-lock.yaml does not match package.json[^\n]*\nInstall step failed: Installing frozen dependencies\nCommand: pnpm install --frozen-lockfile\nExit code: 1\nLast 20 lines of output:\n[\s\S]*ERR_PNPM_OUTDATED_LOCKFILE[\s\S]*\nFull log: \.seed\/installer\/install\.log\n/);
  const data = await run(rer, ['install', '--no-queue', '--json'], pnpmEnv, undefined, fixture);
  const diagnostic = data.stdout.trim().split('\n').map(JSON.parse).find(row => row.event === 'error');
  assert.equal(diagnostic.code, 'ERR_PNPM_OUTDATED_LOCKFILE');
@@ -133,7 +133,7 @@ export const commandAdapter = declare(localInstaller({ tools: [] }), { scheduled
  t.diagnostic(`Missing packed install: ${absent.code}\n${absent.stdout}${absent.stderr}`);
  assert.equal(absent.code, 1);
  assert.match(absent.stderr, /pnpm-lock.yaml is missing/);
- assert.doesNotMatch(absent.stdout + absent.stderr, /ERR_PNPM_/);
+ assert.match(absent.stderr, /pnpm-lock.yaml is missing[^\n]*\nInstall step failed: Installing frozen dependencies\nCommand: pnpm install --frozen-lockfile\nExit code: 1\nLast 20 lines of output:\n[\s\S]*\nFull log: \.seed\/installer\/install\.log\n/);
  const missingData = await run(rer, ['install', '--no-queue', '--json'], pnpmEnv, undefined, fixture);
  assert.equal(missingData.stdout.trim().split('\n').map(JSON.parse).find(row => row.event === 'error').code, 'ERR_PNPM_NO_LOCKFILE');
 

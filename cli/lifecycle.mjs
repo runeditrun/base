@@ -205,7 +205,7 @@ async function installStepError(error, store, root) {
   const { shellQuote } = await import('./node-runtime-cache.mjs');
   const [program, args] = toolCommand('pnpm', ['install', '--no-frozen-lockfile']);
   const next = [program, ...args].map(value => /^[A-Za-z0-9_.-]+$/.test(value) ? value : shellQuote(value)).join(' ');
-  return new RerError(refusal[0], `${refusal[1]}, so the install was stopped; run ${next} to update it, then retry.`, 1, { step, childExitCode: step.exitCode, signal: step.signal });
+  return new RerError(refusal[0], `${refusal[1]}, so the install was stopped; run ${next} to update it, then retry.\n${stepFailureText(step)}`, 1, { step, childExitCode: step.exitCode, signal: step.signal });
  }
  // Only a RerError's message or a symbolic error code is safe to show; a native message can hold private data.
  const cause = error instanceof RerError ? `\n${error.message}` : /^[A-Z][A-Z0-9_]{1,63}$/.test(error?.code ?? '') ? `\nCause: ${error.code}` : '';
