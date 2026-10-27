@@ -71,15 +71,13 @@ test('tag-first release retains a matching local annotation and exact public not
 });
 
 test('tag-first release refuses invalid existing tags without changing their identity', async t => {
-  await caseRows(t, await (async () => {
-    const rows = [];
-    for (const [name, options, reason] of [
+  await caseRows(t, ([
     ['lightweight', { lightweight: true }, /annotated tag/],
     ['other commit', { otherCommit: true }, /exact source commit/],
     ['message mismatch', { message: 'v1.2.3\n\nDifferent release notes.' }, /message/],
     ['embedded name mismatch', { alias: true }, /name.*version/],
     ['requested version mismatch', { requested: 'v1.2.4' }, /match.*version/],
-  ]) await rows.push([name, async t => {
+  ]).map(([name, options, reason]) => [name, async t => {
     const f = await source(t);
     if (options.otherCommit) options.commit = git(f.repo, 'rev-parse', 'HEAD^');
     const oid = publishTag(f, { ...options, name: options.alias ? 'v9.9.9' : 'v1.2.3' });
@@ -90,9 +88,7 @@ test('tag-first release refuses invalid existing tags without changing their ide
     assert.equal(receipt, null);
     assert.match(result.stderr, reason);
     assert.equal(git(f.remote, 'show-ref', '--tags'), before);
-  }]);
-    return rows;
-  })());
+  }]));
 });
 
 test('release branch Verify authorizes tag creation and adoption at the exact source commit', async t => {

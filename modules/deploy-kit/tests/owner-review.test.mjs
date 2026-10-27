@@ -173,11 +173,8 @@ ownedCase('a pending Worker that does not carry a recorded build is still refuse
 });
 
 test('a token missing a scope names the scope, not just the status', async t => {
-  await caseRows(t, await (async () => {
-    const rows = [];
-    for (const [method,path,scope] of [['GET',/^\/d1\/database$/,'d1'],['GET',/^\/r2\/buckets$/,'r2'],['GET',/^\/storage\/kv\/namespaces$/,'kv'],['GET',/^\/queues$/,'queues'],
-      ['GET',/^\/workers\/scripts\/penny-production\/settings$/,'workers'],['POST',/^\/r2\/buckets$/,'r2'],['PUT',/^\/workers\/scripts\/penny-production$/,'workers']]) {
-    await rows.push([`${method} ${scope}`, async t => {
+  await caseRows(t, ([['GET',/^\/d1\/database$/,'d1'],['GET',/^\/r2\/buckets$/,'r2'],['GET',/^\/storage\/kv\/namespaces$/,'kv'],['GET',/^\/queues$/,'queues'],
+      ['GET',/^\/workers\/scripts\/penny-production\/settings$/,'workers'],['POST',/^\/r2\/buckets$/,'r2'],['PUT',/^\/workers\/scripts\/penny-production$/,'workers']]).map(([method,path,scope]) => [`${method} ${scope}`, async t => {
       const declared = declaration({kv:[{binding:'CACHE'}],queues:[{binding:'JOBS'}]});
       const {args,state,fail} = await setup(t,{declared});
       for (const status of [401,403]) {
@@ -187,10 +184,7 @@ test('a token missing a scope names the scope, not just the status', async t => 
         state.kv.splice(0); state.queues.splice(0); state.databases.splice(0); state.buckets.splice(0); state.settings = null;
         await rm(args.statePath,{force:true});
       }
-    }]);
-  }
-    return rows;
-  })());
+    }]));
   const provider = ownerProvider(); t.after(() => provider.close());
   provider.fail('GET',/^\/workers\/subdomain$/,{status:403});
   await assert.rejects(ownerTarget(cloudflare(provider),{project:'runeditrun/penny',environment:'production'}),/token-scope-missing-workers/);

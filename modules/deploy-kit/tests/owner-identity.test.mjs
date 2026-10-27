@@ -28,9 +28,7 @@ function change(args) {
 }
 
 test('Worker ownership checks each receipt identity even if a replacement preserves its fingerprint', async t => {
-  await caseRows(t, await (async () => {
-    const rows = [];
-    for (const field of ['versionId','deploymentId','etag']) rows.push([field, async t => {
+  await caseRows(t, (['versionId','deploymentId','etag']).map((field) => [field, async t => {
     const {args,state} = await setup(t);
     await ownerDeploy(args);
     // Settings and the old fingerprint remain intact; only the provider identity changes.
@@ -42,9 +40,7 @@ test('Worker ownership checks each receipt identity even if a replacement preser
     await assert.rejects(ownerDeploy(change(args)), error => error.message === 'owned-resource-replaced' && error.resource === 'worker:penny-production');
     assert.equal(state.writes.length,writes);
     assert.deepEqual(await readFile(args.statePath),bytes);
-  }]);
-    return rows;
-  })());
+  }]));
 });
 
 test('a replacement of an interrupted successful upload cannot inherit its pending fingerprint', async t => {
@@ -124,9 +120,7 @@ test('provider input errors use neutral codes before any request', () => {
 });
 
 test('R2 legacy compatibility does not permit missing D1, KV or Queue ownership identities', async t => {
-  await caseRows(t, await (async () => {
-    const rows = [];
-    for (const [kind,binding] of [['d1','DB'],['kv','CACHE'],['queues','JOBS']]) rows.push([kind,async t => {
+  await caseRows(t, ([['d1','DB'],['kv','CACHE'],['queues','JOBS']]).map(([kind,binding]) => [kind,async t => {
     const declared = {...declaration,[kind]:[{binding}]};
     const {args,state} = await setup(t,declared);
     await ownerDeploy(args);
@@ -137,9 +131,7 @@ test('R2 legacy compatibility does not permit missing D1, KV or Queue ownership 
     const writes = state.writes.length;
     await assert.rejects(ownerDeploy(args),error => error.message === 'owned-resource-replaced' && error.resource === `${kind}:${name}`);
     assert.equal(state.writes.length,writes);
-  }]);
-    return rows;
-  })());
+  }]));
 });
 
 test('a Worker replaced during asset upload is refused immediately before the Worker PUT', async t => {

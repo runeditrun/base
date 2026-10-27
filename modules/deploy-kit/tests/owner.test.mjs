@@ -153,10 +153,7 @@ ownershipCase('a lost create response is an uncertain outcome: the resume refuse
 });
 
 ownershipCase('a same-named resource the kit did not create is refused, never adopted, before any write', async t => {
-  await caseRows(t, await (async () => {
-    const rows = [];
-    for (const [kind,name] of [['d1','penny-production-db'],['r2','penny-production-files'],['kv','penny-production-cache'],['queues','penny-production-jobs-dead'],['worker','penny-production']]) {
-    rows.push([kind, async t => {
+  await caseRows(t, ([['d1','penny-production-db'],['r2','penny-production-files'],['kv','penny-production-cache'],['queues','penny-production-jobs-dead'],['worker','penny-production']]).map(([kind,name]) => [kind, async t => {
       const {args,state,statePath,foreign} = await setup(t);
       foreign[kind](name);
       const before = JSON.stringify({d:state.databases.map(x => x.name),b:state.buckets,k:state.kv,q:state.queues});
@@ -165,10 +162,7 @@ ownershipCase('a same-named resource the kit did not create is refused, never ad
       assert.equal(state.calls.filter(x => x.method !== 'GET').length,0);
       assert.equal(JSON.stringify({d:state.databases.map(x => x.name),b:state.buckets,k:state.kv,q:state.queues}),before);
       assert.equal(await exists(statePath),false);
-    }]);
-  }
-    return rows;
-  })());
+    }]));
 });
 
 ownershipCase('an owned resource that disappeared or was replaced is refused, never recreated or adopted', async t => {
@@ -232,9 +226,7 @@ test('KV is validated like other named resources, and plans without KV keep thei
 settlementCase('secret writes settle ambiguous answers within their window and clear refusals before later dashboard changes', async t => {
   const answers = [{afterApply:true,status:504}, {afterApply:true,status:524}, {afterApply:true},
     {status:500}, {transport:true}, {status:403}, {status:200}, {status:500,concurrent:true}, {transport:true,concurrent:true}];
-  await caseRows(t, await (async () => {
-    const rows = [];
-    for (const present of [true,false]) for (const answer of answers.filter(answer => present || !answer.concurrent)) rows.push([`${present ? 'set' : 'unset'} ${JSON.stringify(answer)}`, async t => {
+  await caseRows(t, ([true,false]).flatMap((present) => (answers.filter(answer => present || !answer.concurrent)).map((answer) => [`${present ? 'set' : 'unset'} ${JSON.stringify(answer)}`, async t => {
     const fixture = await setup(t), {args,api,target,statePath,state,fail} = fixture;
     await ownerDeploy(args);
     const before = await readOwnerState(statePath,target);
@@ -278,15 +270,11 @@ settlementCase('secret writes settle ambiguous answers within their window and c
     await assert.rejects(ownerDeploy(args),/owned-resource-replaced/);
     await assert.rejects(ownerRemove({api,target,statePath}),/owned-resource-replaced/);
     assert.equal(state.writes.length,writes, 'neither command changes the foreign Worker or its resources');
-  }]);
-    return rows;
-  })());
+  }])));
 });
 
 settlementCase('interrupted secret settlement requires its recorded immediate successor, and a new upload clears old intent', async t => {
-  await caseRows(t, await (async () => {
-    const rows = [];
-    for (const command of ['inspect','deploy','secret','remove']) rows.push([`unchanged preflight ${command}`, async t => {
+  await caseRows(t, (['inspect','deploy','secret','remove']).map((command) => [`unchanged preflight ${command}`, async t => {
     const {args,api,target,statePath,state} = await setup(t);
     await ownerDeploy(args);
     const saved = await readOwnerState(statePath,target);
@@ -310,12 +298,8 @@ settlementCase('interrupted secret settlement requires its recorded immediate su
     await assert.rejects(ownerDeploy(args),/owned-resource-replaced/);
     await assert.rejects(ownerRemove({api,target,statePath}),/owned-resource-replaced/);
     assert.equal(state.writes.length,writes);
-  }]);
-    return rows;
-  })());
-  await caseRows(t, await (async () => {
-    const rows = [];
-    for (const scenario of ['immediate','later-change','stale-receipt','new-upload']) rows.push([scenario, async t => {
+  }]));
+  await caseRows(t, (['immediate','later-change','stale-receipt','new-upload']).map((scenario) => [scenario, async t => {
     const {args,api,target,statePath,state} = await setup(t);
     await ownerDeploy(args);
     const saved = await readOwnerState(statePath,target);
@@ -347,17 +331,13 @@ settlementCase('interrupted secret settlement requires its recorded immediate su
       }
       assert.equal((await readOwnerState(statePath,target)).pendingSecret,undefined);
     }
-  }]);
-    return rows;
-  })());
+  }]));
 });
 
 settlementCase('secret settlement polls delayed or failed reads, preserves unconfirmed intent and refuses drift', async t => {
   const scenarios = ['read-503','read-reset','lag','unsettled','unavailable','active-lag','active-lag-reset','all-reads-lag','wrong-presence','script-drift','two-versions',
     'lost-response','applied-524','applied-504','repeat-unsettled','repeat-read-failed','repeat-refused','repeat-foreign','repeat-lost-response','repeat-later-change'];
-  await caseRows(t, await (async () => {
-    const rows = [];
-    for (const present of [true,false]) for (const scenario of scenarios.filter(name => present || !name.startsWith('repeat-'))) rows.push([`${present ? 'set' : 'unset'} ${scenario}`, async t => {
+  await caseRows(t, ([true,false]).flatMap((present) => (scenarios.filter(name => present || !name.startsWith('repeat-'))).map((scenario) => [`${present ? 'set' : 'unset'} ${scenario}`, async t => {
     const {args,api,target,statePath,state,foreign,fail} = await setup(t);
     await ownerDeploy(args);
     const before = await readOwnerState(statePath,target);
@@ -418,15 +398,11 @@ settlementCase('secret settlement polls delayed or failed reads, preserves uncon
       }
     }
     assert.equal((await readOwnerState(statePath,target)).pendingSecret !== undefined,['script-drift','two-versions','repeat-later-change','repeat-foreign'].includes(scenario));
-  }]);
-    return rows;
-  })());
+  }])));
 });
 
 settlementCase('stale preflight retains intent until deployment and versions agree, then retries safely', async t => {
-  await caseRows(t, await (async () => {
-    const rows = [];
-    for (const listing of ['newer','missing','empty','malformed','malformed-tail','failed']) rows.push([listing, async t => {
+  await caseRows(t, (['newer','missing','empty','malformed','malformed-tail','failed']).map((listing) => [listing, async t => {
     const {args,api,target,statePath,state} = await setup(t);
     await ownerDeploy(args);
     const deployments = await api.request(`/workers/scripts/${target.worker}/deployments`);
@@ -454,16 +430,12 @@ settlementCase('stale preflight retains intent until deployment and versions agr
     await ownerSecret({api,target,statePath,fetch:args.fetch,changes:[{binding:'AUTH_SECRET',value:'test-only-retry'}]});
     assert.equal((await ownerDeploy(args)).receipt.changed,false);
     assert.equal((await readOwnerState(statePath,target)).pendingSecret,undefined);
-  }]);
-    return rows;
-  })());
+  }]));
 });
 
 settlementCase('pending name snapshots use live names before writes and only adopt unchanged other-name sets', async t => {
   const malformedTypes = {'legacy-blank-type':' ','legacy-padded-type':'secret_text ','legacy-unknown-type':'unknown_binding','legacy-inherit-type':'inherit'};
-  await caseRows(t, await (async () => {
-    const rows = [];
-    for (const scenario of ['add','remove','rename','order','empty','set','unset','legacy-own','legacy-add','legacy-unset','legacy-missing','legacy-unavailable','legacy-malformed','legacy-wrong-id','legacy-wrong-etag','legacy-wrong-fingerprint',...Object.keys(malformedTypes)]) rows.push([scenario, async t => {
+  await caseRows(t, (['add','remove','rename','order','empty','set','unset','legacy-own','legacy-add','legacy-unset','legacy-missing','legacy-unavailable','legacy-malformed','legacy-wrong-id','legacy-wrong-etag','legacy-wrong-fingerprint',...Object.keys(malformedTypes)]).map((scenario) => [scenario, async t => {
     const {args,api,target,statePath,state} = await setup(t);
     await ownerDeploy(args);
     const path = `/workers/scripts/${target.worker}/secrets`;
@@ -527,9 +499,7 @@ settlementCase('pending name snapshots use live names before writes and only ado
       if (unset) assert.ok(settled.retiredSecrets.includes(binding));
       assert.equal(state.writes.length,writes);
     }
-  }]);
-    return rows;
-  })());
+  }]));
 });
 
 settlementCase('legacy own secret addition recovers with every supported declared binding family', async t => {
