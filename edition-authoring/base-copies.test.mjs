@@ -323,6 +323,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
     {name: 'adapted root imports', adapted: true},
     {name: 'removed recorded helper', removed: true},
     {name: 'pre-existing partial bootstrap', bootstrap: true},
+    {name: 'adapted partial bootstrap', adapted: true, bootstrap: true},
   ];
   for (const row of cases) {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-authoring-'));
@@ -355,7 +356,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       commit(seed);
       ok(seed, 'record-base', root, `${origin}/refresh.mjs`, revision, '--base', base);
       ok(seed, 'record-base', 'aaa/earlier.mjs', 'tools/earlier.mjs', revision, '--base', base);
-      if (row.mirrorRecord || row.removed || row.adapted) {
+      if ((row.mirrorRecord || row.removed || row.adapted) && !row.bootstrap) {
         write(seed, helper, initialHelper);
         ok(seed, 'record-base', helper, `${row.mirrorRecord ? mirror : origin}/helper.mjs`, revision, '--base', base);
         git(seed, 'add', '--', helper);
@@ -417,12 +418,12 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       assert.equal(ok(seed, 'verify-base', '--base', base).ok, true, row.name);
     } finally { fs.rmSync(temp, {recursive: true, force: true}); }
   }
-  for (const row of ['named', 'default', 'type', 'declaration', 'type-declaration', 'generator', 'equal', 'multi', 'star', 'unknown', 'baseline', 'mapped', 'extensionless', 'withhold', 'withhold-last', 'witness', 'unplaceable']) {
+  for (const row of ['named', 'default', 'type', 'declaration', 'type-declaration', 'generator', 'equal', 'equal-singleton', 'multi', 'star', 'unknown', 'baseline', 'mapped', 'extensionless', 'withhold', 'withhold-last', 'witness', 'unplaceable']) {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-module-'));
     try {
       const {base, seed, revision} = fixture(temp);
       const target = 'vendor/sample/index.mjs';
-      ok(seed, 'record-base', ['mapped', 'extensionless'].includes(row) ? target : 'vendor/sample', ['mapped', 'extensionless'].includes(row) ? 'modules/sample/index.mjs' : 'modules/sample', revision, '--base', base);
+      ok(seed, 'record-base', ['mapped', 'extensionless', 'equal-singleton'].includes(row) ? target : 'vendor/sample', ['mapped', 'extensionless', 'equal-singleton'].includes(row) ? 'modules/sample/index.mjs' : 'modules/sample', revision, '--base', base);
       const specifier = row === 'extensionless' ? './helper.server' : row === 'witness' || row === 'unplaceable' ? '../shared/helper.mjs' : './helper.mjs';
       const imported = row === 'default' ? 'import missing from' : row === 'type' ? 'import type {Missing} from' : row === 'type-declaration' ? 'import type {missing} from' : 'import {missing} from';
       const incoming = `${imported} "${specifier}?raw";\nexport const sample = 2;\n`;
@@ -439,7 +440,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
         ok(seed, 'record-base', 'vendor/shared/witness.mjs', 'modules/shared/witness.mjs', witness, '--base', base);
       }
       if (!['withhold', 'withhold-last', 'witness', 'unplaceable', 'extensionless'].includes(row)) {
-        write(seed, 'vendor/sample/helper.mjs', row === 'star' ? 'export * from "./leaf.mjs";\n' : row === 'generator' ? 'export function* missing(){yield 1;}\n' : row === 'equal' ? 'export const missing = true;\n' : row === 'multi' ? 'export const first = 1, missing = 2;\n' : row === 'unknown' ? 'export * from "synthetic-package";\n' : 'export const custom = true;\n');
+        write(seed, 'vendor/sample/helper.mjs', row === 'star' ? 'export * from "./leaf.mjs";\n' : row === 'generator' ? 'export function* missing(){yield 1;}\n' : row.startsWith('equal') ? 'export const missing = true;\n' : row === 'multi' ? 'export const first = 1, missing = 2;\n' : row === 'unknown' ? 'export * from "synthetic-package";\n' : 'export const custom = true;\n');
         if (row === 'mapped') {
           const bytes = 'export const missing = true;\n';
           write(base, 'other/helper.mjs', bytes);
@@ -472,7 +473,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       } else if (row === 'extensionless') assert.ok(fs.existsSync(path.join(seed, 'vendor/sample/helper.server.ts')));
       else if (row === 'witness') assert.ok(fs.existsSync(path.join(seed, 'vendor/shared/helper.mjs')));
       else assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/helper.mjs'), 'utf8'), before['vendor/sample/helper.mjs'].bytes ? Buffer.from(before['vendor/sample/helper.mjs'].bytes, 'hex').toString() : '');
-      if (row === 'equal') assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
+      if (row.startsWith('equal')) assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
     } finally { fs.rmSync(temp, {recursive: true, force: true}); }
   }
 
