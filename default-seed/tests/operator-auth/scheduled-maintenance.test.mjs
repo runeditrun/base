@@ -1,7 +1,9 @@
+import { runRows } from '../rows.mjs'
+import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { emittedRuntime, setupToken } from './emitted-runtime.mjs'
 
-export const maintenanceRows = []
+const maintenanceRows = []
 
 
 maintenanceRows.push(['cron failure isolation: a broken policy cannot strand a pending person erasure or later policies', {}, async () => {
@@ -70,3 +72,7 @@ maintenanceRows.push(['erasure preview changes nothing, and an explicit resume f
     assert.deepEqual(await (await r.call(`/api/people/${peer}/export`, { cookie })).json(), peerExport, 'the unrelated person is preserved exactly')
   } finally { await r.close() }
 }])
+
+test('erasure recovery keeps preview inert and resumes after explicit interruption or a broken cron policy', async t => {
+  await runRows(t, maintenanceRows)
+})

@@ -1,4 +1,3 @@
-import { maintenanceRows } from '../operator-auth/scheduled-maintenance.mjs'
 import { runRows } from '../rows.mjs'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
@@ -327,6 +326,6 @@ erasureRows.push(['BASE-DATA-003 an imported person is erased from import custod
   } finally { await runtime.close() }
 }])
 
-test('person erasure clears native and import custody, fences archives and resumes through interrupted or broken cron work', async t => {
-  await runRows(t, [...erasureRows, ...maintenanceRows])
+test('person erasure clears native and import custody, fences archives and resumes bounded queued steps', async t => {
+  await runRows(t, erasureRows)
 })

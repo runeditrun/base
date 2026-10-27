@@ -11,6 +11,7 @@ import { emittedRuntime, root, owner, setupToken, decodeStart } from './emitted-
 import { startTogether } from '../ports.mjs'
 
 const admissionRows = []
+const rendererRows = []
 
 
 export const cookieOf = (response) => { assert.equal(response.status, 303); return response.headers.get('set-cookie').split(';')[0] }
@@ -227,10 +228,10 @@ admissionRows.push(['emitted Worker: a linked Auth provider verifies a signed ca
   } finally { await runtime.close() }
 }])
 
-test('native Wrangler emitted artifact: fresh migrations, browser navigation, SSR, assets and real 404s', async () => {
+rendererRows.push(['native Wrangler emitted artifact: fresh migrations, browser navigation, SSR, assets and real 404s', {}, async () => {
   const { nativeWranglerProof } = await import('./native-wrangler.mjs')
   await nativeWranglerProof()
-})
+}])
 
 test('vite dev: real Start scripts hydrate and navigate with no layout or transport failures', async () => {
   const { devBrowserProof } = await import('./dev-browser.mjs')
@@ -273,11 +274,15 @@ admissionRows.push(['emitted Worker administration: invitations, scoped admin ro
   } finally { await runtime.close() }
 }])
 
-test('emitted Worker: the Start renderer stays out of the complete eager module graph', async () => {
+rendererRows.push(['emitted Worker: the Start renderer stays out of the complete eager module graph', {}, async () => {
   const { rendererBoundaryProof } = await import('./renderer-boundary.mjs')
   await rendererBoundaryProof()
-})
+}])
 
 test('emitted Worker operator admission journey: bootstrap, owner identity, migration, linked provider and administration', async t => {
   await runRows(t, [...admissionRows, ...nativeAuthRows, ...lobbyRows, ...demoRows])
+})
+
+test('native emitted Start artifact preserves lazy renderer startup, migrations, SSR, assets and real 404s', async t => {
+  await runRows(t, rendererRows)
 })
