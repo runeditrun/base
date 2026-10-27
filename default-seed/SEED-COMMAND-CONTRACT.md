@@ -347,12 +347,113 @@ provider permissions and deployment ownership.
 
 ## Contract status
 
-A seed's `CONTRACT.md` says what the product is being built towards and how far the code has come. `parseContract(text)` in `foundation/runtime/seed-contract.mjs` (types in `seed-contract.d.mts`; a seed has it at `src/base/seed-contract.mjs`) reads it into `{ commit, date, target: { category, incumbents, replaces, alsoBeats, firstBuyer }, areas: [{ name, slug, group, clauses, done, partial, missing, total }], clauses: [{ id, title, kind, status, evidence, gap, area, line, row }], counts: { done, partial, missing, total } }` (`line` is where the clause is defined, `row` its Status row). It throws a `ContractError` whose `problems` each name a `CONTRACT.md` line; it never fills a missing value. The shape it reads:
+A seed's `CONTRACT.md` is its product target and its only acceptance text and
+status source. Follow the RER contract standard below. The full authoring and
+copy-provenance guide lives beside the parser at `src/base/CONTRACT-DOCS.md`
+(the Base file `foundation/runtime/CONTRACT-DOCS.md`).
 
-- **Product target.** A `## Product target` section (its heading may go on, as in `## Product target — 16 October 2026`) holds a two-column table with the rows `Category`, `Incumbents a buyer switches from` (names separated by commas, `and` or `or`; `replaces` keeps the cell in full) and `First buyer`, and optionally a row whose label says it `must also beat` (`alsoBeats`, else null).
-- **Clauses.** A clause is defined once, at the start of a line, as a bold bullet `- **HOME-001 — Public landing.**`, a bold paragraph `**HOME-001 — Public landing.**` or a heading `#### COLLAB-001 — Live co-editing by default.` An ID is uppercase words and a two- or three-digit number joined by hyphens (`HOME-001`, `PAN-01`), or the legacy hyphenless form of up to four capitals and a number (`E1`, `A7`); Base's release catalogue reads the contract through this parser and lists its `published` clauses, whichever of the three forms defines them. The clause's area is the nearest heading above it that is not itself a clause; areas keep the contract's order. An area is in the `target` group when it or a heading above it starts with `Target clauses` or `Push further`, else `published`; its `slug` (`archive-trash-and-deletion`) must differ from every other area's. Definitions are read everywhere except the Status section and any section whose heading starts with `Retired`. A clause's own `*Status:* partial.` line, where its text keeps one, must agree with its row.
-- **Status.** Exactly one `## Status` section. Its first line is `` Judged from the code and tests at commit `<sha>` (<date>). `` with a 7 to 40 character hex commit and a date written `16 October 2026` or `2026-10-16` (the sentence may go on after a semicolon). It holds one table with the header `| Clause | Title | Kind | Status | Evidence | Gap |` and exactly one row per defined clause: no row for an undefined clause and no second row. Kind is `published`, `target` or `push-further`; Status is `done`, `partial` or `missing`; the title matches the definition's. Evidence lists the repository paths, each in backticks, that back a `done` or `partial` row (one is required); Gap says what is missing for a `partial` or `missing` row (required).
-- **Summaries.** Optional, and checked against the rows when present: a `| Clauses | Done | Partial | Missing | Total |` table whose rows are labelled `All`, a kind (`Published`, `Target`, `Push further`) or kinds joined by `and`, and sentences such as `88 clauses: 23 done, 38 partial, 27 missing.`
+- **Sections.** After `# <Seed> target product contract` and one introductory
+  paragraph, use these exact second-level headings in order: Product target;
+  How to read this contract; Door rules; Shared duties (Base); Published
+  clauses; Target clauses; Push further; Field proof register; Boundaries;
+  Homepage claims; Retired clauses; Status. Omit only Door rules, Push further
+  and Retired clauses when empty. History goes to `CHANGELOG.md`, rulings to
+  `RULINGS.md` and mechanism to `docs/`.
+- **Product target and tiers.** The two-column table has Category, Incumbents a
+  buyer switches from, Up-and-comers it must also beat, and First buyer, naming
+  location, currency and time zone. Follow it with `The primary journey:` and
+  the buyer's journey in order. Core is the switching buyer's first-week work
+  plus push-further, including incumbent integrations, migration sources,
+  golden fixtures and native apps where the first incumbent ships one. Agent
+  surface is a separate tier. Later preserves premium, enterprise, rare or
+  non-US requirements in their original capability areas with their IDs and
+  statuses. Preserve recorded owner requirements.
+- **Clauses.** Each capability is a `#### <ID> — <Title>` under a uniquely
+  named third-level area. Its first line is `*Tier:* Core`, `*Tier:* Agent
+  surface` or `*Tier:* Later`, followed only when applicable by From, Cites,
+  Rules and Register, in that order, separated by ` · `. A published clause's
+  metadata instead sits in a list opening Published clauses, such as
+  ``- `NOTE-001`: *Tier:* Core``. Keep at least one published clause. The body
+  has only `**Requirement.**`, an optional requirement table, and
+  `**Acceptance.**` with one to eight consecutive numbered outcomes. Split a
+  capability needing more. Continue a point with at least two spaces. Status,
+  Evidence and Gap belong only in the Status table; clause prose names no
+  tests. An ID is uppercase words and a two- or three-digit number joined by
+  hyphens, or an existing legacy hyphenless ID. IDs never change or get reused;
+  new parts take the next number above the prefix's highest ever used number.
+- **Shared duties and doors.** List each applicable `BASELINE.md` duty in
+  `Base duty | Duty | Delta clauses | Base journey`, with delta IDs or `none`
+  and the conformance journey on the seed's own data. Delta clauses cite the
+  duty and state only their change; superseding a duty requires owner authority
+  and an explicit Supersedes statement. State repeated door obligations once
+  as D-n rules and cite them in each clause that proves them. Keep Base's
+  shared accessibility bar.
+- **Agent surface.** `### Agent surface` is the last area under Target
+  clauses. It inherits BASE-AGENT-001 to BASE-AGENT-013, maps each Core job to a
+  tool or a reason unrelated to risk, and explains how tool calls receive
+  their fleet risk classes. The company's policy decides every call; the
+  contract presets no tool or class disposition. Use bold labels for the
+  specialist, class facts, resources, events, prompts, limits and handoffs.
+  SURFACE clauses have Tier Agent surface and include a specialist week
+  through MCP under two company policies, one autonomous for every class.
+  People set policy and Pause; agents never widen their authority, act beyond
+  the named person's role, misattribute an action, solve a CAPTCHA or enter a
+  person's password or 2FA code.
+- **Status.** `## Status` is last and unique. It opens with
+  ``Judged from the code and tests at commit `<sha>` (<D Month YYYY>).`` Its
+  clause table is exactly `| Clause | Title | Kind | Status | Evidence | Gap |`,
+  one row per clause with the backticked ID and exact title. Kind is
+  `published`, `target` or `push-further`, matching its section. Status is
+  `done`, `partial` or `missing`. Done and partial cite existing repository
+  evidence paths in backticks; partial and missing have a Gap, done has none.
+  Done proves every point through the seed's own doors in recorded Verify on
+  the exact candidate, with point-by-point asserting tests and failing
+  mutations recorded in the judgement. Rewrites never promote status or
+  change the judged revision; split and merged clauses carry their source
+  statuses and evidence conservatively.
+- **Field proof and claims.** Register only proof the repository cannot
+  produce, using `ID | Proof | Clauses | State | Date | Receipt`. R-n rows are
+  `not run`, `passed` or `failed`; completed rows have ISO dates and receipts.
+  Rows and clauses cite each other; register rows never block done. Seeded
+  scale, sandboxes and official-schema test doubles stay in acceptance.
+  Homepage claims map the live homepage's claims to clause IDs; the generator
+  computes claim status. Keep retired IDs and reasons, every old sentence and
+  gap, and remapped downstream references in the rewrite's records.
+
+`ACCEPTANCE.md`, `docs/CLAIMS.md` and the Status summary rows are generated;
+never edit them by hand. The summary has exactly Published, Target and push
+further, and All rows under `| Clauses | Done | Partial | Missing | Total |`.
+`ACCEPTANCE.md` shows Core, Agent surface, Later and Full target progress,
+then the clauses by tier with their original acceptance text, evidence and
+gaps, plus the Field proof register. Report Core done and full-target done
+together. After every contract edit, run from the runnable seed root:
+
+```sh
+node src/base/contract-docs.mjs write
+node src/base/contract-docs.mjs check
+rer check
+```
+
+Use the generator beside the seed's actual parser when its path differs. Commit
+the generated outputs with the contract, and run the generator's `check` in CI.
+For an edition carrying the source-lock tool, regenerate before refreshing its
+lock. Its `AGENTS.md` carries these lines in order, with its actual paths:
+
+```text
+Lander-Regenerate: node src/base/contract-docs.mjs write
+Lander-Regenerate: node scripts/edition-authoring/cli.mjs lock
+```
+
+The shared parser remains compatible with older bullet and paragraph clause
+definitions and ISO judged dates; new authoring follows the standard above.
+`parseContract(text)` in `foundation/runtime/seed-contract.mjs` (types in
+`seed-contract.d.mts`; a seed has it at `src/base/seed-contract.mjs`) returns
+`{ commit, date, target: { category, incumbents, replaces, alsoBeats, firstBuyer }, areas: [{ name, slug, group, clauses, done, partial, missing, total }], clauses: [{ id, title, kind, status, evidence, gap, area, line, row }], counts: { done, partial, missing, total } }`.
+`line` is the definition's line and `row` its Status row. `date` is ISO; the
+generator preserves the contract's written judged date. `ContractError.problems`
+names each malformed line; the parser never supplies missing values. The
+generator's check detects stale generated documents; parser compatibility
+alone does not establish conformance to the authoring standard.
 
 **The /contract page.** `rer build --site` parses a seed's `CONTRACT.md` and passes it to the site entry as `sitePages({ contract })`; a contract that does not parse stops the build with each problem's line, and no site is written. The entry adds `{ path: '/contract', html: contractPageHtml(identity, run, contract) }` (`src/base/contract-page.ts`) and passes `contract` to `runPageHtml`, `siteHomeHtml` and `siteNotFoundHtml`, whose headers then link Contract; a seed's own pages and docs link `/contract` only when `contract` is given. The site has one header: Base's on its own homepage, `/run`, `/contract` and the not-found page, or, for a seed with an approved homepage, that homepage's header, passed to `runPageHtml`, `contractPageHtml` and `siteNotFoundHtml` as their last argument (`HomepageHeader`, `HOMEPAGE-VARIANTS.md`), with its own links. Without a `CONTRACT.md` there is no `contract`, no page and no link. The page reads the seed's theme, and the status tokens in `onboarding/README.md` ("Seed theme") recolour it.
 
