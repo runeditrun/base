@@ -480,7 +480,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       if (row !== 'withhold-last') write(base, 'modules/sample/index.mjs', fs.readFileSync(path.join(base, 'modules/sample/index.mjs'), 'utf8') + '// incoming revision\n');
       const next = commit(base), before = snapshotTree(seed);
       const result = run(seed, 'refresh-base', next, '--base', base);
-      const refused = ['named', 'default', 'type', 'declaration', 'declaration-target', 'unplaceable', 'withhold-last'].includes(row);
+      const refused = ['named', 'default', 'type', 'declaration', 'declaration-target', 'unplaceable', 'withhold-last', 'extensionless'].includes(row);
       assert.equal(result.status, refused ? 1 : 0, `${row}: ${result.error}`);
       if (refused) assert.deepEqual(snapshotTree(seed), before, row);
       else if (row === 'withhold') {

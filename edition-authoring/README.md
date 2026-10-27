@@ -261,8 +261,9 @@ its relative destination only when an existing copy mapping witnesses that
 namespace. Tracked unrecorded dependencies stay seed-owned and stop traversal;
 new imports from refreshed files must find their named, type and default exports.
 Runtime imports of every form resolve independently of declaration-only files;
-only erased type imports may use declarations. Source TypeScript substitutions
-and extensionless bundler indexes remain supported. Relative `require` directory
+only erased type imports may use declarations. TypeScript sources retain
+emitted-filename substitutions and extensionless bundler resolution; JavaScript
+runtime imports require an explicit filename, as in Node. Relative `require` directory
 lookups use `package.json`'s runtime `main`, never its type metadata.
 Imports already unresolved in that same file before refresh remain untouched,
 except for missing authoring-toolkit bootstrap siblings and recorded removals.

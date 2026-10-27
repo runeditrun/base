@@ -178,25 +178,32 @@ test('packed refresh delivers and adopts templates with their helpers atomically
   git(seed, 'add', '-A');
  }
 
- for (const [origin, scalar] of [
+ for (const [origin, scalar, helper = 'export/literal-helper.mjs', destination = 'scripts/literal-helper.mjs', owned = false] of [
   ['default-seed/.github/workflows/literal.yml', 'node scripts/literal-helper.mjs'],
   ['export/literal.yml', '"bash -c \'node scripts/literal-helper.mjs\'"'],
   ['export/literal.yml', '|2\n          node scripts/literal-helper.mjs'],
+  ['default-seed/.github/workflows/literal.yml', 'node scripts/literal-helper.mjs', 'literal-helper.mjs'],
+  ['export/literal.yml', 'node scripts/literal\\ helper.mjs', 'export/literal helper.mjs', 'scripts/literal helper.mjs'],
+  ['export/literal.yml', 'node\n          scripts/literal-helper.mjs'],
+  ['export/literal.yml', '>2-\n          node scripts/literal-helper.mjs'],
+  ['export/literal.yml', '\'node "scripts/literal-helper.mjs"\''],
+  ['export/literal.yml', '"node scripts/literal-helper.mjs"', 'export/literal-helper.mjs', 'scripts/literal-helper.mjs', true],
  ]) {
   const {seed, source, old, result} = await fixture(t);
   const target = '.github/workflows/literal.yml';
   write(source, origin, 'jobs:\n  check:\n    steps:\n      - run: echo before\n');
   const pin = commit(source);
   write(seed, target, fs.readFileSync(path.join(source, origin)));
-  old('record-base', target, origin, pin, '--base', source);
+  if (!owned) old('record-base', target, origin, pin, '--base', source);
   commit(seed);
   write(source, origin, `jobs:\n  check:\n    steps:\n      - run: ${scalar}\n`);
-  write(source, 'export/literal-helper.mjs', 'export const helper = true;\n');
+  write(source, helper, 'export const helper = true;\n');
   const next = commit(source);
+  if (owned) { write(seed, target, fs.readFileSync(path.join(source, origin))); commit(seed); }
   result('refresh-base', '--ref', next, '--base', source);
-  assert.equal(fs.readFileSync(path.join(seed, 'scripts/literal-helper.mjs'), 'utf8'), 'export const helper = true;\n');
+  assert.equal(fs.readFileSync(path.join(seed, destination), 'utf8'), 'export const helper = true;\n');
   const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json')));
-  assert.equal(record.copies.filter(copy => Object.hasOwn(copy.files, 'scripts/literal-helper.mjs')).length, 1);
+  assert.equal(record.copies.filter(copy => Object.hasOwn(copy.files, destination)).length, 1);
   assert.equal(old('verify-base', '--base', source).ok, true);
  }
 

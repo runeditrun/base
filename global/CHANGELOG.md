@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Refresh resolves every runtime import form without declaration files, reads workflow run steps from a YAML AST, preserves equal-byte tracked siblings as edition-owned discovery exceptions, and keeps ordinary baseline-unresolved imports unresolved. JavaScript runtime paths follow Node's explicit-file rules; TypeScript source resolution is retained.
+
 - Fix the Verify template's unavailable job-level runner context, lint delivered workflows in Base Verify, and upgrade unchanged historical Verify templates and their helper closure during refresh.
 - Close every recorded code module over relative imports and declarations using existing copy namespaces, preserving seed-owned dependencies and pre-existing unresolved imports; withhold optional directory additions without a witnessed destination and refuse missing seed-owned bindings atomically.
 - Declare edition migrations `run-data-paths` and `run-data-pricing`; repeat `--edition-migration ID` to consent to refresh while leaving the documented edition-owned edits owed.
