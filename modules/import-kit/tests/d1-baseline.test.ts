@@ -103,6 +103,20 @@ test('shared D1 reset removes prior-case state and restores seeded schema and pr
           await connection.prepare(insert).bind(2,'x'.repeat(1999993)).run();
           await assert.rejects(connection.prepare(insert).bind(3,'x'.repeat(1999994)).run(), /table row bytes maximum 2000000, measured 2000001/);
         }
+        await connection.prepare('CREATE TABLE synthetic_base_alter(a TEXT,b TEXT)').run();
+        await connection.prepare('ALTER TABLE synthetic_base_alter DROP COLUMN b').run();
+        await connection.prepare('INSERT INTO synthetic_base_alter VALUES(?)').bind('retained').run();
+        await assert.rejects(connection.prepare('INSERT INTO synthetic_base_alter VALUES(?)').bind('x'.repeat(1999996)).run(), /table row bytes maximum 2000000, measured 2000001/);
+        assert.equal((await connection.prepare('SELECT count(*) AS n FROM synthetic_base_alter').first())?.n, 1);
+        const longNames = Array.from({length:99},(_,i)=>'c'+i+'_'+'x'.repeat(550));
+        await connection.prepare('CREATE TABLE synthetic_base_wide(id INTEGER PRIMARY KEY,'+longNames.map(name=>'"'+name+'" TEXT').join(',')+')').run();
+        const insertWide = 'INSERT INTO synthetic_base_wide VALUES('+Array(100).fill('?').join(',')+')';
+        const wideValues = longNames.map(()=> 'x'.repeat(20199));
+        wideValues[0] = wideValues[0].slice(1);
+        await connection.prepare(insertWide).bind(1,...wideValues).run();
+        wideValues[0] += 'x';
+        await assert.rejects(connection.prepare(insertWide).bind(2,...wideValues).run(), /table row bytes maximum 2000000, measured 2000001/);
+        assert.equal((await connection.prepare('SELECT count(*) AS n FROM synthetic_base_wide').first())?.n, 1);
         assert.equal((await connection.prepare(`SELECT max(${Array(32).fill(1).join(',')}) AS value`).first())?.value, 1);
         await assert.rejects(connection.prepare(`SELECT max(${Array(33).fill(1).join(',')})`).first(), /D1 limit exceeded: SQL function arguments maximum 32, measured 33/);
       }

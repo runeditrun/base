@@ -164,8 +164,16 @@ export function createD1RowGuard() {
   const state = new WeakMap();
   const key = name => name.replace(/[A-Z]/g, char => char.toLowerCase());
   return function guardD1Rows(db, prepare, exec, query) {
+    // Internal TEMP triggers must not participate in application schema edits.
+    // SQLite validates every trigger when a column is dropped, even though
+    // these guards will be regenerated against the resulting schema.
+    if (exec && query === true) {
+      for (const name of state.get(db)?.names ?? []) exec(`DROP TRIGGER IF EXISTS temp.${quote(name)}`);
+      state.delete(db);
+      return;
+    }
     const version = exec ? prepare('PRAGMA main.schema_version').get().schema_version : undefined;
-    if (exec && state.get(db) === version) return;
+    if (exec && state.get(db)?.version === version) return;
     const tables = prepare("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'").all();
     let touched;
     if (query) {
@@ -200,6 +208,7 @@ export function createD1RowGuard() {
       for (const table of tables) if (touched.has(key(table.name)) && /^CREATE\s+VIRTUAL\s+TABLE\b/i.test(table.sql))
         for (const shadow of tables) if (key(shadow.name).startsWith(key(table.name) + '_')) touched.add(key(shadow.name));
     }
+    const names = [];
     for (const table of tables) {
       if (touched && !touched.has(key(table.name))) continue;
       // Cloudflare owns reserved metadata; its authorizer forbids user access.
@@ -226,17 +235,46 @@ export function createD1RowGuard() {
       const sizes = `SELECT ${sum(body)} AS payload,${sum(header)} AS header FROM (${source})`;
       const measured = `SELECT payload+header+CASE WHEN header<127 THEN 1 ELSE 2 END AS measured FROM (${sizes})`;
       if (!exec) {
-        const oversized = prepare(`SELECT measured FROM (${measured}) WHERE measured>${d1NativeLimits.length} LIMIT 1`).get();
-        if (oversized) throw new Error(`D1 limit exceeded: table row bytes maximum ${d1NativeLimits.length}, measured ${oversized.measured}`);
+        const check = `SELECT measured FROM (${measured}) WHERE measured>${d1NativeLimits.length} LIMIT 1`;
+        const bytes = sql => new TextEncoder().encode(sql).length;
+        if (bytes(check) <= d1NativeLimits.sqlLength) {
+          const oversized = prepare(check).get();
+          if (oversized) throw new Error(`D1 limit exceeded: table row bytes maximum ${d1NativeLimits.length}, measured ${oversized.measured}`);
+        } else {
+          // Scan the same physical table order for each column chunk. NOT
+          // INDEXED prevents a projection-dependent covering-index choice;
+          // WITHOUT ROWID tables retain their primary-key storage order.
+          // Only numeric partial sizes leave SQLite, never cell contents.
+          const partial = (start, end) => `SELECT ${sum(body.slice(start,end))} AS payload,${sum(header.slice(start,end))} AS header FROM (SELECT ${projection.slice(start,end).join(',')} FROM ${quote(table.name)} NOT INDEXED)`;
+          const totals = [];
+          for (let start = 0; start < columns.length;) {
+            let end = start + 1;
+            while (end < columns.length && bytes(partial(start,end+1)) <= d1NativeLimits.sqlLength) end++;
+            const sql = partial(start,end);
+            d1Preflight(sql);
+            const rows = prepare(sql).all();
+            for (const [index,row] of rows.entries()) {
+              const total = totals[index] ??= { payload:0, header:0 };
+              total.payload += row.payload; total.header += row.header;
+            }
+            start = end;
+          }
+          for (const {payload,header} of totals) {
+            const size = payload + header + (header < 127 ? 1 : 2);
+            if (size > d1NativeLimits.length) throw new Error(`D1 limit exceeded: table row bytes maximum ${d1NativeLimits.length}, measured ${size}`);
+          }
+        }
         continue;
       }
       for (const action of ['INSERT', 'UPDATE']) {
-        const name = quote(`rer_d1_row_${action}_${table.name}`);
+        const rawName = `rer_d1_row_${action}_${table.name}`;
+        names.push(rawName);
+        const name = quote(rawName);
         exec(`DROP TRIGGER IF EXISTS temp.${name}`);
         exec(`CREATE TEMP TRIGGER ${name} BEFORE ${action} ON main.${quote(table.name)} BEGIN SELECT CASE WHEN measured>${d1NativeLimits.length} THEN RAISE(ABORT,'D1 limit exceeded: table row bytes maximum ${d1NativeLimits.length}, measured '||measured) END FROM (${measured}); END`);
       }
     }
-    if (exec) state.set(db, version);
+    if (exec) state.set(db, {version,names});
   };
 }
 
