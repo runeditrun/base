@@ -1,3 +1,5 @@
+import { importFailureText, importText } from './d1-import-diagnostics.mjs';
+
 // Provider text is private until the CLI's existing credential redactor approves
 // it. Identity, rather than mutable Error properties, carries this diagnostic.
 const failures = new WeakMap();
@@ -14,6 +16,8 @@ export function deployDiagnostic(error, redact) {
   return {code,step:detail.step ?? 'deploy',created:(detail.created ?? []).map(clean),
     ...(typeof error.resource==='string' && /^(?:d1|r2|kv|queues|worker|service):[a-z0-9-]+$/.test(error.resource) ? {resource:clean(error.resource)} : {}),
     ...(detail.providerCodes?.length ? {providerCodes:detail.providerCodes} : {}),
+    ...(error.d1Import ? {d1Import:{...error.d1Import,body:importText(error.d1Import.body,redact),
+      errors:error.d1Import.errors.map(item => ({...item,...(item.message ? {message:importText(item.message,redact,300)} : {})}))}} : {}),
     ...(redact && providerFailure(error,redact) ? {provider:providerFailure(error,redact)} : {}),
     output:(detail.output ? (redact ? clean(detail.output) : '(provider output withheld; rer deploy provides redacted details)') : '(no provider output)').split(/\r?\n/).slice(0,8).map(line=>line.slice(0,500)).join('\n')};
 }
@@ -113,6 +117,8 @@ export function deploymentDiagnostics(api, {onCreated} = {}) {
 
 /** All provider failure paths share the same safe, portable rendering. */
 export function providerFailure(error, redact = String) {
+  const imported = importFailureText(error,redact);
+  if (imported) return imported;
   const specific = providerRefusal(error,redact) ?? providerTransport(error,redact);
   if (!specific && error?.cause instanceof Error) return providerFailure(error.cause,redact);
   if (specific) return specific;
