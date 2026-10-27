@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -51,6 +51,7 @@ export default { async fetch(request, env) {
 } };`;
 
 test("seed delivery preserves signed bytes, replay handling and refusal policy through service and development transports", async t => {
+  await caseRows(t, [["seed delivery preserves signed bytes, replay handling and refusal policy through service and development transports", async t => {
   const step = namedSteps(t);
   await step('a seed-shaped delivery: Base DeliveryService and webhook protocol through the real service binding', async () => {
     const seed = await seedReceiver(), edge = networkEdge(), outbound = outboundRecorder(), modules = await egressModules(certs.ca);
@@ -113,4 +114,6 @@ test("seed delivery preserves signed bytes, replay handling and refusal policy t
       assert.equal(seed.receiver.requests.length, 1);
     } finally { sql.close(); await seed.close(); await rm(directory, { recursive: true, force: true }); }
   });
+
+  }]]);
 })

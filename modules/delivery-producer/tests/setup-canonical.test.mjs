@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,cp,writeFile,readFile,mkdir,rm} from 'node:fs/promises';
@@ -9,6 +9,7 @@ import {createHash} from 'node:crypto';
 import {loadSetupManifest} from '../setup-manifest.mjs';
 import {producePackage} from '../package.mjs';
 test("setup consumers bind identical committed canonical manifest bytes and their digest", async t => {
+  await caseRows(t, [["setup consumers bind identical committed canonical manifest bytes and their digest", async t => {
   const step = namedSteps(t);
   await step('root rer-setup.json must already use JSON.stringify(manifest, null, 2) plus newline',async t=>{
    const root=await mkdtemp(join(tmpdir(),'canonical-setup-'));t.after(()=>rm(root,{recursive:true,force:true}));
@@ -34,4 +35,6 @@ test("setup consumers bind identical committed canonical manifest bytes and thei
    const output=await producePackage({root,config});assert.deepEqual(await readFile(output.setup),bytes);assert.deepEqual(await readFile(join(root,'rer-setup.json')),bytes);
    assert.equal(JSON.parse(await readFile(output.project)).setup.sha256,createHash('sha256').update(bytes).digest('hex'));
   });
+
+  }]]);
 })

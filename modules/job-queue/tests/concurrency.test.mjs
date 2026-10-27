@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdir, realpath } from 'node:fs/promises';
@@ -9,6 +9,7 @@ import { recordedState } from './state.mjs';
 import { atomicJson } from '../storage.mjs';
 
 test("concurrent queue clients preserve every ledger update and FIFO lease across repositories and stale contenders", async t => {
+  await caseRows(t, [["concurrent queue clients preserve every ledger update and FIFO lease across repositories and stale contenders", async t => {
   const step = namedSteps(t);
   await step('12 independent processes atomically mutate state without lost updates', async t => {
     const { directory } = await setup(t);
@@ -69,4 +70,6 @@ test("concurrent queue clients preserve every ledger update and FIFO lease acros
       owner: { pid: process.pid, start: 'different-start' } });
     assert.equal((await queue.status()).admissionReason, 'queue empty');
   });
+
+  }]]);
 })

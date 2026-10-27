@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -15,6 +15,7 @@ const wire = (overrides: Record<string, unknown> = {}) => ({ url, headers: { 'co
 const ownership = ownershipPolicy('["owned.example"]', 'fixture.workers.dev');
 
 test("hybrid send preserves route selection, ownership exclusion and bounded response cleanup", async t => {
+  await caseRows(t, [["hybrid send preserves route selection, ownership exclusion and bounded response cleanup", async t => {
   const step = namedSteps(t);
   await step("hybrid egress admits only validated non-owned destinations and sends once through the selected route", async t => {
     const step = namedSteps(t);
@@ -152,6 +153,8 @@ test("hybrid send preserves route selection, ownership exclusion and bounded res
       assert.equal(canceled, 1); assert.equal(calls, 1);
     }
   });
+
+  }]]);
 })
 
 

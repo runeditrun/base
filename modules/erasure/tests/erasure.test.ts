@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -61,6 +61,7 @@ async function fixture(t: any, extra: string[] = []) {
 }
 
 test("erasure journey removes only the declared subject graph, fences it and resumes its blob phase", async t => {
+  await caseRows(t, [["erasure journey removes only the declared subject graph, fences it and resumes its blob phase", async t => {
   const step = namedSteps(t);
   await step('BASE-DATA-003 cascade deletes the declared graph in bounded steps, fences every row, anonymises audit and writes a value-free receipt', async t => {
     const { db, bucket, erasure, dump } = await fixture(t);
@@ -187,4 +188,6 @@ test("erasure journey removes only the declared subject graph, fences it and res
     }
     assert.equal((await erasure.deleteBlobs(native.operationId)).phase, 'complete');
   });
+
+  }]]);
 })

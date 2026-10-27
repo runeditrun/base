@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, setupToken } from './runtime.mjs';
@@ -15,6 +15,7 @@ async function noWrites(app, operation, expected) {
   return response;
 }
 test("owner claim admission preserves atomic ownership and refuses invalid authority without writes", async t => {
+  await caseRows(t, [["owner claim admission preserves atomic ownership and refuses invalid authority without writes", async t => {
   const step = namedSteps(t);
   await step('real workerd + D1: GET and every invalid claim have zero durable writes; valid claim uses auth bootstrap', async t => {
     const app = await runtime(keys.publicKey); t.after(() => app.close());
@@ -129,4 +130,6 @@ test("owner claim admission preserves atomic ownership and refuses invalid autho
     const token = await mint();
     await noWrites(app, () => app.call(undefined, { method: 'POST', input: { token } }), 403);
   });
+
+  }]]);
 })

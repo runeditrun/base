@@ -1,4 +1,4 @@
-import { namedSteps } from './fold-steps.mjs';
+import { namedSteps, caseRows } from './fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
@@ -40,6 +40,7 @@ function kill(pid, group = false) {
 }
 
 test("CLI cancellation awaits its real process and browser cleanup at every phase", async t => {
+  await caseRows(t, [["CLI cancellation awaits its real process and browser cleanup at every phase", async t => {
   const step = namedSteps(t);
   for (const signal of ['SIGINT', 'SIGTERM']) {
     for (const phase of ['startup', 'fixtures', 'journey', 'signin']) {
@@ -93,6 +94,8 @@ test("CLI cancellation awaits its real process and browser cleanup at every phas
       });
     }
   }
+
+  }]]);
 })
 
 

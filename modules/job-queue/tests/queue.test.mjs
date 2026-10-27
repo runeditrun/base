@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
@@ -11,6 +11,7 @@ import { identity, alive } from '../identity.mjs';
 import { recordedState } from './state.mjs';
 
 test("queue admission retains live leases, priority and requests until resources or ownership permit progress", async t => {
+  await caseRows(t, [["queue admission retains live leases, priority and requests until resources or ownership permit progress", async t => {
   const step = namedSteps(t);
   await step('one occupied slot holds FIFO jobs; owner overtakes classes but normal retains order', async t => {
     const { directory, queue } = await setup(t);
@@ -103,10 +104,13 @@ test("queue admission retains live leases, priority and requests until resources
     await occupiedBy(t, directory, (connection, token) => connection.end(`not-${token}`));
     assert.equal((await queue.run([process.execPath, '-e', 'process.exit(0)'])).code, 0);
   });
+
+  }]]);
 })
 
 
 test("lease identity distinguishes dead or recycled processes across nonce and timezone changes", async t => {
+  await caseRows(t, [["lease identity distinguishes dead or recycled processes across nonce and timezone changes", async t => {
   const step = namedSteps(t);
   await step('stale queued/running leases and reused PID are reclaimed without touching live process', async t => {
     const { directory, queue } = await setup(t);
@@ -143,6 +147,8 @@ test("lease identity distinguishes dead or recycled processes across nonce and t
       assert.equal(utc.start, brisbane.start);
     } finally { if (previous === undefined) delete process.env.TZ; else process.env.TZ = previous; }
   });
+
+  }]]);
 })
 
 

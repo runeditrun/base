@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, setupToken } from './runtime.mjs';
@@ -10,6 +10,7 @@ const policy = { ipLimit: 3, emailLimit: 2 };
 const post = (input, ip) => ({ method: 'POST', input, ip });
 
 test("owner bootstrap admission isolates abusive clients and preserves ordinary email-link budgets", async t => {
+  await caseRows(t, [["owner bootstrap admission isolates abusive clients and preserves ordinary email-link budgets", async t => {
   const step = namedSteps(t);
   await step('HTTP bootstrap abuse is isolated to its client while ordinary email-link limits remain shared', async t => {
     const keys = await testKeys();
@@ -66,4 +67,6 @@ test("owner bootstrap admission isolates abusive clients and preserves ordinary 
       assert.equal((await app.mails()).length, 2, 'throttled and unknown addresses send no mail');
     });
   });
+
+  }]]);
 })

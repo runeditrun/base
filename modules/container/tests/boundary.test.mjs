@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,symlink,rm,access,realpath} from 'node:fs/promises';
@@ -21,6 +21,7 @@ async function workerdOnly(root,source) {
  await assert.rejects(checkBoundary(root),/import boundary/);
 }
 test("container boundary admits only reachable APIs supported by the selected engine", async t => {
+  await caseRows(t, [["container boundary admits only reachable APIs supported by the selected engine", async t => {
   const step = namedSteps(t);
   await step('container admission rejects Cloudflare imports and APIs outside the platform boundary',async t=>{
    const root=await fixture(t);
@@ -230,6 +231,8 @@ test("container boundary admits only reachable APIs supported by the selected en
   await step('workerd admits ctx.passThroughOnException while Node refuses it',async t=>{
    await workerdOnly(await fixture(t),'export default { fetch(request,env,ctx) { ctx.passThroughOnException(); return new Response("ok"); } };');
   });
+
+  }]]);
 })
 
 

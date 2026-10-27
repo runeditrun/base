@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readAccountOwnership } from '../account-ownership.mjs';
@@ -8,6 +8,7 @@ const row = (n: number) => ({ id: n.toString(16).padStart(32, '0'), name: `zone$
 const page = (n: number, total: number) => ({ success: true, result: Array.from({ length: Math.min(50, total - (n - 1) * 50) }, (_, i) => row((n - 1) * 50 + i)), result_info: { page: n, per_page: 50, count: Math.min(50, total - (n - 1) * 50), total_count: total, total_pages: Math.max(1, Math.ceil(total / 50)) } });
 
 test("ownership inventory collects the complete selected account and refuses partial or invalid pages", async t => {
+  await caseRows(t, [["ownership inventory collects the complete selected account and refuses partial or invalid pages", async t => {
   const step = namedSteps(t);
   await step('probe obtains the complete selected-account ownership inventory before deployment', async () => {
     const requests: string[] = [];
@@ -66,4 +67,6 @@ test("ownership inventory collects the complete selected account and refuses par
       } }), { message: 'egress-account-ownership-unverified' });
     }
   });
+
+  }]]);
 })

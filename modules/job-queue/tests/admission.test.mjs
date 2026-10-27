@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile, mkdir } from 'node:fs/promises';
@@ -10,6 +10,7 @@ import { recordedState } from './state.mjs';
 
 const config = { slots: 2, loadThreshold: 36, minFreeMemoryBytes: 100 };
 test("job admission respects capacity, resource boundaries and bounded waiting", async t => {
+  await caseRows(t, [["job admission respects capacity, resource boundaries and bounded waiting", async t => {
   const step = namedSteps(t);
   await step('slots, load and free memory independently refuse admission with exact boundaries', () => {
     assert.match(admission(2, config, { load: 0, availableMemoryBytes: 1000 }), /slots/);
@@ -43,9 +44,12 @@ test("job admission respects capacity, resource boundaries and bounded waiting",
     const result = await queue.run([process.execPath, '-e', 'process.exit(0)'], { maxWait: .05, onStarted: () => { started = true; } });
     assert.equal(result.code, 0); assert.equal(started, true);
   });
+
+  }]]);
 })
 
 test("job configuration preserves directory precedence and validates overrides", async t => {
+  await caseRows(t, [["job configuration preserves directory precedence and validates overrides", async t => {
   const step = namedSteps(t);
   await step('central config, environment overrides and conservative hardware defaults', async t => {
     const { directory } = await setup(t);
@@ -67,6 +71,8 @@ test("job configuration preserves directory precedence and validates overrides",
     assert.equal((await configuration({ env: { HOME: home } })).nice, 7);
     assert.equal((await configuration({ env: { HOME: home, RER_JOBS_DIR: join(directory, 'override') } })).nice, 11);
   });
+
+  }]]);
 })
 
 test('priority orders classes; sequence preserves FIFO inside a class', () => {

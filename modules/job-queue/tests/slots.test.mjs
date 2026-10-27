@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile, unlink } from 'node:fs/promises';
@@ -8,6 +8,7 @@ import { recordedState } from './state.mjs';
 import { createQueue } from '../index.mjs';
 
 test("shared queue admission reconciles live member requests with authoritative central slots", async t => {
+  await caseRows(t, [["shared queue admission reconciles live member requests with authoritative central slots", async t => {
   const step = namedSteps(t);
   await step('mixed-limit CLI members admit the lower-limit head first and fill the shared limit', async t => {
     const { directory, queue } = await setup(t, { slots: 3 });
@@ -81,4 +82,6 @@ test("shared queue admission reconciles live member requests with authoritative 
       await job.done;
     }
   });
+
+  }]]);
 })

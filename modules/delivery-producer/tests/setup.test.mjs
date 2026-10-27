@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
@@ -70,6 +70,7 @@ async function filesUnder(directory, prefix = '') {
 }
 
 test("setup manifest packaging preserves canonical bytes and refuses invalid or unsafe selection", async t => {
+  await caseRows(t, [["setup manifest packaging preserves canonical bytes and refuses invalid or unsafe selection", async t => {
   const step = namedSteps(t);
   await step('setup manifest is validated and emitted as deterministic sibling bytes with a matching descriptor digest', async t => {
     const root = await fixture(t);
@@ -176,4 +177,6 @@ test("setup manifest packaging preserves canonical bytes and refuses invalid or 
     const artifact = JSON.parse(await readFile(join(root, 'delivery-artifact/app.json'), 'utf8'));
     assert.equal(artifact.schema, 2);
   });
+
+  }]]);
 })

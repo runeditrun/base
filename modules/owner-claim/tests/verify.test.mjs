@@ -1,9 +1,10 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { verifyOwnerClaim } from '../verify.mjs';
 import { testKeys, signClaim, claimConfig } from './keys.mjs';
 test("claim verifier checks signature, binding and exact lifetime for every accepted or refused token", async t => {
+  await caseRows(t, [["claim verifier checks signature, binding and exact lifetime for every accepted or refused token", async t => {
   const step = namedSteps(t);
   await step('strict portable ES256 verifier validates binding, lifetime, wire and rotated public keys', async () => {
     const { privateKey, publicKey } = await testKeys();
@@ -75,6 +76,8 @@ test("claim verifier checks signature, binding and exact lifetime for every acce
       await verifyOwnerClaim(await signClaim(privateKey, changed), acceptingConfig);
     }
   });
+
+  }]]);
 })
 
 

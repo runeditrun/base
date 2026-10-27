@@ -1,4 +1,4 @@
-import { namedSteps } from './fold-steps.mjs';
+import { namedSteps, caseRows } from './fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -7,6 +7,7 @@ import { signIn } from '../index.mjs';
 const origin = 'http://127.0.0.1:12345';
 
 test("sign-in honours callback results, URL confinement and cancellation", async t => {
+  await caseRows(t, [["sign-in honours callback results, URL confinement and cancellation", async t => {
   const step = namedSteps(t);
   await step('opens a seed-provided URL or completes the seed browser callback', async () => {
     const visits = [];
@@ -63,4 +64,6 @@ test("sign-in honours callback results, URL confinement and cancellation", async
     await assert.rejects(signIn({}, { origin, signal: AbortSignal.abort(), open: () => { started = true; } }), /Sign-in failed/);
     assert.equal(started, false);
   });
+
+  }]]);
 })

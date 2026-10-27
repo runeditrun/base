@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createServer } from 'node:http'
@@ -19,6 +19,7 @@ function isSendGridError(error: unknown): error is Error & {
 const message = { from: 'Support <support@example.com>', to: ['person@example.com'], subject: 'Your request', text: 'Reply', html: '<p>Reply</p>', deliveryId: 'durable-1' }
 
 test("SendGrid submission validates its message, makes one attempt and classifies acceptance or uncertainty", async t => {
+  await caseRows(t, [["SendGrid submission validates its message, makes one attempt and classifies acceptance or uncertainty", async t => {
   const step = namedSteps(t);
   await step('sends authenticated v3 mail with durable correlation and reports acceptance only', async () => {
     let calls = 0
@@ -168,4 +169,6 @@ test("SendGrid submission validates its message, makes one attempt and classifie
       await new Promise<void>(resolve => provider.close(() => resolve()))
     }
   })
+
+  }]]);
 })

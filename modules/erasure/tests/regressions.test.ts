@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -17,6 +17,7 @@ async function fixture(t: any, sql: string[], declaration: any) {
   return { db, bucket, erasure, portability };
 }
 test("erasure graph admission and resumption preserve retained history and fence every erased dependent", async t => {
+  await caseRows(t, [["erasure graph admission and resumption preserve retained history and fence every erased dependent", async t => {
   const step = namedSteps(t);
   await step('overlapping paths delete each child before its parent and fence its blob row', async t => {
     const { db, bucket, erasure } = await fixture(t, [
@@ -155,4 +156,6 @@ test("erasure graph admission and resumption preserve retained history and fence
     assert.equal(done.phase, 'complete');
     assert.deepEqual((await db.prepare('SELECT action FROM anonymized_audit ORDER BY action').all()).results, [{ action: 'created' }, { action: 'moved' }]);
   });
+
+  }]]);
 })

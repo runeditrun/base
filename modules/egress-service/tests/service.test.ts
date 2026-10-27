@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import net from 'node:net';
 import assert from 'node:assert/strict';
@@ -17,6 +17,7 @@ const namedDenied = ['127.0.0.1', '10.1.2.3', '172.16.5.4', '192.168.1.1', '100.
 const denied = [...new Set([...namedDenied, ...deniedAddresses])];
 
 test("egress service binding enforces signed delivery, endpoint policy, TLS and resource bounds", async t => {
+  await caseRows(t, [["egress service binding enforces signed delivery, endpoint policy, TLS and resource bounds", async t => {
   const step = namedSteps(t);
   await step('enforcing egress service in workerd through a service binding', async t => {
     const edge = networkEdge(), outbound = outboundRecorder(), deployedOutbound = outboundRecorder(), strangerOutbound = outboundRecorder();
@@ -251,4 +252,6 @@ test("egress service binding enforces signed delivery, endpoint policy, TLS and 
       await certs.cleanup();
     }
   });
+
+  }]]);
 })

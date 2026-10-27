@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -10,42 +10,54 @@ const descriptor={schema:1,projectId:'publisher/app',name:'App',sourceRepository
 // URL security. Each registration follows one descriptor behavior through its
 // public producer API, with the input retained in assertion failure messages.
 test("descriptor producer canonicalizes or refuses every repository identity", async t => {
+  await caseRows(t, [["descriptor producer canonicalizes or refuses every repository identity", async t => {
   const step = namedSteps(t);
-  await step('descriptor producer canonicalizes legacy repository identities', () => {
-    for (const value of cases.acceptedBare) {
+  await step('descriptor producer canonicalizes legacy repository identities', async t => {
+    const step = namedSteps(t);
+    for (const value of cases.acceptedBare) await step(`legacy ${value}`, () => {
       assert.equal(generateProjectDescriptor({...descriptor, sourceRepository: value}).sourceRepository,
         `https://github.com/${value}`, value);
-    }
+    });
   });
 
-  await step('descriptor producer refuses unrepresentable bare repository identities', () => {
-    for (const value of cases.unrepresentableBare) {
+  await step('descriptor producer refuses unrepresentable bare repository identities', async t => {
+    const step = namedSteps(t);
+    for (const value of cases.unrepresentableBare) await step(`unrepresentable bare ${value}`, () => {
       assert.throws(() => generateProjectDescriptor({...descriptor, sourceRepository: value}),
         /literal \.git repository name/, value);
-    }
+    });
   });
 
-  await step('descriptor producer canonicalizes repository URLs idempotently', () => {
+  await step('descriptor producer canonicalizes repository URLs idempotently', async t => {
+    const step = namedSteps(t);
     for (const {value, identity, canonicalizable} of cases.acceptedUrls) {
       if (canonicalizable === false) continue;
+      await step(`URL ${JSON.stringify(value)}`, () => {
       const result = generateProjectDescriptor({...descriptor, sourceRepository: value});
       assert.equal(result.sourceRepository, `https://github.com/${identity}`, value);
       assert.deepEqual(generateProjectDescriptor(result), result, value);
+      });
     }
   });
 
-  await step('descriptor producer refuses unrepresentable URL repository identities', () => {
+  await step('descriptor producer refuses unrepresentable URL repository identities', async t => {
+    const step = namedSteps(t);
     for (const {value, canonicalizable} of cases.acceptedUrls) {
       if (canonicalizable !== false) continue;
+      await step(`unrepresentable URL ${JSON.stringify(value)}`, () => {
       assert.throws(() => generateProjectDescriptor({...descriptor, sourceRepository: value}),
         /literal \.git repository name/, value);
+      });
     }
   });
 
-  await step('descriptor producer rejects unsafe repository identities', () => {
-    for (const value of [...cases.rejectedUrls, ...cases.rejectedBare]) {
+  await step('descriptor producer rejects unsafe repository identities', async t => {
+    const step = namedSteps(t);
+    for (const value of [...cases.rejectedUrls, ...cases.rejectedBare]) await step(`unsafe ${JSON.stringify(value)}`, () => {
       assert.throws(() => generateProjectDescriptor({...descriptor, sourceRepository: value}),
         /https:\/\/github\.com\/<owner>\/<repo>/, JSON.stringify(value));
-    }
+    });
   });
+
+  }]]);
 })

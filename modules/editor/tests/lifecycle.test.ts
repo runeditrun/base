@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ownerEditorLifecycle } from '../src/lifecycle.ts';
@@ -11,6 +11,7 @@ function harness() {
   return { editor, counts: () => ({ mounts, cleanups }) };
 }
 test("owner editor lifecycle admits current grants and retires revoked, stale or expired mounts", async t => {
+  await caseRows(t, [["owner editor lifecycle admits current grants and retires revoked, stale or expired mounts", async t => {
   const step = namedSteps(t);
   await step('invalid runtime values are rejected before mounting or network', async () => {
     const h = harness(); h.editor.setOwner(true);
@@ -60,4 +61,6 @@ test("owner editor lifecycle admits current grants and retires revoked, stale or
     await new Promise(resolve=>setTimeout(resolve,35));
     assert.deepEqual(h.counts(),{mounts:1,cleanups:1});h.editor.dispose();
   });
+
+  }]]);
 })

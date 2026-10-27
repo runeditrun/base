@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeEmail } from '../../operator-auth/policy.mjs';
@@ -8,6 +8,7 @@ import { testKeys, signClaim, claimConfig } from './keys.mjs';
 const invalidConfiguration = error => error?.code === 'invalid_configuration' && error?.status === 503;
 
 test("claim configuration preserves canonical owner binding and refuses malformed public-key metadata", async t => {
+  await caseRows(t, [["claim configuration preserves canonical owner binding and refuses malformed public-key metadata", async t => {
   const step = namedSteps(t);
   await step('claim email configuration agrees with the real operator-auth policy and preserves canonical binding', async () => {
     const { privateKey, publicKey } = await testKeys();
@@ -55,4 +56,6 @@ test("claim configuration preserves canonical owner binding and refuses malforme
       assert.throws(() => configureClaim({ ...config, publicKeys: { 'test-v1': { ...minimal, ...metadata } } }), invalidConfiguration);
     }
   });
+
+  }]]);
 })

@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {execFileSync} from 'node:child_process';
@@ -28,6 +28,7 @@ async function fixture(t) {
 }
 
 test("descriptor generation preserves identity and verification across valid and refused inputs", async t => {
+  await caseRows(t, [["descriptor generation preserves identity and verification across valid and refused inputs", async t => {
   const step = namedSteps(t);
   await step('source descriptor preserves independent identity and exact existing verification policy', () => {
     const input = descriptor();
@@ -72,6 +73,8 @@ test("descriptor generation preserves identity and verification across valid and
     const accessor = descriptor(); Object.defineProperty(accessor, 'name', {get() {throw new Error('Accessor executed');}});
     assert.throws(() => generateProjectDescriptor(accessor), /data fields only/);
   });
+
+  }]]);
 })
 
 
@@ -80,6 +83,7 @@ test("descriptor generation preserves identity and verification across valid and
 
 
 test("managed caller generation preserves its ABI and refuses unsafe input", async t => {
+  await caseRows(t, [["managed caller generation preserves its ABI and refuses unsafe input", async t => {
   const step = namedSteps(t);
   await step('caller uses existing immutable ABI, full default and only fixed expressions', () => {
     const generated = generateManagedWorkflow({workflowRef, artifactFile: 'app.json'});
@@ -104,12 +108,15 @@ test("managed caller generation preserves its ABI and refuses unsafe input", asy
     for (const bad of ['latest', '11.0.0', '8.15.6\nsecrets: inherit']) assert.throws(() => generateManagedWorkflow({...good, pnpmVersion: bad}));
     assert.throws(() => generateManagedWorkflow({...good, verification_command: 'echo unsafe'}), /Unknown/);
   });
+
+  }]]);
 })
 
 
 
 
 test("integration bundle preserves committed bytes and refuses unsafe source or output", async t => {
+  await caseRows(t, [["integration bundle preserves committed bytes and refuses unsafe source or output", async t => {
   const step = namedSteps(t);
   await step('bundle retains exact committed bytes, identity and current adoption contract despite dirty source', async t => {
     const f = await fixture(t);
@@ -195,4 +202,6 @@ test("integration bundle preserves committed bytes and refuses unsafe source or 
     await assert.rejects(generateIntegrationBundle({projectRoot: f.projectRoot, output: f.output, repository: 'octocat/Hello-World', revision: f.git(['rev-parse', 'HEAD'])}), /Duplicate/);
     await assert.rejects(lstat(f.output), {code: 'ENOENT'});
   });
+
+  }]]);
 })

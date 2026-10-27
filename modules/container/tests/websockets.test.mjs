@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -51,6 +51,7 @@ function refused(url, headers={}) {
 }
 
 test("container WebSocket upgrades preserve the app protocol, authentication and isolated visitor streams", async t => {
+  await caseRows(t, [["container WebSocket upgrades preserve the app protocol, authentication and isolated visitor streams", async t => {
   const step = namedSteps(t);
   await step('container upgrades preserve app sends, text/binary echo, protocol, cookies and close in both directions', {timeout:30000}, async t => {
    const {host,url} = await (await fixture(t))('alice');
@@ -81,4 +82,6 @@ test("container WebSocket upgrades preserve the app protocol, authentication and
    await Promise.all([once(a,'open'),once(b,'open')]);assert.equal((await am)[0].toString(),'visitor:alice');assert.equal((await bm)[0].toString(),'visitor:bob');
    const echoed=once(a,'message');a.send('alice-only');assert.equal((await echoed)[0].toString(),'alice-only');
   });
+
+  }]]);
 })

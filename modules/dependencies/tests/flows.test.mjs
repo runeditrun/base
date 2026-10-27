@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, ORIGIN, ISSUER } from './runtime.mjs';
@@ -18,6 +18,7 @@ async function login(r,claims={}) {
  return result;
 }
 test("dependency link redemption authenticates the exact app, issuer, callback and single-use code", async t => {
+  await caseRows(t, [["dependency link redemption authenticates the exact app, issuer, callback and single-use code", async t => {
   const step = namedSteps(t);
   await step('pull linking uses public keys, fixed origin and pinned issuer; concurrent code has one winner; a second interface shares the protocol',async t=>{
    const r=await runtime(t);
@@ -52,6 +53,8 @@ test("dependency link redemption authenticates the exact app, issuer, callback a
    assert.equal((await r.call('/.well-known/rer-link/callback',{body:{issuer:ISSUER,code,callback:'https://other.example/callback'}})).status,400);
    assert.equal((await r.call('/.well-known/rer-link/callback',{body:{issuer:ISSUER,code}})).status,200);
   });
+
+  }]]);
 })
 
 
@@ -154,6 +157,7 @@ test('editor public authorization grants only the current owner and current issu
 
 
 test("signing-key custody preserves sealed identity across migration, rotation, damage and restore", async t => {
+  await caseRows(t, [["signing-key custody preserves sealed identity across migration, rotation, damage and restore", async t => {
   const step = namedSteps(t);
   await step('dependency signing keys are sealed, upgraded once and rotated without losing sign-in; missing keys refuse',async t=>{
    const r=await runtime(t);await r.bootstrap();await r.link();await r.link('error-sink@1');
@@ -304,4 +308,6 @@ test("signing-key custody preserves sealed identity across migration, rotation, 
    r.sqlite.prepare('UPDATE rer_dependency_keys SET private_key=?').run(JSON.stringify({...value,kid:crypto.randomUUID()}));
    const tampered=await r.call('/auth/oidc/auth/start',{body:{}});assert.equal(tampered.status,503);assert.deepEqual(await tampered.json(),{error:'installation_key_unavailable'});
   });
+
+  }]]);
 })

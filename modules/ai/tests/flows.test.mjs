@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, request as forward } from 'node:http';
@@ -8,6 +8,7 @@ import { createFakeTransport } from '../fake/index.mjs';
 import { runtime, DEV_KEY } from './runtime.mjs';
 
 test("development AI calls preserve deterministic answers, captures, protocol limits and local authorization", async t => {
+  await caseRows(t, [["development AI calls preserve deterministic answers, captures, protocol limits and local authorization", async t => {
   const step = namedSteps(t);
   await step('dev text and JSON answer through Worker HTTP, stream native text, and persist each capture', async t => {
     const f = await runtime(t);
@@ -105,6 +106,8 @@ test("development AI calls preserve deterministic answers, captures, protocol li
     await assert.rejects(failedCapture.responses({ model: 'smart', input: 'private-input-sentinel', stream: true }), error => error instanceof AiError && error.code === 'dev_outbox_unavailable');
     assert.equal(hits, 1); assert.equal(cancelled, true, 'failed capture closes the live body without a new upstream attempt');
   });
+
+  }]]);
 })
 
 
@@ -115,6 +118,7 @@ test("development AI calls preserve deterministic answers, captures, protocol li
 
 
 test("AI provider calls preserve wire content, cancellation, selected transport and fixed failure semantics", async t => {
+  await caseRows(t, [["AI provider calls preserve wire content, cancellation, selected transport and fixed failure semantics", async t => {
   const step = namedSteps(t);
   await step('direct and linked client calls preserve wire content, stream and usage with exactly one upstream attempt', async t => {
     let hits = 0, received;
@@ -188,4 +192,6 @@ test("AI provider calls preserve wire content, cancellation, selected transport 
       assert.equal(hits, 1);
     }
   });
+
+  }]]);
 })

@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
@@ -41,6 +41,7 @@ async function fixture(t) {
 }
 
 test("managed-mail packaging binds provider setup to declared public fields and private credentials", async t => {
+  await caseRows(t, [["managed-mail packaging binds provider setup to declared public fields and private credentials", async t => {
   const step = namedSteps(t);
   await step('generated mail setup and spec survive packaging and the independent exported producer', async t => {
     const {root, config, save, run} = await fixture(t);
@@ -108,4 +109,6 @@ test("managed-mail packaging binds provider setup to declared public fields and 
       await assert.rejects(readFile(join(root, `invalid-${index}/rer-project.json`)));
     }
   });
+
+  }]]);
 })

@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, symlink, truncate, lstat, realpath } from 'node:fs/promises';
@@ -37,6 +37,7 @@ async function snapshot(directory) {
 }
 
 test("artifact packaging preserves bytes and refuses unsafe or oversized inputs", async t => {
+  await caseRows(t, [["artifact packaging preserves bytes and refuses unsafe or oversized inputs", async t => {
   const step = namedSteps(t);
   await step('schema-2 packages deterministic exact raw bytes, code-unit order, and an explicit wrapper', async t => {
     const root = await fixture(t);
@@ -165,6 +166,8 @@ test("artifact packaging preserves bytes and refuses unsafe or oversized inputs"
   });
 
   ;
+
+  }]]);
 })
 
 

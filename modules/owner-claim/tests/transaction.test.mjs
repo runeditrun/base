@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createOperatorAuth } from '../../operator-auth/index.mjs';
@@ -29,6 +29,7 @@ async function verifiedClaim(iat, exp) {
 }
 
 test("atomic admission rechecks the complete timing boundary corpus", async t => {
+  await caseRows(t, [["atomic admission rechecks the complete timing boundary corpus", async t => {
   const step = namedSteps(t);
   for (const ahead of [1, 30, 31]) {
     await step(`atomic admission recheck ${ahead <= 30 ? 'accepts' : 'refuses'} issuance ${ahead}s ahead`, async t => {
@@ -79,4 +80,6 @@ test("atomic admission rechecks the complete timing boundary corpus", async t =>
     await assert.rejects(bootstrap(admission(db, claim, now)), { code: 'invalid_claim', status: 403 });
     assert.deepEqual(db.snapshot(), before);
   });
+
+  }]]);
 })

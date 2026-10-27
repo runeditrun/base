@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp, mkdir, writeFile, rm, symlink, readFile} from 'node:fs/promises';
@@ -22,6 +22,7 @@ async function project(t, config = emitted()) {
 }
 const save = (root,config) => writeFile(join(root,'dist/server/wrangler.json'), JSON.stringify(config));
 test("deployment specification preserves or refuses each emitted configuration", async t => {
+  await caseRows(t, [["deployment specification preserves or refuses each emitted configuration", async t => {
   const step = namedSteps(t);
   await step('actual emitted configuration shape preserves exact prior producer contract', async t => {
     const root = await project(t);
@@ -174,6 +175,8 @@ test("deployment specification preserves or refuses each emitted configuration",
     const config = emitted(); config.vars = {QUOTE:'a"b\\c[]{}'}; await save(root,config);
     assert.equal((await deploymentSpec(root,{...policy,publicVariableNames:['QUOTE']})).publicVariables.QUOTE,config.vars.QUOTE);
   });
+
+  }]]);
 })
 
 

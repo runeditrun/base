@@ -1,4 +1,4 @@
-import { namedSteps } from './fold-steps.mjs';
+import { namedSteps, caseRows } from './fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
@@ -9,6 +9,7 @@ import { redact, safeUrl, sanitize } from '../privacy.mjs';
 import { temporary } from './helpers.mjs';
 
 test("private evidence writes preserve mode and atomically replace previous bytes", async t => {
+  await caseRows(t, [["private evidence writes preserve mode and atomically replace previous bytes", async t => {
   const step = namedSteps(t);
   await step('evidence files are 0600 and nested directories are 0700', async t => {
     const root = await temporary(t);
@@ -29,6 +30,8 @@ test("private evidence writes preserve mode and atomically replace previous byte
     assert.equal(await readFile(file, 'utf8'), 'new');
     assert.equal((await stat(file)).mode & 0o777, 0o600);
   });
+
+  }]]);
 })
 
 test('diagnostics redact literal secrets and token query values; report paths strip tokens', () => {

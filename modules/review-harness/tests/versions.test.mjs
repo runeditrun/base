@@ -1,4 +1,4 @@
-import { namedSteps } from './fold-steps.mjs';
+import { namedSteps, caseRows } from './fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, symlink, writeFile, realpath } from 'node:fs/promises';
@@ -27,6 +27,7 @@ async function project(t, wrong) {
 }
 
 test("dependency resolution refuses mismatched or unavailable packages with guidance", async t => {
+  await caseRows(t, [["dependency resolution refuses mismatched or unavailable packages with guidance", async t => {
   const step = namedSteps(t);
   for (const wrong of Object.keys(PINS)) {
     await step(`wrong resolved ${wrong} is refused and names all expected pins`, async t => {
@@ -38,4 +39,6 @@ test("dependency resolution refuses mismatched or unavailable packages with guid
   await step('missing dependencies are refused with pin guidance', () => {
     assert.throws(() => resolveVersions('/nonexistent-review-consumer'), /expected @playwright\/test 1\.63\.0, @axe-core\/playwright 4\.13\.0/);
   });
+
+  }]]);
 })

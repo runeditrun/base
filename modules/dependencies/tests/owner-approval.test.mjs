@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import { dependencyStore } from '../store.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -51,6 +51,7 @@ async function changePin(r,proof,change) {
 }
 
 test("dependency approval is bound to live owner authority and originating first setup", async t => {
+  await caseRows(t, [["dependency approval is bound to live owner authority and originating first setup", async t => {
   const step = namedSteps(t);
   await step('every dependency callback needs its own live app approval; unlink and in-flight authority changes cannot restore provider access',async t=>{
    const r=await runtime(t);
@@ -223,4 +224,6 @@ test("dependency approval is bound to live owner authority and originating first
    const request=unclaimed.request('/auth/dependencies/setup',{body:{issuer:ISSUER}});request.headers.set('x-rer-local-cli',proof);
    assert.equal((await unclaimed.dependencies().handle(request)).status,403);
   });
+
+  }]]);
 })

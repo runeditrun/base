@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime } from './runtime.mjs';
@@ -12,6 +12,7 @@ async function signIn(r) {
 const setup=(r,issuer)=>r.call('/auth/dependencies/setup',{body:{issuer,interface:'oidc-provider@1',token:'setup-secret-only-for-test-thirty-two-bytes'}});
 
 test("dependency provider linking permits HTTP only for local development loopback origins with exact ports", async t => {
+  await caseRows(t, [["dependency provider linking permits HTTP only for local development loopback origins with exact ports", async t => {
   const step = namedSteps(t);
   await step('under rer dev a seed links to a seed on http loopback, whatever the port and loopback spelling, and signs in through it',async t=>{
    for(const issuer of ['http://127.0.0.1:9787','http://localhost:9788','http://[::1]:9789']){
@@ -33,4 +34,6 @@ test("dependency provider linking permits HTTP only for local development loopba
    for(const issuer of ['http://auth.example','http://127.0.0.1.evil.example','http://192.0.2.7:9787','http://user@127.0.0.1:9787'])assert.equal((await setup(r,issuer)).status,400,issuer);
    assert.equal((await setup(r,'https://auth.example')).status,200);
   });
+
+  }]]);
 })

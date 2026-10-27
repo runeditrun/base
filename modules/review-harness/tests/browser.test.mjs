@@ -1,4 +1,4 @@
-import { namedSteps } from './fold-steps.mjs';
+import { namedSteps, caseRows } from './fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -53,6 +53,7 @@ test('oneclick sign-in and app pass in fresh contexts at both default viewports'
   assert.equal((await readFile(result.reportPath, 'utf8')).includes('token='), false);
 });
 test("browser captures record exact gate failures, preserve evidence and honour per-capture policy", async t => {
+  await caseRows(t, [["browser captures record exact gate failures, preserve evidence and honour per-capture policy", async t => {
   const step = namedSteps(t);
   await step('each defect page fails exactly its gate and writes a complete report', async t => {
     const runtime = await fixture(t);
@@ -115,6 +116,8 @@ test("browser captures record exact gate failures, preserve evidence and honour 
     assert.deepEqual(result.report.errors, []);
     assert.deepEqual(result.report.captures[0].gate.failures, ['secrets']);
   });
+
+  }]]);
 })
 
 test('external routing aborts a second local origin before it receives any request; data and blob are allowed', async t => {
@@ -136,6 +139,7 @@ test('external routing aborts a second local origin before it receives any reque
 
 
 test("browser settling awaits fonts, frames, animations, network and bounded busy state", async t => {
+  await caseRows(t, [["browser settling awaits fonts, frames, animations, network and bounded busy state", async t => {
   const step = namedSteps(t);
   await step('settle awaits busy state, finite animations, fonts and two frames, then scrolls to the top', async t => {
     const runtime = await fixture(t);
@@ -204,4 +208,6 @@ test("browser settling awaits fonts, frames, animations, network and bounded bus
     }, { widths: [390] });
     assert.equal(result.report.passed, true);
   });
+
+  }]]);
 })

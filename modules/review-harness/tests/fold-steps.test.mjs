@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { namedSteps } from './fold-steps.mjs';
+import { namedSteps, caseRows } from './fold-steps.mjs';
 
 test('named rows retain cleanup scope, failure diagnostics and their original timeout', async t => {
   const step = namedSteps(t), events = [];
@@ -28,4 +28,28 @@ test('named rows retain cleanup scope, failure diagnostics and their original ti
   }), /bounded row: Step exceeded its original timeout/);
   assert.equal(signal.aborted, true);
   assert.equal(events.at(-1), 'timed cleanup');
+  const rows = [];
+  await assert.rejects(caseRows(t, [
+    ['outer', async context => {
+      const leaf = namedSteps(context);
+      await leaf('broken fixture', async row => {
+        row.after(() => rows.push('broken cleanup'));
+        assert.equal({ value: 'corrupted' }.value, 'original');
+      });
+      await leaf('sibling', row => {
+        row.after(() => rows.push('sibling cleanup'));
+        rows.push('sibling assertion');
+        assert.equal(2 + 2, 4);
+      });
+      await caseRows(context, [
+        ['nested failure', () => { throw new Error('nested fault'); }],
+        ['nested sibling', () => { rows.push('nested assertion'); assert.ok(true); }],
+      ]);
+    }],
+    ['last sibling', () => { rows.push('last assertion'); assert.ok(true); }],
+  ]), error => error instanceof AggregateError &&
+    error.errors.length === 2 && /broken fixture/.test(error.message) &&
+    /nested failure/.test(error.message));
+  assert.deepEqual(rows, ['broken cleanup', 'sibling assertion', 'sibling cleanup', 'nested assertion', 'last assertion']);
+
 });

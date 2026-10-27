@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -41,6 +41,7 @@ async function archive(source, settings) {
 }
 
 test("restored provider settings stay off until approved relink and explicit owner enablement", async t => {
+  await caseRows(t, [["restored provider settings stay off until approved relink and explicit owner enablement", async t => {
   const step = namedSteps(t);
   await step('public import refuses enabled provider settings before applying data; valid off and absent settings survive approved re-link', async t => {
     const source = await runtime(t);
@@ -93,4 +94,6 @@ test("restored provider settings stay off until approved relink and explicit own
       });
     }
   });
+
+  }]]);
 })

@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp, mkdir, readFile, writeFile, rm, readdir, symlink} from 'node:fs/promises';
@@ -25,6 +25,7 @@ async function fixture(t) {
   return root;
 }
 test("package production retains exact inputs and refuses identity or private-source violations", async t => {
+  await caseRows(t, [["package production retains exact inputs and refuses identity or private-source violations", async t => {
   const step = namedSteps(t);
   await step('one producer emits all files, exact payload identities and current seed declarations', async t => {
     const root = await fixture(t), policy = config();
@@ -76,6 +77,8 @@ test("package production retains exact inputs and refuses identity or private-so
       await rm(join(root,'dist/server',name));
     }
   });
+
+  }]]);
 })
 
 test('exported runtime works inside an independent seed with no Base checkout dependency', async t => {

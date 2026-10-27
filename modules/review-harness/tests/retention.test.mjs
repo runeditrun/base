@@ -1,4 +1,4 @@
-import { namedSteps } from './fold-steps.mjs';
+import { namedSteps, caseRows } from './fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
@@ -25,6 +25,7 @@ async function manifest(evidence, report) {
 }
 
 test("review evidence retains audited failures, selects passing images and prunes only bounded owned history", async t => {
+  await caseRows(t, [["review evidence retains audited failures, selects passing images and prunes only bounded owned history", async t => {
   const step = namedSteps(t);
   await step('accessibility still fails a failures-only run after passing states were audited without images', async t => {
     const runtime = await fixture(t);
@@ -125,4 +126,6 @@ test("review evidence retains audited failures, selects passing images and prune
       await manifest(evidence, report);
     }
   });
+
+  }]]);
 })

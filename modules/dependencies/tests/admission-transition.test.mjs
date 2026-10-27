@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import { dependencyStore } from '../store.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -38,6 +38,7 @@ async function move(r, proof) {
 }
 
 test("dependency admission retains captured provider and owner authority through link transitions and network waits", async t => {
+  await caseRows(t, [["dependency admission retains captured provider and owner authority through link transitions and network waits", async t => {
   const step = namedSteps(t);
   await step('link transitions fence paused callbacks and sessions without consuming invitations or unrelated credentials', async t => {
     for (const scenario of ['first-unlink', 'bound-unlink', 'invite-unlink', 'metadata-relink', 'same-relink', 'move', 'other-interface']) {
@@ -145,4 +146,6 @@ test("dependency admission retains captured provider and owner authority through
       } finally { for (const cleanup of cleanups.reverse()) await cleanup(); }
     }
   });
+
+  }]]);
 })

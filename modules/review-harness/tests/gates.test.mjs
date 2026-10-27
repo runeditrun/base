@@ -1,4 +1,4 @@
-import { namedSteps } from './fold-steps.mjs';
+import { namedSteps, caseRows } from './fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateGates } from '../index.mjs';
@@ -7,6 +7,7 @@ function clean() {
   return { axe: { violations: [] }, overflow: { viewport: 390, document: 390, body: 390 }, errors: { page: [], console: [], settle: [] }, failedResponses: [], externalRequests: [], secretsFound: [], keyboard: { passed: true }, documentStatus: 200 };
 }
 test("axe severity policy covers every impact and mode", async t => {
+  await caseRows(t, [["axe severity policy covers every impact and mode", async t => {
   const step = namedSteps(t);
   for (const impact of ['serious', 'critical']) await step(`axe ${impact} gate`, () => {
     const entry = clean(); entry.axe.violations.push({ impact });
@@ -18,10 +19,13 @@ test("axe severity policy covers every impact and mode", async t => {
     assert.equal(evaluateGates(entry).passed, true);
     assert.deepEqual(evaluateGates(entry, { failOn: 'any' }).failures, ['axe']);
   });
+
+  }]]);
 })
 
 
 test("overflow checks both document and body boundaries", async t => {
+  await caseRows(t, [["overflow checks both document and body boundaries", async t => {
   const step = namedSteps(t);
   for (const field of ['document', 'body']) await step(`overflow ${field} gate`, () => {
     const entry = clean(); entry.overflow[field] += 1;
@@ -29,6 +33,8 @@ test("overflow checks both document and body boundaries", async t => {
     entry.overflow[field] += 1;
     assert.deepEqual(evaluateGates(entry).failures, ['overflow']);
   });
+
+  }]]);
 })
 
 const cases = {

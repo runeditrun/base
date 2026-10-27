@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import { readFile } from 'node:fs/promises';
 import { rustls } from '../rustls.ts';
 import test from 'node:test';
@@ -19,6 +19,7 @@ function resolverEdge(answers: Record<string, () => Response>) {
 const json = (value: unknown, status = 200) => () => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/dns-json' } });
 
 test("DoH resolution queries both address families, rejects unusable answers and cancels bounded work", async t => {
+  await caseRows(t, [["DoH resolution queries both address families, rejects unusable answers and cancels bounded work", async t => {
   const step = namedSteps(t);
   await step('the DoH resolver asks the one fixed endpoint for A and AAAA and returns every address answer', async () => {
     const edge = resolverEdge({
@@ -92,4 +93,6 @@ test("DoH resolution queries both address families, rejects unusable answers and
       assert.equal(connects, mode === 'complete' ? 1 : 0);
     }
   });
+
+  }]]);
 })

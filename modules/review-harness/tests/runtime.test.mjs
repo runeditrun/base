@@ -1,4 +1,4 @@
-import { namedSteps } from './fold-steps.mjs';
+import { namedSteps, caseRows } from './fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, stat, access, writeFile } from 'node:fs/promises';
@@ -45,6 +45,7 @@ test('concurrent runtimes own distinct listeners while slow health becomes ready
   } finally { await Promise.all([runtime.stop(), other.stop()]); }
 });
 test("runtime start refuses exit, timeout, exposure and fixture failure with private diagnostics", async t => {
+  await caseRows(t, [["runtime start refuses exit, timeout, exposure and fixture failure with private diagnostics", async t => {
   const step = namedSteps(t);
   await step('exit before readiness fails with the private log path', async t => {
     const error = await refused(t, await options(t, 'exit'));
@@ -73,6 +74,8 @@ test("runtime start refuses exit, timeout, exposure and fixture failure with pri
     assert.equal(error.message.includes('synthetic-fixture-secret'), false);
     assert.match(error.message, /private log:/);
   });
+
+  }]]);
 })
 
 
@@ -122,6 +125,7 @@ test('listener is IPv4 loopback only', async t => {
   } finally { await runtime.stop(); }
 });
 test("runtime stop sends TERM then confirms resistant descendants disappear within its budget", async t => {
+  await caseRows(t, [["runtime stop sends TERM then confirms resistant descendants disappear within its budget", async t => {
   const step = namedSteps(t);
   await step('TERM, bounded KILL and group inspection remove a resistant grandchild', async t => {
     const runtime = await startRuntime(await options(t, 'tree'));
@@ -170,6 +174,8 @@ test("runtime stop sends TERM then confirms resistant descendants disappear with
     finally { process.env.PATH = previous; }
     assert.equal(await liveOwnedGroup(runtime.pid, 5000), false);
   });
+
+  }]]);
 })
 
 

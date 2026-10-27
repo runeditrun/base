@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { validateConfig, loadConfig } from '../config.mjs'
@@ -24,6 +24,7 @@ const bad = [
   ['empty prefix', { version: 1, rules: { R8: { prefix: '' } } }, /nonempty string/],
 ]
 test("checker configuration admission refuses malformed values and unavailable input paths", async t => {
+  await caseRows(t, [["checker configuration admission refuses malformed values and unavailable input paths", async t => {
   const step = namedSteps(t);
   await step("config rejects invalid input corpus", async t => {
     const step = namedSteps(t);
@@ -45,6 +46,8 @@ test("checker configuration admission refuses malformed values and unavailable i
     await put(root, 'boundaries.json', '{')
     await assert.rejects(loadConfig(resolve(root, 'boundaries.json')), /Cannot read JSON config/)
   })
+
+  }]]);
 })
 
 
@@ -62,10 +65,13 @@ const expected = {
   orbit: [['R2', 'src/core/app/bad.ts', 1], ['R4', 'src/core/features/a/use.ts', 1]],
 }
 test("worked config loads across documented consumers", async t => {
+  await caseRows(t, [["worked config loads across documented consumers", async t => {
   const step = namedSteps(t);
   for (const name of Object.keys(expected)) await step(`${name} worked config loads and has exact findings`, async t => {
     const config = await loadConfig(resolve(moduleRoot, 'examples', `${name}.json`))
     assert.deepEqual(findings(await checkBoundaries({ root: await project(t, name), config })), expected[name])
     assert.equal((await example(name)).version, 1)
   })
+
+  }]]);
 })

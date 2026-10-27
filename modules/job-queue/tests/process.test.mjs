@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, writeFile, symlink } from 'node:fs/promises';
@@ -11,6 +11,7 @@ import { setup, until, client, worker, noLivePids, cli } from './helpers.mjs';
 import { recordedState } from './state.mjs';
 
 test("queued CLI execution preserves command results and releases custody after exit, cancellation or supervisor loss", async t => {
+  await caseRows(t, [["queued CLI execution preserves command results and releases custody after exit, cancellation or supervisor loss", async t => {
   const step = namedSteps(t);
   await step('CLI passes command exit, exact argv, stdout and low priority; JSON status and drain', async t => {
     const { directory } = await setup(t);
@@ -132,6 +133,8 @@ test("queued CLI execution preserves command results and releases custody after 
     assert.equal(result.code, 0, result.stderr);
     assert.doesNotMatch(result.stderr, /EPIPE|ECONNRESET/);
   });
+
+  }]]);
 })
 
 
@@ -150,6 +153,7 @@ test("queued CLI execution preserves command results and releases custody after 
 
 
 test("group signal permission refusal completes only after independent disappearance proof", async t => {
+  await caseRows(t, [["group signal permission refusal completes only after independent disappearance proof", async t => {
   const step = namedSteps(t);
   await step('denied group signal means completion only with proof that no live member remains', async () => {
     const send = () => { throw Object.assign(Error('Denied'), { code: 'EPERM' }); };
@@ -161,6 +165,8 @@ test("group signal permission refusal completes only after independent disappear
     await assert.rejects(deliverGroupSignal(123, 'SIGKILL', { send, live: async () => true }), { code: 'EPERM' });
     await assert.rejects(deliverGroupSignal(123, 'SIGKILL', { send, live: async () => { throw Error('Probe unavailable'); } }), /unavailable/);
   });
+
+  }]]);
 })
 
 

@@ -1,4 +1,4 @@
-import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -9,6 +9,7 @@ import { project, put, run } from './helpers.mjs'
 const passed = 'Boundary check passed for 16 source files.\n'
 
 test("boundary CLI reports malformed invocation or configuration with exact exit and diagnostics", async t => {
+  await caseRows(t, [["boundary CLI reports malformed invocation or configuration with exact exit and diagnostics", async t => {
   const step = namedSteps(t);
   await step('CLI exit 2 names invalid configuration with exact output', async t => {
     const root = await project(t)
@@ -38,6 +39,8 @@ test("boundary CLI reports malformed invocation or configuration with exact exit
     assert.equal(result.status, 2)
     assert.match(result.stderr, /Cannot read tsconfig missing.json/)
   })
+
+  }]]);
 })
 
 
@@ -55,6 +58,7 @@ test('CLI JSON is the complete result for both pass and fail', async t => {
   }
 })
 test("boundary CLI selects the consumer project for local or external configuration", async t => {
+  await caseRows(t, [["boundary CLI selects the consumer project for local or external configuration", async t => {
   const step = namedSteps(t);
   await step('CLI uses the config directory as root from another working directory', async t => {
     const root = await project(t)
@@ -76,4 +80,6 @@ test("boundary CLI selects the consumer project for local or external configurat
     assert.equal(result.status, 0)
     assert.equal(result.stdout, passed)
   })
+
+  }]]);
 })
