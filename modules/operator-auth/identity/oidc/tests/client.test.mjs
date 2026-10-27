@@ -50,7 +50,7 @@ foldedCases.push(['returnTo is saved and cannot be overwritten by callback', asy
   assert.equal(response.status, 303); assert.equal(response.headers.get('location'), '/app');
 }]);
 foldedCases.push(['invalid token and key proofs consume correlation before any retry', async t => {
- for (const [name, change] of Object.entries({
+ await runCases(t, Object.entries({
   multipleAudienceNoAzp: p => { p.options.claims = { ...p.options.claims, aud: ['client', 'other'] }; },
   azp: p => { p.options.claims = { ...p.options.claims, azp: 'another-client' }; },
   expired: p => { p.options.claims = { ...p.options.claims, exp: 1 }; },
@@ -70,17 +70,12 @@ foldedCases.push(['invalid token and key proofs consume correlation before any r
   keyAlgorithm: p => { p.options.jwks = [{ ...p.key.public, alg: 'HS256' }]; },
   keyOps: p => { p.options.jwks = [{ ...p.key.public, key_ops: ['sign', 'verify'] }]; },
   wrongTokenType: p => { p.options.token = { token_type: 'mac' }; },
-})) {
-  try {
+}).map(([name, change]) => [`rejects ${name} and consumes the correlation before any retry`, async t => {
   const r = await fixture(t); await r.bootstrap(); change(r.provider); const f = await r.flow(); const response = await r.finish(f);
   assert.ok(response.status >= 400); assert.ok(!response.headers.get('set-cookie')?.includes('__Host-operator_session='));
   await denied(await r.finish(f));
   assert.equal(r.sqlite.prepare("SELECT COUNT(*) AS n FROM oa_sessions WHERE kind='oidc'").get().n, 0);
-  } catch (error) {
-    error.message = `rejects ${name} and consumes the correlation before any retry: ${error.message}`;
-    throw error;
-  }
- }
+ }]));
 }]);
 foldedCases.push(['response issuer enforced when advertised, and mismatches always rejected', async t => {
   const r = await fixture(t, [authProvider({}, { metadata: { authorization_response_iss_parameter_supported: true } })]); await r.bootstrap();
@@ -227,17 +222,24 @@ foldedCases.push(['Microsoft style unverified email only works with an explicit 
 
 // Refusing an owned upload must finish it before the adapter returns. Optional
 // adapters must leave downstream bodies alone when they decline ownership.
-test('owned early HTTP refusals drain input, while unowned requests remain available downstream', async () => {
-  const r = await runtime();
-  try {
-    const auth = createAuthHandler(r.auth), oidc = createOidcHandler(r.auth.providers);
-    for (const [handler, path, status] of [
-      [auth, '/auth/unknown', 404],
-      [auth, '/auth/bootstrap?token=refused', 400],
-      [auth, '/auth/magic-link', 415],
-      [oidc, '/auth/oidc/auth/start', 415],
-      [oidc, '/auth/oidc/auth/callback', 405],
-    ]) {
+test('owned early HTTP refusals drain input, while unowned requests remain available downstream', async t => {
+  const owned = [
+    ['auth', '/auth/unknown', 404],
+    ['auth', '/auth/bootstrap?token=refused', 400],
+    ['auth', '/auth/magic-link', 415],
+    ['oidc', '/auth/oidc/auth/start', 415],
+    ['oidc', '/auth/oidc/auth/callback', 405],
+  ];
+  const unowned = [['auth', '/application'], ['oidc', '/auth/oidc/unknown/start'], ['signin', '/signin']];
+  const emptyStore = r => {
+    assert.equal(r.sqlite.prepare('SELECT COUNT(*) AS n FROM oa_operators').get().n, 0);
+    assert.equal(r.sqlite.prepare('SELECT COUNT(*) AS n FROM oa_sessions').get().n, 0);
+  };
+  const handlers = r => ({ auth: createAuthHandler(r.auth), oidc: createOidcHandler(r.auth.providers), signin: createSignInHandler(r.auth) });
+  await runCases(t, [
+    ...owned.map(([kind, path, status]) => [`${kind} owns and drains ${path}`, async t => {
+      const r = await fixture(t);
+      const handler = handlers(r)[kind];
       let completed = false;
       const chunks = ['unread ', 'input'].map(text => new TextEncoder().encode(text));
       const body = new ReadableStream({ pull(controller) {
@@ -251,14 +253,16 @@ test('owned early HTTP refusals drain input, while unowned requests remain avail
       assert.equal(request.bodyUsed, true);
       assert.equal(response.headers.get('set-cookie'), null);
       assert.equal(response.headers.get('cache-control'), 'no-store');
-    }
-    for (const [handler, path] of [[auth, '/application'], [oidc, '/auth/oidc/unknown/start'], [createSignInHandler(r.auth), '/signin']]) {
+      emptyStore(r);
+    }]),
+    ...unowned.map(([kind, path]) => [`${kind} leaves ${path} available downstream`, async t => {
+      const r = await fixture(t);
+      const handler = handlers(r)[kind];
       const request = r.request(path, { method: 'POST', body: 'downstream input' });
       assert.equal(await handler(request), null);
       assert.equal(request.bodyUsed, false);
       assert.equal(await request.text(), 'downstream input');
-    }
-    assert.equal(r.sqlite.prepare('SELECT COUNT(*) AS n FROM oa_operators').get().n, 0);
-    assert.equal(r.sqlite.prepare('SELECT COUNT(*) AS n FROM oa_sessions').get().n, 0);
-  } finally { await r.close(); }
+      emptyStore(r);
+    }]),
+  ]);
 });
