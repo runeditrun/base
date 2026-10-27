@@ -23,17 +23,17 @@ foldedCases.push(['no storage operation before successful crypto, schema and aut
   await assert.rejects(intake.ingestWebhook(signed('resend', JSON.stringify(resend()))), { code: 'event_unauthorized' });
   assert.equal(authorizations, 1); assert.equal(operations, 0);
 }]);
-foldedCases.push(['storage and authorization dependency failures do not leak provider or secret text', async () => {
+foldedCases.push(['storage and authorization dependency failures do not leak provider or secret text', async (t) => {
   const marker = 'sensitive sentinel from test dependency';
   const storage = { async transaction() { throw new Error(marker); } };
-  for (const authorize of [() => true, () => { throw new Error(marker); }]) {
+  await runCases(t, Array.from([() => true, () => { throw new Error(marker); }], (authorize, rowIndex) => [`${t.name}: authorize row ${rowIndex + 1}`, async t => {
     const intake = createDeliveryEventIntake({ ...base, storage, authorize });
     await assert.rejects(intake.ingestWebhook(signed('resend', JSON.stringify(resend()))), error => {
       assert.equal(error.message.includes(marker), false);
       assert.ok(['event_storage_failed', 'event_unauthorized'].includes(error.code));
       return true;
     });
-  }
+}]));
 }]);
 foldedCases.push(['Cloudflare exposes only a queue entry, with no HTTP intake or signature mechanism', () => {
   const intake = createDeliveryEventIntake({ ...base, provider: 'cloudflare', key: undefined,

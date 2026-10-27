@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime } from './runtime.mjs';
@@ -5,11 +6,11 @@ import { createOperatorAuth } from '../index.mjs';
 import { securityHeaders } from '../http.mjs';
 const post = (input, cookie) => ({ method: 'POST', input, cookie });
 
-test('real D1 preview and multipart mail preserve expiry, branding and single-use semantics', async () => {
+test('real D1 preview and multipart mail preserve expiry, branding and single-use semantics', async (t) => {
   const r = await runtime({ branding: { productName: 'A <B> & Friends', accentColor: '#ffffff', signInPath: '/signin' }, linkSeconds: 1200, invitationSeconds: 1200 });
   try {
     const owner = await r.bootstrap();
-    for (const kind of ['magic', 'invite']) {
+    await runCases(t, Array.from(['magic', 'invite'], (kind, rowIndex) => [`${t.name}: kind row ${rowIndex + 1}`, async t => {
       assert.equal((await r.call(kind === 'magic' ? '/auth/magic-link' : '/auth/invite', post(kind === 'magic' ? { email: 'owner@example.com' } : { email: 'join@example.com', displayName: 'Join' }, owner))).status, 202);
       const link = await r.link();
       const token = link.searchParams.get('token');
@@ -43,16 +44,16 @@ test('real D1 preview and multipart mail preserve expiry, branding and single-us
       assert.match(await preview.text(), /This link works once and expires in 2 minutes\./);
       assert.deepEqual((await db.prepare('SELECT * FROM oa_tokens').all()).results, before);
       await db.prepare('UPDATE oa_tokens SET expires_at=? WHERE consumed_at IS NULL').bind(Date.now() - 1).run();
-      for (const method of ['GET', 'HEAD']) {
+      await runCases(t, Array.from(['GET', 'HEAD'], (method, rowIndex) => [`${t.name}: method row ${rowIndex + 1}`, async t => {
         const expired = await r.call(`${link.pathname}${link.search}`, { method });
         assert.equal(expired.status, 400);
         assert.equal(expired.headers.get('set-cookie'), null);
         assert.equal(expired.headers.get('referrer-policy'), 'no-referrer');
         if (method === 'GET') assert.match(await expired.text(), /href="\/signin">Request a new link/);
-      }
+}]));
       const failed = await r.call('/auth/confirm', post({ token }));
       assert.equal(failed.status, 400);
       assert.equal(failed.headers.get('content-security-policy'), securityHeaders()['Content-Security-Policy']);
-    }
+}]));
   } finally { await r.close(); }
 });

@@ -66,7 +66,7 @@ foldedCases.push(['cancelInvitation invalidates all links, retains operator/hist
     assert.equal((await db.prepare('SELECT count(*) AS n FROM oa_sessions WHERE operator_id=?').bind(pending.row.id).first()).n, 0);
   } finally { await r.close(); }
 }]);
-foldedCases.push(['cancellation enforces HTTP origin/session and default target role policy before changing invitation authority', async () => {
+foldedCases.push(['cancellation enforces HTTP origin/session and default target role policy before changing invitation authority', async (t) => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -75,12 +75,12 @@ foldedCases.push(['cancellation enforces HTTP origin/session and default target 
     const pending = await invite(r, owner, 'pending@example.com');
     const input = { operatorId: pending.row.id };
     assert.equal((await r.call('/auth/invite/cancel', { cookie: owner })).status, 405);
-    for (const [options, status] of [[post(input), 401], [post(input, owner, { Origin: 'https://attacker.test' }), 403],
-      [post(input, owner, { 'Sec-Fetch-Site': 'cross-site' }), 403], [post(input, member.cookie), 403]]) {
+    await runCases(t, Array.from([[post(input), 401], [post(input, owner, { Origin: 'https://attacker.test' }), 403],
+      [post(input, owner, { 'Sec-Fetch-Site': 'cross-site' }), 403], [post(input, member.cookie), 403]], ([options, status], rowIndex) => [`${t.name}: [options, status] row ${rowIndex + 1}`, async t => {
       assert.equal((await r.call('/auth/invite/cancel', options)).status, status);
       assert.deepEqual(await (await r.db).prepare('SELECT * FROM oa_operators WHERE id=?').bind(pending.row.id).first(), pending.row);
       assert.equal((await r.call(`/auth/confirm?token=${pending.token}`)).status, 200);
-    }
+}]));
     const pendingAdmin = await invite(r, owner, 'pending-admin@example.com', 'admin');
     assert.equal((await r.call('/auth/invite/cancel', post({ operatorId: pendingAdmin.row.id }, admin.cookie))).status, 403);
     assert.equal((await r.call('/auth/invite/cancel', post(input, admin.cookie))).status, 200);

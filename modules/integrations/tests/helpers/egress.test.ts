@@ -68,7 +68,7 @@ foldedCases.push(['validates configured egress against its declaration and core 
   });
   assert.equal(Object.isFrozen(validated), true);
 }]);
-foldedCases.push(['rejects route drift, missing credentials and unsafe or malformed destinations', () => {
+foldedCases.push(['rejects route drift, missing credentials and unsafe or malformed destinations', async (t) => {
   const result = declaration();
   const config = {
     providerId: 'customer-webhook',
@@ -83,15 +83,15 @@ foldedCases.push(['rejects route drift, missing credentials and unsafe or malfor
     ...config,
     secrets: { CUSTOMER_WEBHOOK_SIGNING_KEY: 'bad\nheader' },
   }), /CUSTOMER_WEBHOOK_SIGNING_KEY/);
-  for (const destinationUrl of [
+  await runCases(t, Array.from([
     'http://hooks.example.com/events',
     'https://localhost/events',
     'https://127.0.0.1/events',
     'https://user:test-password@hooks.example.com/events',
     'not a URL',
-  ]) {
+  ], (destinationUrl, rowIndex) => [`${t.name}: destinationUrl row ${rowIndex + 1}`, async t => {
     assert.throws(() => validateEgressConfiguration(result, { ...config, destinationUrl }), /Invalid public HTTPS egress destination/);
-  }
+}]));
 }]);
 foldedCases.push(['rejects incomplete declarations before they can become external promises', () => {
   assert.throws(() => declareEgress({

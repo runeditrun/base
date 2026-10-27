@@ -41,12 +41,16 @@ foldedCases.push(['RFC 2231 continued filename and missing attachment filename n
   const unnamed = full.replace("Content-Disposition: inline; filename*=utf-8''caf%C3%A9.png\r\n", '');
   assert.equal((await normalizeInbound(cloudflare(encoder.encode(unnamed)), limits)).attachments[0].filename, '');
 }]);
-foldedCases.push(['invalid limits, UTF-8, unknown encoding and malformed folds fail closed', async () => {
-  for (const value of [0, -1, 1.5, NaN, Infinity, undefined]) await assert.rejects(normalizeInbound(resend(), { ...limits, maxRawBytes: value }), { code: 'invalid_inbound_limits' });
-  for (const source of [
+foldedCases.push(['invalid limits, UTF-8, unknown encoding and malformed folds fail closed', async (t) => {
+  await runCases(t, Array.from([0, -1, 1.5, NaN, Infinity, undefined], (value, rowIndex) => [`${t.name}: value row ${rowIndex + 1}`, async t => {
+await assert.rejects(normalizeInbound(resend(), { ...limits, maxRawBytes: value }), { code: 'invalid_inbound_limits' });
+}]));
+  await runCases(t, Array.from([
     full.replace('quoted-printable', 'unknown'), full.replace('caf=C3=A9', 'caf=FF'),
     full.replace('From:', ' From:'), full.replace('boundary=alternative', 'boundary=wrong'),
-  ]) await assert.rejects(normalizeInbound(cloudflare(encoder.encode(source)), limits), { name: 'MailValidationError' });
+  ], (source, rowIndex) => [`${t.name}: source row ${rowIndex + 1}`, async t => {
+await assert.rejects(normalizeInbound(cloudflare(encoder.encode(source)), limits), { name: 'MailValidationError' });
+}]));
   await assert.rejects(normalizeInbound(cloudflare(encoder.encode(full.replace('<parent@example.test>\r\nRef', '<parent@example.test> stray\r\nRef'))), limits), { code: 'invalid_inbound_thread' });
   // A long run of header whitespace before a line separator is refused in linear time.
   const started = performance.now();
@@ -60,10 +64,10 @@ foldedCases.push(['a later hydration failure yields no successful partial messag
   await assert.rejects(normalizeInbound(input, limits), { code: 'invalid_inbound' });
   assert.equal(calls, 2);
 }]);
-foldedCases.push(['malformed raw bytes in quoted-printable and encoded words are rejected', async () => {
-  for (const source of [full.replace('caf=C3=A9', 'café'), full.replace('=?UTF-8?B?Q2Fmw6k=?=', '=?UTF-8?Q?Ā?=')]) {
+foldedCases.push(['malformed raw bytes in quoted-printable and encoded words are rejected', async (t) => {
+  await runCases(t, Array.from([full.replace('caf=C3=A9', 'café'), full.replace('=?UTF-8?B?Q2Fmw6k=?=', '=?UTF-8?Q?Ā?=')], (source, rowIndex) => [`${t.name}: source row ${rowIndex + 1}`, async t => {
     await assert.rejects(normalizeInbound(cloudflare(encoder.encode(source)), limits), { name: 'MailValidationError' });
-  }
+}]));
   const input = resend(); input.email.from += '\r\n';
   await assert.rejects(normalizeInbound(input, limits), { code: 'invalid_inbound_header' });
 }]);

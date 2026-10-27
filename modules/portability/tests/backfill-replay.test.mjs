@@ -90,7 +90,7 @@ foldedCases.push(['an archive predating a journal backfill restores to the live 
 }]);
 foldedCases.push(['a carried journal replays INSERT or REPLACE over its archived rows exactly like a live upgrade', async t => {
   const carried = { name: rooms.name, sql: `${rooms.sql}\n${carriedLog}` };
-  for (const verb of ['INSERT OR IGNORE', 'REPLACE']) {
+  await runCases(t, Array.from(['INSERT OR IGNORE', 'REPLACE'], (verb, rowIndex) => [`${t.name}: verb row ${rowIndex + 1}`, async t => {
     const { db: live, archive } = await source(t, carried, ["INSERT INTO membership_log(seq,room,user,action,at) VALUES(8,'r1','u0','archived','2026-10-20T00:00:00Z')"]);
     const added = verb === 'REPLACE' ? "ALTER TABLE membership_log ADD COLUMN origin TEXT NOT NULL DEFAULT 'retained';\n" : '';
     const mirror = { name: '0002_baseline.sql', sql: `${added}${verb} INTO membership_log(room,user,action,at) SELECT room,user,'baseline','2026-10-20T01:00:00Z' FROM members ORDER BY room,user;` };
@@ -107,7 +107,7 @@ foldedCases.push(['a carried journal replays INSERT or REPLACE over its archived
     assert.equal(JSON.stringify(await select(target.db, 'SELECT * FROM membership_log ORDER BY seq')), JSON.stringify(expected));
     assert.deepEqual(await archived(target.db), await archived(live));
     assert.deepEqual(status.bridged.replayed, [{ migration: mirror.name, statement: added ? 1 : 0, table: 'membership_log', rows: 3 }]);
-  }
+}]));
 }]);
 foldedCases.push(['excluded writes are admitted; carried UPDATE/DELETE, another writer and non-archived reads stay refused', async t => {
   const { archive } = await source(t);
@@ -158,7 +158,7 @@ INSERT INTO "retained staging" SELECT coalesce((SELECT max(seq) FROM membership_
 INSERT INTO membership_log(seq,room,user,action,at) SELECT seq,room,user,'retained','2026-10-20T00:00:00Z' FROM "retained staging";
 INSERT INTO attribution(seq,user) SELECT seq,user FROM "retained staging";
 DROP TABLE "retained staging";` };
-  for (const evidence of [true, false]) {
+  await runCases(t, Array.from([true, false], (evidence, rowIndex) => [`${t.name}: evidence row ${rowIndex + 1}`, async t => {
     const original = await source(t);
     if (!evidence) await original.db.prepare('DELETE FROM members').run();
     const archive = await bundle(original.service);
@@ -179,7 +179,7 @@ DROP TABLE "retained staging";` };
     const newer = await bundle(original.service),fresh = await installed(t, [rooms, baseline, retained]);
     assert.equal((await finalize(fresh.service, newer, await stage(fresh.service, newer))).phase, 'complete');
     assert.deepEqual(await Promise.all(queries.map(sql => select(fresh.db, sql))), expected);
-  }
+}]));
   // An unsupported transient UPDATE keeps the old new-table-only admission;
   // its consumers must not run against the missing table at finalize.
   const original = await source(t),unsupported = { ...retained, sql: retained.sql.replace('INSERT INTO membership_log', 'UPDATE "retained staging" SET user=upper(user);\nINSERT INTO membership_log') };

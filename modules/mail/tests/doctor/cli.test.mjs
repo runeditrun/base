@@ -21,10 +21,10 @@ foldedCases.push(['real CLI sample JSON and human plans work without assembled a
   const human = run(args); assert.equal(human.status, 0, human.stderr);
   for (const label of ['MX', 'SPF', 'DKIM', 'DMARC', 'SEND', 'RECEIVE']) assert.match(human.stdout, new RegExp(`${label}:`));
 }]);
-foldedCases.push(['CLI live requires explicit configuration and rejects mutually exclusive/unknown flags', () => {
-  for (const args of [ ['--live'], ['--live', '--plan'], ['--provider'], ['--api-key', 'private-key'] ]) {
+foldedCases.push(['CLI live requires explicit configuration and rejects mutually exclusive/unknown flags', async (t) => {
+  await runCases(t, Array.from([ ['--live'], ['--live', '--plan'], ['--provider'], ['--api-key', 'private-key'] ], (args, rowIndex) => [`${t.name}: args row ${rowIndex + 1}`, async t => {
     const result = run(args); assert.equal(result.status, 2); assert.doesNotMatch(result.stderr, /private-key/);
-  }
+}]));
 }]);
 foldedCases.push(['CLI config permits public setup only; live secrets are read from named environment keys', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'mail-doctor-'));

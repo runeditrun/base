@@ -10,16 +10,16 @@ const validate = new Ajv({ strict: true }).compile(read('block-kit.schema.json')
 
 test("Slack messages preserve event semantics and neutralize all user control syntax", async t => {
   const foldedCases: Case[] = [];
-foldedCases.push(['official Slack sample and every emitted event/path validate against documented Block Kit schema', () => {
+foldedCases.push(['official Slack sample and every emitted event/path validate against documented Block Kit schema', async (t) => {
   assert.equal(validate(read('slack-official-section.json')), true, JSON.stringify(validate.errors));
-  for (const event of Object.keys(slackEventTemplates)) {
+  await runCases(t, Array.from(Object.keys(slackEventTemplates), (event, rowIndex) => [`${t.name}: event row ${rowIndex + 1}`, async t => {
     const message = renderSlackEvent(event, { title: 'Payment processing', detail: 'Investigating elevated errors.' }, slackEventTemplates);
-    for (const channel of [undefined, 'CLOCAL123']) {
+    await runCases(t, Array.from([undefined, 'CLOCAL123'], (channel, rowIndex) => [`${t.name}: channel row ${rowIndex + 1}`, async t => {
       assert.equal(validate(JSON.parse(serializeSlackMessage(message, channel))), true, JSON.stringify(validate.errors));
-    }
-  }
+}]));
+}]));
 }]);
-foldedCases.push(['schema independently rejects wrong block/text types, length/count limits and illegal optional fields', () => {
+foldedCases.push(['schema independently rejects wrong block/text types, length/count limits and illegal optional fields', async (t) => {
   const official = read('slack-official-section.json');
   const invalid = [
     { blocks: [{ type: 'event', text: { type: 'plain_text', text: 'hello' } }] },
@@ -33,7 +33,9 @@ foldedCases.push(['schema independently rejects wrong block/text types, length/c
     { blocks: [{ type: 'section' }] },
     { ...official, event: 'invented_wrapper' },
   ];
-  for (const value of invalid) assert.equal(validate(value), false);
+  await runCases(t, Array.from(invalid, (value, rowIndex) => [`${t.name}: value row ${rowIndex + 1}`, async t => {
+assert.equal(validate(value), false);
+}]));
 }]);
 foldedCases.push(['templates select event semantics, preserve user text as Slack-escaped literals, support custom events and fail visibly', () => {
   const data = { title: '<!channel> & title', detail: 'A *literal* detail' };
@@ -48,21 +50,21 @@ foldedCases.push(['templates select event semantics, preserve user text as Slack
   assert.throws(() => renderSlackEvent('incident.opened', { ...data, detail: 'x'.repeat(3001) }, slackEventTemplates), /failed/);
   assert.throws(() => renderSlackEvent('incident.opened', { ...data, detail: '\ud800' }, slackEventTemplates), /failed/);
 }]);
-foldedCases.push(['every Slack control sequence in user content is neutralised in every field the notifier writes', () => {
-  for (const injection of injections) {
-    for (const message of [
+foldedCases.push(['every Slack control sequence in user content is neutralised in every field the notifier writes', async (t) => {
+  await runCases(t, Array.from(injections, (injection, rowIndex) => [`${t.name}: injection row ${rowIndex + 1}`, async t => {
+    await runCases(t, Array.from([
       renderSlackEvent('incident.opened', { title: injection, detail: injection }, slackEventTemplates),
       renderSlackEvent('job.done', { name: injection }, { 'job.done': d => ({ summary: `Job ${d.name}`, sections: [`Name ${d.name}`, d.name] }) }),
-    ]) {
-      for (const channel of [undefined, 'CLOCAL123']) {
+    ], (message, rowIndex) => [`${t.name}: message row ${rowIndex + 1}`, async t => {
+      await runCases(t, Array.from([undefined, 'CLOCAL123'], (channel, rowIndex) => [`${t.name}: channel row ${rowIndex + 1}`, async t => {
         const wire = serializeSlackMessage(message, channel);
         assert.doesNotMatch(wire, /[<>]/, injection);
         assert.equal(validate(JSON.parse(wire)), true, JSON.stringify(validate.errors));
-      }
+}]));
       assert.equal(message.text.includes(escapeSlackText(injection)), true, injection);
       for (const block of message.blocks) assert.equal(block.text.text.includes(escapeSlackText(injection)), true, injection);
-    }
-  }
+}]));
+}]));
   assert.equal(escapeSlackText('<!channel>'), '&lt;!channel&gt;');
   assert.equal(escapeSlackText('&lt;!channel&gt;'), '&amp;lt;!channel&amp;gt;');
   assert.equal(escapeSlackText('<https://evil.example|click>'), '&lt;https://evil.example|click&gt;');
@@ -74,15 +76,15 @@ foldedCases.push(['a plain ampersand round-trips as &amp; and templates need not
   assert.equal(JSON.parse(serializeSlackMessage(message)).blocks[1].text.text, 'a &amp; b');
   assert.equal(validate(message), true, JSON.stringify(validate.errors));
 }]);
-foldedCases.push(['hand-built messages with raw angle brackets are refused by validation and serialisation', () => {
+foldedCases.push(['hand-built messages with raw angle brackets are refused by validation and serialisation', async (t) => {
   const base = renderSlackEvent('incident.opened', { title: 'ok', detail: 'ok' }, slackEventTemplates);
-  for (const injection of injections.filter(value => /[<>]/.test(value))) {
+  await runCases(t, Array.from(injections.filter(value => /[<>]/.test(value)), (injection, rowIndex) => [`${t.name}: injection row ${rowIndex + 1}`, async t => {
     const topLevel = { ...base, text: injection }, block = { ...base, blocks: [{ ...base.blocks[0]!, text: { ...base.blocks[0]!.text, text: injection } }] };
-    for (const bad of [topLevel, block]) {
+    await runCases(t, Array.from([topLevel, block], (bad, rowIndex) => [`${t.name}: bad row ${rowIndex + 1}`, async t => {
       assert.throws(() => validateSlackMessage(bad), /Unescaped/);
       assert.throws(() => serializeSlackMessage(bad as typeof base), /Unescaped/);
-    }
-  }
+}]));
+}]));
 }]);
   await runCases(t, foldedCases);
 });

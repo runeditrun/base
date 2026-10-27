@@ -68,7 +68,7 @@ foldedCases.push(['connection health survives rejected visitor codes but require
     start(controller) { controller.enqueue(new TextEncoder().encode(JSON.stringify(oversized ? { ...grantError, padding: 'x'.repeat(65536) } : grantError))); },
     cancel() { cancelled = true; },
   }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-  for (const [name, fault, status = 502, error = 'oidc_provider_unavailable'] of [
+  await runCases(t, Array.from([
     ['invalid_client 401', { transport: async () => Response.json({ error: 'invalid_client' }, { status: 401 }) }],
     ['invalid_client 400', { transport: async () => Response.json({ error: 'invalid_client', error_description: 'private-client-detail' }, { status: 400 }) }],
     ['server failure even with invalid_grant body', { transport: async () => Response.json(grantError, { status: 503 }) }],
@@ -84,7 +84,7 @@ foldedCases.push(['connection health survives rejected visitor codes but require
       return response;
     } }],
     ['malformed error body', { transport: async () => new Response('{"error":"invalid_grant",', { status: 400, headers: { 'Content-Type': 'application/json' } }) }],
-  ]) {
+  ], ([name, fault, status = 502, error = 'oidc_provider_unavailable'], rowIndex) => [`${t.name}: [name, fault, status = 502, error = 'oidc_provider_unavailable'] row ${rowIndex + 1}`, async t => {
     cancelled = false;
     const flow = await r.flow();
     Object.assign(r.provider.options, fault, { transport: fault.transport && (async uri => uri.endsWith('/token') ? fault.transport() : null) });
@@ -104,7 +104,7 @@ foldedCases.push(['connection health survives rejected visitor codes but require
     await health(false); // Successful discovery is not exchange proof.
     assert.equal((await r.finish(recovery)).status, 303, name);
     await health(true);
-  }
+}]));
   // A valid exchange remains proof even if application membership denies admission.
   assert.equal((await r.finish(await r.flow(undefined, 0, { sub: 'unknown', email: 'unknown@example.com' }))).status, 403);
   await health(true);
@@ -173,14 +173,14 @@ foldedCases.push(['OIDC browser failures use the configured sign-in URL, includi
   const r = await fixture(t, [authProvider()], { branding: { signInPath: '/sign-in?next=%2Fapp&notice=old#email' } });
   await r.bootstrap();
   const standalone = createOidcHandler(r.auth.providers);
-  for (const [path, options, error, status] of [
+  await runCases(t, Array.from([
     ['/auth/oidc/auth/start', {}, 'oidc_method_not_allowed', 405],
     ['/auth/oidc/auth/start', { method: 'POST', body: '{' }, 'oidc_invalid_input', 400],
     ['/auth/oidc/auth/start', { method: 'POST', body: 'x'.repeat(4097) }, 'oidc_input_too_large', 413],
     ['/auth/oidc/auth/start', { method: 'POST', body: {}, headers: { 'Content-Type': 'text/plain' } }, 'oidc_unsupported_media_type', 415],
     ['/auth/oidc/auth/start', { method: 'POST', body: {}, headers: { Origin: 'https://wrong.example' } }, 'oidc_invalid_origin', 403],
     ['/auth/oidc/auth/callback?state=bad', {}, 'oidc_invalid_correlation', 400],
-  ]) {
+  ], ([path, options, error, status], rowIndex) => [`${t.name}: [path, options, error, status] row ${rowIndex + 1}`, async t => {
     const browser = await r.call(path, { ...options, headers: { ...options.headers, Accept: 'text/html' } });
     assert.equal(browser.status, 303);
     const location = new URL(browser.headers.get('location'), 'https://app.example');
@@ -194,7 +194,7 @@ foldedCases.push(['OIDC browser failures use the configured sign-in URL, includi
     const api = await r.call(path, { ...options, headers: { ...options.headers, Accept: 'application/json' } });
     assert.equal(api.status, status);
     assert.deepEqual(await api.json(), { error });
-  }
+}]));
 }]);
 foldedCases.push(['linked Auth browser failures inherit the configured sign-in URL while APIs retain typed errors', async t => {
   const r = await fixture(t, [authProvider()], { providers: [], dependencies: true,
@@ -214,18 +214,18 @@ foldedCases.push(['linked Auth browser failures inherit the configured sign-in U
     assert.deepEqual(location.searchParams.getAll('notice'), [error]);
     assert.equal(location.hash, '#email');
   };
-  for (const [path, options, error, status] of [
+  await runCases(t, Array.from([
     ['/auth/oidc/auth/start', { method: 'POST', body: '{' }, 'oidc_invalid_input', 400],
     ['/auth/oidc/auth/start', { method: 'POST', body: {}, headers: { Origin: 'https://wrong.example' } }, 'oidc_invalid_origin', 403],
     ['/auth/oidc/auth/start', { method: 'POST', body: {} }, 'oidc_provider_unavailable', 502],
     ['/auth/oidc/auth/callback?state=bad', {}, 'oidc_invalid_correlation', 400],
-  ]) {
+  ], ([path, options, error, status], rowIndex) => [`${t.name}: [path, options, error, status] row ${rowIndex + 1}`, async t => {
     redirect(await r.call(path, { ...options, headers: { ...options.headers, Accept: 'text/html' } }), error);
     const api = await r.call(path, { ...options, headers: { ...options.headers, Accept: 'application/json' } });
     assert.equal(api.status, status);
     assert.equal(api.headers.get('location'), null);
     assert.deepEqual(await api.json(), { error });
-  }
+}]));
   const standalone = createOidcHandler(r.auth.providers);
   redirect(await standalone(r.request('/auth/oidc/auth/start', { method: 'POST', body: '{', headers: { Accept: 'text/html' } })), 'oidc_invalid_input');
 }]);

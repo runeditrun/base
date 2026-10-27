@@ -27,42 +27,42 @@ foldedCases.push(['base64 attachments become bytes and a missing type is a gener
   const wire = JSON.parse(serializeSendGridMessage({ ...message(), attachments: [{ content: 'AP+ACg==', filename: 'bytes.bin' }] }));
   assert.deepEqual(wire.attachments, [{ content: 'AP+ACg==', type: 'application/octet-stream', filename: 'bytes.bin', disposition: 'attachment' }]);
 }]);
-foldedCases.push(['invalid attachment content is rejected before any request', async () => {
-  for (const content of ['not base64!', '', 42, null]) {
+foldedCases.push(['invalid attachment content is rejected before any request', async (t) => {
+  await runCases(t, Array.from(['not base64!', '', 42, null], (content, rowIndex) => [`${t.name}: content row ${rowIndex + 1}`, async t => {
     let calls = 0;
     await assert.rejects(sendSendGrid({ apiKey: 'k', message: { ...message(), attachments: [{ content, filename: 'a.txt' }] }, fetch: async () => { calls++; return accept(); } }),
       error => error instanceof SendGridSendError && error.outcome === 'rejected');
     assert.equal(calls, 0);
-  }
+}]));
 }]);
-foldedCases.push(['html may be null or empty, and fields the former module ignored stay ignored', async () => {
-  for (const html of [null, '', undefined]) {
+foldedCases.push(['html may be null or empty, and fields the former module ignored stay ignored', async (t) => {
+  await runCases(t, Array.from([null, '', undefined], (html, rowIndex) => [`${t.name}: html row ${rowIndex + 1}`, async t => {
     let body;
     await sendSendGrid({ apiKey: 'k', message: { ...message(), html, unknownField: true }, fetch: async (_url, init) => { body = JSON.parse(init.body); return accept(); } });
     assert.deepEqual(body.content, [{ type: 'text/plain', value: 'Reply' }]);
-  }
+}]));
 }]);
-foldedCases.push(['validation failures are rejections that never echo input values', async () => {
-  for (const extra of [{ from: 'canary-secret' }, { to: ['canary-secret'] }, { headers: { From: 'canary-secret@example.com' } }, { deliveryId: '' }, { asmGroupId: 'canary-secret' }]) {
+foldedCases.push(['validation failures are rejections that never echo input values', async (t) => {
+  await runCases(t, Array.from([{ from: 'canary-secret' }, { to: ['canary-secret'] }, { headers: { From: 'canary-secret@example.com' } }, { deliveryId: '' }, { asmGroupId: 'canary-secret' }], (extra, rowIndex) => [`${t.name}: extra row ${rowIndex + 1}`, async t => {
     await assert.rejects(sendSendGrid({ apiKey: 'k', message: { ...message(), ...extra }, fetch: async () => { throw new Error('must not send'); } }), error => {
       assert.ok(error instanceof SendGridSendError && error.outcome === 'rejected' && error.status === undefined);
       assert.doesNotMatch(error.message, /canary/);
       return true;
     });
-  }
+}]));
   assert.throws(() => serializeSendGridMessage({ ...message(), to: [] }), SendGridSendError);
   assert.throws(() => serializeSendGridMessage(null), SendGridSendError);
 }]);
-foldedCases.push(['a blank or malformed API key is rejected before any request', async () => {
-  for (const apiKey of ['', '   ', 'two words', undefined]) {
+foldedCases.push(['a blank or malformed API key is rejected before any request', async (t) => {
+  await runCases(t, Array.from(['', '   ', 'two words', undefined], (apiKey, rowIndex) => [`${t.name}: apiKey row ${rowIndex + 1}`, async t => {
     let calls = 0;
     await assert.rejects(sendSendGrid({ apiKey, message: message(), fetch: async () => { calls++; return accept(); } }), error => error instanceof SendGridSendError && error.outcome === 'rejected');
     assert.equal(calls, 0);
-  }
+}]));
 }]);
-foldedCases.push(['HTTP outcomes keep the exact status the former module reported', async () => {
+foldedCases.push(['HTTP outcomes keep the exact status the former module reported', async (t) => {
   const cases = [[400, 'rejected'], [403, 'rejected'], [429, 'rate_limited'], [408, 'ambiguous'], [500, 'ambiguous'], [307, 'ambiguous'], [200, 'ambiguous']];
-  for (const [status, outcome] of cases) {
+  await runCases(t, Array.from(cases, ([status, outcome], rowIndex) => [`${t.name}: [status, outcome] row ${rowIndex + 1}`, async t => {
     await assert.rejects(sendSendGrid({ apiKey: 'k', message: message(), fetch: async () => new Response('PRIVATE body', { status }) }), error => {
       assert.ok(error instanceof SendGridSendError);
       assert.equal(error.outcome, outcome);
@@ -70,7 +70,7 @@ foldedCases.push(['HTTP outcomes keep the exact status the former module reporte
       assert.doesNotMatch(error.message, /PRIVATE|\bk\b/);
       return true;
     });
-  }
+}]));
   await assert.rejects(sendSendGrid({ apiKey: 'k', message: message(), fetch: async () => { throw new Error('PRIVATE'); } }), error => error.outcome === 'ambiguous' && error.status === undefined && !/PRIVATE/.test(error.message));
 }]);
 foldedCases.push(['an empty headers object is the same SendGrid request as no headers', async () => {
@@ -109,13 +109,13 @@ test('timeoutMilliseconds bounds the single attempt', { timeout: 10_000 }, async
   assert.ok(performance.now() - start < 5_000);
 });
 
-test('the mail facade accepts the same optional timeout and rejects invalid values', { timeout: 10_000 }, async () => {
+test('the mail facade accepts the same optional timeout and rejects invalid values', { timeout: 10_000 }, async (t) => {
   const config = { provider: 'sendgrid', mode: 'test', apiKey: 'fixture-key' };
   const start = performance.now();
   const result = await createMailSender(config, { timeoutMilliseconds: 50, fetch: () => new Promise(() => {}) }).send(message());
   assert.equal(result.status, 'uncertain');
   assert.ok(performance.now() - start < 5_000);
-  for (const timeoutMilliseconds of [0, -1, 1.5, '50', Number.NaN]) {
+  await runCases(t, Array.from([0, -1, 1.5, '50', Number.NaN], (timeoutMilliseconds, rowIndex) => [`${t.name}: timeoutMilliseconds row ${rowIndex + 1}`, async t => {
     assert.throws(() => createMailSender(config, { timeoutMilliseconds, fetch: accept }), error => error instanceof MailValidationError && error.code === 'invalid_timeout');
-  }
+}]));
 });

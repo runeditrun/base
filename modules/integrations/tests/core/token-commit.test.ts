@@ -65,13 +65,13 @@ foldedCases.push(['unchanged native grant issues atomically; audit failure rolls
     assert.equal((await store.repo().query('SELECT * FROM integration_token_events WHERE namespace=?')).length, 2);
   } finally { await store.close(); }
 }]);
-foldedCases.push(['no legacy or absent commit guard can issue a token', async () => {
+foldedCases.push(['no legacy or absent commit guard can issue a token', async (t) => {
   const store = await database();
   try {
-    for (const grant of [['read'], { scopes: ['read'] }, { scopes: ['read'], commitGuard: { sql: '', params: [] } }]) {
+    await runCases(t, Array.from([['read'], { scopes: ['read'] }, { scopes: ['read'], commitGuard: { sql: '', params: [] } }], (grant, rowIndex) => [`${t.name}: grant row ${rowIndex + 1}`, async t => {
       const authority = { grant: async () => grant, administer: async () => {} } as unknown as TokenAuthority<unknown>;
       await assert.rejects(new TokenService(store.repo(), authority).issue(owner, { name: 'app', scopes: ['read'] }), /commit guard required/);
-    }
+}]));
     assert.equal((await store.repo().query('SELECT * FROM integration_tokens WHERE namespace=?')).length, 0);
     assert.equal((await store.repo().query('SELECT * FROM integration_token_events WHERE namespace=?')).length, 0);
   } finally { await store.close(); }

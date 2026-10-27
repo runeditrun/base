@@ -1,10 +1,11 @@
+import { runCases } from '../../tests/cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime, presets } from '../../identity/oidc/tests/fake-runtime.mjs';
 
 test('one-click sign-in keeps visible provider forms and their return destination', async t => {
   // /signin exercises the dev layer; /login reaches the shared sign-in handler.
-  for (const path of ['/signin', '/login']) {
+  await runCases(t, Array.from(['/signin', '/login'], (path, rowIndex) => [`${t.name}: path row ${rowIndex + 1}`, async t => {
     const origin = 'http://127.0.0.1:8787';
     const fixture = presets(origin);
     const devKey = 'one-click-provider-test-only-local-key-0000000000000';
@@ -37,5 +38,5 @@ test('one-click sign-in keeps visible provider forms and their return destinatio
     });
     assert.equal(signedIn.status, 303);
     assert.equal(signedIn.headers.get('location'), returnTo);
-  }
+}]));
 });

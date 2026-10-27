@@ -30,12 +30,12 @@ test("public address policy rejects unsafe aliases and ranges at every save boun
     assert.throws(() => save(address), /Invalid public HTTPS egress destination/, address);
   });
 }],
-    ['public controls remain valid for the portable guard and saved egress configuration', () => {
-  for (const address of publicAddresses) {
+    ['public controls remain valid for the portable guard and saved egress configuration', async (t) => {
+  await runCases(t, Array.from(publicAddresses, (address, rowIndex) => [`${t.name}: address row ${rowIndex + 1}`, async t => {
     assert.equal(isPublicAddress(address), true, address);
     assert.ok(validateDestination(literalUrl(address)));
     assert.equal(save(address).destinationId, 'events');
-  }
+}]));
 }],
     ['portable guard rejects noncanonical IPv4 spellings', async t => {
   for (const address of ['0177.0.0.1', '010.0.0.1', '08.8.8.8', '8.08.8.8', '8.8.08.8',
@@ -44,31 +44,31 @@ test("public address policy rejects unsafe aliases and ranges at every save boun
     assert.equal(isPublicAddress(address), false, address);
   });
 }],
-    ['canonical decimal IPv4 and single-zero octets retain their public/private policy', () => {
-  for (const address of ['177.0.0.1', '8.0.0.1', '8.8.8.0']) {
+    ['canonical decimal IPv4 and single-zero octets retain their public/private policy', async (t) => {
+  await runCases(t, Array.from(['177.0.0.1', '8.0.0.1', '8.8.8.0'], (address, rowIndex) => [`${t.name}: address row ${rowIndex + 1}`, async t => {
     assert.equal(isPublicAddress(address), true, address);
     assert.equal(validateDestination(literalUrl(address)).hostname, address);
     assert.equal(save(address).destinationUrl, literalUrl(address));
-  }
-  for (const address of ['127.0.0.1', '10.0.0.1', '0.0.0.0', '0.8.8.8']) {
+}]));
+  await runCases(t, Array.from(['127.0.0.1', '10.0.0.1', '0.0.0.0', '0.8.8.8'], (address, rowIndex) => [`${t.name}: address row ${rowIndex + 1}`, async t => {
     assert.equal(isPublicAddress(address), false, address);
-  }
+}]));
 }],
-    ['WHATWG-normalized private IPv4 aliases still reject at both save boundaries', () => {
-  for (const host of ['0177.0.0.1', '012.0.0.1', '0x7f000001', '2130706433', '１２７.０.０.１']) {
+    ['WHATWG-normalized private IPv4 aliases still reject at both save boundaries', async (t) => {
+  await runCases(t, Array.from(['0177.0.0.1', '012.0.0.1', '0x7f000001', '2130706433', '１２７.０.０.１'], (host, rowIndex) => [`${t.name}: host row ${rowIndex + 1}`, async t => {
     assert.throws(() => validateDestination(literalUrl(host)), /not public/);
     assert.throws(() => save(host), /Invalid public HTTPS egress destination/);
-  }
+}]));
 }],
-    ['malformed addresses reject and URL-normalized private aliases cannot bypass saving', () => {
-  for (const address of ['', 'example.com', '8.8.8.256', '8.8.8', '8.8.8.8.8', '-1.1.1.1',
+    ['malformed addresses reject and URL-normalized private aliases cannot bypass saving', async (t) => {
+  await runCases(t, Array.from(['', 'example.com', '8.8.8.256', '8.8.8', '8.8.8.8.8', '-1.1.1.1',
     '2606:::1', '2606::1::2', '2606:12345::1', '2606:1:2:3:4:5:6', '2606:1:2:3:4:5:6:7:8',
-    '2606:1:2:3:4:5:6:7::', 'fe80::1%eth0', '2606::1%eth0', ' 2606::1', '2606::1/32']) {
+    '2606:1:2:3:4:5:6:7::', 'fe80::1%eth0', '2606::1%eth0', ' 2606::1', '2606::1/32'], (address, rowIndex) => [`${t.name}: address row ${rowIndex + 1}`, async t => {
     assert.equal(isPublicAddress(address), false, address);
-  }
-  for (const host of ['2130706433', '0x7f000001', '0177.0.0.1', '[::ffff:127.0.0.1]', '[::ffff:8.8.8.8]']) {
+}]));
+  await runCases(t, Array.from(['2130706433', '0x7f000001', '0177.0.0.1', '[::ffff:127.0.0.1]', '[::ffff:8.8.8.8]'], (host, rowIndex) => [`${t.name}: host row ${rowIndex + 1}`, async t => {
     assert.throws(() => validateDestination(`https://${host}/`), /not public/);
-  }
+}]));
 }],
   ]);
 });

@@ -11,7 +11,7 @@ const protocol = createWebhookProtocol({ resolveDestination: async () => 'https:
 
 test("durable webhook delivery preserves bounded retries and conservative outcomes across failure and restart", async t => {
   const foldedCases: Case[] = [];
-foldedCases.push(['real HTTP signature, bounded rate-limit retry, stable identity and durable receiver replay protection after restart', async () => {
+foldedCases.push(['real HTTP signature, bounded rate-limit retry, stable identity and durable receiver replay protection after restart', async (t) => {
   const sender = await database(), inbox = await database(); let now = 1700000000000, calls = 0, effects = 0;
   const seen: Record<string, string>[] = [];
   const http = await receiver(async (body, headers, _req, res) => {
@@ -39,9 +39,9 @@ foldedCases.push(['real HTTP signature, bounded rate-limit retry, stable identit
     await assert.rejects(service.enqueue({ ...envelope, destinationId: 'other' }), /conflict/);
     await assert.rejects(service.enqueue({ ...envelope, tenant: 'other' }), /tenant/);
     const original = await protocol.prepare(envelope, now);
-    for (const change of [ { body: envelope.body + ' ' }, { headers: { ...original.headers, 'webhook-event': 'other' } }, { headers: { ...original.headers, 'webhook-id': 'other' } }, { headers: { ...original.headers, 'webhook-tenant': 'other' } }, { headers: { ...original.headers, 'webhook-destination': 'other' } } ]) {
+    await runCases(t, Array.from([ { body: envelope.body + ' ' }, { headers: { ...original.headers, 'webhook-event': 'other' } }, { headers: { ...original.headers, 'webhook-id': 'other' } }, { headers: { ...original.headers, 'webhook-tenant': 'other' } }, { headers: { ...original.headers, 'webhook-destination': 'other' } } ], (change, rowIndex) => [`${t.name}: change row ${rowIndex + 1}`, async t => {
       await assert.rejects(verifyWebhook({ ...original, ...change, key, tenant: 'tenant', destinationId: 'destination-v1', now }));
-    }
+}]));
     await assert.rejects(verifyWebhook({ ...original, key, tenant: 'tenant', destinationId: 'destination-v1', now: now + 301000 }), /timestamp/);
   } finally { await http.close(); await sender.close(); await inbox.close(); }
 }]);

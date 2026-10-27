@@ -42,9 +42,9 @@ test('member settings navigation gets an actionable document while JSON clients 
     ['text/html;q=0.1234', 'json'], ['text/html,garbage', 'json'],
     ['text/html;profile="unterminated', 'json'], ['text/html;q=1;q=0', 'json'],
   ];
-  for (const [accept, expected] of preferences) {
+  await runCases(t, Array.from(preferences, ([accept, expected], rowIndex) => [`${t.name}: [accept, expected] row ${rowIndex + 1}`, async t => {
     const headers = accept === undefined ? {} : { accept };
-    for (const [method, form] of [['GET', false], ['HEAD', false], ['POST', false], ['POST', true]]) {
+    await runCases(t, Array.from([['GET', false], ['HEAD', false], ['POST', false], ['POST', true]], ([method, form], rowIndex) => [`${t.name}: [method, form] row ${rowIndex + 1}`, async t => {
       const response = await r.call(path, { method, cookie: member, headers, form,
         ...(method === 'POST' ? { input: { idpSignIn: form ? 'true' : true } } : {}) });
       assert.equal(response.status, 403, `${method} ${accept}`);
@@ -53,44 +53,44 @@ test('member settings navigation gets an actionable document while JSON clients 
       if (method === 'HEAD') assert.equal(body, '');
       else if (expected === 'json') assert.deepEqual(JSON.parse(body), { error: 'owner_required' });
       else { assert.match(body, /<main>.*<h1>[^<]+<\/h1><p>[^<]+<\/p>/); assert.match(body, /href="\/app"/); }
-    }
-    for (const method of ['GET', 'HEAD']) {
+}]));
+    await runCases(t, Array.from(['GET', 'HEAD'], (method, rowIndex) => [`${t.name}: method row ${rowIndex + 1}`, async t => {
       const response = await r.call(path, { method, cookie: owner, headers });
       assert.equal(response.status, 200);
       assert.match(response.headers.get('content-type'), expected === 'html' ? /text\/html/ : /application\/json/);
       if (method === 'HEAD') assert.equal(await response.text(), '');
       else if (expected === 'json') assert.equal(typeof (await response.json()).idpSignIn, 'boolean');
       else assert.match(await response.text(), /<form/);
-    }
-  }
+}]));
+}]));
 });
 
 test("provider sign-in enablement follows configured and linked provider state", async t => {
   const foldedCases = [];
 foldedCases.push(['OA and native settings refuse provider enablement without a configured or linked provider and preserve the disabled policy', async t => {
-  for (const native of [false, true]) {
+  await runCases(t, Array.from([false, true], (native, rowIndex) => [`${t.name}: native row ${rowIndex + 1}`, async t => {
     const r = await runtime(t, { providers: [], fakes: [], ...(native ? { native: {} } : {}) });
     const owner = native ? await emailSession(r, 'owner@example.com') : await r.bootstrap();
     assert.equal((await r.call(path, post(owner, { idpSignIn: false }))).status, 200);
     const page = await r.call(path, { cookie: owner, headers: html });
     assert.match(await page.text(), /<input[^>]*name="idpSignIn"[^>]*disabled/);
-    for (const form of [false, true]) {
+    await runCases(t, Array.from([false, true], (form, rowIndex) => [`${t.name}: form row ${rowIndex + 1}`, async t => {
       const response = await r.call(path, post(owner, { idpSignIn: form ? 'true' : true }, form));
       assert.equal(response.status, 409);
       if (form) { assert.match(response.headers.get('content-type'), /text\/html/); assert.match(await response.text(), /role="alert"/); }
       else assert.deepEqual(await response.json(), { error: 'provider_unlinked' });
-    }
-    for (const accept of [undefined, '*/*', 'application/json', 'application/json,text/html;q=0', 'text/html;q=invalid']) {
+}]));
+    await runCases(t, Array.from([undefined, '*/*', 'application/json', 'application/json,text/html;q=0', 'text/html;q=invalid'], (accept, rowIndex) => [`${t.name}: accept row ${rowIndex + 1}`, async t => {
       const response = await r.call(path, { ...post(owner, { idpSignIn: 'true' }, true), headers: accept ? { accept } : {} });
       assert.equal(response.status, 409);
       assert.deepEqual(await response.json(), { error: 'provider_unlinked' });
-    }
+}]));
     const settings = await (await r.call(path, { cookie: owner })).json();
     assert.equal(settings.idpSignIn, false);
     assert.equal(settings.providerSetup.canEnable, false);
     await r.restart();
     assert.equal((await (await r.call(path, { cookie: owner })).json()).idpSignIn, false);
-  }
+}]));
 }]);
 foldedCases.push(['configured providers retain first-use setup, saved form settings persist, and an explicit unlink blocks re-enabling', async t => {
   const setup = presets();

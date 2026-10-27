@@ -31,15 +31,19 @@ foldedCases.push(['export is refused while an import applies', async t=>{
 });
 test("export refuses changed, missing and unreferenced objects", async t => {
   const foldedCases = [];
-for(const action of ['changes','disappears'])foldedCases.push(['export fails when an object '+action, async t=>{
+await runCases(t, Array.from(['changes','disappears'], (action, rowIndex) => [`${t.name}: action row ${rowIndex + 1}`, async t => {
+foldedCases.push(['export fails when an object '+action, async t=>{
   const f=await runtime(t);await seed(f);const s=await f.connect(),id=await s.exports.create();
   if(action==='changes')await f.bucket.put('large',new Uint8Array(18000).fill(7));else await f.bucket.delete('large');
   await assert.rejects(async()=>{for(;;)if((await s.exports.advance(id,{maxParts:100})).phase==='complete')break;},/object_changed/);
 }]);
-for(const action of ['missing','unreferenced'])foldedCases.push(['object references refuse '+action+' objects', async t=>{
+}]));
+await runCases(t, Array.from(['missing','unreferenced'], (action, rowIndex) => [`${t.name}: action row ${rowIndex + 1}`, async t => {
+foldedCases.push(['object references refuse '+action+' objects', async t=>{
   const f=await runtime(t);await seed(f);if(action==='missing')await f.bucket.delete('small');else await f.bucket.put('other','unreferenced');
   await assert.rejects((await f.connect()).exports.create(),/object_references/);
 }]);
+}]));
   await runCases(t, foldedCases);
 });
 
@@ -55,7 +59,9 @@ foldedCases.push(['foreign keys into excluded tables fail by table name', async 
   const f=await runtime(t);await f.db.prepare('CREATE TABLE dependent(id TEXT,parent TEXT REFERENCES private_notes(id))').run();await assert.rejects(f.connect(),/excluded_foreign_key:dependent:private_notes/);
 }]);
 foldedCases.push(['invalid policies fail at construction, including NOT NULL secrets', async t=>{
-  const f=await runtime(t);for(const policy of [{product:''},{product:'x',partBytes:1},{...fixturePolicy,secretColumns:{effects:['delivery']}}])await assert.rejects(createPortability({db:f.db,buckets:{FILES:f.bucket},policy}),/invalid_/);
+  const f=await runtime(t);await runCases(t, Array.from([{product:''},{product:'x',partBytes:1},{...fixturePolicy,secretColumns:{effects:['delivery']}}], (policy, rowIndex) => [`${t.name}: policy row ${rowIndex + 1}`, async t => {
+await assert.rejects(createPortability({db:f.db,buckets:{FILES:f.bucket},policy}),/invalid_/);
+}]));
 }]);
 foldedCases.push(['Base auth, module bookkeeping and development outbox are excluded by default', async t=>{
   const f=await runtime(t);await seed(f);await f.db.prepare('CREATE TABLE rer_mail_development_outbox(message TEXT)').run();await f.db.prepare('CREATE TABLE rer_ai_development_outbox(record TEXT)').run();await f.db.prepare('CREATE TABLE oc_claims(id TEXT)').run();
@@ -65,12 +71,12 @@ foldedCases.push(['Base auth, module bookkeeping and development outbox are excl
   // A seed's own table inventory skips exactly what archives skip, including the
   // deploy controller's migration ledger.
   await migrate(f.db,[]);
-  for(const policy of [fixturePolicy,{...fixturePolicy,includeTables:['oa_sessions']}]){
+  await runCases(t, Array.from([fixturePolicy,{...fixturePolicy,includeTables:['oa_sessions']}], (policy, rowIndex) => [`${t.name}: policy row ${rowIndex + 1}`, async t => {
     const c=await archive(await createPortability({db:f.db,buckets:{FILES:f.bucket},policy}));
     assert.ok(c.manifest.excludedTables.includes('_rer_deploy_migrations'));
     assert.ok(c.manifest.excludedTables.every(name=>excludedTable(name,policy)));
     assert.ok(c.manifest.tables.every(({name})=>!excludedTable(name,policy)));
-  }
+}]));
 }]);
   await runCases(t, foldedCases);
 });

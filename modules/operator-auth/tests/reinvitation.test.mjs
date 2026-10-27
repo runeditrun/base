@@ -32,7 +32,7 @@ foldedCases.push(['cancelled identity can receive a new invitation for the same 
     assert.equal((await r.call('/auth/invite', post(invitation('  PENDING@EXAMPLE.COM  '), owner))).status, 202);
   } finally { await r.close(); }
 }]);
-foldedCases.push(['two cancellation cycles preserve identity/history and admission guard through reissue, pruning and restart', async () => {
+foldedCases.push(['two cancellation cycles preserve identity/history and admission guard through reissue, pruning and restart', async (t) => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -59,11 +59,11 @@ foldedCases.push(['two cancellation cycles preserve identity/history and admissi
       await guarded(r, owner, initial.id);
       await r.restart();
       for (const value of old) await dead(r, value);
-      for (const method of ['GET', 'HEAD']) {
+      await runCases(t, Array.from(['GET', 'HEAD'], (method, rowIndex) => [`${t.name}: method row ${rowIndex + 1}`, async t => {
         const preview = await r.call(`/auth/confirm?token=${current}`, { method });
         assert.equal(preview.status, 200);
         assert.equal(preview.headers.get('set-cookie'), null);
-      }
+}]));
       old.push(current);
     }
     // Pruning credentials cannot turn a pending reissue into admission evidence.

@@ -15,11 +15,15 @@ foldedCases.push(['CLI real Worker export, import, export keeps hashes, modes an
   assert.equal((await f.source.db.prepare('SELECT COUNT(*) AS n FROM rer_portability_jobs').first()).n,before);
 }]);
 foldedCases.push(['CLI truncated download stays partial and resume verifies before promotion', async t=>{await cliJourney(t,cli,worker,{truncate:true});}]);
-foldedCases.push(['CLI refuses non-loopback HTTP origins, credentials and relative paths', ()=>{
+foldedCases.push(['CLI refuses non-loopback HTTP origins, credentials and relative paths', async (t)=>{
   const flags=['--session-file','/absolute/cookie','--out','/absolute/archive'];
   const credentialed=new URL('https://example.test');credentialed.username='fixture-user';credentialed.password=['fixture', 'password'].join('-');
-  for(const origin of ['http://example.test','http://127.1','http://localhost.example',credentialed.href,'https://example.test/path','https://example.test?query','https://example.test#fragment'])assert.throws(()=>options(['export','--origin',origin,...flags]));
-  for(const [key,value] of [['session-file','relative-cookie'],['out','relative-out'],['from','relative-from']])assert.throws(()=>options([key==='from'?'import':'export','--origin','https://example.test','--session-file',key==='session-file'?value:'/absolute/cookie','--'+(key==='from'?'from':'out'),key==='session-file'?'/absolute/archive':value]));
+  await runCases(t, Array.from(['http://example.test','http://127.1','http://localhost.example',credentialed.href,'https://example.test/path','https://example.test?query','https://example.test#fragment'], (origin, rowIndex) => [`${t.name}: origin row ${rowIndex + 1}`, async t => {
+assert.throws(()=>options(['export','--origin',origin,...flags]));
+}]));
+  await runCases(t, Array.from([['session-file','relative-cookie'],['out','relative-out'],['from','relative-from']], ([key,value], rowIndex) => [`${t.name}: [key,value] row ${rowIndex + 1}`, async t => {
+assert.throws(()=>options([key==='from'?'import':'export','--origin','https://example.test','--session-file',key==='session-file'?value:'/absolute/cookie','--'+(key==='from'?'from':'out'),key==='session-file'?'/absolute/archive':value]));
+}]));
   assert.equal(options(['export','--origin','http://[::1]:8787',...flags]).origin,'http://[::1]:8787');
 }]);
 foldedCases.push(['CLI session input is one small regular cookie file', async t=>{

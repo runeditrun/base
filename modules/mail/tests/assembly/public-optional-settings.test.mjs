@@ -47,23 +47,23 @@ async function acceptedWire(input) {
 
 test("public mail assembly preserves explicit SendGrid settings and refuses unsupported inputs", async t => {
   const foldedCases = [];
-foldedCases.push(['public SendGrid omits absent settings and retains the caller durable ID', async () => {
-  for (const deliveryId of ['a', 'delivery/orbit/42', 'd'.repeat(512)]) {
+foldedCases.push(['public SendGrid omits absent settings and retains the caller durable ID', async (t) => {
+  await runCases(t, Array.from(['a', 'delivery/orbit/42', 'd'.repeat(512)], (deliveryId, rowIndex) => [`${t.name}: deliveryId row ${rowIndex + 1}`, async t => {
     const wire = await acceptedWire({ ...message(), deliveryId });
     assert.equal(Object.hasOwn(wire, 'asm'), false);
     assert.deepEqual(wire.tracking_settings, disabledTracking);
     assert.deepEqual(wire.custom_args, { rer_delivery_id: deliveryId });
-  }
+}]));
 }]);
-for (const asmGroupId of [1, 33984, Number.MAX_SAFE_INTEGER]) {
+await runCases(t, Array.from([1, 33984, Number.MAX_SAFE_INTEGER], (asmGroupId, rowIndex) => [`${t.name}: asmGroupId row ${rowIndex + 1}`, async t => {
   foldedCases.push([`public SendGrid preserves positive ASM group ${asmGroupId}`, async () => {
     const wire = await acceptedWire({ ...message(), asmGroupId });
     assert.deepEqual(wire.asm, { group_id: asmGroupId });
     assert.deepEqual(wire.tracking_settings, disabledTracking);
     assert.deepEqual(wire.custom_args, { rer_delivery_id: message().deliveryId });
   }]);
-}
-for (const subscriptionTracking of [false, true]) {
+}]));
+await runCases(t, Array.from([false, true], (subscriptionTracking, rowIndex) => [`${t.name}: subscriptionTracking row ${rowIndex + 1}`, async t => {
   foldedCases.push([`public SendGrid preserves explicit subscription tracking ${subscriptionTracking}`, async () => {
     const wire = await acceptedWire({ ...message(), subscriptionTracking });
     assert.deepEqual(wire.tracking_settings, {
@@ -91,7 +91,7 @@ for (const subscriptionTracking of [false, true]) {
     assert.equal(wire.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
     assert.deepEqual(input, before, 'submission must not consume caller settings');
   }]);
-}
+}]));
 foldedCases.push(['public SendGrid preserves exact product arguments independently of ASM and tracking', async () => {
   const customArgs = { rer_product: 'ferry', command: 'mail/α-17', empty: '' };
   const wire = await acceptedWire({ ...message(), customArgs });

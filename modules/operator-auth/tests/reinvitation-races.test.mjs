@@ -50,7 +50,7 @@ for (const winner of ['cancellation', 'confirmation']) foldedCases.push([`reissu
     assert.equal((await db.prepare('SELECT count(*) AS n FROM oa_invitation_cancellations WHERE operator_id=?').bind(target.row.id).first()).n, winner === 'cancellation' ? 1 : 0);
   } finally { try { await release(r, barrier, pending); } finally { await r.close(); } }
 }]);
-for (const restriction of ['issuer-version', 'issuer-allow-list', 'target-allow-list', 'policy']) foldedCases.push([`reissued token respects ${restriction} before removing its admission guard`, async () => {
+for (const restriction of ['issuer-version', 'issuer-allow-list', 'target-allow-list', 'policy']) foldedCases.push([`reissued token respects ${restriction} before removing its admission guard`, async (t) => {
   const r = await policyRuntime();
   try {
     const owner = await r.bootstrap();
@@ -67,7 +67,9 @@ for (const restriction of ['issuer-version', 'issuer-allow-list', 'target-allow-
     if (restriction === 'target-allow-list') r.config.allowList = ['owner@example.com', admin.row.email];
     if (restriction === 'policy') r.options.policy = 'deny-invites';
     await r.restart();
-    for (const method of ['GET', 'HEAD']) assert.equal((await r.call(`/auth/confirm?token=${target.token}`, { method })).status, 400);
+    await runCases(t, Array.from(['GET', 'HEAD'], (method, rowIndex) => [`${t.name}: method row ${rowIndex + 1}`, async t => {
+assert.equal((await r.call(`/auth/confirm?token=${target.token}`, { method })).status, 400);
+}]));
     const response = await r.call('/auth/confirm', post({ token: target.token }));
     assert.equal(response.status, 400);
     assert.equal(response.headers.get('set-cookie'), null);

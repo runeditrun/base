@@ -9,7 +9,7 @@ const config = { incomingWebhook: async () => webhookUrl, bot: async () => ({ to
 
 test("Slack notification delivery preserves safe payloads and durable conservative retry outcomes", async t => {
   const foldedCases: Case[] = [];
-for (const mode of ['incoming-webhook', 'bot'] as const) {
+await runCases(t, Array.from(['incoming-webhook', 'bot'] as const, (mode, rowIndex) => [`${t.name}: mode row ${rowIndex + 1}`, async t => {
   foldedCases.push([`${mode}: durable enqueue, real ${mode === 'bot' ? 'verified TLS' : 'HTTP'} POST, restart and deduplication`, async t => {
     const fixture = await wireFixture(t), db = durableFixture(t);
     let notifier = createSlackNotifier({ ...config, repository: db.repository(), transport: fixture.transport });
@@ -73,12 +73,12 @@ for (const mode of ['incoming-webhook', 'bot'] as const) {
     await notifier.delivery.resolveUncertain(notice.id, 'accepted', 'operator_confirmed');
     assert.equal((await notifier.delivery.get(notice.id))?.state, 'accepted');
   }]);
-}
+}]));
 foldedCases.push(['both paths persist explicit rejection and uncertain server errors from real receivers', async t => {
   const fixture = await wireFixture(t), db = durableFixture(t);
   const notifier = createSlackNotifier({ ...config, repository: db.repository(), transport: fixture.transport });
-  for (const mode of ['incoming-webhook', 'bot'] as const) {
-    for (const state of ['rejected', 'uncertain'] as const) {
+  await runCases(t, Array.from(['incoming-webhook', 'bot'] as const, (mode, rowIndex) => [`${t.name}: mode row ${rowIndex + 1}`, async t => {
+    await runCases(t, Array.from(['rejected', 'uncertain'] as const, (state, rowIndex) => [`${t.name}: state row ${rowIndex + 1}`, async t => {
       const id = `${mode}-${state}`;
       await notifier.enqueue({ ...notice, id, mode });
       fixture.replies.push(state === 'uncertain' ? { status: 500, body: 'provider unknown' }
@@ -86,8 +86,8 @@ foldedCases.push(['both paths persist explicit rejection and uncertain server er
         : { status: 400, body: 'invalid_payload' });
       assert.equal((await notifier.delivery.dispatch(id))?.state, state);
       assert.equal((await notifier.delivery.log(id))[0]!.outcome?.kind, state);
-    }
-  }
+}]));
+}]));
   await notifier.delivery.dispatchDue(); assert.equal(fixture.received.length, 4);
 }]);
 foldedCases.push(['actual SQLite failure propagates before sending; expired durable claim never replays', async t => {

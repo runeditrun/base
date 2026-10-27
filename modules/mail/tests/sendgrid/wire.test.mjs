@@ -6,15 +6,15 @@ import { sendSendGrid, serializeSendGridMessage } from '../../src/adapters/sendg
 
 test("SendGrid serialization preserves exact caller content and optional settings", async t => {
   const foldedCases = [];
-foldedCases.push(['text-only and HTML-only bodies remain exact; omitted settings are omitted', () => {
-  for (const field of ['text', 'html']) {
+foldedCases.push(['text-only and HTML-only bodies remain exact; omitted settings are omitted', async (t) => {
+  await runCases(t, Array.from(['text', 'html'], (field, rowIndex) => [`${t.name}: field row ${rowIndex + 1}`, async t => {
     const input = { deliveryId: 'minimal', from: 'from@example.com', to: ['to@example.net'], subject: 'Subject', [field]: 'Contents ✓' };
     const wire = JSON.parse(serializeSendGridMessage(input));
     assert.deepEqual(wire.content, [{ type: `text/${field === 'text' ? 'plain' : 'html'}`, value: input[field] }]);
     assert.equal(wire.asm, undefined);
     assert.equal(wire.tracking_settings.subscription_tracking, undefined);
     assert.deepEqual(wire.custom_args, { rer_delivery_id: 'minimal' });
-  }
+}]));
   const wire = JSON.parse(serializeSendGridMessage({ ...message(), subscriptionTracking: false }));
   assert.deepEqual(wire.tracking_settings.subscription_tracking, { enable: false });
 }]);
@@ -34,15 +34,15 @@ foldedCases.push(['null-prototype custom arguments and exact 10,000 byte limit p
   assert.equal(custom.marker, args.marker);
   assert.throws(() => serializeSendGridMessage({ ...input, customArgs: { marker: `${args.marker}a` } }), { code: 'custom_args_too_large' });
 }]);
-foldedCases.push(['remote test and development modes always use configured provider', async () => {
-  for (const mode of ['test', 'development', 'production']) {
+foldedCases.push(['remote test and development modes always use configured provider', async (t) => {
+  await runCases(t, Array.from(['test', 'development', 'production'], (mode, rowIndex) => [`${t.name}: mode row ${rowIndex + 1}`, async t => {
     let calls = 0;
     let outboxWrites = 0;
     const result = await sendSendGrid({ ...config, mode }, message(), { fetch: async () => { calls++; return new Response(null, { status: 202 }); }, outbox: { put: async () => { outboxWrites++; } } });
     assert.equal(result.status, 'accepted');
     assert.equal(calls, 1);
     assert.equal(outboxWrites, 0);
-  }
+}]));
 }]);
 foldedCases.push(['many small custom arguments retain the original aggregate byte guarantee', () => {
   const customArgs = Object.fromEntries(Array.from({ length: 1001 }, (_, index) => [String.fromCodePoint(0x400 + index), '']));

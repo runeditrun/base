@@ -1,3 +1,4 @@
+import { runCases } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -9,7 +10,9 @@ const { Miniflare } = await import(process.env.INTEGRATIONS_MINIFLARE_MODULE ?? 
 
 test('documented Fetch receiver runs in workerd with raw-byte authentication and durable D1 replay protection', async t => {
   const now = Math.floor(Date.now() / 1000) * 1000;
-  t.mock.method(Date, 'now', () => now);
+  const originalNow = Date.now;
+  Date.now = () => now;
+  t.after(() => { Date.now = originalNow; });
   const directory = await mkdtemp(join(tmpdir(), 'integrations-raw-worker-'));
   const modules = await receiverWorkerModules();
   modules['worker.js'] = { type: 'esm', contents: `
@@ -36,10 +39,10 @@ test('documented Fetch receiver runs in workerd with raw-byte authentication and
     await binding.batch(schema.split(';').filter(sql => sql.trim()).map(sql => binding.prepare(sql)));
     const send = (wire: ReturnType<typeof signedWebhook>) => runtime.dispatchFetch('http://receiver.test/', { method: 'POST', ...wire });
     const rows = () => binding.prepare('SELECT * FROM integration_replays').all();
-    for (const mutation of byteMutations) {
+    await runCases(t, Array.from(byteMutations, (mutation, rowIndex) => [`${t.name}: mutation row ${rowIndex + 1}`, async t => {
       const signed = signedWebhook(mutation.original);
       assert.equal((await send({ ...signed, body: mutation.body })).status, 400, mutation.name);
-    }
+}]));
     assert.equal((await rows()).results.length, 0);
     const body = '{"text":"Café λ 🚀 e\u0301 \ufffd"}', signed = signedWebhook(body);
     assert.equal((await send(signed)).status, 204, 'real Worker crypto accepts the original Unicode body');
@@ -49,15 +52,15 @@ test('documented Fetch receiver runs in workerd with raw-byte authentication and
     assert.equal((await send(signed)).status, 204);
     assert.equal((await rows()).results.length, 1, 'durable replay identity survives Worker restart');
     assert.equal((await send(signedWebhook('{"changed":true}'))).status, 400);
-    for (const audience of [{ tenant: 'other' }, { destinationId: 'other' }]) {
+    await runCases(t, Array.from([{ tenant: 'other' }, { destinationId: 'other' }], (audience, rowIndex) => [`${t.name}: audience row ${rowIndex + 1}`, async t => {
       assert.equal((await send(signedWebhook(body, { id: 'wrong-audience', ...audience }))).status, 400);
-    }
+}]));
     assert.equal((await send(signedWebhook(body, { id: 'expired', now: Date.now() - 301000 }))).status, 400);
     assert.equal((await send(signedWebhook(body, { id: 'future', now: Date.now() + 301000 }))).status, 400);
     assert.equal((await rows()).results.length, 1);
-    for (const offset of [-300000, 300000]) {
+    await runCases(t, Array.from([-300000, 300000], (offset, rowIndex) => [`${t.name}: offset row ${rowIndex + 1}`, async t => {
       assert.equal((await send(signedWebhook(body, { id: `boundary-${offset}`, now: now + offset }))).status, 204, 'exact five-minute boundary is accepted');
-    }
+}]));
     assert.equal((await rows()).results.length, 3);
     // A BOM is permitted only when it is actually covered by the signature.
     assert.equal((await send(signedWebhook('\ufeff{"text":"signed BOM"}', { id: 'signed-bom' }))).status, 204);

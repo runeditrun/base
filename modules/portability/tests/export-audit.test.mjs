@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { stat } from 'node:fs/promises';
@@ -25,13 +26,14 @@ test('direct file export records seed audit atomically and refuses callback or a
       return failure === 'sql' ? [insert, insert] : [insert];
     },
   });
-  for (failure of ['callback', 'sql']) {
+  await runCases(t, Array.from(['callback', 'sql'], (rowValue, rowIndex) => [`${t.name}: rowValue row ${rowIndex + 1}`, async t => {failure = rowValue;
+
     await assert.rejects(exportArchive(service, path), failure === 'callback' ? /audit callback refused/ : /UNIQUE constraint failed/);
     assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM operation_audit').first()).n, 0);
     assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM rer_portability_jobs').first()).n, 0);
     assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name GLOB 'rer_portability_snap_*'").first()).n, 0);
     await assert.rejects(stat(path), { code: 'ENOENT' });
-  }
+}]));
   failure = null;
   const receipt = await exportArchive(service, path);
   assert.ok(receipt.archiveHash);

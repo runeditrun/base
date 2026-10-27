@@ -10,7 +10,7 @@ const post = (input, cookie) => ({ method: 'POST', input, cookie });
 
 test("native authority transactions preserve atomic writes and invalidate stale credentials", async t => {
   const foldedCases = [];
-foldedCases.push(['D1 auth writes survive audit triggers and storage failures without partial authority', async () => {
+foldedCases.push(['D1 auth writes survive audit triggers and storage failures without partial authority', async (t) => {
   const r = await runtime({ externalIssuers: ['https://idp.example.com'] });
   try {
     const db = await r.db;
@@ -43,9 +43,9 @@ foldedCases.push(['D1 auth writes survive audit triggers and storage failures wi
     const credential = await minted.json();
     assert.equal((await r.call('/test/credential-use', { headers: { Authorization: `Bearer ${credential.token}` } })).status, 200);
     assert.ok(await db.prepare("SELECT 1 FROM test_auth_writes WHERE table_name='oa_credentials' AND row_key=?").bind(credential.id).first());
-    for (const idpSignIn of [true, true, false]) {
+    await runCases(t, Array.from([true, true, false], (idpSignIn, rowIndex) => [`${t.name}: idpSignIn row ${rowIndex + 1}`, async t => {
       assert.equal((await r.call('/auth/settings/identity', post({ idpSignIn }, proofOwner))).status, 200);
-    }
+}]));
     const audit = (await db.prepare("SELECT value FROM oa_auth_audit WHERE action='idpSignIn' ORDER BY rowid").all()).results;
     assert.deepEqual(audit.map(row => row.value), ['true', 'false'], 'unchanged settings create no audit event even with audit triggers');
     assert.equal((await r.call('/auth/email', post({ email: 'next@example.com' }, proofOwner))).status, 200);

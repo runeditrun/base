@@ -7,7 +7,7 @@ const encoder = new TextEncoder();
 const failure = (input, constraints = limits, code) => assert.rejects(normalizeInbound(input, constraints), error => error.name === 'MailValidationError' && (!code || error.code === code) && !/SECRET/.test(error.message));
 test("inbound adapters normalize complete original mail and refuse malformed partial messages", async t => {
   const foldedCases = [];
-for (const [provider, fixture] of Object.entries({ cloudflare, sendgrid, resend })) {
+await runCases(t, Array.from(Object.entries({ cloudflare, sendgrid, resend }), ([provider, fixture], rowIndex) => [`${t.name}: [provider, fixture] row ${rowIndex + 1}`, async t => {
   foldedCases.push([`${provider} normalizes equivalent Unicode threaded multipart and binary inline mail`, async () => {
     assert.deepEqual(await normalizeInbound(fixture(), limits), { provider, ...expected });
   }]);
@@ -18,7 +18,7 @@ for (const [provider, fixture] of Object.entries({ cloudflare, sendgrid, resend 
     await failure(fixture(), { ...limits, maxAttachmentBytes: attachment.length - 1 }, 'inbound_attachment_limit');
     await failure(fixture(), { ...limits, maxTotalAttachmentBytes: attachment.length - 1 }, 'inbound_attachments_limit');
   }]);
-}
+}]));
 foldedCases.push(['raw boundary success, false size claims and actual streaming overflow', async () => {
   const raw = mimeFixture();
   await normalizeInbound(cloudflare(raw), { ...limits, maxRawBytes: raw.length });
@@ -32,13 +32,15 @@ foldedCases.push(['raw boundary success, false size claims and actual streaming 
   await normalizeInbound(rs, { ...limits, maxRawBytes: jsonBytes });
   await failure(rs, { ...limits, maxRawBytes: jsonBytes - 1 }, 'inbound_raw_limit');
 }]);
-foldedCases.push(['empty subject and missing optional headers remain explicit', async () => {
+foldedCases.push(['empty subject and missing optional headers remain explicit', async (t) => {
   const raw = encoder.encode('From: sender@example.test\r\nTo: receiver@example.test\r\nSubject:\r\n\r\nhello');
   const sg = form([['from', 'sender@example.test'], ['to', 'receiver@example.test'], ['subject', ''], ['text', 'hello']]);
   const rs = resend({ email: { id: 'email-1', from: 'sender@example.test', to: ['receiver@example.test'], subject: '', text: 'hello', attachments: [] } });
-  for (const input of [cloudflare(raw), sg, rs]) assert.deepEqual(await normalizeInbound(input, limits), {
+  await runCases(t, Array.from([cloudflare(raw), sg, rs], (input, rowIndex) => [`${t.name}: input row ${rowIndex + 1}`, async t => {
+assert.deepEqual(await normalizeInbound(input, limits), {
     provider: input.provider, messageId: null, from: 'sender@example.test', to: ['receiver@example.test'], subject: '', text: 'hello', html: null, inReplyTo: null, references: [], attachments: [],
   });
+}]));
 }]);
 foldedCases.push(['SendGrid raw MIME mode parses original bytes', async () => {
   const parsed = await normalizeInbound(form([['email', mimeFixture()]]), limits);

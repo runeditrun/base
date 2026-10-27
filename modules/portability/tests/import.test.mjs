@@ -65,7 +65,7 @@ foldedCases.push(['restore refuses file references outside the declared prefix b
   const {objectReferences}=fixturePolicy.buckets.FILES;
   const source=await runtime(t,{policy:{...fixturePolicy,buckets:{FILES:{prefix:'people/'}}}}),target=await runtime(t,{policy:{...fixturePolicy,buckets:{FILES:{prefix:'people/',objectReferences}}}}),service=await target.connect();
   await target.bucket.put('other/kept.bin','unrelated');
-  for(const key of ['other/kept.bin','people-other/x','/people/x','','people/../x']) {
+  await runCases(t, Array.from(['other/kept.bin','people-other/x','/people/x','','people/../x'], (key, rowIndex) => [`${t.name}: key row ${rowIndex + 1}`, async t => {
     await source.db.batch([source.db.prepare('DELETE FROM files'),source.db.prepare('INSERT INTO files VALUES(?)').bind(key)]);
     // The dot-segment key passes the prefix, so its archive carries an object of that name too.
     if(key.startsWith('people/'))await source.bucket.put(key,'archived');
@@ -73,7 +73,7 @@ foldedCases.push(['restore refuses file references outside the declared prefix b
     await assert.rejects(service.imports.finalize(id,{archiveHash:bundle.closing.archiveHash}),/object_references:FILES/,JSON.stringify(key));
     assert.deepEqual((await target.bucket.list()).objects.map(x=>x.key),['other/kept.bin']);assert.equal(await (await target.bucket.get('other/kept.bin')).text(),'unrelated');
     assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM files').first()).n,0);await service.imports.abort(id);
-  }
+}]));
 }]);
 foldedCases.push(['restore refuses file references that differ from the archived objects', async t=>{
   const source=await runtime(t,{policy:{...fixturePolicy,buckets:{FILES:{}}}}),target=await runtime(t),service=await target.connect();await seed(source);

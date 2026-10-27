@@ -46,13 +46,13 @@ foldedCases.push(['code exchange failure consumes once; provider error descripti
   assert.equal(response.status, 401); assert.equal(await response.text(), '{"error":"oidc_provider_denied"}'); assert.equal(response.headers.get('location'), null);
 }]);
 foldedCases.push(['slow body and redirecting token exchange are bounded and fail closed', async t => {
-  for (const behavior of ['body', 'redirect']) {
+  await runCases(t, Array.from(['body', 'redirect'], (behavior, rowIndex) => [`${t.name}: behavior row ${rowIndex + 1}`, async t => {
     const transport = async uri => uri.endsWith('/token') ? behavior === 'redirect' ? Response.redirect('https://evil.example', 307) : new Response(new ReadableStream({ start() {} }), { headers: { 'Content-Type': 'application/json' } }) : null;
     const r = await fixture(t, [authProvider({}, { transport })], { identityTimeoutMs: 100 });
     await r.bootstrap(); const f = await r.flow(); const start = Date.now();
     const response = await r.finish(f); assert.equal(response.status, 502); assert.ok(Date.now() - start < 2000);
     assert.equal((await r.finish(f)).status, 400);
-  }
+}]));
 }]);
   await runCases(t, foldedCases);
 });

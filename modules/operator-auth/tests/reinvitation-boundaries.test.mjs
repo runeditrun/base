@@ -40,7 +40,7 @@ for (const scope of ['email', 'ip']) foldedCases.push([`${scope} invite budget s
     assert.equal(await (await r.db).prepare("SELECT 1 FROM oa_operators WHERE email='another@example.com'").first(), null);
   } finally { await r.close(); }
 }]);
-for (const failure of ['failed', 'uncertain', 'throw']) foldedCases.push([`reissued invitation is revoked after ${failure} mail delivery`, async () => {
+for (const failure of ['failed', 'uncertain', 'throw']) foldedCases.push([`reissued invitation is revoked after ${failure} mail delivery`, async (t) => {
   const options = {};
   const r = await runtime({}, options);
   try {
@@ -58,7 +58,9 @@ for (const failure of ['failed', 'uncertain', 'throw']) foldedCases.push([`reiss
     assert.ok(await (await r.db).prepare('SELECT 1 FROM oa_invitation_cancellations WHERE operator_id=?').bind(original.id).first());
     await r.restart();
     const token = (await r.link()).searchParams.get('token');
-    for (const method of ['GET', 'HEAD']) assert.equal((await r.call(`/auth/confirm?token=${token}`, { method })).status, 400);
+    await runCases(t, Array.from(['GET', 'HEAD'], (method, rowIndex) => [`${t.name}: method row ${rowIndex + 1}`, async t => {
+assert.equal((await r.call(`/auth/confirm?token=${token}`, { method })).status, 400);
+}]));
     assert.equal((await r.call('/auth/confirm', post({ token }))).status, 400);
     assert.equal((await (await r.db).prepare('SELECT count(*) AS n FROM oa_sessions WHERE operator_id=?').bind(original.id).first()).n, 0);
   } finally { await r.close(); }

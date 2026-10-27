@@ -51,17 +51,17 @@ test('fresh real D1 bootstrap is mail-independent, one owner/session, atomic acr
 
 test("email sign-in admits only fresh, single-use credentials under current admission policy", async t => {
   const foldedCases = [];
-foldedCases.push(['scanner GET/HEAD do not consume; same-origin POST wins once, preserves returnTo, and replay fails', async () => {
+foldedCases.push(['scanner GET/HEAD do not consume; same-origin POST wins once, preserves returnTo, and replay fails', async (t) => {
   const r = await runtime();
   try {
     await r.bootstrap();
     const token = await issue(r, ' OWNER@EXAMPLE.COM ', '/app/queue?state=open#latest');
     const link = `/auth/confirm?token=${token}`;
-    for (const method of ['GET', 'HEAD', 'GET']) {
+    await runCases(t, Array.from(['GET', 'HEAD', 'GET'], (method, rowIndex) => [`${t.name}: method row ${rowIndex + 1}`, async t => {
       const res = await r.call(link, { method });
       assert.equal(res.status, 200); assert.equal(res.headers.get('set-cookie'), null);
       assert.equal(res.headers.get('referrer-policy'), 'strict-origin');
-    }
+}]));
     const db = await r.db;
     assert.equal((await db.prepare('SELECT consumed_at FROM oa_tokens').first()).consumed_at, null);
     assert.equal((await db.prepare('SELECT count(*) AS n FROM oa_sessions').first()).n, 1);
@@ -74,14 +74,16 @@ foldedCases.push(['scanner GET/HEAD do not consume; same-origin POST wins once, 
     const c = cookie(accepted);
     assert.equal((await r.call('/private/known', { cookie: c })).status, 200);
     assert.equal((await r.call('/private/unknown', { cookie: c })).status, 404);
-    for (const path of ['/private/known', '/private/unknown']) assert.equal((await r.call(path)).status, 401);
+    await runCases(t, Array.from(['/private/known', '/private/unknown'], (path, rowIndex) => [`${t.name}: path row ${rowIndex + 1}`, async t => {
+assert.equal((await r.call(path)).status, 401);
+}]));
     assert.equal((await r.call('/auth/confirm', post({ token }))).status, 400);
     assert.equal((await db.prepare('SELECT count(*) AS n FROM oa_sessions').first()).n, 2);
     const stored = await db.prepare('SELECT token_hash FROM oa_tokens').first();
     assert.notEqual(stored.token_hash, token); assert.match(stored.token_hash, /^[0-9a-f]{64}$/);
   } finally { await r.close(); }
 }]);
-foldedCases.push(['expiry, duplicate cookies, missing cookie and revocation deny both known and unknown private paths', async () => {
+foldedCases.push(['expiry, duplicate cookies, missing cookie and revocation deny both known and unknown private paths', async (t) => {
   const r = await runtime();
   try {
     const first = await r.bootstrap();
@@ -94,10 +96,14 @@ foldedCases.push(['expiry, duplicate cookies, missing cookie and revocation deny
     const second = cookie(await r.call('/auth/confirm', post({ token: freshToken })));
     const one = await session(r, first);
     assert.equal((await r.call('/auth/session/revoke', post({ sessionId: one.id }, second))).status, 204);
-    for (const path of ['/private/known', '/private/unknown']) assert.equal((await r.call(path, { cookie: first })).status, 401);
+    await runCases(t, Array.from(['/private/known', '/private/unknown'], (path, rowIndex) => [`${t.name}: path row ${rowIndex + 1}`, async t => {
+assert.equal((await r.call(path, { cookie: first })).status, 401);
+}]));
     const secondSession = await session(r, second);
     await db.prepare('UPDATE oa_sessions SET expires_at=? WHERE id=?').bind(Date.now() - 1, secondSession.id).run();
-    for (const path of ['/private/known', '/private/unknown']) assert.equal((await r.call(path, { cookie: second })).status, 401);
+    await runCases(t, Array.from(['/private/known', '/private/unknown'], (path, rowIndex) => [`${t.name}: path row ${rowIndex + 1}`, async t => {
+assert.equal((await r.call(path, { cookie: second })).status, 401);
+}]));
   } finally { await r.close(); }
 }]);
 foldedCases.push(['durable IP and normalized email limits are independent, atomic, and persist on restart', async () => {
@@ -128,8 +134,8 @@ foldedCases.push(['allow-list filters issuance, confirmation, and existing-sessi
     assert.equal((await r.mails()).length, 1);
   } finally { await r.close(); }
 }]);
-foldedCases.push(['mail failures revoke outstanding credentials; unavailable mail is never silently replaced', async () => {
-  for (const options of [{ noMail: true }, { mailStatus: 'uncertain' }, { mailThrows: true }, { mailStatus: 'development' }]) {
+foldedCases.push(['mail failures revoke outstanding credentials; unavailable mail is never silently replaced', async (t) => {
+  await runCases(t, Array.from([{ noMail: true }, { mailStatus: 'uncertain' }, { mailThrows: true }, { mailStatus: 'development' }], (options, rowIndex) => [`${t.name}: options row ${rowIndex + 1}`, async t => {
     const r = await runtime({}, options);
     try {
       await r.bootstrap();
@@ -137,17 +143,17 @@ foldedCases.push(['mail failures revoke outstanding credentials; unavailable mai
       const rows = await (await r.db).prepare('SELECT revoked_at FROM oa_tokens').all();
       assert.ok(rows.results.every((v) => v.revoked_at !== null));
     } finally { await r.close(); }
-  }
+}]));
 }]);
-foldedCases.push(['review issuance/admission enforce literal loopback Host independent of forwarded headers', async () => {
+foldedCases.push(['review issuance/admission enforce literal loopback Host independent of forwarded headers', async (t) => {
   const r = await runtime({ origin: 'http://localhost:8787', local: true, review: { enabled: true, operatorEmail: 'owner@example.com' } });
   try {
     assert.equal((await r.call('/auth/review-session', post({}))).status, 403); // no fixture owner
     await r.bootstrap();
-    for (const host of ['evil.test', 'localhost.evil.test', '127.0.0.2:8787']) {
+    await runCases(t, Array.from(['evil.test', 'localhost.evil.test', '127.0.0.2:8787'], (host, rowIndex) => [`${t.name}: host row ${rowIndex + 1}`, async t => {
       const bad = await r.call('/auth/review-session', post({}, undefined, { host, headers: { 'X-Forwarded-Host': 'localhost:8787', Forwarded: 'host=localhost:8787' } }));
       assert.equal(bad.status, 403);
-    }
+}]));
     const valid = await r.call('/auth/review-session', post({ returnTo: '/app/review' }));
     assert.equal(valid.status, 303);
     const c = cookie(valid); assert.match(c, /^operator_session_local_8787=/);
@@ -239,7 +245,7 @@ foldedCases.push(['invitation retries invalidate older links; role changes and c
 
 
 
-test('trusted external and password seams share native policy and subject binding; custom policy restricts management', async () => {
+test('trusted external and password seams share native policy and subject binding; custom policy restricts management', async (t) => {
   const r = await runtime({ externalIssuers: ['https://idp.example.com'] });
   try {
     const ownerCookie = await r.bootstrap();
@@ -248,7 +254,9 @@ test('trusted external and password seams share native policy and subject bindin
     const identity = { issuer: 'https://idp.example.com', subject: 'subject-one', email: 'member@example.com', emailVerified: true };
     assert.equal((await r.call('/test/external', post({ identity }))).status, 403, 'provider sign-in starts off');
     assert.equal((await r.call('/auth/settings/identity', post({ idpSignIn: true }, ownerCookie))).status, 200);
-    for (const patch of [{ emailVerified: false }, { issuer: 'https://evil.test' }, { email: 'uninvited@example.com' }]) assert.equal((await r.call('/test/external', post({ identity: { ...identity, ...patch } }))).status, 403);
+    await runCases(t, Array.from([{ emailVerified: false }, { issuer: 'https://evil.test' }, { email: 'uninvited@example.com' }], (patch, rowIndex) => [`${t.name}: patch row ${rowIndex + 1}`, async t => {
+assert.equal((await r.call('/test/external', post({ identity: { ...identity, ...patch } }))).status, 403);
+}]));
     const password = await r.call('/test/password', post({ operatorId: member.operator.id }));
     assert.equal(password.status, 200);
     assert.equal((await session(r, cookie(password))).kind, 'password');

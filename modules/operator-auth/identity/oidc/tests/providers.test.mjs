@@ -39,7 +39,9 @@ foldedCases.push(['each preset signs in on its happy path, and linking pins issu
   assert.deepEqual([pins.microsoft.issuer, pins.microsoft.algorithms, pins.microsoft.tokenAuthMethod], [MICROSOFT, ['RS256'], 'private_key_jwt']);
   assert.deepEqual([pins.okta.issuer, pins.okta.algorithms, pins.okta.clientId], ['https://corp.okta.example', ['RS256'], 'app-at-okta']);
   // Each provider has its own redirect URI.
-  for (const id of ['auth', 'google', 'microsoft', 'okta']) assert.equal(new URL((await r.flow(id)).location).searchParams.get('redirect_uri'), `https://app.example/auth/oidc/${id}/callback`);
+  await runCases(t, Array.from(['auth', 'google', 'microsoft', 'okta'], (id, rowIndex) => [`${t.name}: id row ${rowIndex + 1}`, async t => {
+assert.equal(new URL((await r.flow(id)).location).searchParams.get('redirect_uri'), `https://app.example/auth/oidc/${id}/callback`);
+}]));
   // private_key_jwt sends no shared secret: the Auth fake verified a signed assertion.
   assert.ok((await r.requests('https://id.example')).some(x => x.uri === 'https://id.example/token'));
 }]);
@@ -205,10 +207,10 @@ foldedCases.push(['bound subjects still need current email proof; explicit and l
   const claims = { sub: 'bound', email: 'member@example.com' };
   await signedIn(r, await r.login('auth', claims), claims.email);
   const n = await sessions(r);
-  for (const changed of [{ email_verified_at: stale }, { email_verified_at: null }, { email_verified: false }]) {
+  await runCases(t, Array.from([{ email_verified_at: stale }, { email_verified_at: null }, { email_verified: false }], (changed, rowIndex) => [`${t.name}: changed row ${rowIndex + 1}`, async t => {
     await refused(r, await r.login('auth', { ...claims, ...changed }), 403);
     assert.equal(await sessions(r), n, 'no session was created');
-  }
+}]));
   await signedIn(r, await r.login('auth', { ...claims, email_verified_at: now - 29 * day }), claims.email);
   await refused(r, await r.login('auth', { ...claims, email: 'owner@example.com' }), 403);
   for (let i = 0; i < 2; i++) {
@@ -231,10 +233,10 @@ foldedCases.push(['Google supplied proof dates govern first and bound sign-ins; 
   assert.equal(await sessions(r), 0);
   await signedIn(r, await r.login('google', { ...claims, email_verified_at: now - 29 * day }), claims.email);
   const n = await sessions(r);
-  for (const email_verified_at of bad) {
+  await runCases(t, Array.from(bad, (email_verified_at, rowIndex) => [`${t.name}: email_verified_at row ${rowIndex + 1}`, async t => {
     await refused(r, await r.login('google', { ...claims, email_verified_at }), 403);
     assert.equal(await sessions(r), n);
-  }
+}]));
   await signedIn(r, await r.login('google', claims), claims.email);
   await refused(r, await r.login('google', { ...claims, email_verified: false }), 403);
 }]);
@@ -283,9 +285,9 @@ foldedCases.push(['step-up is demanded for each listed action and is not satisfi
   const outcomes = async cookie => Promise.all(guarded.map(async ([path, method, input]) => (await r.call(path, { method, input, cookie })).status));
   const provider = await signedIn(r, await r.login('auth'), 'owner@example.com');
   await signedIn(r, await r.login('google'), 'owner@example.com');
-  for (const cookie of [setupSession, provider]) {
+  await runCases(t, Array.from([setupSession, provider], (cookie, rowIndex) => [`${t.name}: cookie row ${rowIndex + 1}`, async t => {
     assert.deepEqual(await outcomes(cookie), guarded.map(() => 403), 'no fresh email-link proof');
-  }
+}]));
   // The proof completes only in the session that asked for it.
   assert.equal((await r.call('/auth/step-up', { method: 'POST', input: { action: 'export' }, cookie: provider })).status, 202);
   const token = await r.link();

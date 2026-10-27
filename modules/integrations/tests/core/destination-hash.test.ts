@@ -31,7 +31,8 @@ foldedCases.push(['default destination hash preserves every queued field and exa
     assert.ok(JSON.stringify(sent) === JSON.stringify(await protocol().prepare(envelope, now)), 'default wire is byte-identical');
   } finally { await store.close(); }
 }]);
-for (const prefix of ['', 'hmac-v1:']) foldedCases.push([`configured keyed destination digest persists across restart${prefix ? ' with a version' : ''}`, async () => {
+await runCases(t, Array.from(['', 'hmac-v1:'], (prefix, rowIndex) => [`${t.name}: prefix row ${rowIndex + 1}`, async t => {
+foldedCases.push([`configured keyed destination digest persists across restart${prefix ? ' with a version' : ''}`, async () => {
   const store = await database(), key = randomBytes(48); let sends = 0, hashes = 0;
   const hashDestination = async (url: string) => { hashes++; return prefix + await hmac(key, digest(url)); };
   const transport = { async send(wire: WireRequest) {
@@ -53,6 +54,7 @@ for (const prefix of ['', 'hmac-v1:']) foldedCases.push([`configured keyed desti
     assert.ok((await service.get(envelope.id))?.attempts === 1);
   } finally { await store.close(); }
 }]);
+}]));
 foldedCases.push(['keyed destination drift rejects during preflight without transport', async () => {
   const store = await database(), key = randomBytes(32); let url = endpoint, sends = 0;
   try {
@@ -65,10 +67,10 @@ foldedCases.push(['keyed destination drift rejects during preflight without tran
     assert.ok((await service.log(envelope.id))[0]?.outcome?.code === 'preflight_failed');
   } finally { await store.close(); }
 }]);
-for (const phase of ['enqueue', 'dispatch'] as const) foldedCases.push([`invalid destination digests cannot ${phase === 'enqueue' ? 'insert a delivery' : 'start transport'}`, async () => {
+for (const phase of ['enqueue', 'dispatch'] as const) foldedCases.push([`invalid destination digests cannot ${phase === 'enqueue' ? 'insert a delivery' : 'start transport'}`, async (t) => {
   const store = await database(); let sends = 0;
   try {
-    for (const [index, value] of invalid.entries()) {
+    await runCases(t, Array.from(invalid.entries(), ([index, value], rowIndex) => [`${t.name}: [index, value] row ${rowIndex + 1}`, async t => {
       let valid = phase === 'dispatch';
       const service = new DeliveryService({ repository: store.repo(), protocols: [protocol()], now: () => now,
         hashDestination: async () => (valid ? digest(endpoint) : value) as string,
@@ -83,11 +85,12 @@ for (const phase of ['enqueue', 'dispatch'] as const) foldedCases.push([`invalid
         assert.ok((await service.dispatch(input.id))?.state === 'rejected', 'invalid hash rejects preflight');
         assert.ok((await service.log(input.id))[0]?.outcome?.code === 'preflight_failed');
       }
-    }
+}]));
     assert.ok(sends === 0, 'invalid hash cannot start transport');
   } finally { await store.close(); }
 }]);
-for (const reconcile of [false, true]) foldedCases.push([`asynchronous hashing preserves the durable claim check${reconcile ? ' after reconciliation' : ''}`, async () => {
+await runCases(t, Array.from([false, true], (reconcile, rowIndex) => [`${t.name}: reconcile row ${rowIndex + 1}`, async t => {
+foldedCases.push([`asynchronous hashing preserves the durable claim check${reconcile ? ' after reconciliation' : ''}`, async () => {
   const store = await database(); let clock = now, calls = 0, sends = 0;
   try {
     const service = new DeliveryService({ repository: store.repo(), protocols: [protocol()], now: () => clock,
@@ -101,6 +104,7 @@ for (const reconcile of [false, true]) foldedCases.push([`asynchronous hashing p
     assert.ok((await service.log(envelope.id))[0]?.outcome?.code === 'claim_expired');
   } finally { await store.close(); }
 }]);
+}]));
   await runCases(t, foldedCases);
 });
 

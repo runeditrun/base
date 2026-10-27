@@ -43,13 +43,13 @@ foldedCases.push(['idempotency conflicts distinguish payload mismatch from an in
   }
   await responseCase(new Response('SENSITIVE', { status: 409 }), 'uncertain', 'idempotency_unknown_conflict');
 }]);
-foldedCases.push(['transport interruption and invalid fetch responses remain uncertain without leaking exceptions', async () => {
-  for (const operation of [() => { throw new Error('SENSITIVE credentials and body'); }, async () => { throw new Error('SENSITIVE'); }, async () => null, async () => ({ status: 200, id: receipt })]) {
+foldedCases.push(['transport interruption and invalid fetch responses remain uncertain without leaking exceptions', async (t) => {
+  await runCases(t, Array.from([() => { throw new Error('SENSITIVE credentials and body'); }, async () => { throw new Error('SENSITIVE'); }, async () => null, async () => ({ status: 200, id: receipt })], (operation, rowIndex) => [`${t.name}: operation row ${rowIndex + 1}`, async t => {
     let calls = 0;
     const result = await sendResend(config, message(), { fetch: (...args) => { calls++; return operation(...args); } });
     assert.deepEqual(result, { provider: 'resend', status: 'uncertain', providerMessageId: null, code: 'transport_error' });
     assert.equal(calls, 1);
-  }
+}]));
 }]);
 foldedCases.push(['body streaming, UTF-8 errors, transport errors and oversized responses are bounded', async () => {
   const encoded = new TextEncoder().encode(JSON.stringify({ id: receipt }));

@@ -41,14 +41,14 @@ foldedCases.push(['official endpoint, auth, exact wire schema, threading and byt
   assert.deepEqual(JSON.parse(body), expected);
   for (let i = 0; i < expected.attachments.length; i++) assert.deepEqual(new Uint8Array(Buffer.from(expected.attachments[i].content, 'base64')), input.attachments[i].content);
 }]);
-foldedCases.push(['HTML-only, explicit empty text, empty subject and omitted options retain distinct semantics', async () => {
-  for (const text of [undefined, '']) {
+foldedCases.push(['HTML-only, explicit empty text, empty subject and omitted options retain distinct semantics', async (t) => {
+  await runCases(t, Array.from([undefined, ''], (text, rowIndex) => [`${t.name}: text row ${rowIndex + 1}`, async t => {
     const fixture = providerFixture();
     const input = { ...message(), text, html: '<p>Hello</p>', subject: '' };
     await sendResend(config, input, fixture);
     const body = JSON.parse(fixture.calls[0].body);
     assert.deepEqual(body, { from: input.from, to: input.to, subject: '', ...(text === undefined ? {} : { text }), html: input.html });
-  }
+}]));
 }]);
 foldedCases.push(['display name punctuation remains inside one mailbox and contentId implies inline', async () => {
   const fixture = providerFixture();

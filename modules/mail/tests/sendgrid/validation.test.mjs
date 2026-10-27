@@ -36,38 +36,40 @@ for (const attachment of [
 
 test("SendGrid validates complete supported requests before allocating or dispatching", async t => {
   const foldedCases = [];
-foldedCases.push(['direct send and serializer reject unsupported/invalid inputs before effects', async () => {
+foldedCases.push(['direct send and serializer reject unsupported/invalid inputs before effects', async (t) => {
   let calls = 0;
-  for (const [label, patch] of badMessages) {
+  await runCases(t, Array.from(badMessages, ([label, patch], rowIndex) => [`${t.name}: [label, patch] row ${rowIndex + 1}`, async t => {
     const input = { ...message(), ...patch };
     assert.throws(() => serializeSendGridMessage(input), MailValidationError, label);
     await assert.rejects(sendSendGrid(config, input, { fetch: async () => { calls++; throw new Error('PRIVATE'); } }), MailValidationError, label);
-  }
+}]));
   assert.equal(calls, 0);
 }]);
-foldedCases.push(['configuration never permits endpoint overrides, missing credentials or provider fallback', async () => {
+foldedCases.push(['configuration never permits endpoint overrides, missing credentials or provider fallback', async (t) => {
   let calls = 0;
   const invalidConfigs = [null, {}, { ...config, provider: 'resend' }, { ...config, mode: undefined }, { ...config, apiKey: '' },
     { ...config, apiKey: 'secret\r\nX-Extra: leak' }, { ...config, endpoint: 'https://other.invalid/collect' },
     { ...config, accountId: 'unused' }, { ...config, provider: 'development', mode: 'development', apiKey: undefined }];
-  for (const invalid of invalidConfigs) {
+  await runCases(t, Array.from(invalidConfigs, (invalid, rowIndex) => [`${t.name}: invalid row ${rowIndex + 1}`, async t => {
     await assert.rejects(sendSendGrid(invalid, message(), { fetch: async () => { calls++; return new Response(null, { status: 202 }); } }), MailValidationError);
-  }
+}]));
   assert.equal(calls, 0);
   await assert.rejects(sendSendGrid(config, message(), { fetch: 'not a function' }), { code: 'invalid_fetch' });
 }]);
-foldedCases.push(['recipient and payload allocation bounds apply before transport', async () => {
+foldedCases.push(['recipient and payload allocation bounds apply before transport', async (t) => {
   let calls = 0;
   const dependencies = { fetch: async () => { calls++; return new Response(null, { status: 202 }); } };
   const input = { ...message(), to: Array.from({ length: 998 }, (_, index) => `person${index}@example.net`) };
   assert.equal((await sendSendGrid(config, input, dependencies)).status, 'accepted');
   await assert.rejects(sendSendGrid(config, { ...input, to: [...input.to, 'overflow@example.net'] }, dependencies), { code: 'sendgrid_too_many_recipients' });
-  for (const patch of [
+  await runCases(t, Array.from([
     { text: 'x'.repeat(30_000_000) },
     { attachments: [{ filename: 'large.bin', contentType: 'application/octet-stream', content: new Uint8Array(22_500_000) }] },
     { attachments: Array.from({ length: 1001 }, () => message().attachments[0]) },
     { customArgs: { huge: 'x'.repeat(10001) } },
-  ]) await assert.rejects(sendSendGrid(config, { ...message(), ...patch }, dependencies), MailValidationError);
+  ], (patch, rowIndex) => [`${t.name}: patch row ${rowIndex + 1}`, async t => {
+await assert.rejects(sendSendGrid(config, { ...message(), ...patch }, dependencies), MailValidationError);
+}]));
   assert.equal(calls, 1);
 }]);
 foldedCases.push(['unexpected input exceptions are fixed and redacted', async () => {

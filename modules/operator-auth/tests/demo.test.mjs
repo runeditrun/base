@@ -21,9 +21,9 @@ foldedCases.push(['hosted demo owner claim authorizes invitations and role chang
   assert.equal(changed.status, 200);
   assert.equal((await changed.json()).role, 'member');
   assert.equal((await a.db.prepare('SELECT count(*) AS n FROM oa_step_up_challenges').first()).n, 0);
-  for (const [visitor, foreign] of [[a, ownerB], [b, ownerA]]) {
+  await runCases(t, Array.from([[a, ownerB], [b, ownerA]], ([visitor, foreign], rowIndex) => [`${t.name}: [visitor, foreign] row ${rowIndex + 1}`, async t => {
     assert.equal((await visitor.call('/auth/invite', post(invite, foreign))).status, 401, 'another visitor cannot borrow demo proof');
-  }
+}]));
   assert.equal((await b.call('/auth/operators', { cookie: ownerB }).then(r => r.json())).length, 1, 'other copy has only its owner');
   assert.equal((await a.call('/auth/invite', post(invite, ownerA, { Origin: 'https://other.example.com' }))).status, 403);
   assert.equal((await a.call('/auth/signout', post({}, ownerA))).status, 204);
@@ -34,11 +34,11 @@ foldedCases.push(['hosted demo owner claim authorizes invitations and role chang
 foldedCases.push(['ordinary hosted owner still needs real step-up and cannot use a demo visitor session or request flag', async t => {
   const ordinary = await runtime(t, false), demo = await runtime(t);
   const owner = await ordinary.claim(), visitor = await demo.claim();
-  for (const headers of [{}, { RER_DEMO: '1' }]) {
+  await runCases(t, Array.from([{}, { RER_DEMO: '1' }], (headers, rowIndex) => [`${t.name}: headers row ${rowIndex + 1}`, async t => {
     const refused = await ordinary.call('/auth/invite', post(invite, owner, headers));
     assert.equal(refused.status, 403);
     assert.deepEqual(await refused.json(), { error: 'step_up_required' });
-  }
+}]));
   assert.equal((await ordinary.call('/auth/invite', post(invite, visitor))).status, 401);
   assert.equal((await ordinary.call('/auth/operators', { cookie: owner }).then(r => r.json())).length, 1);
   assert.deepEqual(ordinary.outbound, []);

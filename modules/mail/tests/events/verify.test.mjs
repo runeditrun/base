@@ -8,51 +8,65 @@ import { signed, NOW, encoder } from './fixtures.mjs';
 test("signed webhook verification binds exact bytes, identity, time and trusted keys", async t => {
   const foldedCases = [];
 for (const provider of ['sendgrid', 'resend']) {
-  foldedCases.push([`${provider}: genuine signature covers arbitrary raw bytes including multipart`, async () => {
+  foldedCases.push([`${provider}: genuine signature covers arbitrary raw bytes including multipart`, async (t) => {
     const binary = Buffer.concat([Buffer.from('--boundary\r\nContent-Disposition: form-data; name="email"\r\n\r\nUnicode café\r\n'), Buffer.from([0, 255, 128]), Buffer.from('\r\n--boundary--\r\n')]);
     const input = signed(provider, binary);
     assert.equal(await verifyWebhook(input), true);
-    for (const index of [0, 10, binary.length - 1]) {
+    await runCases(t, Array.from([0, 10, binary.length - 1], (index, rowIndex) => [`${t.name}: index row ${rowIndex + 1}`, async t => {
       const rawBody = new Uint8Array(input.rawBody); rawBody[index] ^= 1;
       assert.equal(await verifyWebhook({ ...input, rawBody }), false);
-    }
+}]));
     assert.equal(await verifyWebhook({ ...input, rawBody: input.rawBody.slice(1) }), false);
     assert.equal(await verifyWebhook({ ...input, headers: new Headers() }), false);
   }]);
-  foldedCases.push([`${provider}: inclusive clock boundary, stale/future and invalid time fail closed`, async () => {
+  foldedCases.push([`${provider}: inclusive clock boundary, stale/future and invalid time fail closed`, async (t) => {
     const input = signed(provider, '{}');
-    for (const offset of [-300_000, 300_000]) assert.equal(await verifyWebhook({ ...input, now: NOW + offset }), true);
-    for (const offset of [-300_001, 300_001]) assert.equal(await verifyWebhook({ ...input, now: NOW + offset }), false);
-    for (const now of [NaN, Infinity, -1, NOW + 0.5]) assert.equal(await verifyWebhook({ ...input, now }), false);
-    for (const toleranceSeconds of [-1, Infinity, 3601, 0.5]) assert.equal(await verifyWebhook({ ...input, toleranceSeconds }), false);
+    await runCases(t, Array.from([-300_000, 300_000], (offset, rowIndex) => [`${t.name}: offset row ${rowIndex + 1}`, async t => {
+assert.equal(await verifyWebhook({ ...input, now: NOW + offset }), true);
+}]));
+    await runCases(t, Array.from([-300_001, 300_001], (offset, rowIndex) => [`${t.name}: offset row ${rowIndex + 1}`, async t => {
+assert.equal(await verifyWebhook({ ...input, now: NOW + offset }), false);
+}]));
+    await runCases(t, Array.from([NaN, Infinity, -1, NOW + 0.5], (now, rowIndex) => [`${t.name}: now row ${rowIndex + 1}`, async t => {
+assert.equal(await verifyWebhook({ ...input, now }), false);
+}]));
+    await runCases(t, Array.from([-1, Infinity, 3601, 0.5], (toleranceSeconds, rowIndex) => [`${t.name}: toleranceSeconds row ${rowIndex + 1}`, async t => {
+assert.equal(await verifyWebhook({ ...input, toleranceSeconds }), false);
+}]));
     assert.equal(await verifyWebhook({ ...input, toleranceSeconds: 0 }), true);
     assert.equal(await verifyWebhook({ ...input, now: NOW + 1, toleranceSeconds: 0 }), false);
-    for (const timestamp of ['01790000000', '+1790000000', '1790000000.0', '1790000000,1790000000']) assert.equal(await verifyWebhook(signed(provider, '{}', { timestamp })), false);
+    await runCases(t, Array.from(['01790000000', '+1790000000', '1790000000.0', '1790000000,1790000000'], (timestamp, rowIndex) => [`${t.name}: timestamp row ${rowIndex + 1}`, async t => {
+assert.equal(await verifyWebhook(signed(provider, '{}', { timestamp })), false);
+}]));
   }]);
-  foldedCases.push([`${provider}: bad key, encoding, signature and size rejection`, async () => {
+  foldedCases.push([`${provider}: bad key, encoding, signature and size rejection`, async (t) => {
     const input = signed(provider, '{}');
-    for (const key of ['', 'not a key', input.key + '\n', input.key + '=', null]) assert.equal(await verifyWebhook({ ...input, key }), false);
+    await runCases(t, Array.from(['', 'not a key', input.key + '\n', input.key + '=', null], (key, rowIndex) => [`${t.name}: key row ${rowIndex + 1}`, async t => {
+assert.equal(await verifyWebhook({ ...input, key }), false);
+}]));
     const header = provider === 'sendgrid' ? 'x-twilio-email-event-webhook-signature' : 'svix-signature';
-    for (const signature of ['%%%', '', 'AA==', 'v1,AA==', input.headers.get(header) + ',']) {
+    await runCases(t, Array.from(['%%%', '', 'AA==', 'v1,AA==', input.headers.get(header) + ','], (signature, rowIndex) => [`${t.name}: signature row ${rowIndex + 1}`, async t => {
       const headers = new Headers(input.headers); headers.set(header, signature);
       assert.equal(await verifyWebhook({ ...input, headers }), false);
-    }
+}]));
     assert.equal(await verifyWebhook({ ...input, rawBody: new Uint8Array(MAX_WEBHOOK_BYTES + 1) }), false);
     assert.equal(await verifyWebhook({ ...input, rawBody: '{}' }), false);
   }]);
 }
-foldedCases.push(['SendGrid rejects wrong key, P-384, negative/nonminimal DER, P1363 and trailing ASN.1', async () => {
+foldedCases.push(['SendGrid rejects wrong key, P-384, negative/nonminimal DER, P1363 and trailing ASN.1', async (t) => {
   const input = signed('sendgrid', '{}');
   const other = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const p384 = generateKeyPairSync('ec', { namedCurve: 'secp384r1' });
-  for (const pair of [other, p384]) assert.equal(await verifyWebhook({ ...input, key: pair.publicKey.export({ type: 'spki', format: 'der' }).toString('base64') }), false);
+  await runCases(t, Array.from([other, p384], (pair, rowIndex) => [`${t.name}: pair row ${rowIndex + 1}`, async t => {
+assert.equal(await verifyWebhook({ ...input, key: pair.publicKey.export({ type: 'spki', format: 'der' }).toString('base64') }), false);
+}]));
   const signature = Buffer.from(input.headers.get('x-twilio-email-event-webhook-signature'), 'base64');
   const negative = Buffer.from(signature); negative[4] |= 128;
   const nonminimal = Buffer.concat([signature.subarray(0, 4), Buffer.from([0]), signature.subarray(4)]); nonminimal[1]++; nonminimal[3]++;
-  for (const bytes of [negative, nonminimal, Buffer.concat([signature, Buffer.from([0])]), randomBytes(64), Buffer.from([48, 6, 2, 1, 0, 2, 1, 1])]) {
+  await runCases(t, Array.from([negative, nonminimal, Buffer.concat([signature, Buffer.from([0])]), randomBytes(64), Buffer.from([48, 6, 2, 1, 0, 2, 1, 1])], (bytes, rowIndex) => [`${t.name}: bytes row ${rowIndex + 1}`, async t => {
     const headers = new Headers(input.headers); headers.set('x-twilio-email-event-webhook-signature', bytes.toString('base64'));
     assert.equal(await verifyWebhook({ ...input, headers }), false);
-  }
+}]));
   assert.equal(await verifyWebhook({ ...input, key: Buffer.concat([Buffer.from(input.key, 'base64'), Buffer.from([0])]).toString('base64') }), false);
 }]);
 foldedCases.push(['Resend verifies rotation signatures and binds Svix identity and timestamp', async () => {

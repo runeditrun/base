@@ -6,7 +6,8 @@ import { createPortability } from '../index.mjs';
 
 test("restore replacement preserves every excluded foreign-key dependent", async t => {
   const foldedCases = [];
-for(const action of ['CASCADE','SET NULL','SET DEFAULT'])foldedCases.push(['replacement refuses excluded destination dependents with '+action, async t=>{
+await runCases(t, Array.from(['CASCADE','SET NULL','SET DEFAULT'], (action, rowIndex) => [`${t.name}: action row ${rowIndex + 1}`, async t => {
+foldedCases.push(['replacement refuses excluded destination dependents with '+action, async t=>{
   const ddl=['CREATE TABLE tenants(id TEXT PRIMARY KEY,name TEXT)',
     `CREATE TABLE oa_sessions(id TEXT PRIMARY KEY,tenant TEXT REFERENCES tenants(id) ON DELETE ${action})`];
   const policy={product:'fixture',replaceableTables:['tenants']};
@@ -20,6 +21,7 @@ for(const action of ['CASCADE','SET NULL','SET DEFAULT'])foldedCases.push(['repl
   assert.equal((await target.db.prepare('SELECT name FROM tenants').first()).name,'bootstrap');
   assert.equal((await target.service.imports.status(id)).phase,'staging');
 }]);
+}]));
 foldedCases.push(['excluded dependents added during staged validation are protected by the commit guard', async t=>{
   const ddl=['CREATE TABLE tenants(id TEXT PRIMARY KEY,name TEXT)',
     'CREATE TABLE oa_sessions(id TEXT PRIMARY KEY,tenant TEXT REFERENCES tenants(id) ON DELETE CASCADE)'];

@@ -37,25 +37,25 @@ test('production transport checks every DNS answer before any HTTPS connection',
   const send = () => new NodePinnedTransport().send({ url: `https://${host}/events`, headers: {}, body: '{}' });
   try {
     await runCases(t, [['DNS rejects every denied address alone and in either mixed order', async row => {
-      for (const address of deniedAddresses) await caseRow(row, `DNS rejects ${address} alone and in either mixed order`, async () => {
-        for (const values of [[address], ['8.8.8.8', address], [address, '2606:4700:4700::1111']]) {
+      for (const address of deniedAddresses) await caseRow(row, `DNS rejects ${address} alone and in either mixed order`, async (t) => {
+        await runCases(t, Array.from([[address], ['8.8.8.8', address], [address, '2606:4700:4700::1111']], (values, rowIndex) => [`${t.name}: values row ${rowIndex + 1}`, async t => {
           answers = values.map(answer); const before = connects;
           await assert.rejects(send(), /Destination DNS is not public/, JSON.stringify(values));
           assert.equal(connects, before, JSON.stringify(values));
-        }
+}]));
       });
-    }], ['empty and malformed answers reject', async () => {
-      for (const values of [[], ['bad-address'], ['2606:::1'], ['8.8.8.256']]) {
+    }], ['empty and malformed answers reject', async (t) => {
+      await runCases(t, Array.from([[], ['bad-address'], ['2606:::1'], ['8.8.8.256']], (values, rowIndex) => [`${t.name}: values row ${rowIndex + 1}`, async t => {
         answers = values.map(answer); const before = connects;
         await assert.rejects(send(), /Destination DNS is not public/, JSON.stringify(values));
         assert.equal(connects, before, JSON.stringify(values));
-      }
-    }], ['public answers pin the first address with the original TLS hostname and no second resolution', async () => {
-      for (const address of publicAddresses) {
+}]));
+    }], ['public answers pin the first address with the original TLS hostname and no second resolution', async (t) => {
+      await runCases(t, Array.from(publicAddresses, (address, rowIndex) => [`${t.name}: address row ${rowIndex + 1}`, async t => {
         answers = [answer(address), answer('8.8.4.4')]; const before = lookups;
         await assert.rejects(send(), error => error === reachedConnection);
         assert.equal(lookups, before + 1);
-      }
+}]));
     }]]);
   } finally {
     dns.lookup = originalLookup; https.request = originalRequest; syncBuiltinESMExports();

@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { test } from 'node:test';
@@ -52,8 +53,8 @@ test('a populated store upgrades with identical rows; native sessions survive an
   } finally { await r.close(); }
 });
 
-test('a fresh store from the current schema admits dev sessions, and the migration is also safe after it', async () => {
-  for (const schemas of [[await read('../accounts/schema/operator-auth.sql')], [await read('../accounts/schema/operator-auth.sql'), await read('../accounts/schema/dev-sessions.sql')]]) {
+test('a fresh store from the current schema admits dev sessions, and the migration is also safe after it', async (t) => {
+  await runCases(t, Array.from([[await read('../accounts/schema/operator-auth.sql')], [await read('../accounts/schema/operator-auth.sql'), await read('../accounts/schema/dev-sessions.sql')]], (schemas, rowIndex) => [`${t.name}: schemas row ${rowIndex + 1}`, async t => {
     const r = await runtime(schemas);
     try {
       await r.db.prepare("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('owner','owner@example.com','Owner','owner','active',1)").run();
@@ -63,5 +64,5 @@ test('a fresh store from the current schema admits dev sessions, and the migrati
       assert.equal(session.status, 200);
       assert.equal((await session.json()).kind, 'dev');
     } finally { await r.close(); }
-  }
+}]));
 });

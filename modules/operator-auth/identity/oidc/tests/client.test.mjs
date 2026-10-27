@@ -133,13 +133,13 @@ foldedCases.push(['start requires exact Origin, host, POST; callback exact route
   assert.equal((await r.finish(f)).status, 303);
 }]);
 foldedCases.push(['discovery and requests enforce trust, size, redirects, timeout; diagnostics are redacted', async t => {
-  for (const metadata of [{ issuer: 'https://evil.example' }, { token_endpoint: 'https://evil.example/token' }, { authorization_endpoint: 'http://idp.example/auth' }, { jwks_uri: 'https://idp.example/jwks?secret=fixture' }, { code_challenge_methods_supported: ['plain'] }]) {
+  await runCases(t, Array.from([{ issuer: 'https://evil.example' }, { token_endpoint: 'https://evil.example/token' }, { authorization_endpoint: 'http://idp.example/auth' }, { jwks_uri: 'https://idp.example/jwks?secret=fixture' }, { code_challenge_methods_supported: ['plain'] }], (metadata, rowIndex) => [`${t.name}: metadata row ${rowIndex + 1}`, async t => {
     const r = await fixture(t, [authProvider({}, { metadata })]); assert.ok((await r.begin()).status >= 400);
-  }
-  for (const transport of [async () => Response.redirect('https://evil.example', 302), async () => new Response('x'.repeat(70000), { headers: { 'Content-Type': 'application/json' } }), async () => { throw new Error('provider-secret-must-not-leak'); }, async () => new Promise(() => {})]) {
+}]));
+  await runCases(t, Array.from([async () => Response.redirect('https://evil.example', 302), async () => new Response('x'.repeat(70000), { headers: { 'Content-Type': 'application/json' } }), async () => { throw new Error('provider-secret-must-not-leak'); }, async () => new Promise(() => {})], (transport, rowIndex) => [`${t.name}: transport row ${rowIndex + 1}`, async t => {
     const r = await fixture(t, [authProvider({}, { transport })], { identityTimeoutMs: 100 }); const response = await r.begin();
     assert.equal(response.status, 502); assert.equal(await response.text(), '{"error":"oidc_provider_unavailable"}');
-  }
+}]));
 }]);
 foldedCases.push(['rate limiting is durable and request bodies bounded', async t => {
   const r = await fixture(t, undefined, { identityStartLimit: 1 }); assert.equal((await r.begin()).status, 303); r.restart();
@@ -150,10 +150,10 @@ foldedCases.push(['providers are pinned to their presets: only HTTPS issuers, te
   const r = await fixture(t);
   const base = { origin: ORIGIN, OWNER_EMAIL: 'owner@example.com', SESSION_SECRET: 'test-only-real-core-session-secret', OIDC_TRANSACTION_SECRET: 'test-only-independent-correlation-secret' };
   const good = authProvider().config;
-  for (const invalid of [{ issuer: 'http://idp.example' }, { preset: 'github' }, { preset: 'generic' }, { tokenAuthMethod: 'none' }, { tokenAuthMethod: 'client_secret_basic', clientSecret: 'x', privateKey: undefined },
-    { id: 'Bad Id' }, { privateKey: { ...clientKey.ES256.private, kid: undefined } }, { minimumVersion: '0.9.0' }, { preset: 'microsoft', tenant: 'common', issuer: undefined }, { preset: 'google', issuer: 'https://evil.example' }]) {
+  await runCases(t, Array.from([{ issuer: 'http://idp.example' }, { preset: 'github' }, { preset: 'generic' }, { tokenAuthMethod: 'none' }, { tokenAuthMethod: 'client_secret_basic', clientSecret: 'x', privateKey: undefined },
+    { id: 'Bad Id' }, { privateKey: { ...clientKey.ES256.private, kid: undefined } }, { minimumVersion: '0.9.0' }, { preset: 'microsoft', tenant: 'common', issuer: undefined }, { preset: 'google', issuer: 'https://evil.example' }], (invalid, rowIndex) => [`${t.name}: invalid row ${rowIndex + 1}`, async t => {
     assert.throws(() => createOperatorAuth({ db: r.db, clientIp: () => '192.0.2.1', config: { ...base, providers: [{ ...good, ...invalid }] } }).providers, e => e.code === 'oidc_invalid_configuration', JSON.stringify(invalid));
-  }
+}]));
   assert.throws(() => createOperatorAuth({ db: r.db, clientIp: () => '192.0.2.1', config: { ...base, OIDC_TRANSACTION_SECRET: undefined, providers: [good] } }), e => e.code === 'invalid_configuration');
   assert.throws(() => createOperatorAuth({ db: r.db, clientIp: () => '192.0.2.1', config: { ...base, providers: [good, good] } }), e => e.code === 'oidc_invalid_configuration');
   const local = createOperatorAuth({ db: r.db, clientIp: () => '192.0.2.1', fetch: r.provider.fetch, config: { ...base, local: true, origin: 'http://localhost:4321', providers: [good] } });

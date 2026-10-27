@@ -73,21 +73,25 @@ foldedCases.push(['age expiration applies at exact boundary on reads and writes,
 }]);
 foldedCases.push(['invalid retention, clocks and unprepared mail fail before storage', async t => {
   const { db } = database(t);
-  for (const key of ['maxMessages', 'maxAgeMs']) for (const value of [0, -1, 1.5, NaN, Infinity, '10', Number.MAX_SAFE_INTEGER + 1]) {
+  await runCases(t, Array.from(['maxMessages', 'maxAgeMs'], (key, rowIndex) => [`${t.name}: key row ${rowIndex + 1}`, async t => {
+await runCases(t, Array.from([0, -1, 1.5, NaN, Infinity, '10', Number.MAX_SAFE_INTEGER + 1], (value, rowIndex) => [`${t.name}: value row ${rowIndex + 1}`, async t => {
     assert.throws(() => createD1DevelopmentOutbox({ db, [key]: value }), /retention/);
-  }
+}]));
+}]));
   assert.throws(() => createD1DevelopmentOutbox(), /configuration/);
   assert.throws(() => createD1DevelopmentOutbox({ db, clock: 3 }), /configuration/);
-  for (const time of [-1, NaN, Infinity, '100', 1.1, 8_640_000_000_000_001]) {
+  await runCases(t, Array.from([-1, NaN, Infinity, '100', 1.1, 8_640_000_000_000_001], (time, rowIndex) => [`${t.name}: time row ${rowIndex + 1}`, async t => {
     const outbox = createD1DevelopmentOutbox({ db, clock: () => time });
     await assert.rejects(outbox.put(message('bad')), /clock/);
     await assert.rejects(outbox.list(), /clock/);
     await assert.rejects(outbox.get('id'), /clock/);
-  }
+}]));
   const outbox = createD1DevelopmentOutbox({ db });
   await assert.rejects(outbox.put({ ...message('unprepared'), unsubscribe: { url: 'https://example.test/leave' } }), error => error.code === 'unsubscribe_not_assembled');
   await assert.rejects(outbox.put({ ...message('invalid'), attachments: [{ content: 'not raw bytes' }] }));
-  for (const id of ['', null, 'x'.repeat(129)]) await assert.rejects(outbox.get(id), /ID/);
+  await runCases(t, Array.from(['', null, 'x'.repeat(129)], (id, rowIndex) => [`${t.name}: id row ${rowIndex + 1}`, async t => {
+await assert.rejects(outbox.get(id), /ID/);
+}]));
   assert.deepEqual(await outbox.list(), []);
 }]);
 foldedCases.push(['a batch failure rolls back capture and does not silently fall back', async t => {

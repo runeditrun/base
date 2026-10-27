@@ -14,14 +14,14 @@ function utf8Database(db) {
 }
 test('large Unicode values survive durable segment boundaries and a full round trip',async t=>{
   const policy={...fixturePolicy,partBytes:1024*1024};
-  for(const padding of [0,1]) {
+  await runCases(t, Array.from([0,1], (padding, rowIndex) => [`${t.name}: padding row ${rowIndex + 1}`, async t => {
     const source=await runtime(t,{policy}),target=await runtime(t,{policy}),value='x'.repeat(padding)+'😀'.repeat(40000);
     await source.db.prepare('INSERT INTO heap VALUES(?)').bind(value).run();
     const service=await createPortability({db:utf8Database(source.db),buckets:{FILES:source.bucket},policy}),first=await archive(service);
     const destination=await target.connect();await restore(destination,first);
     assert.ok((await target.db.prepare('SELECT value FROM heap').first()).value===value);
     assert.equal((await archive(destination)).contentHash,first.contentHash);
-  }
+}]));
 });
 test("SQLite case aliases cannot bypass excluded-table dependency protection", async t => {
   const foldedCases = [];
@@ -29,7 +29,9 @@ foldedCases.push(['default exclusions cover SQLite identifier case variants', as
   const source=await runtime(t),names=['OA_TRANSFER_TEST','OC_TRANSFER_TEST','RER_PORTABILITY_TRANSFER_TEST','RER_MAIL_DEVELOPMENT_OUTBOX'];
   for(const name of names)await source.db.prepare('CREATE TABLE "'+name+'"(id TEXT)').run();
   const bundle=await archive(await source.connect());
-  for(const name of names)assert.ok(bundle.manifest.excludedTables.includes(name),'default exclusion must cover '+name);
+  await runCases(t, Array.from(names, (name, rowIndex) => [`${t.name}: name row ${rowIndex + 1}`, async t => {
+assert.ok(bundle.manifest.excludedTables.includes(name),'default exclusion must cover '+name);
+}]));
 }]);
 foldedCases.push(['foreign keys into excluded parents are refused through SQLite case aliases', async t=>{
   const source=await runtime(t,{policy:{...fixturePolicy,excludeTables:[...fixturePolicy.excludeTables,'ParentTable']}});

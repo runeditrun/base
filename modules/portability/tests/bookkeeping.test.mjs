@@ -39,11 +39,11 @@ foldedCases.push(['migrated export restores into a fresh migrated target and lea
 }]);
 foldedCases.push(['includeTables cannot reintroduce platform tables, including SQLite case aliases', async t=>{
   const source=await migrated(t);
-  for(const name of ['rer_migrations','RER_MIGRATIONS','ik_d1_assertions','IK_D1_ASSERTIONS','d1_migrations','_rer_deploy_migrations','_rer_portability_migrations','rer_portability_jobs','rer_command_receipts','rer_erasure_blobs','rer_erasure_guard','rer_erasure_scope','rer_erasure_rates','rer_demo','rer_dependency_keys','rer_dependency_pending','rer_dependency_codes','rer_mail_development_outbox','rer_ai_development_outbox']) {
+  await runCases(t, Array.from(['rer_migrations','RER_MIGRATIONS','ik_d1_assertions','IK_D1_ASSERTIONS','d1_migrations','_rer_deploy_migrations','_rer_portability_migrations','rer_portability_jobs','rer_command_receipts','rer_erasure_blobs','rer_erasure_guard','rer_erasure_scope','rer_erasure_rates','rer_demo','rer_dependency_keys','rer_dependency_pending','rer_dependency_codes','rer_mail_development_outbox','rer_ai_development_outbox'], (name, rowIndex) => [`${t.name}: name row ${rowIndex + 1}`, async t => {
     const input={...policy,includeTables:[name]};
     assert.equal(excludedTable(name,input),true);
     await assert.rejects(createPortability({db:source.db,policy:input}),error=>error.code==='platform_table:'+name && error.message.includes('includeTables'));
-  }
+}]));
 }]);
 foldedCases.push(['an old schema identity needs complete definitions, then skips platform rows and restores only seed data', async t=>{
   const target=await migrated(t),events=[];

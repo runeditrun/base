@@ -1,3 +1,4 @@
+import { runCases } from '../../tests/cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createOperatorAuth } from '../../index.mjs';
@@ -18,9 +19,9 @@ test('sign-in serves the installation mark beside its name and refuses unsafe ma
   const presentation = create(branding.mark).presentation;
   assert.equal(presentation.mark, branding.mark);
   assert.ok(Object.isFrozen(presentation));
-  for (const mark of [null, 1, '', 'https://other.example/mark.svg', 'javascript:alert(1)', '//other.example/mark.svg', '/\\other.example/mark.svg', '/brand/"mark.svg', "/brand/'mark.svg", '/brand/<mark>.svg', '/brand/mark\n.svg', '/brand/mark.svg\n', '/brand/%2fmark.svg', '/brand/../mark.svg', '/brand/' + 'a'.repeat(2048)]) {
+  await runCases(t, Array.from([null, 1, '', 'https://other.example/mark.svg', 'javascript:alert(1)', '//other.example/mark.svg', '/\\other.example/mark.svg', '/brand/"mark.svg', "/brand/'mark.svg", '/brand/<mark>.svg', '/brand/mark\n.svg', '/brand/mark.svg\n', '/brand/%2fmark.svg', '/brand/../mark.svg', '/brand/' + 'a'.repeat(2048)], (mark, rowIndex) => [`${t.name}: mark row ${rowIndex + 1}`, async t => {
     assert.throws(() => create(mark), { code: 'invalid_configuration', status: 503 });
-  }
+}]));
   const plain = await runtime(t, { providers: [], fakes: [], core: { branding: { productName: branding.productName } } });
   const unmarked = await plain.call('/signin');
   assert.equal(unmarked.status, 200);

@@ -77,12 +77,14 @@ foldedCases.push(['normalization survives a refused validation and a new service
 foldedCases.push(['archive import refuses escalation, undeclared or structural edits, key edits and impure hooks before publishing', async t=>{
   const s=await source(t),path=await archiveFile(t,s),target=await database(t,ddl,policy);
   // Policy validation goes through the same public constructor the importer uses.
-  for(const declaration of [
+  await runCases(t, Array.from([
     {importRow:normalize}, {importSafety}, {importSafety:[],importRow:normalize},
     ...[[],[undefined],[NaN],['inactive','inactive'],[{blob:'!'}]].map(values=>({importSafety:{automations:{status:values}},importRow:normalize})),
     ...['id','display','missing'].map(column=>({importSafety:{automations:{[column]:['inactive']}},importRow:normalize})),
     {importSafety:{missing:{status:['inactive']}},importRow:normalize},
-  ])await assert.rejects(createPortability({db:target.db,policy:{...policy,...declaration}}));
+  ], (declaration, rowIndex) => [`${t.name}: declaration row ${rowIndex + 1}`, async t => {
+await assert.rejects(createPortability({db:target.db,policy:{...policy,...declaration}}));
+}]));
   const mutable={automations:{status:['inactive']}};
   const cases=[
     {column:'status',safe:mutable,map:row=>{mutable.automations.status.push('active');return {...row,status:'active'};}},
@@ -95,14 +97,14 @@ foldedCases.push(['archive import refuses escalation, undeclared or structural e
     {column:'status',safe:{automations:{status:['inactive','paused']}},map:(()=>{let n=0;return row=>({...row,status:++n%2?'inactive':'paused'});})()},
     {column:'automations',map:async row=>row},
   ];
-  for(const example of cases) {
+  await runCases(t, Array.from(cases, (example, rowIndex) => [`${t.name}: example row ${rowIndex + 1}`, async t => {
     const service=await createPortability({db:target.db,policy:{...policy,importSafety:example.safe??importSafety,importRow:(_table,row)=>example.map(row)}});
     await assert.rejects(importArchive(service,path,[]),error=>{
       assert.match(error.message,/automations/);assert.ok(error.message.includes(example.column));return true;
     });
     assert.deepEqual(await rows(target.db),[]);
     assert.equal((await target.db.prepare('SELECT import_job FROM rer_portability_state WHERE id=1').first()).import_job,null);
-  }
+}]));
 }]);
 foldedCases.push(['a policy without import normalization restores the original activation and token values', async t=>{
   const s=await source(t),path=await archiveFile(t,s),target=await database(t,ddl,policy);

@@ -26,7 +26,7 @@ async function unconsumed(r, email) {
 
 test("invitation redemption requires current issuer authority and policy", async t => {
   const foldedCases = [];
-for (const change of ['deactivate', 'demote']) foldedCases.push([`an administrator's unused invitation cannot survive issuer ${change} and restoration`, async () => {
+for (const change of ['deactivate', 'demote']) foldedCases.push([`an administrator's unused invitation cannot survive issuer ${change} and restoration`, async (t) => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -38,7 +38,9 @@ for (const change of ['deactivate', 'demote']) foldedCases.push([`an administrat
     const path = change === 'deactivate' ? '/auth/operator/status' : '/auth/operator/role';
     const input = change === 'deactivate' ? { status: 'inactive' } : { role: 'member' };
     assert.equal((await r.call(path, post({ operatorId: admin.operator.id, ...input }, owner))).status, 200);
-    for (const method of ['GET', 'HEAD']) assert.equal((await r.call(`/auth/confirm?token=${token}`, { method })).status, 400);
+    await runCases(t, Array.from(['GET', 'HEAD'], (method, rowIndex) => [`${t.name}: method row ${rowIndex + 1}`, async t => {
+assert.equal((await r.call(`/auth/confirm?token=${token}`, { method })).status, 400);
+}]));
     assert.equal((await r.call('/auth/confirm', post({ token }))).status, 400);
     await unconsumed(r, 'staff@example.com');
     const restore = change === 'deactivate' ? { status: 'active' } : { role: 'admin' };

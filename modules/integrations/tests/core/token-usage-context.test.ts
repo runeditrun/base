@@ -10,7 +10,7 @@ import { installIssuer, nativeAuthority, owner } from './token-authority-fixture
 const context = (requestId: string, resource = 'tickets/42') => ({ requestId, resource });
 test("token usage durably binds exact request and resource context under current authorization", async t => {
   const foldedCases: Case[] = [];
-foldedCases.push(['allowed and denied usage binds caller request/resource across restart, scope changes, expiry and revocation', async () => {
+foldedCases.push(['allowed and denied usage binds caller request/resource across restart, scope changes, expiry and revocation', async (t) => {
   const store = await database(); let now = 1700000000000;
   try {
     await installIssuer(store.db);
@@ -26,7 +26,9 @@ foldedCases.push(['allowed and denied usage binds caller request/resource across
     assert.equal(await otherTenant.authorize(token, ['read'], context('other')), null);
     const otherRows = await store.repo('other').query('SELECT * FROM integration_token_usage WHERE namespace=?');
     assert.equal(otherRows[0]!.token_id, null); assert.equal(otherRows[0]!.request_id, 'other');
-    for (const operation of [() => tokens.list({ principal: 'visitor' }), () => tokens.usage({ principal: 'visitor' }), () => tokens.revoke({ principal: 'visitor' }, credential.id)]) await assert.rejects(operation(), /Forbidden/);
+    await runCases(t, Array.from([() => tokens.list({ principal: 'visitor' }), () => tokens.usage({ principal: 'visitor' }), () => tokens.revoke({ principal: 'visitor' }, credential.id)], (operation, rowIndex) => [`${t.name}: operation row ${rowIndex + 1}`, async t => {
+await assert.rejects(operation(), /Forbidden/);
+}]));
     store.restart(); tokens = new TokenService(store.repo(), nativeAuthority(store.db), () => now);
     assert.equal((await tokens.authorize(token, ['read'], context('restarted')))!.id, credential.id);
     await store.repo().query("UPDATE integration_tokens SET scopes='[]' WHERE namespace=? AND id=?", [credential.id]);
@@ -48,15 +50,15 @@ foldedCases.push(['allowed and denied usage binds caller request/resource across
     assert.equal(JSON.stringify(usage).includes(token), false);
   } finally { await store.close(); }
 }]);
-foldedCases.push(['missing or unsafe request context rejects; valid context is snapshotted before hashing and never defaulted', async () => {
+foldedCases.push(['missing or unsafe request context rejects; valid context is snapshotted before hashing and never defaulted', async (t) => {
   const store = await database();
   try {
     await installIssuer(store.db);
     const tokens = new TokenService(store.repo(), nativeAuthority(store.db));
     const issued = await tokens.issue(owner, { name: 'app', scopes: ['read'] });
-    for (const invalid of [undefined, null, {}, { requestId: 'r' }, { resource: 'tickets' }, context(''), context('a'.repeat(201)), context('bad\nrequest'), context('ok', 'tickets?token=secret'), context('ok', '/relative'), context('ok', '含义')]) {
+    await runCases(t, Array.from([undefined, null, {}, { requestId: 'r' }, { resource: 'tickets' }, context(''), context('a'.repeat(201)), context('bad\nrequest'), context('ok', 'tickets?token=secret'), context('ok', '/relative'), context('ok', '含义')], (invalid, rowIndex) => [`${t.name}: invalid row ${rowIndex + 1}`, async t => {
       await assert.rejects(tokens.authorize(issued.token, ['read'], invalid as TokenRequestContext), /Invalid/);
-    }
+}]));
     assert.deepEqual(await tokens.usage(owner), []);
     const supplied = context('request-original', 'tickets/42'), pending = tokens.authorize(issued.token, ['read'], supplied);
     supplied.requestId = 'request-mutated'; supplied.resource = 'tickets/99'; await pending;

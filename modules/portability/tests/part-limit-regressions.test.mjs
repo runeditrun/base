@@ -22,13 +22,13 @@ foldedCases.push(['oversized checksummed uploads are refused before any staging 
   const copy=JSON.parse(job.metadata).copies.data;
   assert.equal((await target.db.prepare('SELECT COUNT(*) AS n FROM "'+copy+'"').first()).n,0);
 }]);
-foldedCases.push(['byte bounds count canonical UTF-8 and accept the exact inclusive limit', async()=>{
-  for(const kind of ['row','payload']) {
+foldedCases.push(['byte bounds count canonical UTF-8 and accept the exact inclusive limit', async(t)=>{
+  await runCases(t, Array.from(['row','payload'], (kind, rowIndex) => [`${t.name}: kind row ${rowIndex + 1}`, async t => {
     const item=kind==='row'?{kind,table:'data',index:0,row:{id:1,value:'😀'.repeat(250)}}:{kind,name:'bytes',offset:0,data:'YQ=='.repeat(250)};
     const part=await makePart(0,[item]),bytes=Buffer.byteLength(canonicalJson(part));
     await checkPart(part,0,bytes);
     await assert.rejects(checkPart(part,0,bytes-1),/part_byte_limit/);
-  }
+}]));
 }]);
 foldedCases.push(['the default reader refuses the checksummed 700-row part above 16 MiB', async()=>{
   const table={name:'data',sql:'CREATE TABLE data(id INTEGER PRIMARY KEY,value TEXT)',

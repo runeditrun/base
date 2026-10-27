@@ -5,7 +5,8 @@ import { database,bundle,stage,rows } from './regression-helpers.mjs';
 
 test("wide D1 tables round trip within binding and SQL limits or refuse before export", async t => {
   const foldedCases = [];
-for(const width of [98,99,100])foldedCases.push([width+'-column D1 tables export, restore and export within D1 limits', async t=>{
+await runCases(t, Array.from([98,99,100], (width, rowIndex) => [`${t.name}: width row ${rowIndex + 1}`, async t => {
+foldedCases.push([width+'-column D1 tables export, restore and export within D1 limits', async t=>{
   const ddl=['CREATE TABLE wide(id INTEGER PRIMARY KEY,'+Array.from({length:width-1},(_,i)=>'c'+i+' TEXT').join(',')+')'];
   const policy={product:'fixture',partBytes:16384},source=await database(t,ddl,policy),target=await database(t,ddl,policy);
   const values=[1,...Array.from({length:width-1},(_,i)=>'value '+i)];
@@ -16,6 +17,7 @@ for(const width of [98,99,100])foldedCases.push([width+'-column D1 tables export
   assert.equal(after.closing.contentHash,before.closing.contentHash);
   assert.deepEqual((await target.db.prepare('SELECT * FROM wide').all()).results,(await source.db.prepare('SELECT * FROM wide').all()).results);
 }]);
+}]));
 foldedCases.push(['a 100-column keyless table retains negative rowids and gaps through restore', async t=>{
   const ddl=['CREATE TABLE wide('+Array.from({length:100},(_,i)=>'c'+i+' TEXT').join(',')+')'],policy={product:'fixture',partBytes:16384};
   const source=await database(t,ddl,policy),target=await database(t,ddl,policy);

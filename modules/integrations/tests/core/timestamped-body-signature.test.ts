@@ -23,23 +23,24 @@ function baseHeaders(body: string) {
 
 test("optional timestamped-body signing preserves exact bytes and protected header authority", async t => {
   const foldedCases: Case[] = [];
-foldedCases.push(['omitting timestamped-body signing preserves the exact default webhook request and classifier', async () => {
+foldedCases.push(['omitting timestamped-body signing preserves the exact default webhook request and classifier', async (t) => {
   const protocol = createWebhookProtocol({ resolveDestination: async () => url, signingKey: async () => key });
   const expected = { url, body: envelope.body, headers: baseHeaders(envelope.body) };
   assert.equal(JSON.stringify(await protocol.prepare(envelope, now)), JSON.stringify(expected));
   assert.equal(JSON.stringify(await makeProtocol(undefined).prepare(envelope, now)), JSON.stringify(expected));
   const signed = makeProtocol(additional);
-  for (const status of [200, 204, 302, 400, 401, 408, 429, 500, 503]) {
+  await runCases(t, Array.from([200, 204, 302, 400, 401, 408, 429, 500, 503], (status, rowIndex) => [`${t.name}: status row ${rowIndex + 1}`, async t => {
     const response = { status, headers: { 'retry-after': '9' }, body: '' };
     assert.deepEqual(signed.classify(response, now), protocol.classify(response, now));
-  }
-  for (const status of [302, 408, 500, 503])
-    assert.equal(signed.classify({ status, headers: {}, body: '' }, now).kind, 'uncertain');
+}]));
+  await runCases(t, Array.from([302, 408, 500, 503], (status, rowIndex) => [`${t.name}: status row ${rowIndex + 1}`, async t => {
+assert.equal(signed.classify({ status, headers: {}, body: '' }, now).kind, 'uncertain');
+}]));
 }]);
-foldedCases.push(['timestamped-body signature matches independent HMAC over exact Unicode, newlines, BOM and empty body', async () => {
+foldedCases.push(['timestamped-body signature matches independent HMAC over exact Unicode, newlines, BOM and empty body', async (t) => {
   const protocol = makeProtocol(additional);
   const bodies = ['', '{}', '{\r\n "text": "Café λ 🚀 e\u0301 �", "number": 1\n}\n', '\ufeff{"text":"signed BOM"}'];
-  for (const body of bodies) {
+  await runCases(t, Array.from(bodies, (body, rowIndex) => [`${t.name}: body row ${rowIndex + 1}`, async t => {
     const wire = await protocol.prepare({ ...envelope, body }, now);
     const iso = wire.headers[additional.timestampHeader]!;
     assert.equal(iso, new Date(Math.floor(now / 1000) * 1000).toISOString());
@@ -53,7 +54,7 @@ foldedCases.push(['timestamped-body signature matches independent HMAC over exac
     assert.deepEqual(wire.headers, { ...baseHeaders(body), [additional.timestampHeader]: iso, [additional.signatureHeader]: signature });
     const verified = await verifyWebhook({ ...wire, body: Buffer.from(body, 'utf8'), key, tenant: envelope.tenant, destinationId: envelope.destinationId, now });
     assert.equal(verified.envelope.body, body);
-  }
+}]));
 }]);
 foldedCases.push(['a configured body signing resolver can use a separate key while Base verification retains its own key', async () => {
   const bodyKey = new Uint8Array(32).fill(91);
@@ -70,8 +71,8 @@ foldedCases.push(['a configured body signing resolver can use a separate key whi
   assert.equal(wire.headers['webhook-signature'], baseHeaders(envelope.body)['webhook-signature']);
   await verifyWebhook({ ...wire, key, tenant: envelope.tenant, destinationId: envelope.destinationId, now });
 }]);
-foldedCases.push(['both signatures retain one key snapshot when caller-owned bytes rotate during real WebCrypto signing', async () => {
-  for (const buffer of [false, true]) {
+foldedCases.push(['both signatures retain one key snapshot when caller-owned bytes rotate during real WebCrypto signing', async (t) => {
+  await runCases(t, Array.from([false, true], (buffer, rowIndex) => [`${t.name}: buffer row ${rowIndex + 1}`, async t => {
     const storage = buffer ? Buffer.alloc(48, 37) : new Uint8Array(48).fill(37);
     const shared = storage.subarray(8, 40);
     const original = new Uint8Array(shared);
@@ -96,34 +97,35 @@ foldedCases.push(['both signatures retain one key snapshot when caller-owned byt
     assert.equal(wire.headers['webhook-signature'], `v1=${createHmac('sha256', original).update(canonical, 'utf8').digest('hex')}`);
     assert.equal(wire.headers[additional.signatureHeader], createHmac('sha256', original).update(bodyInput, 'utf8').digest('base64url'));
     assert.notEqual(wire.headers[additional.signatureHeader], createHmac('sha256', shared).update(bodyInput, 'utf8').digest('base64url'));
-  }
+}]));
 }]);
-foldedCases.push(['timestamped-body signing refuses short or non-byte keys from either resolver', async () => {
-  for (const invalid of [new Uint8Array(0), new Uint8Array(31), 'a'.repeat(32), new Array(32).fill(1), null, undefined]) {
+foldedCases.push(['timestamped-body signing refuses short or non-byte keys from either resolver', async (t) => {
+  await runCases(t, Array.from([new Uint8Array(0), new Uint8Array(31), 'a'.repeat(32), new Array(32).fill(1), null, undefined], (invalid, rowIndex) => [`${t.name}: invalid row ${rowIndex + 1}`, async t => {
     const invalidKey = invalid as Uint8Array;
     await assert.rejects(makeProtocol({ ...additional, signingKey: async () => invalidKey }).prepare(envelope, now), /at least 32 bytes/);
-    for (const timestampedBodySignature of [additional, { ...additional, signingKey: async () => key }]) {
+    await runCases(t, Array.from([additional, { ...additional, signingKey: async () => key }], (timestampedBodySignature, rowIndex) => [`${t.name}: timestampedBodySignature row ${rowIndex + 1}`, async t => {
       const protocol = createWebhookProtocol({ resolveDestination: async () => url, signingKey: async () => invalidKey, timestampedBodySignature });
       await assert.rejects(protocol.prepare(envelope, now), /at least 32 bytes/);
-    }
-  }
+}]));
+}]));
   const failure = new Error('fixture resolver failure');
   await assert.rejects(makeProtocol({ ...additional, signingKey: async () => { throw failure; } }).prepare(envelope, now), error => error === failure);
   await assert.rejects(makeProtocol(additional).prepare({ ...envelope, body: '\ud800' }, now), /valid UTF-8/);
 }]);
-foldedCases.push(['timestamped-body headers reject illegal tokens, duplicates and case-insensitive Base or transport header overrides', () => {
+foldedCases.push(['timestamped-body headers reject illegal tokens, duplicates and case-insensitive Base or transport header overrides', async (t) => {
   const invalidNames = ['', 'x space', ' x-leading', 'x-trailing ', 'x:colon', 'x\r\ninjected', 'x\n', 'café', 'x\t', 'x/invalid', null, undefined, 42];
-  for (const name of invalidNames) {
+  await runCases(t, Array.from(invalidNames, (name, rowIndex) => [`${t.name}: name row ${rowIndex + 1}`, async t => {
     assert.throws(() => makeProtocol({ ...additional, timestampHeader: name as string }), /header name/);
     assert.throws(() => makeProtocol({ ...additional, signatureHeader: name as string }), /header name/);
-  }
-  for (const name of ['content-type', 'webhook-id', 'webhook-tenant', 'webhook-destination', 'webhook-event', 'webhook-timestamp', 'webhook-signature',
-    'host', 'connection', 'content-length', 'transfer-encoding', 'proxy-authorization', 'authorization', 'keep-alive', 'proxy-connection', 'te', 'trailer', 'upgrade']) {
+}]));
+  await runCases(t, Array.from(['content-type', 'webhook-id', 'webhook-tenant', 'webhook-destination', 'webhook-event', 'webhook-timestamp', 'webhook-signature',
+    'host', 'connection', 'content-length', 'transfer-encoding', 'proxy-authorization', 'authorization', 'keep-alive', 'proxy-connection', 'te', 'trailer', 'upgrade'], (name, rowIndex) => [`${t.name}: name row ${rowIndex + 1}`, async t => {
     assert.throws(() => makeProtocol({ ...additional, timestampHeader: name.toUpperCase() }), /cannot replace Base headers/);
     assert.throws(() => makeProtocol({ ...additional, signatureHeader: name.toUpperCase() }), /cannot replace Base headers/);
-  }
-  for (const signatureHeader of ['X-Same', 'x-same'])
-    assert.throws(() => makeProtocol({ timestampHeader: 'X-Same', signatureHeader }), /distinct/);
+}]));
+  await runCases(t, Array.from(['X-Same', 'x-same'], (signatureHeader, rowIndex) => [`${t.name}: signatureHeader row ${rowIndex + 1}`, async t => {
+assert.throws(() => makeProtocol({ timestampHeader: 'X-Same', signatureHeader }), /distinct/);
+}]));
   assert.throws(() => makeProtocol({ ...additional, signingKey: null as unknown as TimestampedBodySignature['signingKey'] }), /key resolver/);
 }]);
 foldedCases.push(['all legal token punctuation works and later option mutation cannot replace Base headers', async () => {

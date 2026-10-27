@@ -6,12 +6,12 @@ import { MailValidationError } from '../../src/core/errors.mjs';
 const message = () => ({ deliveryId: 'command-7', from: 'Équipe <help@example.com>', to: ['reader@example.net'], subject: '', text: 'Hello' });
 const rejects = (operation, code) => assert.throws(operation, error => error instanceof MailValidationError && error.code === code && !error.message.includes('SENSITIVE'));
 
-test('explicit provider configuration never falls back to development', () => {
-  for (const provider of ['sendgrid', 'resend', 'cloudflare']) {
+test('explicit provider configuration never falls back to development', async (t) => {
+  await runCases(t, Array.from(['sendgrid', 'resend', 'cloudflare'], (provider, rowIndex) => [`${t.name}: provider row ${rowIndex + 1}`, async t => {
     rejects(() => validateConfig({ provider, mode: 'production' }), 'api_key_required');
     const config = { provider, mode: 'test', apiKey: 'test-token', ...(provider === 'cloudflare' ? { accountId: 'a'.repeat(32) } : {}) };
     assert.equal(validateConfig(config), config);
-  }
+}]));
   rejects(() => validateConfig({ provider: 'fixture', mode: 'test' }), 'invalid_provider');
   rejects(() => validateConfig({ provider: 'development', mode: 'production' }), 'development_mode_required');
   assert.doesNotThrow(() => validateConfig({ provider: 'development', mode: 'development' }));
@@ -30,8 +30,10 @@ foldedCases.push(['envelope, threading and binary contents remain intact', () =>
   assert.equal(encodeBase64(input.attachments[0].content), 'AP+A');
   assert.deepEqual(input.headers, { 'Message-ID': '<new@example.com>', 'In-Reply-To': '<old@example.com>', References: '<first@example.com> <old@example.com>' });
 }]);
-foldedCases.push(['malformed inputs and injection fail before dispatch', () => {
-  for (const address of ['victim@example.net\r\nBcc: secret@example.net', 'a@example.net,b@example.net', 'bad..local@example.net', 'x@-bad.example', 'SENSITIVE', `a${' '.repeat(996)}<`, `${'<'.repeat(997)}>`]) rejects(() => parseAddress(address), 'invalid_address');
+foldedCases.push(['malformed inputs and injection fail before dispatch', async (t) => {
+  await runCases(t, Array.from(['victim@example.net\r\nBcc: secret@example.net', 'a@example.net,b@example.net', 'bad..local@example.net', 'x@-bad.example', 'SENSITIVE', `a${' '.repeat(996)}<`, `${'<'.repeat(997)}>`], (address, rowIndex) => [`${t.name}: address row ${rowIndex + 1}`, async t => {
+rejects(() => parseAddress(address), 'invalid_address');
+}]));
   rejects(() => validateMessage({ ...message(), to: [] }), 'invalid_recipients');
   rejects(() => validateMessage({ ...message(), text: undefined }), 'body_required');
   rejects(() => validateMessage({ ...message(), html: false }), 'invalid_body');
@@ -42,8 +44,10 @@ foldedCases.push(['malformed inputs and injection fail before dispatch', () => {
   rejects(() => validateHeaders({ To: 'other@example.net' }), 'reserved_or_duplicate_header');
   rejects(() => validateHeaders({ 'X Bad': 'x' }), 'invalid_header_name');
 }]);
-foldedCases.push(['SendGrid custom argument limits count UTF-8 bytes and reserve correlation', () => {
-  for (const name of ['rer_delivery_id', 'event', 'email', 'timestamp', 'sg_event_id', 'sg_message_id']) rejects(() => validateMessage({ ...message(), customArgs: { [name]: 'replacement' } }, 'sendgrid'), 'invalid_custom_arg');
+foldedCases.push(['SendGrid custom argument limits count UTF-8 bytes and reserve correlation', async (t) => {
+  await runCases(t, Array.from(['rer_delivery_id', 'event', 'email', 'timestamp', 'sg_event_id', 'sg_message_id'], (name, rowIndex) => [`${t.name}: name row ${rowIndex + 1}`, async t => {
+rejects(() => validateMessage({ ...message(), customArgs: { [name]: 'replacement' } }, 'sendgrid'), 'invalid_custom_arg');
+}]));
   const overhead = new TextEncoder().encode(JSON.stringify({ x: '', rer_delivery_id: 'command-7' })).length;
   const exact = { ...message(), customArgs: { x: 'a'.repeat(10000 - overhead) } };
   assert.equal(validateMessage(exact, 'sendgrid'), exact);
@@ -51,11 +55,19 @@ foldedCases.push(['SendGrid custom argument limits count UTF-8 bytes and reserve
   rejects(() => validateMessage({ ...message(), customArgs: { x: '界'.repeat(4000) } }, 'sendgrid'), 'custom_args_too_large');
   rejects(() => validateMessage({ ...message(), asmGroupId: 0 }, 'sendgrid'), 'invalid_asm_group');
   rejects(() => validateMessage({ ...message(), subscriptionTracking: 1 }, 'sendgrid'), 'invalid_subscription_tracking');
-  for (const provider of ['resend', 'cloudflare']) for (const setting of [{ customArgs: {} }, { asmGroupId: 1 }, { subscriptionTracking: false }]) rejects(() => validateMessage({ ...message(), ...setting }, provider), 'unsupported_provider_setting');
+  await runCases(t, Array.from(['resend', 'cloudflare'], (provider, rowIndex) => [`${t.name}: provider row ${rowIndex + 1}`, async t => {
+await runCases(t, Array.from([{ customArgs: {} }, { asmGroupId: 1 }, { subscriptionTracking: false }], (setting, rowIndex) => [`${t.name}: setting row ${rowIndex + 1}`, async t => {
+rejects(() => validateMessage({ ...message(), ...setting }, provider), 'unsupported_provider_setting');
+}]));
+}]));
 }]);
-foldedCases.push(['attachments and unsubscribe inputs reject unsafe or unsupported shapes', () => {
-  for (const attachment of [{ filename: 'x', contentType: 'text/plain', content: 'Zg==' }, { filename: 'x\r\nInjected', contentType: 'text/plain', content: new Uint8Array() }, { filename: 'x', contentType: 'text/plain', content: new Uint8Array(), disposition: 'inline' }]) assert.throws(() => validateMessage({ ...message(), attachments: [attachment] }), MailValidationError);
-  for (const url of ['http://example.net/unsubscribe', 'https://user:fake-pass@example.net/u', 'https://example.net/u%0d%0aInjected']) rejects(() => validateMessage({ ...message(), unsubscribe: { url } }), 'invalid_unsubscribe_url');
+foldedCases.push(['attachments and unsubscribe inputs reject unsafe or unsupported shapes', async (t) => {
+  await runCases(t, Array.from([{ filename: 'x', contentType: 'text/plain', content: 'Zg==' }, { filename: 'x\r\nInjected', contentType: 'text/plain', content: new Uint8Array() }, { filename: 'x', contentType: 'text/plain', content: new Uint8Array(), disposition: 'inline' }], (attachment, rowIndex) => [`${t.name}: attachment row ${rowIndex + 1}`, async t => {
+assert.throws(() => validateMessage({ ...message(), attachments: [attachment] }), MailValidationError);
+}]));
+  await runCases(t, Array.from(['http://example.net/unsubscribe', 'https://user:fake-pass@example.net/u', 'https://example.net/u%0d%0aInjected'], (url, rowIndex) => [`${t.name}: url row ${rowIndex + 1}`, async t => {
+rejects(() => validateMessage({ ...message(), unsubscribe: { url } }), 'invalid_unsubscribe_url');
+}]));
   const valid = { ...message(), unsubscribe: { url: 'https://example.net/u?a=1', mailto: 'leave@example.net', oneClick: true } };
   assert.equal(validateMessage(valid), valid);
 }]);

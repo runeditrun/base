@@ -42,8 +42,10 @@ foldedCases.push(["archive integrity", async t => {
   const a=await fixture();await assert.rejects(collect(readArchive(bundleStream(a.slice(0,-1)))),/closing_missing/);
   a.at(-1).contentHash='0'.repeat(64);await assert.rejects(collect(readArchive(bundleStream(a))),/content_checksum/);
 }],
-    ['manifest format, version and schema checksums are required', async()=>{
-  for(const change of [{format:'other'},{version:3},{schema:'0'.repeat(64)}]){const a=await fixture();Object.assign(a[0],change);await assert.rejects(collect(readArchive(bundleStream(a))),/archive_format|schema_checksum/);}
+    ['manifest format, version and schema checksums are required', async(t)=>{
+  await runCases(t, Array.from([{format:'other'},{version:3},{schema:'0'.repeat(64)}], (change, rowIndex) => [`${t.name}: change row ${rowIndex + 1}`, async t => {
+const a=await fixture();Object.assign(a[0],change);await assert.rejects(collect(readArchive(bundleStream(a))),/archive_format|schema_checksum/);
+}]));
 }],
     ['row parts cannot exceed one thousand records', async()=>{const part=await makePart(0,Array.from({length:1001},(_,index)=>({kind:'row',table:'data',index,row:{id:index,data:null}})));await assert.rejects(checkPart(part,0),/part_row_limit/);}],
     ['row order is verified independently of the part checksum', async()=>{const a=await fixture();a[1]=await makePart(0,[{...a[1].items[0],index:1}]);await assert.rejects(collect(readArchive(bundleStream(a))),/row_order/);}],
@@ -74,8 +76,10 @@ test("independent archive digests", async t => {
   const integrity=new ArchiveVerifier(b);integrity.add(part);
   assert.notEqual(integrity.digest(),a.at(-1).archiveHash);
 }],
-    ['streaming SHA-256 agrees with Web Crypto across block boundaries', async()=>{
-  for(const n of [0,1,55,56,63,64,65,128,10000]){const bytes=new Uint8Array(n).map((_,i)=>i%251),hash=new StreamHash();for(let i=0;i<n;i+=17)hash.update(bytes.subarray(i,i+17));assert.equal(hash.digest(),await sha256(bytes));}
+    ['streaming SHA-256 agrees with Web Crypto across block boundaries', async(t)=>{
+  await runCases(t, Array.from([0,1,55,56,63,64,65,128,10000], (n, rowIndex) => [`${t.name}: n row ${rowIndex + 1}`, async t => {
+const bytes=new Uint8Array(n).map((_,i)=>i%251),hash=new StreamHash();for(let i=0;i<n;i+=17)hash.update(bytes.subarray(i,i+17));assert.equal(hash.digest(),await sha256(bytes));
+}]));
 }],
     ['content and archive digests agree with independent canonical JSON hashing', async()=>{
   const records=await fixture(),m=records[0],semantic={schema:m.schema,tables:[{name:'data',rows:records.slice(1,-1).flatMap(p=>p.items.map(x=>x.row))}],objects:[],payloads:[],requiredConfiguration:[]};

@@ -54,11 +54,11 @@ foldedCases.push(['priority mismatch and duplicate SPF/DMARC policies fail even 
   const result = await checkDns(planned(), { resolveDns: async query => ({ status: 'ok', records: Object.values(records).flat().filter(row => row.name === query.name).flatMap(row => row.type === 'MX' ? [{ ...row, priority: 20 }] : row.type === 'TXT' ? [row, { ...row, value: row.value + ' extra' }] : [row]) }) });
   assert.deepEqual(result.map(row => row.evidence.state), ['mismatch', 'mismatch', 'match', 'mismatch']);
 }]);
-foldedCases.push(['DNS malformed or contradictory resolver results are errors, never missing', async () => {
-  for (const response of [null, { status: 'okay', records: [] }, { status: 'ok', records: 'bad' }, { status: 'missing', records: records.mx }]) {
+foldedCases.push(['DNS malformed or contradictory resolver results are errors, never missing', async (t) => {
+  await runCases(t, Array.from([null, { status: 'okay', records: [] }, { status: 'ok', records: 'bad' }, { status: 'missing', records: records.mx }], (response, rowIndex) => [`${t.name}: response row ${rowIndex + 1}`, async t => {
     const [result] = await checkDns(planned().slice(0, 1), { resolveDns: async () => response });
     assert.equal(result.evidence.state, 'error');
-  }
+}]));
 }]);
 foldedCases.push(['fixed DNS-over-HTTPS request decodes chunked TXT and refuses redirects/errors', async () => {
   const query = { name: 'mail.example.com', type: 'TXT', signal: new AbortController().signal };
@@ -74,19 +74,23 @@ foldedCases.push(['fixed DNS-over-HTTPS request decodes chunked TXT and refuses 
   assert.equal((await resolveDns(query, async () => Response.json({ Status: 2 }))).status, 'error');
   assert.equal((await resolveDns(query, async () => Response.json({ Status: 3 }))).status, 'missing');
 }]);
-foldedCases.push(['TXT presentation escape handling rejects malformed data', () => {
+foldedCases.push(['TXT presentation escape handling rejects malformed data', async (t) => {
   assert.equal(decodeTxt('"v=DKIM1; " "p=ab\\099"'), 'v=DKIM1; p=abc');
-  for (const value of ['"open', 'unquoted', '"a"junk', '"\\999"']) assert.throws(() => decodeTxt(value));
+  await runCases(t, Array.from(['"open', 'unquoted', '"a"junk', '"\\999"'], (value, rowIndex) => [`${t.name}: value row ${rowIndex + 1}`, async t => {
+assert.throws(() => decodeTxt(value));
+}]));
 }]);
-foldedCases.push(['record schema rejects wrong types, overflow, keys, selector and policy errors', () => {
-  for (const input of [
+foldedCases.push(['record schema rejects wrong types, overflow, keys, selector and policy errors', async (t) => {
+  await runCases(t, Array.from([
     { mx: [{ ...records.mx[0], priority: -1 }] },
     { mx: [{ ...records.mx[0], type: 'TXT' }] },
     { spf: [{ ...records.spf[0], value: 'arbitrary string' }] },
     { dkim: [{ ...records.dkim[0], name: 'missing.mail.example.com' }] },
     { dmarc: [{ ...records.dmarc[0], value: 'v=spf1 -all' }] },
     { mx: Array(33).fill(records.mx[0]) }, { apiKey: 'private' },
-  ]) assert.throws(() => recordPlan(input));
+  ], (input, rowIndex) => [`${t.name}: input row ${rowIndex + 1}`, async t => {
+assert.throws(() => recordPlan(input));
+}]));
 }]);
   await runCases(t, foldedCases);
 });
