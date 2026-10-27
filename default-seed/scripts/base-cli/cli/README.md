@@ -73,7 +73,8 @@ strictly. A healthy application on a different owned port causes an immediate
 port-mismatch refusal. Application health has a hard 60-second limit, including
 setup; an individual probe gets at most five seconds by default. Concurrent
 starts waiting on an existing server have one five-minute elapsed deadline,
-including control requests and polling.
+including control requests and polling. Loopback HTTP requests use an elapsed
+deadline, so a response that keeps sending bytes cannot extend readiness.
 
 `rer dev` runs the local migration hook before starting the app and checking its
 owner prerequisites. The shared operator hook reads every SQL file in the seed's

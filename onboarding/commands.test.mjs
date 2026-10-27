@@ -6,6 +6,8 @@ import { mkdtemp,readFile,stat,rm,symlink,writeFile,link } from 'node:fs/promise
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createCommands } from './commands.mjs';
+import { createServer } from 'node:http';
+import { loopbackRequest } from './app-fetch.mjs';
 import { createRedaction } from './redaction.mjs';
 import { createSecretVault } from './secrets.mjs';
 import { installationFailureMessage } from './failures.mjs';
@@ -76,6 +78,17 @@ test('hard limit names last health and cancellation interrupts an in-flight prob
  const failed=assert.rejects(ready,error=>/deadline exceeded.*Last health: HTTP 503 waiting for migration/s.test(installationFailureMessage(error)));
  await time.advance(0);await time.advance(900000);await failed;assert.equal(child.exitCode,null);
  const abort=new AbortController();const pending=f.store.waitForReady('Start',child,()=>new Promise(()=>{}),{...time,signal:abort.signal});const cancelled=assert.rejects(pending,error=>/cancelled/.test(installationFailureMessage(error)));abort.abort();await cancelled;assert.equal(time.pending,0);child.finish();
+ const server=createServer((_request,response)=>{
+  response.writeHead(200);response.write('{');
+  const trickle=setInterval(()=>response.write(' '),5);
+  response.once('close',()=>clearInterval(trickle));
+ });
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ let guard;
+ try{
+  const request=loopbackRequest({port:server.address().port,timeoutMs:40});
+  await assert.rejects(Promise.race([request,new Promise((_,reject)=>{guard=setTimeout(()=>reject(Error('synthetic-base-1 trickling response exceeded its total bound')),1000);})]),{code:'ETIMEDOUT'});
+ }finally{clearTimeout(guard);server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 });
 
 test('short newline output streams before child close while multiline secrets stay private',async t=>{

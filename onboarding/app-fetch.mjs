@@ -32,7 +32,8 @@ export function loopbackRequest({ host = '127.0.0.1', port, path = '/', method =
    response.on('end', () => resolve({ status: response.statusCode, statusText: response.statusMessage ?? '', rawHeaders: response.rawHeaders, body: Buffer.concat(chunks) }));
    response.on('error', reject);
   });
-  request.setTimeout(timeoutMs, () => request.destroy(Object.assign(Error(`No answer from ${host}:${port} within ${timeoutMs / 1000} s.`), { code: 'ETIMEDOUT' })));
+  const timer=setTimeout(() => request.destroy(Object.assign(Error(`No answer from ${host}:${port} within ${timeoutMs / 1000} s.`), { code: 'ETIMEDOUT' })),timeoutMs);
+  request.once('close',()=>clearTimeout(timer));
   request.on('error', reject);
   request.end(body);
  });
