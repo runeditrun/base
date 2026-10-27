@@ -130,7 +130,8 @@ export function providerFailure(error, redact = String) {
     const step = providerText(failures.get(error).step,redact,200);
     const cause = retained.cause === 'timeout' ? `timeout after ${retained.timeoutMs / 1000} s (limit ${retained.timeoutMs} ms)` : retained.cause === 'connection timeout' ? `connection timeout (per-call limit ${retained.timeoutMs} ms)` : retained.cause;
     const body = providerText(failures.get(error).output ?? '',redact);
-    return `${step}: ${retained.method} ${providerText(retained.endpoint,redact,300)}; elapsed ${retained.elapsedMs} ms; ${retained.status === null ? cause : `HTTP ${retained.status}`}${body ? `; ${body}` : ''}`;
+    const outcome = retained.status === null ? cause : `HTTP ${retained.status}${retained.cause === 'HTTP refusal' ? '' : `; ${cause}`}`;
+    return `${step}: ${retained.method} ${providerText(retained.endpoint,redact,300)}; elapsed ${retained.elapsedMs} ms; ${outcome}${body ? `; ${body}` : ''}`;
   }
   const specific = providerRefusal(error,redact) ?? providerTransport(error,redact);
   if (!specific && error?.cause instanceof Error) return providerFailure(error.cause,redact);
