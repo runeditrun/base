@@ -352,7 +352,10 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       write(seed, root, rootBytes);
       write(seed, 'aaa/earlier.mjs', 'export const earlier = "synthetic-before";\n');
       write(seed, 'edition.json', JSON.stringify({components: [{id: 'runeditrun/base', role: 'foundation', source: {kind: 'local', origin: {repository: base, revision}}}]}));
-      if (row.custom === 'tracked') write(seed, helper, customBytes);
+      if (row.custom === 'tracked') {
+        write(seed, helper, customBytes);
+        fs.chmodSync(path.join(seed, helper), 0o644);
+      }
       commit(seed);
       ok(seed, 'record-base', root, `${origin}/refresh.mjs`, revision, '--base', base);
       ok(seed, 'record-base', 'aaa/earlier.mjs', 'tools/earlier.mjs', revision, '--base', base);
@@ -424,6 +427,11 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       const {base, seed, revision} = fixture(temp);
       const target = 'vendor/sample/index.mjs';
       ok(seed, 'record-base', ['mapped', 'extensionless', 'equal-singleton'].includes(row) ? target : 'vendor/sample', ['mapped', 'extensionless', 'equal-singleton'].includes(row) ? 'modules/sample/index.mjs' : 'modules/sample', revision, '--base', base);
+      if (row.startsWith('equal')) {
+        ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
+        if (row === 'equal-singleton') ok(seed, 'record-base', 'vendor/sample/lib/util.mjs', 'modules/sample/lib/util.mjs', revision, '--base', base);
+        assert.equal(ok(seed, 'verify-base', '--base', base).ok, true, `${row}: original is verifiable`);
+      }
       const specifier = row === 'extensionless' ? './helper.server' : row === 'witness' || row === 'unplaceable' ? '../shared/helper.mjs' : './helper.mjs';
       const imported = row === 'default' ? 'import missing from' : row === 'type' ? 'import type {Missing} from' : row === 'type-declaration' ? 'import type {missing} from' : 'import {missing} from';
       const incoming = `${imported} "${specifier}?raw";\nexport const sample = 2;\n`;

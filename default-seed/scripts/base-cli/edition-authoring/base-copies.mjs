@@ -424,7 +424,6 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
       }
       for (const [source, {object, mode}] of sources.sort(([a], [b]) => a.localeCompare(b))) {
         const name = safe(mapped(source, copy.originPath, copy.path));
-        noLinks(root, name);
         if (!Object.hasOwn(copy.files, name)) added.push(name);
         recorded[name] = upstream.get(object); modes[name] = mode;
       }
