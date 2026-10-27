@@ -4,7 +4,11 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as setup from './setup-validation.mjs';
 const manifestCases = [];
-const manifestCase = (name, check) => manifestCases.push([name, check]);
+// Keep source-linked corpus coverage tied to rows that actually execute.
+const manifestCase = (name, check) => manifestCases.push([name, async t => {
+ await check(t);
+ console.log('SETUP_REVIEW_CASE', JSON.stringify(name));
+}]);
 const read = name => JSON.parse(readFileSync(new URL(name, import.meta.url)));
 const schema = read('SETUP.schema.json');
 const example = read('SETUP.example.json');
