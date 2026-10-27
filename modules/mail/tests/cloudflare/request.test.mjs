@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { sendCloudflare } from '../../src/adapters/cloudflare/index.mjs';
@@ -14,9 +15,9 @@ async function denied(input, code, settings = config) {
   assert.equal(fixture.calls.length, 0);
 }
 
-test("Cloudflare serializes the caller envelope and optional content exactly", async () => {
+test("Cloudflare serializes the caller envelope and optional content exactly", async t => {
   // Each row keeps its original assertions and reports its own failure name.
-  for (const [name, run] of [
+  await runCases(t, [
     ['REST request preserves named envelope, bodies, thread/list headers and binary inline attachments', async () => {
   const headers = {
     'In-Reply-To': '<parent@example.com>', References: '<first@example.com> <parent@example.com>',
@@ -67,19 +68,14 @@ test("Cloudflare serializes the caller envelope and optional content exactly", a
     assert.equal(body.deliveryId, undefined);
   }
 }],
-  ]) {
-    try { await run(); } catch (error) {
-      error.message = name + ': ' + error.message;
-      throw error;
-    }
-  }
+  ]);
 });
 
 
 
-test("Cloudflare refuses unsafe requests before any transport effect", async () => {
+test("Cloudflare refuses unsafe requests before any transport effect", async t => {
   // Each row keeps its original assertions and reports its own failure name.
-  for (const [name, run] of [
+  await runCases(t, [
     ['direct calls validate configuration and fixed account path before transport', async () => {
   for (const settings of [
     { ...config, accountId: '../escape' }, { ...config, accountId: 'a'.repeat(33) },
@@ -154,10 +150,5 @@ test("Cloudflare refuses unsafe requests before any transport effect", async () 
   assert.equal(accepted.calls.length, 1);
   await denied(message({ headers: { ...twenty, Sensitivity: 'private' } }), 'cloudflare_headers_too_large');
 }],
-  ]) {
-    try { await run(); } catch (error) {
-      error.message = name + ': ' + error.message;
-      throw error;
-    }
-  }
+  ]);
 });

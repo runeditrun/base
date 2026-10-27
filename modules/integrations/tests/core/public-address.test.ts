@@ -1,3 +1,4 @@
+import { runCases } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isPublicAddress, validateDestination, declareEgress, validateEgressConfiguration } from '../../index.ts';
@@ -15,9 +16,9 @@ function save(address: string) {
 }
 // Every range endpoint and spelling remains a security assertion. Register each
 // boundary once; the address table is one refusal behaviour, not separate flows.
-test("public address policy rejects unsafe aliases and ranges at every save boundary", async () => {
+test("public address policy rejects unsafe aliases and ranges at every save boundary", async t => {
   // Each row keeps its original assertions and reports its own failure name.
-  for (const [name, run] of [
+  await runCases(t, [
     ['public-address policy rejects every denied range endpoint and spelling', () => {
   for (const address of deniedAddresses) assert.equal(isPublicAddress(address), false, address);
 }],
@@ -67,10 +68,5 @@ test("public address policy rejects unsafe aliases and ranges at every save boun
     assert.throws(() => validateDestination(`https://${host}/`), /not public/);
   }
 }],
-  ] as const) {
-    try { await run(); } catch (error) {
-      if (error instanceof Error) error.message = name + ': ' + error.message;
-      throw error;
-    }
-  }
+  ]);
 });

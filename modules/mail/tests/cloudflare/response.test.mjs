@@ -8,9 +8,9 @@ const send = (body, input = message()) => sendCloudflare(config, input, transpor
 
 test("Cloudflare response disposition preserves recipient truth under malformed or bounded reads", async t => {
   const foldedCases = [];
-foldedCases.push(["Cloudflare acceptance conservatively preserves exact recipient outcomes", async () => {
+foldedCases.push(["Cloudflare acceptance conservatively preserves exact recipient outcomes", async t => {
   // Each row keeps its original assertions and reports its own failure name.
-  for (const [name, run] of [
+  await runCases(t, [
     ['documented REST success without message_id returns nullable ID, not invented correlation', async () => {
   assert.deepEqual(await send(success()), {
     provider: 'cloudflare', status: 'accepted', providerMessageId: null,
@@ -90,12 +90,7 @@ foldedCases.push(["Cloudflare acceptance conservatively preserves exact recipien
     assert.ok(!JSON.stringify(result).includes('secret'));
   }
 }],
-  ]) {
-    try { await run(); } catch (error) {
-      error.message = name + ': ' + error.message;
-      throw error;
-    }
-  }
+  ]);
 }]);
 foldedCases.push(['documented provider errors use fixed redacted codes including rate and transient failures', async () => {
   for (const [code, status] of [[10001, 'rejected'], [10101, 'rejected'], [10004, 'rate_limited'], [10002, 'uncertain'], [10003, 'uncertain'], [10100, 'uncertain']]) {
