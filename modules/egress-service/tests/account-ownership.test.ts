@@ -39,9 +39,15 @@ test("ownership inventory collects the complete selected account and refuses par
       (p: any) => { p.result.pop(); },
       (p: any) => { p.success = false; },
     ];
-    for (const mutate of mutations) await assert.rejects(readAccountOwnership({ account, token, target, fetch: async () => {
-      const p = page(1, 51); mutate(p); return Response.json(p);
-    } }), { message: 'egress-account-ownership-unverified' });
+    for (const mutate of mutations) {
+      let requestedPage = 0;
+      await assert.rejects(readAccountOwnership({ account, token, target, fetch: async () => {
+        const p = page(++requestedPage, 51);
+        // Later valid pages must not mask an unchecked defect in page one.
+        if (requestedPage === 1) mutate(p);
+        return Response.json(p);
+      } }), { message: 'egress-account-ownership-unverified' });
+    }
     let pages = 0;
     await assert.rejects(readAccountOwnership({ account, token, target, fetch: async () => {
       const p = page(++pages, 100);
