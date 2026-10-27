@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -10,7 +11,8 @@ const notice = { deliveryId: 'notice-1', from: 'News <news@example.test>', to: [
     'List-Id': 'Subscriber notices <notices.example.test>', 'List-Archive': '<https://app.example.test/notices>', 'List-Help': '<mailto:help@example.test>',
     'In-Reply-To': '<post.42@example.test>', References: '<post.41@example.test> <post.42@example.test>' } };
 
-test('a Worker sends sign-in and threaded subscriber notices through the rer relay and refuses invalid headers locally', async () => {
+test('a Worker sends sign-in and threaded subscriber notices through the rer relay and refuses invalid headers locally', async t => {
+  await runCases(t, [['relay worker transcript', async t => {
   const relay = [];
   let status = 202;
   const worker = await createWorker('tests/rer/relay-worker.mjs', ['index.mjs'], async request => {
@@ -33,16 +35,16 @@ test('a Worker sends sign-in and threaded subscriber notices through the rer rel
     assert.deepEqual(await send(signIn), { provider: 'rer', status: 'rejected', providerMessageId: null, code: 'provider_redirected' });
     assert.deepEqual(relay.map(request => new URL(request.url).host), Array(3).fill('managed.example.test'));
     // What the relay would refuse with a 400 is refused before any request.
-    for (const headers of [{ 'Auto-Submitted': 'auto-replied' }, { 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+    await runCases(t, Array.from([{ 'Auto-Submitted': 'auto-replied' }, { 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
       { 'List-Unsubscribe': '<mailto:leave@example.test>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
       { 'List-Unsubscribe': '<https://a.example.test/1>, <https://b.example.test/2>, <mailto:leave@example.test>' },
-      { 'List-Unsubscribe': `<https://app.example.test/${'u'.repeat(2000)}>` }, { 'Message-ID': '<id@example.test>' }]) {
+      { 'List-Unsubscribe': `<https://app.example.test/${'u'.repeat(2000)}>` }, { 'Message-ID': '<id@example.test>' }], (headers, rowIndex) => [`${t.name}: headers row ${rowIndex + 1}`, async t => {
       const result = await send({ ...notice, headers });
       assert.ok(result.error, JSON.stringify(headers));
-    }
+}]));
     assert.equal(relay.length, 3);
 
-    for (const [name, values, error] of [
+    await runCases(t, Array.from([
       ['List-Id', ['<undotted>', 'News <a..example.test>', 'Café <news.example.test>', '"bad\tname" <news.example.test>',
         `<${'a'.repeat(252)}.test>`, `${'a'.repeat(2000)} <news.example.test>`, 'News\r\n<news.example.test>', null], 'invalid_list_id'],
       ['List-Archive', ['<http://app.example.test/archive>', '<https://>', '<https://app.example.test\\archive>',
@@ -52,10 +54,12 @@ test('a Worker sends sign-in and threaded subscriber notices through the rer rel
         ' <a@example.test>', '<a@example.test>\t', `<${'a'.repeat(2000)}@example.test>`, {}], 'invalid_in_reply_to'],
       ['References', ['', '<a@example.test>, <b@example.test>', '<a@example.test>\t<b@example.test>', ' <a@example.test>',
         '<a@example.test> ', Array(21).fill('<a@example.test>').join(' '), `<${'a'.repeat(2000)}@example.test>`, []], 'invalid_references'],
-    ]) for (const value of values) {
+    ], ([name, values, error], rowIndex) => [`${t.name}: [name, values, error] row ${rowIndex + 1}`, async t => {
+await runCases(t, Array.from(values, (value, rowIndex) => [`${t.name}: value row ${rowIndex + 1}`, async t => {
       assert.deepEqual(await send({ ...notice, headers: { ...notice.headers, [name]: value } }), { error }, name);
       assert.equal(relay.length, 3, `${name} must fail before dispatch`);
-    }
+}]));
+}]));
 
     status = 202;
     // Platform permits separator tabs, quoted ASCII phrases, mailto query strings,
@@ -70,6 +74,8 @@ test('a Worker sends sign-in and threaded subscriber notices through the rer rel
       inReplyTo: headers['in-reply-to'], references: headers.references });
     assert.equal(relay.length, 4);
   } finally { await worker.dispose(); }
+
+  }]]);
 });
 
 // Platform c1e3ade's keyed Message-ID: RFC 4648 base32 of sha256(installation + ':' + key), first 32 characters.
@@ -83,7 +89,7 @@ function relayMessageId(messageKey) {
   return `<${local}@mail.rer.example.test>`;
 }
 
-test('a Worker threads incident updates on the Message-ID the relay assigned to the first notice', async () => {
+test('a Worker threads incident updates on the Message-ID the relay assigned to the first notice', async (t) => {
   const relay = [];
   const worker = await createWorker('tests/rer/relay-worker.mjs', ['index.mjs'], async request => {
     const body = await request.json();
@@ -104,9 +110,9 @@ test('a Worker threads incident updates on the Message-ID the relay assigned to 
       { to: 'oncall@example.test', subject: incident.subject, text: update.text, messageKey: update.messageKey, inReplyTo: root, references: root },
     ]);
     // The relay's own messageKey rule, refused before any request; a raw Message-ID stays refused.
-    for (const messageKey of ['', 'k'.repeat(201), 'incident 7', 'incident/7', 'incident@7', 'Störung-7', 7, null]) {
+    await runCases(t, Array.from(['', 'k'.repeat(201), 'incident 7', 'incident/7', 'incident@7', 'Störung-7', 7, null], (messageKey, rowIndex) => [`${t.name}: messageKey row ${rowIndex + 1}`, async t => {
       assert.deepEqual(await send({ ...incident, messageKey }), { error: 'invalid_message_key' }, JSON.stringify(messageKey));
-    }
+}]));
     assert.deepEqual(await send({ ...incident, headers: { 'Message-ID': root } }), { error: 'unsupported_provider_setting' });
     assert.equal((await send({ ...incident, messageKey: 'k'.repeat(200) })).status, 'accepted');
     assert.equal((await send({ ...incident, messageKey: 'A-z_0.9:-' })).status, 'accepted');

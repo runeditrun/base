@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -63,26 +64,31 @@ async function assertPresentation(page, width, label) {
     `${label}: visible mark fill or border must contrast with the card at least 3:1`);
 }
 
-test('real Chromium confirmation is responsive, focused and accessible across states, schemes and extreme brand accents', async () => {
+test('real Chromium confirmation is responsive, focused and accessible across states, schemes and extreme brand accents', async (t) => {
+  await runCases(t, [['independent journey rows', async t => {
   let browser;
   try {
     browser = await chromium.launch({ headless: true });
-    for (const accentColor of ['#ffffff', '#000000', '#334155', '#1e293b']) {
+    await runCases(t, Array.from(['#ffffff', '#000000', '#334155', '#1e293b'], (accentColor, rowIndex) => [`${t.name}: brand accent color row ${rowIndex + 1}`, async t => {
+
       const r = await browserRuntime({ branding: { productName: 'Workspace <A> & '.repeat(5), accentColor, signInPath: '/signin' } });
       try {
         const expired = await r.issue();
         await r.db.prepare('UPDATE oa_tokens SET expires_at=?').bind(Date.now() - 1).run();
         const magic = await r.issue();
         const invite = await r.issue({ invite: true });
-        for (const colorScheme of ['light', 'dark']) {
-          for (const width of [1440, 390]) {
+        await runCases(t, Array.from(['light', 'dark'], (colorScheme, rowIndex) => [`${t.name}: color scheme row ${rowIndex + 1}`, async t => {
+
+          await runCases(t, Array.from([1440, 390], (width, rowIndex) => [`${t.name}: viewport row ${rowIndex + 1}`, async t => {
+
             const context = await browser.newContext({ viewport: { width, height: 960 }, colorScheme });
             try {
               const page = await context.newPage();
               const violations = [];
               await page.exposeFunction('recordPolicyViolation', value => violations.push(value));
               await page.addInitScript(() => document.addEventListener('securitypolicyviolation', event => window.recordPolicyViolation(event.violatedDirective)));
-              for (const [kind, link] of [['magic', magic], ['invite', invite], ['invalid', new URL('/auth/confirm?token=invalid', r.origin)], ['expired', expired]]) {
+              await runCases(t, Array.from([['magic', magic], ['invite', invite], ['invalid', new URL('/auth/confirm?token=invalid', r.origin)], ['expired', expired]], ([kind, link], rowIndex) => [`${t.name}: confirmation state row ${rowIndex + 1}`, async t => {
+
                 const hasPreview = kind === 'magic' || kind === 'invite';
                 const response = await page.goto(link.href);
                 assert.equal(response.status(), hasPreview ? 200 : 400);
@@ -104,13 +110,19 @@ test('real Chromium confirmation is responsive, focused and accessible across st
                 const audit = await page.evaluate(async () => (await axe.run(document)).violations.filter(v => ['serious', 'critical'].includes(v.impact)).map(v => ({ id: v.id, impact: v.impact })));
                 assert.deepEqual(audit, [], `${kind}/${width}/${colorScheme}/${accentColor}`);
                 assert.deepEqual(violations, []);
-              }
+
+}]));
             } finally { await context.close(); }
-          }
-        }
+
+}]));
+
+}]));
       } finally { await r.close(); }
-    }
+
+}]));
   } finally { await browser?.close(); }
+
+  }]]);
 });
 
 test('Chromium rejects a modified inline stylesheet under the original exact-byte CSP', async () => {

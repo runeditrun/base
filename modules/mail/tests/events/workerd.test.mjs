@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
@@ -31,7 +32,7 @@ async function send(runtime, path, body) {
   const response = await runtime.dispatchFetch(`https://mail.test/${path}`, { method: 'POST', body: JSON.stringify(body) });
   return response.json();
 }
-test('signed delivery intake is isolated, atomic and durable in real workerd SQLite and Queue', async () => {
+test('signed delivery intake is isolated, atomic and durable in real workerd SQLite and Queue', async (t) => {
   const path = await mkdtemp(join(tmpdir(), 'mail-events-'));
   let runtime;
   try {
@@ -46,9 +47,11 @@ test('signed delivery intake is isolated, atomic and durable in real workerd SQL
     assert.equal((await send(runtime, 'refused', payload(signed('sendgrid', JSON.stringify([sg()])), { authorize: false }))).code, 'event_unauthorized');
     assert.deepEqual(await send(runtime, 'refused', { action: 'list' }), []);
     // Identical event IDs in distinct tenant/endpoint scopes remain independent.
-    for (const tenantId of ['tenant', 'other']) for (const eventNamespace of ['endpoint', 'other']) {
+    await runCases(t, Array.from(['tenant', 'other'], (tenantId, rowIndex) => [`${t.name}: tenantId row ${rowIndex + 1}`, async t => {
+await runCases(t, Array.from(['endpoint', 'other'], (eventNamespace, rowIndex) => [`${t.name}: eventNamespace row ${rowIndex + 1}`, async t => {
       assert.equal((await send(runtime, 'isolated', payload(signed('resend', JSON.stringify(resend())), { tenantId, eventNamespace }))).result[0].outcome, 'stored');
-    }
+}]));
+}]));
     const initial = payload(signed('sendgrid', JSON.stringify([sg()])));
     assert.equal((await send(runtime, 'rollback', initial)).result[0].outcome, 'stored');
     const prior = await send(runtime, 'rollback', { action: 'list' });

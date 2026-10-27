@@ -1,3 +1,4 @@
+import { runCases } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
@@ -9,6 +10,7 @@ const url = 'https://receiver.example.com/events';
 const key = new Uint8Array(32).fill(71); // Test key, never consumer custody.
 
 test('public webhook: exact HMAC, bounded retry after restart, durable replay inbox and identity', async t => {
+  await runCases(t, [['independent input groups', async t => {
   const sender = await store(t), receiver = await store(t);
   let now = 1800000000000, requests = 0;
   const protocol = createWebhookProtocol({ resolveDestination: async () => url, signingKey: async () => key });
@@ -38,13 +40,25 @@ test('public webhook: exact HMAC, bounded retry after restart, durable replay in
   assert.deepEqual(await Promise.all([receiver.repo().acceptReplay(verified), receiver.repo().acceptReplay(verified)]), [false, false]);
   const changed = await protocol.prepare({ ...envelope, body: '{}' }, now);
   const conflict = await verifyWebhook({ ...changed, key, tenant: 'installation', destinationId: 'receiver-v1', now });
-  await assert.rejects(receiver.repo().acceptReplay(conflict), /identity conflict/);
-  await assert.rejects(verifyWebhook({ ...accepted, body: accepted.body + ' ', key, tenant: 'installation', destinationId: 'receiver-v1', now }), /signature/);
-  await assert.rejects(verifyWebhook({ ...accepted, key, tenant: 'installation', destinationId: 'receiver-v1', now: now + 300001 }), /timestamp/);
-  await assert.rejects(service().enqueue({ ...envelope, body: '{}' }), /identity conflict/);
+  await runCases(t, [
+    ["receiver refusal inputs: case 1", async t => {
+      await assert.rejects(receiver.repo().acceptReplay(conflict), /identity conflict/);
+    }],
+    ["receiver refusal inputs: case 2", async t => {
+      await assert.rejects(verifyWebhook({ ...accepted, body: accepted.body + ' ', key, tenant: 'installation', destinationId: 'receiver-v1', now }), /signature/);
+    }],
+    ["receiver refusal inputs: case 3", async t => {
+      await assert.rejects(verifyWebhook({ ...accepted, key, tenant: 'installation', destinationId: 'receiver-v1', now: now + 300001 }), /timestamp/);
+    }],
+    ["receiver refusal inputs: case 4", async t => {
+      await assert.rejects(service().enqueue({ ...envelope, body: '{}' }), /identity conflict/);
+    }]
+  ]);
   await service().dispatch(envelope.id); assert.equal(requests, 2);
   assert.deepEqual((await service().log(envelope.id)).map(a => a.outcome?.kind), ['retryable', 'accepted']);
   assert.equal((await sender.repo('other-installation').get(envelope.id)), null);
+
+  }]]);
 });
 
 test('public delivery: response lost after durable inbox acceptance stays uncertain across restart', async t => {

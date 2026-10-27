@@ -1,3 +1,4 @@
+import { runCases } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSlackNotifier, slackEventTemplates } from '../../index.ts';
@@ -5,6 +6,7 @@ import { store, loopback } from './support.ts';
 
 const slackUrl = 'https://hooks.slack.com/services/TLOCAL/BLOCAL/fixture-secret';
 test('public provider composition: both Slack paths and credential custody', async t => {
+  await runCases(t, [['independent journey rows', async t => {
   const db = await store(t); const now = 1800000000000;
   let loseSlackReply = false;
   const wire = await loopback(t, [slackUrl, 'https://slack.com/api/chat.postMessage'], async (request, req, res) => {
@@ -23,17 +25,21 @@ test('public provider composition: both Slack paths and credential custody', asy
   const slack = () => createSlackNotifier({ repository: db.repo(), transport: wire.transport, templates: slackEventTemplates,
     incomingWebhook: async id => { assert.equal(id, 'slack-hook-v1'); return slackUrl; },
     bot: async id => { assert.equal(id, 'slack-bot-v1'); return { channel: 'CLOCAL123', token: ['xoxb', 'local', 'fixture'].join('-') }; }, now: () => now });
-  for (const mode of ['incoming-webhook', 'bot'] as const) {
+  await runCases(t, Array.from(['incoming-webhook', 'bot'] as const, (mode, rowIndex) => [`${t.name}: mode row ${rowIndex + 1}`, async t => {
     const id = `slack-${mode}`;
     await slack().enqueue({ id, tenant: 'installation', destinationId: mode === 'bot' ? 'slack-bot-v1' : 'slack-hook-v1', event: 'incident.opened', mode, data: { title: 'Payments', detail: 'Investigating' } });
     assert.equal((await slack().delivery.dispatch(id))?.state, 'accepted');
-  }
+}]));
   loseSlackReply = true;
   await slack().enqueue({ id: 'slack-lost', tenant: 'installation', destinationId: 'slack-bot-v1', event: 'incident.opened', mode: 'bot', data: { title: 'Payments', detail: 'Investigating' } });
   assert.equal((await slack().delivery.dispatch('slack-lost'))?.state, 'uncertain');
   db.restart(); const count = wire.received.length;
   await slack().delivery.dispatchDue(); await slack().delivery.dispatch('slack-lost'); assert.equal(wire.received.length, count);
   const stored = await db.contents();
-  for (const secret of [slackUrl, ['xoxb', 'local', 'fixture'].join('-')]) assert.equal(stored.includes(secret), false);
+  await runCases(t, Array.from([slackUrl, ['xoxb', 'local', 'fixture'].join('-')], (secret, rowIndex) => [`${t.name}: stored provider secret row ${rowIndex + 1}`, async t => {
+assert.equal(stored.includes(secret), false);
+}]));
   assert.deepEqual(wire.failures, []);
+
+  }]]);
 });

@@ -1,3 +1,4 @@
+import { runCases } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TokenService } from '../../index.ts';
@@ -5,6 +6,7 @@ import type { TokenAuthority, TokenGrant } from '../../index.ts';
 import { store } from './support.ts';
 
 test('public tokens: native SQL grant ceiling, commit-time authority, current revocation and durable usage', async t => {
+  await runCases(t, [['independent input groups', async t => {
   const db = await store(t);
   db.sql.migrate(`CREATE TABLE native_issuers(namespace TEXT, id TEXT, revision INTEGER, active INTEGER, scopes TEXT, PRIMARY KEY(namespace,id));
     INSERT INTO native_issuers VALUES('installation','operator-1',1,1,'["incidents:read","incidents:write"]');`);
@@ -30,8 +32,14 @@ test('public tokens: native SQL grant ceiling, commit-time authority, current re
     },
   };
   const tokens = () => new TokenService(db.repo(), authority);
-  await assert.rejects(tokens().issue({ principal: 'operator-1' }, { name: 'Forged context', scopes: [] }), /Unauthenticated/);
-  await assert.rejects(tokens().issue(session, { name: 'Too broad', scopes: ['admin'] }), /grant rejected/);
+  await runCases(t, [
+    ["issuance refusal inputs: case 1", async t => {
+      await assert.rejects(tokens().issue({ principal: 'operator-1' }, { name: 'Forged context', scopes: [] }), /Unauthenticated/);
+    }],
+    ["issuance refusal inputs: case 2", async t => {
+      await assert.rejects(tokens().issue(session, { name: 'Too broad', scopes: ['admin'] }), /grant rejected/);
+    }]
+  ]);
   const issued = await tokens().issue(session, { name: 'Reader', scopes: ['incidents:read'] });
   assert.match(issued.token, /^int_[a-f0-9]{64}$/);
   const rows = await db.repo().query('SELECT token_hash FROM integration_tokens WHERE namespace=?');
@@ -61,4 +69,6 @@ test('public tokens: native SQL grant ceiling, commit-time authority, current re
   await db.repo().query('DELETE FROM integration_tokens WHERE namespace=?');
   assert.equal((await tokens().usage(session)).length, 4);
   assert.equal((await db.repo().query('SELECT id FROM integration_token_events WHERE namespace=?')).length, 2);
+
+  }]]);
 });

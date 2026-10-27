@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMailSender, MailValidationError } from '../../index.mjs';
@@ -55,43 +56,85 @@ async function accepts(input, facade = false) {
   return bodyBytes;
 }
 
-test('41 MiB ASCII is invalid through both public paths with zero effects or encoding', async () => {
-  const input = { ...message(), text: 'x'.repeat(41 * 1024 * 1024), attachments: [attachment(Uint8Array.of(1))] };
-  await refuses(input);
-  await refuses(input, true);
-});
+test("Resend payload bounds count actual encoded bytes before effects", async t => {
+  const foldedCases = [];
+foldedCases.push(['41 MiB ASCII is invalid through both public paths with zero effects or encoding', async t => {
 
-test('UTF-8 text, HTML and aggregate alternatives are charged by bytes and transfer encoding', async () => {
+  const input = { ...message(), text: 'x'.repeat(41 * 1024 * 1024), attachments: [attachment(Uint8Array.of(1))] };
+  await runCases(t, [
+['direct payload limit', async t => {
+  await refuses(input);
+}],
+['facade payload limit', async t => {
+  await refuses(input, true);
+}]
+  ]);
+}]);
+foldedCases.push(['UTF-8 text, HTML and aggregate alternatives are charged by bytes and transfer encoding', async t => {
+  await runCases(t, [
+    ['UTF-8 text byte budget', async t => {
+
   await refuses({ ...message(), text: '界'.repeat(5_000_000) });
+    }],
+    ['UTF-8 HTML transfer budget', async t => {
+
   await refuses({ ...message(), text: '', html: '🙂'.repeat(3_300_000) }, true);
+    }],
+    ['combined alternatives exceed budget', async t => {
+
   // Each alternative fits alone; their combined Base64 projection does not.
   await refuses({ ...message(), text: 'x'.repeat(15_000_000), html: 'y'.repeat(15_000_000) });
+    }],
+    ['generated plain text counts toward budget', async t => {
+
   // Omitted text allows generated plain text; explicit empty text suppresses it.
   await refuses({ ...message(), text: undefined, html: 'x'.repeat(15_000_000) }, true);
+    }],
+    ['explicit empty text suppresses generated text', async t => {
+
   await accepts({ ...message(), text: '', html: 'x'.repeat(15_000_000) }, true);
-});
+    }]
+  ]);
+}]);
+foldedCases.push(['all Base64 attachment sizes and body bytes are aggregated before any encoder runs', async t => {
 
-test('all Base64 attachment sizes and body bytes are aggregated before any encoder runs', async () => {
   const half = new Uint8Array(15_000_000);
+  await runCases(t, [
+['aggregate direct attachments', async t => {
   await refuses({ ...message(), attachments: [attachment(half), attachment(half)] });
+}],
+['aggregate facade attachments', async t => {
   await refuses({ ...message(), attachments: [attachment(half), attachment(half)] }, true);
+}],
+['combined text and attachment', async t => {
   await refuses({ ...message(), text: 'x'.repeat(15_000_000), attachments: [attachment(half)] });
+}],
+['one oversized attachment', async t => {
   await refuses({ ...message(), attachments: [attachment(new Uint8Array(30_000_000))] });
-});
+}]
+  ]);
+}]);
+foldedCases.push(['recipient, header and attachment metadata are bounded before wire copies', async t => {
 
-test('recipient, header and attachment metadata are bounded before wire copies', async () => {
   class NoMapBeforeLimit extends Array {
     map() { assert.fail('oversized recipient metadata must not allocate a mapped wire array'); }
   }
+  await runCases(t, [
+['recipient metadata', async t => {
   const cc = new NoMapBeforeLimit(8_000).fill(`${'名'.repeat(900)} <c@example.test>`);
   await refuses({ ...message(), cc });
+}],
+['header metadata', async t => {
   const headers = Object.fromEntries(Array.from({ length: 1700 }, (_, i) => [`X-${i}`, '界'.repeat(8192)]));
   await refuses({ ...message(), headers }, true);
+}],
+['attachment metadata', async t => {
   const emptyPart = { ...attachment(new Uint8Array()), filename: '名'.repeat(998) };
   await refuses({ ...message(), attachments: Array(2000).fill(emptyPart) });
-});
-
-test('a legal ASCII body at the conservative MIME boundary sends; the next byte fails', async () => {
+}]
+  ]);
+}]);
+foldedCases.push(['a legal ASCII body at the conservative MIME boundary sends; the next byte fails', async (t) => {
   // Independent arithmetic from the documented budget: 1 MB reserve, three
   // metadata fields, one 2048-byte part and folded Base64 (dominates ASCII QP).
   const metadata = 6 * (Buffer.byteLength('s@example.test') + Buffer.byteLength('r@example.test')) + 3 * 128;
@@ -105,19 +148,27 @@ test('a legal ASCII body at the conservative MIME boundary sends; the next byte 
     else high = mid - 1;
   }
   assert.ok(low > 28_000_000);
-  for (const facade of [false, true]) {
-    const bytes = await accepts({ ...message(), text: 'x'.repeat(low) }, facade);
-    assert.ok(bytes > 28_000_000);
-    await refuses({ ...message(), text: 'x'.repeat(low + 1) }, facade);
-  }
-});
+  await runCases(t, Array.from([false, true], (facade, rowIndex) => [`${t.name}: facade row ${rowIndex + 1}`, async t => {
+    await runCases(t, [
+      ['inclusive ASCII MIME boundary', async () => {
+        const bytes = await accepts({ ...message(), text: 'x'.repeat(low) }, facade);
+        assert.ok(bytes > 28_000_000);
+      }],
+      ['next ASCII byte refuses', async () => {
+        await refuses({ ...message(), text: 'x'.repeat(low + 1) }, facade);
+      }],
+    ]);
+}]));
+}]);
+foldedCases.push(['Base64 padding, subarray length and metadata affect the attachment boundary', async t => {
 
-test('Base64 padding, subarray length and metadata affect the attachment boundary', async () => {
   // Many references to a modest source view exercise aggregate expansion without
   // allocating a giant source fixture. Every part still has its own MIME overhead.
   const storage = Uint8Array.from({ length: 1_100_005 }, (_, i) => i % 256);
   const content = storage.subarray(2, 1_000_003);
   const input = { ...message(), attachments: Array.from({ length: 28 }, () => attachment(content)) };
+  await runCases(t, [
+['selected attachment bytes send', async t => {
   let calls = 0;
   const result = await sendResend(config, input, { fetch: async (_url, init) => {
     calls++;
@@ -130,25 +181,48 @@ test('Base64 padding, subarray length and metadata affect the attachment boundar
   } });
   assert.equal(result.status, 'accepted');
   assert.equal(calls, 1);
+}],
+['next attachment exceeds bound', async t => {
   await refuses({ ...input, attachments: [...input.attachments, attachment(content)] });
-});
+}]
+  ]);
+}]);
+foldedCases.push(['JSON escape expansion is budgeted, including lone surrogates and control bytes', async t => {
 
-test('JSON escape expansion is budgeted, including lone surrogates and control bytes', async () => {
-  for (const text of ['\0'.repeat(6_500_000), '\ud800'.repeat(6_500_000)]) await refuses({ ...message(), text });
+  await runCases(t, [
+['oversized escape variants refuse', async t => {
+  await runCases(t, Array.from(['\0'.repeat(6_500_000), '\ud800'.repeat(6_500_000)], (text, rowIndex) => [`${t.name}: text row ${rowIndex + 1}`, async t => {
+await refuses({ ...message(), text });
+}]));
+}],
+['bounded NUL escapes send', async t => {
   await accepts({ ...message(), text: '\0'.repeat(6_499_000) }, true);
+}],
+['mixed Unicode escapes send', async t => {
   await accepts({ ...message(), text: 'A🙂界\ud800\udfff\n\t\\"', html: '<b>é</b>' });
-});
+}]
+  ]);
+}]);
+foldedCases.push(['actual serialized UTF-8 size has an inclusive 39 MB hard bound', async t => {
 
-test('actual serialized UTF-8 size has an inclusive 39 MB hard bound', () => {
+  await runCases(t, [
+['inclusive ASCII byte bound', async t => {
   assert.doesNotThrow(() => assertResendRequestSize('x'.repeat(39_000_000)));
+}],
+['inclusive BMP byte bound', async t => {
   assert.doesNotThrow(() => assertResendRequestSize('界'.repeat(13_000_000)));
+}],
+['inclusive astral byte bound', async t => {
   assert.doesNotThrow(() => assertResendRequestSize('🙂'.repeat(9_750_000)));
-  for (const body of ['x'.repeat(39_000_001), '界'.repeat(13_000_000) + 'x', '🙂'.repeat(9_750_000) + 'x']) {
+}],
+['over byte bound', async t => {
+  await runCases(t, Array.from(['x'.repeat(39_000_001), '界'.repeat(13_000_000) + 'x', '🙂'.repeat(9_750_000) + 'x'], (body, rowIndex) => [`${t.name}: body row ${rowIndex + 1}`, async t => {
     assert.throws(() => assertResendRequestSize(body), { name: 'MailValidationError', code: 'resend_message_too_large' });
-  }
-});
-
-test('final request guard runs after serialization and before transport', async () => {
+}]));
+}]
+  ]);
+}]);
+foldedCases.push(['final request guard runs after serialization and before transport', async () => {
   const stringify = JSON.stringify;
   let calls = 0;
   JSON.stringify = (value, ...args) => value && Object.hasOwn(value, 'from')
@@ -159,4 +233,6 @@ test('final request guard runs after serialization and before transport', async 
     }), { name: 'MailValidationError', code: 'resend_message_too_large' });
   } finally { JSON.stringify = stringify; }
   assert.equal(calls, 0);
+}]);
+  await runCases(t, foldedCases);
 });
