@@ -1,3 +1,4 @@
+import { runRows } from '../rows.mjs'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
@@ -9,6 +10,8 @@ import { test } from 'node:test'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 import { isProcessRunning as alive } from './process-liveness.mjs'
+
+const cancellationRows = []
 
 async function until(check, message) {
   const deadline = Date.now() + 10000
@@ -108,7 +111,7 @@ setInterval(() => {}, 1000);
 
 for (const phase of ['build', 'migrations']) {
   for (const signal of ['SIGTERM', 'SIGINT']) {
-    test(`${signal} during ${phase} restores exact credentials and stops only the owned process group`, { timeout: 15000 }, async (t) => {
+    cancellationRows.push([`${signal} during ${phase} restores exact credentials and stops only the owned process group`, { timeout: 15000 }, async (t) => {
       const { dir, survivor, start } = await fixture(t, phase)
       const varsPath = join(dir, '.dev.vars')
       const secret = randomBytes(32).toString('hex')
@@ -148,11 +151,11 @@ for (const phase of ['build', 'migrations']) {
       assert.ok(!`${result.stdout}${result.stderr}${log}`.includes(secret), 'Credentials must remain private')
       const calls = (await readFile(join(dir, 'calls.jsonl'), 'utf8')).trim().split('\n').map(JSON.parse)
       assert.deepEqual(calls.map((call) => call.phase), phase === 'build' ? ['build'] : ['build', 'migrations'])
-    })
+    }])
   }
 }
 
-test('cancellation preserves a concurrent file and keeps the original privately for recovery', { timeout: 15000 }, async (t) => {
+cancellationRows.push(['cancellation preserves a concurrent file and keeps the original privately for recovery', { timeout: 15000 }, async (t) => {
   const { dir, start } = await fixture(t, 'build')
   const path = join(dir, '.dev.vars')
   const original = randomBytes(48)
@@ -172,11 +175,10 @@ test('cancellation preserves a concurrent file and keeps the original privately 
   assert.equal((await stat(backup)).mode & 0o777, 0o640)
   await until(() => !alive(commandPid) && !alive(descendantPid), 'Owned command or descendant survived cancellation')
   await until(() => !pidExists(commandPid) && !pidExists(descendantPid), 'Owned command or descendant PID remained after cancellation')
-})
-
+}])
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
-  test(`ordinary build ${signal} restores exact credentials and stops its descendants`, { timeout: 15000 }, async (t) => {
+  cancellationRows.push([`ordinary build ${signal} restores exact credentials and stops its descendants`, { timeout: 15000 }, async (t) => {
     const { dir, survivor, start } = await fixture(t, 'build', 'local-build')
     const path = join(dir, '.dev.vars')
     const original = Buffer.from(`SESSION_SECRET=${randomBytes(32).toString('hex')}\nSETUP_TOKEN=${randomBytes(32).toString('hex')}\n`)
@@ -196,5 +198,9 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
     assert.deepEqual(await readdir(join(dir, '.wrangler/local-build')), [], 'build recovery directory cleaned')
     await until(() => !pidExists(commandPid) && !pidExists(descendantPid), 'Build descendants survived cancellation')
     assert.ok(alive(survivor.pid), 'Unrelated process survives')
-  })
+  }])
 }
+
+test("cancelled local operations restore private credentials and stop only their descendants", async t => {
+  await runRows(t, cancellationRows)
+})

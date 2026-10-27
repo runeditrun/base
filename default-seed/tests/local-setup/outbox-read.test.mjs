@@ -1,8 +1,11 @@
+import { runRows } from '../rows.mjs'
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFile } from 'node:fs/promises';
 import { createD1DevelopmentOutbox } from '../../../modules/mail/src/development/index.mjs';
+
+const outboxRows = []
 
 const schema = await readFile(new URL('../../../modules/mail/src/development/schema.sql', import.meta.url), 'utf8');
 const message = id => ({
@@ -35,7 +38,7 @@ function database(t) {
   return { db, sqlite };
 }
 
-test('list and get are query-only reads and leave expired rows for the next write to purge', async t => {
+outboxRows.push(['list and get are query-only reads and leave expired rows for the next write to purge', {}, async t => {
   const { db, sqlite } = database(t);
   let time = 1000;
   const outbox = createD1DevelopmentOutbox({ db, maxAgeMs: 100, clock: () => time });
@@ -55,9 +58,9 @@ test('list and get are query-only reads and leave expired rows for the next writ
   await outbox.put(message('fresh'));
   assert.deepEqual((await outbox.list()).map(row => row.message.deliveryId), ['fresh']);
   assert.equal(sqlite.prepare('SELECT count(*) AS count FROM rer_mail_development_outbox').get().count, 1);
-});
+}]);
 
-test('list keeps the configured count bound and newest-first timestamp tie order without pruning on read', async t => {
+outboxRows.push(['list keeps the configured count bound and newest-first timestamp tie order without pruning on read', {}, async t => {
   const { db, sqlite } = database(t);
   const writer = createD1DevelopmentOutbox({ db, maxMessages: 2, clock: () => 1000 });
   for (const id of ['first', 'second', 'third']) await writer.put(message(id));
@@ -68,9 +71,9 @@ test('list keeps the configured count bound and newest-first timestamp tie order
   const limited = createD1DevelopmentOutbox({ db, maxMessages: 1, clock: () => 1000 });
   assert.deepEqual((await limited.list()).map(row => row.message.deliveryId), ['third']);
   assert.equal(sqlite.prepare('SELECT count(*) AS count FROM rer_mail_development_outbox').get().count, 2);
-});
+}]);
 
-test('list drops attachment payloads without decoding poisoned base64', async t => {
+outboxRows.push(['list drops attachment payloads without decoding poisoned base64', {}, async t => {
   const { db, sqlite } = database(t);
   const outbox = createD1DevelopmentOutbox({ db, clock: () => 1000 });
   await outbox.put(message('poison'));
@@ -87,9 +90,9 @@ test('list drops attachment payloads without decoding poisoned base64', async t 
   assert.equal(summary.id, capture.id);
   assert.equal('attachments' in summary.message, false);
   assert.doesNotMatch(JSON.stringify(summary), /not base64/);
-});
+}]);
 
-test('get restores complete attachment payloads as independent Uint8Array bytes', async t => {
+outboxRows.push(['get restores complete attachment payloads as independent Uint8Array bytes', {}, async t => {
   const { db } = database(t);
   const outbox = createD1DevelopmentOutbox({ db, clock: () => 1000 });
   const input = message('binary');
@@ -99,10 +102,9 @@ test('get restores complete attachment payloads as independent Uint8Array bytes'
   assert.deepEqual(capture.message, input);
   assert.ok(capture.message.attachments[0].content instanceof Uint8Array);
   assert.notEqual(capture.message.attachments[0].content, input.attachments[0].content);
-});
+}]);
 
-
-test('failed retention rolls back the insert and invalid storage results reject reads', async t => {
+outboxRows.push(['failed retention rolls back the insert and invalid storage results reject reads', {}, async t => {
   const { db, sqlite } = database(t);
   const outbox = createD1DevelopmentOutbox({ db, maxMessages: 1, clock: () => 1000 });
   await outbox.put(message('kept'));
@@ -115,4 +117,8 @@ test('failed retention rolls back the insert and invalid storage results reject 
     async batch() { return [{ success: false, results: [] }]; },
   } });
   await assert.rejects(invalidStorage.list(), /Development outbox storage failed/);
-});
+}]);
+
+test("development outbox reads retained messages without writes or attachment leaks", async t => {
+  await runRows(t, outboxRows)
+})

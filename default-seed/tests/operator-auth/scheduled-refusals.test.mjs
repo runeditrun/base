@@ -1,13 +1,16 @@
+import { runRows } from '../rows.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { scheduledHarness, definition } from './scheduled-harness.mjs'
+
+const refusalRows = []
 
 async function refused(response, error, status = 403) {
   assert.equal(response.status, status, await response.clone().text())
   assert.equal((await response.json()).error, error)
 }
 
-test('standing approval needs fresh native proof or session-bound step-up and rejects authenticated dev/review sessions', async () => {
+refusalRows.push(['standing approval needs fresh native proof or session-bound step-up and rejects authenticated dev/review sessions', {}, async () => {
   const h = await scheduledHarness()
   try {
     const owner = await h.person('owner@example.test', 'owner', { sessionDaysAgo: 6 })
@@ -29,9 +32,9 @@ test('standing approval needs fresh native proof or session-bound step-up and re
     const signedIn = await h.approveAs(fresh.cookie)
     assert.notEqual(signedIn.id, steppedUp.id)
   } finally { await h.close() }
-})
+}])
 
-test('seed role policy gates every grant and target; caught scope/action refusals still leave the run refused', async () => {
+refusalRows.push(['seed role policy gates every grant and target; caught scope/action refusals still leave the run refused', {}, async () => {
   let denyReactivation = true, protectedId
   const rolePolicy = ({ actor, action, target }) => actor.status === 'active' && actor.role === 'owner'
     && !(denyReactivation && action === 'operators:reactivate')
@@ -68,9 +71,9 @@ test('seed role policy gates every grant and target; caught scope/action refusal
     assert.equal(await h.status(invited.id), 'invited')
     assert.equal(await h.status(dormant.id), 'inactive')
   } finally { await h.close() }
-})
+}])
 
-test('a refused definition edit invalidates the approval even when the previous definition returns', async () => {
+refusalRows.push(['a refused definition edit invalidates the approval even when the previous definition returns', {}, async () => {
   let policies = [definition()]
   const h = await scheduledHarness({ definitions: () => policies })
   try {
@@ -88,9 +91,9 @@ test('a refused definition edit invalidates the approval even when the previous 
     assert.equal((await h.runWith(run => run.execute('operators:deactivate', member.id))).status, 'completed')
     assert.equal(await h.status(member.id), 'inactive')
   } finally { await h.close() }
-})
+}])
 
-test('owner run history exposes committed and refused target evidence across pages and denies nonowners', async () => {
+refusalRows.push(['owner run history exposes committed and refused target evidence across pages and denies nonowners', {}, async () => {
   const h = await scheduledHarness()
   try {
     const owner = await h.person('owner@example.test', 'owner', { sessionDaysAgo: 0 })
@@ -127,9 +130,9 @@ test('owner run history exposes committed and refused target evidence across pag
     for (const cookie of [admin.cookie, member.cookie]) await refused(await h.call('/auth/policy-runs', { cookie }), 'forbidden')
     await refused(await h.call('/auth/policy-runs'), 'unauthenticated', 401)
   } finally { await h.close() }
-})
+}])
 
-test('action volume and run interval are independently bounded while identical unadmitted ticks coalesce', async () => {
+refusalRows.push(['action volume and run interval are independently bounded while identical unadmitted ticks coalesce', {}, async () => {
   const policy = definition({ maxActionsPerRun: 2 })
   const h = await scheduledHarness({ definitions: () => [policy] })
   try {
@@ -163,9 +166,9 @@ test('action volume and run interval are independently bounded while identical u
     assert.equal((await h.runWith(run => run.execute('operators:deactivate', members[2].id))).status, 'completed')
     assert.equal(await h.status(members[2].id), 'inactive')
   } finally { await h.close() }
-})
+}])
 
-test('inactivity refusals survive provider-session scrubbing after the next interval is admitted', async () => {
+refusalRows.push(['inactivity refusals survive provider-session scrubbing after the next interval is admitted', {}, async () => {
   const h = await scheduledHarness()
   try {
     const owner = await h.person('owner@example.test', 'owner', { sessionDaysAgo: 0 })
@@ -181,4 +184,8 @@ test('inactivity refusals survive provider-session scrubbing after the next inte
     assert.deepEqual([after.admitted, after.status, after.error], [1, 'refused', 'authority_changed'])
     assert.equal(await h.status(member.id), 'active')
   } finally { await h.close() }
+}])
+
+test("scheduled policy refusal keeps native proof, scope and interval authority fenced", async t => {
+  await runRows(t, refusalRows)
 })
