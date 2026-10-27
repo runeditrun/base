@@ -102,10 +102,16 @@ foldedCases.push(['alg none, HS256 and an algorithm the link did not pin are ref
 
 }]));
   // RS256 is not in the Auth pin (ES256 only); ES256 is not in Google's (RS256 only).
-  await r.set('https://id.example', { header: {}, signingKeyName: 'googleSigning', jwksNames: ['authSigning', 'googleSigning'] });
-  await refused(r, await r.login('auth'), 400, 'oidc_algorithm_refused');
-  await r.set('https://accounts.google.com', { signingKeyName: 'authSigning', jwksNames: ['googleSigning', 'authSigning'] });
-  await refused(r, await r.login('google'), 400, 'oidc_algorithm_refused');
+  await runCases(t, [
+    ['Auth refuses the unpinned RSA algorithm', async t => {
+      await r.set('https://id.example', { header: {}, signingKeyName: 'googleSigning', jwksNames: ['authSigning', 'googleSigning'] });
+      await refused(r, await r.login('auth'), 400, 'oidc_algorithm_refused');
+    }],
+    ['Google refuses the unpinned EC algorithm', async t => {
+      await r.set('https://accounts.google.com', { signingKeyName: 'authSigning', jwksNames: ['googleSigning', 'authSigning'] });
+      await refused(r, await r.login('google'), 400, 'oidc_algorithm_refused');
+    }]
+  ]);
   assert.equal(await sessions(r), 0);
 }]);
 foldedCases.push(['an unknown kid refetches JWKS once: a rotated key is then accepted, a key still unknown is refused', async t => {
@@ -150,13 +156,17 @@ test("provider admission requires current trusted email, binding and domain poli
   const foldedCases = [];
 foldedCases.push(['production refuses amr dev and emails under .localhost, .test or .invalid', async t => {
   const r = await runtime(t); await r.bootstrap();
-  await refused(r, await r.login('auth', { amr: ['dev'] }), 403, 'oidc_admission_denied');
-  await runCases(t, Array.from(['dev.localhost', 'example.test', 'example.invalid'], (domain, rowIndex) => [`${t.name}: untrusted email domain row ${rowIndex + 1}`, async t => {
-
-    await r.operator(`person@${domain}`);
-    await refused(r, await r.login('auth', { sub: `sub-${domain}`, email: `person@${domain}` }), 403);
-
-}]));
+  await runCases(t, [
+    ['production refuses development authentication', async t => {
+      await refused(r, await r.login('auth', { amr: ['dev'] }), 403, 'oidc_admission_denied');
+    }],
+    ['production refuses reserved email domains', async t => {
+      await runCases(t, Array.from(['dev.localhost', 'example.test', 'example.invalid'], (domain, rowIndex) => [`${t.name}: untrusted email domain row ${rowIndex + 1}`, async t => {
+        await r.operator(`person@${domain}`);
+        await refused(r, await r.login('auth', { sub: `sub-${domain}`, email: `person@${domain}` }), 403);
+      }]));
+    }]
+  ]);
   assert.equal(await sessions(r), 0);
 }]);
 foldedCases.push(['email trust: unverified, stale (31 days) and unproven emails are refused; a 29-day proof and Google with hd or @gmail.com count', async t => {
@@ -180,8 +190,14 @@ foldedCases.push(['email trust: unverified, stale (31 days) and unproven emails 
     }]
   ]);
   assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM oa_external_identities').first()).n, 0, 'nothing unproven was bound');
-  await signedIn(r, await r.login('auth', { sub: 'u4', email: 'member@example.com', email_verified_at: now - 29 * day }), 'member@example.com');
-  await signedIn(r, await r.login('google', { sub: 'g2', email: gmail, hd: null }), gmail);
+  await runCases(t, [
+    ['Auth accepts a current email proof', async t => {
+      await signedIn(r, await r.login('auth', { sub: 'u4', email: 'member@example.com', email_verified_at: now - 29 * day }), 'member@example.com');
+    }],
+    ['Google accepts a Gmail address without a hosted domain', async t => {
+      await signedIn(r, await r.login('google', { sub: 'g2', email: gmail, hd: null }), gmail);
+    }]
+  ]);
 }]);
 foldedCases.push(['bindings on (iss, sub) are never silently rebound; a proven email binds once per issuer; binding revokes passwords', async t => {
   const r = await runtime(t); await r.bootstrap(); await r.operator('member@example.com');
@@ -273,10 +289,18 @@ foldedCases.push(['bound subjects still need current email proof; explicit and l
       await refused(r, await r.login('auth', { ...claims, email: 'owner@example.com' }), 403);
     }]
   ]);
-  for (let i = 0; i < 2; i++) {
-    await signedIn(r, await r.login('auth', { sub: 'mapped', email: 'owner@example.com', email_verified: false, email_verified_at: stale }), 'mapped@example.com');
-    await signedIn(r, await r.call('/test/association', { method: 'POST', input: { issuer: 'https://legacy.example', subject: 'legacy', emailVerified: false, emailVerifiedAt: stale * 1000 } }), 'legacy@example.com');
-  }
+  await runCases(t, [
+    ['configured mapped OIDC admission creates then reuses its binding', async t => {
+      for (let i = 0; i < 2; i++) {
+        await signedIn(r, await r.login('auth', { sub: 'mapped', email: 'owner@example.com', email_verified: false, email_verified_at: stale }), 'mapped@example.com');
+      }
+    }],
+    ['legacy association admission creates then reuses its binding', async t => {
+      for (let i = 0; i < 2; i++) {
+        await signedIn(r, await r.call('/test/association', { method: 'POST', input: { issuer: 'https://legacy.example', subject: 'legacy', emailVerified: false, emailVerifiedAt: stale * 1000 } }), 'legacy@example.com');
+      }
+    }]
+  ]);
   await runCases(t, [
     ["stale identity inputs: case 1", async t => {
       await refused(r, await r.login('auth', { sub: 'mapped', email_verified: true, email_verified_at: stale }), 403);
@@ -462,10 +486,16 @@ foldedCases.push(['a provider failing discovery for 5 minutes, or answering 404 
 }]);
 foldedCases.push(['a provider below the minimum interface version is refused and nothing is pinned', async t => {
   const r = await runtime(t); const owner = await r.bootstrap();
-  await r.set('https://id.example', { rerInterfaces: ['oidc-provider@0.9.0'] });
-  await refused(r, await r.call('/auth/oidc/auth/start', { method: 'POST', input: {} }), 502, 'oidc_provider_version_unsupported');
-  await r.set('https://id.example', { rerInterfaces: undefined });
-  await refused(r, await r.call('/auth/oidc/auth/start', { method: 'POST', input: {} }), 502, 'oidc_provider_version_unsupported');
+  await runCases(t, [
+    ['an old provider interface is refused', async t => {
+      await r.set('https://id.example', { rerInterfaces: ['oidc-provider@0.9.0'] });
+      await refused(r, await r.call('/auth/oidc/auth/start', { method: 'POST', input: {} }), 502, 'oidc_provider_version_unsupported');
+    }],
+    ['an absent provider interface is refused', async t => {
+      await r.set('https://id.example', { rerInterfaces: undefined });
+      await refused(r, await r.call('/auth/oidc/auth/start', { method: 'POST', input: {} }), 502, 'oidc_provider_version_unsupported');
+    }]
+  ]);
   assert.equal((await json(await r.call('/auth/providers', { cookie: owner }))).body.some(p => p.id === 'auth'), false);
 }]);
   await runCases(t, foldedCases);
