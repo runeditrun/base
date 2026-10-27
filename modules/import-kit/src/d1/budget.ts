@@ -3,12 +3,13 @@ import { wireDatabase } from '../../../d1-transport/index.mjs';
 import { guard, guardPredicate } from './guards.ts';
 import type { D1Database, D1ImportContext, D1Sql } from './types.ts';
 export const D1_REQUEST_QUERY_LIMIT = 1000;
+const D1_BATCH_QUERY_COST = 1;
 const budgets = new WeakMap<D1Database, { used: number; statements: number; statementLimit?: number }>();
 /** Paid D1 counts one batch call as one query, regardless of its members.
  * An explicit erasure work ceiling still counts each executed statement. */
 export function batchExecutions(context: { storage?: Pick<D1ImportContext['storage'], 'database'> }, statements: number): number {
   const budget = context.storage ? budgets.get(context.storage.database) : undefined;
-  return budget?.statementLimit === undefined ? 1 : statements;
+  return budget?.statementLimit === undefined ? D1_BATCH_QUERY_COST : statements;
 }
 const reservedTail = Symbol('import request return queries');
 type ReservedContext = D1ImportContext & { [reservedTail]?: number };
@@ -47,7 +48,7 @@ export function requestDatabase(database: D1Database): D1Database {
 export function requestContext(context: D1ImportContext): D1ImportContext {
   if (budgets.has(context.storage.database)) return context;
   const db = wireDatabase(context.storage.database), budget: { used: number; statements: number; statementLimit?: number } = { used: 0, statements: 0 };
-  const consume = (n: number) => { const queries = batchExecutions({}, n); if (budget.used + queries > D1_REQUEST_QUERY_LIMIT || budget.statements + n > (budget.statementLimit ?? Infinity)) throw new D1RequestLimitError(); budget.used += queries; budget.statements += n; };
+  const consume = (n: number) => { const queries = D1_BATCH_QUERY_COST; if (budget.used + queries > D1_REQUEST_QUERY_LIMIT || budget.statements + n > (budget.statementLimit ?? Infinity)) throw new D1RequestLimitError(); budget.used += queries; budget.statements += n; };
   const raw = new WeakMap<object, any>();
   const wrap = (statement: any, query: D1Sql): any => {
     checkSql(query);

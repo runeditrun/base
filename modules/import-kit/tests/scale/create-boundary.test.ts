@@ -7,7 +7,7 @@ import { planD1Import, preflightD1ImportJob, createD1ImportJob, readD1ImportOrig
 // Orchestrator ruling, 8 Oct 2026: no creation input reaches 1000 D1 requests
 // before Node fails on string length or memory, so the kit refuses plans over
 // PLAN_BYTES_LIMIT canonical bytes before encoding them (README "Plan-size cap").
-test('real D1: a plan one byte over PLAN_BYTES_LIMIT is refused with IMPORT_PLAN_TOO_LARGE before encoding, and every ik_* table stays empty', async t => {
+test('real D1: at-cap custody creates; one byte over PLAN_BYTES_LIMIT is refused before encoding with every kit table empty', async t => {
   const r = await runtime(t), m = meter(r.db()), ctx = { ...r.context(), storage: { ...r.context().storage, database: m.database } };
   const bundleFor = (bytes: Buffer, base64: string, name: string) => {
     const bundle = source(0);

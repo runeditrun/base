@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 const bytes = (v: any): number => v == null ? 0 : typeof v === 'string' ? Buffer.byteLength(v) : ArrayBuffer.isView(v) || v instanceof ArrayBuffer ? v.byteLength : typeof v === 'object' ? Object.values(v).reduce<number>((n, x) => n + bytes(x), 0) : 8;
-/** Counts executed statements, including every member of a real D1 batch, and
- * the work they carry: rows returned and bytes bound across the request. */
+/** Counts D1 calls and records every individual statement in a real batch,
+ * checking their rows, parameters and bytes independently across the request. */
 export function meter(database: any) {
   let count = 0, statements = 0, bindings = 0, sqlBytes = 0, valueBytes = 0, rows = 0, boundBytes = 0;
   const snapshots: any[] = [];

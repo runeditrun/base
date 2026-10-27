@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83",
+  "cliVersion": "0.2.83-dev.g37568fe3",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2003,7 +2003,7 @@
     },
     "modules/import-kit/src/d1/README.md": {
       "source": "modules/import-kit/src/d1/README.md",
-      "sha256": "e792f076a69b8cea544e9fc8591556f7a6057a7cebc73ac769ef57cf41aae5de"
+      "sha256": "da65233d57222fa567bf4e1065a4053da591ab11bc486c266458c533a4c655b1"
     },
     "modules/import-kit/src/d1/apply-effects.ts": {
       "source": "modules/import-kit/src/d1/apply-effects.ts",
@@ -2019,7 +2019,7 @@
     },
     "modules/import-kit/src/d1/budget.ts": {
       "source": "modules/import-kit/src/d1/budget.ts",
-      "sha256": "8cfffa91cb317f031e832ab8496675d4f8518d4d99ce476f6a41f3e022fb7c0d"
+      "sha256": "e3e83c66b22a2fa70ea834f6a936ffb1e4d65e0f8bdad72b07daf184ce7d53b3"
     },
     "modules/import-kit/src/d1/compressed-plan.ts": {
       "source": "modules/import-kit/src/d1/compressed-plan.ts",
@@ -2027,7 +2027,7 @@
     },
     "modules/import-kit/src/d1/creation.ts": {
       "source": "modules/import-kit/src/d1/creation.ts",
-      "sha256": "5ad68786733d5d13ab72820ddcad35f80b73988d29658adb515e37754e81f65e"
+      "sha256": "9d7ffc3a673dc812b2a7a2a6cbece552e0f6ea36abbf89800fc85d8e36a23471"
     },
     "modules/import-kit/src/d1/custody-fence.ts": {
       "source": "modules/import-kit/src/d1/custody-fence.ts",
@@ -2175,7 +2175,7 @@
     },
     "modules/import-kit/src/d1/jobs.ts": {
       "source": "modules/import-kit/src/d1/jobs.ts",
-      "sha256": "f93021f5e4d1188d526bd65d3ef8cd3acfc63a44e05a4ecf86a91f79bc8411bd"
+      "sha256": "c92f901e0e1dd26e1223e8ea297a9f01a786d3791f6638673f86f42656ef6e68"
     },
     "modules/import-kit/src/d1/native-set.ts": {
       "source": "modules/import-kit/src/d1/native-set.ts",
@@ -2235,7 +2235,7 @@
     },
     "modules/import-kit/src/d1/plans.ts": {
       "source": "modules/import-kit/src/d1/plans.ts",
-      "sha256": "3338241f200ebf1921e133030c61372e397b37f38322b13880b7bfa7d0363312"
+      "sha256": "1601f76d14db9ea8b0c7e11e6d9b59469292c197be8c10e335cad97927a62b13"
     },
     "modules/import-kit/src/d1/preparation-fingerprint.ts": {
       "source": "modules/import-kit/src/d1/preparation-fingerprint.ts",
@@ -2631,7 +2631,7 @@
     },
     "modules/import-kit/src/door/refusals.ts": {
       "source": "modules/import-kit/src/door/refusals.ts",
-      "sha256": "1c03c2366bac97733ba30ad9e0f69311191735dcddced839a5e804dc2e4f6d6e"
+      "sha256": "ba2e39dbf609f52d83a1e298b4aa62611374decbf58c0658882912ed994ac424"
     },
     "modules/import-kit/src/door/schema.ts": {
       "source": "modules/import-kit/src/door/schema.ts",

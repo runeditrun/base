@@ -22,7 +22,7 @@ export type D1CreatePreflightContext = Pick<D1ImportContext, 'destination' | 'na
   planCodec?: D1PlanCodec;
 };
 export interface D1CreatePreflight {
-  /** Statements in the one atomic job, plan and original-custody batch. */
+  /** Statements across private staging and atomic job, plan and custody publication. */
   mutationStatements: number;
   mutationExecutions: number;
   /** D1 queries: authority batch, operation-key lookup, mutation and return reads. */
@@ -85,7 +85,8 @@ export function preflightD1ImportJob(plan: ImportPlan, context: D1CreatePrefligh
     sql('SELECT * FROM ik_jobs WHERE id=?', '00000000-0000-0000-0000-000000000000'),
     sql('SELECT * FROM ik_d1_plan_chunks WHERE job_id IN (SELECT value FROM json_each(?)) ORDER BY job_id,ordinal', JSON.stringify(['00000000-0000-0000-0000-000000000000']))];
   const chunkRead = reads.pop()!;
-  for (let n = 0; n < planChunkReads(retained.body, unbounded); n++) reads.push(chunkRead);
+  const chunkReads = planChunkReads(retained.body, unbounded, retained.encoded.chunks);
+  for (let n = 0; n < chunkReads; n++) reads.push(chunkRead);
   if (policy(context) === 'preserve-conflicts') reads.push(sql('SELECT r.*,p.reversed AS native_reversed FROM ik_d1_reversal_reports r LEFT JOIN ik_provenance p ON p.id=r.effect_id AND p.job_id=r.job_id WHERE r.job_id=? ORDER BY r.position', '00000000-0000-0000-0000-000000000000'));
   const erasedReads = erasedSourcePredicates(plan).map(p => ({ sql: `SELECT ${p.sql} AS clear`, params: p.params }));
   const all = [...initial, ...erasedReads, ...statements, ...reads];
