@@ -97,7 +97,12 @@ foldedCases.push(['Platform-prefixed and native ledgers place the same files in 
     const {path,source}=await retainedArchive(t,{native:sourceNative,prefix:sourceNative?'':'core-'});
     const receipt=await importArchive(target.service,path,[]);
     assert.deepEqual(receipt.bridged.migrations,['1270_roles.sql','1280_policy_rules.sql']);
-    for(const table of ['items','jobs','policies'])assert.deepEqual(await all(target.db,`SELECT * FROM ${table} ORDER BY id`),await all(source.db,`SELECT * FROM ${table} ORDER BY id`));
+    let tableRow = 0;
+    for(const table of ['items','jobs','policies']) {
+      await runCases(t, [[`${t.name} > table row ${++tableRow}`, async () => {
+        assert.deepEqual(await all(target.db,`SELECT * FROM ${table} ORDER BY id`),await all(source.db,`SELECT * FROM ${table} ORDER BY id`));
+      }]]);
+    }
     assert.deepEqual(await all(target.db,`SELECT * FROM ${ledgerTable} ORDER BY rowid`),before);
   }]]);
 }]);

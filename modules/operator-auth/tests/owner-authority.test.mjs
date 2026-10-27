@@ -53,8 +53,8 @@ test("owner authority routes require fresh local proof through native SQL writes
 foldedCases.push(['all owner-authority routes demand fresh local proof and preserve non-owner status behavior', async (t) => {
   await runCases(t, Array.from(cases, (row, rowIndex) => [`${t.name}: row row ${rowIndex + 1}`, async t => {
     const cleanup = [];
-    const r = await runtime({ after: fn => cleanup.push(fn) });
     try {
+      const r = await runtime({ after: fn => cleanup.push(fn) });
       const setup = await r.bootstrap();
       assert.equal((await r.stepUp(setup, 'owner:transfer')).status, 303);
       const target = await prepare(r, setup, row.before);
@@ -63,16 +63,18 @@ foldedCases.push(['all owner-authority routes demand fresh local proof and prese
       const actor = r.session(signedIn);
       const input = { ...(target.operatorId ? { operatorId: target.operatorId } : {}), ...row.input };
       for (const proof of ['absent provider-session proof', 'expired local proof']) {
-        if (proof === 'expired local proof') {
-          assert.equal((await r.stepUp(actor, 'owner:transfer')).status, 303);
-          await r.clock(11 * 60000);
-        }
-        const before = await snapshot(r);
-        const refused = await r.call(row.route, post(input, actor));
-        assert.equal(refused.status, 403, `${row.name}: ${proof}`);
-        assert.deepEqual(await refused.json(), { error: 'step_up_required' });
-        assert.equal(refused.headers.get('set-cookie'), null);
-        assert.deepEqual(await snapshot(r), before, `${row.name}: refused without changing authority or sending credentials`);
+        await runCases(t, [[`${t.name} > ${proof}`, async () => {
+          if (proof === 'expired local proof') {
+            assert.equal((await r.stepUp(actor, 'owner:transfer')).status, 303);
+            await r.clock(11 * 60000);
+          }
+          const before = await snapshot(r);
+          const refused = await r.call(row.route, post(input, actor));
+          assert.equal(refused.status, 403, `${row.name}: ${proof}`);
+          assert.deepEqual(await refused.json(), { error: 'step_up_required' });
+          assert.equal(refused.headers.get('set-cookie'), null);
+          assert.deepEqual(await snapshot(r), before, `${row.name}: refused without changing authority or sending credentials`);
+        }]]);
       }
       assert.equal((await r.stepUp(actor, 'owner:transfer')).status, 303);
       const allowed = await r.call(row.route, post(input, actor));
@@ -100,8 +102,8 @@ foldedCases.push(['all owner-authority routes demand fresh local proof and prese
 }]));
 
   const cleanup = [];
-  const r = await runtime({ after: fn => cleanup.push(fn) });
   try {
+    const r = await runtime({ after: fn => cleanup.push(fn) });
     await r.bootstrap();
     const actor = r.session(await r.login('auth'));
     await runCases(t, Array.from(['member', 'admin'], (role, rowIndex) => [`${t.name}: role row ${rowIndex + 1}`, async t => {

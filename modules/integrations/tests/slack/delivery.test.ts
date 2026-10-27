@@ -31,7 +31,12 @@ await runCases(t, Array.from(['incoming-webhook', 'bot'] as const, (mode, rowInd
     await assert.rejects(notifier.enqueue({ ...notice, mode, data: { ...notice.data, detail: 'Changed' } }), /conflict|reuse|immutable/i);
     const log = await notifier.delivery.log(notice.id); assert.equal(log.length, 1);
     assert.equal(log[0]!.outcome?.kind, 'accepted');
-    for (const secret of [botToken, webhookUrl, 'localFixtureOnly']) { assert.equal(db.bytes().includes(secret), false); assert.equal(JSON.stringify(log).includes(secret), false); }
+    let secretRow = 0;
+    for (const secret of [botToken, webhookUrl, 'localFixtureOnly']) {
+      await runCases(t, [[`${t.name} > secret row ${++secretRow}`, async () => {
+        assert.equal(db.bytes().includes(secret), false); assert.equal(JSON.stringify(log).includes(secret), false);
+      }]]);
+    }
   }]);
   foldedCases.push([`${mode}: hostile user content reaches the provider only as escaped text`, async t => {
     const fixture = await wireFixture(t), db = durableFixture(t);

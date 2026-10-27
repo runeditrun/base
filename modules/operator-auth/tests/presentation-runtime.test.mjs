@@ -17,18 +17,24 @@ test('real D1 preview and multipart mail preserve expiry, branding and single-us
       const message = (await r.mails()).at(-1);
       assert.equal(message.subject, kind === 'invite' ? "You're invited to A <B> & Friends" : 'Your sign-in link for A <B> & Friends');
       assert.ok(!message.subject.includes(token));
+      let contentPartRow = 0;
       for (const part of [message.text, message.html]) {
-        assert.equal(part.split(token).length - 1, 1);
-        assert.equal((part.match(/https?:\/\//g) ?? []).length, 1);
-        assert.match(part, /This link works once and expires in 20 minutes\./);
+        await runCases(t, [[`${t.name} > content part row ${++contentPartRow}`, async () => {
+          assert.equal(part.split(token).length - 1, 1);
+          assert.equal((part.match(/https?:\/\//g) ?? []).length, 1);
+          assert.match(part, /This link works once and expires in 20 minutes\./);
+        }]]);
       }
       assert.equal((message.html.match(/<a /g) ?? []).length, 1);
       assert.match(message.html, /A &lt;B&gt; &amp; Friends/);
       assert.ok(!message.html.includes('A <B> & Friends'), 'HTML never contains the raw product name');
       assert.ok(message.html.includes(`<h1>${kind === 'invite' ? 'Accept your invitation to' : 'Confirm sign-in to'} A &lt;B&gt; &amp; Friends</h1>`), 'mail heading escapes the product name');
       assert.match(message.html, />Confirm<\/a>/);
+      let instructionPartRow = 0;
       for (const part of [message.text, message.html]) {
-        assert.ok(part.includes(`Open this link to review and confirm. On the confirmation page, press Confirm to ${kind === 'invite' ? 'accept your invitation to' : 'sign in to'}`));
+        await runCases(t, [[`${t.name} > instruction part row ${++instructionPartRow}`, async () => {
+          assert.ok(part.includes(`Open this link to review and confirm. On the confirmation page, press Confirm to ${kind === 'invite' ? 'accept your invitation to' : 'sign in to'}`));
+        }]]);
       }
       assert.match(message.html, /<body style="margin:0;font-family:Arial,sans-serif;background:#fff;color:#172033"><main style="max-width:480px;margin:0 auto;padding:32px 24px">/);
       assert.doesNotMatch(message.html, /<script|<img|<link|<iframe|url\s*\(|@import/i);

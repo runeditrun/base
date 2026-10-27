@@ -198,7 +198,13 @@ test("native server-verified seams preserve association, policy and binding auth
   const verified={issuer:legacyIssuer,subject:'legacy-owner',email:'owner@example.com',emailVerified:true};
   const admitted=await post(r,'/test/verified',verified);assert.equal(admitted.status,303,await admitted.clone().text());let ownerCookie=r.session(admitted);
   const rows=(await r.db.prepare("SELECT provider,linked_at,generation FROM sessions WHERE kind='oidc'").all()).results;
-  assert.equal(rows.length,2);for(const row of rows){assert.equal(row.provider,null);assert.equal(row.linked_at,null);assert.equal(row.generation,1);}
+  assert.equal(rows.length,2);
+  let rowRow = 0;
+  for(const row of rows) {
+    await runCases(t, [[`${t.name} > row row ${++rowRow}`, async () => {
+      assert.equal(row.provider,null);assert.equal(row.linked_at,null);assert.equal(row.generation,1);
+    }]]);
+  }
   assert.equal((await r.stepUp(cookie,'export')).status,303,'un-pinned server seam sessions still use the native actor fence');
   assert.equal((await r.call('/test/guard/export',{cookie})).status,200);
   await r.restart();assert.equal((await r.call('/auth/session',{cookie})).status,200);

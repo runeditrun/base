@@ -62,7 +62,12 @@ foldedCases.push(['every Slack control sequence in user content is neutralised i
         assert.equal(validate(JSON.parse(wire)), true, JSON.stringify(validate.errors));
 }]));
       assert.equal(message.text.includes(escapeSlackText(injection)), true, injection);
-      for (const block of message.blocks) assert.equal(block.text.text.includes(escapeSlackText(injection)), true, injection);
+      let blockRow = 0;
+      for (const block of message.blocks) {
+        await runCases(t, [[`${t.name} > block row ${++blockRow}`, async () => {
+          assert.equal(block.text.text.includes(escapeSlackText(injection)), true, injection);
+        }]]);
+      }
 }]));
 }]));
   assert.equal(escapeSlackText('<!channel>'), '&lt;!channel&gt;');

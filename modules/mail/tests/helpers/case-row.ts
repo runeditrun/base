@@ -66,7 +66,10 @@ const failures = new WeakMap<TestContext, unknown[]>();
  * reach the test runner, so use defer for work beyond the observation window.
  */
 export function caseRow(t: TestContext, name: string, run: CaseRow[1]): Promise<void> {
-  const pending = collectRow(t, name, run);
+  const path = name.startsWith(`${t.name} > `) ? name
+    : name.startsWith(`${t.name}: `) ? `${t.name} > ${name.slice(t.name.length + 2)}`
+    : `${t.name} > ${name}`;
+  const pending = collectRow(t, path, run);
   // Nested runner work belongs to its parent even when the caller omits await.
   if (typeof (t as CaseRowContext).defer === 'function') (t as CaseRowContext).defer(pending);
   return pending;

@@ -33,10 +33,12 @@ test("product names preserve visible Unicode while refusing unsafe or misplaced 
 foldedCases.push(['product names reject every forbidden control scalar and preserve normal Unicode', async (t) => {
   await runCases(t, Array.from([[0x0000, 0x001f], [0x007f, 0x009f], [0x061c, 0x061c], [0x200b, 0x200f], [0x2028, 0x202e], [0x2060, 0x2064], [0x2066, 0x206f], [0xfeff, 0xfeff]], ([first, last], rowIndex) => [`${t.name}: [first, last] row ${rowIndex + 1}`, async t => {
     for (let code = first; code <= last; code++) {
-      // ZWNJ and ZWJ are valid between letters, so those two are checked in a position where they never are.
-      const joiner = code === 0x200c || code === 0x200d;
-      const productName = joiner ? `Workspace ${String.fromCodePoint(code)} Name` : `Workspace${String.fromCodePoint(code)}Name`;
-      assert.throws(() => configure({ ...base, branding: { productName } }), { code: 'invalid_configuration', status: 503 }, `U+${code.toString(16)}`);
+      await runCases(t, [[`${t.name} > U+${code.toString(16)}`, async () => {
+        // ZWNJ and ZWJ are valid between letters, so those two are checked in a position where they never are.
+        const joiner = code === 0x200c || code === 0x200d;
+        const productName = joiner ? `Workspace ${String.fromCodePoint(code)} Name` : `Workspace${String.fromCodePoint(code)}Name`;
+        assert.throws(() => configure({ ...base, branding: { productName } }), { code: 'invalid_configuration', status: 503 }, `U+${code.toString(16)}`);
+      }]]);
     }
 }]));
   await runCases(t, Array.from(['Café', 'Cafe\u0301', '日本語のワークスペース', 'مساحة العمل', 'שלום', 'Workspace 🚀'], (productName, rowIndex) => [`${t.name}: productName row ${rowIndex + 1}`, async t => {
@@ -59,8 +61,10 @@ foldedCases.push(['product names reject invisible scalars and misplaced joiners 
     [0x3164, 0x3164], [0xfe00, 0xfe0f], [0xffa0, 0xffa0], [0xe0100, 0xe01ef],
   ], ([first, last], rowIndex) => [`${t.name}: [first, last] row ${rowIndex + 1}`, async t => {
     for (let code = first; code <= last; code++) {
-      assert.throws(() => configure({ ...base, branding: { productName: `Workspace${String.fromCodePoint(code)}Name` } }),
-        { code: 'invalid_configuration', status: 503 }, `U+${code.toString(16)}`);
+      await runCases(t, [[`${t.name} > U+${code.toString(16)}`, async () => {
+        assert.throws(() => configure({ ...base, branding: { productName: `Workspace${String.fromCodePoint(code)}Name` } }),
+          { code: 'invalid_configuration', status: 503 }, `U+${code.toString(16)}`);
+      }]]);
     }
 }]));
   await runCases(t, Array.from([
