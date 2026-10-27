@@ -27,6 +27,6 @@ export function readinessAPI(api, window, failure = 'deployment-readiness-timeou
   const remaining = window.remaining();
   assert(remaining > 0, failure);
   const deadline = window.timeout(Math.max(1, Math.ceil(remaining)));
-  return api.request(path, {...options, signal:options.signal ? AbortSignal.any([options.signal,deadline]) : deadline});
+  return api.request(path, {...options, deadlineMs:remaining, signal:options.signal ? AbortSignal.any([options.signal,deadline]) : deadline});
  }};
 }

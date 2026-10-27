@@ -18,6 +18,10 @@ test('transport uses exact account, rejects arbitrary URLs, redacts provider err
   let calls=0;const api=cloudflare({accountId,token:'test-secret',fetch:async(url,init)=>{calls++;assert.equal(new URL(url).pathname,`/client/v4/accounts/${accountId}/queues`);assert.equal(init.redirect,'error');return Response.json({error:'test-secret'},{status:403});}});
   await assert.rejects(api.request('https://evil.test'),/invalid-provider-path/);assert.equal(calls,0);
   await assert.rejects(api.request('/queues'),error=>error.message==='provider-http-403');assert.equal(calls,1);
+  for (const [code,kind] of [['ENOTFOUND','DNS failure'],['EAI_AGAIN','DNS failure'],['ERR_TLS_CERT_ALTNAME_INVALID','TLS failure'],['CERT_HAS_EXPIRED','TLS failure'],['ECONNRESET','connection reset'],['EPIPE','connection reset']]) {
+    const failing = cloudflare({accountId,token:'synthetic-base-1',fetch:async () => {throw new TypeError('fetch failed',{cause:Object.assign(new Error('synthetic-base-2'),{code})});}});
+    await assert.rejects(failing.request('/queues'),error => deployDiagnostic(error,String).providerRequest.cause === kind);
+  }
 });
 test('provider read retries share the original timeout, cancellation and request budget', async () => {
   const pending = signal => new Promise((resolve,reject) => {

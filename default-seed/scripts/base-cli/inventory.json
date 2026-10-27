@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83",
+  "cliVersion": "0.2.83-dev.gb8571d1a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1719,7 +1719,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "90391f25bf6c43e94d98733f218c21e9c372c0cc9a199abc017d0c5e635459a9"
+      "sha256": "7254d56d59a4f533c1a03cc494018f9c8679eb055a0160592af9ab3a58616478"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -1759,7 +1759,7 @@
     },
     "modules/deploy-kit/diagnostics.mjs": {
       "source": "modules/deploy-kit/diagnostics.mjs",
-      "sha256": "957d4d985cc35eae0c85d0bea4c1108cc963901e438b24abcf6506a1ebd934f8"
+      "sha256": "e31b712e86e9e2b8451ec407677a87b47db6b5298f62459dd66d2d2ec0f0888b"
     },
     "modules/deploy-kit/env-file.mjs": {
       "source": "modules/deploy-kit/env-file.mjs",
@@ -1835,11 +1835,11 @@
     },
     "modules/deploy-kit/provider-transport.mjs": {
       "source": "modules/deploy-kit/provider-transport.mjs",
-      "sha256": "a5768fc0f3d6125aceb5b01fe800d9a3ba3c1507cf12dd9b7cc5346c6cb47a7a"
+      "sha256": "5279eb4bfe4ddc34c7dc6d804bca2cd2da3c7f05dcc43d4cbf678a0e442cef5d"
     },
     "modules/deploy-kit/provider.mjs": {
       "source": "modules/deploy-kit/provider.mjs",
-      "sha256": "2d011b989273ea5970d3aa4445c18cee9c27e208abcad4dd0922957014a1f182"
+      "sha256": "5ec70069bb5b14ba899a16877082a81531443e3e6dba92555666e31d25a1dbcb"
     },
     "modules/deploy-kit/public-origin.mjs": {
       "source": "modules/deploy-kit/public-origin.mjs",
@@ -1859,7 +1859,7 @@
     },
     "modules/deploy-kit/readiness-window.mjs": {
       "source": "modules/deploy-kit/readiness-window.mjs",
-      "sha256": "237cc1de1793d054d4932b223faf4f10c9c32413f2c1d7f5c14ea58e36c4afe2"
+      "sha256": "af8eb760fb20b50d73f6281cb996a629e5c037d6fb9a9b2ec3359106642a5d54"
     },
     "modules/deploy-kit/receipt.mjs": {
       "source": "modules/deploy-kit/receipt.mjs",

@@ -127,7 +127,7 @@ test('site deploy preserves its redacted provider failure in human and JSON outp
   await writeFile(join(args[3],'run.html'),'<!doctype html><h1>Run</h1>');
  }};
  let caught;
- await assert.rejects(siteCommand({root,adapter:{site:{entry:'site.mjs',output:'dist/site',declaration:'deploy-site.json'}}},{verb:'deploy',json:true},store,undefined,{human:() => {}}),error => {caught = error;return true;});
+ await assert.rejects(siteCommand({root,adapter:{site:{entry:'site.mjs',output:['dist','site'].join('/'),declaration:'deploy-site.json'}}},{verb:'deploy',json:true},store,undefined,{human:() => {}}),error => {caught = error;return true;});
  assert.equal(caught.code,'deploy_refused'); assert.match(caught.message,/creating site assets upload session/);
  assert.match(caught.message,/POST \/client\/v4\/accounts\/\[REDACTED\].*HTTP 403/);
  assert.equal(caught.siteDeploy.providerRequest.status,403);

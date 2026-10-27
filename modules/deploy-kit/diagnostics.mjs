@@ -7,7 +7,7 @@ export function recordDeployFailure(error, details) {
 }
 export function deployDiagnostic(error, redact) {
   const detail = failures.get(error);
-  if (!detail) return undefined;
+  if (!detail) return error?.cause instanceof Error ? deployDiagnostic(error.cause,redact) : undefined;
   const clean = value => (redact ?? String)(String(value)).replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g,'').replace(/\b[a-f0-9]{32}\b/gi,'[REDACTED]');
   const failureCode = detail.code ?? error.message;
   const code = /^[a-zA-Z0-9_-]{1,120}$/.test(failureCode) ? clean(failureCode) : 'deploy-failed';
@@ -128,9 +128,9 @@ export function providerFailure(error, redact = String) {
   const retained = failures.get(error)?.providerRequest;
   if (retained) {
     const step = providerText(failures.get(error).step,redact,200);
-    const cause = retained.cause === 'timeout' ? `timeout after ${retained.timeoutMs / 1000} s (limit ${retained.timeoutMs} ms)` : retained.cause;
+    const cause = retained.cause === 'timeout' ? `timeout after ${retained.timeoutMs / 1000} s (limit ${retained.timeoutMs} ms)` : retained.cause === 'connection timeout' ? `connection timeout (per-call limit ${retained.timeoutMs} ms)` : retained.cause;
     const body = providerText(failures.get(error).output ?? '',redact);
-    return `${step}: ${retained.method} ${retained.endpoint}; elapsed ${retained.elapsedMs} ms; ${retained.status === null ? cause : `HTTP ${retained.status}`}${body ? `; ${body}` : ''}`;
+    return `${step}: ${retained.method} ${providerText(retained.endpoint,redact,300)}; elapsed ${retained.elapsedMs} ms; ${retained.status === null ? cause : `HTTP ${retained.status}`}${body ? `; ${body}` : ''}`;
   }
   const specific = providerRefusal(error,redact) ?? providerTransport(error,redact);
   if (!specific && error?.cause instanceof Error) return providerFailure(error.cause,redact);
