@@ -76,7 +76,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
   options.idleTimeout=Number(value);
  }
  if (options.port !== undefined) {
-  if (!/^\d+$/.test(options.port) || Number(options.port) < 1 || Number(options.port) > 65535) throw invalid('Port must be a decimal integer from 1 to 65535.');
+  if (!/^\d+$/.test(options.port) || Number(options.port) < 1 || Number(options.port) > 65535) throw Object.assign(invalid('Port must be a decimal integer from 1 to 65535.'), { humanMessage: `Port ${JSON.stringify(options.port)} is invalid. Use a port from 1 to 65535, for example: rer ${verb} --port 4800` });
   options.port = Number(options.port);
  }
  for(const key of ['httpPort','httpsPort'])if(options[key]!==undefined){if(!/^[0-9]+$/.test(options[key])||Number(options[key])<1||Number(options[key])>65535)throw invalid('Ingress port must be an integer from 1 to 65535.');options[key]=Number(options[key]);}

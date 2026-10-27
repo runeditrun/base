@@ -1,3 +1,4 @@
+import { humanError } from '../cli/human-error.mjs';
 import { checkoutBootstrap, checkoutVerbs } from '../cli/contract.mjs';
 import { dispatcher, locate, pinnedPackage, unsupportedMessage } from './checkout.mjs';
 import { delegate } from './delegate.mjs';
@@ -80,7 +81,7 @@ export async function main(argv) {
   const repository = repoArguments(argv);
   if (repository) return await (await import('./cli/repo-command.mjs')).repoCommand(repository);
  } catch (error) {
-  process.stderr.write(error.message + '\n');
+  process.stderr.write((argv.includes('--json') ? error.message : humanError(error)) + '\n');
   return typeof error.exitCode === 'number' ? error.exitCode : 1;
  }
  const target = locate(argv);
@@ -95,7 +96,7 @@ export async function main(argv) {
   if ((mode !== 'bundled' || pinnedPackage(target.root)) && verb === 'doctor' && !argv.includes('--help')) {
    const { parse } = await import('../cli/parse.mjs');
    try { parse(target.args, target.root); }
-   catch (error) { process.stderr.write(error.message + '\n'); return error.exitCode ?? 2; }
+   catch (error) { process.stderr.write((argv.includes('--json') ? error.message : humanError(error)) + '\n'); return error.exitCode ?? 2; }
    const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, target.args);
    if (code !== undefined) return code;
   }
@@ -107,11 +108,11 @@ export async function main(argv) {
    // here, before provisioning the checkout's package manager.
    const publicArgs = verb === 'dev' ? target.args.filter(arg => arg !== '--door-start') : target.args;
    try { parse(publicArgs, target.root); }
-   catch (error) { process.stderr.write(error.message + '\n'); return error.exitCode ?? 2; }
+   catch (error) { process.stderr.write((argv.includes('--json') ? error.message : humanError(error)) + '\n'); return error.exitCode ?? 2; }
    const { ensureProjectPnpm } = await import('../cli/project-pnpm.mjs');
    const { RerError } = await import('../cli/errors.mjs');
    try { await ensureProjectPnpm(target.root, { report: text => process.stderr.write(text + '\n') }); }
-   catch (error) { if (!(error instanceof RerError)) throw error; process.stderr.write(error.message + '\n'); return error.exitCode; }
+   catch (error) { if (!(error instanceof RerError)) throw error; process.stderr.write((argv.includes('--json') ? error.message : humanError(error)) + '\n'); return error.exitCode; }
   }
  }
  if (verb === 'queue') {
@@ -135,7 +136,7 @@ export async function main(argv) {
    if (!(failure instanceof LaunchFailure)) throw failure;
    // A --json caller gets the failed step as data, as the checkout's own verbs report it.
    if (failure.event && target.args.includes('--json')) for (const event of [{ ...failure.event, verb }, { version: 1, verb, event: 'result', ok: false, exitCode: failure.exitCode }]) process.stdout.write(JSON.stringify(event) + '\n');
-   else process.stderr.write(failure.message + '\n');
+   else process.stderr.write(humanError(failure, { retry: `rer ${verb} --cwd '${target.root.replaceAll("'", "'\\''")}'` }) + '\n');
    return failure.exitCode;
   }
  }

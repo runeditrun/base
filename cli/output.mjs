@@ -1,3 +1,4 @@
+import { humanError } from './human-error.mjs';
 import { handleBrokenPipes } from './stdio.mjs';
 import { exportSummary } from './export-summary.mjs';
 import { importSafetySummary } from './import-summary.mjs';
@@ -25,7 +26,7 @@ export function output(options) {
   },
   error(error) {
    if (structuredResult) this.event('error', { code: error.code, message: error.message, exitCode: error.exitCode, ...(error.availableDeployments ? { environment: error.environment, availableDeployments: error.availableDeployments } : {}), ...(error.step ? { step: error.step } : {}) });
-   else write(2, error.message + '\n');
+   else write(2, humanError(error) + '\n');
   },
  };
 }

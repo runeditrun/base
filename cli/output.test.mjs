@@ -1,3 +1,5 @@
+import { plainErrors } from './fixtures/plain-errors.mjs';
+import { humanError } from './human-error.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, spawnSync } from 'node:child_process';
@@ -9,7 +11,10 @@ import { promisify } from 'node:util';
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
 
-test('large JSON reports drain through a full-reading pipe at both CLI entries', async t => {
+test('plain packed CLI failures preserve machine diagnostics and large JSON reports drain at both CLI entries', async t => {
+ await plainErrors(t, base);
+ assert.equal(humanError({ code: 'launch_failed', message: 'TypeError: Synthetic failure\n    at synthetic-base-1:1' }), 'Synthetic failure\nRun the same command with --json for details.');
+ assert.equal(humanError({ code: 'command_failed', message: 'Synthetic failure' }), 'Synthetic failure\nRun the same command with --json for details.');
  const root = await mkdtemp(join(tmpdir(), 'rer-output-'));
  t.after(() => rm(root, { recursive: true, force: true }));
  const effects = 'Read the complete description: café 日本語. '.repeat(16384);

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Explain refused dependency downloads, invalid ports and checkout archive paths with a plain cause and a runnable next command. Keep technical diagnostics in the unchanged JSON output and omit error classes and stacks from human failure summaries.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.
