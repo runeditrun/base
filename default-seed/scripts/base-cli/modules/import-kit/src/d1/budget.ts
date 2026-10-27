@@ -28,7 +28,7 @@ export function remaining(context: D1ImportContext): number { const budget=budge
 export function limitStatements(context:D1ImportContext,max:number):D1ImportContext {
   const budget=budgets.get(context.storage.database);
   if(!budget||!Number.isSafeInteger(max)||max<1||max>D1_REQUEST_QUERY_LIMIT)throw new Error('INVALID_ERASURE_STATEMENT_LIMIT');
-  budget.statementLimit=Math.min(budget.statementLimit??Infinity,budget.statements+max);
+  budget.statementLimit=Math.min(budget.statementLimit??D1_REQUEST_QUERY_LIMIT,budget.statements+max);
   return context;
 }
 /** A nested operation leaves the outer operation's exact bounded return path

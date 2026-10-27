@@ -288,8 +288,9 @@ with `IMPORT_PLAN_TOO_LARGE`, naming the 1,000-query paid-plan limit.
 `totalStatements` and `mutationStatements` retain the individual statement
 counts, and `mutationExecutions` counts mutation batch calls.
 The door shares one budget across all its kit calls in one HTTP request; later
-apply, resume and undo requests are distinct Worker invocations. An explicit
-erasure `maxStatements` ceiling additionally counts every batch member.
+apply, resume and undo requests are distinct Worker invocations. Erasure retains
+its existing 1,000-statement work ceiling, counting every batch member as well
+as reads. An explicit `maxStatements` may tighten that separate ceiling.
 
 The port counts queries over the entire public invocation (including
 nested resume reads and atomic batches), caps them at 1,000 and

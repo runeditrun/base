@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.g37568fe3",
+  "cliVersion": "0.2.83-dev.g294a1756",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2003,7 +2003,7 @@
     },
     "modules/import-kit/src/d1/README.md": {
       "source": "modules/import-kit/src/d1/README.md",
-      "sha256": "da65233d57222fa567bf4e1065a4053da591ab11bc486c266458c533a4c655b1"
+      "sha256": "c3b4cf6387d435b6b8df992f7556acb4f68b897f0fea42caec8522cb9cd826a0"
     },
     "modules/import-kit/src/d1/apply-effects.ts": {
       "source": "modules/import-kit/src/d1/apply-effects.ts",
@@ -2019,7 +2019,7 @@
     },
     "modules/import-kit/src/d1/budget.ts": {
       "source": "modules/import-kit/src/d1/budget.ts",
-      "sha256": "e3e83c66b22a2fa70ea834f6a936ffb1e4d65e0f8bdad72b07daf184ce7d53b3"
+      "sha256": "287300276449bc7a4a7e28d351d033cdf15c5c9a0d63be3067d4d9746e51ebc2"
     },
     "modules/import-kit/src/d1/compressed-plan.ts": {
       "source": "modules/import-kit/src/d1/compressed-plan.ts",
@@ -2139,7 +2139,7 @@
     },
     "modules/import-kit/src/d1/erasure.ts": {
       "source": "modules/import-kit/src/d1/erasure.ts",
-      "sha256": "c9b9c0d7aa9795a53c3ef7cf0aca52f349782132318d44037262d59025d0520f"
+      "sha256": "74b6eb164ac2df0091514bc4faf6871eb8088c77fcbfdba26bee17ff256ae1cf"
     },
     "modules/import-kit/src/d1/evolutions/0001-preserved-undo.ts": {
       "source": "modules/import-kit/src/d1/evolutions/0001-preserved-undo.ts",
@@ -2359,7 +2359,7 @@
     },
     "modules/import-kit/src/d1/retirement.ts": {
       "source": "modules/import-kit/src/d1/retirement.ts",
-      "sha256": "8dea57607323dcb6c3896c53bb7d9ddd6706eb6782325f4db47201e553147015"
+      "sha256": "15f3e0f7feac73c8daf5b3c2a31c0af6547d0b921899932eb4645dd4849bc43e"
     },
     "modules/import-kit/src/d1/reversal-conversion-record.ts": {
       "source": "modules/import-kit/src/d1/reversal-conversion-record.ts",
