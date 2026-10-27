@@ -99,14 +99,14 @@ await runCases(t, Array.from(['events', 'other'], (eventNamespace, rowIndex) => 
       signedEvents([event('future')], { claims: { iat: NOW / 1000 + 3600 } }),
       signedEvents([event('alg')], { header: { alg: 'HS256' } }),
       signedEvents([event('kid')], { header: { kid: 'untrusted' } }),
-      signedEvents([event('jku')], { header: { jku: 'https://evil.test/keys' } })], (bad, rowIndex) => [`${t.name}: bad row ${rowIndex + 1}`, async t => {
+      signedEvents([event('jku')], { header: { jku: 'https://evil.test/keys' } })], (bad, rowIndex) => [`${t.name}: invalid signature row ${rowIndex + 1}`, async t => {
       assert.equal((await ingest(runtime, bad)).code, 'event_signature_invalid');
 }]));
     const unauthorized = await ingest(runtime, signedEvents([event('before-unauthorized'), event('unauthorized', { deliveryId: 'unowned' })]));
     assert.equal(unauthorized.code, 'event_unauthorized');
     await runCases(t, Array.from([event('schema', { surprise: 'SENSITIVE' }), event('detail', { detail: { text: 'SENSITIVE' } }),
       event('detail-kind', { detail: { bounce: 'hard' } }), event('bad-address', { recipient: 'Reader <Reader@example.test>' }),
-      event('bad-date', { occurredAt: '2026-02-30T00:00:00Z' })], (bad, rowIndex) => [`${t.name}: bad row ${rowIndex + 1}`, async t => {
+      event('bad-date', { occurredAt: '2026-02-30T00:00:00Z' })], (bad, rowIndex) => [`${t.name}: invalid event row ${rowIndex + 1}`, async t => {
       assert.equal((await ingest(runtime, signedEvents([event('before-invalid'), bad]))).status, 400);
 }]));
     assert.deepEqual(await counts(db), baseline);
