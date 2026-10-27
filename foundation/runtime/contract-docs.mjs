@@ -484,8 +484,9 @@ function covScope(old) {
       const section = [...headings].reverse().find(entry => entry.level === 2)?.text ?? '';
       const inStatus = headings.some(entry => /^Status\b/i.test(entry.text));
       const cells = !insideFence && text.includes('|') ? covCells(text) : [];
-      if (file === 'CONTRACT.md' && inStatus && cells.length === 6 && covId.test(plainText(cells[0]))) {
-        if (plainText(cells[5]).trim()) entries.push({ file, line, cell: 'gap', text: cells[5], raw, clause: plainText(cells[0]), section, homepage: false });
+      // Every Status table line is out of scope except a clause row's non-empty Gap cell.
+      if (file === 'CONTRACT.md' && inStatus && !insideFence && text.trimStart().startsWith('|')) {
+        if (cells.length === 6 && covId.test(plainText(cells[0])) && plainText(cells[5]).trim()) entries.push({ file, line, cell: 'gap', text: cells[5], raw, clause: plainText(cells[0]), section, homepage: false });
         continue;
       }
       const intro = !introEnded && !headings.some(entry => entry.level > 1) && !definition;
