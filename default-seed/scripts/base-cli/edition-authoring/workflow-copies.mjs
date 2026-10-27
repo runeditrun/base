@@ -70,7 +70,7 @@ function candidates(invoked) {
   if (invoked.startsWith('.github/workflows/')) return ['export/' + path.posix.basename(invoked), 'default-seed/' + invoked];
   return ['export/' + invoked.replace(/^scripts\//, ''), 'default-seed/' + invoked,
     ...(invoked.startsWith('scripts/') ? [invoked.slice(8)] : [])]
-    .filter(name => !name.startsWith('scripts/') && !name.startsWith('.github/workflows/')); 
+    .filter(name => !name.startsWith('scripts/') && !name.startsWith('.github/workflows/'));
 }
 
 export function completeWorkflowHelpers(root, plans, {tree, read, revision}) {
@@ -81,6 +81,9 @@ export function completeWorkflowHelpers(root, plans, {tree, read, revision}) {
   // copied workflow. Parse the bytes that will actually remain in the seed.
   const queued = new Set(queue.map(item => item.target));
   for (const target of index) if (/(?:^|\/)\.github\/workflows\/[^/]+\.ya?ml$/.test(target) && !queued.has(target)) {
+    // Template adoption already preserves an unrecorded physical alias with a
+    // notice. It cannot become a canonical caller in the helper write plan.
+    if (templates.some(([name]) => name === target) && physicalEntry(root, target).kind === 'alias') continue;
     const {stat} = requirePhysical(root, target);
     if (stat) queue.push({target});
   }
