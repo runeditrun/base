@@ -1,39 +1,7 @@
 import {tokens, unquote} from './module-syntax.mjs';
 export {resolve} from './module-resolution.mjs';
 
-// Module edges retain their import kind and erased-type status before resolving.
-// Bindings are checked separately: a namespace or side-effect edge has no named
-// bindings, but has exactly the same runtime dependency as a named import.
-export function dependencies(source) {
-  const t = tokens(source), result = [];
-  const add = (token, kind, types = false) => {
-    const specifier = unquote(token);
-    if (specifier?.startsWith('.')) result.push({specifier: kind === 'require' ? specifier : specifier.split(/[?#]/)[0], kind, types});
-  };
-  for (let i = 0; i < t.length; i++) {
-    const word = t[i];
-    if (word === 'module' && t[i + 1] === '[' && unquote(t[i + 2]) === 'require' && t[i + 3] === ']' && t[i + 4] === '(') add(t[i + 5], 'require');
-    if (!['import', 'export', 'require'].includes(word)) continue;
-    if (t[i - 1] === '.' && !(word === 'require' && t[i - 2] === 'module')) continue;
-    if (word === 'require') {
-      if (t[i + 1] === '(') add(t[i + 2], 'require');
-      else if (t[i + 1] === '.' && t[i + 2] === 'resolve' && t[i + 3] === '(') add(t[i + 4], 'require');
-      continue;
-    }
-    if (word === 'import' && t[i + 1] === '(') { add(t[i + 2], 'import'); continue; }
-    if (word === 'import' && unquote(t[i + 1]) !== null) { add(t[i + 1], 'import'); continue; }
-    if (word === 'export' && !['{', '*', 'type'].includes(t[i + 1])) continue;
-    let end = i + 1;
-    while (end < t.length && ![';', 'import', 'export', 'from'].includes(t[end])) end++;
-    if (t[end] !== 'from') continue;
-    const clause = t.slice(i + 1, end);
-    const erased = clause[0] === 'type' && clause.length > 1 && clause[1] !== ',' || clause[0] === '{' && clause.at(-1) === '}' &&
-      clause.slice(1, -1).length > 0 && clause.slice(1, -1).join(' ').split(' , ').every(item => item.startsWith('type ') && !item.startsWith('type as '));
-    add(t[end + 1], 'import', erased);
-  }
-  return result;
-}
-export const specifiers = source => dependencies(source).map(edge => edge.specifier);
+export {dependencies} from './module-edges.mjs';
 
 // Binding checks are lexical: unknown export forms remain unknown, never absent.
 export function bindings(source, types = false) {

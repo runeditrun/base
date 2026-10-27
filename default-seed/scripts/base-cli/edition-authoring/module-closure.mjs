@@ -107,7 +107,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   const baseline = new Set();
   for (const {plan, source, target} of queue) {
     if (!Object.hasOwn(plan.copy.files, target) || !disk.has(target) || bootstrap(source)) continue;
-    for (const request of dependencies(local(target))) {
+    for (const request of dependencies(local(target), source)) {
       const candidate = edge(source, target, request);
       if (!resolve(disk, target, request.specifier, request) && !recorded.has(candidate.destination)) baseline.add(key(target, request));
     }
@@ -115,7 +115,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   // Do not let an optional directory addition incidentally fill an old edge.
   for (const {plan, source, target} of queue) {
     if (!Object.hasOwn(plan.copy.files, target) || !disk.has(target)) continue;
-    for (const request of dependencies(local(target))) if (baseline.has(key(target, request))) {
+    for (const request of dependencies(local(target), source)) if (baseline.has(key(target, request))) {
       const destination = resolve(view, target, request.specifier, request);
       if (!directoryAdditions.has(destination)) continue;
       const addition = planned.get(destination);
@@ -125,7 +125,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     }
   }
   const incoming = new Set();
-  for (const item of queue) for (const request of dependencies(item.adapted ? local(item.target) : blob(item.entry))) {
+  for (const item of queue) for (const request of dependencies(item.adapted ? local(item.target) : blob(item.entry), item.source)) {
     if (baseline.has(key(item.target, request))) continue;
     const {destination} = edge(item.source, item.target, request);
     if (destination) incoming.add(destination);
@@ -157,7 +157,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     const before = Object.hasOwn(plan.copy.files, target) && disk.has(target) ? local(target) : '';
     const imports = bindings(bytes), oldBindings = bindings(before);
     const typeImports = bindings(bytes, true), oldTypes = bindings(before, true);
-    const edges = dependencies(bytes).map(request => edge(source, target, request));
+    const edges = dependencies(bytes, source).map(request => edge(source, target, request));
     for (const {manifests = []} of [...edges]) for (const dependency of manifests) {
       edges.push({dependency, destination: path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency))});
     }
@@ -200,7 +200,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   const final = {has: name => planned.has(name) || !removed.has(name) && disk.has(name), read: view.read};
   for (const {plan, source, target, entry, adapted} of queue) {
     if (!adapted && !plan.sources.some(([name]) => name === source)) continue;
-    for (const request of dependencies(adapted ? local(target) : blob(entry))) {
+    for (const request of dependencies(adapted ? local(target) : blob(entry), source)) {
       const id = key(target, request);
       if (!baseline.has(id)) continue;
       expected.add(id);

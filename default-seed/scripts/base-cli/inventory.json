@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.g7dfccf0d",
+  "cliVersion": "0.2.83-dev.g63631644",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -807,7 +807,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "28faf4e9f165bc6d932ec5d09ce64872334c6dd7c5861b3abaa722109cee3bab"
+      "sha256": "7468e0af2b5878954455b07d6a582adae8feb7748b0455afdff76cb20b0b6937"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1203,7 +1203,11 @@
     },
     "edition-authoring/module-closure.mjs": {
       "source": "edition-authoring/module-closure.mjs",
-      "sha256": "f2d667731aebc5c26665f8fe751e75d38f40ee11a4719988b4d7966ec4c1e7fa"
+      "sha256": "ea176dbfd67c4ce750458c66afc7ab8aa202c526c309cd6a30cfaa57766496cd"
+    },
+    "edition-authoring/module-edges.mjs": {
+      "source": "edition-authoring/module-edges.mjs",
+      "sha256": "4afab197c080fdd7a5c6a4e2b5371f4c27fc527640dfc30e2cf3fa592dc5a002"
     },
     "edition-authoring/module-resolution.mjs": {
       "source": "edition-authoring/module-resolution.mjs",
@@ -1231,7 +1235,7 @@
     },
     "edition-authoring/runtime-dependencies.mjs": {
       "source": "edition-authoring/runtime-dependencies.mjs",
-      "sha256": "9854961c184a2f3f1248c74fa8864698096f9dd0e02a3338085d562d26ea92ec"
+      "sha256": "9b2e39d3ea7abb23915b7594a02f8a7a042b3244f75d7a15d681cbf961c0d9bc"
     },
     "edition-authoring/sources.mjs": {
       "source": "edition-authoring/sources.mjs",
@@ -1240,6 +1244,194 @@
     "edition-authoring/updates.mjs": {
       "source": "edition-authoring/updates.mjs",
       "sha256": "54e7246025a618ed16ee042c22dc9a8dc27b06175c30f81c4c6568992ed04799"
+    },
+    "edition-authoring/vendor/babel-parser/LICENSE": {
+      "source": "edition-authoring/vendor/babel-parser/LICENSE",
+      "sha256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76"
+    },
+    "edition-authoring/vendor/babel-parser/README.md": {
+      "source": "edition-authoring/vendor/babel-parser/README.md",
+      "sha256": "40239f07f6e276a0cd688965b8deb83a8023ba1ef2e9241270a04b764bafa83f"
+    },
+    "edition-authoring/vendor/babel-parser/babel-helper-string-parser/index.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-helper-string-parser/index.mjs",
+      "sha256": "eb92ebd43a40c267f5042c7f9e64107fa9a8b7f46cb18bc1527e6bc338427644"
+    },
+    "edition-authoring/vendor/babel-parser/babel-helper-validator-identifier/identifier.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-helper-validator-identifier/identifier.mjs",
+      "sha256": "541a820b2b0f7b609575fe798b7193e7f3e6008575e01e2996e6e93e1f377da4"
+    },
+    "edition-authoring/vendor/babel-parser/babel-helper-validator-identifier/index.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-helper-validator-identifier/index.mjs",
+      "sha256": "dc3a12f1276104e25dda3697e26b2fc7e7785ef2b708c9e3aa2ec6b86b3d1554"
+    },
+    "edition-authoring/vendor/babel-parser/babel-helper-validator-identifier/keyword.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-helper-validator-identifier/keyword.mjs",
+      "sha256": "3dfb223898a754132eb85f0090159c0963ee64cbabd107d26cb492eb0e480e9e"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/index.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/index.mjs",
+      "sha256": "62634d03cf6e6eb5d1b35b24a20d69568864f7faf9fe30f47522f8bf93c12bf9"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/options.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/options.mjs",
+      "sha256": "6d2f10fbc5c9286a1584c53d48164eb95bafc4c12fa23f592cfd98e8907aca64"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parse-error.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parse-error.mjs",
+      "sha256": "341d48dbb4573ba04c25d07178a0b2a529eb8f1ee895d6eba4134856fa93ff18"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parse-error/bind-operator-errors.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parse-error/bind-operator-errors.mjs",
+      "sha256": "7ccd8271f6cbbad7d1fd2115919336a6c52488bac074b5b6e45b97ea747ca12b"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parse-error/module-errors.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parse-error/module-errors.mjs",
+      "sha256": "92c0d0284fda16496376377a38f17979e44864b3cc3f55115b44291979c2320a"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parse-error/parse-expression-errors.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parse-error/parse-expression-errors.mjs",
+      "sha256": "e9749768b9fd91a038f0b28721c8b9fd4da2fb2effe2c488558f9ae0723d45df"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parse-error/pipeline-operator-errors.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parse-error/pipeline-operator-errors.mjs",
+      "sha256": "e0cfd3be7e520b1b6ad94f358f60d3eb31ed5a0efc9a27460e7e15c551d21b74"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parse-error/standard-errors.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parse-error/standard-errors.mjs",
+      "sha256": "9cabe07430eadfe53ccd083bdeecc133608700134b4afdb713c030ab2188b1f4"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parse-error/strict-mode-errors.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parse-error/strict-mode-errors.mjs",
+      "sha256": "776411adeb8b6648acdccdf1bf0e40e2c2688d05a80bb804ce0041d60c535d52"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parse-error/to-node-description.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parse-error/to-node-description.mjs",
+      "sha256": "a4202432d13806018fc3332f2f668615703863815fa16ae135a622005d9e1c44"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parser/base.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/base.mjs",
+      "sha256": "e021adbefc8d7fc8531960a1df77c42cbfa5ac0c4a18d2dd74d3fbee8bf669a5"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parser/comments.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/comments.mjs",
+      "sha256": "a8145e521ab0f64e2ecce5e49ff8374238ba0d3a8c567305bcf442d45e433d68"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parser/expression.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/expression.mjs",
+      "sha256": "06c48a2160691592dff40714b9a54d0086010ff3fcdc093cba8a33a24fa095be"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parser/index.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/index.mjs",
+      "sha256": "daf0da47d2755a48ec5707e6129577328e210a65ffcac4a668a48e25a9674032"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parser/lval.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/lval.mjs",
+      "sha256": "17f457fc89f274f9dbf4e6ebc98d36afc38c783f2be69cb5003cdb720dd4f725"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parser/node.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/node.mjs",
+      "sha256": "597444520607b975613d36d1288d51d42247198288a6ed0284bfc208b2b6fe4f"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parser/statement.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/statement.mjs",
+      "sha256": "a85cde071998d2fbfea9e9cf3742b877a942a7a0fd534aa66c7e29d9513f4dde"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/parser/util.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/parser/util.mjs",
+      "sha256": "050fa55b7b273142fba9e7e38b8c8ea1423f973f7468503935e066f11ff5c7ac"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/plugin-utils.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/plugin-utils.mjs",
+      "sha256": "81d9700bf9a4f1592b099163abecd309109a6bd40b2046dec98ad6faa41b8ed7"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/plugins/estree.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/estree.mjs",
+      "sha256": "72ae8ce2dcc03a6baf54c201225f961add484852e92e405f71e417df29521bc8"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/plugins/flow/index.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/flow/index.mjs",
+      "sha256": "400d74a6286f00b695a8832ef745a42cde840fa854d46ed61b71e26310445e0a"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/plugins/flow/scope.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/flow/scope.mjs",
+      "sha256": "321c862f334af66e004d337f8b88a71000a043c5cc45718745ed134472b114a2"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/plugins/jsx/index.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/jsx/index.mjs",
+      "sha256": "b5c6885d06cab129311fec1348c3a11b27385e7db486bc9a189df285efb05db4"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/plugins/jsx/xhtml.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/jsx/xhtml.mjs",
+      "sha256": "e4162785fe91410df9d5f16a37b2a75862c2c0c8fe86df015aa91f1dd1685906"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/plugins/placeholders.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/placeholders.mjs",
+      "sha256": "1ad06c94fee2e26112c8d01415e1696b490baa1cbfb2e7cb797552c06041a7dd"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/plugins/typescript/index.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/typescript/index.mjs",
+      "sha256": "693484d6301910251f9141f1844535b933dedb5536fca967acbb4436e859c5a5"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/plugins/typescript/scope.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/typescript/scope.mjs",
+      "sha256": "ec2035086d3f77d94877486ed34ec89758ea9e936ee515259a6b0d7ecde385dd"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/plugins/v8intrinsic.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/plugins/v8intrinsic.mjs",
+      "sha256": "d75a887b9dd983c0319af7489c578309726afe88553ddc0f7a01fcb1fe656c7e"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/tokenizer/context.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/tokenizer/context.mjs",
+      "sha256": "870d575e4f1313a910b20d4a75df4b57f2035203786001980ee20ac29eec8910"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/tokenizer/index.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/tokenizer/index.mjs",
+      "sha256": "618f626ae8b4687596e406dffd0a43d9f4704afd079db42107d08504585e3bb6"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/tokenizer/state.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/tokenizer/state.mjs",
+      "sha256": "c212f75b6f4abde9a9d707924a8b70921ee4de2ba491951081ba6b21246510c1"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/tokenizer/types.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/tokenizer/types.mjs",
+      "sha256": "694971980ef04d96ce92e6d4b0487e9637d84df23d2c01da40508a0aba3d3bc1"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/types.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/types.mjs",
+      "sha256": "7220719c4d56a39b2b63d28ebe4131f2b59e55c7de96533cd4b1dcdc3a2e02d0"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/util/class-scope.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/util/class-scope.mjs",
+      "sha256": "4aa05ff8765a436757841befc3479660a1ba787270b64c1a829bd7ece87d7497"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/util/expression-scope.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/util/expression-scope.mjs",
+      "sha256": "e78a4938e193f6ac42657278396c2848bac64017adbdaba2df91f814d978c3e1"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/util/identifier.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/util/identifier.mjs",
+      "sha256": "915cbccee5460da1c5a7a9d60f56fdcfb8a2816e355ac56c5e9f4ed62049a8f6"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/util/location.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/util/location.mjs",
+      "sha256": "9d100c2c3a607bf803a537e896662da9448f2f0ac8d00ff6aac3a2c4facaf66d"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/util/production-parameter.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/util/production-parameter.mjs",
+      "sha256": "259a7843694360df30e9a6269fac44162591bc36110aa40c6b9ccca15df95654"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/util/scope.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/util/scope.mjs",
+      "sha256": "edb1bf32d18f23813b721a45161e509ce56c5fbbefcac6e952e25b66f4f7ea4a"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/util/scopeflags.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/util/scopeflags.mjs",
+      "sha256": "7e14f762f53b99b6654b2bbba1a0f9a2fb35add7d751b9b29a4f185a312c9694"
+    },
+    "edition-authoring/vendor/babel-parser/babel-parser/util/whitespace.mjs": {
+      "source": "edition-authoring/vendor/babel-parser/babel-parser/util/whitespace.mjs",
+      "sha256": "4dc932a47c0366fa6d96fc5bcab5c215468c889cdf489319a8221db1dcfd420d"
     },
     "edition-authoring/vendor/yaml/LICENSE": {
       "source": "edition-authoring/vendor/yaml/LICENSE",

@@ -1,0 +1,136 @@
+// Generated from Babel v7.29.8 (MIT); see README.md.
+import { Position } from "../util/location.mjs";
+import { types as ct } from "./context.mjs";
+import { tt } from "./types.mjs";
+var LoopLabelKind = {
+  Loop: 1,
+  Switch: 2
+};
+class State {
+  flags = 1024;
+  get strict() {
+    return (this.flags & 1) > 0;
+  }
+  set strict(v) {
+    v ? this.flags |= 1 : this.flags &= -2;
+  }
+  startIndex;
+  curLine;
+  lineStart;
+  startLoc;
+  endLoc;
+  init({
+    strictMode,
+    sourceType,
+    startIndex,
+    startLine,
+    startColumn
+  }) {
+    this.strict = strictMode === !1 ? !1 : strictMode === !0 ? !0 : sourceType === "module", this.startIndex = startIndex, this.curLine = startLine, this.lineStart = -startColumn, this.startLoc = this.endLoc = new Position(startLine, startColumn, startIndex);
+  }
+  errors = [];
+  potentialArrowAt = -1;
+  noArrowAt = [];
+  noArrowParamsConversionAt = [];
+  get maybeInArrowParameters() {
+    return (this.flags & 2) > 0;
+  }
+  set maybeInArrowParameters(v) {
+    v ? this.flags |= 2 : this.flags &= -3;
+  }
+  get inType() {
+    return (this.flags & 4) > 0;
+  }
+  set inType(v) {
+    v ? this.flags |= 4 : this.flags &= -5;
+  }
+  get noAnonFunctionType() {
+    return (this.flags & 8) > 0;
+  }
+  set noAnonFunctionType(v) {
+    v ? this.flags |= 8 : this.flags &= -9;
+  }
+  get hasFlowComment() {
+    return (this.flags & 16) > 0;
+  }
+  set hasFlowComment(v) {
+    v ? this.flags |= 16 : this.flags &= -17;
+  }
+  get isAmbientContext() {
+    return (this.flags & 32) > 0;
+  }
+  set isAmbientContext(v) {
+    v ? this.flags |= 32 : this.flags &= -33;
+  }
+  get inAbstractClass() {
+    return (this.flags & 64) > 0;
+  }
+  set inAbstractClass(v) {
+    v ? this.flags |= 64 : this.flags &= -65;
+  }
+  get inDisallowConditionalTypesContext() {
+    return (this.flags & 128) > 0;
+  }
+  set inDisallowConditionalTypesContext(v) {
+    v ? this.flags |= 128 : this.flags &= -129;
+  }
+  topicContext = {
+    maxNumOfResolvableTopics: 0,
+    maxTopicIndex: null
+  };
+  get soloAwait() {
+    return (this.flags & 256) > 0;
+  }
+  set soloAwait(v) {
+    v ? this.flags |= 256 : this.flags &= -257;
+  }
+  get inFSharpPipelineDirectBody() {
+    return (this.flags & 512) > 0;
+  }
+  set inFSharpPipelineDirectBody(v) {
+    v ? this.flags |= 512 : this.flags &= -513;
+  }
+  labels = [];
+  commentsLen = 0;
+  commentStack = [];
+  pos = 0;
+  type = tt.eof;
+  value = null;
+  start = 0;
+  end = 0;
+  lastTokEndLoc = null;
+  lastTokStartLoc = null;
+  context = [ct.brace];
+  get canStartJSXElement() {
+    return (this.flags & 1024) > 0;
+  }
+  set canStartJSXElement(v) {
+    v ? this.flags |= 1024 : this.flags &= -1025;
+  }
+  get containsEsc() {
+    return (this.flags & 2048) > 0;
+  }
+  set containsEsc(v) {
+    v ? this.flags |= 2048 : this.flags &= -2049;
+  }
+  firstInvalidTemplateEscapePos = null;
+  get hasTopLevelAwait() {
+    return (this.flags & 4096) > 0;
+  }
+  set hasTopLevelAwait(v) {
+    v ? this.flags |= 4096 : this.flags &= -4097;
+  }
+  strictErrors = /* @__PURE__ */ new Map();
+  tokensLength = 0;
+  curPosition() {
+    return new Position(this.curLine, this.pos - this.lineStart, this.pos + this.startIndex);
+  }
+  clone() {
+    const state = new State();
+    return state.flags = this.flags, state.startIndex = this.startIndex, state.curLine = this.curLine, state.lineStart = this.lineStart, state.startLoc = this.startLoc, state.endLoc = this.endLoc, state.errors = this.errors.slice(), state.potentialArrowAt = this.potentialArrowAt, state.noArrowAt = this.noArrowAt.slice(), state.noArrowParamsConversionAt = this.noArrowParamsConversionAt.slice(), state.topicContext = this.topicContext, state.labels = this.labels.slice(), state.commentsLen = this.commentsLen, state.commentStack = this.commentStack.slice(), state.pos = this.pos, state.type = this.type, state.value = this.value, state.start = this.start, state.end = this.end, state.lastTokEndLoc = this.lastTokEndLoc, state.lastTokStartLoc = this.lastTokStartLoc, state.context = this.context.slice(), state.firstInvalidTemplateEscapePos = this.firstInvalidTemplateEscapePos, state.strictErrors = this.strictErrors, state.tokensLength = this.tokensLength, state;
+  }
+}
+export {
+  LoopLabelKind,
+  State as default
+};

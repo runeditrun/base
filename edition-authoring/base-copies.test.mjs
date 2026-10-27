@@ -428,7 +428,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
     try {
       const {base, seed, revision: original} = fixture(temp);
       let revision = original;
-      const typed = row === 'typescript-extensionless';
+      const typed = ['typescript-extensionless', 'type', 'type-declaration'].includes(row);
       if (typed) {
         for (const [root, prefix] of [[base, 'modules/sample'], [seed, 'vendor/sample']]) fs.renameSync(path.join(root, prefix, 'index.mjs'), path.join(root, prefix, 'index.ts'));
         revision = commit(base);
@@ -493,7 +493,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       else if (row === 'withhold') {
         assert.equal(fs.existsSync(path.join(seed, 'vendor/sample/new.mjs')), false);
         assert.ok(result.report.withheld.some(item => item.path === 'vendor/sample/new.mjs'));
-      } else if (typed) assert.ok(fs.existsSync(path.join(seed, 'vendor/sample/helper.server.ts')));
+      } else if (row === 'typescript-extensionless') assert.ok(fs.existsSync(path.join(seed, 'vendor/sample/helper.server.ts')));
       else if (row === 'witness') assert.ok(fs.existsSync(path.join(seed, 'vendor/shared/helper.mjs')));
       else assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/helper.mjs'), 'utf8'), before['vendor/sample/helper.mjs'].bytes ? Buffer.from(before['vendor/sample/helper.mjs'].bytes, 'hex').toString() : '');
       if (row.startsWith('equal')) assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
