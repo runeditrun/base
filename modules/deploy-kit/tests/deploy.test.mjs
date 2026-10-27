@@ -1,4 +1,4 @@
-import { runCase } from './fold-case.mjs';
+import { caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare } from '../provider.mjs';
@@ -115,18 +115,18 @@ ledgerCase('standard Wrangler name-only inserts remain possible but never become
   assert.equal(db.prepare("SELECT count(*) n FROM sqlite_master WHERE name='from_wrangler'").get().n,0);
 });
 
-test('deployment requires new secrets and preserves already deployed secret values', async () => {
-  for (const {name,run} of secretCaseRows) await runCase(name,run);
+test('deployment requires new secrets and preserves already deployed secret values', async (t) => {
+  await caseRows(t, secretCaseRows.map(({name,run}) => [name,run]));
 });
 
-test('deployment applies only missing migration bytes and preserves prior data on refusal', async () => {
-  for (const {name,run} of sqlCaseRows) await runCase(name,run);
+test('deployment applies only missing migration bytes and preserves prior data on refusal', async (t) => {
+  await caseRows(t, sqlCaseRows.map(({name,run}) => [name,run]));
 });
 
-test('retained deployment refuses provider drift without repair writes', async () => {
-  for (const {name,run} of repeatCaseRows) await runCase(name,run);
+test('retained deployment refuses provider drift without repair writes', async (t) => {
+  await caseRows(t, repeatCaseRows.map(({name,run}) => [name,run]));
 });
 
-test('deployment adopts only attested compatible migration ledgers without replaying product SQL', async () => {
-  for (const {name,run} of ledgerCaseRows) await runCase(name,run);
+test('deployment adopts only attested compatible migration ledgers without replaying product SQL', async (t) => {
+  await caseRows(t, ledgerCaseRows.map(({name,run}) => [name,run]));
 });

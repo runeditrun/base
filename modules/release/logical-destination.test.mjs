@@ -1,4 +1,4 @@
-import { runCase } from '../deploy-kit/tests/fold-case.mjs';
+import { caseRows } from '../deploy-kit/tests/fold-case.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -135,6 +135,6 @@ for (const scenario of ['cli-logical', 'cli-destination', 'project-id', 'project
   });
 }
 
-test('logical publication identity binds committed project, repository, recipe and lock metadata', async () => {
-  for (const {name,run} of logicalCaseRows) await runCase(name,run);
+test('logical publication identity binds committed project, repository, recipe and lock metadata', async (t) => {
+  await caseRows(t, logicalCaseRows.map(({name,run}) => [name,run]));
 });

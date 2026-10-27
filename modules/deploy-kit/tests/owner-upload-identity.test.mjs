@@ -1,4 +1,4 @@
-import { runCase } from './fold-case.mjs';
+import { caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { access, mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
@@ -141,6 +141,6 @@ for (const kind of kinds) {
   });
 }
 
-test('asset upload refuses replaced Worker or resource identities before the Worker PUT', async () => {
-  for (const {name,run} of replacementCaseRows) await runCase(name,run);
+test('asset upload refuses replaced Worker or resource identities before the Worker PUT', async (t) => {
+  await caseRows(t, replacementCaseRows.map(({name,run}) => [name,run]));
 });

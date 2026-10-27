@@ -1,4 +1,4 @@
-import { runCase } from './fold-case.mjs';
+import { caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare } from '../provider.mjs';
@@ -132,6 +132,6 @@ test('resource reconciliation stops before a create when bounded inventory is in
   assert.equal(f.calls.length, 1);
 });
 
-test('bounded R2 inventory traverses complete evidence and refuses ambiguous pages', async () => {
-  for (const {name,run} of boundedCaseRows) await runCase(name,run);
+test('bounded R2 inventory traverses complete evidence and refuses ambiguous pages', async (t) => {
+  await caseRows(t, boundedCaseRows.map(({name,run}) => [name,run]));
 });

@@ -1,4 +1,4 @@
-import { runCase } from './fold-case.mjs';
+import { caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare } from '../provider.mjs';
@@ -236,6 +236,6 @@ cronCase('no-op still requires the recorded active version and etag with correct
   assert.equal(state.writes.length,writes);
 });
 
-test('deployment reconciles declared Cron schedules while refusing removal, drift and stale identities', async () => {
-  for (const {name,run} of cronCaseRows) await runCase(name,run);
+test('deployment reconciles declared Cron schedules while refusing removal, drift and stale identities', async (t) => {
+  await caseRows(t, cronCaseRows.map(({name,run}) => [name,run]));
 });

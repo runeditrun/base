@@ -1,4 +1,4 @@
-import { runCase } from './fold-case.mjs';
+import { caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateMigrations, migrate } from '../migrations.mjs';
@@ -52,6 +52,6 @@ for (const [label, sql] of cases) {
   });
 }
 
-test('comment-only migrations are refused before any provider request or claim', async () => {
-  for (const {name,run} of emptyCaseRows) await runCase(name,run);
+test('comment-only migrations are refused before any provider request or claim', async (t) => {
+  await caseRows(t, emptyCaseRows.map(({name,run}) => [name,run]));
 });

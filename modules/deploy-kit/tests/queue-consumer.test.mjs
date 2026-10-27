@@ -1,4 +1,4 @@
-import { runCase } from './fold-case.mjs';
+import { caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { workerConsumerScript } from '../index.mjs';
@@ -83,6 +83,6 @@ test('observed response settings and DLQ remain strict; repair uses documented r
   }
 });
 
-test('consumer identity admission accepts agreeing Worker aliases and refuses malformed or foreign owners', async () => {
-  for (const {name,run} of identityCaseRows) await runCase(name,run);
+test('consumer identity admission accepts agreeing Worker aliases and refuses malformed or foreign owners', async (t) => {
+  await caseRows(t, identityCaseRows.map(({name,run}) => [name,run]));
 });

@@ -1,4 +1,4 @@
-import { runCase } from './fold-case.mjs';
+import { caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile, access } from 'node:fs/promises';
@@ -173,9 +173,11 @@ ownedCase('a pending Worker that does not carry a recorded build is still refuse
 });
 
 test('a token missing a scope names the scope, not just the status', async t => {
-  for (const [method,path,scope] of [['GET',/^\/d1\/database$/,'d1'],['GET',/^\/r2\/buckets$/,'r2'],['GET',/^\/storage\/kv\/namespaces$/,'kv'],['GET',/^\/queues$/,'queues'],
+  await caseRows(t, await (async () => {
+    const rows = [];
+    for (const [method,path,scope] of [['GET',/^\/d1\/database$/,'d1'],['GET',/^\/r2\/buckets$/,'r2'],['GET',/^\/storage\/kv\/namespaces$/,'kv'],['GET',/^\/queues$/,'queues'],
       ['GET',/^\/workers\/scripts\/penny-production\/settings$/,'workers'],['POST',/^\/r2\/buckets$/,'r2'],['PUT',/^\/workers\/scripts\/penny-production$/,'workers']]) {
-    await t.test(`${method} ${scope}`, async t => {
+    await rows.push([`${method} ${scope}`, async t => {
       const declared = declaration({kv:[{binding:'CACHE'}],queues:[{binding:'JOBS'}]});
       const {args,state,fail} = await setup(t,{declared});
       for (const status of [401,403]) {
@@ -185,8 +187,10 @@ test('a token missing a scope names the scope, not just the status', async t => 
         state.kv.splice(0); state.queues.splice(0); state.databases.splice(0); state.buckets.splice(0); state.settings = null;
         await rm(args.statePath,{force:true});
       }
-    });
+    }]);
   }
+    return rows;
+  })());
   const provider = ownerProvider(); t.after(() => provider.close());
   provider.fail('GET',/^\/workers\/subdomain$/,{status:403});
   await assert.rejects(ownerTarget(cloudflare(provider),{project:'runeditrun/penny',environment:'production'}),/token-scope-missing-workers/);
@@ -254,10 +258,10 @@ test('the owner CLI reports the named codes', async t => {
   assert.equal(provider.state.writes.length,0);
 });
 
-test('owner deployment distinguishes its resumable Worker and bucket from replacements', async () => {
-  for (const {name,run} of ownedCaseRows) await runCase(name,run);
+test('owner deployment distinguishes its resumable Worker and bucket from replacements', async (t) => {
+  await caseRows(t, ownedCaseRows.map(({name,run}) => [name,run]));
 });
 
-test('owner deployment serializes state changes and releases only its own lock', async () => {
-  for (const {name,run} of lockCaseRows) await runCase(name,run);
+test('owner deployment serializes state changes and releases only its own lock', async (t) => {
+  await caseRows(t, lockCaseRows.map(({name,run}) => [name,run]));
 });

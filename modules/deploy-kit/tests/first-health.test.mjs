@@ -1,4 +1,4 @@
-import { runCase } from './fold-case.mjs';
+import { caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare } from '../provider.mjs';
@@ -55,6 +55,6 @@ readinessCase('an unchanged repeat makes one health request and records no attem
   assert.equal(again.changed,false);assert.equal(calls,1);assert.equal(again.health,undefined);
 });
 
-test('deployment readiness records bounded transient recovery and terminal failures', async () => {
-  for (const {name,run} of readinessCaseRows) await runCase(name,run);
+test('deployment readiness records bounded transient recovery and terminal failures', async (t) => {
+  await caseRows(t, readinessCaseRows.map(({name,run}) => [name,run]));
 });

@@ -1,4 +1,4 @@
-import { runCase } from './fold-case.mjs';
+import { caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -219,6 +219,6 @@ test('rer deploy retries a claim D1 rolled back on bytes a reviewed rewrite repl
   assert.equal((await deploy()).changed, false, 'the next deploy has nothing to do');
 });
 
-test('migration completion preserves SQL bytes and records each terminator variant exactly once', async () => {
-  for (const {name,run} of completionCaseRows) await runCase(name,run);
+test('migration completion preserves SQL bytes and records each terminator variant exactly once', async (t) => {
+  await caseRows(t, completionCaseRows.map(({name,run}) => [name,run]));
 });

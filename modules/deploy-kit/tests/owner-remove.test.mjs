@@ -1,5 +1,5 @@
 import test from 'node:test';
-import { runCase } from './fold-case.mjs';
+import { caseRows } from './fold-case.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -29,7 +29,9 @@ async function fixture(t) {
 }
 
 test('owned R2 removal retains proof on interrupted purge and refuses replacements and incomplete readback', async t => {
- for (const scenario of ['replacement-after-preflight','replacement-during-purge','partial-delete','bucket-remains','incomplete-pagination']) await runCase(scenario, async t => {
+ await caseRows(t, await (async () => {
+    const rows = [];
+    for (const scenario of ['replacement-after-preflight','replacement-during-purge','partial-delete','bucket-remains','incomplete-pagination']) rows.push([scenario, async t => {
   const f = await fixture(t);
   let replaced = false;
   f.intercept(async (input, init = {}) => {
@@ -65,7 +67,9 @@ test('owned R2 removal retains proof on interrupted purge and refuses replacemen
    assert.equal(f.state.buckets.length,0);
   }
   if (scenario === 'incomplete-pagination') assert.equal(f.objects.size,2);
- });
+ }]);
+    return rows;
+  })());
 });
 
 test('owned R2 removal purges short object listings without metadata and refuses ambiguous pages', async t => {
@@ -73,7 +77,9 @@ test('owned R2 removal purges short object listings without metadata and refuses
   'issues/01M4Z5M6QSXHVE57A0H79TGRRM/01M4Z5N128HB91117VG46N6FV0',
   'issues/01M4Z5M6QSXHVE57A0H79TGRRM/01M4Z5N3F64S7RZ5R15555HF88',
  ];
- for (const scenario of ['absent','null','cursor','full-absent','full-null','missing-cursor','terminal-cursor','duplicate']) await runCase(scenario, async t => {
+ await caseRows(t, await (async () => {
+    const rows = [];
+    for (const scenario of ['absent','null','cursor','full-absent','full-null','missing-cursor','terminal-cursor','duplicate']) rows.push([scenario, async t => {
   const f = await fixture(t), listed = [];
   f.objects.clear();
   for (const key of keys) f.objects.set(key, Buffer.from('stored data'));
@@ -112,5 +118,7 @@ test('owned R2 removal purges short object listings without metadata and refuses
    assert.equal(f.state.buckets.length,1);
    assert.deepEqual(JSON.parse(await readFile(f.statePath,'utf8')).owned.r2,f.saved.owned.r2);
   }
- });
+ }]);
+    return rows;
+  })());
 });

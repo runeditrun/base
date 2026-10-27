@@ -1,5 +1,5 @@
 import test from 'node:test';
-import { runCase } from './fold-case.mjs';
+import { caseRows } from './fold-case.mjs';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { validateMigrations, migrate } from '../migrations.mjs';
@@ -387,6 +387,6 @@ admission('BEGIN in a trigger name or header operand is distinct from the body b
   assert.throws(() => validate(`${sql} COMMIT;`), /unsafe-migration-control/);
 });
 
-test('migration SQL admission preserves application SQL and refuses controller transaction or ledger access', async () => {
-  for (const {name,run} of admissionRows) await runCase(name,run);
+test('migration SQL admission preserves application SQL and refuses controller transaction or ledger access', async (t) => {
+  await caseRows(t, admissionRows.map(({name,run}) => [name,run]));
 });

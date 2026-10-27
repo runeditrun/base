@@ -1,4 +1,4 @@
-import { runCase } from '../deploy-kit/tests/fold-case.mjs';
+import { caseRows } from '../deploy-kit/tests/fold-case.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { testSummary } from './test-summary.mjs';
@@ -89,6 +89,6 @@ summaryCase('duration units stay numeric and counters remain safe integers', () 
     counts({ tests: Number.MAX_SAFE_INTEGER }));
 });
 
-test('release test summaries count only bounded reporter outcomes across byte boundaries', async () => {
-  for (const {name,run} of summaryCaseRows) await runCase(name,run);
+test('release test summaries count only bounded reporter outcomes across byte boundaries', async (t) => {
+  await caseRows(t, summaryCaseRows.map(({name,run}) => [name,run]));
 });

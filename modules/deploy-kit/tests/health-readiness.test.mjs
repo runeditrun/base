@@ -1,3 +1,4 @@
+import { caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare, deploy, verifyHealth, defaultStagePlan } from '../index.mjs';
@@ -40,7 +41,9 @@ test('health that settles from 404 and 503 inside the window passes, with bounde
 });
 
 test('standalone health verification recovers from each transient HTTP status', async t => {
+  const rows = [];
   for (const status of [404,503]) {
+    rows.push([String(status), async t => {
     const {args,state,clock,sleeps} = setup(t);
     const receipt = await deploy(args);
     let calls = 0;
@@ -52,31 +55,42 @@ test('standalone health verification recovers from each transient HTTP status', 
     assert.equal((await verifyHealth({...args,receipt,fetch,...clock})).ok,true, `standalone ${status} recovers`);
     assert.equal(calls,2, `standalone ${status} retries once`);
     assert.deepEqual(sleeps,[2000], `standalone ${status} waits within the window`);
+
+    }]);
   }
+  await caseRows(t, rows);
 });
 
 test('health that never settles fails with the deploy-kit code at the deadline', async t => {
+  const rows = [];
   const {args,state,clock,sleeps} = setup(t);
   const receipt = await deploy(args);
   for (const [response,code] of [
     [() => new Response('',{status:503}),'health-http-failed'],
     [() => { throw new TypeError('test-only connection reset'); },'health-transport-failed'],
   ]) {
+    rows.push([String(code), async t => {
     let calls = 0;
     sleeps.length = 0;
     state.healthOverride = () => { calls++; return response(); };
     await assert.rejects(verifyHealth({...args,receipt,timeoutMs:6000,...clock}),error => error.message === code);
     assert.equal(calls,3);
     assert.deepEqual(sleeps,[2000,2000,2000]);
+
+    }]);
   }
   for (const status of [401,302,500]) {
+    rows.push([String(status), async t => {
     let calls = 0;
     sleeps.length = 0;
     state.healthOverride = () => { calls++; return new Response('',{status}); };
     await assert.rejects(verifyHealth({...args,receipt,...clock}),error => error.message === 'health-http-failed');
     assert.equal(calls,1);
     assert.deepEqual(sleeps,[]);
+
+    }]);
   }
+  await caseRows(t, rows);
 });
 
 test('the health request carries no credential and asks for uncached JSON without following redirects', async t => {

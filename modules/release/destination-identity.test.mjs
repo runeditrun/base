@@ -1,4 +1,4 @@
-import { runCase } from '../deploy-kit/tests/fold-case.mjs';
+import { caseRows } from '../deploy-kit/tests/fold-case.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -195,10 +195,10 @@ for (const [declared, state, status, rule] of [
   });
 }
 
-test('GitHub response classification preserves public, private, missing and incomplete evidence across package modes', async () => {
-  for (const {name,run} of responseCaseRows) await runCase(name,run);
+test('GitHub response classification preserves public, private, missing and incomplete evidence across package modes', async (t) => {
+  await caseRows(t, responseCaseRows.map(({name,run}) => [name,run]));
 });
 
-test('publication destination admission binds distinct identities across history modes and refuses unsafe evidence', async () => {
-  for (const {name,run} of destinationCaseRows) await runCase(name,run);
+test('publication destination admission binds distinct identities across history modes and refuses unsafe evidence', async (t) => {
+  await caseRows(t, destinationCaseRows.map(({name,run}) => [name,run]));
 });

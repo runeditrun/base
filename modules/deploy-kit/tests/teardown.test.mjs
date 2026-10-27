@@ -1,4 +1,4 @@
-import { runCase } from './fold-case.mjs';
+import { caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare } from '../provider.mjs';
@@ -73,6 +73,6 @@ test('a schedule set that never clears leaves the Worker in place with a plain m
   assert(!calls.some(call=>call.startsWith('DELETE')));
 });
 
-test('teardown verification requires a complete empty owned-resource inventory', async () => {
-  for (const {name,run} of inventoryCaseRows) await runCase(name,run);
+test('teardown verification requires a complete empty owned-resource inventory', async (t) => {
+  await caseRows(t, inventoryCaseRows.map(({name,run}) => [name,run]));
 });
