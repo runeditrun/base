@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.83-dev.gc935aed9",
+  "cliVersion": "0.2.83-dev.ge5ca23a8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1207,7 +1207,7 @@
     },
     "edition-authoring/module-edges.mjs": {
       "source": "edition-authoring/module-edges.mjs",
-      "sha256": "808943a98e9d171b09a807fa7fb62d7e4c440ac1f582831254b6bf1adcbf56ca"
+      "sha256": "04db07d4c56caee955568004589047625a187948640351ad0d14e1ac69097741"
     },
     "edition-authoring/module-resolution.mjs": {
       "source": "edition-authoring/module-resolution.mjs",
