@@ -101,6 +101,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     if (seen.has(target)) return new Set();
     seen.add(target); inspect(target);
     if (!disk.has(target)) return null;
+    if (!types && /\.d\.[cm]?ts$/.test(target)) return new Set();
     const result = lexicalExports(local(target), specifier => {
       const next = resolve(disk, target, specifier);
       return next ? exportsAt(next, types, seen) : null;

@@ -418,7 +418,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       assert.equal(ok(seed, 'verify-base', '--base', base).ok, true, row.name);
     } finally { fs.rmSync(temp, {recursive: true, force: true}); }
   }
-  for (const row of ['named', 'default', 'type', 'declaration', 'type-declaration', 'generator', 'equal', 'equal-singleton', 'multi', 'star', 'unknown', 'baseline', 'mapped', 'extensionless', 'withhold', 'withhold-last', 'witness', 'unplaceable']) {
+  for (const row of ['named', 'default', 'type', 'declaration', 'declaration-target', 'type-declaration', 'generator', 'equal', 'equal-singleton', 'multi', 'star', 'unknown', 'baseline', 'mapped', 'extensionless', 'withhold', 'withhold-last', 'witness', 'unplaceable']) {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-module-'));
     try {
       const {base, seed, revision} = fixture(temp);
@@ -449,6 +449,10 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
         }
         if (row === 'star') write(seed, 'vendor/sample/leaf.mjs', 'export const missing = true;\n');
         if (row === 'declaration' || row === 'type-declaration') write(seed, 'vendor/sample/helper.d.mts', 'export type missing = boolean;\n');
+        if (row === 'declaration-target') {
+          fs.rmSync(path.join(seed, 'vendor/sample/helper.mjs'));
+          write(seed, 'vendor/sample/helper.d.mts', 'export declare const missing: boolean;\n');
+        }
         if (row === 'baseline') {
           write(base, 'modules/sample/index.mjs', incoming);
           const baseline = commit(base);
@@ -464,7 +468,7 @@ test('refresh-base closes authoring sibling imports while preserving edition-own
       if (row !== 'withhold-last') write(base, 'modules/sample/index.mjs', fs.readFileSync(path.join(base, 'modules/sample/index.mjs'), 'utf8') + '// incoming revision\n');
       const next = commit(base), before = snapshotTree(seed);
       const result = run(seed, 'refresh-base', next, '--base', base);
-      const refused = ['named', 'default', 'type', 'declaration', 'unplaceable', 'withhold-last'].includes(row);
+      const refused = ['named', 'default', 'type', 'declaration', 'declaration-target', 'unplaceable', 'withhold-last'].includes(row);
       assert.equal(result.status, refused ? 1 : 0, `${row}: ${result.error}`);
       if (refused) assert.deepEqual(snapshotTree(seed), before, row);
       else if (row === 'withhold') {

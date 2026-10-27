@@ -74,7 +74,7 @@ export function lexicalExports(source, star, types = false) {
   for (let i = 0; i < t.length; i++) {
     if (t[i] !== 'export') continue;
     let j = i + 1;
-    if (t[j] === 'default') { names.add('default'); continue; }
+    if (t[j] === 'default') { if (types || !['interface', 'type'].includes(t[j + 1])) names.add('default'); continue; }
     const declared = t[j] === 'declare';
     if (declared) j++;
     if (t[j] === 'async') j++;
