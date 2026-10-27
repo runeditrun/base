@@ -116,7 +116,7 @@ export const commandAdapter = declare(localInstaller({ tools: [] }), { scheduled
  await writeFile(join(fixture, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'synthetic-base-1', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { install: { argv: ['node', 'adapter.mjs'], inputs: [], effects: 'Install dependencies.' } } }));
  const failed = await run(rer, ['install', '--no-queue'], pnpmEnv, undefined, fixture);
  t.diagnostic(`Stale packed install: ${failed.code}\n${failed.stdout}${failed.stderr}`);
- assert.notEqual(failed.code, 0);
+ assert.equal(failed.code, 1);
  assert.match(failed.stderr, /pnpm-lock.yaml does not match package.json/);
  assert.doesNotMatch(failed.stdout + failed.stderr, /ERR_PNPM_|Last 20|Command:|Exit code:/);
  const data = await run(rer, ['install', '--no-queue', '--json'], pnpmEnv, undefined, fixture);
@@ -130,9 +130,12 @@ export const commandAdapter = declare(localInstaller({ tools: [] }), { scheduled
  assert.equal((await run(rer, ['install', '--no-queue'], pnpmEnv, undefined, fixture)).code, 0);
  await rm(join(fixture, 'pnpm-lock.yaml'));
  const absent = await run(rer, ['install', '--no-queue'], pnpmEnv, undefined, fixture);
- assert.notEqual(absent.code, 0);
+ t.diagnostic(`Missing packed install: ${absent.code}\n${absent.stdout}${absent.stderr}`);
+ assert.equal(absent.code, 1);
  assert.match(absent.stderr, /pnpm-lock.yaml is missing/);
  assert.doesNotMatch(absent.stdout + absent.stderr, /ERR_PNPM_/);
+ const missingData = await run(rer, ['install', '--no-queue', '--json'], pnpmEnv, undefined, fixture);
+ assert.equal(missingData.stdout.trim().split('\n').map(JSON.parse).find(row => row.event === 'error').code, 'ERR_PNPM_NO_LOCKFILE');
 
  // The installer's last line puts rer on PATH: in the shell that runs it, and
  // in a new login shell of the person's SHELL that starts without it.
