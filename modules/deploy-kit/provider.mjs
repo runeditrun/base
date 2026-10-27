@@ -1,7 +1,7 @@
 import { providerPages, providerListShape } from './pagination.mjs';
 import { deleteR2Object } from './r2-object-transport.mjs';
 import { isR2ObjectDelete } from './r2-objects.mjs';
-import { recordDeployFailure } from './diagnostics.mjs';
+import { recordDeployFailure, providerText } from './diagnostics.mjs';
 import { D1_IMPORT_POLL_LIMIT, importD1, importUploadURL } from './d1-import.mjs';
 import { assert, hexId, uuid } from './validation.mjs';
 import { providerResponse, transportOutput, transportReason } from './provider-transport.mjs';
@@ -50,7 +50,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     maxRequests = limit;
   }
   // `zone` scope: the zone-level API (/zones/...), for a run site's zone lookup and redirect rule.
-  async function rawEnvelope(path, { method = 'GET', body, assetToken, zone = false, signal: callerSignal } = {}) {
+  async function rawEnvelope(path, { method = 'GET', body, assetToken, zone = false, signal: callerSignal, step } = {}) {
     assert(typeof path === 'string' && (isR2ObjectDelete(path, method) || /^\/[a-z0-9/_?=&.,%-]+$/i.test(path) && !path.includes('..') && !path.split('?')[0].includes('%')), 'invalid-provider-path');
     assert(!zone || /^\/zones(?:[/?]|$)/.test(path), 'invalid-provider-path');
     assert(++requests <= maxRequests, 'provider-request-budget');
@@ -62,12 +62,17 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     const redactAuth = text => /\/r2\/buckets\/[^/]+\/objects(?:[/?]|$)/.test(path) ? '[R2 object details omitted]' : /\/d1\/database\/[^/]+\/import$/.test(path) ? redactCredentials(text).replace(/\bhttps?:\/\/\S+/gi,'[URL omitted]') : redactCredentials(text);
     const operation = `${method} ${path.split('?')[0].replace(/(\/r2\/buckets\/[^/]+\/objects)\/.*/, '$1/[object]')}`;
     const endpoint = redactCredentials(`https://api.cloudflare.com/client/v4${zone ? '' : '/accounts/[REDACTED]'}${operation.slice(method.length + 1)}`);
+    const started = performance.now();
+    const detail = (status, cause) => ({method,endpoint:endpoint.replace('https://api.cloudflare.com',''),status,elapsedMs:Math.round(performance.now()-started),timeoutMs,cause});
+    const failureStep = step ?? `${method} ${operation.slice(method.length + 1)}`;
     const transportFailure = (cause, attempts, status = null) => {
       const error = new Error('provider-transport-failed');
       // Portable across vendored kit copies used by custom deploy hooks. Raw
       // network messages stay private until the CLI applies its redactor.
       error.providerTransport = {operation:redactCredentials(operation),endpoint,attempts,status,reason:transportReason(cause)};
-      return recordDeployFailure(error,{output:redactAuth(transportOutput(cause))});
+      const reason = transportReason(cause);
+      const kind = reason === 'TimeoutError' || reason === 'UND_ERR_CONNECT_TIMEOUT' ? 'timeout' : /ECONNRESET|EPIPE|UND_ERR_SOCKET/.test(reason) ? 'connection reset' : /ENOTFOUND|EAI_AGAIN/.test(reason) ? 'DNS failure' : /TLS|CERT|SSL/.test(reason) ? 'TLS failure' : reason === 'AbortError' ? 'cancelled' : 'network failure';
+      return recordDeployFailure(error,{step:failureStep,providerRequest:detail(status,kind),output:providerText(transportOutput(cause),redactAuth,Infinity)});
     };
     const {response,output = ''} = await providerResponse({method,timeoutMs,callerSignal:deadlineSignal(callerSignal),removal,
       replayableAsset:method === 'POST' && (/^\/workers\/scripts\/[^/]+\/assets-upload-session$/.test(path) || path === '/workers/assets/upload?base64=true'),
@@ -92,8 +97,8 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
       const said = (Array.isArray(payload?.errors) ? payload.errors : []).filter(x => Number.isSafeInteger(x?.code) || typeof x?.message === 'string').slice(0,3)
         .map(x => ({...(Number.isSafeInteger(x.code) ? {code:x.code} : {}),...(typeof x.message === 'string' ? {message:bounded(x.message)} : {})}));
       error.providerRefusal = {operation:redactCredentials(operation),errors:said.length || payload !== undefined || !output.trim() ? said : [{message:bounded(output.trim().split('\n')[0])}]};
-      throw recordDeployFailure(error,{providerCodes:(Array.isArray(payload?.errors) ? payload.errors : []).filter(x => Number.isSafeInteger(x?.code)).map(x=>x.code).slice(0,8),
-        output:redactAuth(Array.isArray(payload?.errors) ? payload.errors.filter(x=>typeof x?.message==='string').map(x=>x.message).join('\n') : output)});
+      throw recordDeployFailure(error,{step:failureStep,providerRequest:detail(response.status,'HTTP refusal'),providerCodes:(Array.isArray(payload?.errors) ? payload.errors : []).filter(x => Number.isSafeInteger(x?.code)).map(x=>x.code).slice(0,8),
+        output:providerText(output,redactAuth,Infinity)});
     }
     assert(payload?.success === true && Object.hasOwn(payload,'result') && (!payload.errors || Array.isArray(payload.errors) && !payload.errors.length), 'provider-unsuccessful-or-malformed');
     if (/^\/d1\/database\/[^/]+\/query$/.test(path) && Array.isArray(payload.result)) {
