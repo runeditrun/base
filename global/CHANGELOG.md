@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Prevent "fetch failed" and UND_ERR_SOCKET on local worker requests by closing each loopback harness connection after its response instead of reusing idle sockets. Readiness, owner claims and seed runtime journeys share this transport without retries.
+
 ## 0.2.83
 
 - Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.
