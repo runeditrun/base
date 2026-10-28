@@ -18,9 +18,9 @@ test('rer verify drives signed, setup-token and native owner lifecycles through 
   const result = JSON.parse(stdout.trim().split('\n').at(-1));
   assert.equal(result.ok, true, stderr + stdout);
   assert.equal(result.agentDoor.ok, true, stdout);
-  // Binding names are reported; the per-run issuer and other minted values never are.
-  assert.match(stdout, /native bindings FIXTURE_MANAGEMENT_ORIGIN \(issuer\), FIXTURE_INSTALLATION_ID \(installationId\)/);
-  assert.doesNotMatch(stdout, /synthetic-base-1-[0-9a-f-]{36}\.invalid/);
+  // Binding names are reported on progress; the per-run issuer and other minted values never are.
+  assert.match(stderr, /native bindings FIXTURE_MANAGEMENT_ORIGIN \(issuer\), FIXTURE_INSTALLATION_ID \(installationId\)/);
+  assert.doesNotMatch(stdout + stderr, /synthetic-base-1-[0-9a-f-]{36}\.invalid/);
   const durable = result.agentDoor.points.filter(point => point.id.startsWith('BASE-AGENT-004.durable.'));
   assert.ok(durable.some(point => point.id.endsWith('.revoked')) && durable.every(point => point.ok), stdout);
   t.diagnostic(`${mode}: rer verify PASS; ${result.agentDoor.points.filter(point => point.ok).length}/${result.agentDoor.points.length} conformance points (${durable.length} durable consent); native bindings, JSON/SSE, signed receiver, undeclared 502 and adapter network denial completed.`);
@@ -51,8 +51,8 @@ test('rer verify binds only the native names a seed declares', { timeout: 120000
  const root = await fixtureSeed(t, 'signed', partial);
  const failure = await run(process.execPath, [join(base, 'bin/rer.mjs'), 'verify', '--cwd', root, '--json'], { env, timeout: 75000, maxBuffer: 4 * 1024 * 1024 }).then(() => null, error => error);
  assert.ok(failure, 'verify must fail without the undeclared installation binding');
- assert.match(failure.stdout, /BASE-AGENT-001\.owner-bootstrap: Native owner bootstrap returned HTTP 503/);
- assert.doesNotMatch(failure.stdout, /synthetic-base-1-[0-9a-f-]{36}\.invalid/);
+ assert.match(failure.stderr, /FAIL BASE-AGENT-001\.owner-bootstrap: Native owner bootstrap returned HTTP 503/);
+ assert.doesNotMatch(failure.stdout + failure.stderr, /synthetic-base-1-[0-9a-f-]{36}\.invalid/);
  t.diagnostic('One declared binding: the undeclared FIXTURE_INSTALLATION_ID was not injected; bootstrap HTTP 503, no writes, no minted value printed.');
 });
 
