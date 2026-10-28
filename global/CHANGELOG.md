@@ -24,6 +24,7 @@
 - First runs needed a shell PATH detour, led with machine lines and an unlabelled site URL, showed a fixed owner address without explanation, and timed every phase from the launch. The installer now prints a quoted absolute launch command, ready output leads with one plain app link and labels the site, the owner form explains the local account, and each launch phase is timed separately; machine ready output is unchanged.
 - The shared hosting guide listed its options in a different order from the Run chooser. It now follows the chooser: the one-line local run first, then Assisted, then Managed for a listing that offers it, then the do-it-yourself Cloudflare steps, with plan copy, sign-up state and links taken from the chooser.
 - Automatic `rer dev` port selection could exhaust its 1,000 candidates when stopped checkouts kept saved setup records. A saved setup port now excludes a candidate only while that checkout's launch worker or server still runs with its recorded start identity; live servers, active claims and bound sockets still exclude their ports, and an exhausted search still names its range and candidate count.
+- Publication scans rejected OpenAI noreply co-author trailers in commit messages. That provider's exact `noreply` address is now accepted in the final trailer paragraph, as the Anthropic and GitHub ones are; personal addresses, body text, other trailer keys, other or lookalike domains, files and annotated tags still fail.
 
 ## 0.2.84
 
