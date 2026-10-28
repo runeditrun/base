@@ -78,7 +78,7 @@
 
 - Expose frozen agent-door admission identity, granted scopes, operation id and idempotency key to native tools. Bind queued continuations to their retained admission, preserve named approvers and once-only replay, and recheck current grants and consent before effects.
 
-- Add `rer business setup --origin URL --session-file FILE --confirm-demo` to provision the synthetic Run your business demo through the platform owner routes. Mirror managed/assisted/self_host hosting, resumable door proofs and read-only completed repeats; require an owned 0600 session file, keep its value out of output, and retain the platform JSON receipt and nonzero incomplete result.
+- Add `rer business setup --origin URL --session-file FILE --confirm-demo` to provision the synthetic Run your business demo through the platform owner routes. Mirror managed/assisted/self_host hosting, resumable door proofs and read-only completed repeats; require an owned 0600 session file, keep its value out of output, and retain the platform JSON receipt. Exit 0 requires every required seed to be provisioned, token-issued, policy-confirmed, settings-delivered and door-proved; completed repeats return equal receipts.
 
 - Prove publication-scan copy digests per file, so an adapted file in a directory copy no longer discards its unchanged siblings' proofs. Mismatched digests, adapted content and unlisted files remain fully scanned.
 
