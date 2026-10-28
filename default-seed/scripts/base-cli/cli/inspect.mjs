@@ -1,3 +1,4 @@
+import { checkTestBudget } from './check-tests.mjs';
 import { browserDoctor } from './browser-runtime.mjs';
 import { dependencyDoctor } from './dependency-doctor.mjs';
 import { inventory } from './export.mjs';
@@ -77,9 +78,11 @@ async function localState(project) {
 }
 
 export async function check(project, explicitProfile) {
+ const testBudget = await checkTestBudget(project.root);
  const clauses = [], add = (id, ok, message) => clauses.push({ id, ok: Boolean(ok), ...(!ok ? { message } : {}) });
  // A warning, never a failing clause: live run sites redeploy while seeds keep Base's mark.
  let placeholderMarks = [];
+ if (testBudget) add('TEST.budget', testBudget.ok, testBudget.message);
  clauses.push(...await deliveryDeclarationClauses(project.root));
  for (const command of project.commands) add('SC-10.inputs.' + command.name, command.available, `Restore the declared inputs for ${command.name}.`);
  for (const loop of project.descriptor.loops ?? []) add('SC-10.loop.' + loop.id, !loop.required || loop.enabled, `Enable the required ${loop.id} loop or correct its declaration.`);
@@ -142,7 +145,7 @@ export async function check(project, explicitProfile) {
   placeholderMarks = await checkoutPlaceholderMarks(project.root, project.descriptor.project);
  }
  for(const issue of await localAiDiagnostics(project,process.env))add('AI.'+issue.feature,false,issue.code+': '+issue.message);
- return { clauses, ok: clauses.every(clause => clause.ok), placeholderMarks };
+ return { clauses, ok: clauses.every(clause => clause.ok), placeholderMarks, ...(testBudget ? { testBudget } : {}) };
 }
 
 // Package mode: the exact pin, its lockfile entry, no vendored copy and no

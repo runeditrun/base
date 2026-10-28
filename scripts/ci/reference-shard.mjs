@@ -3,27 +3,42 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { verificationPlan } from '../../default-seed/scripts/verify-app.mjs';
 
+export const REFERENCE_SHARDS = 2;
+const moved = ['auth-emitted', 'journey-demo'];
+
 export async function referenceShardPlan() {
   const plan = await verificationPlan();
   const push = plan.push.map(({ name }) => name);
   const groups = {
-    '1': push.filter(name => name === 'journey-erasure'),
-    '2': push.filter(name => name !== 'journey-erasure'),
+    push,
     nightly: plan.nightly.map(({ name }) => name),
   };
-  assert.equal(groups['1'].length, 1, 'Reference verification needs the journey-erasure shard');
-  assert.ok(groups['2'].length, 'Reference verification needs the remaining push shards');
-  assert.ok(groups.nightly.length, 'Reference verification needs nightly journeys');
-  assert.deepEqual([...groups['1'], ...groups['2']].sort(), [...push].sort(), 'Reference CI must cover every push shard exactly once');
+  assert.ok(groups.push.length, 'Reference verification needs push shards');
+  assert.equal(new Set(groups.push).size, push.length, 'Reference CI must cover every push shard exactly once');
   return groups;
 }
 
-export async function verifyReferenceShard(shard) {
-  assert.ok(['1', '2', 'nightly'].includes(shard), 'REFERENCE_SHARD must be 1, 2 or nightly');
-  const names = (await referenceShardPlan())[shard];
+export async function referencePushShardPlan() {
+  const { push } = await referenceShardPlan();
+  for (const name of moved) assert.ok(push.includes(name), `Missing moved reference entry: ${name}`);
+  const groups = { '1': push.filter(name => !moved.includes(name)), '2': push.filter(name => moved.includes(name)) };
+  assert.ok(Object.values(groups).every(names => names.length), 'Each reference partition needs entries');
+  assert.deepEqual(Object.values(groups).flat().sort(), [...push].sort(), 'Reference CI must cover every selected push entry exactly once');
+  return groups;
+}
+
+export async function verifyReferenceShard(shard, { partition } = {}) {
+  assert.ok(['push', 'nightly'].includes(shard), 'REFERENCE_SHARD must be push or nightly');
+  let names = (await referenceShardPlan())[shard];
+  if (partition !== undefined) {
+    assert.equal(shard, 'push', 'Only push reference entries are partitioned');
+    const groups = await referencePushShardPlan();
+    assert.ok(Object.hasOwn(groups, partition), 'Choose a reference push partition');
+    names = groups[partition];
+  }
   const cwd = fileURLToPath(new URL('../../default-seed/', import.meta.url));
   const queue = fileURLToPath(new URL('../../onboarding/queued-entry.mjs', import.meta.url));
-  const label = shard === 'nightly' ? 'nightly' : `${shard}/2`;
+  const label = partition ? `${shard} partition=${partition}/${REFERENCE_SHARDS}` : shard;
   const started = performance.now();
   let child, signal, code = 0;
   const cancel = value => { signal ??= value; child?.kill(value); };

@@ -9,6 +9,26 @@ import { lookupMainVerification } from '../export/verify-ci.mjs';
 const helper = resolve(import.meta.dirname, '../export/verify-ci.mjs');
 
 test('Base and delivered workflow templates parse with their local reusable workflows', async t => {
+ const { ciPlan, groups } = await import('../scripts/ci/verify.mjs');
+ const { MODULE_SHARDS, moduleShardPlan, moduleTestFiles } = await import('../scripts/ci/module-shard.mjs');
+ const { CLI_SHARDS, cliShardPlan, cliTestFiles } = await import('../scripts/ci/cli-shard.mjs');
+ const { referenceShardPlan, referencePushShardPlan, verifyReferenceShard } = await import('../scripts/ci/reference-shard.mjs');
+ const reference = await referenceShardPlan(), push = await referencePushShardPlan();
+ assert.deepEqual(Object.values(push).flat().sort(), [...reference.push].sort());
+ assert.deepEqual(push['2'], ['auth-emitted', 'journey-demo'], 'move complete measured reference entries');
+ await assert.rejects(verifyReferenceShard('push', { partition: '3' }), /Choose a reference push partition/);
+ const matrix = await ciPlan();
+ assert.equal(matrix.include.length, 8, 'retain the eight-job Linux cap');
+ assert.equal(Object.keys(await moduleShardPlan()).length, MODULE_SHARDS);
+ assert.equal(Object.keys(await cliShardPlan()).length, CLI_SHARDS);
+ assert.deepEqual(Object.values(await moduleShardPlan()).flat().sort(), await moduleTestFiles());
+ assert.deepEqual(Object.values(await cliShardPlan()).flat().sort(), await cliTestFiles());
+ for (const { group, native } of matrix.include) {
+  assert.equal(native, groups[group].some(task => task.stage === 'verify:editor'), 'native setup must follow the editor stage');
+ }
+ const nightly = await ciPlan({ journeys: true });
+ assert.deepEqual(nightly.include.slice(0, -1), matrix.include);
+ assert.equal(nightly.include.at(-1).group, 'journeys', 'retain the scheduled journeys');
  const root = resolve(import.meta.dirname, '..');
  const temporary = await mkdtemp(join(tmpdir(), 'rer-workflow-lint-'));
  t.after(() => rm(temporary, { recursive: true, force: true }));
@@ -37,6 +57,21 @@ test('Base and delivered workflow templates parse with their local reusable work
    }
   }
  }
+ // Exercise the ordered file runner with module-level effects: no new test
+ // registrations. Keep selected entries, order and a failing command's exit.
+ const log = join(temporary, 'selected.log');
+ const selected = [join(temporary, 'z-pass.mjs'), join(temporary, 'a-fail.mjs')];
+ const unselected = join(temporary, 'unselected.mjs');
+ for (const [index, file] of [...selected, unselected].entries()) {
+  await writeFile(file, `import { appendFileSync } from 'node:fs'; appendFileSync(${JSON.stringify(log)}, '${index}\\n'); ${index === 1 ? "throw Error('selected failure');" : ''}\n`);
+ }
+ const runnerEnv = { ...process.env }; delete runnerEnv.NODE_TEST_CONTEXT;
+ const ordered = spawnSync(process.execPath, [join(root, 'scripts/ci/run-files.mjs'), '1', ...selected], { encoding: 'utf8', env: runnerEnv });
+ assert.equal(ordered.status, 1, ordered.stdout + ordered.stderr);
+ assert.equal(await readFile(log, 'utf8'), '0\n1\n', 'keep the selected files and their order');
+ const passed = spawnSync(process.execPath, [join(root, 'scripts/ci/run-files.mjs'), '2', selected[0]], { encoding: 'utf8', env: runnerEnv });
+ assert.equal(passed.status, 0, passed.stdout + passed.stderr);
+
 });
 // Public GitHub responses recorded 2026-10-23: runeditrun/base Verify run
 // 39821100223 (the rer-v0.2.79 tag push) and its jobs. Only fields consumed by
