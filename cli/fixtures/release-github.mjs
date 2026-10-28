@@ -54,6 +54,7 @@ const fs = require('node:fs'), args = process.argv.slice(2), path = args.at(-1);
 fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args) + '\\n');
 const responses = JSON.parse(fs.readFileSync(${JSON.stringify(responses)}, 'utf8'));
 if (args.includes('--include')) { process.stdout.write('HTTP/2.0 200 OK\\r\\n\\r\\n{"private":false}'); }
+else if (responses.__failure) { process.stderr.write(responses.__failure.stderr); process.exitCode = responses.__failure.status; }
 else if (Object.hasOwn(responses, path)) { process.stdout.write(JSON.stringify(responses[path])); }
 else { process.stderr.write('unexpected API request'); process.exitCode = 1; }
 `);
@@ -69,11 +70,11 @@ else { process.stderr.write('unexpected API request'); process.exitCode = 1; }
   const run = { id: 12345, workflow_id: 42, head_sha: f.sha, head_branch: 'main', event: 'push',
     status: 'completed', conclusion: 'success', repository: { full_name: repository }, head_repository: { full_name: repository } };
   let attempt = 0;
-  function invoke(runs = [run], flags = [], extra = {}, { dryRun = true, validationError = false } = {}) {
+  function invoke(runs = [run], flags = [], extra = {}, { dryRun = true, validationError = false, ghFailure } = {}) {
     writeFileSync(responses, JSON.stringify({
       [`repos/${repository}`]: { full_name: repository, default_branch: 'main' },
       [`repos/${repository}/actions/workflows?per_page=100`]: [{ workflows: [{ id: 42, name: 'Verify' }] }],
-      [`repos/${repository}/actions/workflows/42/runs?head_sha=${f.sha}&per_page=100`]: [{ workflow_runs: runs }], ...extra,
+      [`repos/${repository}/actions/workflows/42/runs?head_sha=${f.sha}&per_page=100`]: [{ workflow_runs: runs }], ...extra, ...(ghFailure ? { __failure: ghFailure } : {}),
     }));
     const output = join(f.temporary, 'release-' + attempt++);
     const result = spawnSync(process.execPath, [cli, 'release', '--repo', f.repo, '--project', repository,

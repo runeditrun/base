@@ -18,6 +18,7 @@
 - After Business pairing, name `business next` as the next step; both `next` and `run` apply the owner's latest computer choices without reconnecting.
 - Lead Business setup and local launch with one plain next step, defer optional shell setup until ready, and show a shared cold-run budget plus measured archive downloads and disk use.
 - Carry the paired Business name and display settings into local first-party apps at connect, setup and dev; refresh live apps while Business runs and remove the local carry on disconnect.
+- Include the GitHub CLI exit status and bounded, redacted stderr in unavailable release verification receipts; retain authentication guidance when stderr is empty.
 
 ## 0.2.84
 

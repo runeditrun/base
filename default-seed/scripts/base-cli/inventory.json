@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.84-dev.gf0a627f0",
+  "cliVersion": "0.2.84-dev.g11ad06e1",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4439,7 +4439,7 @@
     },
     "modules/release/github-verify.mjs": {
       "source": "modules/release/github-verify.mjs",
-      "sha256": "5971db3fa47c2ebbda7b7fbfb381c27c67dc5ad30eb33e88e4b65174921cdb29"
+      "sha256": "bcd28f1daea6d051c51c1797f72bf6d8f2e32eb0edd425b69a125d926a0acefe"
     },
     "modules/release/keygen.mjs": {
       "source": "modules/release/keygen.mjs",
