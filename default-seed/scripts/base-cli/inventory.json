@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g1a6b8370",
+  "cliVersion": "0.2.85-dev.g02c14769",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -819,7 +819,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "3af3c189c71b2688e48ab9c8e844d53ef4352e9b721fb5cfa7560e3aa396aa75"
+      "sha256": "26f84c7c817479fc5b1600eb8273e7f44a84a7881ee382e83e37e1fb17501bc6"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
