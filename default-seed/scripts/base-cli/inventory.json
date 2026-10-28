@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g0cad22d3",
+  "cliVersion": "0.2.85-dev.g4d11a237",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -689,13 +689,17 @@
       "source": "cli/demo-build.mjs",
       "sha256": "c5f65956a44a2e9662a352c1d03a8b4130a4500381f15a7befa952715e032921"
     },
+    "cli/demo-deploy-error.mjs": {
+      "source": "cli/demo-deploy-error.mjs",
+      "sha256": "726590ad339264fe851cb1f7e601ac3925c3074de51433536403e75f988c1663"
+    },
     "cli/demo-host.mjs": {
       "source": "cli/demo-host.mjs",
       "sha256": "eaa5ed6d54c10690f5050e2f179a5267216d0a9ee9326c728b607c59a3757366"
     },
     "cli/demo-native.mjs": {
       "source": "cli/demo-native.mjs",
-      "sha256": "64f9b45d9235854fe8b24cfef050ab305f7b31855918d0b6824e00772946eaa1"
+      "sha256": "63428d32236476174a077c3fefc350c6d0706dc2a68c394ce4d871b625c27649"
     },
     "cli/demo-removal-provider.mjs": {
       "source": "cli/demo-removal-provider.mjs",
@@ -2091,7 +2095,7 @@
     },
     "modules/demo-host/README.md": {
       "source": "modules/demo-host/README.md",
-      "sha256": "d13fed5f17eb0434f0de34ac005bc251fec405b4eb753037fc9358aa6669f1c6"
+      "sha256": "3786fc143425105a595e96676834939db5c4a1a70443ae47c003de916052d75b"
     },
     "modules/demo-host/build.mjs": {
       "source": "modules/demo-host/build.mjs",
@@ -2205,6 +2209,10 @@
       "source": "modules/demo-host/operator.mjs",
       "sha256": "24a0a516d46c41c8896f96ea3746e1f949f00f52f1ae78d00aa6b65382da38bf"
     },
+    "modules/demo-host/ownership.mjs": {
+      "source": "modules/demo-host/ownership.mjs",
+      "sha256": "c2eb3083f8b0f7b3bc45814764aa36182cc189329a781e12798fe134675db93c"
+    },
     "modules/demo-host/page-style.mjs": {
       "source": "modules/demo-host/page-style.mjs",
       "sha256": "c758d08fe7baed75bbeff0eb61ec190ed54c98aa37affce54118e5ae6ce93c48"
@@ -2215,11 +2223,11 @@
     },
     "modules/demo-host/plan.mjs": {
       "source": "modules/demo-host/plan.mjs",
-      "sha256": "92fd66c643e2f0f62f15025503edb972425b7c25ce4ed91f0af6c4fb7de4a48c"
+      "sha256": "f6d1ea104402e13dbdb4bc5ec67369e7c95733dec701881db770deab18cc007e"
     },
     "modules/demo-host/remove.mjs": {
       "source": "modules/demo-host/remove.mjs",
-      "sha256": "2d4fe45e8a86215cc2e37706356880d4d3a41d5c2a8dd24db12ee32c146ea09c"
+      "sha256": "54d2b85ffa16d810f994a62ba610aeaa094776ebc071a3097a515503cbb45359"
     },
     "modules/demo-host/start-script.mjs": {
       "source": "modules/demo-host/start-script.mjs",
