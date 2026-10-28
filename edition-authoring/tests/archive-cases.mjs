@@ -85,8 +85,8 @@ export function archiveSourceCases(temp, run, snapshotTree) {
   assert.deepEqual(snapshotTree(archived), repeated);
   fs.rmSync(path.join(incoming, 'linked.mjs'));
 
-  // Matching old workflow bytes and migration introductions require history,
-  // which an archive must never invent from its caller-supplied revision.
+  // Archives preserve unrecorded workflows without inferring historical
+  // ownership. Migration introductions still require real ancestry.
   write(base, 'export/verify.yml', 'jobs: {}\n');
   commit(base);
   write(base, 'export/verify.yml', 'name: Verify\njobs: {}\n');
@@ -94,8 +94,10 @@ export function archiveSourceCases(temp, run, snapshotTree) {
   write(archived, '.github/workflows/verify.yml', 'jobs: {}\n');
   git(archived, 'add', '.github/workflows/verify.yml');
   const beforeHistory = snapshotTree(archived);
-  assert.match(run(archived, 'refresh-base', '--ref', withWorkflow, '--base-archive', workflowArchive).error, /archive has no Git history.*--base <checkout>/);
-  assert.deepEqual(snapshotTree(archived), beforeHistory);
+  const refreshed = ok(archived, 'refresh-base', '--ref', withWorkflow, '--base-archive', workflowArchive);
+  assert.equal(refreshed.templateAdoptions.length, 0);
+  assert.deepEqual(snapshotTree(archived)['.github/workflows/verify.yml'], beforeHistory['.github/workflows/verify.yml']);
+  assert.ok(refreshed.notices.length > 0);
   fs.rmSync(path.join(archived, '.github/workflows/verify.yml'));
   git(archived, 'reset', '--quiet', '--', '.github/workflows/verify.yml');
   write(base, 'foundation/edition-migrations.json', JSON.stringify({schemaVersion: 1, migrations: [{id: 'sample-edit', introduced: first, origin: 'modules/sample/index.mjs', guide: 'GUIDE.md', edit: 'Review sample edit.', deliver: []}]}));

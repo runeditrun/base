@@ -399,3 +399,9 @@ test('packed refresh preserves literal workflow text and refreshes an acknowledg
  assert.equal(fs.readFileSync(path.join(seed, 'scripts/polish-helper.mjs'), 'utf8'), fs.readFileSync(path.join(source, 'export/polish-helper.mjs'), 'utf8'));
  assert.equal(old('verify-base', '--base', source).ok, true);
 });
+
+
+test('packed archive refresh preserves workflow ownership and delivers an interchangeable authoring tool', async t => {
+ const {archiveDeliveryJourney} = await import('./fixtures/authoring-archive.mjs');
+ await archiveDeliveryJourney(t, {fixture, write, commit, git});
+});
