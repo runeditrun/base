@@ -132,7 +132,7 @@ export function hostingPageHtml(identity: EditionIdentity, run: RunData, hosting
     + `<p class="alt"><span>Already have Node 22 or later?</span>${code(run.clone)}</p>`
     + `<p class="note">${escape(PATHS.self.requirements)}${run.paths.requirementsExtra ? ` ${escape(run.paths.requirementsExtra)}` : ''}</p>`
     + `<p class="note">${name} then runs only on your computer: nobody else can open it, and it sends no email. To start it again later, run the same line from the same folder.</p>`
-    + (run.docs ? `<p class="guide"><a href="${escape(PATHS.self.guide.href(slug))}">${escape(PATHS.self.guide.label)}</a></p>` : '')
+    + (run.docs ? `<p class="guide"><a href="${escape(PATHS.self.guide.href)}">${escape(PATHS.self.guide.label)}</a></p>` : '')
     + '</section>'
   const assisted = `<section class="card assisted" aria-labelledby="assisted"><p class="kicker">${escape(PATHS.assisted.title)}</p><h2 id="assisted">Let Run Edit Run do it</h2>`
     + `<p class="lead">${escape(`${PATHS.assisted.lead} ${PATHS.assisted.rest}`)}</p><p>Either way, we guide you through the setup.</p>`
