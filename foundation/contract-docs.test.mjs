@@ -54,10 +54,109 @@ async function generatedJourney(root) {
   assert.equal(await read(root, 'ACCEPTANCE.md'), acceptance)
 }
 
+async function nonProductJourney() {
+  // Small public-command reproductions of the two immutable source forms:
+  // Coaster's OWN alias and Nectar's explicit em-dash exemptions. These facts
+  // have no product duty; a real product promise remains beside them.
+  const sources = [
+    [
+      [6, '"100% free, open source alternative to Expensify, SAP Concur and Emburse"', 'OWN', 'license/public-repository ownership'],
+      [51, '"100% free and open source. MIT licensed."', 'OWN', 'license/public-repository ownership'],
+    ],
+    [
+      [6, '"100% free, open source alternative to Stripe Billing, Chargebee and Recurly"', '—', 'license/public-repository ownership'],
+      [71, 'Terminal: `npx -y @runeditrun/rer dev just-every/run-nectar` starts Nectar', '—', 'launcher identity'],
+      [73, '"100% free and open source. MIT licensed."', '—', 'license/public-repository ownership'],
+      [76, '"Try the demo" opens the hosted demo', '—', 'hosted-demo action'],
+    ],
+  ]
+  for (const facts of sources) {
+    const root = await installation('legacy')
+    try {
+      await rm(join(root, 'docs/CLAIMS.md'))
+      const initial = await read(root, 'CONTRACT.md')
+      const table = [
+        '| # | Section | Claim | Clause(s) | Status |', '| --- | --- | --- | --- | --- |',
+        '| 1 | Hero | Publish the studio\'s entries | PUBLISH-01 | done |',
+        ...facts.map(([number, claim, reference]) => `| ${number} | Closing | ${claim} | ${reference} | done |`),
+        '| 2 | Catalogue | Publish entries as open source | — | partial |',
+      ].join('\n')
+      await edit(root, 'CONTRACT.md', initial.replace(/\| # \| Claim \| Clauses \|[\s\S]*?(?=\n## Status)/, table + '\n'))
+      git(root, 'add', '.')
+      git(root, 'commit', '-qm', 'Synthetic non-product source forms')
+      const old = git(root, 'rev-parse', 'HEAD'), originalText = await read(root, 'CONTRACT.md'), original = parseContract(originalText)
+      const claims = facts.map(([, claim, , nonProduct]) => ({ file: 'CONTRACT.md', line: originalText.split('\n').findIndex(line => line.includes(`| ${claim} |`)) + 1, claim, nonProduct }))
+      const productAlias = { file: 'CONTRACT.md', line: originalText.split('\n').findIndex(line => line.startsWith('| 2 | Catalogue |')) + 1, claim: 'Publish entries as open source', clauses: ['PUBLISH-01'] }
+      claims.push(productAlias)
+      const map = { schema: 1, old, claims }
+      refuses(root, 'Homepage claim', 'convert', '--old', old)
+      for (const [change, explanation] of [
+        [{ old: '0'.repeat(40) }, 'old'],
+        [{ claims: [{ ...claims[0], claim: 'Changed source text' }, ...claims.slice(1)] }, 'claim'],
+        [{ claims: claims.slice(1) }, 'Homepage claim'],
+        [{ claims: [{ ...claims[0], nonProduct: 'arbitrary exemption' }, ...claims.slice(1)] }, 'non-product basis'],
+        [{ claims: [{ ...claims[0], clauses: ['PUBLISH-01'] }, ...claims.slice(1)] }, 'cannot also supply clauses'],
+        [{ claims: [...claims.slice(0, -1), { ...productAlias, clauses: undefined, nonProduct: 'license/public-repository ownership' }] }, 'product promises need real clauses'],
+        [{ claims: [...claims, { file: 'CONTRACT.md', line: originalText.split('\n').findIndex(line => line.includes('| 1 | Hero |')) + 1, claim: "Publish the studio's entries", nonProduct: 'license/public-repository ownership' }] }, 'product promises need real clauses'],
+      ]) {
+        await edit(root, 'claim-map.json', JSON.stringify({ ...map, ...change }))
+        refuses(root, explanation, 'convert', '--old', old, '--claim-map', 'claim-map.json')
+        assert.equal(await read(root, 'CONTRACT.md'), originalText, 'refusal changed the immutable-source working copy')
+      }
+      await edit(root, 'claim-map.json', JSON.stringify(map))
+      succeeds(root, 'convert', '--old', old, '--claim-map', 'claim-map.json')
+      succeeds(root, 'check')
+      succeeds(root, 'id-map', '--old', old)
+      succeeds(root, 'coverage', 'check', '--old', old)
+      const converted = await read(root, 'CONTRACT.md'), after = parseContract(converted)
+      for (const key of ['counts', 'commit', 'date']) assert.deepEqual(after[key], original[key])
+      assert.deepEqual(after.clauses.map(({ id, kind, status, evidence, gap }) => ({ id, kind, status, evidence, gap })), original.clauses.map(({ id, kind, status, evidence, gap }) => ({ id, kind, status, evidence, gap })))
+      const view = await read(root, 'docs/CLAIMS.md')
+      for (const [number, claim, , basis] of facts) {
+        assert.ok(view.includes(`| ${number} | Closing | ${claim} |  | Non-product: ${basis} | done | unassessed |`))
+        const record = JSON.parse(converted.match(/<!-- contract-claim-source\n([\s\S]*?)\n-->/)[1])
+        const source = record.claims.find(row => row.number === String(number))
+        assert.equal(record.old, old)
+        assert.equal(source.text, originalText.split('\n')[source.line - 1])
+        assert.equal(source.status, 'done')
+        assert.equal(source.claim, claim)
+      }
+      assert.ok(view.includes(`Claims: ${facts.length + 2}; 2 done, 0 partial, 0 missing. Non-product: ${facts.length} unassessed.`))
+      const mutateRecord = change => converted.replace(/(<!-- contract-claim-source\n)([\s\S]*?)(\n-->)/, (_, start, body, end) => {
+        const record = JSON.parse(body); change(record); return start + JSON.stringify(record, null, 2) + end
+      })
+      const first = facts[0], row = converted.split('\n').find(line => line.startsWith(`| ${first[0]} | Closing |`))
+      for (const [text, explanation] of [
+        [converted.replace(row + '\n', ''), 'retain every original claim'],
+        [converted.replace(row, row.replace(first[1], 'Changed claim meaning')), 'current claim number/text'],
+        [mutateRecord(record => { record.old = '0'.repeat(40) }), 'old'],
+        [mutateRecord(record => { record.claims[1].claim = 'Forged historical claim' }), 'immutable original'],
+        [mutateRecord(record => { record.claims[1].status = 'missing' }), 'immutable original'],
+        [mutateRecord(record => { record.claims[1].line++ }), 'immutable original'],
+        [converted.replace('| PUBLISH-01 | Product |', '|  | Product |'), 'existing clause ids'],
+        [converted.replace('| PUBLISH-01 | Product |', '| ABSENT-001 | Product |'), 'existing clause ids'],
+        [converted.replace('| PUBLISH-01 | Product |', '|  | Non-product: license/public-repository ownership |'), 'product claim cannot acquire'],
+        [mutateRecord(record => { record.claims[0].nonProduct = 'license/public-repository ownership' }).replace('| PUBLISH-01 | Product |', '|  | Non-product: license/public-repository ownership |'), 'product promises need real clauses'],
+        [converted.replace(/<!-- contract-claim-source\n[\s\S]*?\n-->/, ''), 'require a contract-claim-source'],
+      ]) {
+        await edit(root, 'CONTRACT.md', text)
+        refuses(root, explanation, 'write')
+      }
+      await edit(root, 'CONTRACT.md', converted)
+      await generatedJourney(root)
+      succeeds(root, 'coverage', 'check', '--old', old)
+      const coveragePath = 'docs/contract/COVERAGE.json', coverageText = await read(root, coveragePath)
+      await edit(root, coveragePath, coverageText.replace(old, '0'.repeat(40)))
+      refuses(root, 'original SHA', 'check')
+    } finally { await rm(root, { recursive: true, force: true }) }
+  }
+}
+
 test('contract docs convert handwritten contracts and keep generated documents and migration maps accountable', async () => {
   const roots = await Promise.all(['standard', 'legacy'].map(installation))
   try {
     const results = await Promise.allSettled([
+      nonProductJourney(),
       (async () => {
         const root = roots[0]
         const original = parseContract(await read(root, 'CONTRACT.md'))
