@@ -996,6 +996,7 @@ modules/portability/sqlite-tokens.mjs
 modules/portability/bookkeeping.mjs
 modules/portability/storage.mjs
 modules/portability/copies.mjs
+modules/portability/derived.mjs
 modules/portability/dev-data.mjs
 modules/portability/provider-data.mjs
 modules/portability/policy-data.mjs
