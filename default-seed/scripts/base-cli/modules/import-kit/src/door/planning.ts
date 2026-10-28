@@ -13,9 +13,9 @@ import { bundleBytes, text, uploadRow, type UploadRow } from './uploads.ts';
 import { sourceRefusal } from './refusals.ts';
 import { intakeState } from './intake-policy.ts';
 
-export function preview(snapshot: DoorSnapshot) {
+export function preview(snapshot: DoorSnapshot, created: boolean) {
   const {plan,differences} = snapshot;
-  return {planId:snapshot.id,fingerprint:plan.fingerprint,bundleSha256:snapshot.bundleSha256,
+  return {planId:snapshot.id,fingerprint:plan.fingerprint,bundleSha256:snapshot.bundleSha256,created,
     summary:{sourceRecords:snapshot.sourceCount,created:differences.additions.length,updated:differences.replacements.length,unchanged:differences.unchanged.length,gone:differences.gone.length},
     counts:plan.counts,rejected:plan.entries.filter(e=>e.rejection).map(e=>({kind:e.source.kind,sourceId:e.source.sourceId,reason:e.rejection})),
     diagnostics:plan.diagnostics,differences};
@@ -67,7 +67,7 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
     if (snapshot.plan.mappingVersion !== request.options.mapping.version) throw new DoorError('snapshot_mapping_changed_use_new_namespace',409);
     if (request.access.catchup === 'bounded' && (!snapshot.standingApproval || snapshot.standingApproval.id !== request.access.approvalRecordId || snapshot.standingApproval.at !== request.access.approvedAt)) throw new DoorError('standing_approval_mismatch');
     await dropCredentialBytes(request,snapshot,upload);
-    return preview(snapshot);
+    return preview(snapshot,false);
   }
   if (current.pending_id) throw new DoorError('namespace_has_pending_import',409);
   // An erasure withdrew the live import's snapshot, so nothing can be compared
@@ -138,7 +138,7 @@ async function planUpload(request: DoorRequest, input: Record<string, unknown>, 
   if (retired) await retire(request,retired,snapshot.plan);
   await saveSnapshot(request,snapshot,upload,retainedFrom);
   await dropCredentialBytes(request,snapshot,upload);
-  return preview(snapshot);
+  return preview(snapshot,true);
 }
 /** Retire an erasure-withdrawn live import as the namespace's baseline. The kit
  * never lets a new import write a record another live import holds, so while an

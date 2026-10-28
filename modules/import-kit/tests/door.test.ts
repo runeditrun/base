@@ -10,7 +10,7 @@ import type { ImportMapping, Json, ParsedRecord } from '../src/types.ts';
 
 test('HTTP import door is absent until the installation opts in',async t=>{
   const d=await door(t);
-  for (const action of ['uploads','plan','apply','status','reconcile','undo'] as const) assert.equal((await d.call(action,{})).status,404);
+  for (const action of ['uploads','plan','apply','status','reconcile','undo','cancel'] as const) assert.equal((await d.call(action,{})).status,404);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
   const erased=await retireD1ImportCustody({values:['absent@example.test']},[],d.runtime.context(),[]);
@@ -18,7 +18,7 @@ test('HTTP import door is absent until the installation opts in',async t=>{
   assert.equal((await readD1ErasureJournal(d.runtime.context()))[0].receiptId,erased.receiptId);
   await d.enable();
   delete (d.options.claim.publicKeys as Record<string, JsonWebKey>).test;
-  for (const action of ['uploads','plan','apply','status','reconcile','undo'] as const) assert.equal((await d.call(action,{})).status,404);
+  for (const action of ['uploads','plan','apply','status','reconcile','undo','cancel'] as const) assert.equal((await d.call(action,{})).status,404);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
 });
 
@@ -189,6 +189,8 @@ test('HTTP upload, reviewed plan, bounded apply, reconcile and owner-visible und
   assert.equal((await d.call('uploads',{name:'bad.json',bundleSha256:sha256(badBytes),totalBytes:badBytes.length,totalChunks:1,index:0,chunkSha256:sha256(badBytes),base64:badBytes.toString('base64')},{maxBytes:1})).status,400);
   const records=[...documents(50,true),{id:'unsupported',title:'Unsupported',reject:true}];
   const planned=await d.plan(records);assert.equal(planned.status,200,JSON.stringify(planned.body));
+  assert.equal(planned.body.created,true);
+  const reused=await d.plan(records);assert.deepEqual([reused.body.planId,reused.body.created],[planned.body.planId,false]);
   assert.equal(planned.body.rejected.length,1);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
   const job=await d.apply(planned.body);
   const status=await d.call('status',{planId:planned.body.planId});assert.equal(status.body.job.state,'completed');assert.ok(status.body.caption.includes(planned.body.fingerprint));
@@ -827,7 +829,7 @@ test('HTTP reconcile and catch-up planning fail closed on a native edit between 
 
 test('owner-session HTTP pipeline works in a seed with no owner-claim module or grant key ring',async t=>{
   const d=await door(t,'operator');
-  for (const action of ['uploads','plan','apply','status','reconcile','undo']) {
+  for (const action of ['uploads','plan','apply','status','reconcile','undo','cancel']) {
     assert.equal((await d.request(d.origin+'/api/rer/import/'+action,{method:'POST'})).status,404);
   }
   const post=(body:unknown,headers:Record<string,string>)=>d.request(d.origin+'/api/operator/import/apply',{
