@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
@@ -149,7 +150,9 @@ DROP TABLE entries_copy;` };
 const entryRows = db => db.prepare('SELECT rowid,code,kind FROM entries ORDER BY rowid').all().map(row => ({ ...row }));
 const entryDefinition = db => db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='entries'").get().sql;
 
-test('trigger-only migrations admit archives that predate them and restore every row exactly', async () => {
+test("restore admits compatible triggers and rebuilds while refusing archived-row rewrites", async t => {
+  const foldedCases = [];
+foldedCases.push(['trigger-only migrations admit archives that predate them and restore every row exactly', async () => {
   // An archive without recorded migrations (placed by its schema prefix).
   const source = database([reads], { ledger: false });
   source.exec("INSERT INTO message_history VALUES('m1','c1'),('m2','c2'); INSERT INTO reads VALUES('c1','u1',10),('c2','u1',20); INSERT INTO thread_reads VALUES('m1','u2')");
@@ -173,9 +176,8 @@ test('trigger-only migrations admit archives that predate them and restore every
   assert.deepEqual(guarded.status.bridged.replayed, [{ migration: guardedInsert.name, statement: 2, table: 'accepted', rows: 1 }]);
   guarded.target.exec("UPDATE data_state SET value='blocked' WHERE id='mode'");
   assert.throws(() => guarded.target.exec("INSERT INTO accepted VALUES('denied')"), /STATE_NOT_READY/);
-});
-
-test('later migrations that rewrite archived rows, directly, through a trigger or past an unbounded trigger, stay refused', async () => {
+}]);
+foldedCases.push(['later migrations that rewrite archived rows, directly, through a trigger or past an unbounded trigger, stay refused', async () => {
   const bundle = await archive(await service(custodySource([custody]), [custody]));
   const refusals = [
     { name: '0002_backfill.sql', sql: 'UPDATE custody_states SET revision=revision+1;' },
@@ -213,44 +215,8 @@ INSERT INTO audit VALUES('a1');` },
     assert.deepEqual(rows(destination, ['companion', 'entries']), { companion: [], entries: [] }, later.name);
     assert.equal(entryDefinition(destination), definition);
   }
-});
-
-// Like a search capacity migration: triggers feeding an excluded queue whose
-// bodies start `SELECT CASE ... END||p.id`. Wrangler's splitter misses their
-// END and hands them over glued to each other and to the backfill after them.
-const searchPolicy = { product: 'trigger-migrations', excludeTables: ['search_dirty'] };
-const knowledge = { name: '0001_knowledge.sql', sql: `CREATE TABLE pages(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,page_kind TEXT NOT NULL);
-CREATE TABLE page_blocks(id TEXT PRIMARY KEY,page_id TEXT NOT NULL,body TEXT NOT NULL);
-CREATE TABLE ik_d1_assertions(ok INTEGER NOT NULL CHECK(ok=1));` };
-const dirty = "INSERT INTO search_dirty SELECT CASE WHEN p.page_kind='record' THEN 'record:' ELSE 'page:' END||p.id,p.workspace_id FROM pages p WHERE p.id=NEW.page_id ON CONFLICT(key) DO NOTHING;";
-const search = { name: '0002_search.sql', sql: `CREATE TABLE search_dirty(key TEXT PRIMARY KEY,workspace_id TEXT NOT NULL);
-CREATE TRIGGER search_pages_insert AFTER INSERT ON pages BEGIN INSERT INTO search_dirty VALUES(CASE WHEN NEW.page_kind='record' THEN 'record:' ELSE 'page:' END||NEW.id,NEW.workspace_id) ON CONFLICT(key) DO NOTHING; END;
-CREATE TRIGGER search_page_blocks_insert AFTER INSERT ON page_blocks BEGIN ${dirty} END;
-CREATE TRIGGER search_page_blocks_update AFTER UPDATE ON page_blocks BEGIN ${dirty} END;
-INSERT INTO search_dirty SELECT CASE WHEN page_kind='record' THEN 'record:' ELSE 'page:' END||id,workspace_id FROM pages;` };
-// Like an import door: a guard that fails the migration while an old unique
-// index exists, writing only an excluded assertions table, then a new table and a view of it.
-const door = { name: '0003_door.sql', sql: `INSERT INTO ik_d1_assertions(ok) SELECT 0 WHERE EXISTS(SELECT 1 FROM pragma_index_list('door_plans') l WHERE l."unique"=1 AND (SELECT group_concat(name) FROM pragma_index_info(l.name))='page_id,id');
-CREATE TABLE IF NOT EXISTS door_plans(id TEXT PRIMARY KEY,page_id TEXT NOT NULL);
-CREATE VIEW door_plan_pages AS SELECT id,page_id FROM door_plans;` };
-
-// Reproduce a valid version-two archive from before guard bookkeeping was
-// excluded, including the original schema and full archive integrity binding.
-async function legacyAssertions(exported, source, values = []) {
-  const manifest = structuredClone(exported.manifest), name = 'ik_d1_assertions';
-  const sql = source.prepare('SELECT sql FROM sqlite_master WHERE name=?').get(name).sql;
-  const columns = source.prepare(`PRAGMA table_info(${name})`).all().map(({ name, type, notnull, pk }) => ({ name, type, notnull, pk }));
-  manifest.tables = [...manifest.tables.filter(table => table.name !== name), { name, sql, columns, dependencies: [], rowidAlias: 'rowid', count: values.length }].sort((a, b) => a.name < b.name ? -1 : 1);
-  manifest.excludedTables = manifest.excludedTables.filter(table => table !== name);
-  manifest.schema = await sha256(canonicalJson(manifest.tables.map(({ name, sql }) => ({ name, sql }))));
-  const items = [...values.map((ok, index) => ({ kind: 'row', table: name, index, rowid: index + 1, row: { ok } })), ...exported.parts.flatMap(part => part.items).filter(item => item.table !== name)];
-  const parts = [await makePart(0, items)]; manifest.partCount = parts.length;
-  const content = new ContentVerifier(manifest), integrity = new ArchiveVerifier(manifest);
-  for (const part of parts) { integrity.add(part); for (const item of part.items) content.add(item); }
-  return { manifest, parts, closing: { kind: 'closing', partCount: parts.length, contentHash: content.digest(), archiveHash: integrity.digest() } };
-}
-
-test('an archive predating a guard and a view restores past triggers holding CASE ... END; archived rewrites and unreadable chunks stay refused', async t => {
+}]);
+foldedCases.push(['an archive predating a guard and a view restores past triggers holding CASE ... END; archived rewrites and unreadable chunks stay refused', async t => {
   const source = database([knowledge, search]);
   source.exec("INSERT INTO pages VALUES('p1','w1','page'),('r1','w1','record'); INSERT INTO page_blocks VALUES('b1','p1','Hello'),('b2','r1','Fields')");
   const exported = await archive(await service(source, [knowledge, search], searchPolicy));
@@ -287,13 +253,13 @@ test('an archive predating a guard and a view restores past triggers holding CAS
   // An UPDATE of a carried table with no rows cannot alter the archive, even
   // when its expression reads another carried table that does have rows.
   const stateDb = stateSource();
-  await t.test('a row-less target may read carried rows', async () => {
+  await runCases(t, [['a row-less target may read carried rows', async () => {
     await roundTrip([state, emptyUpdate], stateDb, ['data_state', 'queued']);
-  });
+  }]]);
 
   // The view itself has no archived rows. Resolve its carried base table and
   // replay the INSERT after restoring it, rather than silently leaving it empty.
-  await t.test('a replay resolves every view dependency', async () => {
+  await runCases(t, [['a replay resolves every view dependency', async () => {
     const throughView = await roundTrip([state, viewInsert], stateDb, ['data_state', 'queued']);
     assert.deepEqual(rows(throughView.target, ['snapshots']), { snapshots: rows(stateDb, ['data_state']).data_state });
 
@@ -302,10 +268,9 @@ test('an archive predating a guard and a view restores past triggers holding CAS
     const viewTarget = database([state, externalViewInsert]);
     await assert.rejects((await service(viewTarget, [state, externalViewInsert])).imports.create(throughView.bundle.manifest), /schema_mismatch:migration_data:0002_external_view\.sql/);
     assert.deepEqual(rows(viewTarget, ['data_state', 'queued', 'local_state', 'snapshots']), { data_state: [], queued: [], local_state: [], snapshots: [] });
-  });
-});
-
-test('a five-statement CHECK widening rebuild preserves the destination definition and every archived rowid', async () => {
+  }]]);
+}]);
+foldedCases.push(['a five-statement CHECK widening rebuild preserves the destination definition and every archived rowid', async () => {
   const logged = { name: '0003_entry_log.sql', sql: `CREATE TABLE entry_log(code TEXT NOT NULL,kind TEXT NOT NULL);
 INSERT INTO entry_log(code,kind) SELECT code,kind FROM entries;
 CREATE TRIGGER entry_logged AFTER INSERT ON entries BEGIN INSERT INTO entry_log VALUES(NEW.code,NEW.kind); END;` };
@@ -324,4 +289,43 @@ CREATE TRIGGER entry_logged AFTER INSERT ON entries BEGIN INSERT INTO entry_log 
     target.exec("INSERT INTO entries(code,kind) VALUES('after','new')");
     assert.throws(() => target.exec("INSERT INTO entries(code,kind) VALUES('invalid','unknown')"), /CHECK constraint/);
   }
+}]);
+  await runCases(t, foldedCases);
 });
+
+
+
+// Like a search capacity migration: triggers feeding an excluded queue whose
+// bodies start `SELECT CASE ... END||p.id`. Wrangler's splitter misses their
+// END and hands them over glued to each other and to the backfill after them.
+const searchPolicy = { product: 'trigger-migrations', excludeTables: ['search_dirty'] };
+const knowledge = { name: '0001_knowledge.sql', sql: `CREATE TABLE pages(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,page_kind TEXT NOT NULL);
+CREATE TABLE page_blocks(id TEXT PRIMARY KEY,page_id TEXT NOT NULL,body TEXT NOT NULL);
+CREATE TABLE ik_d1_assertions(ok INTEGER NOT NULL CHECK(ok=1));` };
+const dirty = "INSERT INTO search_dirty SELECT CASE WHEN p.page_kind='record' THEN 'record:' ELSE 'page:' END||p.id,p.workspace_id FROM pages p WHERE p.id=NEW.page_id ON CONFLICT(key) DO NOTHING;";
+const search = { name: '0002_search.sql', sql: `CREATE TABLE search_dirty(key TEXT PRIMARY KEY,workspace_id TEXT NOT NULL);
+CREATE TRIGGER search_pages_insert AFTER INSERT ON pages BEGIN INSERT INTO search_dirty VALUES(CASE WHEN NEW.page_kind='record' THEN 'record:' ELSE 'page:' END||NEW.id,NEW.workspace_id) ON CONFLICT(key) DO NOTHING; END;
+CREATE TRIGGER search_page_blocks_insert AFTER INSERT ON page_blocks BEGIN ${dirty} END;
+CREATE TRIGGER search_page_blocks_update AFTER UPDATE ON page_blocks BEGIN ${dirty} END;
+INSERT INTO search_dirty SELECT CASE WHEN page_kind='record' THEN 'record:' ELSE 'page:' END||id,workspace_id FROM pages;` };
+// Like an import door: a guard that fails the migration while an old unique
+// index exists, writing only an excluded assertions table, then a new table and a view of it.
+const door = { name: '0003_door.sql', sql: `INSERT INTO ik_d1_assertions(ok) SELECT 0 WHERE EXISTS(SELECT 1 FROM pragma_index_list('door_plans') l WHERE l."unique"=1 AND (SELECT group_concat(name) FROM pragma_index_info(l.name))='page_id,id');
+CREATE TABLE IF NOT EXISTS door_plans(id TEXT PRIMARY KEY,page_id TEXT NOT NULL);
+CREATE VIEW door_plan_pages AS SELECT id,page_id FROM door_plans;` };
+
+// Reproduce a valid version-two archive from before guard bookkeeping was
+// excluded, including the original schema and full archive integrity binding.
+async function legacyAssertions(exported, source, values = []) {
+  const manifest = structuredClone(exported.manifest), name = 'ik_d1_assertions';
+  const sql = source.prepare('SELECT sql FROM sqlite_master WHERE name=?').get(name).sql;
+  const columns = source.prepare(`PRAGMA table_info(${name})`).all().map(({ name, type, notnull, pk }) => ({ name, type, notnull, pk }));
+  manifest.tables = [...manifest.tables.filter(table => table.name !== name), { name, sql, columns, dependencies: [], rowidAlias: 'rowid', count: values.length }].sort((a, b) => a.name < b.name ? -1 : 1);
+  manifest.excludedTables = manifest.excludedTables.filter(table => table !== name);
+  manifest.schema = await sha256(canonicalJson(manifest.tables.map(({ name, sql }) => ({ name, sql }))));
+  const items = [...values.map((ok, index) => ({ kind: 'row', table: name, index, rowid: index + 1, row: { ok } })), ...exported.parts.flatMap(part => part.items).filter(item => item.table !== name)];
+  const parts = [await makePart(0, items)]; manifest.partCount = parts.length;
+  const content = new ContentVerifier(manifest), integrity = new ArchiveVerifier(manifest);
+  for (const part of parts) { integrity.add(part); for (const item of part.items) content.add(item); }
+  return { manifest, parts, closing: { kind: 'closing', partCount: parts.length, contentHash: content.digest(), archiveHash: integrity.digest() } };
+}

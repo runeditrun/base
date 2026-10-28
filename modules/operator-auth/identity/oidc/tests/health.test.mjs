@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -12,7 +13,9 @@ async function fixture(t, entries, core) {
 
 // Health is an operational claim, independent of whether the accounts layer
 // admits this particular person. Exercise both public provider views over SQL.
-test('connection health survives rejected visitor codes but requires fresh proof after provider faults or relinking', async t => {
+test("provider health requires current successful token exchange evidence", async t => {
+  const foldedCases = [];
+foldedCases.push(['connection health survives rejected visitor codes but requires fresh proof after provider faults or relinking', async t => {
   const r = await fixture(t, undefined, { identityTimeoutMs: 100 });
   const owner = await r.bootstrap();
   const health = async expected => {
@@ -111,9 +114,8 @@ test('connection health survives rejected visitor codes but requires fresh proof
   await health(false);
   assert.equal((await r.finish(await r.flow())).status, 303);
   await health(true);
-});
-
-test('discovery and JWKS probe recovery cannot establish or restore token exchange proof', async t => {
+}]);
+foldedCases.push(['discovery and JWKS probe recovery cannot establish or restore token exchange proof', async t => {
   const r = await fixture(t);
   await r.bootstrap();
   assert.equal((await r.finish(await r.flow())).status, 303);
@@ -131,9 +133,8 @@ test('discovery and JWKS probe recovery cannot establish or restore token exchan
   assert.equal(recovered.linked, false, 'discovery and JWKS cannot certify token exchange');
   assert.equal((await r.finish(await r.flow())).status, 303);
   assert.equal((await r.auth.providers.list())[0].linked, true);
-});
-
-test('a token response from a superseded pin never establishes health for its replacement', async t => {
+}]);
+foldedCases.push(['a token response from a superseded pin never establishes health for its replacement', async t => {
   const r = await fixture(t);
   await r.bootstrap();
   const flow = await r.flow();
@@ -158,9 +159,17 @@ test('a token response from a superseded pin never establishes health for its re
   };
   assert.equal((await r.finish(stale)).status, 502);
   assert.equal((await r.auth.providers.list())[0].linked, true, 'a stale failure cannot invalidate the replacement proof');
+}]);
+  await runCases(t, foldedCases);
 });
 
-test('OIDC browser failures use the configured sign-in URL, including malformed starts; APIs remain JSON', async t => {
+
+
+
+
+test("browser OIDC failures use the configured sign-in URL while APIs retain typed errors", async t => {
+  const foldedCases = [];
+foldedCases.push(['OIDC browser failures use the configured sign-in URL, including malformed starts; APIs remain JSON', async t => {
   const r = await fixture(t, [authProvider()], { branding: { signInPath: '/sign-in?next=%2Fapp&notice=old#email' } });
   await r.bootstrap();
   const standalone = createOidcHandler(r.auth.providers);
@@ -186,10 +195,8 @@ test('OIDC browser failures use the configured sign-in URL, including malformed 
     assert.equal(api.status, status);
     assert.deepEqual(await api.json(), { error });
   }
-});
-
-
-test('linked Auth browser failures inherit the configured sign-in URL while APIs retain typed errors', async t => {
+}]);
+foldedCases.push(['linked Auth browser failures inherit the configured sign-in URL while APIs retain typed errors', async t => {
   const r = await fixture(t, [authProvider()], { providers: [], dependencies: true,
     branding: { signInPath: '/member/sign-in?next=%2Fapp%3Ftab%3Done%26view%3Dtwo&notice=old#email' } });
   r.sqlite.exec(await readFile(new URL('../../../../dependencies/schema/dependencies.sql', import.meta.url), 'utf8'));
@@ -221,4 +228,6 @@ test('linked Auth browser failures inherit the configured sign-in URL while APIs
   }
   const standalone = createOidcHandler(r.auth.providers);
   redirect(await standalone(r.request('/auth/oidc/auth/start', { method: 'POST', body: '{', headers: { Accept: 'text/html' } })), 'oidc_invalid_input');
+}]);
+  await runCases(t, foldedCases);
 });

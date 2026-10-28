@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -16,7 +17,9 @@ async function authDatabase(t) {
  return f;
 }
 
-test('session admission records durable sign-in history through OIDC session scrubbing and restore',async t=>{
+test("archive policy state is scrubbed without losing native provenance or audit history", async t => {
+  const foldedCases = [];
+foldedCases.push(['session admission records durable sign-in history through OIDC session scrubbing and restore', async t=>{
  const source=await authDatabase(t),target=await authDatabase(t),now=Date.now();
  const origin='https://app.example',issuer='https://issuer.example';
  const auth=createOperatorAuth({db:source.db,clientIp:()=> '192.0.2.1',clock:()=>now,
@@ -35,21 +38,8 @@ test('session admission records durable sign-in history through OIDC session scr
  await target.service.imports.finalize(id,{archiveHash:archive.closing.archiveHash});
  assert.equal((await target.db.prepare("SELECT last_signin_at FROM oa_operators WHERE id='member'").first()).last_signin_at,now);
  assert.equal((await target.db.prepare("SELECT COUNT(*) n FROM oa_sessions WHERE operator_id='member'").first()).n,0);
-});
-
-const ddl=[
- 'CREATE TABLE oa_operators(id TEXT PRIMARY KEY)',
- 'CREATE TABLE oa_policy_approvals(id TEXT PRIMARY KEY,owner_id TEXT REFERENCES oa_operators(id),approved_at INTEGER NOT NULL,revoked_at INTEGER)',
- 'CREATE TABLE oa_policy_runs(id TEXT PRIMARY KEY,approval_id TEXT REFERENCES oa_policy_approvals(id),status TEXT)',
-];
-const policy={product:'policy-provenance',includeTables:['oa_operators','oa_policy_approvals','oa_policy_runs']};
-async function approved(t,extra={}) {
- const source=await database(t,ddl,{...policy,...extra});
- await source.db.batch(["INSERT INTO oa_operators VALUES('owner')","INSERT INTO oa_policy_approvals VALUES('live','owner',1000,NULL),('revoked','owner',1000,2000)","INSERT INTO oa_policy_runs VALUES('run','live','completed')"].map(sql=>source.db.prepare(sql)));
- return source;
-}
-
-test('export revokes copied delegations while preserving source authority, provenance and run references; import refuses a re-signed live approval',async t=>{
+}]);
+foldedCases.push(['export revokes copied delegations while preserving source authority, provenance and run references; import refuses a re-signed live approval', async t=>{
  const source=await approved(t),target=await database(t,ddl,policy),archive=await bundle(source.service);
  const approvals=rows(archive).filter(x=>x.table==='oa_policy_approvals');
  assert.ok(approvals.every(x=>x.row.revoked_at!==null));
@@ -71,9 +61,22 @@ test('export revokes copied delegations while preserving source authority, prove
  await assert.rejects(empty.service.imports.finalize(badId,{archiveHash:integrity.digest(),contentHash:content.digest()}),error=>error.code==='live_policy_approval' && error.status===409);
  assert.equal((await empty.db.prepare('SELECT COUNT(*) n FROM oa_operators').first()).n,0);
  assert.equal((await empty.db.prepare('SELECT COUNT(*) n FROM oa_policy_approvals').first()).n,0);
-});
-
-test('an export row transform cannot revive a scrubbed policy approval',async t=>{
+}]);
+foldedCases.push(['an export row transform cannot revive a scrubbed policy approval', async t=>{
  const source=await approved(t,{exportRow(table,row){if(table==='oa_policy_approvals')row.revoked_at=null;return row;}});
  await assert.rejects(bundle(source.service),error=>error.code==='live_policy_approval');
+}]);
+  await runCases(t, foldedCases);
 });
+
+const ddl=[
+ 'CREATE TABLE oa_operators(id TEXT PRIMARY KEY)',
+ 'CREATE TABLE oa_policy_approvals(id TEXT PRIMARY KEY,owner_id TEXT REFERENCES oa_operators(id),approved_at INTEGER NOT NULL,revoked_at INTEGER)',
+ 'CREATE TABLE oa_policy_runs(id TEXT PRIMARY KEY,approval_id TEXT REFERENCES oa_policy_approvals(id),status TEXT)',
+];
+const policy={product:'policy-provenance',includeTables:['oa_operators','oa_policy_approvals','oa_policy_runs']};
+async function approved(t,extra={}) {
+ const source=await database(t,ddl,{...policy,...extra});
+ await source.db.batch(["INSERT INTO oa_operators VALUES('owner')","INSERT INTO oa_policy_approvals VALUES('live','owner',1000,NULL),('revoked','owner',1000,2000)","INSERT INTO oa_policy_runs VALUES('run','live','completed')"].map(sql=>source.db.prepare(sql)));
+ return source;
+}

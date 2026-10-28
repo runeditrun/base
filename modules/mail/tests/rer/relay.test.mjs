@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -34,7 +35,9 @@ async function relay(t, configuration) {
   };
 }
 
-test('public sender submits only the relay envelope and accepts 202 with or without HTML', async t => {
+test("relay submission makes one bounded authorized attempt with honest outcomes", async t => {
+  const foldedCases = [];
+foldedCases.push(['public sender submits only the relay envelope and accepts 202 with or without HTML', async t => {
   const configuration = config(), edge = await relay(t, configuration);
   const sender = createMailSender(configuration, { fetch: edge.fetch });
   for (const html of [undefined, '<p>Your sign-in link</p>']) {
@@ -47,9 +50,8 @@ test('public sender submits only the relay envelope and accepts 202 with or with
     assert.deepEqual(request.body, { to: 'reader@example.test', subject: input.subject, text: input.text, ...(html ? { html } : {}) });
   }
   assert.equal(edge.requests.length, 2);
-});
-
-test('relay errors preserve delivery policy without retrying or exposing the key', async t => {
+}]);
+foldedCases.push(['relay errors preserve delivery policy without retrying or exposing the key', async t => {
   const configuration = config(), edge = await relay(t, configuration);
   const logs = [];
   for (const method of ['log', 'info', 'warn', 'error', 'debug']) t.mock.method(console, method, (...args) => logs.push(args));
@@ -69,9 +71,8 @@ test('relay errors preserve delivery policy without retrying or exposing the key
   assert.equal(result.status, 'uncertain');
   assert.ok(!JSON.stringify(result).includes(configuration.apiKey));
   assert.ok(!JSON.stringify(logs).includes(configuration.apiKey));
-});
-
-test('the public sender refuses a relay redirect without following it', async t => {
+}]);
+foldedCases.push(['the public sender refuses a relay redirect without following it', async t => {
   const configuration = config(), edge = await relay(t, configuration);
   const sender = createMailSender(configuration, { fetch: edge.fetch });
   for (const status of [301, 302, 303, 307, 308]) {
@@ -83,9 +84,8 @@ test('the public sender refuses a relay redirect without following it', async t 
     assert.equal(edge.requests.length, before + 1);
   }
   assert.ok(edge.requests.every(request => request.path === '/api/managed-mail/send'));
-});
-
-test('unsupported relay messages and invalid credentials fail before network effects', async () => {
+}]);
+foldedCases.push(['unsupported relay messages and invalid credentials fail before network effects', async () => {
   let calls = 0;
   const dependencies = { fetch: async () => { calls++; return new Response(null, { status: 202 }); } };
   const configuration = config();
@@ -103,4 +103,6 @@ test('unsupported relay messages and invalid credentials fail before network eff
   ]) assert.throws(() => createMailSender({ ...configuration, ...change }, dependencies), error =>
     error instanceof MailValidationError && !error.message.includes(configuration.apiKey));
   assert.equal(calls, 0);
+}]);
+  await runCases(t, foldedCases);
 });

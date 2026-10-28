@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { sendCloudflare } from '../../src/adapters/cloudflare/index.mjs';
@@ -14,7 +15,10 @@ async function denied(input, code, settings = config) {
   assert.equal(fixture.calls.length, 0);
 }
 
-test('REST request preserves named envelope, bodies, thread/list headers and binary inline attachments', async () => {
+test("Cloudflare serializes the caller envelope and optional content exactly", async t => {
+  // Each row keeps its original assertions and reports its own failure name.
+  await runCases(t, [
+    ['REST request preserves named envelope, bodies, thread/list headers and binary inline attachments', async () => {
   const headers = {
     'In-Reply-To': '<parent@example.com>', References: '<first@example.com> <parent@example.com>',
     'Thread-Topic': 'An existing thread', 'List-Unsubscribe': '<https://example.com/unsubscribe?id=42>, <mailto:leave@example.com>',
@@ -53,9 +57,8 @@ test('REST request preserves named envelope, bodies, thread/list headers and bin
   });
   assert.deepEqual(input, snapshot);
   assert.equal(result.providerMessageId, null);
-});
-
-test('text-only, HTML-only and optional empty fields retain exact caller content', async () => {
+}],
+    ['text-only, HTML-only and optional empty fields retain exact caller content', async () => {
   for (const overrides of [{ html: '<p>Hi</p>', text: undefined }, { text: 'Hi', html: '' }, { subject: '', cc: [], bcc: [], attachments: [] }]) {
     const input = message(overrides);
     const fixture = transport();
@@ -64,18 +67,24 @@ test('text-only, HTML-only and optional empty fields retain exact caller content
     for (const field of ['text', 'html', 'subject', 'cc', 'bcc', 'attachments']) assert.deepEqual(body[field], input[field]);
     assert.equal(body.deliveryId, undefined);
   }
+}],
+  ]);
 });
 
-test('direct calls validate configuration and fixed account path before transport', async () => {
+
+
+test("Cloudflare refuses unsafe requests before any transport effect", async t => {
+  // Each row keeps its original assertions and reports its own failure name.
+  await runCases(t, [
+    ['direct calls validate configuration and fixed account path before transport', async () => {
   for (const settings of [
     { ...config, accountId: '../escape' }, { ...config, accountId: 'a'.repeat(33) },
     { ...config, apiKey: 'token\r\nInjected: yes' }, { ...config, apiKey: '' },
     { ...config, mode: undefined }, { ...config, endpoint: 'https://example.com' },
     { provider: 'resend', mode: 'test', apiKey: 'fixture-token' },
   ]) await denied(message(), undefined, settings);
-});
-
-test('unsupported requests are explicit before any effect', async () => {
+}],
+    ['unsupported requests are explicit before any effect', async () => {
   for (const field of [{ customArgs: {} }, { asmGroupId: 7 }, { subscriptionTracking: false }]) {
     await denied(message(field), 'unsupported_provider_setting');
   }
@@ -84,9 +93,8 @@ test('unsupported requests are explicit before any effect', async () => {
   await denied(message({ attachments: [{ filename: 'a', contentType: 'text/plain', content: new Uint8Array(), contentId: 'part' }] }), 'cloudflare_unsupported_attachment_content_id');
   await denied(message({ attachments: [{ filename: 'a', contentType: 'text/plain', content: new Uint8Array(), disposition: 'attachment', contentId: 'part' }] }), 'cloudflare_unsupported_attachment_content_id');
   await denied(message({ unknownFeature: true }), 'invalid_message');
-});
-
-test('header and address injection, malformed bodies and attachments cannot cause a send', async () => {
+}],
+    ['header and address injection, malformed bodies and attachments cannot cause a send', async () => {
   for (const overrides of [
     { from: 'sender@example.com\nBcc: thief@example.com' }, { to: ['a@example.com\r\nX: y'] },
     { replyTo: 'a@example.com\u0000' }, { subject: 'Hi\nSubject: other' },
@@ -96,18 +104,16 @@ test('header and address injection, malformed bodies and attachments cannot caus
     { attachments: [{ filename: 'a', contentType: 'text/plain', content: 'not-bytes' }] },
     { attachments: [{ filename: 'a', contentType: 'text/plain', content: new Uint8Array(), disposition: 'inline' }] },
   ]) await denied(message(overrides));
-});
-
-test('Cloudflare rejects platform controlled and non-allowlisted headers locally', async () => {
+}],
+    ['Cloudflare rejects platform controlled and non-allowlisted headers locally', async () => {
   for (const name of ['Message-ID', 'Date', 'Feedback-ID', 'ARC-Seal', 'TLS-Required', 'CFBL-Address', 'Unrecognized', 'X-Bad!']) {
     await denied(message({ headers: { [name]: 'value' } }), 'cloudflare_unsupported_header');
   }
   for (const name of ['From', 'To', 'Cc', 'Bcc', 'Subject', 'Reply-To', 'Content-Type', 'Return-Path']) {
     await denied(message({ headers: { [name]: 'value' } }), 'reserved_or_duplicate_header');
   }
-});
-
-test('Cloudflare enforces byte header limits and value restrictions', async () => {
+}],
+    ['Cloudflare enforces byte header limits and value restrictions', async () => {
   await denied(message({ headers: { ['X-' + 'a'.repeat(99)]: 'v' } }), 'cloudflare_invalid_header_name');
   await denied(message({ headers: { 'X-Test': 'é'.repeat(1025) } }), 'cloudflare_invalid_header_value');
   await denied(message({ headers: { 'X-Test': '' } }), 'cloudflare_invalid_header_value');
@@ -116,9 +122,8 @@ test('Cloudflare enforces byte header limits and value restrictions', async () =
   const fixture = transport();
   await sendCloudflare(config, message({ headers: { 'x-trace': 'é'.repeat(1024), Importance: 'high' } }), fixture);
   assert.equal(fixture.calls.length, 1);
-});
-
-test('raw list headers obey HTTPS, mailto and exact one-click pairing', async () => {
+}],
+    ['raw list headers obey HTTPS, mailto and exact one-click pairing', async () => {
   for (const headers of [
     { 'List-Unsubscribe': '<http://example.com/u>' }, { 'List-Unsubscribe': 'https://example.com/u' },
     { 'List-Unsubscribe': '<https://user:fake-pass@example.com/u>' },
@@ -127,13 +132,11 @@ test('raw list headers obey HTTPS, mailto and exact one-click pairing', async ()
     { 'List-Unsubscribe': '<mailto:leave@example.com>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
     { 'List-Unsubscribe': '<https://example.com/u>', 'List-Unsubscribe-Post': 'List-Unsubscribe=one-click' },
   ]) await denied(message({ headers }), 'cloudflare_invalid_unsubscribe_header');
-});
-
-test('oversized serialized payload is rejected before effects', async () => {
+}],
+    ['oversized serialized payload is rejected before effects', async () => {
   await denied(message({ text: 'a'.repeat(5 * 1024 * 1024) }), 'cloudflare_message_too_large');
-});
-
-test('total header byte boundary is exact, and twenty standard headers are the maximum', async () => {
+}],
+    ['total header byte boundary is exact, and twenty standard headers are the maximum', async () => {
   // Eight X headers: 8 * (name bytes 3 + framing 4) + value bytes = 16 KiB.
   const headers = Object.fromEntries(Array.from({ length: 8 }, (_, n) => [`X-${n}`, 'a'.repeat(n === 7 ? 1992 : 2048)]));
   const fixture = transport();
@@ -146,4 +149,6 @@ test('total header byte boundary is exact, and twenty standard headers are the m
   await sendCloudflare(config, message({ headers: twenty }), accepted);
   assert.equal(accepted.calls.length, 1);
   await denied(message({ headers: { ...twenty, Sensitivity: 'private' } }), 'cloudflare_headers_too_large');
+}],
+  ]);
 });

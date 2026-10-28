@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMailSender, MailValidationError } from '../../index.mjs';
@@ -5,7 +6,9 @@ import { validateSendResult } from '../../src/core/validation.mjs';
 import { config, message, accepted, verifyRequest, NOW } from './fixtures.mjs';
 
 const redacted = error => error instanceof MailValidationError && !error.message.includes('SENSITIVE');
-test('public Messaging facade signs actual bytes, snapshots inputs, reconciles escaped IDs and erases exact mailbox', async () => {
+test("Messaging facade preserves signed effects and conservative readback outcomes", async t => {
+  const foldedCases = [];
+foldedCases.push(['public Messaging facade signs actual bytes, snapshots inputs, reconciles escaped IDs and erases exact mailbox', async () => {
   const original = message();
   original.unsubscribe = { url: 'https://app.example.test/unsubscribe', oneClick: true };
   const input = structuredClone(original), options = config();
@@ -30,9 +33,8 @@ test('public Messaging facade signs actual bytes, snapshots inputs, reconciles e
   assert.deepEqual(await sender.erase('Reader@example.test'), { erased: true });
   assert.deepEqual(JSON.parse(seen[2].bytes), { address: 'Reader@example.test' });
   assert.equal(seen.length, 3);
-});
-
-test('signed service binding and closed provider-specific outcomes never fall back or expose malformed fields', async () => {
+}]);
+foldedCases.push(['signed service binding and closed provider-specific outcomes never fall back or expose malformed fields', async () => {
   let calls = 0, value = accepted();
   const serviceBinding = { async fetch(url, init) { assert.equal(this, serviceBinding); verifyRequest(url, init); calls++; return Response.json(value); } };
   const sender = createMailSender(config(), { serviceBinding, clock: () => NOW });
@@ -54,9 +56,8 @@ test('signed service binding and closed provider-specific outcomes never fall ba
     const result = { provider, status: provider === 'development' ? 'development' : 'accepted', providerMessageId: null, retryAfter: 1 };
     assert.throws(() => validateSendResult(result, provider), redacted);
   }
-});
-
-test('invalid envelopes/settings fail before dispatch; missing and failed reads remain honest', async () => {
+}]);
+foldedCases.push(['invalid envelopes/settings fail before dispatch; missing and failed reads remain honest', async () => {
   let calls = 0;
   const sender = createMailSender(config(), { clock: () => NOW, fetch: async () => { calls++; return new Response(null, { status: 404 }); } });
   for (const bad of [{ ...message(), kind: undefined }, { ...message(), kind: 'sms' }, { ...message(), to: ['a@example.test', 'b@example.test'] },
@@ -74,9 +75,8 @@ test('invalid envelopes/settings fail before dispatch; missing and failed reads 
   assert.equal(await sender.reconcile('not-found'), null);
   await assert.rejects(sender.erase('Reader@example.test'), redacted);
   await assert.rejects(sender.erase('Reader <Reader@example.test>'), redacted);
-});
-
-test('one network attempt covers error, redirect, missing response, hanging fetch and hanging body', async () => {
+}]);
+foldedCases.push(['one network attempt covers error, redirect, missing response, hanging fetch and hanging body', async () => {
   for (const edge of [async () => { throw Error('SENSITIVE'); }, async () => new Response('SENSITIVE', { status: 503 }),
     async () => new Response(null, { status: 302, headers: { Location: 'https://evil.test' } }), async () => Response.json({ secret: 'SENSITIVE' }),
     async () => new Response('SENSITIVE'), async () => new Response('x'.repeat(1024 * 1024 + 1)),
@@ -86,4 +86,6 @@ test('one network attempt covers error, redirect, missing response, hanging fetc
     assert.deepEqual(await sender.send(message()), { provider: 'messaging', status: 'uncertain', providerMessageId: null, code: 'ambiguous' });
     assert.equal(calls, 1);
   }
+}]);
+  await runCases(t, foldedCases);
 });

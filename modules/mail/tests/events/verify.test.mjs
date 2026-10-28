@@ -1,11 +1,14 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { verifyWebhook, MAX_WEBHOOK_BYTES } from '../../src/events/index.mjs';
 import { signed, NOW, encoder } from './fixtures.mjs';
 
+test("signed webhook verification binds exact bytes, identity, time and trusted keys", async t => {
+  const foldedCases = [];
 for (const provider of ['sendgrid', 'resend']) {
-  test(`${provider}: genuine signature covers arbitrary raw bytes including multipart`, async () => {
+  foldedCases.push([`${provider}: genuine signature covers arbitrary raw bytes including multipart`, async () => {
     const binary = Buffer.concat([Buffer.from('--boundary\r\nContent-Disposition: form-data; name="email"\r\n\r\nUnicode café\r\n'), Buffer.from([0, 255, 128]), Buffer.from('\r\n--boundary--\r\n')]);
     const input = signed(provider, binary);
     assert.equal(await verifyWebhook(input), true);
@@ -15,8 +18,8 @@ for (const provider of ['sendgrid', 'resend']) {
     }
     assert.equal(await verifyWebhook({ ...input, rawBody: input.rawBody.slice(1) }), false);
     assert.equal(await verifyWebhook({ ...input, headers: new Headers() }), false);
-  });
-  test(`${provider}: inclusive clock boundary, stale/future and invalid time fail closed`, async () => {
+  }]);
+  foldedCases.push([`${provider}: inclusive clock boundary, stale/future and invalid time fail closed`, async () => {
     const input = signed(provider, '{}');
     for (const offset of [-300_000, 300_000]) assert.equal(await verifyWebhook({ ...input, now: NOW + offset }), true);
     for (const offset of [-300_001, 300_001]) assert.equal(await verifyWebhook({ ...input, now: NOW + offset }), false);
@@ -25,8 +28,8 @@ for (const provider of ['sendgrid', 'resend']) {
     assert.equal(await verifyWebhook({ ...input, toleranceSeconds: 0 }), true);
     assert.equal(await verifyWebhook({ ...input, now: NOW + 1, toleranceSeconds: 0 }), false);
     for (const timestamp of ['01790000000', '+1790000000', '1790000000.0', '1790000000,1790000000']) assert.equal(await verifyWebhook(signed(provider, '{}', { timestamp })), false);
-  });
-  test(`${provider}: bad key, encoding, signature and size rejection`, async () => {
+  }]);
+  foldedCases.push([`${provider}: bad key, encoding, signature and size rejection`, async () => {
     const input = signed(provider, '{}');
     for (const key of ['', 'not a key', input.key + '\n', input.key + '=', null]) assert.equal(await verifyWebhook({ ...input, key }), false);
     const header = provider === 'sendgrid' ? 'x-twilio-email-event-webhook-signature' : 'svix-signature';
@@ -36,10 +39,9 @@ for (const provider of ['sendgrid', 'resend']) {
     }
     assert.equal(await verifyWebhook({ ...input, rawBody: new Uint8Array(MAX_WEBHOOK_BYTES + 1) }), false);
     assert.equal(await verifyWebhook({ ...input, rawBody: '{}' }), false);
-  });
+  }]);
 }
-
-test('SendGrid rejects wrong key, P-384, negative/nonminimal DER, P1363 and trailing ASN.1', async () => {
+foldedCases.push(['SendGrid rejects wrong key, P-384, negative/nonminimal DER, P1363 and trailing ASN.1', async () => {
   const input = signed('sendgrid', '{}');
   const other = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const p384 = generateKeyPairSync('ec', { namedCurve: 'secp384r1' });
@@ -52,9 +54,8 @@ test('SendGrid rejects wrong key, P-384, negative/nonminimal DER, P1363 and trai
     assert.equal(await verifyWebhook({ ...input, headers }), false);
   }
   assert.equal(await verifyWebhook({ ...input, key: Buffer.concat([Buffer.from(input.key, 'base64'), Buffer.from([0])]).toString('base64') }), false);
-});
-
-test('Resend verifies rotation signatures and binds Svix identity and timestamp', async () => {
+}]);
+foldedCases.push(['Resend verifies rotation signatures and binds Svix identity and timestamp', async () => {
   const input = signed('resend', '{}');
   const headers = new Headers(input.headers);
   headers.set('svix-signature', `v1,${randomBytes(32).toString('base64')} ${headers.get('svix-signature')}`);
@@ -73,24 +74,23 @@ test('Resend verifies rotation signatures and binds Svix identity and timestamp'
   const aliased = signature.slice(0, position) + alphabet[alphabet.indexOf(signature[position]) + 1] + '=';
   const aliases = new Headers(input.headers); aliases.set('svix-signature', aliased);
   assert.equal(await verifyWebhook({ ...input, headers: aliases }), false);
-});
-
-test('published Svix interoperability vector', async () => {
+}]);
+foldedCases.push(['published Svix interoperability vector', async () => {
   // The key is Svix's published example: its base64 body is kept apart from the
   // provider prefix so the copied test holds no literal credential-shaped value.
   const publishedExampleBody = 'plJ3nmyCDGBKInavdOK15jsl';
   assert.equal(await verifyWebhook({ provider: 'resend', rawBody: encoder.encode('{"event_type":"ping","data":{"success":true}}'), key: `whsec_${publishedExampleBody}`, now: 1731705121000,
     headers: new Headers({ 'svix-id': 'msg_loFOjxBNrRLzqYUf', 'svix-timestamp': '1731705121', 'svix-signature': 'v1,rAvfW3dJ/X/qxhsaXPOyyCGmRKsaKWcsNccKXlIktD0=' }) }), true);
-});
-
-test('raw body is snapshotted before asynchronous crypto', async () => {
+}]);
+foldedCases.push(['raw body is snapshotted before asynchronous crypto', async () => {
   const input = signed('resend', '{}');
   const verification = verifyWebhook(input); input.rawBody.fill(0);
   assert.equal(await verification, true);
-});
-
-test('exact raw-byte limit succeeds, unsupported provider and invalid input fail closed', async () => {
+}]);
+foldedCases.push(['exact raw-byte limit succeeds, unsupported provider and invalid input fail closed', async () => {
   assert.equal(await verifyWebhook(signed('resend', new Uint8Array(MAX_WEBHOOK_BYTES))), true);
   assert.equal(await verifyWebhook(undefined), false);
   assert.equal(await verifyWebhook({ ...signed('resend', '{}'), provider: 'cloudflare' }), false);
+}]);
+  await runCases(t, foldedCases);
 });

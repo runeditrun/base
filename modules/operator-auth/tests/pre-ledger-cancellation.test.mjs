@@ -1,10 +1,13 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime, post } from './pre-ledger-runtime.mjs';
 import { credentials, NOW } from './fixtures/pre-ledger/owner-state.mjs';
 import { snapshot, authoritySnapshot, operator, marker, owner, invite, error, session, deniedLink, conflict, guarded, accept } from './pre-ledger-assertions.mjs';
 
-test('post-upgrade witnessed cancellation remains guarded through reissue/restart and atomic acceptance', async () => {
+test("legacy cancellation recovery preserves witnessed admission guards", async t => {
+  const foldedCases = [];
+foldedCases.push(['post-upgrade witnessed cancellation remains guarded through reissue/restart and atomic acceptance', async () => {
   const r = await runtime();
   try {
     await r.migrate();
@@ -57,9 +60,8 @@ test('post-upgrade witnessed cancellation remains guarded through reissue/restar
     await deniedLink(r, oldLink);
     await deniedLink(r, freshLink);
   } finally { await r.close(); }
-});
-
-test('owner deliberate removal and reinvitation replaces an unrecorded legacy cancellation', async () => {
+}]);
+foldedCases.push(['owner deliberate removal and reinvitation replaces an unrecorded legacy cancellation', async () => {
   const r = await runtime();
   try {
     await r.migrate();
@@ -104,4 +106,6 @@ test('owner deliberate removal and reinvitation replaces an unrecorded legacy ca
     await deniedLink(r, freshLink);
     await session(r, owner, 'owner', 1);
   } finally { await r.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdir } from 'node:fs/promises';
@@ -63,7 +64,9 @@ function failingOnce(db) {
   } };
 }
 
-test('an archive predating a journal backfill restores to the live upgrade, and a failed apply leaves no replayed row', async t => {
+test("restore replays only safe carried journal backfills without rewriting archived data", async t => {
+  const foldedCases = [];
+foldedCases.push(['an archive predating a journal backfill restores to the live upgrade, and a failed apply leaves no replayed row', async t => {
   const { db: live, archive } = await source(t);
   assert.deepEqual(archive.manifest.migrations, [rooms.name]);
   await apply(live, [journal]);
@@ -84,9 +87,8 @@ test('an archive predating a journal backfill restores to the live upgrade, and 
   // Triggers are back after the replay: a new member logs a join after the baselines.
   await target.db.prepare("INSERT INTO members VALUES('r2','u3')").run();
   assert.deepEqual((await membership(target.db)).at(-1), { seq: 4, room: 'r2', user: 'u3', action: 'join' });
-});
-
-test('a carried journal replays INSERT or REPLACE over its archived rows exactly like a live upgrade', async t => {
+}]);
+foldedCases.push(['a carried journal replays INSERT or REPLACE over its archived rows exactly like a live upgrade', async t => {
   const carried = { name: rooms.name, sql: `${rooms.sql}\n${carriedLog}` };
   for (const verb of ['INSERT OR IGNORE', 'REPLACE']) {
     const { db: live, archive } = await source(t, carried, ["INSERT INTO membership_log(seq,room,user,action,at) VALUES(8,'r1','u0','archived','2026-10-20T00:00:00Z')"]);
@@ -106,9 +108,8 @@ test('a carried journal replays INSERT or REPLACE over its archived rows exactly
     assert.deepEqual(await archived(target.db), await archived(live));
     assert.deepEqual(status.bridged.replayed, [{ migration: mirror.name, statement: added ? 1 : 0, table: 'membership_log', rows: 3 }]);
   }
-});
-
-test('excluded writes are admitted; carried UPDATE/DELETE, another writer and non-archived reads stay refused', async t => {
+}]);
+foldedCases.push(['excluded writes are admitted; carried UPDATE/DELETE, another writer and non-archived reads stay refused', async t => {
   const { archive } = await source(t);
   const admitted = { name: '0002_changes.sql', sql: changes };
   const target = await installed(t, [rooms, admitted]);
@@ -140,15 +141,14 @@ test('excluded writes are admitted; carried UPDATE/DELETE, another writer and no
     [{ archive }, [rooms, { name: '0002_from_excluded.sql', sql: `${changes}\n${log}\nINSERT INTO membership_log(room,user,action,at) SELECT room,'u0','baseline','now' FROM room_changes;` }]],
   ];
   for (const [{ archive: older }, migrations, rules = policy] of refusals) {
-    await t.test(migrations[1].name, async scenario => {
+    await runCases(t, [[migrations[1].name, async scenario => {
       const destination = await installed(scenario, migrations, undefined, rules);
       await assert.rejects(destination.service.imports.create(older.manifest), new RegExp('schema_mismatch:migration_data:' + migrations[1].name), migrations[1].name);
       assert.deepEqual([await membership(destination.db).catch(() => []), ...await archived(destination.db)], [[], [], []]);
-    });
+    }]]);
   }
-});
-
-test('import reconstructs a transient backfill from archived evidence and drops it atomically', async t => {
+}]);
+foldedCases.push(['import reconstructs a transient backfill from archived evidence and drops it atomically', async t => {
   const baseline = { name: '0002_baseline.sql', sql: `CREATE TABLE room_baseline(room TEXT PRIMARY KEY);
 INSERT INTO room_baseline SELECT id FROM rooms;
 ${log}
@@ -187,4 +187,6 @@ DROP TABLE "retained staging";` };
   assert.equal((await finalize(target.service, original.archive, await stage(target.service, original.archive))).phase, 'complete');
   assert.deepEqual(await membership(target.db), []);
   assert.deepEqual(await archived(target.db), await archived(original.db));
+}]);
+  await runCases(t, foldedCases);
 });

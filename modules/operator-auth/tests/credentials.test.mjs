@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime, post, SETUP } from './regression-runtime.mjs';
@@ -45,7 +46,9 @@ test('setup rejects duplicate form/JSON credentials before owner claim, with a s
   } finally { await r.close(); }
 });
 
-for (const kind of ['magic', 'invite']) test(`${kind} rejects query/form/JSON token ambiguity without preview, writes or credential leakage`, async () => {
+test("ambiguous confirmation credentials cannot preview, mutate or disclose tokens", async t => {
+  const foldedCases = [];
+for (const kind of ['magic', 'invite']) foldedCases.push([`${kind} rejects query/form/JSON token ambiguity without preview, writes or credential leakage`, async () => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -75,4 +78,6 @@ for (const kind of ['magic', 'invite']) test(`${kind} rejects query/form/JSON to
     assert.ok(accepted.headers.get('set-cookie'));
     assert.equal((await r.call('/auth/confirm', post({ token }))).status, 400);
   } finally { await r.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

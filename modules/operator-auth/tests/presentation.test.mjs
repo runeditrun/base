@@ -1,3 +1,5 @@
+import { conformanceGroups } from './conformance-cases.mjs';
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createHash } from 'node:crypto';
@@ -26,7 +28,9 @@ test('branding validates all optional fields and snapshots only public presentat
   assert.equal(configure({ ...base, branding: { productName: 'a'.repeat(80), signInPath: '/signin?q=one%20two#start' } }).branding.productName.length, 80);
 });
 
-test('product names reject every forbidden control scalar and preserve normal Unicode', () => {
+test("product names preserve visible Unicode while refusing unsafe or misplaced scalars", async t => {
+  const foldedCases = [];
+foldedCases.push(['product names reject every forbidden control scalar and preserve normal Unicode', () => {
   for (const [first, last] of [[0x0000, 0x001f], [0x007f, 0x009f], [0x061c, 0x061c], [0x200b, 0x200f], [0x2028, 0x202e], [0x2060, 0x2064], [0x2066, 0x206f], [0xfeff, 0xfeff]]) {
     for (let code = first; code <= last; code++) {
       // ZWNJ and ZWJ are valid between letters, so those two are checked in a position where they never are.
@@ -38,9 +42,8 @@ test('product names reject every forbidden control scalar and preserve normal Un
   for (const productName of ['Café', 'Cafe\u0301', '日本語のワークスペース', 'مساحة العمل', 'שלום', 'Workspace 🚀']) {
     assert.equal(configure({ ...base, branding: { productName } }).branding.productName, productName);
   }
-});
-
-test('product names preserve script joiners and emoji presentation', () => {
+}]);
+foldedCases.push(['product names preserve script joiners and emoji presentation', () => {
   for (const productName of [
     'می\u200cخواهم', 'क्\u200dष', 'क्\u200cष', 'مساحة العمل', 'שלום', '中文工作区',
     '👨\u200d👩\u200d👧', '👩🏽\u200d💻', '❤️', '🏳️\u200d🌈',
@@ -48,9 +51,8 @@ test('product names preserve script joiners and emoji presentation', () => {
   ]) {
     assert.equal(configure({ ...base, branding: { productName } }).branding.productName, productName);
   }
-});
-
-test('product names reject invisible scalars and misplaced joiners or variation selectors', () => {
+}]);
+foldedCases.push(['product names reject invisible scalars and misplaced joiners or variation selectors', () => {
   for (const [first, last] of [
     [0x00ad, 0x00ad], [0x034f, 0x034f], [0x115f, 0x1160], [0x17b4, 0x17b5],
     [0x180b, 0x180f], [0x2065, 0x2065], [0x1bca0, 0x1bca3], [0x1d173, 0x1d17a],
@@ -68,9 +70,8 @@ test('product names reject invisible scalars and misplaced joiners or variation 
   ]) {
     assert.throws(() => configure({ ...base, branding: { productName } }), { code: 'invalid_configuration', status: 503 });
   }
-});
-
-test('product names allow emoji presentation only on pictographs and keycaps, and reject placeholders and broken text', () => {
+}]);
+foldedCases.push(['product names allow emoji presentation only on pictographs and keycaps, and reject placeholders and broken text', () => {
   for (const productName of ['#\ufe0f\u20e3', '*\ufe0f\u20e3', '0\ufe0f\u20e3 Team', '\u00a9\ufe0f Studio', '\u2764\ufe0f']) {
     assert.equal(configure({ ...base, branding: { productName } }).branding.productName, productName);
   }
@@ -81,9 +82,8 @@ test('product names allow emoji presentation only on pictographs and keycaps, an
   ]) {
     assert.throws(() => configure({ ...base, branding: { productName } }), { code: 'invalid_configuration', status: 503 }, JSON.stringify(productName));
   }
-});
-
-test('product names keep word-final chillu and Persian ZWNJ before spaces or digits', () => {
+}]);
+foldedCases.push(['product names keep word-final chillu and Persian ZWNJ before spaces or digits', () => {
   for (const productName of [
     '\u0d15\u0d47\u0d30\u0d33\u0d24\u0d4d\u0d24\u0d3f\u0d32\u0d4d\u200d', '\u0d05\u0d35\u0d7c \u0d2a\u0d23\u0d4d\u200d \u0d15\u0d1f',
     '\u0915\u094d\u200d', '\u06a9\u062a\u0627\u0628\u200c \u0647\u0627', '\u0633\u0627\u0644\u200c\u06f1\u06f4\u06f0\u06f0',
@@ -95,7 +95,17 @@ test('product names keep word-final chillu and Persian ZWNJ before spaces or dig
   ]) {
     assert.throws(() => configure({ ...base, branding: { productName } }), { code: 'invalid_configuration', status: 503 }, JSON.stringify(productName));
   }
+}]);
+  await runCases(t, foldedCases);
 });
+
+
+
+
+
+
+
+
 
 test('mail provides a self-contained reading layout and describes navigation before confirmation', () => {
   for (const kind of ['magic', 'invite']) {
@@ -140,7 +150,7 @@ test('branding preserves encoded percent data while inspecting nested unsafe enc
   }
 });
 
-test('HTML confirmation has one exact-byte stylesheet hash and a minimal credential footprint', async () => {
+test('HTML confirmation has one exact-byte stylesheet hash and a minimal credential footprint', async t => {
   for (const accentColor of ['#ffffff', '#000000', '#336699']) {
     for (const preview of [{ kind: 'magic', expiresInMinutes: 15 }, { kind: 'invite', expiresInMinutes: 1 }, null]) {
       const token = 'test-only-opaque-token';
@@ -170,6 +180,7 @@ test('HTML confirmation has one exact-byte stylesheet hash and a minimal credent
       assert.deepEqual([...head.headers], [...response.headers]);
     }
   }
+  await runCases(t, conformanceGroups.presentation);
 });
 
 test('a declared seed theme links its served stylesheet and the CSP admits only same-origin theme files', async () => {

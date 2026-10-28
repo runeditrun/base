@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createHmac } from 'node:crypto';
@@ -11,7 +12,9 @@ async function fresh() {
 const gateOnly = cookie => cookie.split('; ').filter(pair => pair.startsWith('rer_dev_gate_8787=')).join('; ');
 const sessionOnly = cookie => cookie.split('; ').filter(pair => !pair.startsWith('rer_dev_gate_8787=')).join('; ');
 
-test('dev sign-in and personas answer only behind the key gate, and a dev session counts only there', async () => {
+test("development sign-in preserves the key gate and current native identity authority", async t => {
+  const foldedCases = [];
+foldedCases.push(['dev sign-in and personas answer only behind the key gate, and a dev session counts only there', async () => {
   const r = await fresh();
   try {
     for (const path of ['/auth/dev/enter?as=owner', '/__dev/personas']) {
@@ -83,9 +86,8 @@ test('dev sign-in and personas answer only behind the key gate, and a dev sessio
     assert.equal((await r.call('/auth/session', { cookie: both })).status, 401);
     assert.equal((await r.call('/auth/dev/enter?as=nobody', { cookie: both })).status, 404);
   } finally { await r.close(); }
-});
-
-test('a link minted while using a dev session is a dev credential: it needs the gate and yields a dev session', async () => {
+}]);
+foldedCases.push(['a link minted while using a dev session is a dev credential: it needs the gate and yields a dev session', async () => {
   const r = await fresh();
   try {
     const owner = cookies(await r.call('/auth/dev/enter?as=owner', { key: DEV_KEY }));
@@ -100,9 +102,8 @@ test('a link minted while using a dev session is a dev credential: it needs the 
     const session = await r.call('/auth/session', { cookie: [gateOnly(owner), cookies(confirmed)].join('; ') });
     assert.deepEqual([(await session.json()).kind, session.status], ['dev', 200]);
   } finally { await r.close(); }
-});
-
-test("a person invited at a persona's address signs in as that person, with the role they were invited to", async () => {
+}]);
+foldedCases.push(["a person invited at a persona's address signs in as that person, with the role they were invited to", async () => {
   const r = await fresh();
   try {
     const owner = cookies(await r.call('/auth/dev/enter?as=owner', { key: DEV_KEY }));
@@ -114,9 +115,8 @@ test("a person invited at a persona's address signs in as that person, with the 
     const operators = await r.db.prepare("SELECT role FROM oa_operators WHERE email='admin@dev.localhost'").all();
     assert.deepEqual(operators.results, [{ role: 'member' }], 'the persona never adds or widens a role');
   } finally { await r.close(); }
-});
-
-test('dev sign-in obeys domain provider rules on issue and reuse, with an active owner exemption', async () => {
+}]);
+foldedCases.push(['dev sign-in obeys domain provider rules on issue and reuse, with an active owner exemption', async () => {
   const r = await runtime([await read('../accounts/schema/operator-auth.sql'), await read('../identity/oidc/schema/oidc.sql')], {
     OIDC_TRANSACTION_SECRET: 'test-only-dev-domain-transaction-secret',
     providers: [{ id: 'okta', preset: 'okta', issuer: 'https://corp.okta.example', clientId: 'dev-app', tokenAuthMethod: 'client_secret_post', clientSecret: 'test-only-okta-secret' }],
@@ -153,10 +153,8 @@ test('dev sign-in obeys domain provider rules on issue and reuse, with an active
     assert.equal(remaining.status, 303);
     assert.equal((await (await r.call('/auth/session', { cookie: cookies(remaining) })).json()).operator.email, 'backup@example.com');
   } finally { await r.close(); }
-});
-
-
-test('owner-side CLI proof signs into the local dev entry without mail and fences that proof to the owner version', async () => {
+}]);
+foldedCases.push(['owner-side CLI proof signs into the local dev entry without mail and fences that proof to the owner version', async () => {
   const r = await runtime([await read('../accounts/schema/operator-auth.sql'), await read('./fixtures/trigger-writes.sql')]);
   const headers = { 'x-rer-local-cli': createHmac('sha256', SECRET).update('local-cli\0sign-in').digest('hex') };
   try {
@@ -180,4 +178,6 @@ test('owner-side CLI proof signs into the local dev entry without mail and fence
     assert.equal((await r.call('/auth/session', { cookie })).status, 401);
     assert.equal((await r.call('/auth/local/cli-session', { method: 'POST', input: {}, headers })).status, 303);
   } finally { await r.close(); }
+}]);
+  await runCases(t, foldedCases);
 });
