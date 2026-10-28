@@ -18,5 +18,7 @@ export async function injectionArgs(c, step, outputs) {
   } else for (const item of Object.values(value)) await visit(item);
  }
  await visit(step.args);
- return { ...c.args(step, fresh), ...c.resolve(step.inject, fresh) };
+ const args = c.args(step, fresh);
+ const write = !c.surface.tools.find(tool => tool.name === step.tool)?.readOnly;
+ return { ...args, ...c.resolve(step.inject, fresh), ...(write ? { idempotency_key: args.idempotency_key } : {}) };
 }

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.86-dev.g208bf31b",
+  "cliVersion": "0.2.86-dev.gbaca262e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1935,7 +1935,7 @@
     },
     "modules/agent-door/conformance/injection.mjs": {
       "source": "modules/agent-door/conformance/injection.mjs",
-      "sha256": "af570387d21f354d2803b436a7f1d1dae3f02b2b451098e203a31ad06c011643"
+      "sha256": "677874564cd7e3d6a6f083cffd358c22a05f28cd129b4f22bdb4743186d0b472"
     },
     "modules/agent-door/conformance/invocation.mjs": {
       "source": "modules/agent-door/conformance/invocation.mjs",
