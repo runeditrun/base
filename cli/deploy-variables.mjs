@@ -26,7 +26,7 @@ export async function deployVariableClause(root, adapter) {
   if (declarationSource === null) return { id, ok: true };
   const secretLocations = new Map();
   const declaration = parseJsonc(declarationSource, (path, offset) => {
-   if (path[0] === 'secrets' && path[2] === 'binding') secretLocations.set(path[1], lineAt(declarationSource, offset));
+   if (path.length === 3 && path[0] === 'secrets' && path[2] === 'binding') secretLocations.set(path[1], lineAt(declarationSource, offset));
   });
   // deploy.json uses strict JSON in both native and container builds.
   try { JSON.parse(declarationSource); } catch { throw Error(`${declarationPath}: invalid JSON declaration.`); }

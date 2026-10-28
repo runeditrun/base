@@ -86,10 +86,12 @@ ANOTHER_SECRET = "synthetic-toml-value"
 vars = {
   ANOTHER_SECRET = ""
 }
+[vars.OWNER_EMAIL]
+public = true
 `);
  const toml = check();
  assert.equal(toml.status, 1);
- for (const [binding, line] of [['OWNER_EMAIL', 3], ['ANOTHER_SECRET', 4], ['ANOTHER_SECRET', 7]]) {
+ for (const [binding, line] of [['OWNER_EMAIL', 3], ['ANOTHER_SECRET', 4], ['ANOTHER_SECRET', 7], ['OWNER_EMAIL', 9]]) {
   assert.ok(toml.clause.message.includes(`${binding}: deploy/wrangler.template.toml:${line}`), toml.clause.message);
  }
  await rm(join(root, 'deploy/wrangler.template.toml'));

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g45f4aafd",
+  "cliVersion": "0.2.85-dev.g884b66d6",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -495,7 +495,7 @@
     },
     "cli/business/parsers-config.mjs": {
       "source": "cli/business/parsers-config.mjs",
-      "sha256": "01d1de8bdd6770cac13c7fc7e5baa56277f1d73ce17b7f94deffec263ec7512f"
+      "sha256": "02193820d0636228c21ffabf74aa645d84855b630bba96835ab9f1ebb13a539f"
     },
     "cli/business/parsers-infrastructure.mjs": {
       "source": "cli/business/parsers-infrastructure.mjs",
@@ -799,7 +799,7 @@
     },
     "cli/deploy-variables.mjs": {
       "source": "cli/deploy-variables.mjs",
-      "sha256": "1e84fc8b37a06c917f20174c876283ce7634d6c90a59896ee0a4970bd98ba316"
+      "sha256": "1eb0c8253782477f0985bd812bd342fa2f15ea4b5d1a72fbc526cd60629858e4"
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",

@@ -71,7 +71,7 @@ export function tomlEntries(source, { locations = false } = {}) {
   if (header && header[1].length === header[3].length) {
    table = keyParts(header[2], true) ?? [];
    if (table.length) {
-    entries.push({ path: table, value: undefined });
+    entries.push({ path: table, value: undefined, ...(locations ? {offset} : {}) });
     if (header[1] === '[[') table = [...table, '[]'];
    }
    continue;
