@@ -53,7 +53,7 @@ export async function main(argv = process.argv.slice(2)) {
    const result = await check(project, options.profile);
    (await import('./placeholder-mark.mjs')).warnPlaceholderMarks(out, options, result.placeholderMarks);
    if (!options.json) for (const clause of result.clauses.filter(c => !c.ok)) out.human(`${clause.id}: ${clause.message}`);
-   out.result(result.ok, result.ok ? 0 : 1, { clauses: result.clauses }); return result.ok ? 0 : 1;
+   out.result(result.ok, result.ok ? 0 : 1, { clauses: result.clauses, ...(result.testBudget ? { testBudget: result.testBudget } : {}) }); return result.ok ? 0 : 1;
   }
   if (options.verb === 'doctor') {
    const result = await (await import('./lifecycle.mjs')).runCommand(project, options, out);
