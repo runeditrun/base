@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.gdb888446",
+  "cliVersion": "0.2.85-dev.g34f9ac08",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3151,7 +3151,7 @@
     },
     "modules/import-kit/src/door/ADOPTING.md": {
       "source": "modules/import-kit/src/door/ADOPTING.md",
-      "sha256": "14454d30bd29f3a3b7fbd8a5e7f3c57c855dfa720682337ad1ca8285ef1da42f"
+      "sha256": "ba357021f40b70af8635eb3a18c4244b28d5480f5522946b2b44911c5c2ca10a"
     },
     "modules/import-kit/src/door/README.md": {
       "source": "modules/import-kit/src/door/README.md",
@@ -3159,11 +3159,11 @@
     },
     "modules/import-kit/src/door/admission.ts": {
       "source": "modules/import-kit/src/door/admission.ts",
-      "sha256": "d5c3abaf2446ba66dec16c48bef24eec3c049dd009c5c9b63e8fc997d6972678"
+      "sha256": "8f35144e2dce9518dca504783b288a5d496919649f71f0f580d8066b3af784e8"
     },
     "modules/import-kit/src/door/archive.ts": {
       "source": "modules/import-kit/src/door/archive.ts",
-      "sha256": "51a6b6a7212be2efa0cc8f6fdd310085b1b843cf230401d00c0dd547a72c3db2"
+      "sha256": "349a6c4ba23cacb21b6e6a7c014ac7373d278b5a668966ef0246cebb5a0aa354"
     },
     "modules/import-kit/src/door/authority.ts": {
       "source": "modules/import-kit/src/door/authority.ts",
@@ -3179,11 +3179,11 @@
     },
     "modules/import-kit/src/door/handler.ts": {
       "source": "modules/import-kit/src/door/handler.ts",
-      "sha256": "3d44e98510e2ef30d833f6587382b10119a7b249d14f0ad32857aa338c941885"
+      "sha256": "77faebf29204c6228761086011563f49ffb71c0261f6dc69d489fac8d9925826"
     },
     "modules/import-kit/src/door/index.ts": {
       "source": "modules/import-kit/src/door/index.ts",
-      "sha256": "9cdd909cbd29b37cc3a0e87bde63ef1d879b5b398aeb3d51a6a8617757cac117"
+      "sha256": "67489c928b090225818971d89f4ed66a4f940bc9d3bb751514386e8c629234da"
     },
     "modules/import-kit/src/door/intake-policy.ts": {
       "source": "modules/import-kit/src/door/intake-policy.ts",
@@ -3223,19 +3223,23 @@
     },
     "modules/import-kit/src/door/operator.ts": {
       "source": "modules/import-kit/src/door/operator.ts",
-      "sha256": "90b498512e2e661caaaebc6e947a24f3e0815882cbbb930161a0dfae63dc6a15"
+      "sha256": "2ba4c679bb17edd92697a890f50957e84223eb8e16efdd1b07e0d2dc3fb6cd43"
     },
     "modules/import-kit/src/door/planning.ts": {
       "source": "modules/import-kit/src/door/planning.ts",
-      "sha256": "c66f10cf1d32fc1153031b4081560b0b64f6844c10078e4e57f6c5e5dfb82fdf"
+      "sha256": "a43f90026c103fb2016105da40ec17af5313d718c88d5f908deec071609a433d"
     },
     "modules/import-kit/src/door/protocol.ts": {
       "source": "modules/import-kit/src/door/protocol.ts",
       "sha256": "69d3a7f33e55d9eef7a64ab6784576d650fdbd6fec1aa808e8ee18c260f8a57c"
     },
+    "modules/import-kit/src/door/raw.ts": {
+      "source": "modules/import-kit/src/door/raw.ts",
+      "sha256": "bd1717c736d62367081ef57601b3dedb72dba9cb7afb770b45b9fa330573e3c1"
+    },
     "modules/import-kit/src/door/refusals.ts": {
       "source": "modules/import-kit/src/door/refusals.ts",
-      "sha256": "ba2e39dbf609f52d83a1e298b4aa62611374decbf58c0658882912ed994ac424"
+      "sha256": "4c8c0c4f3a2c3da2fe666fde2dfb829e4c369032b1062928fac421debe0d2d24"
     },
     "modules/import-kit/src/door/schema.ts": {
       "source": "modules/import-kit/src/door/schema.ts",
@@ -3247,7 +3251,7 @@
     },
     "modules/import-kit/src/door/types.ts": {
       "source": "modules/import-kit/src/door/types.ts",
-      "sha256": "312d52b42ea72d4db4f90ec2af528cc5d9ce34defef891e5f16c6434d9d93177"
+      "sha256": "7413afb4be8765c89f83a839fea570e336c002be66bc86f957a43bd03c1d2ed1"
     },
     "modules/import-kit/src/door/uploads.ts": {
       "source": "modules/import-kit/src/door/uploads.ts",
