@@ -267,6 +267,69 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
         self.write('public.md', '\n'.join('https://github.com/' + repository for repository in public))
         for name in ('vault', 'absent', 'saml'):
             self.write(f'{name}.md', f'https://github.com/acme-org/{name}-app')
+        # Repository words in prose, headings and a previous table cell do not
+        # declare the next slash token. Use a real, extensionless local path so
+        # this checks context rather than a directory/extension exemption.
+        self.write('components/runtime', 'A local source file.\n')
+        self.write('context.md', '\n'.join((
+            '# Repository', '', '`review/decision`', '',
+            'A provider does not read repository records/contents.',
+            'Repository records/contents remain unavailable.',
+            'Repository observations include `audit/summary`.',
+            '| Outcome | Source |', '| --- | --- |',
+            '| Registered against a local Git repository | `components/runtime:59` |',
+            '| A repository discussion | `records/contents` |',
+        )))
+        # Ambiguous prose must still refuse a genuinely private repository.
+        self.write('ambiguous.md', 'Repository observations include `acme-org/vault-app`.')
+        self.write('ambiguous-heading.md', '# Repository\n\nacme-org/vault-app')
+        expected = {('vault.md', 'hygiene.github-private'), ('absent.md', 'hygiene.github-missing'),
+                    ('saml.md', 'hygiene.github-private'), ('ambiguous.md', 'hygiene.github-private'),
+                    ('ambiguous-heading.md', 'hygiene.github-private')}
+        forms = {
+            'field.md': 'Repository: `{repo}`',
+            'multiline.md': 'Repository:\n  `{repo}`',
+            'equals.md': 'The repository = **{repo}** is maintained upstream.',
+            'table.md': '| **Repository** | `{repo}` |',
+            'inline.md': 'Use the repository `{repo}` for builds.',
+            'postfix.md': 'Use the `{repo}` repository for builds.',
+            'declaration.md': 'Repository {repo}',
+            'command.md': 'Clone {repo} first.',
+            'quoted-command.md': 'Clone `{repo}` first.',
+            'source.md': 'Source repository `{repo}`',
+            'origin.md': 'Origin: `{repo}`',
+            'submodule.md': 'Submodule `{repo}`',
+            'repositories.md': 'Repositories: `{repo}`',
+            'route.md': 'Inspect `{repo}/tree/main`.',
+            'metadata.json': '{{"repository": "{repo}"}}',
+            'metadata.yaml': 'repository: {repo}',
+            'source.mjs': 'const repository: string = "{repo}";',
+        }
+        for index, (name, form) in enumerate(forms.items()):
+            for ending, newline in (('lf', '\n'), ('crlf', '\r\n')):
+                for state in ('public', 'missing', 'private'):
+                    repository = f'acme-org/declared-{index}-{ending}-{state}-app'
+                    truth[repository] = state
+                    path = f'declarations/{state}/{ending}/{name}'
+                    self.write(path, (form.format(repo=repository) + '\n').replace('\n', newline))
+                    if state != 'public':
+                        expected.add((path, 'hygiene.github-' + state))
+        # Actual declarations/URLs outrank even a coincident local path. Neither
+        # a familiar prefix nor a file suffix grants a remote-reference bypass.
+        for repository in ('components/runtime', 'tests/fixture.mjs'):
+            truth[repository] = 'missing'
+            self.write(repository, 'A local source file.\n')
+            for name, form in (('table', '| Repository | `{repo}` |'),
+                               ('url', 'https://github.com/{repo}')):
+                path = f'explicit-{name}-{repository.replace("/", "-")}.md'
+                self.write(path, form.format(repo=repository))
+                expected.add((path, 'hygiene.github-missing'))
+        self.commit()
+        retained = self.git('rev-parse', 'HEAD')
+        # Delete the context/controls at the head: old immutable blobs must be
+        # classified with their own tree, not rescued by editing the candidate.
+        for path in ('context.md', 'ambiguous.md', 'ambiguous-heading.md', 'components/runtime', 'tests/fixture.mjs', 'declarations'):
+            self.git('rm', '-qr', path)
         self.commit()
         with tempfile.TemporaryDirectory() as network:
             gh, log = os.path.join(network, 'gh'), os.path.join(network, 'calls.jsonl')
@@ -280,14 +343,20 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
             with open(log) as file:
                 calls = [json.loads(line) for line in file]
         report = json.loads(result.stdout)
-        # The REST verdicts: no finding for public, one each for private and
-        # missing, and the SAML-protected repository is private.
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(report['complete'])
         self.assertEqual(report['status'], 'FAIL')
-        self.assertEqual({(f['path'], f['rule']) for f in report['findings']},
-                         {('vault.md', 'hygiene.github-private'), ('absent.md', 'hygiene.github-missing'),
-                          ('saml.md', 'hygiene.github-private')})
+        self.assertEqual({(f['path'], f['rule']) for f in report['findings']}, expected)
+        self.assertTrue(all(retained in f['commits'] and 'newly-public' in f['scopes']
+                            for f in report['findings'] if f['path'].startswith('declarations/')))
         graphql = [call for call in calls if 'graphql' in call]
-        self.assertLessEqual(len(graphql), -(-len(truth) // 100))
+        expected_repositories = set(truth) | {'review/decision', 'records/contents', 'audit/summary'}
+        self.assertLessEqual(len(graphql), -(-len(expected_repositories) // 100))
+        asked = set()
+        for call in graphql:
+            fields = dict(call[i + 1].split('=', 1) for i, arg in enumerate(call) if arg == '-f')
+            asked.update(fields[key] + '/' + fields['n' + key[1:]] for key in fields if key.startswith('o'))
+        self.assertEqual(asked, expected_repositories)
         # Only the repository GraphQL answered with doubt takes the REST lookup.
         self.assertEqual([call[-1] for call in calls if 'graphql' not in call], ['repos/acme-org/saml-app'])
 
