@@ -13,6 +13,8 @@ import { RerError } from './errors.mjs';
 import { verificationReviewers } from './agent-reviewers.mjs';
 import { verificationSponsors } from './agent-sponsors.mjs';
 import { verificationWebhooks } from './agent-webhooks.mjs';
+import { verificationInvoke, verificationJourney } from './agent-verifier.mjs';
+import { verificationBindings } from './agent-bindings.mjs';
 
 function finish(result, report) {
  for (const point of result.points) report(`${point.ok ? 'PASS' : 'FAIL'} ${point.id}${point.ok || !point.detail ? '' : `: ${point.detail}`}`);
@@ -31,6 +33,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  const manifest = setupManifest ?? JSON.parse(await readFile(join(root, 'rer-setup.json'), 'utf8'));
  const claim = manifest.steps?.find(step => step.type === 'owner-claim');
  const verification = declared.surface.verification ?? {};
+ const workerDriver = await verificationInvoke(root, verification.invoke);
  let prove;
  if (verification.proof !== undefined) {
   if (typeof verification.proof?.module !== 'string' || Object.keys(verification.proof).join(',') !== 'module') throw new RerError('agent_proof_invalid', 'verification.proof must name a contained test module.', 1);
@@ -49,11 +52,11 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  const { kty, crv, x, y } = await webcrypto.subtle.exportKey('jwk', pair.publicKey);
  const publicKeys = { [kid]: { kty, crv, x, y, kid, alg: 'ES256', use: 'sig' } };
  const values = { issuer, installationId, appOrigin: HOSTED_ORIGIN, publicKeys: JSON.stringify(publicKeys), email, sub, token, sessionSecret: randomBytes(32).toString('hex') };
- const nativeBindings = Object.fromEntries(Object.entries(native.bindings ?? {}).map(([name, source]) => [name, values[source]]));
+ const nativeBindings = await verificationBindings(root, native.bindings, values);
  const network = await createAgentConformanceNetwork(root, verification.network, { email });
  let hosted;
  try {
- hosted = await serveHosted(root, { declaration, outboundService: async request => {
+ hosted = await serveHosted(root, { declaration, rpc: verification.rpc, workerEntrypoints: workerDriver ? [workerDriver.entrypoint] : [], outboundService: async request => {
   const copy = reviewers.observes(request) ? request.clone() : null, response = await network.fetch(request);
   if (copy) await reviewers.capture(copy, response.clone());
   return response;
@@ -125,18 +128,9 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   }
   const secrets = await network.provision(hosted);
   const webhooks = await verificationWebhooks(root, verification.webhooks, secrets);
-  let nativeJourney;
-  if (verification.journey !== undefined) {
-   await contained(root, verification.journey);
-   const journey = (await import(pathToFileURL(resolve(root, verification.journey)))).default;
-   if (typeof journey !== 'function') throw new RerError('agent_journey_invalid', 'verification.journey must default-export an async native journey.', 1);
-   nativeJourney = async ({ tool }) => {
-    try { await journey({ request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures, tool }); }
-    catch { throw new Error('Native verification journey failed; no captured mail or fixture values are logged.'); }
-   };
-  }
+  const journey = await verificationJourney(root, verification.journey, { request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures });
   const result = await runAgentDoorConformance({ fetch: request, origin: hosted.origin, surface: declared.surface,
-   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors, webhooks, business, prove, nativeJourney,
+   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors, webhooks, business, prove, ...journey, invoke: workerDriver?.run(hosted),
   });
   const points = [...result.points, ...reviewers.points()];
   return finish({ ...result, points, ok: points.every(point => point.ok) }, report);
