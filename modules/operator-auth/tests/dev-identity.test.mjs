@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createHmac } from 'node:crypto';
@@ -11,13 +12,15 @@ async function fresh() {
 const gateOnly = cookie => cookie.split('; ').filter(pair => pair.startsWith('rer_dev_gate_8787=')).join('; ');
 const sessionOnly = cookie => cookie.split('; ').filter(pair => !pair.startsWith('rer_dev_gate_8787=')).join('; ');
 
-test('dev sign-in and personas answer only behind the key gate, and a dev session counts only there', async () => {
+test("development sign-in preserves the key gate and current native identity authority", async t => {
+  const foldedCases = [];
+foldedCases.push(['dev sign-in and personas answer only behind the key gate, and a dev session counts only there', async (t) => {
   const r = await fresh();
   try {
-    for (const path of ['/auth/dev/enter?as=owner', '/__dev/personas']) {
+    await runCases(t, Array.from(['/auth/dev/enter?as=owner', '/__dev/personas'], (path, rowIndex) => [`${t.name}: path row ${rowIndex + 1}`, async t => {
       assert.equal((await r.call(path)).status, 404, `${path} without the key`);
       assert.equal((await r.call(path, { key: DEV_KEY.replace(/.$/, 'x') })).status, 404, `${path} with a wrong key`);
-    }
+}]));
     assert.deepEqual(await (await r.call('/__dev/personas', { key: DEV_KEY })).json(),
       [{ as: 'owner', email: OWNER }, { as: 'admin', email: 'admin@dev.localhost', role: 'admin' }, { as: 'signed-out' }]);
     const entered = await r.call('/auth/dev/enter?as=owner', { key: DEV_KEY });
@@ -32,8 +35,9 @@ test('dev sign-in and personas answer only behind the key gate, and a dev sessio
     // A provider's redirect back is a cross-site top-level GET: the session counts, the gated surfaces do not open.
     const crossSite = { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate' };
     assert.equal((await r.call('/auth/session', { cookie: both, headers: crossSite })).status, 200, 'a dev session survives a cross-site redirect');
-    for (const path of ['/auth/dev/enter?as=admin', '/__dev/personas'])
-      assert.equal((await r.call(path, { cookie: both, headers: crossSite })).status, 404, `${path} refuses a cross-site request`);
+    await runCases(t, Array.from(['/auth/dev/enter?as=admin', '/__dev/personas'], (path, rowIndex) => [`${t.name}: path row ${rowIndex + 1}`, async t => {
+assert.equal((await r.call(path, { cookie: both, headers: crossSite })).status, 404, `${path} refuses a cross-site request`);
+}]));
     assert.equal((await r.call('/signin', { cookie: both, headers: crossSite })).headers.get('location'), '/__dev/key');
     const signin = await (await r.call('/signin', { cookie: gateOnly(both) })).text();
     assert.match(signin, /href="\/auth\/dev\/enter\?as=owner/);
@@ -61,17 +65,17 @@ test('dev sign-in and personas answer only behind the key gate, and a dev sessio
     assert.match(refusal, /<main>.*<h1>[^<]+<\/h1><p>[^<]+<\/p>/);
     assert.match(refusal, /href="\/signin\?returnTo=%2Fapp%2Fteam"/);
     assert.ok(!cookies(refused).includes('operator_session_local_8787='), 'a refusal never issues a session');
-    for (const accept of ['application/json,text/html;q=0', 'application/json;q=1,text/html;q=0.5', 'application/json']) {
+    await runCases(t, Array.from(['application/json,text/html;q=0', 'application/json;q=1,text/html;q=0.5', 'application/json'], (accept, rowIndex) => [`${t.name}: accept row ${rowIndex + 1}`, async t => {
       const response = await r.call('/auth/dev/enter?as=admin', { key: DEV_KEY, headers: { accept } });
       assert.equal(response.status, 403);
       assert.deepEqual(await response.json(), { error: 'sign_in_refused' });
       assert.equal(cookies(response), '', 'negotiation never issues a session');
-    }
-    for (const accept of [undefined, '*/*', 'text/html;q=invalid']) {
+}]));
+    await runCases(t, Array.from([undefined, '*/*', 'text/html;q=invalid'], (accept, rowIndex) => [`${t.name}: accept row ${rowIndex + 1}`, async t => {
       const response = await r.call('/auth/dev/enter?as=admin', { key: DEV_KEY, headers: accept ? { accept } : {} });
       assert.equal(response.status, 403);
       assert.match(response.headers.get('content-type'), /text\/plain/, 'the direct inactive-persona route retains its main default');
-    }
+}]));
     const unknown = await r.call('/auth/dev/enter?as=nobody', { key: DEV_KEY, headers: { accept: 'application/json,text/html;q=0' } });
     assert.equal(unknown.status, 404);
     assert.equal(typeof (await unknown.json()).error, 'string');
@@ -83,9 +87,8 @@ test('dev sign-in and personas answer only behind the key gate, and a dev sessio
     assert.equal((await r.call('/auth/session', { cookie: both })).status, 401);
     assert.equal((await r.call('/auth/dev/enter?as=nobody', { cookie: both })).status, 404);
   } finally { await r.close(); }
-});
-
-test('a link minted while using a dev session is a dev credential: it needs the gate and yields a dev session', async () => {
+}]);
+foldedCases.push(['a link minted while using a dev session is a dev credential: it needs the gate and yields a dev session', async () => {
   const r = await fresh();
   try {
     const owner = cookies(await r.call('/auth/dev/enter?as=owner', { key: DEV_KEY }));
@@ -100,9 +103,8 @@ test('a link minted while using a dev session is a dev credential: it needs the 
     const session = await r.call('/auth/session', { cookie: [gateOnly(owner), cookies(confirmed)].join('; ') });
     assert.deepEqual([(await session.json()).kind, session.status], ['dev', 200]);
   } finally { await r.close(); }
-});
-
-test("a person invited at a persona's address signs in as that person, with the role they were invited to", async () => {
+}]);
+foldedCases.push(["a person invited at a persona's address signs in as that person, with the role they were invited to", async () => {
   const r = await fresh();
   try {
     const owner = cookies(await r.call('/auth/dev/enter?as=owner', { key: DEV_KEY }));
@@ -114,9 +116,8 @@ test("a person invited at a persona's address signs in as that person, with the 
     const operators = await r.db.prepare("SELECT role FROM oa_operators WHERE email='admin@dev.localhost'").all();
     assert.deepEqual(operators.results, [{ role: 'member' }], 'the persona never adds or widens a role');
   } finally { await r.close(); }
-});
-
-test('dev sign-in obeys domain provider rules on issue and reuse, with an active owner exemption', async () => {
+}]);
+foldedCases.push(['dev sign-in obeys domain provider rules on issue and reuse, with an active owner exemption', async (t) => {
   const r = await runtime([await read('../accounts/schema/operator-auth.sql'), await read('../identity/oidc/schema/oidc.sql')], {
     OIDC_TRANSACTION_SECRET: 'test-only-dev-domain-transaction-secret',
     providers: [{ id: 'okta', preset: 'okta', issuer: 'https://corp.okta.example', clientId: 'dev-app', tokenAuthMethod: 'client_secret_post', clientSecret: 'test-only-okta-secret' }],
@@ -127,18 +128,18 @@ test('dev sign-in obeys domain provider rules on issue and reuse, with an active
     const owner = cookies(await r.call('/auth/confirm', { method: 'POST', input: { token: await r.latestLink() } }));
     const admin = cookies(await r.call('/auth/dev/enter?as=admin', { key: DEV_KEY }));
     assert.equal((await r.call('/auth/session', { cookie: admin })).status, 200);
-    for (const domain of ['dev.localhost', 'example.com']) {
+    await runCases(t, Array.from(['dev.localhost', 'example.com'], (domain, rowIndex) => [`${t.name}: domain row ${rowIndex + 1}`, async t => {
       assert.equal((await r.call('/auth/domain-rules', { method: 'POST', cookie: owner, input: { domain, provider: 'okta' } })).status, 200);
-    }
+}]));
     const count = async () => (await r.db.prepare("SELECT count(*) AS n FROM oa_sessions WHERE kind='dev'").first()).n;
     const n = await count();
-    for (const context of [{ key: DEV_KEY }, { cookie: admin }]) {
+    await runCases(t, Array.from([{ key: DEV_KEY }, { cookie: admin }], (context, rowIndex) => [`${t.name}: context row ${rowIndex + 1}`, async t => {
       const refused = await r.call('/auth/dev/enter?as=admin', context);
       assert.equal(refused.status, 403);
       assert.ok(refused.headers.get('content-type').startsWith('text/plain'));
       assert.ok(!cookies(refused).includes('operator_session_local_8787='));
       assert.equal(await count(), n, 'no new dev session');
-    }
+}]));
     const entered = await r.call('/auth/dev/enter?as=owner', { key: DEV_KEY });
     assert.equal(entered.status, 303);
     const ownerDev = cookies(entered);
@@ -153,18 +154,16 @@ test('dev sign-in obeys domain provider rules on issue and reuse, with an active
     assert.equal(remaining.status, 303);
     assert.equal((await (await r.call('/auth/session', { cookie: cookies(remaining) })).json()).operator.email, 'backup@example.com');
   } finally { await r.close(); }
-});
-
-
-test('owner-side CLI proof signs into the local dev entry without mail and fences that proof to the owner version', async () => {
+}]);
+foldedCases.push(['owner-side CLI proof signs into the local dev entry without mail and fences that proof to the owner version', async (t) => {
   const r = await runtime([await read('../accounts/schema/operator-auth.sql'), await read('./fixtures/trigger-writes.sql')]);
   const headers = { 'x-rer-local-cli': createHmac('sha256', SECRET).update('local-cli\0sign-in').digest('hex') };
   try {
     assert.equal((await r.call('/auth/local/cli-session', { method: 'POST', input: {}, headers })).status, 403);
     await r.db.prepare("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('owner',?,'Owner','owner','active',1)").bind(OWNER).run();
-    for (const presented of [{}, { 'x-rer-local-cli': 'forged' }, { 'x-rer-dev-key': DEV_KEY }]) {
+    await runCases(t, Array.from([{}, { 'x-rer-local-cli': 'forged' }, { 'x-rer-dev-key': DEV_KEY }], (presented, rowIndex) => [`${t.name}: presented row ${rowIndex + 1}`, async t => {
       assert.equal((await r.call('/auth/local/cli-session', { method: 'POST', input: {}, headers: presented })).status, 404);
-    }
+}]));
     assert.equal((await r.call('/auth/local/cli-session', { method: 'POST', input: {}, headers: { ...headers, Origin: 'https://elsewhere.example' } })).status, 403);
     const entered = await r.call('/auth/local/cli-session', { method: 'POST', input: { returnTo: '/setup', email: 'admin@dev.localhost' }, headers });
     assert.equal(entered.status, 303);
@@ -180,4 +179,6 @@ test('owner-side CLI proof signs into the local dev entry without mail and fence
     assert.equal((await r.call('/auth/session', { cookie })).status, 401);
     assert.equal((await r.call('/auth/local/cli-session', { method: 'POST', input: {}, headers })).status, 303);
   } finally { await r.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 // The original server seams kept for existing callers: admitVerifiedIdentity
 // and createIdentityAdmission, now admitting through the accounts adapter.
 import test from 'node:test';
@@ -34,9 +35,9 @@ test('associations are immutable issuer-scoped configuration, and identity field
   await assert.rejects(admit(request(), { issuer: issuers[1], subject: 'configured' }));
   await assert.rejects(admit(request(), { issuer, subject: 'injected', email: 'owner@example.com', emailVerified: true }));
   await assert.rejects(auth.admitVerifiedIdentity(request(), { issuer, subject: 'injected', email: 'owner@example.com', emailVerified: true, associatedEmail: 'owner@example.com' }));
-  for (const input of [{ issuer: 'https://unconfigured.example' }, { issuer, subjectEmails: [] }, { issuer, subjectEmails: { '': 'owner@example.com' } }, { issuer, subjectEmails: { configured: 'invalid' } }]) {
+  await runCases(t, Array.from([{ issuer: 'https://unconfigured.example' }, { issuer, subjectEmails: [] }, { issuer, subjectEmails: { '': 'owner@example.com' } }, { issuer, subjectEmails: { configured: 'invalid' } }], (input, rowIndex) => [`${t.name}: input row ${rowIndex + 1}`, async t => {
     assert.throws(() => auth.createIdentityAdmission(input), e => e.code === 'invalid_configuration');
-  }
+}]));
   assert.deepEqual(bindings().map(b => b.subject), ['configured', 'owner-subject']);
 });
 

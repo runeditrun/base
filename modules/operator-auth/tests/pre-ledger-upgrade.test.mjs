@@ -1,10 +1,11 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime, post } from './pre-ledger-runtime.mjs';
 import { credentials, oldCookie, SETUP, NOW } from './fixtures/pre-ledger/owner-state.mjs';
 import { oldTables, snapshot, authoritySnapshot, operator, owner, invite, error, session, deniedLink, conflict, accept } from './pre-ledger-assertions.mjs';
 
-test('static populated pre-ledger store upgrades without rewriting any old table and retains usable authority', async () => {
+test('static populated pre-ledger store upgrades without rewriting any old table and retains usable authority', async (t) => {
   const r = await runtime();
   try {
     const db = await r.db;
@@ -16,14 +17,14 @@ test('static populated pre-ledger store upgrades without rewriting any old table
       ['active', 'active', 2], ['cancelled', 'inactive', 2], ['expired', 'invited', 1],
       ['guarded', 'invited', 1], ['inactive', 'inactive', 3], ['owner', 'active', 1], ['pending', 'invited', 1],
     ]);
-    for (const name of ['active', 'inactive']) {
+    await runCases(t, Array.from(['active', 'inactive'], (name, rowIndex) => [`${t.name}: name row ${rowIndex + 1}`, async t => {
       const token = before.oa_tokens.find(row => row.operator_id === name);
       const persisted = before.oa_sessions.find(row => row.operator_id === name);
       assert.equal(token.operator_version, 1);
       assert.ok(token.consumed_at < NOW);
       assert.equal(persisted.source_token_id, token.id);
       assert.equal(persisted.operator_version, 2);
-    }
+}]));
     assert.equal(before.oa_tokens.find(row => row.operator_id === 'cancelled').consumed_at, null);
     const migration = await r.migrate();
     assert.ok(migration.statementCount > 0, 'The shipped migration contains statements');
@@ -44,7 +45,7 @@ test('static populated pre-ledger store upgrades without rewriting any old table
       await deniedLink(r, credentials[`${name}Link`]);
     }
     const accepted = [];
-    for (const name of ['pending', 'expired']) {
+    await runCases(t, Array.from(['pending', 'expired'], (name, rowIndex) => [`${t.name}: name row ${rowIndex + 1}`, async t => {
       const old = await operator(r, name);
       const returnTo = before.oa_tokens.find(row => row.operator_id === name).return_to;
       if (name === 'expired') await deniedLink(r, credentials.expiredLink);
@@ -56,7 +57,7 @@ test('static populated pre-ledger store upgrades without rewriting any old table
       await deniedLink(r, credentials[`${name}Link`]);
       const token = await r.latestLink();
       accepted.push([name, await accept(r, token, name, 2, returnTo)]);
-    }
+}]));
     await r.restart();
     for (const [name, cookie] of accepted) {
       await session(r, cookie, name, 2);

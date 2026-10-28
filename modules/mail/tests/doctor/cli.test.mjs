@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -10,22 +11,22 @@ import { doctorOptions } from '../../doctor.mjs';
 const cli = fileURLToPath(new URL('../../doctor.mjs', import.meta.url));
 function run(args) { return spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', env: { PATH: process.env.PATH } }); }
 
-test('real CLI sample JSON and human plans work without assembled adapters or secrets', () => {
+test("mail doctor CLI requires explicit live configuration and server-side credential custody", async t => {
+  const foldedCases = [];
+foldedCases.push(['real CLI sample JSON and human plans work without assembled adapters or secrets', () => {
   const args = ['--domain', 'mail.example.com', '--provider', 'resend', '--plan'];
   const json = run([...args, '--json']); assert.equal(json.status, 0, json.stderr);
   const result = JSON.parse(json.stdout); assert.equal(result.items.length, 6);
   assert.ok(result.items.every(item => item.status === 'not_checked'));
   const human = run(args); assert.equal(human.status, 0, human.stderr);
   for (const label of ['MX', 'SPF', 'DKIM', 'DMARC', 'SEND', 'RECEIVE']) assert.match(human.stdout, new RegExp(`${label}:`));
-});
-
-test('CLI live requires explicit configuration and rejects mutually exclusive/unknown flags', () => {
-  for (const args of [ ['--live'], ['--live', '--plan'], ['--provider'], ['--api-key', 'private-key'] ]) {
+}]);
+foldedCases.push(['CLI live requires explicit configuration and rejects mutually exclusive/unknown flags', async (t) => {
+  await runCases(t, Array.from([ ['--live'], ['--live', '--plan'], ['--provider'], ['--api-key', 'private-key'] ], (args, rowIndex) => [`${t.name}: args row ${rowIndex + 1}`, async t => {
     const result = run(args); assert.equal(result.status, 2); assert.doesNotMatch(result.stderr, /private-key/);
-  }
-});
-
-test('CLI config permits public setup only; live secrets are read from named environment keys', async () => {
+}]));
+}]);
+foldedCases.push(['CLI config permits public setup only; live secrets are read from named environment keys', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'mail-doctor-'));
   try {
     const path = join(dir, 'config.json');
@@ -39,7 +40,13 @@ test('CLI config permits public setup only; live secrets are read from named env
     const refused = run(['--live', '--config', path]); assert.equal(refused.status, 2);
     assert.doesNotMatch(refused.stderr, /must-never-print/);
   } finally { await rm(dir, { recursive: true, force: true }); }
+}]);
+  await runCases(t, foldedCases);
 });
+
+
+
+
 
 test('protected proof entry rejects local execution before sending', () => {
   const entry = fileURLToPath(new URL('../../live-proof/run.mjs', import.meta.url));

@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sendSendGrid } from '../../src/adapters/sendgrid/index.mjs';
@@ -23,13 +24,13 @@ test('default fetch uses the same single fixed endpoint and refuses redirect for
   } finally { globalThis.fetch = original; }
 });
 
-test('neither acceptance nor rejection consumes the provider body', async () => {
-  for (const status of [202, 400, 429, 500]) {
+test('neither acceptance nor rejection consumes the provider body', async (t) => {
+  await runCases(t, Array.from([202, 400, 429, 500], (status, rowIndex) => [`${t.name}: status row ${rowIndex + 1}`, async t => {
     const response = new Response('PRIVATE recipient metadata', { status });
     const result = await sendSendGrid(config, message(), { fetch: async () => response });
     assert.equal(response.bodyUsed, false);
     assert.ok(!JSON.stringify(result).includes('PRIVATE'));
-  }
+}]));
 });
 
 test('unresponsive transport is bounded without retries or provider fallback', { timeout: 20_000 }, async () => {

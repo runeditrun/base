@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { database,bundle,stage } from './regression-helpers.mjs';
@@ -19,7 +20,9 @@ async function migrated(t) {
   await fixture.db.prepare("INSERT INTO rer_migrations VALUES('0001_items.sql','destination-ledger')").run();
   return fixture;
 }
-test('migrated export restores into a fresh migrated target and leaves its bookkeeping intact',async t=>{
+test("restore preserves native bookkeeping while refusing omitted platform or occupied data", async t => {
+  const foldedCases = [];
+foldedCases.push(['migrated export restores into a fresh migrated target and leaves its bookkeeping intact', async t=>{
   const source=await migrated(t),target=await migrated(t);
   await source.db.prepare("INSERT INTO items VALUES('person-1','Asha Chen')").run();
   // Exact bookkeeping names must not swallow seed tables sharing their prefix.
@@ -33,16 +36,16 @@ test('migrated export restores into a fresh migrated target and leaves its bookk
   assert.deepEqual((await target.db.prepare('SELECT * FROM items').all()).results,[{id:'person-1',value:'Asha Chen'}]);
   assert.equal((await target.db.prepare('SELECT note FROM rer_migrations_notes').first()).note,'seed-owned');
   assert.equal((await target.db.prepare('SELECT applied_at FROM rer_migrations').first()).applied_at,'destination-ledger');
-});
-test('includeTables cannot reintroduce platform tables, including SQLite case aliases',async t=>{
+}]);
+foldedCases.push(['includeTables cannot reintroduce platform tables, including SQLite case aliases', async t=>{
   const source=await migrated(t);
-  for(const name of ['rer_migrations','RER_MIGRATIONS','ik_d1_assertions','IK_D1_ASSERTIONS','d1_migrations','_rer_deploy_migrations','_rer_portability_migrations','rer_portability_jobs','rer_command_receipts','rer_erasure_blobs','rer_erasure_guard','rer_erasure_scope','rer_erasure_rates','rer_demo','rer_dependency_keys','rer_dependency_pending','rer_dependency_codes','rer_mail_development_outbox','rer_ai_development_outbox']) {
+  await runCases(t, Array.from(['rer_migrations','RER_MIGRATIONS','ik_d1_assertions','IK_D1_ASSERTIONS','d1_migrations','_rer_deploy_migrations','_rer_portability_migrations','rer_portability_jobs','rer_command_receipts','rer_erasure_blobs','rer_erasure_guard','rer_erasure_scope','rer_erasure_rates','rer_demo','rer_dependency_keys','rer_dependency_pending','rer_dependency_codes','rer_mail_development_outbox','rer_ai_development_outbox'], (name, rowIndex) => [`${t.name}: name row ${rowIndex + 1}`, async t => {
     const input={...policy,includeTables:[name]};
     assert.equal(excludedTable(name,input),true);
     await assert.rejects(createPortability({db:source.db,policy:input}),error=>error.code==='platform_table:'+name && error.message.includes('includeTables'));
-  }
-});
-test('an old schema identity needs complete definitions, then skips platform rows and restores only seed data',async t=>{
+}]));
+}]);
+foldedCases.push(['an old schema identity needs complete definitions, then skips platform rows and restores only seed data', async t=>{
   const target=await migrated(t),events=[];
   await target.db.prepare("INSERT INTO rer_command_receipts VALUES('destination-request','keep')").run();
   const fixture=new URL('./fixtures/bookkeeping-v2.jsonl',import.meta.url);
@@ -61,12 +64,14 @@ test('an old schema identity needs complete definitions, then skips platform row
   assert.deepEqual((await target.db.prepare('SELECT * FROM items').all()).results,[{id:'person-1',value:'Asha Chen'}]);
   assert.deepEqual((await target.db.prepare('SELECT * FROM rer_command_receipts').all()).results,[{id:'destination-request',result:'keep'}]);
   assert.equal((await target.db.prepare('SELECT applied_at FROM rer_migrations').first()).applied_at,'destination-ledger');
-});
-test('a non-empty seed target still refuses restore with its table name',async t=>{
+}]);
+foldedCases.push(['a non-empty seed target still refuses restore with its table name', async t=>{
   const source=await migrated(t),target=await migrated(t);
   await source.db.prepare("INSERT INTO items VALUES('person-1','Asha Chen')").run();
   await target.db.prepare("INSERT INTO items VALUES('person-2','Mateo Ruiz')").run();
   const archive=await bundle(source.service),id=await stage(target.service,archive);
   await assert.rejects(target.service.imports.finalize(id,{archiveHash:archive.closing.archiveHash}),error=>error.code==='target_not_empty:items' && error.status===409);
   assert.deepEqual((await target.db.prepare('SELECT * FROM items').all()).results,[{id:'person-2',value:'Mateo Ruiz'}]);
+}]);
+  await runCases(t, foldedCases);
 });

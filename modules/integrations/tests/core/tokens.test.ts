@@ -1,3 +1,4 @@
+import { runCases, type Case } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -5,7 +6,9 @@ import { TokenService } from '../../core/index.ts';
 import { database } from './support.ts';
 import { installIssuer, nativeAuthority } from './token-authority-fixture.ts';
 const owner = { principal: 'owner' }, denied = { principal: 'visitor' };
-test('tokens reveal once, hash-only persistence, live scopes/expiry/revocation and durable usage across restart', async () => {
+test("token credentials reveal once and enforce current scope, expiry, revocation and usage evidence", async t => {
+  const foldedCases: Case[] = [];
+foldedCases.push(['tokens reveal once, hash-only persistence, live scopes/expiry/revocation and durable usage across restart', async () => {
   const store = await database(); let now = 1700000000000;
   try {
     await installIssuer(store.db);
@@ -39,9 +42,8 @@ test('tokens reveal once, hash-only persistence, live scopes/expiry/revocation a
     assert.equal((await tokens.usage(owner)).length, 7);
     assert.equal((await readFile(store.path)).includes(Buffer.from(token)), false);
   } finally { await store.close(); }
-});
-
-test('usage write failure denies authorization visibly; 100 concurrent tokens are distinct', async () => {
+}]);
+foldedCases.push(['usage write failure denies authorization visibly; 100 concurrent tokens are distinct', async () => {
   const store = await database();
   try {
     await installIssuer(store.db);
@@ -53,4 +55,6 @@ test('usage write failure denies authorization visibly; 100 concurrent tokens ar
     await assert.rejects(tokens.authorize(issued[0]!.token, ['read'], { requestId: 'token-test-9', resource: 'integration-test/resource' }), /usage unavailable/);
     assert.equal((await tokens.usage(owner)).length, 0);
   } finally { await store.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

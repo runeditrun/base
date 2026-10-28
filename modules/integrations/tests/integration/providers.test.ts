@@ -1,3 +1,4 @@
+import { runCases } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSlackNotifier, slackEventTemplates } from '../../index.ts';
@@ -23,11 +24,11 @@ test('public provider composition: both Slack paths and credential custody', asy
   const slack = () => createSlackNotifier({ repository: db.repo(), transport: wire.transport, templates: slackEventTemplates,
     incomingWebhook: async id => { assert.equal(id, 'slack-hook-v1'); return slackUrl; },
     bot: async id => { assert.equal(id, 'slack-bot-v1'); return { channel: 'CLOCAL123', token: ['xoxb', 'local', 'fixture'].join('-') }; }, now: () => now });
-  for (const mode of ['incoming-webhook', 'bot'] as const) {
+  await runCases(t, Array.from(['incoming-webhook', 'bot'] as const, (mode, rowIndex) => [`${t.name}: mode row ${rowIndex + 1}`, async t => {
     const id = `slack-${mode}`;
     await slack().enqueue({ id, tenant: 'installation', destinationId: mode === 'bot' ? 'slack-bot-v1' : 'slack-hook-v1', event: 'incident.opened', mode, data: { title: 'Payments', detail: 'Investigating' } });
     assert.equal((await slack().delivery.dispatch(id))?.state, 'accepted');
-  }
+}]));
   loseSlackReply = true;
   await slack().enqueue({ id: 'slack-lost', tenant: 'installation', destinationId: 'slack-bot-v1', event: 'incident.opened', mode: 'bot', data: { title: 'Payments', detail: 'Investigating' } });
   assert.equal((await slack().delivery.dispatch('slack-lost'))?.state, 'uncertain');

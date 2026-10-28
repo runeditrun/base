@@ -1,3 +1,4 @@
+import { runCases } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
@@ -23,11 +24,11 @@ test('outbound HMAC preserves original UTF-8 bytes including whitespace, line en
   });
   const protocol = createWebhookProtocol({ resolveDestination: async () => url, signingKey: async () => key });
   const service = new DeliveryService({ repository: sender.repo(), protocols: [protocol], transport: transport.transport, now: () => now });
-  for (const [index, body] of bodies.entries()) {
+  await runCases(t, Array.from(bodies.entries(), ([index, body], rowIndex) => [`${t.name}: [index, body] row ${rowIndex + 1}`, async t => {
     const id = `exact-${index}`;
     await service.enqueue({ id, tenant: 'installation', destinationId: 'exact-v1', event: 'changed', protocol: 'webhook', body });
     assert.equal((await service.dispatch(id))?.state, 'accepted');
-  }
+}]));
   assert.equal(transport.received.length, bodies.length);
   assert.deepEqual(transport.failures, []);
   inbox.restart();
