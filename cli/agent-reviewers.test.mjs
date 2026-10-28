@@ -97,6 +97,29 @@ test('native reviewer failures are redacted and never manufacture a passing life
  }
 });
 
+test('closing verification stops mail and session continuations already in flight', async t => {
+ const f = await fixture(t);
+ const reviewers = await verificationReviewers(f.root, f.declaration, ownerEmail);
+ let deliver, reading;
+ const started = new Promise(resolve => { reading = resolve; });
+ const response = { ok: true, json: () => { reading(); return new Promise(resolve => { deliver = resolve; }); } };
+ const capture = reviewers.capture(resend({ text: 'late invitation' }), response);
+ await started;
+ reviewers.close();
+ deliver({ get id() { throw new Error('Closed capture must stop before reading the late receipt'); } });
+ await capture;
+
+ await writeFile(join(f.root, 'delayed.mjs'), `export let finish;
+export default async () => new Promise(resolve => { finish = () => resolve(new Response(null, {status:303, headers:{'Set-Cookie':${JSON.stringify(f.cookie)}}})); });`);
+ const delayed = await verificationReviewers(f.root, [{ ...f.declaration[0], initializer: 'delayed.mjs' }], ownerEmail);
+ const pending = delayed.initialize('quality', { cookie: session() }, {});
+ const module = await import(pathToFileURL(join(f.root, 'delayed.mjs')));
+ delayed.close();
+ module.finish();
+ await assert.rejects(() => pending, { code: 'agent_reviewer_failed' });
+ assert.equal(delayed.points()[0].ok, false);
+});
+
 test('native independent-reviewer fixture fails without its lifecycle and passes with it while same-person and invalid proofs still fail', { timeout: 150000 }, async t => {
  const root = await fixtureSeed(t, 'native-reviewer');
  await buildFixture(root);

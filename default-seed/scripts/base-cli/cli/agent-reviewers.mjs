@@ -71,6 +71,7 @@ export async function verificationReviewers(root, declaration, ownerEmail) {
     body = JSON.parse(await new Blob(chunks).text());
     if (provider !== 'sendgrid') acknowledgement = await response.json();
    } catch { return; }
+   if (closed) return;
    if (provider === 'resend' && typeof acknowledgement?.id !== 'string'
     || provider === 'sendgrid' && response.status !== 202
     || provider === 'cloudflare' && acknowledgement?.success !== true) return;
@@ -94,7 +95,7 @@ export async function verificationReviewers(root, declaration, ownerEmail) {
    try {
     const response = await entry.initialize({ request, origin, label, email: entry.email, owner: { email: ownerEmail, cookie: owner.cookie },
      returnTo, mail: Object.freeze({ read: options => read(entry.email, options) }) });
-    if (!(response instanceof Response) || response.status !== 303 || response.redirected) throw failed();
+    if (closed || !(response instanceof Response) || response.status !== 303 || response.redirected) throw failed();
     const cookie = response.headers.getSetCookie().map(value => value.split(';', 1)[0]).join('; ');
     await response.body?.cancel();
     if (!cookie || cookie === owner.cookie) throw failed();

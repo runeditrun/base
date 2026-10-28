@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.86-dev.g66f5b8ec",
+  "cliVersion": "0.2.86-dev.g6fe6080f",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -395,7 +395,7 @@
     },
     "cli/agent-reviewers.mjs": {
       "source": "cli/agent-reviewers.mjs",
-      "sha256": "4d4696dcc6043b391a93ea22f4877323d2e0bfa0f33bc18cfc5931fb47bc3d7a"
+      "sha256": "9dfa031cd15effc371186a1fd12873cf17426b2f2630a6bbe481333dfc50b570"
     },
     "cli/agent-surface.mjs": {
       "source": "cli/agent-surface.mjs",
