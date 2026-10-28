@@ -387,7 +387,11 @@ The public API exports `canonicalReceiptJson`, `signImporterVerificationReceipt`
 `verifyImporterVerificationReceipt` and `createReceiptEvidencePort`. The receipt
 and status entry points (`src/receipt/index.ts` and `src/status/index.ts`) use only
 WebCrypto and Web APIs and can run in a Worker or Node. The root entry also
-exports these APIs alongside the existing Node SQLite engine.
+exports these APIs alongside the existing Node SQLite engine. Package consumers
+use `@runeditrun/rer/modules/import-kit/receipt` for signing, portable verification
+and trust policy, and `@runeditrun/rer/modules/import-kit/status` for
+`validateImporters`; both entries avoid the Node SQLite engine. Bundle these
+TypeScript package entries for your Node or Worker target.
 
 The signer takes a caller-supplied Ed25519 private `CryptoKey` with `sign` usage
 and a payload satisfying

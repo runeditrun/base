@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { buildPackage } from '../../../scripts/rer-package.mjs';
+import { integrity } from '../../../scripts/rer-package/registry.mjs';
+import { readPackage, writePackage } from '../../../global/update/archive.mjs';
 import { build } from '../../../default-seed/node_modules/esbuild/lib/main.js';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import {
@@ -211,8 +217,21 @@ test('the evidence port admits verified only with a verifying receipt and preser
   assert.equal((await validateImporters(document, port)).valid, true);
 });
 
-test('Worker and Node exchange signed receipts using WebCrypto without nodejs_compat and judge export origins alike', async () => {
+test('Worker and Node exchange packed receipts using WebCrypto without nodejs_compat and judge export origins alike', async (t) => {
   const f = await fixture();
+  const root = await mkdtemp(join(tmpdir(), 'receipt-package-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const base = fileURLToPath(new URL('../../../', import.meta.url));
+  const tarball = await buildPackage(base, root);
+  const installed = join(root, 'node_modules/@runeditrun/rer');
+  await mkdir(join(root, 'node_modules/@runeditrun'), { recursive: true });
+  const packedBytes = await readFile(tarball);
+  await writePackage(readPackage(packedBytes, { integrity: integrity(packedBytes) }), installed);
+  const nodeBundle = await build({
+    stdin: { resolveDir: root, contents: "export * from '@runeditrun/rer/modules/import-kit/receipt';" },
+    bundle: true, platform: 'node', format: 'esm', write: false,
+  });
+  const { signImporterVerificationReceipt, verifyImporterVerificationReceipt } = await import('data:text/javascript;base64,' + Buffer.from(nodeBundle.outputFiles[0].text).toString('base64'));
   // Origins whose URL/IDNA parse differs by runtime get the one verdict of the module's ASCII grammar in Node and the Worker.
   // So does a path of 2^23 + 1 characters, more than V8's regexp backtrack stack holds for a grouped path pattern.
   const origins = new Map([
@@ -222,33 +241,45 @@ test('Worker and Node exchange signed receipts using WebCrypto without nodejs_co
   ]);
   const originReceipts = await Promise.all([...origins.keys()].map((origin) => signImporterVerificationReceipt(
     { ...f.payload, source: { ...f.payload.source, origin } }, 'test', f.keys.privateKey)));
-  const entry = fileURLToPath(new URL('../src/receipt/index.ts', import.meta.url));
   const bundle = await build({
-    stdin: { resolveDir: fileURLToPath(new URL('../src/receipt/', import.meta.url)), contents: `
-      import { signImporterVerificationReceipt, verifyImporterVerificationReceipt } from ${JSON.stringify(entry)};
+    stdin: { resolveDir: root, contents: `
+      import { signImporterVerificationReceipt, verifyImporterVerificationReceipt, createReceiptEvidencePort } from '@runeditrun/rer/modules/import-kit/receipt';
+      import { validateImporters } from '@runeditrun/rer/modules/import-kit/status';
       export default { async fetch(request) {
         const input = await request.json();
         const publicKey = await crypto.subtle.importKey('raw', new Uint8Array(input.publicKey), 'Ed25519', false, ['verify']);
         const policy = { environment: 'test', keys: { test: { publicKey, environments: ['test'] } } };
         const accepted = await verifyImporterVerificationReceipt(input.receipt, policy);
         const refused = await verifyImporterVerificationReceipt(input.receipt, { ...policy, environment: 'production' });
+        const evidence = createReceiptEvidencePort({ trustedHosts: ['evidence.example.test'], resolve(link) {
+          const artifact = input.artifacts.find(([url]) => url === link)?.[1];
+          return artifact && { url: artifact.url, bytes: new Uint8Array(artifact.bytes) };
+        } }, policy);
+        const registry = await validateImporters(input.document, evidence);
         const origins = await Promise.all(input.originReceipts.map(async (receipt) => (await verifyImporterVerificationReceipt(receipt, policy)).valid));
         const keys = await crypto.subtle.generateKey('Ed25519', false, ['sign', 'verify']);
         const receipt = await signImporterVerificationReceipt(input.receipt.payload, 'worker', keys.privateKey);
-        return Response.json({ accepted, refused, origins, receipt, publicKey: Array.from(new Uint8Array(await crypto.subtle.exportKey('raw', keys.publicKey))) });
+        return Response.json({ accepted, refused, registry, origins, receipt, publicKey: Array.from(new Uint8Array(await crypto.subtle.exportKey('raw', keys.publicKey))) });
       } };
     ` },
     bundle: true, platform: 'browser', format: 'esm', write: false,
   });
   const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-09-01' }));
   try {
+    const bytes = new TextEncoder().encode(JSON.stringify(f.receipt));
+    const document = structuredClone(f.document);
+    Object.assign(document.importers[0].evidence, { sha256: digest(bytes), size: bytes.length });
+    const artifacts = new Map(f.artifacts);
+    artifacts.set(f.receiptLink, { url: f.receiptLink, bytes });
     const response = await mf.dispatchFetch('https://receipt.test', {
-      method: 'POST', body: JSON.stringify({ receipt: f.receipt, originReceipts, publicKey: Array.from(new Uint8Array(await crypto.subtle.exportKey('raw', f.keys.publicKey))) }),
+      method: 'POST', body: JSON.stringify({ receipt: f.receipt, originReceipts, document, artifacts: [...artifacts].map(([url, artifact]) => [url, { url: artifact.url, bytes: [...artifact.bytes] }]), publicKey: Array.from(new Uint8Array(await crypto.subtle.exportKey('raw', f.keys.publicKey))) }),
     });
     assert.equal(response.status, 200);
     const result = await response.json();
     assert.equal(result.accepted.valid, true, JSON.stringify(result.accepted.issues));
     assert.equal(result.refused.valid, false);
+    assert.equal(result.registry.valid, true, JSON.stringify(result.registry.issues));
+    assert.equal(result.registry.evidence.verifiedReceipts, 1);
     const node = await Promise.all(originReceipts.map(async (receipt) => (await verifyImporterVerificationReceipt(receipt, f.policy)).valid));
     assert.deepEqual({ node, worker: result.origins }, { node: [...origins.values()], worker: [...origins.values()] });
     const publicKey = await crypto.subtle.importKey('raw', new Uint8Array(result.publicKey), 'Ed25519', false, ['verify']);
