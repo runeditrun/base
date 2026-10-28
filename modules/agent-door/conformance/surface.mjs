@@ -67,7 +67,7 @@ export function validateAgentSurface(surface, { contract } = {}) {
  const narrowingTools = new Set();
  for (const [i, fixture] of (Array.isArray(surface.narrowings) ? surface.narrowings : []).entries()) {
   const tool = tools.get(fixture?.tool), witness = fixture?.witness;
-  escalation(`narrowing.${i}`, tool?.widens === false && !narrowingTools.has(fixture.tool) && steps.has(fixture.step) && surface.journey.some(step => step.id === fixture.step && step.tool === fixture.tool) && tools.get(witness?.tool)?.readOnly === true && object(witness?.args) && Object.hasOwn(witness.args, tool.narrowing.target) && typeof witness?.pointer === 'string' && (witness.pointer === '' || witness.pointer.startsWith('/')), 'Narrowing fixture must name its journey step and a native target grant-set witness.');
+  escalation(`narrowing.${i}`, tool?.widens === false && !narrowingTools.has(fixture.tool) && steps.has(fixture.step) && surface.journey.some(step => step.id === fixture.step && step.tool === fixture.tool) && tools.get(witness?.tool)?.readOnly === true && object(witness?.args) && Object.hasOwn(witness.args, tool.narrowing?.target) && typeof witness?.pointer === 'string' && (witness.pointer === '' || witness.pointer.startsWith('/')), 'Narrowing fixture must name its journey step and a native target grant-set witness.');
   checkReferences(witness?.args, `narrowing.${i}.witness`, steps, escalation);
   narrowingTools.add(fixture?.tool);
  }

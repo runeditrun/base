@@ -72,5 +72,8 @@ test('narrowing declarations reject widening fields, open objects and hidden sch
   assert.ok(validation.points.some(point => point.id === 'BASE-AGENT-005.surface.fixture.access.revoke.narrowing-contract' && !point.ok));
   assert.equal(validation.ok, false);
  }
- t.diagnostic(`Gap N negative declarations: ${mutations.length}/${mutations.length} refused.`);
+ const incomplete = structuredClone(original);
+ delete incomplete.tools.find(tool => tool.widens === false).narrowing;
+ assert.equal(validateAgentSurface(incomplete).ok, false);
+ t.diagnostic(`Gap N negative declarations: ${mutations.length + 1}/${mutations.length + 1} refused.`);
 });

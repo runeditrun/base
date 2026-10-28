@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g281d0af7",
+  "cliVersion": "0.2.85-dev.gb21a2b7d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1875,7 +1875,7 @@
     },
     "modules/agent-door/conformance/surface.mjs": {
       "source": "modules/agent-door/conformance/surface.mjs",
-      "sha256": "432645c457255b27247d4557d1f31951dc9cdcfe9ad0260e9cec1401dde2edb3"
+      "sha256": "498beef37d5401a342b71921c0a4d01ceaeb0cc7389bc68d3eb4941a65ccf441"
     },
     "modules/ai/LICENSE": {
       "source": "modules/ai/LICENSE",

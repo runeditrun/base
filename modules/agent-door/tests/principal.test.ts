@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createAgentDoor, operatorAuthPeople } from '../index.ts'
 import { runtime } from './runtime.mjs'
 import { autonomousPolicy, heldPolicy } from '../conformance/crypto.mjs'
 
@@ -57,6 +58,15 @@ test('principal journey: one sponsor retains distinct client fences through reso
     check((await r.tool('records.list', {}, { token: await r.token({ scope: 'events:read' }) })).status, 403)
     check((await r.person('/agents/api/audit')).body.rows.findLast((row: any) => row.door === 'embedded' && row.code === 'insufficient_scope').tool, 'synthetic.records.list')
     assert.ok(decision(await r.tool('events.list', {})))
+    let ran = false
+    const nativePeople = operatorAuthPeople({ db: r.db, session: async () => null })
+    const embedded = createAgentDoor({ seed: 'synthetic', name: 'Native grant failure', specialist: 'operations', db: r.db, origin: r.c.origin, trust: null, people: nativePeople,
+      currentScopes: async () => undefined as unknown as string[],
+      tools: [{ name: 'synthetic.grants.read', title: 'Read', description: 'Read only with a valid current grant.', scope: 'records:read', readOnly: true, inputSchema: { type: 'object', additionalProperties: false }, outputSchema: { type: 'object' }, classes: ['standard'], clauses: ['BASE-AGENT-005'], classify: () => [{ class: 'standard', facts: { measure: 1 } }], async run() { ran = true; return { result: {} } } }],
+    })
+    const failure = await embedded.invoke('synthetic.grants.read', {}, { person: (await nativePeople.person(sponsor))!, agent: { id: 'grant-failure', name: 'Grant failure' }, scopes: ['records:read'] })
+    check(failure.code, 'execution_failed')
+    check(ran, false)
     t.diagnostic(`Gap P public-door journey: ${points}/${points} points passed.`)
   } finally { await r.close() }
 })
