@@ -26,7 +26,7 @@ test('public foundation CLI renders pinned schedules and requires their committe
   const git = (...args) => execFileSync('git', ['-C', base, ...args], { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim()
   const commit = () => {
     git('add', '.')
-    git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'source fixture')
+    git('-c', 'user.name=Test', '-c', 'user.email=base-test@example.invalid', 'commit', '-qm', 'source fixture')
     return git('rev-parse', 'HEAD')
   }
   const generate = (ref, name) => {

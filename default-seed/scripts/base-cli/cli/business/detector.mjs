@@ -27,8 +27,11 @@ function highEntropy(text, tokens) {
  return false;
 }
 
+/** A known credential shape (private keys, provider token prefixes, JWTs, SSH keys, certificates). */
+export const credentialShaped = text => shapes.some(pattern => pattern.test(text));
+
 export function sensitive(text) {
- return shapes.some(pattern => pattern.test(text)) || highEntropy(text, /[A-Za-z0-9_+\/=\-]{24,}/g);
+ return credentialShaped(text) || highEntropy(text, /[A-Za-z0-9_+\/=\-]{24,}/g);
 }
 
 function sensitivePath(path) {

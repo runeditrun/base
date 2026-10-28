@@ -27,7 +27,10 @@ CREATE INDEX computed_entries_total ON computed_entries(total);`;
 export async function portabilityFixture(t,{generated=true}={}) {
  const directory=await mkdtemp(join(tmpdir(),'rer-data-journey-')),root=join(directory,'installation');
  const children=new Set();
- t.after(async()=>{for(const child of children)if(child.exitCode===null&&child.signalCode===null){child.kill('SIGTERM');await child.done;}await rm(directory,{recursive:true,force:true,maxRetries:3,retryDelay:100});});
+ t.after(async()=>{
+  // Detached managed servers outlive the completed CLI child. Stop only this fixture's registered servers before removing its checkout.
+  for (const mode of ['dev', 'preview']) await command(['scripts/rer.mjs', mode, '--stop', '--json']);
+  for(const child of children)if(child.exitCode===null&&child.signalCode===null){child.kill('SIGTERM');await child.done;}await rm(directory,{recursive:true,force:true,maxRetries:3,retryDelay:100});});
  await exportReference(base,root);
  const declaration = JSON.parse(await readFile(join(root, 'deploy.json'), 'utf8'));
  declaration.vars.MAIL_FROM = productionSender;

@@ -283,6 +283,14 @@ resolves the deferred choice for preflight. An explicitly selected provider
 still requires its own credentials. Undeclared environment values do not count;
 the product's deploy adapter remains responsible for applying these settings.
 
+`rer deploy --dry-run` accepts syntactically valid fixture senders on reserved
+domains: `.test`, `.example`, `.invalid`, `.localhost`, and `example.com`,
+`example.net` or `example.org` (including their subdomains). It prints the local
+plan and the sender correction needed for a real deploy. A real deploy still
+refuses these placeholder senders with `safety_refusal` before building or
+uploading. Malformed senders and placeholders on ordinary domains refuse in
+both modes. A dry run sends no mail and makes no Cloudflare request.
+
 Idle timeout is `--idle-timeout SECONDS`, then `RER_SERVER_IDLE_SECONDS`, then
 43200 seconds (12 hours). Only positive integer seconds are accepted. HTTP requests,
 including assets, reset inactivity; a live request/stream prevents idle
@@ -417,7 +425,16 @@ interactive deploy asks once and saves it there. For unattended deployment,
 without a saved or supplied name, it refuses before upload. Names use the same
 validation as `setup --owner-name`: nonblank, at most 200 characters and no
 Unicode Cc or Cf control characters. Nameless installers retain their existing
-deployment behavior.
+deployment behavior. A dry run never prompts for or requires a missing owner
+name, never saves a name, and never claims a hosted owner. An explicitly supplied
+name still must be valid and supported by the installer.
+
+For real deployments, an adapter that validates the hosted owner email in its
+managed deploy preflight does so before rer asks for the owner name. A placeholder
+email therefore receives the adapter's email refusal first; once the email is
+accepted, a missing name prompts interactively or refuses unattended deployment.
+Dry runs bypass custom deploy hooks and their owner-email preflight: they validate
+the local plan, while a real deployment validates the hosted identity before upload.
 
 `--env-file` values are available in the command's preflight, custom hook and
 child build environment and are redacted; the caller environment is restored
@@ -538,3 +555,46 @@ On loopback, `rer preview` prints `RER_OPEN` for native owner entry.
 `rer demo` keeps its persona link and also prints `RER_OWNER_OPEN` for a native
 owner session in its isolated demo data. These native entry links work once,
 expire within 15 minutes and are never saved. Restarting retires them.
+
+## Run your business demo
+
+```sh
+rer business setup --origin https://app.runeditrun.com --session-file /private/path/owner.session --confirm-demo
+```
+
+This provisions the synthetic Juniper Harbor Software demo through the platform's
+Business routes using the signed-in person's session. The session file must be
+an owned regular file with mode `0600`, containing only `rer_session=VALUE` or
+`__Host-rer_session=VALUE`. Symbolic links are refused. The session is read in
+process, sent only as the platform Cookie header, and never printed or placed
+in argv, local Business state or a receipt. `--confirm-demo` is required.
+
+Hosting defaults to `managed`; `--hosting assisted` and `--hosting self_host`
+are also supported. There is no `hosted` alias. `--wait-seconds 0..240` bounds
+provisioning polling (default: 240). Both normal output and `--json` print the
+platform script's JSON receipt, including each seed's actual state and only
+credential identifiers. Errors print a named `{code}` to stderr and exit 1.
+
+Run the same command to resume. Completed seeds keep their token, consent and
+policy identifiers and report `already provisioned`; a completed repeat is a
+read and sets `business_created` to false. Missing adoptions remain
+`not yet on the agent door`. The command uses the platform script's exit rule:
+exit 1 below `min(5, required_total)` required provisions, or for any failed,
+waiting-for-owner or provisioning row. It does not invent a `complete` field.
+
+The route order, policy, synthetic company profile and receipt are mirrored from
+`runeditrun/platform` commit `c62af17e4d64105f84b71dd89ae012cb0ebccc4c`,
+`scripts/business/demo.mjs` and `demo/company.json`. The platform owns the seed
+catalogue, fixture data and door proofs. This command does not pair the computer
+or use its stored device credential.
+
+## Sync agent contract clauses
+
+`rer door clauses --write` synchronizes Base's thirteen shared agent duties
+into a seed's `CONTRACT.md` and runs its contract-docs generator and check.
+`rer door clauses --check` names missing or stale clauses and exits nonzero;
+`--cwd DIR` selects the seed root. Existing statuses, evidence and gaps survive,
+new clauses start missing, and seed-owned AGENT and SURFACE clauses stay intact.
+Run the edition's source-lock command last. See
+[Contract clauses](../modules/agent-door/ADOPTING.md#contract-clauses) for source
+delivery and generation details.

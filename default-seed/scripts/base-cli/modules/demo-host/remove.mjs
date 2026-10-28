@@ -2,6 +2,7 @@ import { ownedBucket, removeBucket } from './native/deploy-r2.mjs';
 import { assert } from '../deploy-kit/validation.mjs';
 import { workerSettings } from '../deploy-kit/owner.mjs';
 import { servedVersion } from '../deploy-kit/site.mjs';
+import { secretRotationOwned } from './ownership.mjs';
 import { deleteWorker } from '../deploy-kit/teardown.mjs';
 
 // Exact-id teardown and ownership inventory, shared by native upgrades.
@@ -23,7 +24,11 @@ export async function demoInventory(api, plan) {
   for (const row of named) if (row.service !== plan.worker) throw refuse('resource-name-collision', `domain:${row.hostname}`);
   if (worker) {
     const served = await servedVersion(api, plan.worker);
-    if (served.annotation !== plan.record) throw refuse('resource-name-collision', `worker:${plan.worker}`);
+    if (served.annotation !== plan.record && !await secretRotationOwned(api, plan, served)) {
+      const error = refuse('resource-name-collision', `worker:${plan.worker}`);
+      error.ownershipReason = served.annotation === undefined ? 'missing-annotation' : 'different-annotation';
+      throw error;
+    }
     if (!served.current) throw refuse('owned-resource-replaced', `worker:${plan.worker}`);
     for (const row of attached) if (!plan.hostnames.includes(row.hostname)) throw refuse('resource-not-in-record', `domain:${row.hostname}`);
   } else if (named.length || attached.length || apps.length) {

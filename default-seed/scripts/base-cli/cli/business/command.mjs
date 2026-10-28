@@ -1,3 +1,4 @@
+import { setupCommand } from './setup-command.mjs';
 import { scanCommand } from './scan-command.mjs';
 import { connect } from './connect.mjs';
 import { vendorKey, disconnect, status } from './local-commands.mjs';
@@ -10,25 +11,42 @@ Business keeps your business name, logo and brand colour together for the apps
 that support shared Business settings. Choose what to share in your browser.
 
 Advanced commands (Usage: rer business VERB)
+  setup --origin URL --session-file FILE --confirm-demo
+                                 Provision the synthetic Run your business demo
+                                 --hosting managed|assisted|self_host (default: managed)
+                                 --wait-seconds 0..240 (default: 240); --json
   scan [DIR...] [--json]          Names-only local discovery
   connect [--code CODE] [--origin URL]
                                  Pair this computer, waiting until the owner approves in the browser
                                  (up to the code's 10 minutes); run it again to resume
                                  Connect carries the Business name into local apps
-  run [--once]                   Run consented local discovery; vendor upload integration pending
-  next                           Return one templated question or nothing yet within 60 seconds
+  run [--once]                   Work this computer's tasks: the folder scan the owner allows, then
+                                 vendor exports into each app's import door (a preview the owner
+                                 approves), catch-ups (applied within the owner's standing approval,
+                                 else reviewed by the owner) and the final archive the app keeps and
+                                 test-restores; the vendor key stays in OS credential storage. Says
+                                 what it is doing and waiting for; applies the owner's choices at
+                                 each check-in
+  next                           Apply the owner's choices, then return one templated question, the
+                                 agent's next step, an owner step with its browser link (freeze,
+                                 rollback card, cancellation; never agent work), or nothing yet
+                                 within 60 seconds
   answer ID VENDOR USAGE [CONFIDENCE]
                                  Catalog vendor or none; uses, sells, both, product-dependency
-  vendor-key add|remove VENDOR   Keep a vendor key in OS credential storage
+  vendor-key add|remove VENDOR   Keep a read-only vendor key in OS credential storage; the owner
+                                 types it in their own terminal, never in chat or a command
   token                          MCP headersHelper output; send directly to the MCP client
   status [--json]                Pairing, service, current task and checkpoint
-  disconnect                     Revoke this computer, then remove local credentials and additions
-Vendors: sentry, uptimerobot, pagerduty, calendly. Owner approvals stay in the browser.
+  disconnect                     Revoke this computer, then remove local credentials and additions;
+                                 inside an agent sandbox it names the one command that finishes
+Vendors: sentry, uptimerobot, pagerduty, calendly (with a read-only key); sorry (its public page,
+no key). Owner approvals stay in the browser.
 State lives in $RER_BUSINESS_STATE_DIR when set, otherwise in ~/.rer/business.
 In an agent sandbox that writes only inside its working folder, use RER_BUSINESS_STATE_DIR="$PWD/.rer-business".
 `;
 
 export async function businessCommand(argv) {
+ if (argv[0] === 'setup') return setupCommand(argv.slice(1));
  if (!argv.length || argv[0] !== 'scan' && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(usage); return 0; }
  if (argv[0] === 'scan') return scanCommand(argv);
  try {

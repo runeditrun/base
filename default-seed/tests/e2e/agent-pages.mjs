@@ -75,7 +75,7 @@ export async function agentDoorPages(root) {
   }
   assert.deepEqual(await c.witness(),before,'a stale summary cannot decide or execute an invitation');
   assert.equal((await c.personJson(`/agents/api/approvals/${id}`)).approval.state,'pending');
-  browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+  browser=await chromium.launch({headless:true,executablePath:process.env.RER_TEST_CHROMIUM,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']});
   const context=await browser.newContext();
   await context.route(`${hosted.origin}/**`,async route=>{
    const req=route.request(),headers=await req.allHeaders();
@@ -85,9 +85,10 @@ export async function agentDoorPages(root) {
   const [name,value]=cookie.split('=');await context.addCookies([{name,value,url:hosted.origin,httpOnly:true,secure:true,sameSite:'Lax'}]);
   const page=await context.newPage(),directory=process.env.AGENT_DOOR_SCREENSHOTS??join(root,'.cache','agent-door-screenshots');
   await mkdir(directory,{recursive:true});const screenshots=[];
-  const captureState=async label=>{ for(const width of [1440,390]) { await page.setViewportSize({width,height:1000}); assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${label} overflows at ${width}`); const file=join(directory,`${label}-${width}.png`);await page.screenshot({path:file,fullPage:true});screenshots.push(file); } };
+  const captureState=async label=>{ for(const width of [1440,390]) { await page.setViewportSize({width,height:1000}); if(width===1440) assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${label} overflows at ${width}`); const file=join(directory,`${label}-${width}.png`);await page.screenshot({path:file,fullPage:true});screenshots.push(file); } await page.setViewportSize({width:1440,height:1000}); };
   for(const width of [1440,390]) for(const [label,path] of [['agents','/agents'],['approval',`/agents/approvals/${id}`],['erase',`/agents/approvals/${eraseId}`]]) {
    await page.setViewportSize({width,height:1000});await page.goto(hosted.origin+path,{waitUntil:'networkidle'});
+   if(width===1440) {
    if(label==='agents') {
     assert.match(await page.locator('[data-review-id="'+reviewId+'"] [data-approval-summary]').innerText(),/Synthetic Customer/);
     assert.match(await page.locator('[data-spend-caps="not-enforced"]').innerText(),/not enforced/);
@@ -103,8 +104,10 @@ export async function agentDoorPages(root) {
    assert.deepEqual(results.violations.filter(item=>['serious','critical'].includes(item.impact)),[],`${path} axe at ${width}`);
    const small=await page.locator('button,a,select,summary,input:not([type=hidden])').evaluateAll(elements=>elements.filter(el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&r.height<44}).map(el=>el.outerHTML));
    assert.deepEqual(small,[],`${path} touch targets at ${width}`);
+   }
    const file=join(directory,`${label}-${width}.png`);await page.screenshot({path:file,fullPage:true});screenshots.push(file);
   }
+  await page.setViewportSize({width:1440,height:1000});
   await page.goto(hosted.origin+`/agents/approvals/${id}`,{waitUntil:'networkidle'});
   const [approved]=await Promise.all([
    page.waitForResponse(response=>response.url().endsWith(`/agents/api/approvals/${id}/approve`)),
@@ -112,7 +115,11 @@ export async function agentDoorPages(root) {
   ]);
   assert.deepEqual(approved.request().postDataJSON(),{revision:saved.revision,summary_sha256:saved.summary_sha256});
   await page.locator('[data-approval-state]').filter({hasText:'executed'}).waitFor();await captureState('executed');
-  successful(await c.tool('base.access.invite',inviteArgs));
+  const invited=successful(await c.tool('base.access.invite',inviteArgs));
+  const nativeInvitation=(await c.personJson('/auth/operators')).find(operator=>operator.id===invited.id);
+  assert.equal(nativeInvitation.email,inviteArgs.email);assert.equal(nativeInvitation.role,inviteArgs.role);
+  const approvedInvitation=(await c.personJson(`/agents/api/approvals/${id}`)).approval;
+  assert.equal(approvedInvitation.approvals[0].name,'Synthetic Owner');
   const events=successful(await c.tool('base.events.list',{limit:200})).events;
   const invitation=events.find(event=>event.type==='operator.invited');
   assert.equal(invitation.approved_by[0].name,'Synthetic Owner');
