@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Agent conformance journeys can select real native client credentials and reference phase-local values from a contained `verification.fixtures` module. Fresh native setup runs before each policy journey round; receipts, destructive state, approvals and audits retain their actual client identity and scope. Missing clients, missing fixtures and reused consumed state still fail verification. This provides fixture support for Mango and Oncall; editions must still declare their missing tool/class cases.
+
 ## 0.2.86
 
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.
