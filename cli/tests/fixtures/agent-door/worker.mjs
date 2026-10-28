@@ -159,7 +159,10 @@ export default {
     const settings = createBusinessSettings({ db: env.DB, trust: env.RER_BUSINESS_TRUST,
       business: { settings: 1, values: ['display_name'], team: { roles: { admin: 'admin', member: 'member' } } }, team: teamAuth.businessTeam });
     const auth = createOperatorAuth({ db: env.DB, config, clientIp, businessSettings: settings });
-    const trust = { issuer: env.RER_OWNER_CLAIM_ISSUER, installationId: env.RER_OWNER_CLAIM_INSTALLATION_ID, appOrigin: origin, publicKeys: JSON.parse(env.RER_OWNER_CLAIM_PUBLIC_KEYS) };
+    const trust = { issuer: env.OWNER_MODE === 'signed' ? env.RER_MANAGEMENT_ORIGIN : env.RER_OWNER_CLAIM_ISSUER,
+      installationId: env.OWNER_MODE === 'signed' ? env.RER_INSTALLATION_ID : env.RER_OWNER_CLAIM_INSTALLATION_ID,
+      appOrigin: origin, publicKeys: JSON.parse(env.RER_OWNER_CLAIM_PUBLIC_KEYS) };
+    if (!trust.issuer || !trust.installationId) return new Response('Native owner bindings required', { status: 503 });
     const records = nativeRecords(env.DB, nativeMode);
     const door = createAgentDoor({ seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [],
       limits: { requestsPerMinute: 10000 }, tools: recordTools(env.DB, records),

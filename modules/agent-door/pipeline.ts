@@ -32,6 +32,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     if (tool.scope && !principal.scopes.includes(tool.scope)) { status = 403; scope = tool.scope; return refuse('insufficient_scope') }
     const state = await policyState(rt)
     row.revision = state.revision
+    if (principal.consent && state.revoked.consents.includes(principal.consent)) return refuse('consent_revoked')
     const refusal = policyRefusal(rt, state, tool.classes)
     if (refusal) {
       const disposition = { agents_paused: 'paused', policy_unset: 'unset', policy_unavailable: 'unavailable' }[refusal.code] ?? 'none'
@@ -89,6 +90,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     const summary_sha256 = await digest(savedSummary)
     recordDecision(row, meta)
     const claim = key === null ? undefined : { key, digest: requestDigest }
+    if (principal.consent && (await policyState(rt)).revoked.consents.includes(principal.consent)) return refuse('consent_revoked')
     if (decision.result === 'approval') {
       await startPending(rt, row, principal, evidence, claim); owned = key !== null
       result = await openApproval(rt, { decision_id: row.id, revision: state.revision, tool: name, args, digest: requestDigest, key,
@@ -100,7 +102,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     } else {
       // Once execution begins, retain the claim even on an unexpected failure:
       // an action may already have committed and must never be executed twice.
-      if (!await startExecution(rt, row, principal, classes, state, evidence, claim)) return refuse('decision_busy')
+      if (!await startExecution(rt, row, principal, classes, state, evidence, claim)) return refuse(principal.consent && (await policyState(rt)).revoked.consents.includes(principal.consent) ? 'consent_revoked' : 'decision_busy')
       owned = key !== null
       await releaseDecision(rt, row.id); locked = false
       effected = true
