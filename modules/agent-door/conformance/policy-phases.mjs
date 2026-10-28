@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { autonomousPolicy } from './crypto.mjs';
 import { errorCode } from './protocol.mjs';
+import { nativeStepHook } from './step-hooks.mjs';
 
 export async function unsetPolicy(c, initial = false) {
  const listed = await c.mcp('tools/list');
@@ -34,6 +35,7 @@ export async function blockedPhases(c) {
   const outputs = new Map();
   for (const step of c.surface.journey) {
    const args = c.args(step, outputs);
+   await nativeStepHook(c, 'beforeStep', `blocked:${cls}`, step, args, outputs);
    if (step.expect.some(item => item.class === cls)) {
     const policy = autonomousPolicy(); policy.rules.push({ id: `block-${cls}`, class: cls, do: 'blocked' });
     await c.adopt(policy);
@@ -45,6 +47,7 @@ export async function blockedPhases(c) {
    const completed = await c.tool(step.tool, args, await c.proof(step.tool, args));
    if (completed.result?.isError || completed.result?.structuredContent === undefined) throw new Error(`Could not prepare ${step.id} for the ${cls} blocked variant (${errorCode(completed) ?? completed.status})`);
    outputs.set(step.id, completed.result.structuredContent);
+   await nativeStepHook(c, 'afterStep', `blocked:${cls}`, step, args, outputs, completed.result.structuredContent);
   }
  }
 }
