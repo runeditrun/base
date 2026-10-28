@@ -42,41 +42,54 @@ test('rer deploy accepts the declared adapter mail credential and preserves its 
  });
 });
 
-test('public deploy dry-run refuses placeholder senders before provider access and accepts their correction', async t => {
+test('public deploy dry-run accepts reserved fixture senders while real deploy preserves sender refusals', async t => {
  const { root, provider } = await deployProviderFixture(t, {
-  vars: { MAIL_PROVIDER: 'resend', MAIL_FROM: productionSender, MAIL_API_KEY: 'synthetic-mail-1' },
+  vars: { MAIL_PROVIDER: 'resend', MAIL_FROM: productionSender, MAIL_API_KEY: 'synthetic-base-1' },
  });
  const declaration = JSON.parse(await readFile(join(root, 'deploy.json'), 'utf8'));
+ for (const name of Object.keys(process.env)) if (/^(CLOUDFLARE_|CF_)/.test(name)) delete process.env[name];
+ t.mock.method(globalThis, 'fetch', () => { throw Error('No network is available during local validation'); });
  let stdout = '', stderr = '';
  t.mock.method(process.stdout, 'write', chunk => { stdout += String(chunk); return true; });
  t.mock.method(process.stderr, 'write', chunk => { stderr += String(chunk); return true; });
- const run = async (json, ...flags) => {
+ const run = async (json, dryRun, ...flags) => {
   stdout = ''; stderr = '';
-  const code = await main(['deploy', '--dry-run', '--cwd', root, ...(json ? ['--json'] : []), ...flags]);
+  const code = await main(['deploy', '--non-interactive', ...(dryRun ? ['--dry-run'] : []), '--cwd', root, ...(json ? ['--json'] : []), ...flags]);
   return { code, text: stdout + stderr };
  };
- for (const sender of ['Your Business <sender@example.invalid>', 'sender@example.com', productionSender.replace(/@.+/, '@yourdomain.com'), productionSender.replace(/^[^@]+/, 'fake'), 'sender@example.test', 'not-an-address']) {
+ const fixtures = ['Support <support@dry-run.example.test>', 'sender@example.invalid', 'sender@example.com', 'sender@nested.example.net', 'sender@example.org', 'sender@fixture.example', 'sender@fixture.localhost', 'sender@fixture.test'];
+ const placeholders = [productionSender.replace(/@.+/, '@yourdomain.com'), productionSender.replace(/^[^@]+/, 'fake'), 'not-an-address', 'Support <not-an-address>', 'sender@example.test,other@example.test'];
+ for (const sender of [...fixtures, ...placeholders]) {
   await writeFile(join(root, 'deploy.json'), JSON.stringify({ ...declaration, vars: { ...declaration.vars, MAIL_FROM: sender } }));
   for (const json of [false, true]) {
-   const before = provider.state.calls.length, result = await run(json);
-   assert.equal(result.code, 4, result.text);
-   assert.ok(result.text.includes('MAIL_FROM') && result.text.includes('vars'), 'the refusal names the setting and its declaration location');
-   assert.equal(provider.state.calls.length, before, 'placeholder refusal precedes provider access');
+   const dry = await run(json, true), real = await run(json, false);
+   assert.equal(dry.code, fixtures.includes(sender) ? 0 : 4, dry.text);
+   assert.equal(real.code, 4, real.text);
+   assert.ok(real.text.includes('MAIL_FROM') && real.text.includes('vars'), 'the refusal names the setting and its declaration location');
+   if (fixtures.includes(sender)) {
+    assert.match(dry.text, /Would deploy:/);
+    assert.match(dry.text, /Needed for a real deploy/);
+   }
+   if (json) assert.match(real.text, /"code":"safety_refusal"/);
+   assert.equal(provider.state.calls.length, 0, 'both local plans and sender refusals precede provider access');
+   if (sender === fixtures[0]) t.diagnostic(`${json ? 'JSON' : 'Human'} fixture dry run: exit ${dry.code}; ${dry.text}Real deploy: exit ${real.code}; ${real.text}`);
   }
  }
  const { MAIL_FROM, ...vars } = declaration.vars;
  await writeFile(join(root, 'deploy.json'), JSON.stringify({ ...declaration, vars }));
  await writeFile(join(root, 'rer-packaging.json'), JSON.stringify({ artifact: { specInputs: { publicVariables: { MAIL_FROM: 'sender@example.invalid' } } } }));
- const packaged = await run(true);
+ const packagedDry = await run(true, true), packaged = await run(true, false);
+ assert.equal(packagedDry.code, 0, packagedDry.text);
  assert.equal(packaged.code, 4, packaged.text);
  assert.ok(packaged.text.includes('rer-packaging.json') && packaged.text.includes('publicVariables.MAIL_FROM'), 'the correction identifies the packaging source');
  await writeFile(join(root, 'deploy.json'), JSON.stringify({ ...declaration, vars, secrets: [{ binding: 'MAIL_FROM', environment: 'OUTBOUND_SENDER' }] }));
  await writeFile(join(root, 'sender.env'), 'OUTBOUND_SENDER=sender@example.invalid\n', { mode: 0o600 });
- const mapped = await run(true, '--env-file', 'sender.env');
+ const mappedDry = await run(true, true, '--env-file', 'sender.env'), mapped = await run(true, false, '--env-file', 'sender.env');
+ assert.equal(mappedDry.code, 0, mappedDry.text);
  assert.equal(mapped.code, 4, mapped.text);
  assert.ok(mapped.text.includes('OUTBOUND_SENDER') && mapped.text.includes('--env-file'), 'the correction follows the declared environment mapping');
  await writeFile(join(root, 'sender.env'), `OUTBOUND_SENDER=${MAIL_FROM}\n`, { mode: 0o600 });
- const corrected = await run(true, '--env-file', 'sender.env');
+ const corrected = await run(true, true, '--env-file', 'sender.env');
  assert.equal(corrected.code, 0, corrected.text);
  assert.equal(provider.state.writes.length, 0, 'neither refusal nor corrected dry-run writes to the provider');
 });
