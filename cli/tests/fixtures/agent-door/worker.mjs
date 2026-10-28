@@ -8,6 +8,7 @@ import { createReceiver } from './receiver.mjs';
 import { deliverySecret, openAiAuthorization } from './credentials.mjs';
 const { deliveryRequest, verifyDeliveryReceipt } = createReceiver(deliverySecret);
 import { authorityTools, nativeProof, issueProof } from './authority.mjs';
+import { createMailSender } from '../../../../modules/mail/index.mjs';
 
 const object = (properties, required = Object.keys(properties)) => ({ type: 'object', properties, required, additionalProperties: false });
 const text = { type: 'string', minLength: 1 }, integer = { type: 'integer' };
@@ -157,18 +158,18 @@ export default {
     const origin = env.RER_OWNER_CLAIM_APP_ORIGIN, nativeMode = env.OWNER_MODE === 'native';
     if (!['signed', 'native', 'setup-token'].includes(env.OWNER_MODE)) return new Response('Invalid owner configuration', { status: 503 });
     const config = { origin, OWNER_EMAIL: nativeMode ? env.SETUP_OPERATOR_EMAIL : env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, SETUP_TOKEN: env.SETUP_TOKEN,
-      branding: { productName: 'Records' } };
+      MAIL_FROM: 'synthetic-records@example.com', branding: { productName: 'Records' } };
     const clientIp = incoming => incoming.headers.get('CF-Connecting-IP') ?? '';
     const teamAuth = createOperatorAuth({ db: env.DB, config, clientIp });
     const settings = createBusinessSettings({ db: env.DB, trust: env.RER_BUSINESS_TRUST,
       business: { settings: 1, values: ['display_name'], team: { roles: { admin: 'admin', member: 'member' } } }, team: teamAuth.businessTeam });
-    const auth = createOperatorAuth({ db: env.DB, config, clientIp, businessSettings: settings });
+    const auth = createOperatorAuth({ db: env.DB, config, clientIp, businessSettings: settings, mailSender: createMailSender({ provider: 'resend', mode: 'production', apiKey: env.MAIL_API_KEY }) });
     const trust = { issuer: env.OWNER_MODE === 'signed' ? env.RER_MANAGEMENT_ORIGIN : env.RER_OWNER_CLAIM_ISSUER,
       installationId: env.OWNER_MODE === 'signed' ? env.RER_INSTALLATION_ID : env.RER_OWNER_CLAIM_INSTALLATION_ID,
       appOrigin: origin, publicKeys: JSON.parse(env.RER_OWNER_CLAIM_PUBLIC_KEYS) };
     if (!trust.issuer || !trust.installationId) return new Response('Native owner bindings required', { status: 503 });
     const records = nativeRecords(env.DB, nativeMode);
-    const door = createAgentDoor({ seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [],
+    const door = createAgentDoor({ seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [{ uriTemplate: 'fixture://record/{id}', name: 'Record', scope: 'records:read', classes: ['standard'], classify: standard, async read(resource, ctx) { try { return { json: await records.read(resource.split('/').pop(), ctx.person) }; } catch (error) { if (error instanceof ToolRefusal) return null; throw error; } } }],
       limits: { requestsPerMinute: 10000 }, tools: [...recordTools(env.DB, records), ...authorityTools(env.DB, records)], nativeProof: nativeProof(env.DB),
       people: memberPeople(operatorAuthPeople({ db: env.DB, session: incoming => auth.getSession(incoming) }), env.DB, nativeMode) });
     const handled = await door.handle(request) ?? await settings.handle(request);

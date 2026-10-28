@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.
+
+- Recheck native resource visibility before retained event replay and subscription delivery; accept single-segment and underscore tool names within MCP's 128-character limit; preserve opaque string or numeric revision tokens through approvals. Negotiate every advertised MCP version explicitly and document the unsupported March 2025 transport.
+
 - Agent-door access/security tools can declare a machine-checked revoke/narrow contract and prove a native grant subset plus undeclared-argument refusal. Native-proof tools challenge with a human handoff, use the seed verifier before execution and remain subject to company policy and approval; conformance checks challenges, bogus references, audits and valid native proof.
 
 - Carry agent/client scopes into resource authorization, delayed approvals and event/subscription filtering. Embedded callers supply explicit scopes; native current-grant hooks may only narrow their original authority.

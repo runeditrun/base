@@ -41,10 +41,13 @@ export async function listedDoor(c) {
   c.add(`BASE-AGENT-002.3.${declared.name}`, tool?.annotations?.readOnlyHint === declared.readOnly && tool?.annotations?.destructiveHint === declared.classes.includes('destructive') && tool?.annotations?.openWorldHint === declared.classes.includes('external'), `${declared.name} annotations differ from its declared behavior.`);
   c.add(`BASE-AGENT-006.1.${declared.name}`, isDeepStrictEqual([...(tool?._meta?.['com.runeditrun/classes'] ?? [])].sort(), [...declared.classes].sort()) && tool?._meta?.['com.runeditrun/scope'] === declared.scope && isDeepStrictEqual([...(tool?._meta?.['com.runeditrun/clauses'] ?? [])].sort(), [...declared.clauses].sort()), `${declared.name} classes, scope or clauses differ from the Agent surface.`);
  }
- const initialized = await c.mcp('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'rer-agent-conformance-legacy', version: '1' } }, { version: '2025-11-25' });
- const session = initialized.headers.get('mcp-session-id');
- const legacy = await c.mcp('tools/list', {}, { version: '2025-11-25', headers: session ? { 'Mcp-Session-Id': session } : {} });
- c.add('BASE-AGENT-001.2', !session && initialized.result?.protocolVersion === '2025-11-25' && isDeepStrictEqual(legacy.result?.tools?.map(tool => tool.name), names), 'A 2025-11-25 client must initialize and list the same tools as a handshake-free modern client.');
+ for (const version of [VERSION, '2025-11-25']) {
+  const initialized = await c.mcp('initialize', { protocolVersion: version, capabilities: {}, clientInfo: { name: 'rer-agent-conformance', version: '1' } }, { version });
+  const listed = await c.mcp('tools/list', {}, { version });
+  c.add(`BASE-AGENT-001.2.${version}`, !initialized.headers.has('mcp-session-id') && initialized.result?.protocolVersion === version && isDeepStrictEqual(listed.result?.tools?.map(tool => tool.name), names), `${version} must negotiate and expose the same tools.`);
+ }
+ const march = await c.mcp('initialize', { protocolVersion: '2025-03-26', capabilities: {} }, { version: '2025-03-26' });
+ c.add('BASE-AGENT-001.3.2025-03-26', march.status === 400 && march.message?.error?.code === -32022 && march.message.error.message === 'UnsupportedProtocolVersion', 'March 2025 batching is not implemented; refuse its negotiation explicitly.');
  const templates = await c.mcp('resources/templates/list');
  c.add('BASE-AGENT-003.1', isDeepStrictEqual((templates.result?.resourceTemplates ?? []).map(item => item.uriTemplate).sort(), [...c.surface.resources].sort()), 'resources/templates/list must match the Agent surface.');
  const prompts = await c.mcp('prompts/list');

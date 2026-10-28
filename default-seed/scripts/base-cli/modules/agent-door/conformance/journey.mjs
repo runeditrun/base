@@ -80,6 +80,11 @@ export async function runJourney(c, phase, { held = false, injections = false, r
     const smuggled = await c.tool(step.tool, { ...args, idempotency_key: randomUUID(), grant_to_add: 'admin' });
     c.add(`BASE-AGENT-005.narrowing.${step.tool}.undeclared`, errorCode(smuggled) === 'invalid_arguments' && isDeepStrictEqual(beforeInjection, await c.witness()), `${step.tool} must refuse an undeclared widening argument without an effect.`);
    }
+   if (!c.surface.tools.find(tool => tool.name === step.tool)?.readOnly) {
+    const snapshot = await c.tool(`${c.surface.seed}.events.list`, { limit: 200 });
+    if (!Array.isArray(snapshot.result?.structuredContent?.events)) throw new Error('Post-effect events.list must return events');
+    (c.effectEvents ??= []).push(...snapshot.result.structuredContent.events);
+   }
    if (injections && step.inject) {
     const injected = { ...args, ...c.resolve(step.inject, outputs), ...(!c.surface.tools.find(tool => tool.name === step.tool)?.readOnly ? { idempotency_key: randomUUID() } : {}) };
     const checked = await c.tool(step.tool, injected, proof);

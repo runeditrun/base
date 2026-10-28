@@ -1,4 +1,5 @@
 import { narrowingContract } from './narrowing.mjs';
+import { validToolName } from './tool-name.mjs';
 
 export const AGENT_CLASSES = Object.freeze(['standard', 'external', 'money', 'commitment', 'accounts', 'gated', 'access', 'security', 'destructive', 'sensitive', 'live']);
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -22,7 +23,7 @@ export function validateAgentSurface(surface, { contract } = {}) {
  const tools = new Map(), steps = new Set(), coverage = new Map();
  for (const [i, tool] of (Array.isArray(surface.tools) ? surface.tools : []).entries()) {
   const name = tool?.name, label = text(name) ? name : `tools[${i}]`;
-  add(`${label}.name`, text(name) && /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/.test(name) && name.split('.')[0] === surface.seed && !tools.has(name), `Malformed, duplicate or foreign-seed tool ${JSON.stringify(name)}.`);
+  add(`${label}.name`, validToolName(name, surface.seed) && !tools.has(name), `Malformed, duplicate or foreign-seed tool ${JSON.stringify(name)}.`);
   add(`${label}.scope`, text(tool?.scope), `${label} must declare its scope.`);
   add(`${label}.readOnly`, typeof tool?.readOnly === 'boolean', `${label} must declare readOnly.`);
   add(`${label}.classes`, Array.isArray(tool?.classes) && tool.classes.length > 0 && new Set(tool.classes).size === tool.classes.length && tool.classes.every(cls => AGENT_CLASSES.includes(cls)), `${label} has an empty, duplicate or uncatalogued class: ${JSON.stringify(tool?.classes)}.`);

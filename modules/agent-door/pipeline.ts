@@ -106,7 +106,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       await startPending(rt, row, principal, evidence, claim); owned = key !== null
       result = await openApproval(rt, { decision_id: row.id, revision: state.revision, tool: name, args, digest: requestDigest, key,
         classes, principal, summary: savedSummary, summary_sha256, approvers: decision.approvers!, expires_at: new Date(rt.now() + durationSeconds(decision.wait)! * 1000).toISOString(), door, evidence,
-        result, ...(expected === undefined ? {} : { expected_revision: expected as number }) })
+        result, ...(expected === undefined ? {} : { expected_revision: expected as string | number }) })
       effected = true
       await saveCall(rt, principal, key, result)
       await appendEvents(rt, [{ type: 'approval.pending', uri: result.approval!.url, actor: { kind: 'agent', ...preparedBy(principal) }, data: { decision_id: row.id, classes } }])

@@ -38,7 +38,8 @@ export interface ToolDefinition {
   inputSchema: JsonSchemaObject; outputSchema: JsonSchema; classes: ClassId[]; clauses: string[]
   classify(args: Record<string, unknown>, ctx: ToolContext): ClassAndFacts[] | Promise<ClassAndFacts[]>
   run(args: Record<string, unknown>, ctx: ToolContext): Promise<{ result: unknown; resources?: Array<{ uri: string; name: string }>; undo?: unknown }>
-  revision?(args: Record<string, unknown>, ctx: ToolContext): Promise<number | null>
+  revisionType?: 'integer' | 'number' | 'string'
+  revision?(args: Record<string, unknown>, ctx: ToolContext): Promise<string | number | null>
   summary?(args: Record<string, unknown>, ctx: ToolContext): ApprovalSummary | Promise<ApprovalSummary>
   undo?(saved: unknown, ctx: UndoContext): Promise<void>
   authority?(args: Record<string, unknown>, ctx: ToolContext): Promise<{ subject: string; widens: boolean } | null>

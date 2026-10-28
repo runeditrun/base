@@ -65,7 +65,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  const publicKeys = { [kid]: { kty, crv, x, y, kid, alg: 'ES256', use: 'sig' } };
  const values = { issuer, installationId, appOrigin: HOSTED_ORIGIN, publicKeys: JSON.stringify(publicKeys), email, sub, token, sessionSecret: randomBytes(32).toString('hex') };
  const nativeBindings = Object.fromEntries(Object.entries(native.bindings ?? {}).map(([name, source]) => [name, values[source]]));
- const network = await createAgentConformanceNetwork(root, verification.network);
+ const network = await createAgentConformanceNetwork(root, verification.network, { email });
  let hosted;
  try {
  hosted = await serveHosted(root, { declaration, outboundService: network.fetch, bindings: {
@@ -94,7 +94,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   let bootstrap;
   try {
    bootstrap = native.initialize ? await native.initialize({ request, origin: hosted.origin, email, sub,
-    displayName: 'Synthetic Base 1', token, claim: { mode: claim?.mode ?? 'setup-token', path, token: claimToken }, returnTo: owner?.returnTo ?? '/',
+    displayName: 'Synthetic Base 1', token, claim: { mode: claim?.mode ?? 'setup-token', path, token: claimToken }, returnTo: owner?.returnTo ?? '/', mail: network.mail, fixtures: network.fixtures,
    }) : await request(new URL(path, hosted.origin).href, { method: 'POST', redirect: 'manual',
     headers: { Origin: hosted.origin, 'Content-Type': 'application/json' },
     body: JSON.stringify({ token: claimToken, displayName: 'Synthetic Base 1', returnTo: owner?.returnTo ?? '/' }),
@@ -115,8 +115,18 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   });
   let ack; try { ack = await paired.json(); } catch {}
   if (!paired.ok || ack?.rev !== 1) return finish({ ok: false, points: [...validation.points, { id: 'BASE-AGENT-004.business-owner-binding', ok: false, detail: `Signed Business owner binding returned HTTP ${paired.status} without the expected acknowledgement.` }] }, report);
+  let nativeJourney;
+  if (verification.journey !== undefined) {
+   await contained(root, verification.journey);
+   const journey = (await import(pathToFileURL(resolve(root, verification.journey)))).default;
+   if (typeof journey !== 'function') throw new RerError('agent_journey_invalid', 'verification.journey must default-export an async native journey.', 1);
+   nativeJourney = async ({ tool }) => {
+    try { await journey({ request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures, tool }); }
+    catch { throw new Error('Native verification journey failed; no captured mail or fixture values are logged.'); }
+   };
+  }
   const result = await runAgentDoorConformance({ fetch: request, origin: hosted.origin, surface: declared.surface,
-   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: { email, cookie, sub }, business, prove,
+   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: { email, cookie, sub }, business, prove, nativeJourney,
   });
   return finish(result, report);
  } finally { try { await hosted?.close(); } finally { await network.close(); } }

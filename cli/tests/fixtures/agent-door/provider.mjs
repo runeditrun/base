@@ -4,9 +4,12 @@ const receiver = createReceiver(deliverySecret);
 
 const refused = message => new Response(message, { status: 502 });
 export default {
-  async fetch(request) {
+  async fetch(request, { fixture } = {}) {
     const url = new URL(request.url);
-    if (url.origin === 'https://receiver.example.invalid') return receiver.fetch(request);
+    if (url.origin === 'https://receiver.example.invalid') {
+      if (fixture && (await request.clone().json()).value !== fixture.value) return new Response('Native challenge mismatch', { status: 409 });
+      return receiver.fetch(request);
+    }
     if (url.origin !== 'https://api.openai.com' || url.pathname !== '/v1/responses' || url.search || request.method !== 'POST') return refused('Undeclared provider operation');
     if (request.headers.get('authorization') !== openAiAuthorization || request.headers.get('content-type') !== 'application/json') return refused('Invalid provider authentication or media type');
     let input;

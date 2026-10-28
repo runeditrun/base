@@ -12,7 +12,7 @@ import { invocationPhase } from './invocation.mjs';
 export { validateAgentSurface } from './surface.mjs';
 
 /** Run against a fresh, real installation using its HTTP and person doors. */
-export async function runAgentDoorConformance({ fetch, invoke, origin, surface, signer, person, business = 'rer-agent-conformance', consent = randomUUID(), now, prove }) {
+export async function runAgentDoorConformance({ fetch, invoke, origin, surface, signer, person, business = 'rer-agent-conformance', consent = randomUUID(), now, prove, nativeJourney }) {
  const validation = validateAgentSurface(surface), points = [...validation.points];
  if (!validation.ok) return { ok: false, points };
  if (typeof fetch !== 'function' || !signer?.privateKey || !signer.issuer || !signer.installationId || !signer.kid || !person?.email || !person.cookie || typeof person.sub !== 'string' || !person.sub.trim() || typeof consent !== 'string' || !consent.trim() || new URL(origin).origin !== origin) throw new TypeError('Conformance requires fetch, canonical origin, signer, consent and signed-in person {email,cookie,sub}');
@@ -27,6 +27,7 @@ export async function runAgentDoorConformance({ fetch, invoke, origin, surface, 
  await c.phase('BASE-AGENT-004.phase6', () => negativePhase(c));
  await c.phase('BASE-AGENT-004.consent', () => consentRevocationPhase(c));
  if (invoke) await c.phase('BASE-AGENT-012.invocation', () => invocationPhase(c, invoke));
+ if (nativeJourney) await c.phase('BASE-AGENT-013.native-journey', async () => { await nativeJourney({ tool: c.tool }); c.add('BASE-AGENT-013.native-journey', true); });
  await c.phase('BASE-AGENT-009.phase7', () => auditPhase(c));
  return { ok: points.every(point => point.ok), points };
 }

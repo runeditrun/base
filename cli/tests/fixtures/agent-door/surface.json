@@ -15,7 +15,7 @@
     {"name": "fixture.records.protected", "scope": "records:write", "readOnly": false, "classes": ["sensitive"], "clauses": ["BASE-AGENT-004"], "proof": "native", "proofKind": "step_up"}
   ],
   "notTools": [],
-  "resources": [],
+  "resources": ["fixture://record/{id}"],
   "escalations": [
     {"id": "grant-sponsor", "tool": "fixture.access.grant", "args": {"id": {"$sponsor": "id"}, "scope": "records:read"}}
   ],
