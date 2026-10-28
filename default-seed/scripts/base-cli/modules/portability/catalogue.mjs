@@ -65,11 +65,13 @@ async function archived(db,config) {
   return {objects,kinds,excluded,schemaObjects,entries:objects.filter(x=>x.type==='table' && !excluded.some(y=>y.name===x.name))};
 }
 // The archive schema identity alone, for databases that need not satisfy the policy.
-export async function schemaIdentity(db,config,{legacyExcludedObjects=false}={}) {
+export async function schemaIdentity(db,config,{legacyExcludedObjects=false,tablesOnly=false}={}) {
   const {entries,excluded,schemaObjects}=await archived(db,config);
   // Acknowledged v1 recovery places an old backup using its historical
-  // projection. Current archives always retain the complete object inventory.
-  const objects=legacyExcludedObjects?schemaObjects.filter(object=>!excluded.some(table=>table.name===object.table)):schemaObjects;
+  // projection; acknowledged recovery of a version 2 archive without an object
+  // inventory compares tables only. Current archives always retain the
+  // complete object inventory.
+  const objects=tablesOnly?[]:legacyExcludedObjects?schemaObjects.filter(object=>!excluded.some(table=>table.name===object.table)):schemaObjects;
   return schemaIdentityOf(entries,objects);
 }
 export async function catalogue(db,config) {

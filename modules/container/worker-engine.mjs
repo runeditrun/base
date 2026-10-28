@@ -5,7 +5,7 @@ import { rootCertificates } from 'node:tls';
 import { ensurePortabilitySchema } from './portability-schema.mjs';
 import { migrate } from './migrations.mjs';
 async function files(root) { const result = []; for (const item of await readdir(root, { withFileTypes: true })) { const path = join(root, item.name); if (item.isDirectory()) result.push(...await files(path)); else if (/\.(m?js)$/.test(item.name)) result.push(path); } return result; }
-export async function workerEngine({ root, data, manifest, settings, edge }) {
+export async function workerEngine({ root, data, manifest, settings, edge, applyMigrations=true }) {
  const config = manifest.config, directory = join(root, 'dist/server'), entry = join(root, manifest.entry);
  const modules = [entry, ...(await files(directory)).filter(path => path !== entry)].map(path => ({ type: 'ESModule', path }));
  const app = { name:'app', modules, modulesRoot:directory, compatibilityDate:config.compatibility_date, compatibilityFlags:config.compatibility_flags,
@@ -23,7 +23,7 @@ export async function workerEngine({ root, data, manifest, settings, edge }) {
     serviceBindings:{ NETWORK:{ network:{ allow:['public'],tlsOptions:{ trustBrowserCas:true,trustedCertificates:[...rootCertificates] } } } } }],
  }));
  await mf.ready; const databases = {}, objects = {};
- for (const [binding, plan] of Object.entries(manifest.migrations)) { const db = await mf.getD1Database(binding, 'app'); databases[binding] = db; await migrate(db, plan); await ensurePortabilitySchema(db, manifest.portabilityMigrations); }
+ for (const [binding, plan] of Object.entries(manifest.migrations)) { const db = await mf.getD1Database(binding, 'app'); databases[binding] = db; if(applyMigrations){await migrate(db, plan); await ensurePortabilitySchema(db, manifest.portabilityMigrations);} }
  for (const bucket of config.r2_buckets ?? []) objects[bucket.binding] = await mf.getR2Bucket(bucket.binding, 'app');
  const worker = await mf.getWorker('app');
  return { mf, databases, objects, app:worker, coupleWebSocket,

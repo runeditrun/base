@@ -18,16 +18,19 @@ const reExport = 'Re-export from the original installation with rer export --out
 // Seeds declare their real bindings and data policy. The shared module owns the
 // archive format and atomic restore; the shared runner owns its native children.
 export function localPortability({ database, binding = 'DB', buckets = {}, policy, policyModule, transient = [], platformMigrations, managedData = false }) {
- async function run({ root, path, journal, store, signal, operationToken, platform, legacyRecovery }, direction) {
+ async function run({ root, path, journal, store, signal, operationToken, platform, legacyRecovery, acknowledgeUnverifiedSchemaObjects }, direction) {
   if (direction === 'export') {
    if (await lstat(path).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) throw refuse('Export requires a new archive path.');
   }
   if(legacyRecovery && (!legacyRecovery.acknowledged || await lstat(legacyRecovery.output).catch(error=>{if(error.code==='ENOENT')return null;throw error;})))throw refuse('Legacy recovery requires acknowledgement and a new output archive path.');
+  let unverifiedSchemaRecovery=false;
   if (direction === 'import') {
    // Refuse damaged or unverifiable archives before migrations open the
    // destination database. Worker and finalization verify again before publish.
    try {
-    for await (const record of fileRecords(path,legacyRecovery?readLegacyArchive:readArchive)) {}
+    for await (const record of fileRecords(path,legacyRecovery?readLegacyArchive:readArchive)) {
+     if(record.kind==='manifest')unverifiedSchemaRecovery=!legacyRecovery && acknowledgeUnverifiedSchemaObjects===true && record.schemaObjects===undefined;
+    }
     if(journal)for await(const record of fileRecords(journal)) {}
    }
    catch (error) {
@@ -52,8 +55,8 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
    if (!(error instanceof PortabilityError)) throw error;
    throw refuse(`Local portability policy refused (${error.code}). Executable policies require a seed-owned policyModule with a valid default policy export; policyModule requires native local transport.`);
   }
-  if(platform==='container') return (await import('./container-transfer.mjs')).containerTransfer({root,path,journal,store,signal,direction,binding,buckets,policy:declaration.policy,transient});
-  const input={ root, path, journal, binding, buckets, ...declaration, transient, legacyRecovery, platformMigrations };
+  if(platform==='container') return (await import('./container-transfer.mjs')).containerTransfer({root,path,journal,store,signal,direction,binding,buckets,policy:declaration.policy,transient,acknowledgeUnverifiedSchemaObjects});
+  const input={ root, path, journal, binding, buckets, ...declaration, transient, legacyRecovery, acknowledgeUnverifiedSchemaObjects, platformMigrations };
   // Check the executable policy before migrations; the transfer worker imports
   // it again in its own process so module closures are retained during restore.
   if (policyModule !== undefined) await nativeWorker(store,'policy-preflight',input,signal);
@@ -68,6 +71,7 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
     throw error;
    }
   }
+  if(unverifiedSchemaRecovery)await nativeWorker(store,'schema-recovery-preflight',input,signal);
   const {nativeApply}=await nativeWorker(store,'migration-preflight',input,signal);
   // Local migrations need no provider account: wrangler runs without credentials.
   // Its info lines (the local location and "Use --remote if you want to access
@@ -88,7 +92,7 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
 async function nativeWorker(store,direction,input,signal) {
   // The notice filter loads before the worker links its static node:sqlite import.
   const worker = fileURLToPath(new URL('./portability-worker.mjs', import.meta.url)), notice = new URL('./sqlite-notice.mjs', import.meta.url).href;
-  const child = store.spawn(`${direction === 'migration-preflight' ? 'Checking migration history for' : direction === 'policy-preflight' ? 'Checking archive policy' : direction === 'legacy-preflight' ? 'Checking empty recovery destination' : direction === 'export' ? 'Exporting' : 'Restoring'} local installation data`, process.execPath,
+  const child = store.spawn(`${direction === 'migration-preflight' ? 'Checking migration history for' : direction === 'policy-preflight' ? 'Checking archive policy' : ['legacy-preflight','schema-recovery-preflight'].includes(direction) ? 'Checking empty recovery destination' : direction === 'export' ? 'Exporting' : 'Restoring'} local installation data`, process.execPath,
    ['--import', notice, worker, direction, JSON.stringify(input)], { cwd: input.root, signal, env: { ...process.env, WRANGLER_SEND_METRICS: 'false' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
   let receipt;
   // Progress lines come first, as {progress}; the last message is the receipt.

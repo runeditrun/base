@@ -22,6 +22,7 @@
 - Allow seed source folders named exports in development while keeping generated top-level export output and installation archives private.
 - Prevent "fetch failed" and UND_ERR_SOCKET on local worker requests by closing each loopback harness connection after its response instead of reusing idle sockets. Readiness, owner claims and seed runtime journeys share this transport without retries.
 - Make application deploy dry runs build and validate the local plan without Cloudflare credentials or requests. Print target, binding and migration names and reserve remote readiness checks for a real deploy.
+- Add explicit `--acknowledge-unverified-schema-objects` recovery for version 2 backups without a schema object inventory. Destination migration replay, an empty target and all existing restore fences remain required; completed receipts record the acknowledged schema uncertainty. Current archives restore without acknowledgment.
 
 ## 0.2.84
 

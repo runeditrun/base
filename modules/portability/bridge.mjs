@@ -22,7 +22,7 @@ export async function appliedMigrations(db) {
 // Restored rows never pass through a later migration, so one that writes or
 // rewrites restorable data is refused, whether or not it changes the schema,
 // unless its statement is replayed at finalize (backfills.mjs).
-async function placement(db,manifest,cat,replay,ledger,history,legacyRecovery) {
+async function placement(db,manifest,cat,replay,ledger,history,legacyRecovery,unverified=false) {
   const files=replay.names.map(name=>({name,sha256:replay.sha256?.(name),aliases:replay.aliases?.(name)}));
   // An aligned replayer keeps its existing contract: hashes are optional.
   // Resolve destination aliases only when its ledger uses different names.
@@ -34,10 +34,13 @@ async function placement(db,manifest,cat,replay,ledger,history,legacyRecovery) {
   const recorded=historyEntries && matchMigrationLedger(historyEntries,files,replay);
   // Only explicitly acknowledged v1 recovery may use the old projection for
   // archive placement. The live destination check above remains complete, and
-  // ordinary v2 imports still require their authenticated object inventory.
-  const schemaAfter=names=>replay.schemaAfter(names,legacyRecovery && manifest.schemaObjects===undefined?{legacyExcludedObjects:true}:undefined);
+  // ordinary v2 imports still require their authenticated object inventory;
+  // acknowledged v2 recovery without that inventory places by tables only.
+  const schemaAfter=names=>replay.schemaAfter(names,legacyRecovery && manifest.schemaObjects===undefined?{legacyExcludedObjects:true}:unverified?{tablesOnly:true}:undefined);
+  if(unverified && archived && manifest.migrations)insist(canonicalJson(matchMigrationLedger(archived,files,replay))===canonicalJson(recorded),'schema_mismatch:migration_history',409);
   let earlier,unapplied;
   if(recorded) {
+    if(unverified)insist(recorded.every((name,i)=>applied.indexOf(name)>(i?applied.indexOf(recorded[i-1]):-1)),'schema_mismatch:migration_history',409);
     earlier=applied.filter(name=>recorded.includes(name));
     insist(await schemaAfter(earlier)===manifest.schema,'schema_mismatch');
     unapplied=applied.filter(name=>!earlier.includes(name));
@@ -89,10 +92,10 @@ export async function sameSchemaMigrations(db,manifest,cat,migrations,history) {
 // are additive, or a proven row-preserving CHECK rebuild: new tables, new
 // columns that take a default, or later schema objects established by replay.
 // Anything else stays a schema_mismatch refusal.
-export async function additiveBridge(db,manifest,cat,migrations,history,legacyRecovery) {
+export async function additiveBridge(db,manifest,cat,migrations,history,legacyRecovery,unverified=false) {
   insist(migrations,'schema_mismatch');
   const replay=await migrations(),ledger=await destinationLedger(db)??[];
-  const {applied,earlier,replays,rebuilt}=await placement(db,manifest,cat,replay,ledger,history,legacyRecovery);
+  const {applied,earlier,replays,rebuilt}=await placement(db,manifest,cat,replay,ledger,history,legacyRecovery,unverified);
   const columns={};
   for(const table of manifest.tables) {
     const target=cat.tables.find(t=>t.name===table.name),label=':'+table.name;
