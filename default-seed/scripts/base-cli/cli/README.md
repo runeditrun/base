@@ -538,3 +538,14 @@ On loopback, `rer preview` prints `RER_OPEN` for native owner entry.
 `rer demo` keeps its persona link and also prints `RER_OWNER_OPEN` for a native
 owner session in its isolated demo data. These native entry links work once,
 expire within 15 minutes and are never saved. Restarting retires them.
+
+## Sync agent contract clauses
+
+`rer door clauses --write` synchronizes Base's thirteen shared agent duties
+into a seed's `CONTRACT.md` and runs its contract-docs generator and check.
+`rer door clauses --check` names missing or stale clauses and exits nonzero;
+`--cwd DIR` selects the seed root. Existing statuses, evidence and gaps survive,
+new clauses start missing, and seed-owned AGENT and SURFACE clauses stay intact.
+Run the edition's source-lock command last. See
+[Contract clauses](../modules/agent-door/ADOPTING.md#contract-clauses) for source
+delivery and generation details.

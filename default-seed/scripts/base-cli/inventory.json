@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g0cad22d3",
+  "cliVersion": "0.2.85-dev.g45f4aafd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -379,7 +379,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "f96acb39255babe41a42889960e04a3fa04b3410459ba9b7ab44121736bbd249"
+      "sha256": "e33325efbb60df8e6a8a38a45c56a2d1fc237299f7b292e32d031c7a382904ae"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -813,6 +813,10 @@
       "source": "cli/dev-identity.mjs",
       "sha256": "96f6ecc985ab22e59f30e7197026bdbee2695b55d655041744bee122a3393649"
     },
+    "cli/door-clauses.mjs": {
+      "source": "cli/door-clauses.mjs",
+      "sha256": "63dd8c0ce91141605a9991e55a38e14393b7b8e64dbe1bb5edb4c08a9bb54afd"
+    },
     "cli/door-mode.mjs": {
       "source": "cli/door-mode.mjs",
       "sha256": "6d8f920cf229e5273379472525df6c0daab33c39c583d42d86c23c05c49af9a6"
@@ -831,7 +835,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "3058270b9d950dc1243ca7c58c0f1874043695ea8c867b11c390b9b9894e36bb"
+      "sha256": "9a1ec5cb81b3368a37a9a284d0c126b499f1980ee68f1a8fb28a7e5325c53c6c"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -927,7 +931,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "7cb427fe7276ede937aa0140b96a3662df139a65ae5c05cc8243ee38487d5b41"
+      "sha256": "69ce3d31738cea5cbd54632ed81fc27a784dee9c07c601a5d60059508544c245"
     },
     "cli/managed-data-schema.mjs": {
       "source": "cli/managed-data-schema.mjs",
@@ -1816,6 +1820,10 @@
     "foundation/runtime/seed-contract.mjs": {
       "source": "foundation/runtime/seed-contract.mjs",
       "sha256": "7beada5d271beaaf63d76e1f8cf2712ba906ec7d430f8312f4abedfad57428b4"
+    },
+    "modules/agent-door/CLAUSES.md": {
+      "source": "modules/agent-door/CLAUSES.md",
+      "sha256": "0568321ca8cc6c5ff5056d3e12868795aadfedd17c51aa693dd4517450a9e867"
     },
     "modules/agent-door/conformance/audit.mjs": {
       "source": "modules/agent-door/conformance/audit.mjs",

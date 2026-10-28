@@ -19,6 +19,8 @@ The front door serves every registered checkout at http://NAME.localhost:PORT
 from one process on one port. A checkout starts on its first visit in a browser
 and stops when idle. It is opt-in for this computer.
 
+  rer door clauses (--write | --check) [--cwd DIR]
+                        Sync Base agent requirements into a seed contract, preserving judgments.
   rer door enable [--port N] [--server-limit N] [--idle-timeout S]
                         Opt this computer in, record the policy and start the door.
                         Defaults: port 8700, 10 servers, 43200 s (12 hours) idle.

@@ -19,6 +19,13 @@ Review source changes and run edition tests before committing. See the
 [edition authoring guide](https://github.com/runeditrun/base/blob/main/export/EDITION-AUTHORING.md)
 for adoption, refusal behavior, JSON fields and the original Base-checkout form.
 
+`rer door clauses --write` syncs the shared agent requirements into a seed's
+contract, preserving its judgments and its own specialist clauses, then runs
+contract document generation and checking. `rer door clauses --check` reports
+missing or stale requirements without writing; use `--cwd DIR` to select a seed.
+The CLI can sync a contract before runtime adoption; regenerate the seed's source lock last.
+See [agent door adoption](https://github.com/runeditrun/base/blob/main/modules/agent-door/ADOPTING.md#contract-clauses).
+
 ## Install
 
 Start a seed from an empty folder, with or without Node:
