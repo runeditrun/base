@@ -200,7 +200,7 @@ test('packed refresh delivers and adopts templates with their helpers atomically
   git(seed, 'add', '-A');
  }
 
- for (const [origin, scalar, helper = 'export/literal-helper.mjs', destination = 'scripts/literal-helper.mjs', owned = false] of [
+ for (const [origin, scalar, helper = 'export/literal-helper.mjs', destination = 'scripts/literal-helper.mjs', owned = false, refused = false] of [
   ['default-seed/.github/workflows/literal.yml', 'node scripts/literal-helper.mjs'],
   ['export/literal.yml', '"bash -c \'node scripts/literal-helper.mjs\'"'],
   ['export/literal.yml', '|2\n          node scripts/literal-helper.mjs'],
@@ -211,8 +211,10 @@ test('packed refresh delivers and adopts templates with their helpers atomically
   ['export/literal.yml', '>2-\n          node scripts/literal-helper.mjs'],
   ['export/literal.yml', '\'node "scripts/literal-helper.mjs"\''],
   ['export/literal.yml', '"node scripts/literal-helper.mjs"', 'export/literal-helper.mjs', 'scripts/literal-helper.mjs', true],
+  ['export/literal.yml', '|2\n          echo "org secret\'s"\n          node scripts/literal-helper.mjs'],
+  ['export/literal.yml', '|2\n          echo "org secret\'s\n          node scripts/literal-helper.mjs', undefined, undefined, false, true],
  ]) {
-  const {seed, source, old, result} = await fixture(t);
+  const {seed, source, old, result, run} = await fixture(t);
   const target = '.github/workflows/literal.yml';
   write(source, origin, 'jobs:\n  check:\n    steps:\n      - run: echo before\n');
   const pin = commit(source);
@@ -223,6 +225,15 @@ test('packed refresh delivers and adopts templates with their helpers atomically
   write(source, helper, 'export const helper = true;\n');
   const next = commit(source);
   if (owned) { write(seed, target, fs.readFileSync(path.join(source, origin), 'utf8') + '# Edition-owned workflow\n'); commit(seed); }
+  if (refused) {
+   const workflow = fs.readFileSync(path.join(seed, target)), record = fs.readFileSync(path.join(seed, 'base-copies.json'));
+   const refresh = run('refresh-base', '--ref', next, '--base', source);
+   assert.equal(refresh.status, 4, refresh.stdout + refresh.stderr);
+   assert.match(refresh.stdout, /Unclosed shell quote in workflow/);
+   assert.deepEqual(fs.readFileSync(path.join(seed, target)), workflow);
+   assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
+   continue;
+  }
   result('refresh-base', '--ref', next, '--base', source);
   assert.equal(fs.readFileSync(path.join(seed, destination), 'utf8'), 'export const helper = true;\n');
   const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json')));
@@ -232,7 +243,7 @@ test('packed refresh delivers and adopts templates with their helpers atomically
 
 
  for (const historyRoot of ['export', 'default-seed']) {
- for (const ownership of ['tracked', 'diverged', 'untracked', 'ignored', 'adapted']) {
+ for (const ownership of ['tracked', 'diverged', 'untracked', 'ignored', 'adapted', 'adapted-current']) {
   const {seed, source, old, result} = await fixture(t);
   const workflow = '.github/workflows/verify.yml', guide = 'VERIFY-WORKFLOW.md';
   const historical = 'jobs:\n  check:\n    runs-on: ubuntu-24.04\n    env:\n      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright\n    steps:\n      - run: echo old\n';
@@ -244,8 +255,8 @@ test('packed refresh delivers and adopts templates with their helpers atomically
   for (const [target, sourcePath] of [[workflow, origin], [guide, guideOrigin]]) write(seed, target, fs.readFileSync(path.join(source, sourcePath)));
   if (ownership === 'diverged') write(seed, workflow, historical + '# product adaptation\n');
   if (ownership === 'ignored') write(seed, '.gitignore', 'node_modules/\n.github/\nVERIFY-WORKFLOW.md\n');
-  if (['tracked', 'diverged', 'adapted'].includes(ownership)) commit(seed);
-  if (ownership === 'adapted') {
+  if (['tracked', 'diverged', 'adapted', 'adapted-current'].includes(ownership)) commit(seed);
+  if (ownership.startsWith('adapted')) {
    old('record-base', workflow, origin, pin, '--base', source);
    old('adapt-base', workflow);
   }
@@ -255,12 +266,22 @@ test('packed refresh delivers and adopts templates with their helpers atomically
   write(source, 'export/VERIFY-WORKFLOW.md', 'Current workflow guide with enough bytes.\n');
   write(source, 'export/future-helper.py', 'print("new dependency")\n');
   const next = commit(source);
+  if (ownership === 'adapted-current') {
+   write(seed, workflow, current);
+   old('record-base', workflow, 'export/verify.yml', next, '--base', source);
+   old('adapt-base', workflow);
+  }
   const refreshed = result('refresh-base', '--ref', next, '--base', source);
   if (ownership === 'tracked') {
    assert.equal(fs.readFileSync(path.join(seed, workflow), 'utf8'), current);
    assert.equal(refreshed.templateAdoptions.find(item => item.path === workflow).from, pin);
    assert.equal(fs.readFileSync(path.join(seed, guide), 'utf8'), 'Current workflow guide with enough bytes.\n');
    assert.ok(fs.existsSync(path.join(seed, 'scripts/future-helper.py')));
+  } else if (ownership === 'adapted-current') {
+   assert.equal(fs.readFileSync(path.join(seed, workflow), 'utf8'), current);
+   assert.deepEqual(refreshed.notices, []);
+   assert.ok(fs.existsSync(path.join(seed, 'scripts/future-helper.py')));
+   assert.equal(old('verify-base', '--base', source).ok, true);
   } else {
    assert.deepEqual(fs.readFileSync(path.join(seed, workflow)), before);
    assert.equal(refreshed.notices.length, 1);

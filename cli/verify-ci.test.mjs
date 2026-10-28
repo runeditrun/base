@@ -198,6 +198,7 @@ test('verification planning requires the newest push proof, identical trees and 
  await commit('src/base/contract-docs.mjs', 'export {};\n');
  await commit('scripts/edition-authoring/cli.mjs', 'export {};\n');
  await commit('tests/e2e/reference-runtime.mjs', 'export {};\n');
+ await commit('tests/edition-contract.test.mjs', "import { readFileSync } from 'node:fs';\nreadFileSync('STATUS.md');\n");
  await commit('edition.json', '{}\n');
  const parent = await commit('sources.lock.json', '{}\n');
  const head = await commit('STATUS.md', 'synthetic-base-1\n');
@@ -250,6 +251,16 @@ test('verification planning requires the newest push proof, identical trees and 
  assert.equal((await decide({ runs: [] })).coverage, 'full', 'unverified parent');
  const changedReaders = { push: [{ ...plan.push[0], commands: ['node --test tests/synthetic-base-8.test.mjs'] }, plan.push[1]], nightly: [] };
  assert.equal((await planVerification({ cwd: directory, env: environment, plan: changedReaders, fetch: network({ runs: [parentRun] }) })).coverage, 'full', 'unknown reader refuses light');
+ const editionPlan = { push: [...plan.push, { name: 'contract', browser: false, hosted: false, commands: ['node --test tests/edition-contract.test.mjs'] }], nightly: [] };
+ const editionNetwork = () => network({ runs: [parentRun], jobs: run => proofJobs(run, ['plan', 'full-push-proof', 'verify', ...editionPlan.push.map(shard => `shards (${shard.name})`)]) });
+ const editionDecision = candidate => planVerification({ cwd: directory, env: environment, plan: candidate, fetch: editionNetwork() });
+ assert.equal((await editionDecision(editionPlan)).coverage, 'full', 'undeclared edition reader');
+ const declaredReaders = { ...editionPlan, readers: { 'tests/edition-contract.test.mjs': ['STATUS.md'] } };
+ const editionLight = await editionDecision(declaredReaders);
+ assert.equal(editionLight.coverage, 'light', 'edition declares its document reader in verification.json');
+ assert.ok(editionLight.readers.includes('node --test --test-concurrency=1 tests/edition-contract.test.mjs'));
+ assert.ok(editionLight.readers.includes('node src/base/contract-docs.mjs check'));
+ assert.equal((await editionDecision({ ...declaredReaders, readers: { 'tests/edition-contract.test.mjs': 'STATUS.md' } })).coverage, 'full', 'malformed reader declaration');
  git('commit', '--allow-empty', '--quiet', '-m', 'synthetic-base-2');
  const child = git('rev-parse', 'HEAD'), childSelf = { ...current, head_sha: child };
  const childDecision = await planVerification({ cwd: directory, env: { ...environment, GITHUB_SHA: child }, plan,
