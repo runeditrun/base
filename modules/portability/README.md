@@ -433,7 +433,7 @@ Re-export from the original installation to carry the complete definitions.
 A new archive explicitly records even an empty object inventory, so later
 additive migrations can still be placed normally. The separate acknowledged
 v1 recovery path remains an explicitly unverified recovery, as documented below.
-Version 2 backups without that inventory have their own acknowledged recovery below.
+Version 2 backups without that inventory use recorded migration replay when it proves the complete destination schema, or the acknowledged recovery below.
 
 New exports use archive version 2. The closing `archiveHash` is SHA-256 of
 canonical JSON `{manifest,parts}`, where `manifest` is the complete manifest
@@ -468,20 +468,30 @@ authenticate it. If the original installation is unavailable, use the explicit
 [backup-only v1 recovery](#backup-only-v1-recovery) below. Normal import still
 requires version 2 integrity.
 
-## Acknowledged recovery of older version 2 backups
+## Older version 2 backups and acknowledged recovery
 
 A fresh export from a current rer is preferred whenever the original installation
 is available. Current archives carry the complete schema inventory and restore
 without any acknowledgment. Version 2 backups written by rer 0.2.79 or earlier
-can lack `schemaObjects`. If only such a backup remains, the owner can explicitly
-accept that its schema objects are unverified:
+can lack `schemaObjects`. Ordinary import verifies such a backup without an
+acknowledgment when its nonempty recorded migration history, resolved against the
+destination's own applied files in order, replays to the complete live destination
+schema identity, including indexes, views and triggers. The same replay's tables
+must match the archive's table definitions. The archive's ledger, when present,
+must agree with its recorded names, and available hashes must match. Missing
+history, failed replay, table drift or a different complete destination identity
+still refuses `schema_mismatch:legacy_schema` before staging. Source SQL is never
+installed. This verified path records no `schemaUnverified` receipt.
+
+When that proof is unavailable, the owner can explicitly accept that its schema
+objects are unverified:
 
 ```sh
 rer import --input exports/retained.rer --yes --acknowledge-unverified-schema-objects
 ```
 
-This accepts only the missing inventory. Ordinary import still refuses
-`schema_mismatch:legacy_schema` before staging. The acknowledgment never accepts
+This accepts only the missing inventory and preserves the existing recovery path,
+even when ordinary import could verify the backup. The acknowledgment never accepts
 version 1 metadata; that separate recovery still needs both v1 flags below.
 The destination must be empty under the existing product emptiness rule:
 non-migration rows in product tables refuse `target_not_empty:<table>` before
