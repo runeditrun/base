@@ -533,7 +533,8 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     const templates = adoptWorkflowTemplates(root, plans, {tree: next, read, revision, files});
     notices = templates.notices;
     completeWorkflowHelpers(root, plans, {tree: next, read, revision});
-    const withheld = completeModuleCopies(root, plans, {tree: next, read, revision, base: origin.repository, ownerSources,
+    const relocations = new Map();
+    const withheld = completeModuleCopies(root, plans, {tree: next, read, revision, base: origin.repository, ownerSources, relocations,
       deliveries: migrations.flatMap(step => step.deliver.map(source => ({source, origin: step.origin, importers: step.copies})))});
     // Closure may add individually recorded siblings when the seed originally
     // selected runtime files one at a time instead of copying the directory.
@@ -567,6 +568,13 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
         const {object, mode} = byName.get(name);
         if (!Object.hasOwn(copy.files, name)) added.push(name);
         recorded[name] = upstream.get(object); modes[name] = mode;
+        if (relocations.has(name)) {
+          // The upstream digest remains the comparison baseline. Mechanical
+          // namespace edits are honest, acknowledged seed-owned adaptations.
+          (copy.adapted ||= {})[name] = revision;
+          (copy.acknowledged ||= {})[name] = {sha256: hash(relocations.get(name)), mode};
+          adapted.push({path: name, originPath: source, revision, conflict: false});
+        }
       }
       changes.push({path: copy.path, from: copy.revision, files: sources.length, added, removed});
       Object.assign(copy, {revision, files: recorded, modes, originFiles: [...next.keys()].filter(name => within(name, copy.originPath)).sort()});
@@ -584,12 +592,12 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
         noLinks(root, name);
         const target = path.join(root, name);
         fs.mkdirSync(path.dirname(target), {recursive: true});
-        fs.writeFileSync(target, bytes.get(object));
+        fs.writeFileSync(target, relocations.get(name) ?? bytes.get(object));
         fs.chmodSync(target, mode === '100755' ? 0o755 : 0o644);
       }
     }
     fs.writeFileSync(filename, json(record));
-    return {refreshed: revision, record: recordPath, copies: changes, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, withheld, editionMigrations: migrations.map(({id, guide, edit, copies}) => ({id, guide, edit, copies})), ...templates, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
+    return {refreshed: revision, record: recordPath, copies: changes, retired: plans.filter(plan => plan.retired).map(plan => plan.copy.path), adapted, relocated: [...relocations.keys()], withheld, editionMigrations: migrations.map(({id, guide, edit, copies}) => ({id, guide, edit, copies})), ...templates, next: 'Run verify-base, then the edition tests, and commit the copied files with the record.'};
   } catch (error) {
     if (!writing && !/no files were refreshed/i.test(error.message)) error.message += ' No files were refreshed.';
     if (!writing && notices.length) error.message += '\n' + notices.join('\n');

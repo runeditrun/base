@@ -1,5 +1,6 @@
 import test from 'node:test';
 import {closureClasses} from './tests/closure-cases.mjs';
+import {vendorNamespaceCases} from './tests/vendor-namespace-cases.mjs';
 import {archiveSourceCases} from './tests/archive-cases.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -366,6 +367,7 @@ test('refresh-base completes required dependencies of a sparse historical module
 });
 
 test('refresh-base closes authoring sibling imports while preserving edition-owned helpers', () => {
+  vendorNamespaceCases({init, write, commit, git, snapshotTree});
   closureClasses({init, write, commit, git, run, ok, snapshotTree});
   const mirror = 'export/scripts/base-cli/edition-authoring';
   const cases = [
