@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { parseContract, clauseIdSource, plainText } from './seed-contract.mjs'
+import { contractProseFindings, printProseFindings } from './contract-prose.mjs'
 
 const marker = '<!-- Generated from CONTRACT.md by contract-docs. Edit CONTRACT.md, then regenerate. -->'
 const idPattern = new RegExp(`^${clauseIdSource}$`)
@@ -718,7 +719,8 @@ function covPlacement(entry, current, contractEntries) {
   if (entry.file === 'ACCEPTANCE.md') {
     const repeated = covRepeated(entry, contractEntries);
     if (repeated) return { to: 'copy', of: repeated.line };
-    if (entry.clause || covGeneratedStatement(entry.text)) return { to: 'generated', note: 'The contract generator writes this status or count.' };
+    if (covGeneratedStatement(entry.text)) return { to: 'generated', note: 'The contract generator writes this status or count.' };
+    if (entry.clause) return { to: 'clause', ids: current.from.get(entry.clause) ?? [entry.clause] };
     return { to: 'docs', path: 'docs/verify.md' };
   }
   if (entry.file !== 'CONTRACT.md') return { to: 'changelog' };
@@ -751,7 +753,7 @@ function coverageInit(old) {
 function covDestination(destination, fragment, source, context, problems, label) {
   const fail = message => problems.push(`${label}: ${message}`);
   if (!destination || typeof destination !== 'object' || Array.isArray(destination)) { fail('A destination must be an object.'); return; }
-  const { current, old, expected, groups } = context;
+  const { current, expected, groups } = context;
   const note = () => { if (typeof destination.note !== 'string' || !destination.note.trim()) fail(`${destination.to} needs a note.`); };
   const ids = known => {
     if (!Array.isArray(destination.ids) || !destination.ids.length || destination.ids.some(id => typeof id !== 'string')) { fail(`${destination.to} needs a non-empty ids list.`); return; }
@@ -903,6 +905,16 @@ function coverageRebase(from, onto) {
   return { ...map, old: { commit: onto.commit, files: covFiles(onto) }, fragments };
 }
 
+function checkProse() {
+  const text = read('CONTRACT.md');
+  if (text === undefined) throw Error('CONTRACT.md does not exist.');
+  const coverage = read(covMapPath) === undefined ? undefined : covReadMap();
+  const sources = coverage ? covScope(snapshot(coverage.old?.commit)) : [];
+  const findings = contractProseFindings({ text, clauses: parseContract(withoutSummary(text)).clauses, coverage, sources, generatedStatement: covGeneratedStatement });
+  if (printProseFindings(findings)) process.exitCode = 1;
+}
+
+const usage = 'Usage: contract-docs.mjs write|check|check-prose|id-map --old <ref>|coverage init|check --old <ref>|coverage rebase --from <ref> --onto <ref>|convert --old <ref> [--old-acceptance <ref>] [--claim-map <file>]';
 function main(args) {
   const [command, ...rest] = args
   const option = (name, description = 'Git reference') => {
@@ -912,12 +924,14 @@ function main(args) {
     return rest[index + 1]
   }
   if (command === 'write' && !rest.length) generate()
-  else if (command === 'check' && !rest.length) generate(true)
+  else if (command === 'check' && !rest.length) { checkProse(); generate(true) }
+  else if (command === 'check-prose' && !rest.length) checkProse()
+  else if (command === '--help' && !rest.length) console.log(usage)
   else if (command === 'id-map') idMap(snapshot(option('--old')))
   else if (command === 'coverage' && rest[0] === 'init') coverageInit(snapshot(option('--old')))
   else if (command === 'coverage' && rest[0] === 'check') coverageCheck(snapshot(option('--old')))
   else if (command === 'coverage' && rest[0] === 'rebase') coverageRebase(snapshot(option('--from')), snapshot(option('--onto')))
   else if (command === 'convert') convert(snapshot(option('--old')), rest.includes('--old-acceptance') ? snapshot(option('--old-acceptance')) : undefined, rest.includes('--claim-map') ? option('--claim-map', 'JSON file path') : undefined)
-  else throw Error('Usage: contract-docs.mjs write|check|id-map --old <ref>|coverage init|check --old <ref>|coverage rebase --from <ref> --onto <ref>|convert --old <ref> [--old-acceptance <ref>] [--claim-map <file>]')
+  else throw Error(usage)
 }
 try { main(process.argv.slice(2)) } catch (error) { console.error(error.message); process.exitCode = 1 }
