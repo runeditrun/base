@@ -241,7 +241,7 @@ function oldClauseBody(text, clause) {
   for (let index = start + 1; index < lines.length; index++) {
     const line = lines[index]
     if (/^#{1,6}\s/.test(line) || new RegExp(`^(?:-\\s+)?\\*\\*${clauseIdSource}\\s+[—–-]\\s+`).test(line)) break
-    if (bold?.[1] && line.trim() && !/^[ \t]/.test(line)) break
+    if (bold?.[1] && line.trim() && !/^[ \t>]/.test(line)) break
     body.push(bold?.[1] ? line.replace(/^ {1,2}/, '') : line)
   }
   return block(body.join('\n'))
@@ -260,6 +260,9 @@ function acceptanceEntries(text, ids) {
   return result
 }
 function requirementAndAcceptance(body, oldAcceptance, clause) {
+  // Legacy clauses can wrap their prose and acceptance in a blockquote.
+  // Remove its outer marker before reading status and acceptance metadata.
+  body = block(body.split('\n').map(line => line.replace(/^ {0,3}> ?/, '')).join('\n'))
   const history = []
   // A leading status records the judgment, not the end of the requirement.
   // Keep its complete line in history, then read the prose below it normally.

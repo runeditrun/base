@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Contract conversion now reads requirement prose and acceptance lists in a blockquote after a legacy clause bullet, while preserving clause boundaries and refusing clauses with no requirement prose.
+
 - Contract conversion now keeps requirement prose and acceptance points after a leading plain, italic or bold Status line, preserves the recorded status, and still refuses a clause with no requirement prose or a conflicting status.
 
 - Bind agent sponsors to durable Business person ids from signed settings, enforce native admission including the allow-list, and honour signed agent and consent revocation. Resources now use the policy and audit pipeline. Approvals show saved summaries, bind decisions to their hash, execute with named approvers and leave a separate execution audit; Undo is the reviewer's act. Running audits commit before effects and recover from recorded outcomes. Standalone spend caps and unscoped Business daily limits are refused until their enforcement exists. The reference journey exercises self-escalation fixtures and real settings pairing.
