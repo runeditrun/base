@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.84-dev.gae98fa3c",
+  "cliVersion": "0.2.84-dev.g83c1f7ea",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -573,6 +573,14 @@
       "source": "cli/cache-doctor.mjs",
       "sha256": "28d90e72bf971865543149dba83e7cff81f738af8e54208b848b8e08a36377f8"
     },
+    "cli/check-tests-reader.mjs": {
+      "source": "cli/check-tests-reader.mjs",
+      "sha256": "0d8c4177a46bfc9001e82b85a8359fee541bfbfb138ec3752a53dc57bbe461c6"
+    },
+    "cli/check-tests.mjs": {
+      "source": "cli/check-tests.mjs",
+      "sha256": "5a51404e38edc1c21f8ad622465004c8fa66c28a13baa2b76175f3e6cb749cfb"
+    },
     "cli/companion/api.mjs": {
       "source": "cli/companion/api.mjs",
       "sha256": "55ad736961d6f6027ecd1ff44ac5c0188ecff3739be9efc581b9f4f39e259c4b"
@@ -867,7 +875,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "c2f6889ae9ff06168877f8b23b331c5150fabf7a95d0048ce6b63c2a7532d04d"
+      "sha256": "c4ea534fbdab3cd1f042dfc139faaef8535f9696876c7496783d5a1d9e1b29ab"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -899,7 +907,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "5a0c1a005d051031c539d4bae486bce0091268a47799d00d094aa0674831b66f"
+      "sha256": "e8ad669844617a82071861cf0704f1f89a715d07c2b612a787b2108250f9a9d0"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
