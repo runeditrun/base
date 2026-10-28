@@ -1,3 +1,4 @@
+import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -39,54 +40,57 @@ async function archive(source, settings) {
   return { manifest: checked[0], parts: checked.filter(record => record.kind === 'part'), contentHash: checked.at(-1).contentHash, archiveHash: checked.at(-1).archiveHash };
 }
 
-test('public import refuses enabled provider settings before applying data; valid off and absent settings survive approved re-link', async t => {
-  const source = await runtime(t);
-  await source.bootstrap(); await source.link(); assert.equal((await login(source)).status, 303);
-  source.sqlite.exec(migration);
-  const proof = await source.proof();
-  for (const settings of [{ idp_sign_in: 1, first_setup: 0 }, { idp_sign_in: 0, first_setup: 1 }, { idp_sign_in: 0, first_setup: 0 }, null]) {
-    await t.test(settings === null ? 'absent settings remain off' : JSON.stringify(settings), async t => {
-      const target = await runtime(t); target.sqlite.exec(migration);
-      const bundle = await archive(source, settings);
-      // The control installation authorizes restoration with its actual native owner proof.
-      const handler = await createPortabilityHandler({ db: target.db, policy, appOrigin: ORIGIN,
-        authorize: async request => (await source.auth().requireStepUp(request, 'export')).operator.id });
-      const call = (path, method, body) => handler(source.request('/api/portability/' + path, { method, body, cookie: proof }));
-      const applicationTables = target.sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT GLOB 'rer_portability_*' AND name NOT GLOB 'sqlite_*' ORDER BY name").all();
-      const snapshot = () => Object.fromEntries(applicationTables.map(table => [table.name, target.sqlite.prepare(`SELECT * FROM "${table.name}"`).all()]));
-      const before = snapshot();
-      const created = await call('imports', 'POST', { manifest: bundle.manifest, confirmed: true });
-      assert.equal(created.status, 201); const { id } = await created.json();
-      for (const part of bundle.parts) assert.equal((await call(`imports/${id}/parts/${part.index}`, 'PUT', part)).status, 200);
-      const finalized = await call(`imports/${id}/finalize`, 'POST', { contentHash: bundle.contentHash, archiveHash: bundle.archiveHash });
-      if (settings?.idp_sign_in || settings?.first_setup) {
-        assert.equal(finalized.status, 409);
-        assert.deepEqual(await finalized.json(), { error: 'provider_sign_in_must_be_off' });
-        assert.deepEqual(snapshot(), before, 'refusal leaves every destination application table unchanged');
-        assert.equal((await (await call(`imports/${id}`, 'GET')).json()).phase, 'staging');
-        assert.equal(target.sqlite.prepare('SELECT applying FROM rer_portability_state').get().applying, 0);
-        assert.equal((await call(`imports/${id}/abort`, 'POST', {})).status, 200);
-        t.diagnostic(JSON.stringify({ settings, finalize: finalized.status, targetUnchanged: true, applying: 0 }));
-        return;
-      }
-      assert.equal(finalized.status, 200);
-      assert.equal((await finalized.json()).contentHash, bundle.contentHash);
-      const owner = await target.proof();
-      const setting = async () => (await (await target.call('/auth/settings/identity', { cookie: owner })).json()).idpSignIn;
-      assert.equal(await setting(), false);
-      assert.equal((await target.call('/auth/oidc/auth/start', { body: {} })).status, 403);
-      const sector = target.sqlite.prepare('SELECT sector_id FROM rer_dependency_installation').get();
-      const bindings = target.sqlite.prepare('SELECT * FROM oa_external_identities').all();
-      assert.equal((await target.call('/auth/dependencies/relink', { cookie: owner, body: { issuer: ISSUER } })).status, 200);
-      assert.equal((await target.link()).status, 200);
-      assert.deepEqual(target.sqlite.prepare('SELECT sector_id FROM rer_dependency_installation').get(), sector);
-      assert.deepEqual(target.sqlite.prepare('SELECT * FROM oa_external_identities').all(), bindings);
-      assert.equal(await setting(), false);
-      assert.equal((await target.call('/auth/oidc/auth/start', { body: {} })).status, 403);
-      assert.equal((await target.call('/auth/settings/identity', { cookie: owner, body: { idpSignIn: true } })).status, 200);
-      const signed = await login(target); assert.equal(signed.status, 303);
-      assert.equal((await target.call('/auth/session', { cookie: signed.headers.get('set-cookie') })).status, 200);
-      t.diagnostic(JSON.stringify({ settings, finalize: finalized.status, afterImport: 'off', afterRelink: 'off', ownerEnabledCallback: signed.status, session: 200 }));
-    });
-  }
-});
+test("restored provider settings stay off until approved relink and explicit owner enablement", async t => {
+  const step = namedSteps(t);
+  await step('public import refuses enabled provider settings before applying data; valid off and absent settings survive approved re-link', async t => {
+    const source = await runtime(t);
+    await source.bootstrap(); await source.link(); assert.equal((await login(source)).status, 303);
+    source.sqlite.exec(migration);
+    const proof = await source.proof();
+    for (const settings of [{ idp_sign_in: 1, first_setup: 0 }, { idp_sign_in: 0, first_setup: 1 }, { idp_sign_in: 0, first_setup: 0 }, null]) {
+      await step(settings === null ? 'absent settings remain off' : JSON.stringify(settings), async t => {
+        const target = await runtime(t); target.sqlite.exec(migration);
+        const bundle = await archive(source, settings);
+        // The control installation authorizes restoration with its actual native owner proof.
+        const handler = await createPortabilityHandler({ db: target.db, policy, appOrigin: ORIGIN,
+          authorize: async request => (await source.auth().requireStepUp(request, 'export')).operator.id });
+        const call = (path, method, body) => handler(source.request('/api/portability/' + path, { method, body, cookie: proof }));
+        const applicationTables = target.sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT GLOB 'rer_portability_*' AND name NOT GLOB 'sqlite_*' ORDER BY name").all();
+        const snapshot = () => Object.fromEntries(applicationTables.map(table => [table.name, target.sqlite.prepare(`SELECT * FROM "${table.name}"`).all()]));
+        const before = snapshot();
+        const created = await call('imports', 'POST', { manifest: bundle.manifest, confirmed: true });
+        assert.equal(created.status, 201); const { id } = await created.json();
+        for (const part of bundle.parts) assert.equal((await call(`imports/${id}/parts/${part.index}`, 'PUT', part)).status, 200);
+        const finalized = await call(`imports/${id}/finalize`, 'POST', { contentHash: bundle.contentHash, archiveHash: bundle.archiveHash });
+        if (settings?.idp_sign_in || settings?.first_setup) {
+          assert.equal(finalized.status, 409);
+          assert.deepEqual(await finalized.json(), { error: 'provider_sign_in_must_be_off' });
+          assert.deepEqual(snapshot(), before, 'refusal leaves every destination application table unchanged');
+          assert.equal((await (await call(`imports/${id}`, 'GET')).json()).phase, 'staging');
+          assert.equal(target.sqlite.prepare('SELECT applying FROM rer_portability_state').get().applying, 0);
+          assert.equal((await call(`imports/${id}/abort`, 'POST', {})).status, 200);
+          t.diagnostic(JSON.stringify({ settings, finalize: finalized.status, targetUnchanged: true, applying: 0 }));
+          return;
+        }
+        assert.equal(finalized.status, 200);
+        assert.equal((await finalized.json()).contentHash, bundle.contentHash);
+        const owner = await target.proof();
+        const setting = async () => (await (await target.call('/auth/settings/identity', { cookie: owner })).json()).idpSignIn;
+        assert.equal(await setting(), false);
+        assert.equal((await target.call('/auth/oidc/auth/start', { body: {} })).status, 403);
+        const sector = target.sqlite.prepare('SELECT sector_id FROM rer_dependency_installation').get();
+        const bindings = target.sqlite.prepare('SELECT * FROM oa_external_identities').all();
+        assert.equal((await target.call('/auth/dependencies/relink', { cookie: owner, body: { issuer: ISSUER } })).status, 200);
+        assert.equal((await target.link()).status, 200);
+        assert.deepEqual(target.sqlite.prepare('SELECT sector_id FROM rer_dependency_installation').get(), sector);
+        assert.deepEqual(target.sqlite.prepare('SELECT * FROM oa_external_identities').all(), bindings);
+        assert.equal(await setting(), false);
+        assert.equal((await target.call('/auth/oidc/auth/start', { body: {} })).status, 403);
+        assert.equal((await target.call('/auth/settings/identity', { cookie: owner, body: { idpSignIn: true } })).status, 200);
+        const signed = await login(target); assert.equal(signed.status, 303);
+        assert.equal((await target.call('/auth/session', { cookie: signed.headers.get('set-cookie') })).status, 200);
+        t.diagnostic(JSON.stringify({ settings, finalize: finalized.status, afterImport: 'off', afterRelink: 'off', ownerEnabledCallback: signed.status, session: 200 }));
+      });
+    }
+  });
+})

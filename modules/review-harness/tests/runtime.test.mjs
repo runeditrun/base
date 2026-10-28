@@ -1,3 +1,4 @@
+import { namedSteps } from './fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, stat, access, writeFile } from 'node:fs/promises';
@@ -43,20 +44,39 @@ test('concurrent runtimes own distinct listeners while slow health becomes ready
     assert.equal((await fetch(other.origin + '/health')).status, 200);
   } finally { await Promise.all([runtime.stop(), other.stop()]); }
 });
-test('exit before readiness fails with the private log path', async t => {
-  const error = await refused(t, await options(t, 'exit'));
-  assert.match(error.message, /exited before ready.*private log:/);
-});
-test('health timeout is bounded and cleans up its process', async t => {
-  const started = performance.now();
-  const error = await refused(t, await options(t, 'timeout', { readyTimeoutMs: 300 }));
-  assert.match(error.message, /health timed out.*private log:/);
-  assert.ok(performance.now() - started < 4000);
-});
-test('spawn errors fail promptly with diagnostics', async t => {
-  const error = await refused(t, await options(t, 'exit', { command: '/nonexistent-review-command' }));
-  assert.match(error.message, /exited before ready.*private log:/);
-});
+test("runtime start refuses exit, timeout, exposure and fixture failure with private diagnostics", async t => {
+  const step = namedSteps(t);
+  await step('exit before readiness fails with the private log path', async t => {
+    const error = await refused(t, await options(t, 'exit'));
+    assert.match(error.message, /exited before ready.*private log:/);
+  });
+
+  await step('health timeout is bounded and cleans up its process', async t => {
+    const started = performance.now();
+    const error = await refused(t, await options(t, 'timeout', { readyTimeoutMs: 300 }));
+    assert.match(error.message, /health timed out.*private log:/);
+    assert.ok(performance.now() - started < 4000);
+  });
+
+  await step('spawn errors fail promptly with diagnostics', async t => {
+    const error = await refused(t, await options(t, 'exit', { command: '/nonexistent-review-command' }));
+    assert.match(error.message, /exited before ready.*private log:/);
+  });
+
+  await step('launcher refuses a command that exposes its port outside loopback', async t => {
+    const error = await refused(t, await options(t, 'wide'));
+    assert.match(error.message, /listener is exposed outside 127\.0\.0\.1.*private log:/);
+  });
+
+  await step('fixture failure tears down the healthy process and redacts its diagnostic', async t => {
+    const error = await refused(t, await options(t, 'environment', { secrets: ['synthetic-fixture-secret'], fixtures: async () => { throw new Error('synthetic-fixture-secret'); } }));
+    assert.equal(error.message.includes('synthetic-fixture-secret'), false);
+    assert.match(error.message, /private log:/);
+  });
+})
+
+
+
 test('logs redact chunked secrets and token queries; files and temporary storage are private', async t => {
   const mask = process.umask(0);
   t.after(() => process.umask(mask));
@@ -101,54 +121,61 @@ test('listener is IPv4 loopback only', async t => {
     });
   } finally { await runtime.stop(); }
 });
-test('TERM, bounded KILL and group inspection remove a resistant grandchild', async t => {
-  const runtime = await startRuntime(await options(t, 'tree'));
-  fallbackCleanup(t, runtime);
-  let log = '';
-  for (let attempt = 0; attempt < 50 && !log.includes('grandchild'); attempt++) { await delay(20); log = await readFile(runtime.logPath, 'utf8'); }
-  const pid = JSON.parse(log.split('\n').find(line => line.startsWith('{'))).grandchild;
-  assert.ok(pid > 0);
-  const started = performance.now();
-  await runtime.stop();
-  await runtime.stop();
-  assert.ok(performance.now() - started < 4000);
-  assert.equal(await liveOwnedGroup(runtime.pid, 1000), false);
-  const states = execFileSync('ps', ['-Ao', 'pid=,stat=']).toString();
-  const remaining = states.split('\n').find(line => Number(line.trim().split(/\s+/)[0]) === pid);
-  assert.ok(!remaining || remaining.trim().split(/\s+/)[1].startsWith('Z'));
-});
-test('launcher refuses a command that exposes its port outside loopback', async t => {
-  const error = await refused(t, await options(t, 'wide'));
-  assert.match(error.message, /listener is exposed outside 127\.0\.0\.1.*private log:/);
-});
-test('stop sends TERM before escalating', async t => {
-  const runtime = await startRuntime(await options(t, 'term'));
-  fallbackCleanup(t, runtime);
-  await runtime.stop();
-  assert.match(await readFile(runtime.logPath, 'utf8'), /received TERM/);
-});
-test('a tiny graceful inspection budget still confirms group disappearance after KILL', async t => {
-  const runtime = await startRuntime(await options(t, 'tree', { stopTimeoutMs: 1 }));
-  fallbackCleanup(t, runtime);
-  await runtime.stop();
-  assert.equal(await liveOwnedGroup(runtime.pid, 1000), false);
-});
-test('slow process inspection uses the remaining shutdown budget', async t => {
-  const runtime = await startRuntime(await options(t, 'tree'));
-  fallbackCleanup(t, runtime);
-  let log = '';
-  for (let attempt = 0; attempt < 50 && !log.includes('grandchild'); attempt++) { await delay(20); log = await readFile(runtime.logPath, 'utf8'); }
-  assert.ok(JSON.parse(log.split('\n').find(line => line.startsWith('{'))).grandchild > 0);
-  const directory = await temporary(t, 'review-slow-inspector-');
-  // An inspector can exit zero after its deadline signal, with an incomplete
-  // snapshot. That is not proof that the resistant child has disappeared.
-  await writeFile(join(directory, 'ps'), `#!${process.execPath}\nimport { execFileSync } from 'node:child_process';\nprocess.on('SIGTERM', () => process.exit(0));\nsetTimeout(() => { process.stdout.write(execFileSync('/bin/ps', process.argv.slice(2))); }, 1500);\n`, { mode: 0o700 });
-  const previous = process.env.PATH;
-  process.env.PATH = `${directory}:${previous}`;
-  try { await runtime.stop(); }
-  finally { process.env.PATH = previous; }
-  assert.equal(await liveOwnedGroup(runtime.pid, 5000), false);
-});
+test("runtime stop sends TERM then confirms resistant descendants disappear within its budget", async t => {
+  const step = namedSteps(t);
+  await step('TERM, bounded KILL and group inspection remove a resistant grandchild', async t => {
+    const runtime = await startRuntime(await options(t, 'tree'));
+    fallbackCleanup(t, runtime);
+    let log = '';
+    for (let attempt = 0; attempt < 50 && !log.includes('grandchild'); attempt++) { await delay(20); log = await readFile(runtime.logPath, 'utf8'); }
+    const pid = JSON.parse(log.split('\n').find(line => line.startsWith('{'))).grandchild;
+    assert.ok(pid > 0);
+    const started = performance.now();
+    await runtime.stop();
+    await runtime.stop();
+    assert.ok(performance.now() - started < 4000);
+    assert.equal(await liveOwnedGroup(runtime.pid, 1000), false);
+    const states = execFileSync('ps', ['-Ao', 'pid=,stat=']).toString();
+    const remaining = states.split('\n').find(line => Number(line.trim().split(/\s+/)[0]) === pid);
+    assert.ok(!remaining || remaining.trim().split(/\s+/)[1].startsWith('Z'));
+  });
+
+  await step('stop sends TERM before escalating', async t => {
+    const runtime = await startRuntime(await options(t, 'term'));
+    fallbackCleanup(t, runtime);
+    await runtime.stop();
+    assert.match(await readFile(runtime.logPath, 'utf8'), /received TERM/);
+  });
+
+  await step('a tiny graceful inspection budget still confirms group disappearance after KILL', async t => {
+    const runtime = await startRuntime(await options(t, 'tree', { stopTimeoutMs: 1 }));
+    fallbackCleanup(t, runtime);
+    await runtime.stop();
+    assert.equal(await liveOwnedGroup(runtime.pid, 1000), false);
+  });
+
+  await step('slow process inspection uses the remaining shutdown budget', async t => {
+    const runtime = await startRuntime(await options(t, 'tree'));
+    fallbackCleanup(t, runtime);
+    let log = '';
+    for (let attempt = 0; attempt < 50 && !log.includes('grandchild'); attempt++) { await delay(20); log = await readFile(runtime.logPath, 'utf8'); }
+    assert.ok(JSON.parse(log.split('\n').find(line => line.startsWith('{'))).grandchild > 0);
+    const directory = await temporary(t, 'review-slow-inspector-');
+    // An inspector can exit zero after its deadline signal, with an incomplete
+    // snapshot. That is not proof that the resistant child has disappeared.
+    await writeFile(join(directory, 'ps'), `#!${process.execPath}\nimport { execFileSync } from 'node:child_process';\nprocess.on('SIGTERM', () => process.exit(0));\nsetTimeout(() => { process.stdout.write(execFileSync('/bin/ps', process.argv.slice(2))); }, 1500);\n`, { mode: 0o700 });
+    const previous = process.env.PATH;
+    process.env.PATH = `${directory}:${previous}`;
+    try { await runtime.stop(); }
+    finally { process.env.PATH = previous; }
+    assert.equal(await liveOwnedGroup(runtime.pid, 5000), false);
+  });
+})
+
+
+
+
+
 test('synthetic fixtures finish before readiness resolves', async t => {
   let finished = false;
   const runtime = await fixture(t, { args: ['--health-delay', '500'], fixtures: async origin => {
@@ -157,9 +184,4 @@ test('synthetic fixtures finish before readiness resolves', async t => {
   } });
   assert.equal(finished, true);
   assert.equal((await fetch(runtime.origin + '/health')).status, 200);
-});
-test('fixture failure tears down the healthy process and redacts its diagnostic', async t => {
-  const error = await refused(t, await options(t, 'environment', { secrets: ['synthetic-fixture-secret'], fixtures: async () => { throw new Error('synthetic-fixture-secret'); } }));
-  assert.equal(error.message.includes('synthetic-fixture-secret'), false);
-  assert.match(error.message, /private log:/);
 });

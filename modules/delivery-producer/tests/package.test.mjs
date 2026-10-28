@@ -1,3 +1,4 @@
+import { namedSteps } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp, mkdir, readFile, writeFile, rm, readdir, symlink} from 'node:fs/promises';
@@ -23,30 +24,60 @@ async function fixture(t) {
   await writeFile(join(root,'edition.json'), JSON.stringify({schemaVersion:1,components:[{id:'publisher/app',role:'edition'}]}));
   return root;
 }
-test('one producer emits all files, exact payload identities and current seed declarations', async t => {
-  const root = await fixture(t), policy = config();
-  const output = await producePackage({root,config:policy});
-  const project = JSON.parse(await readFile(output.project));
-  assert.deepEqual(project,policy.project);
-  assert.equal(await readFile(output.workflow,'utf8'),generateManagedWorkflow(policy.managed));
-  const manifest = JSON.parse(await readFile(output.artifact));
-  assert.equal(manifest.schema,2);
-  assert.equal(manifest.mainModule,'index.js');
-  assert.deepEqual(manifest.deploymentSpec.providerEffects,policy.artifact.specInputs.providerEffects);
-  assert.deepEqual(manifest.deploymentSpec.surfaces,policy.artifact.specInputs.surfaces);
-  assert.deepEqual(manifest.deploymentSpec.initialSetup,policy.artifact.specInputs.initialSetup);
-  for (const entry of [...manifest.modules,...manifest.assets]) {
-    const bytes = await readFile(join(root,'rer-package/delivery-artifact',entry.payload));
-    assert.equal(entry.size,bytes.length);
-    assert.equal(entry.sha256,createHash('sha256').update(bytes).digest('hex'));
-  }
-  assert.deepEqual(await readFile(join(root,'rer-package/delivery-artifact',manifest.assets[0].payload)),Buffer.from([0,255,13,10]));
-  const again = await producePackage({root,config:policy,output:'second'});
-  assert.deepEqual(await readFile(again.artifact),await readFile(output.artifact));
-  assert.deepEqual(await readFile(again.project),await readFile(output.project));
-  assert.deepEqual(await readFile(again.workflow),await readFile(output.workflow));
-  await assert.rejects(producePackage({root,config:policy}),/fresh/);
-});
+test("package production retains exact inputs and refuses identity or private-source violations", async t => {
+  const step = namedSteps(t);
+  await step('one producer emits all files, exact payload identities and current seed declarations', async t => {
+    const root = await fixture(t), policy = config();
+    const output = await producePackage({root,config:policy});
+    const project = JSON.parse(await readFile(output.project));
+    assert.deepEqual(project,policy.project);
+    assert.equal(await readFile(output.workflow,'utf8'),generateManagedWorkflow(policy.managed));
+    const manifest = JSON.parse(await readFile(output.artifact));
+    assert.equal(manifest.schema,2);
+    assert.equal(manifest.mainModule,'index.js');
+    assert.deepEqual(manifest.deploymentSpec.providerEffects,policy.artifact.specInputs.providerEffects);
+    assert.deepEqual(manifest.deploymentSpec.surfaces,policy.artifact.specInputs.surfaces);
+    assert.deepEqual(manifest.deploymentSpec.initialSetup,policy.artifact.specInputs.initialSetup);
+    for (const entry of [...manifest.modules,...manifest.assets]) {
+      const bytes = await readFile(join(root,'rer-package/delivery-artifact',entry.payload));
+      assert.equal(entry.size,bytes.length);
+      assert.equal(entry.sha256,createHash('sha256').update(bytes).digest('hex'));
+    }
+    assert.deepEqual(await readFile(join(root,'rer-package/delivery-artifact',manifest.assets[0].payload)),Buffer.from([0,255,13,10]));
+    const again = await producePackage({root,config:policy,output:'second'});
+    assert.deepEqual(await readFile(again.artifact),await readFile(output.artifact));
+    assert.deepEqual(await readFile(again.project),await readFile(output.project));
+    assert.deepEqual(await readFile(again.workflow),await readFile(output.workflow));
+    await assert.rejects(producePackage({root,config:policy}),/fresh/);
+  });
+
+  await step('mismatched identities, invalid manifest selection and unsafe output fail without touching source', async t => {
+    const root = await fixture(t);
+    const policy = config();
+    for (const changed of [{...policy,managed:{...policy.managed,artifactFile:'other.json'}},{...policy,schema:2},{...policy,managed:{...policy.managed,verificationProfiles:['full','visual']}},{...policy,project:{...policy.project,deployment:{...policy.project.deployment,target:'other-provider'}}}]) assert.throws(() => packagingConfig(changed));
+    for (const manifest of [{schemaVersion:1,components:[{id:'publisher/app',role:'module'}]},{schemaVersion:1,components:[{id:'publisher/app',role:'edition'},{id:'publisher/app',role:'edition'}]}]) {
+      await writeFile(join(root,'edition.json'),JSON.stringify(manifest));
+      await assert.rejects(producePackage({root,config:policy}));
+    }
+    await writeFile(join(root,'edition.json'),JSON.stringify({schemaVersion:1,components:[{id:'publisher/app',role:'edition'}]}));
+    await symlink(join(root,'dist'),join(root,'linked'));
+    for (const output of ['../escape','.git/packaging','linked/package','dist/server']) await assert.rejects(producePackage({root,config:policy,output}));
+    assert.equal(await readFile(join(root,'dist/server/index.js'),'utf8'),'export default {};\r\n');
+    await writeFile(join(root,'dist/server/.env'),'synthetic fixture bytes');
+    await assert.rejects(producePackage({root,config:policy}),/Private/);
+    await assert.rejects(readFile(join(root,'rer-package/rer-project.json')));
+  });
+
+  await step('SSH and credential-store build entries cannot be packaged', async t => {
+    const root = await fixture(t), policy = config();
+    for (const name of ['id_rsa','id_ed25519','id_ecdsa.pub','id_dsa','credentials','credentials.ini','credentials.toml','credentials.yaml']) {
+      await writeFile(join(root,'dist/server',name),'synthetic fixture bytes');
+      await assert.rejects(producePackage({root,config:policy}),/Private/);
+      await rm(join(root,'dist/server',name));
+    }
+  });
+})
+
 test('exported runtime works inside an independent seed with no Base checkout dependency', async t => {
   const root = await fixture(t), policy = config();
   policy.project.verifyWorkflow = 'Verify application';
@@ -61,22 +92,7 @@ test('exported runtime works inside an independent seed with no Base checkout de
   assert.throws(() => run(['package','--config','scripts/delivery/base/packaging.json']));
   assert.throws(() => run(['artifact','--config','scripts/delivery/base/packaging.json','--root',root,'--root',root]));
 });
-test('mismatched identities, invalid manifest selection and unsafe output fail without touching source', async t => {
-  const root = await fixture(t);
-  const policy = config();
-  for (const changed of [{...policy,managed:{...policy.managed,artifactFile:'other.json'}},{...policy,schema:2},{...policy,managed:{...policy.managed,verificationProfiles:['full','visual']}},{...policy,project:{...policy.project,deployment:{...policy.project.deployment,target:'other-provider'}}}]) assert.throws(() => packagingConfig(changed));
-  for (const manifest of [{schemaVersion:1,components:[{id:'publisher/app',role:'module'}]},{schemaVersion:1,components:[{id:'publisher/app',role:'edition'},{id:'publisher/app',role:'edition'}]}]) {
-    await writeFile(join(root,'edition.json'),JSON.stringify(manifest));
-    await assert.rejects(producePackage({root,config:policy}));
-  }
-  await writeFile(join(root,'edition.json'),JSON.stringify({schemaVersion:1,components:[{id:'publisher/app',role:'edition'}]}));
-  await symlink(join(root,'dist'),join(root,'linked'));
-  for (const output of ['../escape','.git/packaging','linked/package','dist/server']) await assert.rejects(producePackage({root,config:policy,output}));
-  assert.equal(await readFile(join(root,'dist/server/index.js'),'utf8'),'export default {};\r\n');
-  await writeFile(join(root,'dist/server/.env'),'synthetic fixture bytes');
-  await assert.rejects(producePackage({root,config:policy}),/Private/);
-  await assert.rejects(readFile(join(root,'rer-package/rer-project.json')));
-});
+
 test('declarations reject malformed effects, readiness, surface address conflicts and setup states', async t => {
   const root = await fixture(t);
   const policy = config().artifact.specInputs;
@@ -92,13 +108,4 @@ test('workflow profiles are explicit and require full as the default', () => {
   const input = {workflowRef,artifactFile:'app.json',verificationProfiles:['full']};
   assert.match(generateManagedWorkflow(input),/options: \[full\]/);
   for (const profiles of [[],['visual'],['full','full'],['full','arbitrary']]) assert.throws(() => generateManagedWorkflow({...input,verificationProfiles:profiles}));
-});
-
-test('SSH and credential-store build entries cannot be packaged', async t => {
-  const root = await fixture(t), policy = config();
-  for (const name of ['id_rsa','id_ed25519','id_ecdsa.pub','id_dsa','credentials','credentials.ini','credentials.toml','credentials.yaml']) {
-    await writeFile(join(root,'dist/server',name),'synthetic fixture bytes');
-    await assert.rejects(producePackage({root,config:policy}),/Private/);
-    await rm(join(root,'dist/server',name));
-  }
 });
