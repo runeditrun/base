@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime } from '../identity/oidc/tests/fake-runtime.mjs';
@@ -47,7 +48,9 @@ async function prepare(r, setup, before) {
   return { operatorId: target.id, token, cookie };
 }
 
-test('all owner-authority routes demand fresh local proof and preserve non-owner status behavior', async () => {
+test("owner authority routes require fresh local proof through native SQL writes", async t => {
+  const foldedCases = [];
+foldedCases.push(['all owner-authority routes demand fresh local proof and preserve non-owner status behavior', async () => {
   for (const row of cases) {
     const cleanup = [];
     const r = await runtime({ after: fn => cleanup.push(fn) });
@@ -118,9 +121,8 @@ test('all owner-authority routes demand fresh local proof and preserve non-owner
     assert.deepEqual(await snapshot(r), before, 'unchanged owner role/status preserves authority and sessions without step-up');
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 
-});
-
-test('local owner persona creation keeps its proof fence with product insert triggers', async () => {
+}]);
+foldedCases.push(['local owner persona creation keeps its proof fence with product insert triggers', async () => {
   const setup = 'fixture-owner-persona-setup-token';
   const dev = await devRuntime([await read('../accounts/schema/operator-auth.sql'), await read('./fixtures/trigger-writes.sql')], { SETUP_TOKEN: setup }, 'owner-persona-worker.mjs');
   try {
@@ -161,4 +163,6 @@ test('local owner persona creation keeps its proof fence with product insert tri
     assert.ok(await dev.db.prepare("SELECT 1 FROM test_auth_writes WHERE event='ignored'").first(), 'the ignored insert still ran a trigger write');
     console.log(JSON.stringify({ case: 'create local owner persona', absent: '403 step_up_required', expired: '403 step_up_required', fresh: 303 }));
   } finally { await dev.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

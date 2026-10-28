@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime, post } from './cancellation-runtime.mjs';
@@ -24,7 +25,9 @@ async function release(r, id, pending) {
   if (pending) return pending;
 }
 
-for (const winner of ['cancellation', 'confirmation']) test(`reissued admission race preserves its guard when ${winner} wins`, async () => {
+test("reissued invitation admission serializes with cancellation and current policy", async t => {
+  const foldedCases = [];
+for (const winner of ['cancellation', 'confirmation']) foldedCases.push([`reissued admission race preserves its guard when ${winner} wins`, async () => {
   const r = await runtime();
   let pending, barrier;
   try {
@@ -46,9 +49,8 @@ for (const winner of ['cancellation', 'confirmation']) test(`reissued admission 
     assert.equal((await db.prepare('SELECT count(*) AS n FROM oa_sessions WHERE operator_id=?').bind(target.row.id).first()).n, winner === 'cancellation' ? 0 : 1);
     assert.equal((await db.prepare('SELECT count(*) AS n FROM oa_invitation_cancellations WHERE operator_id=?').bind(target.row.id).first()).n, winner === 'cancellation' ? 1 : 0);
   } finally { try { await release(r, barrier, pending); } finally { await r.close(); } }
-});
-
-for (const restriction of ['issuer-version', 'issuer-allow-list', 'target-allow-list', 'policy']) test(`reissued token respects ${restriction} before removing its admission guard`, async () => {
+}]);
+for (const restriction of ['issuer-version', 'issuer-allow-list', 'target-allow-list', 'policy']) foldedCases.push([`reissued token respects ${restriction} before removing its admission guard`, async () => {
   const r = await policyRuntime();
   try {
     const owner = await r.bootstrap();
@@ -74,4 +76,6 @@ for (const restriction of ['issuer-version', 'issuer-allow-list', 'target-allow-
     assert.equal((await db.prepare('SELECT count(*) AS n FROM oa_sessions WHERE operator_id=?').bind(target.row.id).first()).n, 0);
     await assert.rejects(db.prepare("UPDATE oa_operators SET status='active' WHERE id=?").bind(target.row.id).run(), /invitation_required/);
   } finally { await r.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

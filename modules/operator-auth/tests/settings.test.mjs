@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime, presets } from '../identity/oidc/tests/fake-runtime.mjs';
@@ -64,7 +65,9 @@ test('member settings navigation gets an actionable document while JSON clients 
   }
 });
 
-test('OA and native settings refuse provider enablement without a configured or linked provider and preserve the disabled policy', async t => {
+test("provider sign-in enablement follows configured and linked provider state", async t => {
+  const foldedCases = [];
+foldedCases.push(['OA and native settings refuse provider enablement without a configured or linked provider and preserve the disabled policy', async t => {
   for (const native of [false, true]) {
     const r = await runtime(t, { providers: [], fakes: [], ...(native ? { native: {} } : {}) });
     const owner = native ? await emailSession(r, 'owner@example.com') : await r.bootstrap();
@@ -88,9 +91,8 @@ test('OA and native settings refuse provider enablement without a configured or 
     await r.restart();
     assert.equal((await (await r.call(path, { cookie: owner })).json()).idpSignIn, false);
   }
-});
-
-test('configured providers retain first-use setup, saved form settings persist, and an explicit unlink blocks re-enabling', async t => {
+}]);
+foldedCases.push(['configured providers retain first-use setup, saved form settings persist, and an explicit unlink blocks re-enabling', async t => {
   const setup = presets();
   const r = await runtime(t, { providers: [setup.providers[0]], fakes: [setup.fakes[0]] });
   const owner = await r.bootstrap();
@@ -112,4 +114,6 @@ test('configured providers retain first-use setup, saved form settings persist, 
   assert.equal(refused.status, 409);
   assert.deepEqual(await refused.json(), { error: 'provider_unlinked' });
   assert.equal((await (await r.call(path, { cookie: owner })).json()).providerSetup.canEnable, false);
+}]);
+  await runCases(t, foldedCases);
 });

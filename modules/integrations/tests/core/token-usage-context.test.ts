@@ -1,3 +1,4 @@
+import { runCases, type Case } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -7,7 +8,9 @@ import { database } from './support.ts';
 import { installIssuer, nativeAuthority, owner } from './token-authority-fixture.ts';
 
 const context = (requestId: string, resource = 'tickets/42') => ({ requestId, resource });
-test('allowed and denied usage binds caller request/resource across restart, scope changes, expiry and revocation', async () => {
+test("token usage durably binds exact request and resource context under current authorization", async t => {
+  const foldedCases: Case[] = [];
+foldedCases.push(['allowed and denied usage binds caller request/resource across restart, scope changes, expiry and revocation', async () => {
   const store = await database(); let now = 1700000000000;
   try {
     await installIssuer(store.db);
@@ -44,9 +47,8 @@ test('allowed and denied usage binds caller request/resource across restart, sco
     assert.equal((await readFile(store.path)).includes(Buffer.from(token)), false);
     assert.equal(JSON.stringify(usage).includes(token), false);
   } finally { await store.close(); }
-});
-
-test('missing or unsafe request context rejects; valid context is snapshotted before hashing and never defaulted', async () => {
+}]);
+foldedCases.push(['missing or unsafe request context rejects; valid context is snapshotted before hashing and never defaulted', async () => {
   const store = await database();
   try {
     await installIssuer(store.db);
@@ -61,9 +63,8 @@ test('missing or unsafe request context rejects; valid context is snapshotted be
     const row = (await tokens.usage(owner))[0]!;
     assert.equal(row.requestId, 'request-original'); assert.equal(row.resource, 'tickets/42');
   } finally { await store.close(); }
-});
-
-test('usage failure denies visibly with no partial receipt; concurrent issuance retains random hash-only credentials', async () => {
+}]);
+foldedCases.push(['usage failure denies visibly with no partial receipt; concurrent issuance retains random hash-only credentials', async () => {
   const store = await database();
   try {
     await installIssuer(store.db);
@@ -79,9 +80,8 @@ test('usage failure denies visibly with no partial receipt; concurrent issuance 
     await assert.rejects(tokens.authorize('invalid', ['read'], context('failed-denied')), /usage unavailable/);
     assert.deepEqual(await tokens.usage(owner), []);
   } finally { await store.close(); }
-});
-
-test('usage-context expansion preserves pre-v2 receipts without inventing request provenance', async () => {
+}]);
+foldedCases.push(['usage-context expansion preserves pre-v2 receipts without inventing request provenance', async () => {
   const store = await database();
   try {
     await installIssuer(store.db);
@@ -96,4 +96,6 @@ test('usage-context expansion preserves pre-v2 receipts without inventing reques
     const current = (await tokens.usage(owner))[1]!;
     assert.equal(current.requestId, 'new-after-upgrade'); assert.equal(current.resource, 'tickets/42');
   } finally { await store.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

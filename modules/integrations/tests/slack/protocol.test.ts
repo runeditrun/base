@@ -1,3 +1,4 @@
+import { runCases, type Case } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { classifySlackBot, classifySlackIncomingWebhook, createSlackBotProtocol, createSlackIncomingWebhookProtocol, createSlackNotifier, renderSlackEvent, serializeSlackMessage, slackEventTemplates, SLACK_BOT_PROTOCOL, SLACK_WEBHOOK_PROTOCOL } from '../../slack/index.ts';
@@ -9,7 +10,9 @@ const base = { id: 'local-1', tenant: 'installation', destinationId: 'destinatio
 const webhook = () => ({ ...base, protocol: SLACK_WEBHOOK_PROTOCOL, body: serializeSlackMessage(message) });
 const bot = () => ({ ...base, protocol: SLACK_BOT_PROTOCOL, body: serializeSlackMessage(message, channel) });
 
-test('webhook success is exact; documented failures reject; unknown server/redirect responses stay uncertain', () => {
+test("Slack protocols preserve explicit destination authority and conservative provider outcomes", async t => {
+  const foldedCases: Case[] = [];
+foldedCases.push(['webhook success is exact; documented failures reject; unknown server/redirect responses stay uncertain', () => {
   const cases: [number, string, string][] = [
     [200, 'ok', 'accepted'], [200, 'ok\n', 'uncertain'], [201, 'ok', 'uncertain'],
     [200, '{"ok":true}', 'uncertain'], [204, '', 'uncertain'],
@@ -19,8 +22,8 @@ test('webhook success is exact; documented failures reject; unknown server/redir
     [400, 'unknown-secret-detail', 'uncertain'], [200, 'invalid_token', 'uncertain'],
   ];
   for (const [status, body, kind] of cases) assert.equal(classifySlackIncomingWebhook({ status, body, headers: {} }).kind, kind, `${status} ${body}`);
-});
-test('bot requires boolean ok; HTTP 200 errors, partial failures and untrusted response details are distinguished', () => {
+}]);
+foldedCases.push(['bot requires boolean ok; HTTP 200 errors, partial failures and untrusted response details are distinguished', () => {
   const cases: [number, string, string, string][] = [
     [200, successBot, 'accepted', 'slack_bot_accepted'],
     [200, '{"ok":false,"error":"invalid_auth"}', 'rejected', 'slack_invalid_auth'],
@@ -36,16 +39,16 @@ test('bot requires boolean ok; HTTP 200 errors, partial failures and untrusted r
     [500, successBot, 'uncertain', 'slack_bot_http_unknown'], [302, successBot, 'uncertain', 'slack_bot_http_unknown'],
   ];
   for (const [status, body, kind, code] of cases) assert.deepEqual(classifySlackBot({ status, body, headers: {} }), { kind, code, status });
-});
-test('rate limits parse seconds case-insensitively without inventing cooldowns', () => {
+}]);
+foldedCases.push(['rate limits parse seconds case-insensitively without inventing cooldowns', () => {
   for (const classify of [classifySlackBot, classifySlackIncomingWebhook]) {
     assert.deepEqual(classify({ status: 429, body: '', headers: { 'Retry-After': '7' } }), { kind: 'retryable', code: 'slack_rate_limited', status: 429, retryAfterMs: 7000 });
     for (const value of ['', '-1', 'tomorrow', '1.5', 'Infinity', '99999999999999999999999999']) assert.equal(classify({ status: 429, body: '', headers: { 'retry-after': value } }).kind, 'rejected');
     assert.equal(classify({ status: 429, body: '', headers: { 'retry-after': '3', 'Retry-After': '4' } }).kind, 'rejected');
   }
   for (const error of ['rate_limited', 'ratelimited']) assert.equal(classifySlackBot({ status: 200, body: JSON.stringify({ ok: false, error }), headers: { 'retry-after': '3' } }).retryAfterMs, 3000);
-});
-test('trusted configuration binds webhook host and bot channel; errors redact credentials', async () => {
+}]);
+foldedCases.push(['trusted configuration binds webhook host and bot channel; errors redact credentials', async () => {
   const urls = [
     'https://evil.example/services/a/b/c', 'http://hooks.slack.com/services/a/b/c',
     'https://hooks.slack.com.evil.example/services/a/b/c', 'https://fixture-hooks.slack.com@evil.example/services/a/b/c',
@@ -66,8 +69,8 @@ test('trusted configuration binds webhook host and bot channel; errors redact cr
   await assert.rejects(protocol.prepare({ ...bot(), body: serializeSlackMessage(message, 'CEVIL') }, 0), /options/);
   await assert.rejects(protocol.prepare({ ...bot(), body: JSON.stringify({ ...JSON.parse(bot().body), token: botToken }) }, 0), /Unsupported/);
   await assert.rejects(createSlackBotProtocol({ resolveDestination: async () => ({ token: botToken + '\r\nX-Injected: yes', channel }) }).prepare(bot(), 0), /configuration/);
-});
-test('destination drift and channel drift reject preflight before real transport', async t => {
+}]);
+foldedCases.push(['destination drift and channel drift reject preflight before real transport', async t => {
   const fixture = await wireFixture(t), db = durableFixture(t); let url = webhookUrl, configuredChannel = channel;
   const notifier = createSlackNotifier({ repository: db.repository(), transport: fixture.transport, templates: slackEventTemplates,
     incomingWebhook: async () => url, bot: async () => ({ token: botToken, channel: configuredChannel }) });
@@ -78,8 +81,8 @@ test('destination drift and channel drift reject preflight before real transport
     assert.equal((await notifier.delivery.log(id))[0]!.outcome?.code, 'preflight_failed');
   }
   assert.equal(fixture.received.length, 0);
-});
-test('real response errors and redirect do not leak secrets or forward bearer headers', async t => {
+}]);
+foldedCases.push(['real response errors and redirect do not leak secrets or forward bearer headers', async t => {
   const fixture = await wireFixture(t), db = durableFixture(t);
   const notifier = createSlackNotifier({ repository: db.repository(), transport: fixture.transport, templates: slackEventTemplates, bot: async () => ({ token: botToken, channel }) });
   const responses = [
@@ -95,8 +98,10 @@ test('real response errors and redirect do not leak secrets or forward bearer he
   }
   await notifier.delivery.dispatchDue(); assert.equal(fixture.received.length, 3);
   assert.equal(db.bytes().includes(botToken), false);
-});
-test('production core transport rejects private literal endpoints without connecting', async () => {
+}]);
+foldedCases.push(['production core transport rejects private literal endpoints without connecting', async () => {
   const transport = new NodePinnedTransport();
   for (const url of ['https://127.0.0.1/secret', 'https://169.254.169.254/secret', 'https://[::1]/secret', 'http://slack.com/api/chat.postMessage']) await assert.rejects(transport.send({ url, headers: {}, body: 'local' }));
+}]);
+  await runCases(t, foldedCases);
 });

@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -35,7 +36,9 @@ async function archiveFile(t,s) {
   await exportArchive(s.service,path,[]);return path;
 }
 
-test('archive import normalizes staged automations, journals actual changes and returns a secret-free receipt',async t=>{
+test("restore normalization admits only declared safe changes with durable receipts", async t => {
+  const foldedCases = [];
+foldedCases.push(['archive import normalizes staged automations, journals actual changes and returns a secret-free receipt', async t=>{
   const s=await source(t),before=await rows(s.db),path=await archiveFile(t,s);
   let validated=false;
   const target=await database(t,ddl,{...policy,importSafety,importRow:normalize,validateStaged:async ({read})=>{
@@ -58,9 +61,8 @@ test('archive import normalizes staged automations, journals actual changes and 
   const erased=await bundle(target.service),fresh=await database(t,ddl,policy),id=await stage(fresh.service,erased);
   await fresh.service.imports.finalize(id,erased.closing);
   assert.deepEqual((await rows(fresh.db)).map(r=>r.id),['b','c','d']);
-});
-
-test('normalization survives a refused validation and a new service without double counting',async t=>{
+}]);
+foldedCases.push(['normalization survives a refused validation and a new service without double counting', async t=>{
   const s=await source(t),archive=await bundle(s.service);
   const target=await database(t,ddl,{...policy,importSafety,importRow:normalize,validateStaged:()=>false});
   const id=await stage(target.service,archive);
@@ -71,9 +73,8 @@ test('normalization survives a refused validation and a new service without doub
   const status=await resumed.imports.finalize(id,archive.closing);
   assert.deepEqual(status.safetyChanges,changes);
   assert.deepEqual(await resumed.imports.finalize(id,archive.closing),status);
-});
-
-test('archive import refuses escalation, undeclared or structural edits, key edits and impure hooks before publishing',async t=>{
+}]);
+foldedCases.push(['archive import refuses escalation, undeclared or structural edits, key edits and impure hooks before publishing', async t=>{
   const s=await source(t),path=await archiveFile(t,s),target=await database(t,ddl,policy);
   // Policy validation goes through the same public constructor the importer uses.
   for(const declaration of [
@@ -102,11 +103,12 @@ test('archive import refuses escalation, undeclared or structural edits, key edi
     assert.deepEqual(await rows(target.db),[]);
     assert.equal((await target.db.prepare('SELECT import_job FROM rer_portability_state WHERE id=1').first()).import_job,null);
   }
-});
-
-test('a policy without import normalization restores the original activation and token values',async t=>{
+}]);
+foldedCases.push(['a policy without import normalization restores the original activation and token values', async t=>{
   const s=await source(t),path=await archiveFile(t,s),target=await database(t,ddl,policy);
   const receipt=await importArchive(target.service,path,[]);
   assert.deepEqual(await rows(target.db),await rows(s.db));
   assert.equal(receipt.safetyChanges,undefined);
+}]);
+  await runCases(t, foldedCases);
 });

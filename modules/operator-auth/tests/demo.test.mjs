@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime } from './demo-runtime.mjs';
@@ -5,7 +6,9 @@ import { runtime } from './demo-runtime.mjs';
 const post = (input, cookie, headers) => ({ method: 'POST', input, cookie, headers });
 const invite = { email: 'alex@example.com', displayName: 'Alex Morgan', role: 'owner' };
 
-test('hosted demo owner claim authorizes invitations and role changes with mocked mail only in its own copy', async t => {
+test("hosted demo ownership grants authority only to its own claimed visitor", async t => {
+  const foldedCases = [];
+foldedCases.push(['hosted demo owner claim authorizes invitations and role changes with mocked mail only in its own copy', async t => {
   const a = await runtime(t), b = await runtime(t);
   const ownerA = await a.claim(), ownerB = await b.claim();
   assert.equal((await a.call('/auth/session', { cookie: ownerA })).status, 200);
@@ -27,9 +30,8 @@ test('hosted demo owner claim authorizes invitations and role changes with mocke
   assert.equal((await a.call('/auth/invite', post(invite, ownerA))).status, 401, 'revoked demo sessions cannot supply proof');
   assert.deepEqual(a.outbound, []);
   assert.deepEqual(b.outbound, []);
-});
-
-test('ordinary hosted owner still needs real step-up and cannot use a demo visitor session or request flag', async t => {
+}]);
+foldedCases.push(['ordinary hosted owner still needs real step-up and cannot use a demo visitor session or request flag', async t => {
   const ordinary = await runtime(t, false), demo = await runtime(t);
   const owner = await ordinary.claim(), visitor = await demo.claim();
   for (const headers of [{}, { RER_DEMO: '1' }]) {
@@ -40,4 +42,6 @@ test('ordinary hosted owner still needs real step-up and cannot use a demo visit
   assert.equal((await ordinary.call('/auth/invite', post(invite, visitor))).status, 401);
   assert.equal((await ordinary.call('/auth/operators', { cookie: owner }).then(r => r.json())).length, 1);
   assert.deepEqual(ordinary.outbound, []);
+}]);
+  await runCases(t, foldedCases);
 });

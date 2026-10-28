@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { sendCloudflare } from '../../src/adapters/cloudflare/index.mjs';
@@ -5,23 +6,26 @@ import { config, message, success, transport } from './fixtures.mjs';
 
 const send = (body, input = message()) => sendCloudflare(config, input, transport(body));
 
-test('documented REST success without message_id returns nullable ID, not invented correlation', async () => {
+test("Cloudflare response disposition preserves recipient truth under malformed or bounded reads", async t => {
+  const foldedCases = [];
+foldedCases.push(["Cloudflare acceptance conservatively preserves exact recipient outcomes", async t => {
+  // Each row keeps its original assertions and reports its own failure name.
+  await runCases(t, [
+    ['documented REST success without message_id returns nullable ID, not invented correlation', async () => {
   assert.deepEqual(await send(success()), {
     provider: 'cloudflare', status: 'accepted', providerMessageId: null,
     recipientResults: [{ recipient: 'a@example.com', status: 'accepted' }],
   });
   assert.equal((await send(success({ message_id: null }))).providerMessageId, null);
   assert.equal((await send(success({ message_id: '<real@cloudflare.example>' }))).providerMessageId, '<real@cloudflare.example>');
-});
-
-test('queued recipients are accepted without claiming mailbox receipt', async () => {
+}],
+    ['queued recipients are accepted without claiming mailbox receipt', async () => {
   const result = await send(success({ delivered: [], queued: ['a@example.com'] }));
   assert.equal(result.status, 'accepted');
   assert.equal(result.recipientResults[0].status, 'accepted');
   assert.equal(Object.hasOwn(result, 'delivered'), false);
-});
-
-test('partial bounces and suppressions remain visible, conservative and correlated across all envelopes', async () => {
+}],
+    ['partial bounces and suppressions remain visible, conservative and correlated across all envelopes', async () => {
   const result = await send(success({
     message_id: '<real@cloudflare.example>', queued: ['c@example.com'],
     permanent_bounces: ['b@example.com'], suppressed_recipients: ['hidden@example.com'],
@@ -33,17 +37,15 @@ test('partial bounces and suppressions remain visible, conservative and correlat
       { recipient: 'c@example.com', status: 'accepted' }, { recipient: 'hidden@example.com', status: 'rejected' },
     ],
   });
-});
-
-test('all bounce or suppressed recipients reject without fabricating delivery', async () => {
+}],
+    ['all bounce or suppressed recipients reject without fabricating delivery', async () => {
   for (const field of ['permanent_bounces', 'suppressed_recipients']) {
     const result = await send(success({ delivered: [], [field]: ['a@example.com'] }));
     assert.equal(result.status, 'rejected');
     assert.equal(result.code, 'cloudflare_recipients_rejected');
   }
-});
-
-test('missing, duplicated, conflicting and extraneous recipient outcomes never pass', async () => {
+}],
+    ['missing, duplicated, conflicting and extraneous recipient outcomes never pass', async () => {
   for (const fields of [
     { delivered: [] }, { delivered: ['a@example.com', 'a@example.com'] },
     { queued: ['a@example.com'] }, { permanent_bounces: ['a@example.com'] },
@@ -59,26 +61,23 @@ test('missing, duplicated, conflicting and extraneous recipient outcomes never p
     assert.ok(!JSON.stringify(result).includes('SECRET'));
     assert.ok(!JSON.stringify(result).includes('outsider'));
   }
-});
-
-test('incomplete coverage preserves known outcomes and marks missing requested recipients uncertain', async () => {
+}],
+    ['incomplete coverage preserves known outcomes and marks missing requested recipients uncertain', async () => {
   const result = await send(success(), message({ to: ['a@example.com', 'b@example.com'] }));
   assert.equal(result.status, 'uncertain');
   assert.deepEqual(result.recipientResults, [
     { recipient: 'a@example.com', status: 'accepted' }, { recipient: 'b@example.com', status: 'uncertain' },
   ]);
-});
-
-test('recipient matching ignores domain case only and unique mailboxes do not erase the sent envelope', async () => {
+}],
+    ['recipient matching ignores domain case only and unique mailboxes do not erase the sent envelope', async () => {
   const fixture = transport(success());
   const result = await sendCloudflare(config, message({ to: ['a@EXAMPLE.COM', 'a@EXAMPLE.COM'] }), fixture);
   assert.equal(result.status, 'accepted');
   assert.deepEqual(JSON.parse(fixture.calls[0].init.body).to, ['a@EXAMPLE.COM', 'a@EXAMPLE.COM']);
   assert.equal(result.recipientResults.length, 1);
   assert.equal((await send(success(), message({ to: ['A@example.com'] }))).status, 'uncertain');
-});
-
-test('2xx success flag, result schema and message IDs are checked independently of HTTP', async () => {
+}],
+    ['2xx success flag, result schema and message IDs are checked independently of HTTP', async () => {
   for (const body of [null, {}, [], { success: true }, { ...success(), success: 'true' },
     { ...success(), result: null }, { ...success(), errors: null },
     { ...success(), errors: [{ code: 10002, message: 'secret provider text' }] },
@@ -90,17 +89,17 @@ test('2xx success flag, result schema and message IDs are checked independently 
     assert.equal(result.providerMessageId, null);
     assert.ok(!JSON.stringify(result).includes('secret'));
   }
-});
-
-test('documented provider errors use fixed redacted codes including rate and transient failures', async () => {
+}],
+  ]);
+}]);
+foldedCases.push(['documented provider errors use fixed redacted codes including rate and transient failures', async () => {
   for (const [code, status] of [[10001, 'rejected'], [10101, 'rejected'], [10004, 'rate_limited'], [10002, 'uncertain'], [10003, 'uncertain'], [10100, 'uncertain']]) {
     assert.deepEqual(await send({ success: false, result: null, errors: [{ code, message: 'fixture-token BODY SECRET' }] }), {
       provider: 'cloudflare', status, providerMessageId: null, code: 'cloudflare_provider_error',
     });
   }
-});
-
-test('HTTP errors, redirects and interrupted transport make one attempt and redact raw errors', async () => {
+}]);
+foldedCases.push(['HTTP errors, redirects and interrupted transport make one attempt and redact raw errors', async () => {
   for (const [http, status] of [[300, 'uncertain'], [302, 'uncertain'], [400, 'rejected'], [401, 'rejected'], [403, 'rejected'], [408, 'uncertain'], [429, 'rate_limited'], [500, 'uncertain'], [503, 'uncertain']]) {
     const fixture = transport({ secret: 'fixture-token BODY' }, http);
     assert.deepEqual(await sendCloudflare(config, message(), fixture), {
@@ -113,9 +112,8 @@ test('HTTP errors, redirects and interrupted transport make one attempt and reda
   const result = await sendCloudflare(config, message(), { fetch: async () => { attempts++; throw new Error('fixture-token BODY'); } });
   assert.deepEqual(result, { provider: 'cloudflare', status: 'uncertain', providerMessageId: null, code: 'cloudflare_transport_failed' });
   assert.equal(attempts, 1);
-});
-
-test('empty, malformed, truncated, oversized and invalid UTF-8 response bodies remain uncertain', async () => {
+}]);
+foldedCases.push(['empty, malformed, truncated, oversized and invalid UTF-8 response bodies remain uncertain', async () => {
   const responses = [
     new Response(null, { status: 204 }), new Response('not json secret'), new Response('{"success":'),
     new Response(' '.repeat(1024 * 1024 + 1)), new Response(new Uint8Array([255])),
@@ -125,17 +123,15 @@ test('empty, malformed, truncated, oversized and invalid UTF-8 response bodies r
     const result = await sendCloudflare(config, message(), { fetch: async () => response });
     assert.deepEqual(result, { provider: 'cloudflare', status: 'uncertain', providerMessageId: null, code: 'cloudflare_invalid_response' });
   }
-});
-
-test('an already-consumed transport response is redacted and uncertain', async () => {
+}]);
+foldedCases.push(['an already-consumed transport response is redacted and uncertain', async () => {
   const response = new Response(JSON.stringify(success()));
   await response.text();
   assert.deepEqual(await sendCloudflare(config, message(), { fetch: async () => response }), {
     provider: 'cloudflare', status: 'uncertain', providerMessageId: null, code: 'cloudflare_invalid_response',
   });
-});
-
-test('a stalled response body is bounded and its stream is cancelled', async context => {
+}]);
+foldedCases.push(['a stalled response body is bounded and its stream is cancelled', async context => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   let cancelled = false;
   const response = new Response(new ReadableStream({ cancel() { cancelled = true; } }));
@@ -147,4 +143,6 @@ test('a stalled response body is bounded and its stream is cancelled', async con
   assert.equal(result.status, 'uncertain');
   assert.equal(result.code, 'cloudflare_invalid_response');
   assert.equal(cancelled, true);
+}]);
+  await runCases(t, foldedCases);
 });
