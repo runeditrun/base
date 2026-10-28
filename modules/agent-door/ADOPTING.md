@@ -133,6 +133,25 @@ to be a subset of the set before. Points named `BASE-AGENT-005.surface.<tool>.na
 and `BASE-AGENT-005.narrowing.<id>.*` show which tools used this check; a tool that
 can widen keeps its escalation fixture.
 
+Return resource references for outcomes the user can inspect. Supply undo only
+when the native action has a real reversal; review and approval do not invent one.
+
+The maintained reference pattern is
+`default-seed/src/agent-door/index.server.ts`, with native people and access tools
+in that directory. Its tools call the seed's existing people repository and
+operator-account services. Follow that division: the edition owns native
+actions, resources and permission checks, while the copied module owns the
+agent transport and policy pipeline. Do not copy Base's people model into an
+edition with a different domain. Use `door.invoke` for embedded agents and
+`door.emit` after native person changes so both enter the same event vocabulary.
+
+Expose resources through explicit readers and treat imported or external
+content as untrusted. Every resource declares non-empty catalogue `classes`
+and `classify(record,ctx)`, based on the record itself. Resource reads pass through
+the same policy, approval, review and audit path as tools. A resource read must enforce the current person's native
+access. Mark device, screen, connector, import-door and installation operations
+as outside the tool registry when they require another supported door.
+
 ### Principal custody
 
 Every check receives the authenticated principal: the sponsoring `person`, the
@@ -189,25 +208,6 @@ completes the seed's real native proof for the signed-in owner through `request`
 disposable installation sent there. Conformance asserts the challenge, its audit
 row, refusal of a bogus and of an unproven reference, the confirmed handoff page
 and the proven call.
-
-Return resource references for outcomes the user can inspect. Supply undo only
-when the native action has a real reversal; review and approval do not invent one.
-
-The maintained reference pattern is
-`default-seed/src/agent-door/index.server.ts`, with native people and access tools
-in that directory. Its tools call the seed's existing people repository and
-operator-account services. Follow that division: the edition owns native
-actions, resources and permission checks, while the copied module owns the
-agent transport and policy pipeline. Do not copy Base's people model into an
-edition with a different domain. Use `door.invoke` for embedded agents and
-`door.emit` after native person changes so both enter the same event vocabulary.
-
-Expose resources through explicit readers and treat imported or external
-content as untrusted. Every resource declares non-empty catalogue `classes`
-and `classify(record,ctx)`, based on the record itself. Resource reads pass through
-the same policy, approval, review and audit path as tools. A resource read must enforce the current person's native
-access. Mark device, screen, connector, import-door and installation operations
-as outside the tool registry when they require another supported door.
 
 ## Keep runtime and CLI evidence separate
 
