@@ -54,10 +54,50 @@ async function generatedJourney(root) {
   assert.equal(await read(root, 'ACCEPTANCE.md'), acceptance)
 }
 
+async function nonProductJourney() {
+  const sources = [
+    [
+      [6, '"100% free, open source alternative to Expensify, SAP Concur and Emburse"', 'OWN', 'license/public-repository ownership'],
+      [51, '"100% free and open source. MIT licensed."', 'OWN', 'license/public-repository ownership'],
+    ],
+    [
+      [6, '"100% free, open source alternative to Stripe Billing, Chargebee and Recurly"', '—', 'license/public-repository ownership'],
+      [71, 'Terminal: `npx -y @runeditrun/rer dev just-every/run-nectar` starts Nectar', '—', 'launcher identity'],
+      [73, '"100% free and open source. MIT licensed."', '—', 'license/public-repository ownership'],
+      [76, '"Try the demo" opens the hosted demo', '—', 'hosted-demo action'],
+    ],
+  ]
+  for (const facts of sources) {
+    const root = await installation('legacy')
+    try {
+      await rm(join(root, 'docs/CLAIMS.md'))
+      const initial = await read(root, 'CONTRACT.md')
+      const table = [
+        '| # | Section | Claim | Clause(s) | Status |', '| --- | --- | --- | --- | --- |',
+        "| 1 | Hero | Publish the studio's entries | PUBLISH-01 | done |",
+        ...facts.map(([number, claim, reference]) => `| ${number} | Closing | ${claim} | ${reference} | done |`),
+      ].join('\n')
+      await edit(root, 'CONTRACT.md', initial.replace(/\| # \| Claim \| Clauses \|[\s\S]*?(?=\n## Status)/, table + '\n'))
+      git(root, 'add', '.')
+      git(root, 'commit', '-qm', 'Synthetic historical homepage source')
+      const old = git(root, 'rev-parse', 'HEAD'), before = parseContract(await read(root, 'CONTRACT.md'))
+      const lines = (await read(root, 'CONTRACT.md')).split('\n')
+      const claims = facts.map(([, claim, , nonProduct]) => ({ file: 'CONTRACT.md', line: lines.findIndex(line => line.includes(`| ${claim} |`)) + 1, claim, nonProduct }))
+      await edit(root, 'claim-map.json', JSON.stringify({ schema: 1, old, claims }))
+      succeeds(root, 'convert', '--old', old, '--claim-map', 'claim-map.json')
+      succeeds(root, 'check')
+      succeeds(root, 'id-map', '--old', old)
+      succeeds(root, 'coverage', 'check', '--old', old)
+      assert.deepEqual(parseContract(await read(root, 'CONTRACT.md')).clauses.map(({ id, status }) => ({ id, status })), before.clauses.map(({ id, status }) => ({ id, status })))
+    } finally { await rm(root, { recursive: true, force: true }) }
+  }
+}
+
 test('contract docs convert handwritten contracts and keep generated documents and migration maps accountable', async () => {
   const roots = await Promise.all(['standard', 'legacy'].map(installation))
   try {
     const results = await Promise.allSettled([
+      nonProductJourney(),
       (async () => {
         const root = roots[0]
         const original = parseContract(await read(root, 'CONTRACT.md'))
