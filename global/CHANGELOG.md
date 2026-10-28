@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Contract document generation accepts distinct current Homepage claims when the historical source has none. Missing original claims and duplicate current claims remain refused.
+
 ## 0.2.86
 
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.
