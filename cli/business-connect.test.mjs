@@ -1,6 +1,6 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
 import { door } from './fixtures/business/door.mjs';
@@ -13,6 +13,7 @@ import { integrity, localRegistry } from '../scripts/rer-package/registry.mjs';
 import { readPackage, writePackage } from '../global/update/archive.mjs';
 import { userInfo } from 'node:os';
 import { realpath } from 'node:fs/promises';
+import { identity } from '../modules/job-queue/identity.mjs';
 
 const base = resolve(import.meta.dirname, '..');
 const fixture = join(import.meta.dirname, 'fixtures/business');
@@ -47,6 +48,29 @@ async function cli(home, args, { terminal = false, npx = false, input = '', colu
   child.stdin.end(input);
  });
 }
+test('Business entry points expose setup before advanced commands and preserve the selected pairing destination', async t => {
+ const home = join(directory, 'handoff-home');
+ const outputs = await Promise.all([['business'], ['business', '--help']].map(args => cli(home, args)));
+ for (const result of outputs) {
+  assert.equal(result.code, 0);
+  const [lead, ...secondary] = result.stdout.trim().split(/\n\s*\n/);
+  assert.equal(lead.match(/\brer business connect\b/g)?.length, 1, 'one setup action leads help');
+  assert.ok(!/^\s*token(?:\s|$)/m.test(lead), 'advanced commands stay out of the lead');
+  assert.ok(secondary.some(section => /^\S[^\n]*\n/.test(section) && /^ +token(?:\s|$)/m.test(section)),
+   'the token command remains in a separate, headed section after setup');
+ }
+ const remote = await fixtureServer(t);
+ for (const terminal of [false, true]) {
+  const result = await cli(home, ['business', 'connect', '--origin', remote.origin], { terminal });
+  assert.equal(result.code, 1, 'the no-code handoff does not redeem or alter pairing');
+  const text = result.stdout + result.stderr;
+  const urls = text.match(/https?:\/\/[^\s;]+/g);
+  assert.deepEqual(urls, [remote.origin + '/business'], 'one browser link, for the selected app');
+  assert.ok(!text.includes('app.runeditrun.com'), 'an explicitly selected app is preserved');
+  assert.equal(remote.state.requests.length, 0);
+ }
+});
+
 // The fixture answers polls every second instead of the platform's five.
 async function fixtureServer(t) {
  const remote = await server(t);
@@ -351,10 +375,63 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
 
  const stateDir = join(work, '.rer-business');
  await mkdir(stateDir); await writeFile(join(stateDir, 'keep.txt'), 'not rer');
- const env = { RER_BUSINESS_STATE_DIR: stateDir, CLAUDECODE: '1' };
+ const registry = join(work, 'registry'), checkout = join(work, 'synthetic-base-1'), live = join(work, 'synthetic-base-2');
+ const owner = await identity(); t.after(() => owner.close());
+ for (const root of [checkout, live]) {
+  await mkdir(root); await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, seedContract: { profile: 'first-party' } }));
+ }
+ await mkdir(registry);
+ const register = roots => writeFile(join(registry, 'state.json'), JSON.stringify({ running: roots.map(checkout => ({ checkout, mode: 'dev', owner: owner.info })) }));
+ await register([checkout]);
+ const env = { RER_BUSINESS_STATE_DIR: stateDir, RER_SERVERS_DIR: registry, CLAUDECODE: '1' };
+ const carryFile = root => join(root, '.rer/local/business.json');
+ const proof = async root => {
+  const text = await readFile(carryFile(root), 'utf8');
+  assert.ok(!text.includes(remote.device));
+  t.diagnostic(spawnSync('ls', ['-ld', join(root, '.rer/local'), carryFile(root)], { encoding: 'utf8' }).stdout.trim());
+  t.diagnostic(text.trim());
+  assert.equal((await stat(join(root, '.rer/local'))).mode & 0o777, 0o700);
+  assert.equal((await stat(carryFile(root))).mode & 0o777, 0o600);
+  return text;
+ };
  remote.state.optIns = { installPermissions: null, awakeConsent: false, installService: null };
  const paired = await connect(home, remote, { env });
  assert.equal(redemptions(), before + 1, 'the same code pairs once the folder is writable');
+ const firstCarry = await proof(checkout), carried = JSON.parse(firstCarry);
+ assert.deepEqual(carried, { version: 1, origin: remote.origin, business_id: 'biz', business_url: remote.origin + '/business/biz',
+  name: 'synthetic-base-1', legal_name: null, accent: '#264f45', logo_url: null, refreshed_at: carried.refreshed_at });
+ assert.equal(new Date(carried.refreshed_at).toISOString(), carried.refreshed_at);
+ assert.deepEqual(JSON.parse(await readFile(join(stateDir, 'carried.json'), 'utf8')), [checkout]);
+ assert.equal((await stat(join(stateDir, 'carried.json'))).mode & 0o777, 0o600);
+ assert.equal((await cli(home, ['business','connect'], { env })).code, 0);
+ assert.equal(await readFile(carryFile(checkout), 'utf8'), firstCarry, 'a re-connect preserves unchanged bytes');
+ remote.state.business = { ...remote.state.business, name: 'synthetic-base-2', legal_name: 'synthetic-base-3', brand_color: 'invalid', logo_url: 'http://example.test/logo.png' };
+ const selfReads = () => remote.state.requests.filter(item => item.route === '/api/business/executors/self' && item.method === 'GET').length;
+ const beforeRun = selfReads();
+ assert.equal((await cli(home, ['business','run','--once'], { env })).code, 0);
+ assert.equal(selfReads(), beforeRun + 1, 'run once reads self once');
+ const refreshed = JSON.parse(await proof(checkout));
+ assert.deepEqual([refreshed.name, refreshed.legal_name, refreshed.accent, refreshed.logo_url], ['synthetic-base-2', 'synthetic-base-3', null, null]);
+ assert.notEqual(refreshed.refreshed_at, carried.refreshed_at);
+ const changedCarry = await readFile(carryFile(checkout), 'utf8');
+ remote.state.business.id = 'synthetic-base-4';
+ const mismatched = await cli(home, ['business','connect'], { env });
+ assert.equal(mismatched.code, 0); assert.equal(await readFile(carryFile(checkout), 'utf8'), changedCarry);
+ assert.equal(mismatched.stderr.trim().split('\n').length, 1); assert.ok(mismatched.stderr.includes(remote.origin) && mismatched.stderr.includes('another Business'));
+ await rm(carryFile(checkout));
+ assert.equal((await cli(home, ['business','connect'], { env })).code, 0);
+ await assert.rejects(stat(carryFile(checkout)), { code: 'ENOENT' });
+ remote.state.business = undefined;
+ assert.equal((await cli(home, ['business','connect'], { env })).code, 0);
+ await assert.rejects(stat(carryFile(checkout)), { code: 'ENOENT' });
+ remote.state.business = { id: 'biz', name: 'synthetic-base-2', legal_name: null, brand_color: '#264F45', logo_url: 'https://example.test/logo.png' };
+ assert.equal((await cli(home, ['business','connect'], { env })).code, 0);
+ const finalCarry = await proof(checkout);
+ // One recorded checkout is no longer live. The other live checkout was never recorded.
+ await mkdir(join(live, '.rer/local'), { recursive: true, mode: 0o700 });
+ await writeFile(carryFile(live), finalCarry, { mode: 0o600 });
+ await proof(live); await register([live]);
+
  assert.ok(!(await readdir(home)).includes('.rer'), 'nothing is written to ~/.rer when RER_BUSINESS_STATE_DIR is set');
  assert.equal((await stat(join(stateDir, 'state.json'))).mode & 0o777, 0o600);
  for (const choice of ['Add rules so Claude Code never reads your secret files', 'Install the background service']) assert.ok(paired.stdout.includes(choice), paired.stdout);
@@ -364,7 +441,17 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
  assert.ok(!/installPermissions|awakeConsent|installService/.test(paired.stdout + paired.stderr), 'internal names never reach a person');
  const status = await cli(home, ['business','status','--json'], { env });
  assert.equal(JSON.parse(status.stdout).paired, true);
+ // A server revocation must retain the carry custody record until disconnect,
+ // including an earlier checkout that is no longer in the live registry.
+ remote.state.revoked = true;
+ const revokedRun = await cli(home, ['business','run','--once'], { env });
+ assert.equal(revokedRun.code, 0, revokedRun.stderr);
+ assert.equal(JSON.parse((await cli(home, ['business','status','--json'], { env })).stdout).revoked, true);
+ assert.deepEqual(JSON.parse(await readFile(join(stateDir, 'carried.json'), 'utf8')), [checkout]);
  assert.equal((await cli(home, ['business','disconnect'], { env })).code, 0);
+ await assert.rejects(stat(carryFile(checkout)), { code: 'ENOENT' });
+ await assert.rejects(stat(carryFile(live)), { code: 'ENOENT' });
+ t.diagnostic('disconnect: recorded carry absent; live unrecorded carry absent; carried.json removed');
  assert.deepEqual(await readdir(stateDir), ['keep.txt'], 'disconnect removes only its own files from a named folder');
  delete remote.state.optIns;
 
@@ -424,6 +511,35 @@ test('browser opt-ins apply without terminal prompts, and disconnect revokes bef
   assert.equal(remote.state.revoked, true);
   assert.deepEqual(JSON.parse(await readFile(join(home, '.claude/settings.json'), 'utf8')), prior);
   assert.deepEqual(await readdir(home), baseline, 'service files, parents, keychain items, state and permission additions are removed');
+ }
+});
+
+test('paired guidance names one applying command and run and next apply later browser choices without reconnecting', async t => {
+ const remote = await fixtureServer(t);
+ for (const terminal of [false, true]) {
+  for (const command of ['next', 'run']) {
+   const home = join(directory, `later-choices-${command}-${terminal}`);
+   remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
+   const paired = await connect(home, remote, { terminal, env: { CLAUDECODE: '1' } });
+   assert.match(paired.stdout, /\bbusiness next\b/);
+   // An already-paired invocation emits just the successful connection guidance,
+   // without the earlier instruction for resuming a pending approval.
+   const connected = await cli(home, ['business', 'connect'], { terminal, env: { CLAUDECODE: '1' } });
+   assert.equal(connected.code, 0, connected.stderr);
+   assert.deepEqual([...new Set(Array.from(connected.stdout.matchAll(/\bbusiness (\w+)\b/g), match => match[1]))], ['next']);
+   assert.doesNotMatch(connected.stdout + connected.stderr, /\bconnect\b/);
+   assert.ok(!(await readdir(home)).includes('.claude'));
+   remote.state.optIns = { installPermissions: true, awakeConsent: true, installService: true };
+   const applied = await cli(home, ['business', command, ...(command === 'run' ? ['--once'] : [])], { terminal, env: { CLAUDECODE: '1' } });
+   assert.equal(applied.code, 0, applied.stderr);
+   assert.equal(JSON.parse(await readFile(join(home, '.rer/business/state.json'), 'utf8')).awakeConsent, true);
+   assert.ok((await readdir(join(home, '.claude'))).includes('settings.json'));
+   const status = await cli(home, ['business', 'status', '--json']);
+   assert.equal(JSON.parse(status.stdout).service, 'running');
+   assert.equal(remote.state.requests.filter(entry => entry.body.code).length, 1, 'applying choices never redeems another code');
+   assert.equal((await cli(home, ['business', 'disconnect'])).code, 0);
+   remote.state.requests.length = 0;
+  }
  }
 });
 
@@ -672,7 +788,7 @@ test('an agent exports a vendor into its app\'s import door: next names the owne
  assert.equal(seed.state.requests.length, 0, 'nothing reaches the door without a key');
 
  // The owner types the key in a terminal; it goes to the OS credential store (the fixture keychain seam).
- const key = 'fixture-uptimerobot-read-only-key-never-output';
+ const key = 'synthetic-bz-1';
  const added = await cli(home, ['business','vendor-key','add','uptimerobot'], { terminal: true, input: key + '\n', env }); outputs.push(added);
  assert.equal(added.code, 0, added.stderr);
  const stored = await cli(home, ['business','next'], { env }); outputs.push(stored);
@@ -691,21 +807,40 @@ test('an agent exports a vendor into its app\'s import door: next names the owne
  // The lease ends and Business hands the export back.
  remote.state.tasks = [exportTask];
 
+ // Interrupt the public supervisor after the door acknowledges one chunk.
+ // Its handover returns the task to ready, retaining the server checkpoint;
+ // the next invocation finishes the export under a new lease and fresh grants.
+ let interruptedChild;
+ remote.state.onHeartbeat = () => {
+  if (remote.state.checkpoint.page === 1) { remote.state.onHeartbeat = null; interruptedChild.kill('SIGTERM'); }
+ };
+ const interrupted = await cli(home, ['business','run','--once'], { env: vendorEnv, onSpawn: child => { interruptedChild = child; } }); outputs.push(interrupted);
+ assert.equal(interrupted.code, 0, interrupted.stderr);
+ assert.equal(remote.state.released.reason, 'handover');
+ assert.equal(remote.state.phase, 'ready'); assert.equal(remote.state.tasks[0].state, 'ready');
+ assert.equal(remote.state.checkpoint.page, 1); assert.ok(remote.state.checkpoint.total > 1);
+ assert.equal(seed.state.plans.length, 0, 'an interrupted partial upload never becomes a preview');
+ const [partial] = seed.state.uploads.values();
+ assert.equal(partial.chunks.size, 1); assert.equal(partial.bytes, undefined);
+ await assert.rejects(stat(join(stateDir, 'run.lock')), { code: 'ENOENT' });
+ assert.ok(!(await readdir(stateDir)).some(name => name.endsWith('.bundle')), 'handover removes the private export file');
+ const recoveredFence = remote.state.fence, doorBefore = seed.state.requests.length;
  const grantsBefore = remote.state.importGrants;
  const exported = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(exported);
+ assert.ok(remote.state.fence > recoveredFence, 'the resumed task holds a new fenced lease');
  assert.equal(exported.code, 0, exported.stderr);
  assert.equal(remote.state.phase, 'done', 'Business completed the export after its door held the plan');
  // The completion reports identifiers only: the door's upload and plan and the bundle's hash.
  const completed = remote.state.requests.find(entry => entry.route === '/api/business/tasks/biz%3Aseed%3Auptime%3Aexport%3Atool1/complete');
  assert.deepEqual(completed.body.outputs, { upload_id: seed.state.plans[0].uploadId, plan_id: seed.state.plans[0].planId, bundle_sha256: seed.state.plans[0].bundleSha256 });
  assert.ok(exported.stdout.includes(`Import preview ready in ${seed.origin}: 600 source records; 600 to create, 0 to update, 0 unchanged, 0 rejected. Nothing was imported`), exported.stdout);
- assert.deepEqual((await readFile(join(home, 'vendor-requests.log'), 'utf8')).trim().split('\n'), ['/v3/monitors?limit=200 authorized', '/v3/monitors?limit=200&cursor=page2 authorized'], 'the shipped adapter read the vendor with the stored key');
+ assert.deepEqual((await readFile(join(home, 'vendor-requests.log'), 'utf8')).trim().split('\n'), Array(2).fill(['/v3/monitors?limit=200 authorized', '/v3/monitors?limit=200&cursor=page2 authorized']).flat(), 'both runs read the vendor with the stored key');
  // 64 KiB chunks, each with its own single-use grant, then the plan: a preview with no native writes.
- const [upload] = seed.state.uploads.values(), uploads = seed.state.requests.filter(entry => entry.url === '/api/rer/import/uploads');
+ const upload = seed.state.uploads.get(seed.state.plans[0].uploadId), requests = seed.state.requests.slice(doorBefore), uploads = requests.filter(entry => entry.url === '/api/rer/import/uploads');
  assert.ok(upload.totalChunks >= 2 && uploads.length === upload.totalChunks && upload.name === 'uptimerobot-monitors.json', `${upload.totalChunks} chunks`);
  assert.deepEqual(uploads.map(entry => JSON.parse(entry.body).index), [...uploads.keys()]);
  assert.ok(uploads.slice(0, -1).every(entry => Buffer.from(JSON.parse(entry.body).base64, 'base64').length === 65_536));
- const authorizations = seed.state.requests.map(entry => entry.authorization);
+ const authorizations = requests.map(entry => entry.authorization);
  assert.equal(new Set(authorizations).size, authorizations.length, 'every door request carries a fresh grant');
  assert.equal(remote.state.importGrants - grantsBefore, authorizations.length, 'each grant was asked of Business for one request');
  assert.equal(seed.state.plans.length, 1); assert.equal(seed.state.nativeWrites, 0, 'the import is a zero-write preview');
@@ -717,6 +852,7 @@ test('an agent exports a vendor into its app\'s import door: next names the owne
  const printed = outputs.map(result => result.stdout + result.stderr).join('');
  assert.ok(!printed.includes(key) && !printed.includes('Fixture monitor'), 'neither the key nor vendor records are printed');
  assert.ok(!JSON.stringify(remote.state.requests).includes(key) && !JSON.stringify(seed.state.requests).includes(key), 'the key reaches neither Business nor the door');
+ for (const upload of seed.state.uploads.values()) for (const bytes of upload.chunks.values()) assert.ok(!bytes.includes(Buffer.from(key)), 'decoded upload chunks contain no synthetic key marker');
  for (const name of await readdir(stateDir)) assert.ok(!(await readFile(join(stateDir, name), 'utf8')).includes(key), `${name} holds no key`);
  assert.ok((await readFile(join(home, 'fake-keychain.json'), 'utf8')).includes(key), 'the key lives in the OS credential store');
  // With the export done and nothing else waiting, next and run say so.
@@ -731,7 +867,7 @@ test('an agent exports Sentry, PagerDuty and Sorry with the non-secret inputs it
  const vendorEnv = { ...env, NODE_OPTIONS: `--import=${join(fixture, 'register.mjs')} --import=${join(fixture, 'vendor-edge.mjs')}` };
  await connect(home, remote, { env });
  seed.state.stateDir = stateDir; remote.state.door = seed;
- const outputs = [], keys = { sentry: 'fixture-sentry-read-only-token-never-output', pagerduty: 'fixture-pagerduty-read-only-key-never-output' };
+ const outputs = [], keys = { sentry: 'synthetic-bz-2', pagerduty: 'synthetic-bz-3' };
  const vendorLog = async host => (await readFile(join(home, 'vendor-requests.log'), 'utf8').catch(() => '')).trim().split('\n').filter(line => line.startsWith(`${host} `));
  const since = '2026-07-01T00:00:00.000Z';
  const moves = [
@@ -750,6 +886,17 @@ test('an agent exports Sentry, PagerDuty and Sorry with the non-secret inputs it
  assert.equal(remote.state.released.reason, 'paused');
  assert.ok(remote.state.requests.some(entry => entry.route === '/api/business/tasks/biz%3Aspool%3Aexport%3Asentry-early/events' && entry.body.event?.payload.question === 'configuration_required'));
  assert.equal(seed.state.requests.length, 0, 'nothing reaches the door without the inputs');
+ for (const [vendor, title] of [['pagerduty', 'PagerDuty'], ['sorry', 'Sorry'], ['calendly', 'Calendly']]) {
+  const taskId = `biz:export:${vendor}-unconfigured`;
+  remote.state.exportVendor = vendor;
+  remote.state.tasks = [{ task_id: taskId, kind: 'export.vendor', state: 'ready', runner: 'executor', fence: 0, title: `Export ${title} history` }];
+  const paused = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(paused);
+  assert.equal(paused.code, 1);
+  assert.equal(remote.state.released.reason, 'paused');
+  assert.ok(remote.state.requests.some(entry => entry.route === `/api/business/tasks/${encodeURIComponent(taskId)}/events` && entry.body.event?.payload.question === 'configuration_required'));
+  assert.equal(seed.state.requests.length, 0, 'missing leased inputs and the unsupported folder layout stay outside the door');
+ }
+
 
  const refusedKey = await cli(home, ['business','vendor-key','add','sorry'], { terminal: true, input: 'not-a-key\n', env }); outputs.push(refusedKey);
  assert.notEqual(refusedKey.code, 0); assert.ok((refusedKey.stdout + refusedKey.stderr).includes('Sorry needs no key'), refusedKey.stderr);
@@ -812,6 +959,7 @@ test('an agent exports Sentry, PagerDuty and Sorry with the non-secret inputs it
  for (const key of Object.values(keys)) {
   assert.ok(!printed.includes(key), 'no key is printed');
   assert.ok(!JSON.stringify(remote.state.requests).includes(key) && !JSON.stringify(seed.state.requests).includes(key), 'no key reaches Business or the door');
+  for (const upload of seed.state.uploads.values()) for (const bytes of upload.chunks.values()) assert.ok(!bytes.includes(Buffer.from(key)), 'decoded upload chunks contain no synthetic key marker');
   for (const name of await readdir(stateDir)) assert.ok(!(await readFile(join(stateDir, name), 'utf8')).includes(key), `${name} holds no key`);
  }
  assert.ok(!/TypeError: Cannot read|Responder 1|Elevated checkout errors/.test(printed), 'no vendor record is printed');
@@ -825,7 +973,7 @@ test('status names active catch-up and archive tasks while their uploads are in 
  await connect(home, remote, { env });
  seed.state.stateDir = stateDir;
  seed.state.baselines.set('uptimerobot', Array.from({ length: 590 }, (_, index) => String(800000 + index)));
- const added = await cli(home, ['business','vendor-key','add','uptimerobot'], { terminal: true, input: 'fixture-active-status-read-only-key\n', env });
+ const added = await cli(home, ['business','vendor-key','add','uptimerobot'], { terminal: true, input: 'synthetic-bz-5\n', env });
  assert.equal(added.code, 0, added.stderr);
  // Hold the second chunk at the network edge while the first acknowledged
  // chunk is saved by the real supervisor, then use both public status forms.
@@ -873,7 +1021,7 @@ test('an agent catches up and archives a vendor through its app\'s import door, 
  const vendorEnv = { ...env, NODE_OPTIONS: `--import=${join(fixture, 'register.mjs')} --import=${join(fixture, 'vendor-edge.mjs')}` };
  await connect(home, remote, { env });
  seed.state.stateDir = stateDir; remote.state.door = seed;
- const key = 'fixture-uptimerobot-read-only-key-for-the-switch', outputs = [];
+ const key = 'synthetic-bz-4', outputs = [];
  const added = await cli(home, ['business','vendor-key','add','uptimerobot'], { terminal: true, input: key + '\n', env }); outputs.push(added);
  assert.equal(added.code, 0, added.stderr);
  const completed = id => remote.state.requests.find(entry => entry.route === `/api/business/tasks/${encodeURIComponent(id)}/complete`);
@@ -959,6 +1107,7 @@ test('an agent catches up and archives a vendor through its app\'s import door, 
  const printed = outputs.map(result => result.stdout + result.stderr).join('');
  assert.ok(!printed.includes(key) && !printed.includes('Fixture monitor'), 'neither the key nor vendor records are printed');
  assert.ok(!JSON.stringify(remote.state.requests).includes(key) && !JSON.stringify(seed.state.requests).includes(key), 'the key reaches neither Business nor the door');
+ for (const upload of seed.state.uploads.values()) for (const bytes of upload.chunks.values()) assert.ok(!bytes.includes(Buffer.from(key)), 'decoded upload chunks contain no synthetic key marker');
  assert.ok(seed.state.bundleModes.length >= 6 && seed.state.bundleModes.every(mode => mode === 0o600), JSON.stringify(seed.state.bundleModes));
  for (const name of await readdir(stateDir)) {
   assert.ok(!name.endsWith('.bundle'), `${name}: bundles are removed after completion`);

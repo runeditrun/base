@@ -20,9 +20,15 @@ test('demo decoration keeps singular titles and its run exit through client navi
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   let browser;
   try {
-    browser = await chromium.launch({ headless: true });
-    const page = await browser.newPage();
+    browser = await chromium.launch({ headless: true, args: ["--use-mock-keychain", "--password-store=basic"] });
+    const context = await browser.newContext();
+    const page = await context.newPage();
     const origin = `http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}`;
+    for (const width of [1440, 390]) {
+    await page.setViewportSize({width, height: 900});
+    await page.goto(`${origin}/?${new URLSearchParams({mode: 'Demo', name: 'Pencil'})}`);
+    await page.locator('[data-rer-demo-exit]').waitFor();
+    if (process.env.RER_TEST_EVIDENCE_DIRECTORY) await page.screenshot({path: `${process.env.RER_TEST_EVIDENCE_DIRECTORY}/demo-${width}.png`});
     for (const name of ['Revenue $&', "Revenue $'", 'Revenue $`', 'Revenue $$', '<img src=x onerror="window.__G16=1">', 'Revenue "quoted"', "Revenue 'quoted'", '収益 café 🧭']) {
       await page.goto(`${origin}/?${new URLSearchParams({ mode: 'Demo', name })}`);
       const exits = page.locator('[data-rer-demo-exit]');
@@ -67,6 +73,7 @@ test('demo decoration keeps singular titles and its run exit through client navi
         });
         assert.equal(await page.title(), expected, 'head mutations preserve the single suffix');
       }
+    }
     }
   } finally {
     await browser?.close();

@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import unittest
 from test_repo import ROOT, RepositoryFixture, resolving, LICENSE, generic_credential
+from hygiene_config import EMAIL
 
 
 class HygieneTests(RepositoryFixture, unittest.TestCase):
@@ -19,6 +20,58 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
 
     def test_email_in_history(self):
         self.deleted('contact.txt', 'person' + '@' + 'gmail.com', 'hygiene.email')
+
+    def test_coauthor_provider_addresses_only_in_final_commit_trailers(self):
+        from test_source_metadata import public_scan
+        clean = self.git('rev-parse', 'HEAD')
+        subject = 'synthetic-base-1\n\n'
+
+        def trailer(address, name='OpenAI'):
+            return 'Co-Authored-By: ' + name + ' <' + address + '>\n'
+
+        provider = 'noreply' + '@' + 'openai.com'
+        personal = 'synthetic-base-2' + '@' + 'synthetic-base-3.net'
+        other = 'noreply' + '@' + 'synthetic-base-4.org'
+        lookalike = 'noreply' + '@' + 'openai.com.synthetic-base-5.net'
+        cases = [(name, 'commit', subject + trailer('noreply' + '@' + domain, name), True)
+                 for name, domain in (('OpenAI', 'openai.com'), ('Anthropic', 'anthropic.com'),
+                                      ('GitHub', 'github.com'))]
+        cases.extend((
+            ('personal trailer', 'commit', subject + trailer(personal), False),
+            ('personal body', 'commit', subject + personal + '\n\nsynthetic-base-6\n', False),
+            ('provider trailer in body', 'commit', subject + trailer(provider) + '\nsynthetic-base-6\n', False),
+            ('non-provider trailer', 'commit', subject + trailer(other), False),
+            ('lookalike trailer', 'commit', subject + trailer(lookalike), False),
+            ('other trailer key', 'commit', subject + trailer(provider).replace('Co-Authored-By:', 'Signed-Off-By:'), False),
+            ('file', 'file', subject + trailer(provider), False),
+            ('annotated tag', 'tag', subject + trailer(provider), False),
+        ))
+        for label, kind, message, accepted in cases:
+            with self.subTest(case=label):
+                self.git('reset', '-q', '--hard', clean)
+                if kind == 'commit':
+                    self.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', message, '--allow-empty')
+                    self.assertEqual(self.git('log', '-1', '--format=%B'), message.strip())
+                elif kind == 'file':
+                    self.write('synthetic-base-7.txt', message)
+                    self.commit()
+                else:
+                    self.git('tag', '-a', 'synthetic-base-8', '-m', message)
+                inspected = self.git('rev-parse', 'synthetic-base-8' if kind == 'tag' else 'HEAD')
+                # Inspect the planted commit in newly-public history as well.
+                self.commit()
+                try:
+                    report = public_scan(self)
+                    self.assertEqual(report['status'], 'PASS' if accepted else 'FAIL')
+                    expected = set() if accepted else {('hygiene.email', '@commit-message' if kind == 'commit'
+                                                       else '@tag-message' if kind == 'tag' else 'synthetic-base-7.txt')}
+                    self.assertEqual({(f['rule'], f['path']) for f in report['findings']}, expected)
+                    if not accepted:
+                        self.assertTrue(any(inspected in f['commits'] and 'newly-public' in f['scopes']
+                                            for f in report['findings']))
+                finally:
+                    if kind == 'tag':
+                        self.git('tag', '-d', 'synthetic-base-8')
 
     def test_reserved_domains_are_not_personal_email(self):
         self.write('personas.txt', 'admin' + '@' + 'dev.localhost owner' + '@' + 'example.com')
@@ -100,6 +153,39 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
         self.assertEqual(report['status'], 'FAIL')
         self.assertEqual({f['path'] for f in report['findings'] if f['rule'] == 'hygiene.email'},
                          {'fonts/b/LICENSE.txt', 'fonts/c/NOTICE.txt', 'fonts/d/README.txt', 'fonts/e/LICENSE.txt', 'fonts/f/LICENSE.txt'})
+
+    def test_third_party_licence_notice_is_public_only_as_the_listed_bytes(self):
+        # The vendored yaml licence: Base lists these exact bytes, whose upstream
+        # copyright notice carries the maintainer's address.
+        notice = (ROOT / 'edition-authoring/vendor/yaml/LICENSE').read_bytes()
+        maintainer = EMAIL.search(notice.decode()).group()
+        self.write('vendor/yaml/LICENSE', notice)
+        self.commit()
+        blob = self.git('hash-object', 'vendor/yaml/LICENSE')
+        # Historical, release-tree and untracked working-tree copies alike.
+        (self.repo / 'vendor/yaml/LICENSE').rename(self.repo / 'vendor/yaml/LICENSE.md')
+        self.commit()
+        self.write('vendor/copy/COPYING', notice)
+        report = self.report()
+        self.assertEqual(report['status'], 'PASS')
+        notices = {(n['path'], n['blob'], n['package']) for n in report['thirdPartyNotices']}
+        self.assertEqual(notices, {(path, blob, 'yaml') for path in ('vendor/yaml/LICENSE', 'vendor/yaml/LICENSE.md', 'vendor/copy/COPYING')})
+        # Negative controls: one changed byte, the exact bytes under other
+        # names, another licence text, plain text, an unrelated second address
+        # and the same address in a commit message.
+        self.write('vendor/a/LICENSE', notice.replace(b'Permission', b'permission', 1))
+        self.write('vendor/b/NOTICE', notice)
+        self.write('vendor/c/README', notice)
+        self.write('vendor/d/LICENSE', 'Copyright (c) Someone <' + maintainer + '>\n')
+        self.write('notes.txt', 'Maintainer: ' + maintainer)
+        self.write('CONTACT.txt', 'person' + '@' + 'gmail.com')
+        self.git('add', '.')
+        self.git('commit', '-qm', 'Vendor yaml; ask ' + maintainer)
+        report = self.report()
+        self.assertEqual(report['status'], 'FAIL')
+        self.assertEqual({f['path'] for f in report['findings'] if f['rule'] == 'hygiene.email'},
+                         {'vendor/a/LICENSE', 'vendor/b/NOTICE', 'vendor/c/README', 'vendor/d/LICENSE', 'notes.txt', 'CONTACT.txt', '@commit-message'})
+        self.assertEqual({(n['path'], n['blob'], n['package']) for n in report['thirdPartyNotices']}, notices)
 
     def test_ca_email_is_public_only_inside_a_pinned_trust_anchor_subject(self):
         # The real egress bundle: a Mozilla trust anchor's subject Name in the

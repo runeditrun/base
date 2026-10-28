@@ -137,6 +137,12 @@ regenerates the manifest, and its `--check` mode rejects a stale one. An
 alphabetic top-level domain label ends before a following digit, so a match
 ends at the DER string's boundary rather than absorbing the next tag byte.
 
+`third_party_notices.py` loads Base's listed licence texts and compares the Git
+blob ID of a licence-named file's complete bytes with them, computed from the
+bytes so untracked working files bind the same way. Only `hygiene.email` from
+that file's content becomes a `notice.third-party` entry in `thirdPartyNotices`;
+the path and every other rule are inspected as usual.
+
 `controller_metadata.py` recognizes the standalone controller review manifest by
 its exact four-field structure, immutable source revision, descriptor digest,
 relative directory list and path-to-SHA-256 file map, at any JSON path. Only

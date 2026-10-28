@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {closureClasses} from './tests/closure-cases.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -24,6 +25,23 @@ function ok(root, ...args) {
   return result.report;
 }
 const kinds = report => report.drift.map(item => `${item.kind} ${item.path}`).sort();
+
+// Include ignored owner files and directory modes when proving a refused refresh.
+function snapshotTree(root) {
+  const entries = {};
+  function visit(directory, prefix = '') {
+    for (const name of fs.readdirSync(directory).sort()) {
+      if (!prefix && name === '.git') continue;
+      const relative = prefix ? `${prefix}/${name}` : name;
+      const absolute = path.join(directory, name), stat = fs.lstatSync(absolute);
+      entries[relative] = {mode: stat.mode, ...(stat.isFile() ? {bytes: fs.readFileSync(absolute).toString('hex')} :
+        stat.isSymbolicLink() ? {link: fs.readlinkSync(absolute)} : {})};
+      if (stat.isDirectory()) visit(absolute, relative);
+    }
+  }
+  visit(root);
+  return entries;
+}
 
 function fixture(temp) {
   const base = path.join(temp, 'base'), seed = path.join(temp, 'seed');
@@ -259,6 +277,313 @@ test('refresh-base moves every copy to one Base commit and drops a legacy record
   } finally { fs.rmSync(temp, {recursive: true, force: true}); }
 });
 
+test('refresh-base checks read-only destinations before updating any copy and permits overwrites', () => {
+  for (const adding of [true, false]) {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-readonly-'));
+    let directory;
+    try {
+      const {base, seed, revision} = fixture(temp);
+      ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
+      ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
+      write(base, 'modules/sample/index.mjs', 'export const sample = 2;\n');
+      write(base, 'tools/helper.mjs', 'export const helper = "updated";\n');
+      if (adding) write(base, 'modules/sample/added.mjs', 'export const added = true;\n');
+      const next = commit(base);
+      directory = path.join(seed, 'vendor/sample');
+      fs.chmodSync(directory, 0o555);
+      const before = snapshotTree(seed);
+      const result = run(seed, 'refresh-base', next, '--base', base);
+      assert.equal(result.status, adding ? 1 : 0, result.error);
+      if (adding) {
+        assert.match(result.error, /vendor\/sample\/added\.mjs/);
+        assert.deepEqual(snapshotTree(seed), before, 'A later unwritable addition must preserve every earlier copy and the record');
+      } else {
+        assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/index.mjs'), 'utf8'), 'export const sample = 2;\n');
+        assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), 'export const helper = "updated";\n');
+        assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
+      }
+      assert.equal(fs.statSync(directory).mode & 0o777, 0o555);
+    } finally {
+      if (directory) fs.chmodSync(directory, 0o755);
+      fs.rmSync(temp, {recursive: true, force: true});
+    }
+  }
+});
+
+test('refresh-base closes authoring sibling imports while preserving edition-owned helpers', () => {
+  closureClasses({init, write, commit, git, run, ok, snapshotTree});
+  const mirror = 'export/scripts/base-cli/edition-authoring';
+  const cases = [
+    {name: 'singleton transitive imports'},
+    {name: 'runtime singleton imports', origin: 'foundation/runtime'},
+    {name: 'ordinary module imports', origin: 'modules/demo'},
+    {name: 'exported mirror root', origin: mirror},
+    {name: 'tracked custom helper', custom: 'tracked'},
+    {name: 'untracked custom helper', custom: 'untracked'},
+    {name: 'ignored custom helper', custom: 'ignored'},
+    {name: 'mirror-origin helper record', mirrorRecord: true},
+    {name: 'adapted root imports', adapted: true},
+    {name: 'removed recorded helper', removed: true},
+    {name: 'pre-existing partial bootstrap', bootstrap: true},
+    {name: 'adapted partial bootstrap', adapted: true, bootstrap: true},
+  ];
+  for (const row of cases) {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-authoring-'));
+    try {
+      const base = path.join(temp, 'base'), seed = path.join(temp, 'seed');
+      const origin = row.origin || 'edition-authoring';
+      const root = 'scripts/edition-authoring/refresh.mjs';
+      const helper = 'scripts/edition-authoring/helper.mjs';
+      const leaf = 'scripts/edition-authoring/leaf.mjs';
+      const incomingBytes = 'import {helper} from "./helper.mjs";\nexport const refresh = helper;\n';
+      const rootBytes = row.removed || row.bootstrap ? incomingBytes : 'export const refresh = "synthetic-base";\n';
+      const initialHelper = 'export const helper = true;\n';
+      const helperBytes = 'export {leaf as helper} from "./leaf.mjs";\n';
+      const leafBytes = 'export const leaf = "synthetic-base-leaf";\n';
+      const customBytes = 'import "./seed-private.mjs";\nexport const helper = "synthetic-edition-helper";\n';
+      init(base);
+      for (const directory of new Set([origin, ...(row.mirrorRecord ? [mirror] : [])])) {
+        write(base, `${directory}/refresh.mjs`, rootBytes);
+        write(base, `${directory}/helper.mjs`, initialHelper);
+        write(base, `${directory}/leaf.mjs`, leafBytes);
+        write(base, `${directory}/unrelated.mjs`, 'export const unrelated = "synthetic-unselected";\n');
+      }
+      write(base, 'tools/earlier.mjs', 'export const earlier = "synthetic-before";\n');
+      const revision = commit(base);
+      init(seed);
+      write(seed, root, rootBytes);
+      write(seed, 'aaa/earlier.mjs', 'export const earlier = "synthetic-before";\n');
+      write(seed, 'edition.json', JSON.stringify({components: [{id: 'runeditrun/base', role: 'foundation', source: {kind: 'local', origin: {repository: base, revision}}}]}));
+      if (row.custom === 'tracked') {
+        write(seed, helper, customBytes);
+        fs.chmodSync(path.join(seed, helper), 0o644);
+      }
+      commit(seed);
+      ok(seed, 'record-base', root, `${origin}/refresh.mjs`, revision, '--base', base);
+      ok(seed, 'record-base', 'aaa/earlier.mjs', 'tools/earlier.mjs', revision, '--base', base);
+      if ((row.mirrorRecord || row.removed || row.adapted) && !row.bootstrap) {
+        write(seed, helper, initialHelper);
+        ok(seed, 'record-base', helper, `${row.mirrorRecord ? mirror : origin}/helper.mjs`, revision, '--base', base);
+        git(seed, 'add', '--', helper);
+      }
+      if (row.removed) fs.rmSync(path.join(seed, helper));
+      if (row.custom && row.custom !== 'tracked') {
+        write(seed, helper, customBytes);
+        fs.chmodSync(path.join(seed, helper), 0o755);
+        if (row.custom === 'ignored') write(seed, '.gitignore', `${helper}\n`);
+      }
+      const adaptedBytes = 'import {helper} from "./helper.mjs";\nexport const refresh = `synthetic-adapted-${helper}`;\n';
+      if (row.adapted) {
+        write(seed, root, adaptedBytes);
+        ok(seed, 'adapt-base', root);
+      }
+      for (const directory of new Set([origin, ...(row.mirrorRecord ? [mirror] : [])])) write(base, `${directory}/helper.mjs`, helperBytes);
+      write(base, `${origin}/refresh.mjs`, `${incomingBytes}// synthetic incoming root\n`);
+      write(base, 'tools/earlier.mjs', 'export const earlier = "synthetic-after";\n');
+      const next = commit(base);
+      const before = snapshotTree(seed);
+      const result = run(seed, 'refresh-base', next, '--base', base);
+      if (row.removed || (row.custom && row.custom !== 'tracked')) {
+        assert.equal(result.status, 1, `${row.name}: ${result.error}`);
+        assert.ok(result.error.includes(helper), `${row.name}: refusal names the sibling`);
+        assert.deepEqual(snapshotTree(seed), before, `${row.name}: refusal preserves all bytes, modes and records`);
+        if (row.removed) {
+          assert.match(result.error, /restore|adapt/i);
+          git(seed, 'restore', '--', helper);
+          ok(seed, 'refresh-base', next, '--base', base);
+          assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
+          continue;
+        }
+        const recovery = `git add -f -- '${helper}'`;
+        assert.ok(result.error.includes(recovery), `${row.name}: refusal names runnable recovery ${recovery}`);
+        git(seed, 'add', '-f', '--', helper);
+        ok(seed, 'refresh-base', next, '--base', base);
+      } else assert.equal(result.status, 0, `${row.name}: ${result.error}`);
+      const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json'), 'utf8'));
+      const records = name => record.copies.filter(copy => Object.hasOwn(copy.files, name));
+      assert.equal(fs.readFileSync(path.join(seed, 'aaa/earlier.mjs'), 'utf8'), 'export const earlier = "synthetic-after";\n');
+      assert.equal(fs.readFileSync(path.join(seed, root), 'utf8'), row.adapted ? adaptedBytes : `${incomingBytes}// synthetic incoming root\n`);
+      assert.equal(fs.existsSync(path.join(seed, 'scripts/edition-authoring/unrelated.mjs')), false, row.name);
+      if (row.custom) {
+        assert.equal(fs.readFileSync(path.join(seed, helper), 'utf8'), customBytes, row.name);
+        assert.equal(fs.statSync(path.join(seed, helper)).mode & 0o777, row.custom === 'tracked' ? 0o644 : 0o755, row.name);
+        assert.deepEqual(records(helper), [], `${row.name}: custom helper remains edition owned`);
+        assert.equal(fs.existsSync(path.join(seed, leaf)), false, `${row.name}: custom helper imports are not traversed`);
+      } else {
+        for (const [name, bytes] of [[helper, helperBytes], [leaf, leafBytes]]) {
+          assert.equal(fs.readFileSync(path.join(seed, name), 'utf8'), bytes, row.name);
+          assert.equal(records(name).length, 1, `${row.name}: sibling recorded exactly once`);
+          const copy = records(name)[0];
+          assert.equal(copy.path, name, `${row.name}: sibling has singleton record`);
+          assert.equal(copy.originPath, `${row.mirrorRecord ? mirror : origin}/${path.basename(name)}`, row.name);
+          assert.equal(copy.revision, next, row.name);
+          assert.equal(copy.files[name], sha(bytes), row.name);
+        }
+      }
+      assert.equal(ok(seed, 'verify-base', '--base', base).ok, true, row.name);
+    } finally { fs.rmSync(temp, {recursive: true, force: true}); }
+  }
+  for (const row of ['named', 'default', 'type', 'declaration', 'declaration-target', 'type-declaration', 'generator', 'equal', 'equal-singleton', 'multi', 'star', 'unknown', 'baseline', 'mapped', 'extensionless', 'typescript-extensionless', 'withhold', 'withhold-last', 'witness', 'unplaceable']) {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-module-'));
+    try {
+      const {base, seed, revision: original} = fixture(temp);
+      let revision = original;
+      const typed = ['typescript-extensionless', 'type', 'type-declaration'].includes(row);
+      if (typed) {
+        for (const [root, prefix] of [[base, 'modules/sample'], [seed, 'vendor/sample']]) fs.renameSync(path.join(root, prefix, 'index.mjs'), path.join(root, prefix, 'index.ts'));
+        revision = commit(base);
+      }
+      const source = typed ? 'modules/sample/index.ts' : 'modules/sample/index.mjs';
+      const target = typed ? 'vendor/sample/index.ts' : 'vendor/sample/index.mjs';
+      ok(seed, 'record-base', ['mapped', 'extensionless', 'typescript-extensionless', 'equal-singleton'].includes(row) ? target : 'vendor/sample', ['mapped', 'extensionless', 'typescript-extensionless', 'equal-singleton'].includes(row) ? source : 'modules/sample', revision, '--base', base);
+      if (row.startsWith('equal')) {
+        ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
+        if (row === 'equal-singleton') ok(seed, 'record-base', 'vendor/sample/lib/util.mjs', 'modules/sample/lib/util.mjs', revision, '--base', base);
+        assert.equal(ok(seed, 'verify-base', '--base', base).ok, true, `${row}: original is verifiable`);
+      }
+      const specifier = ['extensionless', 'typescript-extensionless'].includes(row) ? './helper.server' : row === 'witness' || row === 'unplaceable' ? '../shared/helper.mjs' : './helper.mjs';
+      const imported = row === 'default' ? 'import missing from' : row === 'type' ? 'import type {Missing} from' : row === 'type-declaration' ? 'import type {missing} from' : 'import {missing} from';
+      const incoming = `${imported} "${specifier}?raw";\nexport const sample = 2;\n`;
+      write(base, ['extensionless', 'typescript-extensionless'].includes(row) ? 'modules/sample/helper.server.ts' : row === 'witness' || row === 'unplaceable' ? 'modules/shared/helper.mjs' : 'modules/sample/helper.mjs', 'export const missing = true;\n');
+      if (row === 'withhold' || row === 'withhold-last') {
+        write(base, 'modules/sample/new.mjs', 'import {missing} from "../shared/helper.mjs";\n');
+        write(base, 'modules/shared/helper.mjs', 'export const missing = true;\n');
+        if (row === 'withhold-last') for (const name of ['index.mjs', 'lib/util.mjs', 'helper.mjs', 'tests/sample.test.mjs']) fs.rmSync(path.join(base, 'modules/sample', name));
+      } else write(base, source, incoming);
+      if (row === 'witness') {
+        write(base, 'modules/shared/witness.mjs', 'export const witness = true;\n');
+        const witness = commit(base);
+        write(seed, 'vendor/shared/witness.mjs', 'export const witness = true;\n');
+        ok(seed, 'record-base', 'vendor/shared/witness.mjs', 'modules/shared/witness.mjs', witness, '--base', base);
+      }
+      if (!['withhold', 'withhold-last', 'witness', 'unplaceable', 'extensionless', 'typescript-extensionless'].includes(row)) {
+        write(seed, 'vendor/sample/helper.mjs', row === 'star' ? 'export * from "./leaf.mjs";\n' : row === 'generator' ? 'export function* missing(){yield 1;}\n' : row.startsWith('equal') ? 'export const missing = true;\n' : row === 'multi' ? 'export const first = 1, missing = 2;\n' : row === 'unknown' ? 'export * from "synthetic-package";\n' : 'export const custom = true;\n');
+        if (row === 'mapped') {
+          const bytes = 'export const missing = true;\n';
+          write(base, 'other/helper.mjs', bytes);
+          write(seed, 'vendor/sample/helper.mjs', bytes);
+          ok(seed, 'record-base', 'vendor/sample/helper.mjs', 'other/helper.mjs', commit(base), '--base', base);
+        }
+        if (row === 'star') write(seed, 'vendor/sample/leaf.mjs', 'export const missing = true;\n');
+        if (row === 'declaration' || row === 'type-declaration') write(seed, 'vendor/sample/helper.d.mts', 'export type missing = boolean;\n');
+        if (row === 'declaration-target') {
+          fs.rmSync(path.join(base, 'modules/sample/helper.mjs'));
+          write(base, 'modules/sample/helper.d.mts', 'export declare const missing: boolean;\n');
+          fs.rmSync(path.join(seed, 'vendor/sample/helper.mjs'));
+          write(seed, 'vendor/sample/helper.d.mts', 'export declare const missing: boolean;\n');
+        }
+        if (row === 'baseline') {
+          write(base, source, incoming);
+          const baseline = commit(base);
+          write(seed, target, incoming);
+          const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json')));
+          record.copies[0].revision = baseline;
+          record.copies[0].files[target] = sha(incoming);
+          write(seed, 'base-copies.json', JSON.stringify(record));
+          write(base, source, incoming.replace('?raw', '?changed'));
+        }
+        commit(seed);
+      }
+      if (row !== 'withhold-last') write(base, source, fs.readFileSync(path.join(base, source), 'utf8') + '// incoming revision\n');
+      const next = commit(base), before = snapshotTree(seed);
+      const result = run(seed, 'refresh-base', next, '--base', base);
+      const refused = ['named', 'default', 'type', 'declaration', 'declaration-target', 'unplaceable', 'withhold-last', 'extensionless'].includes(row);
+      assert.equal(result.status, refused ? 1 : 0, `${row}: ${result.error}`);
+      if (refused) assert.deepEqual(snapshotTree(seed), before, row);
+      else if (row === 'withhold') {
+        assert.equal(fs.existsSync(path.join(seed, 'vendor/sample/new.mjs')), false);
+        assert.ok(result.report.withheld.some(item => item.path === 'vendor/sample/new.mjs'));
+      } else if (row === 'typescript-extensionless') assert.ok(fs.existsSync(path.join(seed, 'vendor/sample/helper.server.ts')));
+      else if (row === 'witness') assert.ok(fs.existsSync(path.join(seed, 'vendor/shared/helper.mjs')));
+      else assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/helper.mjs'), 'utf8'), before['vendor/sample/helper.mjs'].bytes ? Buffer.from(before['vendor/sample/helper.mjs'].bytes, 'hex').toString() : '');
+      if (row.startsWith('equal')) assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
+    } finally { fs.rmSync(temp, {recursive: true, force: true}); }
+  }
+
+});
+
+test('refresh-base checks file and directory transitions after each plan removes its old files', () => {
+  const cases = [
+    {from: 'part.mjs', to: 'part.mjs/index.mjs'},
+    {from: 'part.mjs', to: 'part.mjs/deep/index.mjs'},
+    {from: 'nested/part.mjs', to: 'nested/part.mjs/index.mjs'},
+    {from: 'part/index.mjs', to: 'part', refuses: true},
+    {from: 'part/deep/index.mjs', to: 'part', refuses: true},
+    {from: 'part/index.mjs', to: 'part', removeDirectory: true},
+    {from: 'part.mjs', to: 'Part.mjs'},
+    {from: 'part/index.mjs', to: 'Part/index.mjs', directoryCase: true},
+    {from: 'part/a.mjs', to: 'Part/a.mjs', directoryCase: true, imports: true},
+  ];
+  for (const {from, to, refuses, removeDirectory, directoryCase, imports} of cases) {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-transition-'));
+    try {
+      const {base, seed} = fixture(temp);
+      git(base, 'config', 'core.ignorecase', 'false');
+      git(seed, 'config', 'core.ignorecase', 'false');
+      const oldBytes = imports ? 'import {b} from "./b.mjs"; export const a=b;\n' : '// old transition file\n';
+      const newBytes = imports ? 'import {b} from "./b.mjs"; export const a=b+1;\n' : '// new transition file\n';
+      write(base, `modules/sample/${from}`, oldBytes);
+      write(seed, `vendor/sample/${from}`, oldBytes);
+      if (imports) for (const [root, prefix] of [[base, 'modules/sample'], [seed, 'vendor/sample']]) write(root, `${prefix}/part/b.mjs`, 'export const b=1;\n');
+      const revision = commit(base);
+      commit(seed);
+      ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
+      ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
+      if (imports) {
+        git(base, 'mv', 'modules/sample/part', 'modules/sample/intermediate');
+        git(base, 'mv', 'modules/sample/intermediate', 'modules/sample/Part');
+      } else {
+      fs.rmSync(path.join(base, 'modules/sample', from));
+      git(base, 'rm', '--cached', '--', `modules/sample/${from}`);
+      // Git does not track the now-empty source directories.
+      if (from.includes('/')) fs.rmSync(path.join(base, 'modules/sample', from.split('/')[0]), {recursive: true});
+      }
+      write(base, `modules/sample/${to}`, newBytes);
+      write(base, 'tools/helper.mjs', '// updated earlier copy\n');
+      const next = commit(base);
+      if (removeDirectory) {
+        fs.rmSync(path.join(seed, 'vendor/sample/part'), {recursive: true});
+        git(seed, 'add', '-A');
+      }
+      const before = fs.readFileSync(path.join(seed, 'base-copies.json'));
+      const result = run(seed, 'refresh-base', next, '--base', base);
+      assert.equal(result.status, refuses ? 1 : 0, `${from} -> ${to}: ${result.error}`);
+      if (refuses) {
+        assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), before);
+        assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), 'export const helper = true;\n');
+        assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample', from), 'utf8'), '// old transition file\n');
+      } else {
+        assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample', to), 'utf8'), newBytes);
+        if (imports) execFileSync(process.execPath, [path.join(seed, 'vendor/sample', to)]);
+        if (from !== to && from.toLowerCase() === to.toLowerCase()) git(seed, 'rm', '--cached', '--', `vendor/sample/${from}`);
+        git(seed, 'add', '-A');
+        // On insensitive filesystems mkdir reuses the old directory spelling.
+        // Refresh supports that existing behavior; it does not rename directories.
+        if (!directoryCase) assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
+      }
+    } finally { fs.rmSync(temp, {recursive: true, force: true}); }
+  }
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-case-distinct-'));
+  try {
+    const {base, seed} = fixture(temporary);
+    write(base, 'modules/sample/part.txt', 'lower before\n');
+    if (!fs.existsSync(path.join(base, 'modules/sample/PART.txt'))) {
+      write(base, 'modules/sample/PART.txt', 'upper before\n');
+      const pin = commit(base);
+      write(seed, 'vendor/sample/part.txt', 'lower before\n');
+      write(seed, 'vendor/sample/PART.txt', 'upper before\n');
+      commit(seed);
+      ok(seed, 'record-base', 'vendor/sample', 'modules/sample', pin, '--base', base);
+      write(base, 'modules/sample/part.txt', 'lower after\n');
+      write(base, 'modules/sample/PART.txt', 'upper after\n');
+      ok(seed, 'refresh-base', commit(base), '--base', base);
+      assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/part.txt'), 'utf8'), 'lower after\n');
+      assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/PART.txt'), 'utf8'), 'upper after\n');
+    }
+  } finally { fs.rmSync(temporary, {recursive: true, force: true}); }
+
+});
+
 test('refresh-base refuses to rewrite an applied migration and leaves every file as it was', () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-migration-'));
   try {
@@ -279,6 +604,40 @@ test('refresh-base refuses to rewrite an applied migration and leaves every file
     assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/index.mjs'), 'utf8'), 'export const sample = 1;\n');
     assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
   } finally { fs.rmSync(temp, {recursive: true, force: true}); }
+  for (const row of ['consent', 'adapted', 'already', 'unknown', 'invalid']) {
+    const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-edition-migration-'));
+    try {
+      const {base, seed, revision} = fixture(temporary);
+      ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
+      write(base, 'modules/sample/index.mjs', 'export const sample = 2;\n');
+      write(base, 'modules/sample/pricing.mjs', 'export const pricing = true;\n');
+      const introduced = commit(base);
+      const steps = [{id: 'synthetic-contract', introduced, origin: 'modules/sample/index.mjs', guide: 'export/guide.md', edit: 'Add edition-owned pricing.', deliver: ['modules/sample/pricing.mjs']}];
+      write(base, 'foundation/edition-migrations.json', row === 'invalid' ? '{invalid' : JSON.stringify({schemaVersion: 1, migrations: steps}));
+      if (row === 'adapted') ok(seed, 'adapt-base', 'vendor/sample/index.mjs');
+      if (row === 'already') {
+        write(seed, 'vendor/sample/index.mjs', 'export const sample = 2;\n');
+        ok(seed, 'record-base', 'vendor/sample', 'modules/sample', introduced, '--base', base);
+      }
+      write(base, 'modules/sample/index.mjs', fs.readFileSync(path.join(base, 'modules/sample/index.mjs'), 'utf8') + '// incoming revision\n');
+      const next = commit(base), before = snapshotTree(seed);
+      const flags = row === 'unknown' ? ['--edition-migration', 'unknown'] : [];
+      const result = run(seed, 'refresh-base', next, '--base', base, ...flags);
+      const refused = !['adapted', 'already'].includes(row);
+      assert.equal(result.status, refused ? 1 : 0, `${row}: ${result.error}`);
+      if (refused) assert.deepEqual(snapshotTree(seed), before, row);
+      if (row === 'consent') {
+        const refreshed = ok(seed, 'refresh-base', next, '--base', base, '--edition-migration', steps[0].id);
+        assert.ok(refreshed.editionMigrations.some(step => step.id === steps[0].id));
+        assert.ok(fs.existsSync(path.join(seed, 'vendor/sample/pricing.mjs')));
+        const stable = snapshotTree(seed);
+        ok(seed, 'refresh-base', next, '--base', base);
+        assert.deepEqual(snapshotTree(seed), stable);
+      }
+      if (!refused) assert.deepEqual(result.report.editionMigrations, []);
+    } finally { fs.rmSync(temporary, {recursive: true, force: true}); }
+  }
+
 });
 
 test('record-base records each file mode and verify-base reports mode drift locally and against Base', () => {
@@ -478,20 +837,20 @@ test('declared Purse-shaped adaptations survive refresh while untouched copies a
   try {
     const {base, seed, revision} = fixture(temp);
     const adapted = ['.github/workflows/run-demo.yml', 'public/fonts/fonts.css', 'src/base/dispatch.ts', 'src/base/font-head.ts'];
-    for (const name of adapted) write(base, name, `Base original ${name}\n`);
-    write(base, 'src/base/untouched.ts', 'original untouched sibling\n');
+    for (const name of adapted) write(base, name, `// Base original ${name}\n`);
+    write(base, 'src/base/untouched.ts', '// original untouched sibling\n');
     const pinned = commit(base);
-    write(seed, 'src/base/untouched.ts', 'original untouched sibling\n');
+    write(seed, 'src/base/untouched.ts', '// original untouched sibling\n');
     for (const name of adapted) {
       write(seed, name, fs.readFileSync(path.join(base, name)));
     }
     for (const name of [adapted[0], adapted[1], 'src/base']) ok(seed, 'record-base', name, name, pinned, '--base', base);
-    for (const name of adapted) write(seed, name, `Seed adaptation ${name}\n`);
+    for (const name of adapted) write(seed, name, `// Seed adaptation ${name}\n`);
     ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base);
     ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
-    write(base, 'modules/sample/index.mjs', 'updated untouched copy\n');
+    write(base, 'modules/sample/index.mjs', '// updated untouched copy\n');
     write(base, adapted[0], 'changed upstream workflow\n');
-    write(base, 'src/base/untouched.ts', 'updated untouched sibling\n');
+    write(base, 'src/base/untouched.ts', '// updated untouched sibling\n');
     fs.rmSync(path.join(base, adapted[1]));
     fs.chmodSync(path.join(base, adapted[2]), 0o755);
     const next = commit(base);
@@ -507,21 +866,21 @@ test('declared Purse-shaped adaptations survive refresh while untouched copies a
     assert.equal(report.adapted.length, 4);
     assert.deepEqual(report.adapted.filter(item => item.conflict).map(item => item.path).sort(), adapted.slice(0, 3).sort());
     assert.ok(report.adapted.filter(item => item.conflict).every(item => item.diffHint.includes(next)));
-    for (const name of adapted) assert.equal(fs.readFileSync(path.join(seed, name), 'utf8'), `Seed adaptation ${name}\n`);
-    assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/index.mjs'), 'utf8'), 'updated untouched copy\n');
-    assert.equal(fs.readFileSync(path.join(seed, 'src/base/untouched.ts'), 'utf8'), 'updated untouched sibling\n');
+    for (const name of adapted) assert.equal(fs.readFileSync(path.join(seed, name), 'utf8'), `// Seed adaptation ${name}\n`);
+    assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/index.mjs'), 'utf8'), '// updated untouched copy\n');
+    assert.equal(fs.readFileSync(path.join(seed, 'src/base/untouched.ts'), 'utf8'), '// updated untouched sibling\n');
     assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
     assert.equal(ok(seed, 'verify-base', '--offline').ok, true);
     const refreshed = fs.readFileSync(path.join(seed, 'base-copies.json'));
     ok(seed, 'refresh-base', next, '--base', base);
     assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), refreshed);
-    for (const name of adapted) assert.equal(fs.readFileSync(path.join(seed, name), 'utf8'), `Seed adaptation ${name}\n`);
+    for (const name of adapted) assert.equal(fs.readFileSync(path.join(seed, name), 'utf8'), `// Seed adaptation ${name}\n`);
     // Re-recording after explicitly restoring current Base bytes returns to managed copies.
     const restored = adapted[3];
     fs.copyFileSync(path.join(base, restored), path.join(seed, restored));
     ok(seed, 'record-base', 'src/base', 'src/base', next, '--base', base);
     ok(seed, 'adapt-base', adapted[2]);
-    write(seed, restored, 'undeclared again\n');
+    write(seed, restored, '// undeclared again\n');
     assert.equal(run(seed, 'refresh-base', next, '--base', base).status, 1);
     assert.match(run(seed, 'adapt-base', 'src/app.mjs').error, /not a recorded/);
   } finally { fs.rmSync(temp, {recursive: true, force: true}); }
@@ -537,12 +896,12 @@ test('adaptations require renewed acknowledgement when local bytes or mode chang
     const record = ['--record', recordPath];
     ok(seed, 'record-base', 'vendor/sample', 'modules/sample', revision, '--base', base, ...record);
     ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base, ...record);
-    write(seed, name, 'acknowledged seed implementation\n');
+    write(seed, name, '// acknowledged seed implementation\n');
     ok(seed, 'adapt-base', name, ...record);
-    write(seed, name, 'later seed implementation\n');
-    write(base, 'modules/sample/index.mjs', 'upstream implementation changed\n');
-    write(base, 'modules/sample/lib/util.mjs', 'updated untouched sibling\n');
-    write(base, 'tools/helper.mjs', 'updated untouched copy\n');
+    write(seed, name, '// later seed implementation\n');
+    write(base, 'modules/sample/index.mjs', '// upstream implementation changed\n');
+    write(base, 'modules/sample/lib/util.mjs', '// updated untouched sibling\n');
+    write(base, 'tools/helper.mjs', '// updated untouched copy\n');
     const next = commit(base);
     const before = fs.readFileSync(recordFile);
     const refused = run(seed, 'refresh-base', next, '--base', base, ...record);
@@ -564,9 +923,9 @@ test('adaptations require renewed acknowledgement when local bytes or mode chang
     acknowledge();
     const refreshed = ok(seed, 'refresh-base', next, '--base', base, ...record);
     assert.equal(refreshed.adapted.find(item => item.path === name).conflict, true);
-    assert.equal(fs.readFileSync(path.join(seed, name), 'utf8'), 'later seed implementation\n');
-    assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/lib/util.mjs'), 'utf8'), 'updated untouched sibling\n');
-    assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), 'updated untouched copy\n');
+    assert.equal(fs.readFileSync(path.join(seed, name), 'utf8'), '// later seed implementation\n');
+    assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/lib/util.mjs'), 'utf8'), '// updated untouched sibling\n');
+    assert.equal(fs.readFileSync(path.join(seed, 'scripts/helper.mjs'), 'utf8'), '// updated untouched copy\n');
     assert.equal(ok(seed, 'verify-base', '--base', base, ...record).ok, true);
     const unchanged = fs.readFileSync(recordFile);
     ok(seed, 'refresh-base', next, '--base', base, ...record);

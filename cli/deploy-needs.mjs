@@ -21,12 +21,14 @@ export function deployGuide(declaration) {
  return value;
 }
 
+/** The account permissions an API token needs to deploy this declaration (the run site's /docs/hosting lists the same). */
+export const deployPermissions = declaration => permissions.filter(([, used]) => used(declaration)).map(([name]) => name);
+
 // Where a person gets the Cloudflare values: the project's guide, else the token page and the permissions.
 function credentialHelp(declaration) {
  const guide = deployGuide(declaration);
  if (guide) return [`Follow this project's deploy guide: ${guide}`];
- const needed = permissions.filter(([, used]) => used(declaration)).map(([name]) => name);
- return [`Create an account API token at ${tokenPage} with these account permissions: ${needed.join(', ')}. Copy your account ID from the Cloudflare dashboard.`];
+ return [`Create an account API token at ${tokenPage} with these account permissions: ${deployPermissions(declaration).join(', ')}. Copy your account ID from the Cloudflare dashboard.`];
 }
 
 export function missingCredentialsMessage(declaration, env, { dryRun = false, signIn } = {}) {

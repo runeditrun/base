@@ -9,11 +9,11 @@ import { trafficProxy } from './server-proxy.mjs';
 // for application URLs, cookies and sign-in links.
 // In door mode (`door`) the listener is 127.0.0.1 on a port the OS assigns,
 // and only the machine's front door reaches it.
-export async function runtimeFrontDoor({ host, port, activity, door, devKey, origin }) {
- const runtimePort = await runtimeLoopbackPort(port);
+export async function runtimeFrontDoor({ host, port, activity, door, devKey, origin, ownerEntry }) {
+ let runtimePort = await runtimeLoopbackPort(port);
  const observer = activity ?? { begin: () => () => {}, touch: () => {} };
- const proxy = await trafficProxy({ host, port, target: runtimePort, activity: observer, door, devKey, origin });
- return { ...proxy, runtimePort };
+ const proxy = await trafficProxy({ host, port, target: runtimePort, activity: observer, door, devKey, origin, ownerEntry });
+ return { ...proxy, get runtimePort(){return runtimePort;}, setRuntimePort(port){runtimePort=port;proxy.setTarget(port);} };
 }
 
 // The runtime binds this port strictly, seconds after it is chosen. A port the

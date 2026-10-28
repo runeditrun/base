@@ -1,11 +1,93 @@
 # Changelog
 
-## Unreleased
+## 0.2.85
 
-- Add signed runtime Business settings, same-origin logos, app accent fills, local overrides and owner-scoped team reconciliation. The reference seed adopts the module; owners can stop settings with fresh sign-in proof.
-- Validate preserving import adapters before every apply batch, including resumed work; refuse invalid preparation before its batch publishes and keep earlier admitted batches available to Undo without an unjournaled failure fence. Restore exact retained-value and complete catch-up undo report checks.
-- Keep demo Run exits out of the host layout; use spare label space, truncate the exit itself and reveal its full accessible link on keyboard focus without moving header controls.
-- Add seed-owned transactional audit hooks for native operator administration and direct installation export creation. Provider unlink audits require a new pin generation; already-unlinked requests keep HTTP 200 without another audit row. The export hook belongs to the direct `createPortability` service; the HTTP handler has no hook.
+- Two starters could both take over a stale local operation lock and both act as its owner. Takeover is now exclusive: the lock's inode stays pinned through takeover, and release checks the owner token.
+- A local app listening on a different port than the CLI assigned left `rer dev`, `rer preview` and test runs waiting about 15 minutes. Shared local runtimes now bind before reporting their port, a mismatched listener fails within seconds, and application health readiness is bounded to 60 seconds.
+- An import at the planner's accepted cap could fail part-way with `IMPORT_D1_REQUEST_LIMIT`. Each D1 batch call now counts as one paid-plan query, creation admission is shared with execution, existing erasure statement ceilings stay separate, and plan read pages are sized from their actual chunk bytes so the public door keeps room for its own queries. The canonical plan byte cap is unchanged.
+- Portability export of a wide table (very many or very long column names) failed on D1: its row-size preflight query exceeded D1's 100,000-byte statement limit. The measurement is now split into bounded column queries and summed per row before the unchanged size limit applies, and internal row guards stay out of column removal so valid schema changes keep SQLite semantics. Local D1 stand-ins on the pinned Node 22 runtime now enforce D1's limits on SQL bytes, parameters, function arguments, pattern bytes, bound values and encoded rows (native demo SQLite bindings use the same helper), so tests can fail for queries production would reject. Expression depth 100 is observed, not documented, and is checked with an estimated parser-tree depth proved against workerd at 100 and 101.
+- Run site deploy failures did not say which provider call failed or why. Human and JSON failures now name the failing provider step, sanitized endpoint, elapsed time, timeout limit and network cause or redacted HTTP refusal body, beside the existing deploy failure facts.
+- Hosted demo bundling refused "Secret declared as an image variable" for an empty Wrangler placeholder of a declared runtime secret. Container and native demo bundles now drop empty placeholders for declared runtime secrets, keep the runtime secret declarations and still refuse non-empty secret image values.
+- **Import the Platform data download natively.** The Managed data ZIP failed as a damaged archive. The reference adapter now opts into a bounded ZIP intake that stages the source in isolation, translates its Platform migration ledger and uses the existing empty-install restore; adapters opt in with `managedData: true` or wrap their native restore with `withManagedDataImport`. Malformed downloads, unknown source tables (even those row policy excludes) and occupied destinations are refused before destination data changes. Internal schema prefixes compare literally, indexes and triggers on excluded tables stay in archive accounting, trigger definitions import literally, retired schema objects reconcile against destination migrations, and dependent new-table backfills replay during native restore. The historical schema projection remains only for explicitly acknowledged v1 recovery.
+- The separate install-then-start recipe needed a PATH step, and frozen-lockfile install failures showed raw pnpm codes. The recipe now runs the installed launcher by its absolute path, and frozen-lockfile refusals give one plain cause and a runnable repair command, keeping pnpm codes and captured output in JSON.
+- A refused D1 import upload lost Cloudflare's HTTP status and body, so `rer deploy` could not explain it. D1 import init, upload, ingest and poll failures now keep redacted, bounded diagnostics (status, provider codes and messages, network cause) in human and JSON failures; the failure code and retry policy are unchanged.
+- Refused dependency downloads, invalid ports and checkout archive paths printed error classes and stacks. They now give a plain cause and a runnable next command and keep useful detail facts (command, status, output tail, log path); JSON output is unchanged.
+- After Business pairing the next step was unclear, and the owner's computer choices needed a reconnect. Business setup and local launch now lead with one plain next step, name `business next` after pairing, defer optional shell setup (`rer cli path`) until the app is ready, and show a shared cold-run budget with measured archive downloads and disk use; `business next` and `business run` apply the owner's latest choices without reconnecting.
+- Local first-party apps did not know the paired Business. Connect, setup and dev now carry its name and display settings into the checkout, running apps refresh while Business runs, and disconnect removes the local carry.
+- Contract `coverage check` counted the old Status summary table as lines to place, so a seed could not satisfy both it and the contract standard. Coverage now skips Status table lines except a clause row's non-empty Gap cell.
+- Release verification reported one fixed reason for every GitHub CLI failure, hiding causes such as a rate-limit 403. Unavailable verification receipts now include the gh exit status and bounded, redacted stderr, keeping the authentication guidance when stderr is empty.
+- `rer dev` and `rer demo` failed to load seed source folders named `exports`. Development now allows them while generated top-level export output and installation archives stay private.
+- Local worker requests could fail with "fetch failed" or `UND_ERR_SOCKET` after a server closed an idle socket. Loopback harness connections now close after each response; readiness, owner claims and seed runtime journeys share this transport, with no retries.
+- `rer deploy --dry-run` exited 3 without Cloudflare credentials although it is documented to validate locally. Dry runs now build and validate the local plan with no credentials or Cloudflare requests and print target, binding and migration names; remote readiness checks are left to a real deploy.
+- Version 2 backups without a schema object inventory could not be restored. Explicit `--acknowledge-unverified-schema-objects` recovers them into an empty installation with destination migration replay and every existing restore fence; completed receipts record the acknowledged schema uncertainty, and current archives restore without acknowledgment.
+- A fresh owner could not sign in to a local `rer preview`, and `rer demo` offered only its persona. Preview now prints a single-use native owner entry and demo adds one beside its persona, through the existing fragment gate and native owner grant; links expire within 15 minutes and are never saved.
+- First runs needed a shell PATH detour, led with machine lines and an unlabelled site URL, showed a fixed owner address without explanation, and timed every phase from the launch. The installer now prints a quoted absolute launch command, ready output leads with one plain app link and labels the site, the owner form explains the local account, and each launch phase is timed separately; machine ready output is unchanged.
+- The shared hosting guide listed its options in a different order from the Run chooser. It now follows the chooser: the one-line local run first, then Assisted, then Managed for a listing that offers it, then the do-it-yourself Cloudflare steps, with plan copy, sign-up state and links taken from the chooser.
+- Automatic `rer dev` port selection could exhaust its 1,000 candidates when stopped checkouts kept saved setup records. A saved setup port now excludes a candidate only while that checkout's launch worker or server still runs with its recorded start identity; live servers, active claims and bound sockets still exclude their ports, and an exhausted search still names its range and candidate count.
+- Publication scans rejected OpenAI noreply co-author trailers in commit messages. That provider's exact `noreply` address is now accepted in the final trailer paragraph, as the Anthropic and GitHub ones are; personal addresses, body text, other trailer keys, other or lookalike domains, files and annotated tags still fail.
+- Refresh refused with "fetch full Base history" when a shallow Base checkout lacked the ancestry its migration comparison needs. Online refresh now fetches just the two immutable comparison tips, with no tags and a 60-second transport deadline, into a temporary bare repository and leaves the supplied checkout unchanged; failed or offline acquisition refuses before any write and names both revisions, the Base remote and an exact one-line repair command.
+- Seed Verify ran the push shards in full for both a branch push and its pull request, ran every push shard again on each nightly schedule, and installed system browser libraries before trying Chromium. The delivered workflow now plans each run: it reuses the newest full push proof of an identical tree (the pull request's head push, the same commit on another branch, or a direct parent with the same tree), runs light coverage (the edition lock check, `pnpm run check`, the reviewed readers and the site build) when a branch push changes only contract documents, `sources.lock.json` or evidence on top of a push-verified parent, and otherwise runs in full. Schedules run only the nightly shards, on Monday and Thursday at a time rendered from the seed name; release tags still run every shard; and Chromium's system libraries are installed only after a failed launch probe.
+
+### Known issues
+
+- The two refresh recovery guidance issues documented in 0.2.82 still apply, with the same manual recoveries.
+- The delivered Verify template's runner-temporary pnpm store, Chromium and apt cache lifecycle is not yet exercised end to end on a GitHub Ubuntu 24.04 runner; Base Verify covers only Base's own bootstrap.
+
+## 0.2.84
+
+- The publication scan accepts the upstream copyright notice of a Base-listed third-party licence text only under an exact licence file name with the listed Git blob ID (initially the vendored yaml 2.9.1 `LICENSE`) and reports each in `thirdPartyNotices`; seed configuration cannot extend the list, and scans of the unpacked rer tarball and of refreshed seeds pass without review records.
+- Refresh resolves every runtime import form without declaration files, reads workflow run steps from a YAML AST, preserves equal-byte tracked siblings as edition-owned discovery exceptions, and keeps ordinary baseline-unresolved imports unresolved. Local package conditions are selected by Node itself, excluding types for runtime edges. JavaScript runtime paths follow Node's explicit-file rules; TypeScript source resolution is retained.
+- Parse those import edges and workflow files with Babel parser 7.29.8 (MIT) and yaml 2.9.1 (ISC), vendored unchanged in behaviour as portable ESM modules under `edition-authoring/vendor`, so refresh installs no parser package.
+- The edition-authoring tool includes its vendored YAML and JavaScript parsers with their licences: deploy-kit templates and the review-harness upgrade guide copy the whole `vendor/` directory, and the lock's toolchain identity covers it, so a copied tool's `lock` and `check` no longer fail on a missing `vendor/yaml/index.mjs`.
+- Fix the Verify template's unavailable job-level runner context, keep its pnpm store under the runner temporary directory, lint delivered workflows in Base Verify, and upgrade unchanged historical Verify templates and their helper closure during refresh.
+- Close every recorded code module over relative imports and declarations using existing copy namespaces, preserving seed-owned dependencies and pre-existing unresolved imports; withhold optional directory additions without a witnessed destination and refuse missing seed-owned bindings atomically.
+- Declare edition migrations `run-data-paths` and `run-data-pricing`; repeat `--edition-migration ID` to consent to refresh while leaving the documented edition-owned edits owed.
+- Check physical spelling before refresh writes or relies on a path; preserve unrecorded template aliases with a notice and refuse aliases on recorded paths and dependencies.
+- Discover workflow helpers across shell wrappers, quoted paths, command substitutions and interpreter options, using the caller's template namespace.
+- Pass the resolved demo Run exit from the CLI to Vite without loading adapters from copied demo modules, remove an empty authoring catch, and keep the Run guide link lint-clean.
+- Add the contract document generator `foundation/runtime/contract-docs.mjs`: `write` regenerates `ACCEPTANCE.md`, `docs/CLAIMS.md` and the Status summary rows from `CONTRACT.md`, `check` fails on stale outputs, and `convert`, `id-map` and `coverage` support structural contract rewrites. `BASELINE.md` adds shared conformance and agent access duties that seeds cite by Base id.
+
+### Known issues
+
+- The two refresh recovery guidance issues documented in 0.2.82 still apply, with the same manual recoveries.
+- The delivered Verify template's runner-temporary pnpm store, Chromium and apt cache lifecycle is not yet exercised end to end on a GitHub Ubuntu 24.04 runner; Base Verify covers only Base's own bootstrap.
+
+## 0.2.83
+
+- Point the shared Run chooser to Business pairing and keep one local launch recipe with optional alternatives tucked away.
+- Show Assisted at US$10/month and Managed at US$100/month, labelled early access, with global billing on the Run chooser.
+- Keep seed CI Chromium and apt caches under the runner temporary directory, prepare them before sudo, and require the apt helper cache directory to exist so it cannot create runner HOME directories as root.
+- Pin every seed workflow example to Ubuntu 24.04 so Ubuntu 26.04 adoption requires deliberate qualification.
+- Print setup refusal reasons from the command itself in reference-journey failure diagnostics, including refusals before a setup log is opened.
+
+### Known issues
+
+- The two refresh recovery guidance issues documented in 0.2.82 still apply, with the same manual recoveries. Use the manual recoveries below.
+
+## 0.2.82
+
+- Deliver the accepted import-door intake implementation and its runtime and type dependencies at `@runeditrun/rer/modules/import-kit/door`, preserving the D1 entry.
+- Close relative imports from every recorded authoring module, including mirror-origin copies and acknowledged local adaptations, and record newly delivered siblings. Preserve tracked unrecorded siblings without traversing them.
+- Preflight destination types, casing, ownership and effective permissions using filesystem metadata and access checks before writes, accounting for the plan's own removals; overwrites require writable files (and ownership when setting copy modes), while creates and removals require writable, searchable directories. Refuse untracked authoring helper collisions, including ignored files or matching Base bytes. Races, disk and I/O failures, new-directory umasks and two new case-distinct names on an insensitive volume remain outside these checks.
+- Check the packed door lifecycle and refresh pinned Pegboard, Pencil, Dial, Placemat and Envelope checkouts before package publication, resolving every direct authoring module's relative imports, running local and package verification and requiring byte-identical records on repeat.
+- To adopt with a copied authoring CLI predating 0.2.82, update the installed package and run `rer refresh-base --ref FULL_40_HEX_COMMIT --base /absolute/base-checkout` through that package.
+
+### Known issues
+
+- For a Base-equal untracked, ignored or excluded authoring helper, the suggested `git add -f` followed by refresh can leave `verify-base` reporting `unrecordedCopies`; from the seed root, run `node node_modules/@runeditrun/rer/edition-authoring/cli.mjs record-base LOCAL_PATH ORIGIN_PATH FULL_40_HEX_COMMIT --base /absolute/base-checkout`, then the same entry's `verify-base --base /absolute/base-checkout`. The manual recovery remains necessary.
+- On case-insensitive APFS, the suggested `mv -i` for a Base-equal committed `Copy-Checkout.mjs` can leave the old Git index spelling, so refresh succeeds but verification fails; move its `.refresh-backup` outside the checkout, run `git rm --cached -- PATH/Copy-Checkout.mjs` and `git add -- PATH/copy-checkout.mjs base-copies.json`, then verify again. This preserves both the backup and delivered bytes; the manual recovery remains necessary.
+
+## 0.2.81
+
+- Import RER Platform archives into native installations by migration hash, recording `rer_migrations` as the source ledger without restoring it as product data; expose `mapMigrationLedger` for custom archive adapters and name unapplied files in preflight refusals.
+- Project declared import intake fields before storing chunks, keeping excluded values such as Auth0 password hashes and Okta credentials and factors out of custody.
+- Validate preserving import adapters before every apply batch, including resumed work; retain earlier admitted batches for Undo when later preparation is refused.
+- Deliver the shared three-way Run chooser and hosting guide through Base refresh, with byte-exact Copy, listing-aware Assisted and Managed links, and commands that wrap under adopted seed themes.
+- Keep demo Run exits within available header space and reveal the full accessible link on keyboard focus without moving host controls.
+- Add transactional audit hooks for native operator administration and direct installation exports; audit provider unlink only for a new pin generation.
+- Apply signed runtime Business settings, same-origin logos, app accents, local overrides and owner-scoped team reconciliation; allow owners to stop settings with fresh sign-in proof.
+- Authorize explicit publisher project lists with version 2 signing anchors and an optional signing publisher, while retaining version 1 verification.
+- Simplify the shared Run invocation, show the public Roadmap without repository citations, and preserve retained runtime dependencies during Base copy refresh.
 
 ## 0.2.80
 

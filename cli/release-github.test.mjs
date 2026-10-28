@@ -56,6 +56,30 @@ test('rer release refuses absent, unsuccessful or untrusted GitHub evidence with
     assert.equal(result.status, 1, result.stdout);
     assert.match(receipt.gates.verify.details, reason);
   }
+  const token = ['gh', 'p_'].join('') + 'synthetic-base-1';
+  for (const [name, stderr, expected] of [
+    ['rate limit', 'HTTP 403: API rate limit exceeded', /HTTP 403: API rate limit exceeded/],
+    ['token redaction', token, /\[REDACTED\]/],
+    ['empty stderr', '', /Check gh authentication and repository access/],
+    ['header redaction', 'Authorization: Bearer synthetic-base-2', /\[REDACTED\]/],
+    ['bounded stderr', 'synthetic-base-3 '.repeat(1000), /synthetic-base-3/],
+  ]) await t.test(name, () => {
+    const { result, receipt } = f.invoke([], [], {}, { ghFailure: { status: 1, stderr } });
+    const gate = receipt.gates.verify;
+    assert.equal(result.status, 1);
+    assert.equal(receipt.status, 'BLOCKED');
+    assert.equal(gate.status, 'FAIL');
+    assert.equal(gate.reason, 'github-verify-unavailable');
+    assert.match(gate.details, /^gh exited with status 1: /);
+    assert.match(gate.details, expected);
+    assert.ok(gate.details.length <= 'gh exited with status 1: '.length + 8192);
+    assert.ok(!JSON.stringify(receipt).includes(token));
+    assert.ok(!gate.details.includes('synthetic-base-2'));
+    assert.equal(receipt.publicExport, null);
+    assert.equal(existsSync(f.env.BUILD_MARKER), false);
+    assert.equal(existsSync(f.env.VERIFY_MARKER), false);
+    if (name !== 'bounded stderr') t.diagnostic(JSON.stringify({ scenario: name, status: receipt.status, verify: gate }));
+  });
 });
 
 test('rer release accepts exact-SHA branch Verify despite a failed default-branch duplicate', async t => {

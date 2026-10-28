@@ -1,5 +1,9 @@
 # Run it locally
 
+<!-- BEGIN COLD RUN BUDGET -->
+Allow roughly 500 MB–1 GB of downloads and 1–3 GB of disk space for a first run, including Node, rer, the app and its dependencies. The app and your computer can need more; later runs reuse downloads.
+<!-- END COLD RUN BUDGET -->
+
 Start a published seed with one line:
 
 ```sh
@@ -16,10 +20,10 @@ contents arrive as a checkout needs them), so `git checkout <tag>` adopts an
 older release. To set up without starting, use
 `curl -fsSL https://runeditrun.com/install.sh | sh -s -- setup <owner/repo>`.
 It installs `rer` in `~/.local/bin` with its own Node and edits no shell
-profile: when `~/.local/bin` is not on PATH for new terminals, its install step
-ends with the one command that adds it for your shell (for zsh:
-`echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && export PATH="$HOME/.local/bin:$PATH"`);
-run it once. To start the seed again later, run `cd <repo> && rer dev` (the
+profile. Its absolute launcher works immediately. After opening your app,
+the optional `rer cli path` step explains how to make `rer` available in future
+terminals; only running the displayed shell line changes a startup file.
+To start the seed again later, run `cd <repo> && rer dev` (the
 folder is the repository name). `npm install -g @runeditrun/rer` is another way to
 install `rer`. The installer's Node stays private to `rer`: it puts no `node`,
 `npm` or `npx` on PATH. First-party commands fetch and verify

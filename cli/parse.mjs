@@ -3,7 +3,7 @@ import { authoringVerbs, commonFlags, serverDefaults, signinVerb, verbs } from '
 import { invalid, refuse } from './errors.mjs';
 import { isLoopbackHost } from '../modules/operator-auth/loopback.mjs';
 import { normalizeEmail } from '../modules/operator-auth/policy.mjs';
-const booleans = new Set(['--help', '--json', '--non-interactive', '--yes', '--dry-run', '--stop', '--detach', '--foreground', '--no-queue', '--login', '--legacy-v1', '--acknowledge-unverified-metadata', '--door', '--direct', '--site', '--remove', '--demo', '--offline']);
+const booleans = new Set(['--help', '--json', '--non-interactive', '--yes', '--dry-run', '--stop', '--detach', '--foreground', '--no-queue', '--login', '--legacy-v1', '--acknowledge-unverified-metadata', '--acknowledge-unverified-schema-objects', '--door', '--direct', '--site', '--remove', '--demo', '--offline']);
 export const mailbox = value => typeof value === 'string' && value.length <= 254 && /^[a-zA-Z0-9.!+_%\-]+@[a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)+$/.test(value);
 export const validOwnerName = value => typeof value === 'string' && Boolean(value.trim()) && value.length <= 200 && !/[\p{Cc}\p{Cf}]/u.test(value);
 // A loopback host: the shared predicate (including `*.localhost` door names),
@@ -40,7 +40,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
    throw invalid(`Unsupported flag ${/^--[a-zA-Z-]{1,40}$/.test(flag)?flag:'(invalid)'} for ${verb}.${suggestion?` Did you mean ${suggestion}?`:''} Run rer ${verb} --help.`);
   }
   // Several secrets change in one deploy: --set-secret A --set-secret B is --set-secret A,B.
-  const listed = ['--set-secret', '--unset-secret'].includes(flag);
+  const listed = ['--set-secret', '--unset-secret', '--edition-migration'].includes(flag);
   if (options.supplied.has(flag) && !listed) throw invalid(`Repeated flag ${flag} for ${verb}. Run rer ${verb} --help.`);
   options.supplied.add(flag);
   const key = flag.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
@@ -76,7 +76,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
   options.idleTimeout=Number(value);
  }
  if (options.port !== undefined) {
-  if (!/^\d+$/.test(options.port) || Number(options.port) < 1 || Number(options.port) > 65535) throw invalid('Port must be a decimal integer from 1 to 65535.');
+  if (!/^\d+$/.test(options.port) || Number(options.port) < 1 || Number(options.port) > 65535) throw Object.assign(invalid('Port must be a decimal integer from 1 to 65535.'), { humanMessage: `Port ${JSON.stringify(options.port)} is invalid. Use a port from 1 to 65535, for example: rer ${verb} --port 4800` });
   options.port = Number(options.port);
  }
  for(const key of ['httpPort','httpsPort'])if(options[key]!==undefined){if(!/^[0-9]+$/.test(options[key])||Number(options[key])<1||Number(options[key])>65535)throw invalid('Ingress port must be an integer from 1 to 65535.');options[key]=Number(options[key]);}

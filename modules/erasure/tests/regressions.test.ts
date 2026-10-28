@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions } from '../../container/adapters/d1-workerd.mjs';
 import { createErasure, defineErasure } from '../index.mjs';
 import { createPortability, sha256, canonicalJson } from '../../portability/index.mjs';
 import { archive, restore } from '../../portability/tests/helpers.mjs';

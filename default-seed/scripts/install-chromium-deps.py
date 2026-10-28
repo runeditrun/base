@@ -59,8 +59,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix='chromium-apt-') as temporary:
         work = Path(temporary)
         config = work / 'apt.conf'
-        archives = Path(os.environ['APT_ARCHIVES'])
-        archives.mkdir(parents=True, exist_ok=True)
+        # The caller prepares its cache outside HOME before sudo. Never create
+        # caller-owned parent directories as root (notably ~/.cache).
+        archives = Path(os.environ['APT_ARCHIVES']).resolve(strict=True)
+        if not archives.is_dir():
+            raise NotADirectoryError(archives)
+        print(f'Chromium apt: uid={os.geteuid()} HOME={Path.home()} '
+              f'archives={archives} owner={archives.stat().st_uid}', flush=True)
         base = (f'Dir::Cache::archives "{archives}";\n'
                 'APT::Keep-Downloaded-Packages "true";\n'
                 'APT::Update::Error-Mode "any";\nDPkg::Lock::Timeout "15";\n'

@@ -5,11 +5,16 @@ import { next, answer, token } from './questions.mjs';
 import { run } from './supervisor.mjs';
 import { describe } from './errors.mjs';
 
-const usage = `Usage: rer business VERB
+const usage = `Set up your business: rer business connect
+Business keeps your business name, logo and brand colour together for the apps
+that support shared Business settings. Choose what to share in your browser.
+
+Advanced commands (Usage: rer business VERB)
   scan [DIR...] [--json]          Names-only local discovery
   connect [--code CODE] [--origin URL]
                                  Pair this computer, waiting until the owner approves in the browser
                                  (up to the code's 10 minutes); run it again to resume
+                                 Connect carries the Business name into local apps
   run [--once]                   Work this computer's tasks: the folder scan the owner allows, then
                                  vendor exports into each app's import door (a preview the owner
                                  approves), catch-ups (applied within the owner's standing approval,

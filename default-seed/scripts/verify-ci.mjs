@@ -175,6 +175,22 @@ if (invokedDirectly()) {
   const output = `skip=${await lookupMainVerification()}\n`;
   if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, output);
   process.stdout.write(output);
+ } else if (mode === '--plan' && !tier) {
+  const { verificationPlan } = await import('./verify-app.mjs');
+  const { planVerification } = await import('./verify-plan.mjs');
+  const decision = await planVerification({ plan: await verificationPlan() });
+  const output = Object.entries({ ...decision, matrix: JSON.stringify(decision.matrix), readers: JSON.stringify(decision.readers), has_shards: decision.matrix.include.length > 0 })
+   .map(([key, value]) => `${key}=${value}\n`).join('');
+  if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, output);
+  process.stdout.write(output);
+ } else if (mode === '--light' && !tier) {
+  const { run } = await import('./verify-app.mjs');
+  const readers = JSON.parse(process.env.LIGHT_READERS);
+  if (!Array.isArray(readers) || readers.some(command => typeof command !== 'string')) throw Error('Invalid light readers');
+  run('node scripts/edition-authoring/cli.mjs check');
+  run('pnpm run check');
+  for (const command of readers) run(command);
+  run('pnpm run build --site');
  } else if (mode === '--check-workflows' && !tier) {
   const errors = await workflowPermissionErrors();
   for (const error of errors) console.error(error);
@@ -184,8 +200,8 @@ if (invokedDirectly()) {
   const { verificationPlan, run } = await import('./verify-app.mjs');
   const plan = await verificationPlan();
   if (mode === '--matrix') {
-   if (!['push', 'all'].includes(tier)) throw Error('Usage: verify-ci.mjs --matrix push|all');
-   const shards = tier === 'push' ? plan.push : [...plan.push, ...plan.nightly];
+   if (!['push', 'nightly', 'all'].includes(tier)) throw Error('Usage: verify-ci.mjs --matrix push|nightly|all');
+   const shards = tier === 'all' ? [...plan.push, ...plan.nightly] : plan[tier];
    console.log(JSON.stringify({ include: shards.map(({ name, browser }) => ({ name, browser })) }));
   } else {
    const shard = [...plan.push, ...plan.nightly].find(shard => shard.name === mode);

@@ -118,6 +118,11 @@ jobs:
             echo "$VERSION carries no development stamp."
           fi
 
+      - name: Check delivered release surfaces and fresh seed refresh
+        env:
+          TARBALL: ${{ steps.build.outputs.tarball }}
+        run: node scripts/rer-package/artifact.mjs "$TARBALL" --out "$DIST/artifact"
+
       - name: Publication and secret scan of the unpacked tarball
         env:
           TARBALL: ${{ steps.build.outputs.tarball }}
@@ -164,6 +169,7 @@ jobs:
             ${{ env.DIST }}/install.sh
             ${{ env.DIST }}/SHA256SUMS
             ${{ env.DIST }}/scan.json
+            ${{ env.DIST }}/artifact/**
 
       - name: Summary
         if: always()

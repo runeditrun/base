@@ -64,7 +64,7 @@ finally {
 if (reason) report = {
   schema: 'rer.publish-check/v3', status: 'INCOMPLETE', complete: false, source: null,
   findings: [{ rule: reason, path: '.', commit: null, scope: 'newly-public' }],
-  preExisting: [], warnings: [], fixtures: [], reviewed: [], info: [],
+  preExisting: [], warnings: [], fixtures: [], reviewed: [], info: [], thirdPartyNotices: [],
   history: { commits: 0, trees: 0, blobs: 0 },
   guarantees: { historyScanned: false, visualRecognition: false, environmentChecked: false },
 };

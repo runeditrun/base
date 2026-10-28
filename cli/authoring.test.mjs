@@ -26,7 +26,7 @@ async function fixture(t) {
  env.GIT_CONFIG_COUNT = '1'; env.GIT_CONFIG_KEY_0 = `url.${source}.insteadOf`; env.GIT_CONFIG_VALUE_0 = 'https://github.com/runeditrun/base.git';
  const run = (...args) => spawnSync(process.execPath, [path.join(pkg, 'global/rer.mjs'), ...args, '--cwd', seed, '--json'], {env, cwd: temp, encoding: 'utf8', timeout: 20000});
  const result = (...args) => { const r = run(...args); assert.equal(r.status, 0, r.stdout + r.stderr); return JSON.parse(r.stdout.trim().split('\n').at(-1)); };
- const old = (...args) => { const r = spawnSync(process.execPath, [path.join(pkg, 'edition-authoring/cli.mjs'), ...args], {env, cwd: seed, encoding: 'utf8'}); assert.equal(r.status, 0, r.stderr); return JSON.parse(r.stdout); };
+ const old = (...args) => { const r = spawnSync(process.execPath, [path.join(pkg, 'edition-authoring/cli.mjs'), ...args], {env, cwd: seed, encoding: 'utf8'}); assert.equal(r.status, 0, r.stdout + r.stderr); return JSON.parse(r.stdout); };
  write(seed, '.gitignore', 'node_modules/\n');
  write(seed, '.node-version', process.versions.node + '\n');
  write(seed, 'package.json', JSON.stringify({engines: {node: process.versions.node}, devDependencies: {'@runeditrun/rer': version}}));
@@ -44,7 +44,7 @@ async function fixture(t) {
  old('record-base', 'vendor', 'module', revision, '--base', source);
  old('record-base', 'one.mjs', 'singleton.mjs', revision, '--base', source);
  commit(seed);
- return {seed, source, revision, run, result, old};
+ return {seed, source, revision, run, result, old, env, pkg};
 }
 
 test('a package-pinned seed adopts authoring and refreshes through the packed public commands', async t => {
@@ -85,6 +85,28 @@ test('a package-pinned seed adopts authoring and refreshes through the packed pu
 });
 
 test('packed authoring preserves source and provenance on invalid adoption and refresh refusal', async t => {
+ {
+  const {seed, source, old, run} = await fixture(t);
+  const importer = 'src/modules/portability/http-errors.mjs', owned = 'src/modules/portability/import-lease.mjs';
+  write(source, 'modules/portability/http-errors.mjs', 'export const status = true;\n');
+  write(source, 'modules/portability/import-lease.mjs', 'export const importRunningMetadata = () => ({});\n');
+  write(seed, importer, 'export const status = true;\n');
+  write(seed, owned, 'export const seedOwned = true;\n');
+  old('record-base', importer, 'modules/portability/http-errors.mjs', commit(source), '--base', source);
+  commit(seed);
+  write(source, 'modules/portability/http-errors.mjs', "import {importRunningMetadata} from './import-lease.mjs';\nexport const status = importRunningMetadata;\n");
+  const record = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  const refused = run('refresh-base', '--ref', commit(source), '--base', source, '--offline');
+  assert.equal(refused.status, 4, refused.stdout + refused.stderr);
+  const error = refused.stdout.trim().split('\n').map(line => JSON.parse(line)).find(event => event.event === 'error');
+  assert.ok(error.message.includes(owned) && error.message.includes('importRunningMetadata'), error.message);
+  assert.match(error.message, /git -C .* show .* > .*import-lease\.mjs\.base/);
+  assert.doesNotMatch(refused.stdout + refused.stderr, /\n\s+at |SyntaxError:/);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
+  assert.equal(fs.readFileSync(path.join(seed, owned), 'utf8'), 'export const seedOwned = true;\n');
+  assert.equal(fs.readFileSync(path.join(seed, importer), 'utf8'), 'export const status = true;\n');
+  t.diagnostic(`missing seed-owned export: exit ${refused.status}; ${error.message}`);
+ }
  const {seed, source, revision, run, result, old} = await fixture(t);
  const recordPath = path.join(seed, 'base-copies.json'), record = fs.readFileSync(recordPath), singleton = fs.readFileSync(path.join(seed, 'one.mjs'));
  for (const verb of ['adopt-edition', 'refresh-base']) assert.equal(run(verb, '--help').status, 0);
@@ -111,4 +133,237 @@ test('packed authoring preserves source and provenance on invalid adoption and r
  const recipe = fs.readFileSync(path.join(seed, 'edition.json'));
  assert.equal(run('adopt-edition').status, 4);
  assert.deepEqual(fs.readFileSync(path.join(seed, 'edition.json')), recipe);
+ for (const acquisition of ['automatic', 'checkout', 'offline']) {
+  const {seed, source, old, pkg, env} = await fixture(t);
+  write(source, 'singleton.mjs', 'export const singleton = "migration";\n');
+  const introduced = commit(source);
+  write(source, 'foundation/edition-migrations.json', JSON.stringify({schemaVersion: 1, migrations: [{id: 'fixture-edit', introduced, origin: 'singleton.mjs', deliver: [], guide: 'export/guide.md', edit: 'Review edition data.'}]}));
+  const next = commit(source);
+  const flags = acquisition === 'automatic' ? [] : ['--base', source, ...(acquisition === 'offline' ? ['--offline'] : [])];
+  const before = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  const refused = spawnSync(process.execPath, [path.join(pkg, 'edition-authoring/cli.mjs'), 'refresh-base', next, ...flags], {cwd: seed, env, encoding: 'utf8'});
+  assert.equal(refused.status, 1, refused.stderr);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), before);
+  const command = refused.stderr.match(/repeat exactly: (.+)/)?.[1];
+  assert.ok(command, acquisition);
+  const recovered = spawnSync('bash', ['-c', command], {cwd: seed, env, encoding: 'utf8'});
+  assert.equal(recovered.status, 0, recovered.stderr);
+  assert.equal(old('verify-base', '--base', source).ok, true);
+ }
+});
+
+test('packed refresh delivers and adopts templates with their helpers atomically', async t => {
+ const {seed, source, old, result, run} = await fixture(t);
+ const workflow = '.github/workflows/custom.yml';
+ for (const origin of ['export/custom.yml', 'default-seed/.github/workflows/custom.yml']) {
+  write(source, origin, 'jobs:\n  check:\n    steps:\n      - run: echo before\n');
+  const pin = commit(source);
+  write(seed, workflow, fs.readFileSync(path.join(source, origin)));
+  old('record-base', workflow, origin, pin, '--base', source);
+  commit(seed);
+  // Neither helper name is special to the implementation. Cache-only and
+  // commented script names must not become dependencies.
+  write(source, origin, 'jobs:\n  check:\n    steps:\n      - run: |\n          # python3 scripts/comment.py\n          sudo env X=yes python3 scripts/new-helper.py\n          node scripts/another-helper.mjs\n          env -u X node scripts/env.mjs\n          node ./bare-helper.mjs\n          sudo -u nobody node scripts/sudo.mjs\n          node --import scripts/bootstrap.mjs scripts/entry.mjs\n          node \"scripts/with space.mjs\"\n          bash -c \'node scripts/shell.mjs\'\n          echo $(node scripts/substitution.mjs)\n          echo scripts/not-invoked.py\n      - uses: actions/cache@v4\n        with:\n          path: scripts/cache-only.py\n');
+  write(source, 'default-seed/scripts/new-helper.py', 'print("workflow helper")\n');
+  write(source, 'export/bare-helper.mjs', 'export const bare = true;\n');
+  write(source, 'default-seed/bare-helper.mjs', 'export const bare = true;\n');
+  write(source, 'export/new-helper.py', 'print("workflow helper")\n');
+  write(source, 'default-seed/scripts/another-helper.mjs', 'console.log("second helper");\n');
+  for (const name of ['env', 'sudo', 'bootstrap', 'entry', 'with space', 'shell', 'substitution']) {
+   for (const prefix of ['export', 'default-seed/scripts']) write(source, `${prefix}/${name}.mjs`, 'export {leaf} from \"./leaf.mjs\";\n');
+  }
+  for (const prefix of ['export', 'default-seed/scripts']) write(source, `${prefix}/leaf.mjs`, 'export const leaf = true;\n');
+  const next = commit(source);
+  const before = fs.readFileSync(path.join(seed, workflow)), record = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  write(seed, 'scripts/new-helper.py', 'print("workflow helper")\n');
+  assert.equal(run('refresh-base', '--ref', next, '--base', source).status, 4, 'untracked equality cannot transfer ownership');
+  assert.deepEqual(fs.readFileSync(path.join(seed, workflow)), before);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
+  fs.rmSync(path.join(seed, 'scripts/new-helper.py'));
+  execFileSync('mkfifo', [path.join(seed, 'scripts/new-helper.py')]);
+  assert.equal(run('refresh-base', '--ref', next, '--base', source).status, 4);
+  assert.deepEqual(fs.readFileSync(path.join(seed, workflow)), before);
+  fs.rmSync(path.join(seed, 'scripts/new-helper.py'));
+  result('refresh-base', '--ref', next, '--base', source);
+  assert.ok(fs.existsSync(path.join(seed, 'bare-helper.mjs')));
+  for (const name of ['new-helper.py', 'another-helper.mjs']) assert.ok(fs.existsSync(path.join(seed, 'scripts', name)));
+  for (const name of ['env', 'sudo', 'bootstrap', 'entry', 'with space', 'shell', 'substitution', 'leaf']) assert.ok(fs.existsSync(path.join(seed, `scripts/${name}.mjs`)));
+  assert.equal(old('verify-base', '--base', source).ok, true);
+  const after = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  result('refresh-base', '--ref', next, '--base', source, '--offline');
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
+  // Remove this iteration's helper records to exercise both origin layouts.
+  const copies = JSON.parse(after); copies.copies = copies.copies.filter(copy => !copy.path.startsWith('scripts/') && copy.path !== 'bare-helper.mjs');
+  write(seed, 'base-copies.json', JSON.stringify(copies));
+  fs.rmSync(path.join(seed, 'scripts'), {recursive: true});
+  fs.rmSync(path.join(seed, 'bare-helper.mjs'));
+  git(seed, 'add', '-A');
+ }
+
+ for (const [origin, scalar, helper = 'export/literal-helper.mjs', destination = 'scripts/literal-helper.mjs', owned = false] of [
+  ['default-seed/.github/workflows/literal.yml', 'node scripts/literal-helper.mjs'],
+  ['export/literal.yml', '"bash -c \'node scripts/literal-helper.mjs\'"'],
+  ['export/literal.yml', '|2\n          node scripts/literal-helper.mjs'],
+  ['default-seed/.github/workflows/literal.yml', 'node scripts/literal-helper.mjs', 'literal-helper.mjs'],
+  ['export/literal.yml', 'node scripts/literal\\ helper.mjs', 'export/literal helper.mjs', 'scripts/literal helper.mjs'],
+  ['export/literal.yml', 'node\n          scripts/literal-helper.mjs'],
+  ['export/literal.yml', 'curl --doh-url https://cloudflare-dns.com/dns-query; node scripts/literal-helper.mjs'],
+  ['export/literal.yml', '>2-\n          node scripts/literal-helper.mjs'],
+  ['export/literal.yml', '\'node "scripts/literal-helper.mjs"\''],
+  ['export/literal.yml', '"node scripts/literal-helper.mjs"', 'export/literal-helper.mjs', 'scripts/literal-helper.mjs', true],
+ ]) {
+  const {seed, source, old, result} = await fixture(t);
+  const target = '.github/workflows/literal.yml';
+  write(source, origin, 'jobs:\n  check:\n    steps:\n      - run: echo before\n');
+  const pin = commit(source);
+  write(seed, target, fs.readFileSync(path.join(source, origin)));
+  if (!owned) old('record-base', target, origin, pin, '--base', source);
+  commit(seed);
+  write(source, origin, `jobs:\n  check:\n    steps:\n      - run: ${scalar}\n`);
+  write(source, helper, 'export const helper = true;\n');
+  const next = commit(source);
+  if (owned) { write(seed, target, fs.readFileSync(path.join(source, origin), 'utf8') + '# Edition-owned workflow\n'); commit(seed); }
+  result('refresh-base', '--ref', next, '--base', source);
+  assert.equal(fs.readFileSync(path.join(seed, destination), 'utf8'), 'export const helper = true;\n');
+  const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json')));
+  assert.equal(record.copies.filter(copy => Object.hasOwn(copy.files, destination)).length, 1);
+  assert.equal(old('verify-base', '--base', source).ok, true);
+ }
+
+
+ for (const historyRoot of ['export', 'default-seed']) {
+ for (const ownership of ['tracked', 'diverged', 'untracked', 'ignored', 'adapted']) {
+  const {seed, source, old, result} = await fixture(t);
+  const workflow = '.github/workflows/verify.yml', guide = 'VERIFY-WORKFLOW.md';
+  const historical = 'jobs:\n  check:\n    runs-on: ubuntu-24.04\n    env:\n      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright\n    steps:\n      - run: echo old\n';
+  const origin = historyRoot === 'export' ? 'export/verify.yml' : 'default-seed/' + workflow;
+  const guideOrigin = historyRoot + '/' + guide;
+  write(source, origin, historical);
+  write(source, guideOrigin, 'Historical workflow guide with enough bytes.\n');
+  const pin = commit(source);
+  for (const [target, sourcePath] of [[workflow, origin], [guide, guideOrigin]]) write(seed, target, fs.readFileSync(path.join(source, sourcePath)));
+  if (ownership === 'diverged') write(seed, workflow, historical + '# product adaptation\n');
+  if (ownership === 'ignored') write(seed, '.gitignore', 'node_modules/\n.github/\nVERIFY-WORKFLOW.md\n');
+  if (['tracked', 'diverged', 'adapted'].includes(ownership)) commit(seed);
+  if (ownership === 'adapted') {
+   old('record-base', workflow, origin, pin, '--base', source);
+   old('adapt-base', workflow);
+  }
+  const before = fs.readFileSync(path.join(seed, workflow));
+  const current = 'jobs:\n  check:\n    runs-on: ubuntu-24.04\n    steps:\n      - run: python3 scripts/future-helper.py\n';
+  write(source, 'export/verify.yml', current);
+  write(source, 'export/VERIFY-WORKFLOW.md', 'Current workflow guide with enough bytes.\n');
+  write(source, 'export/future-helper.py', 'print("new dependency")\n');
+  const next = commit(source);
+  const refreshed = result('refresh-base', '--ref', next, '--base', source);
+  if (ownership === 'tracked') {
+   assert.equal(fs.readFileSync(path.join(seed, workflow), 'utf8'), current);
+   assert.equal(refreshed.templateAdoptions.find(item => item.path === workflow).from, pin);
+   assert.equal(fs.readFileSync(path.join(seed, guide), 'utf8'), 'Current workflow guide with enough bytes.\n');
+   assert.ok(fs.existsSync(path.join(seed, 'scripts/future-helper.py')));
+  } else {
+   assert.deepEqual(fs.readFileSync(path.join(seed, workflow)), before);
+   assert.equal(refreshed.notices.length, 1);
+   assert.ok(refreshed.notices[0].includes(workflow));
+   const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json'), 'utf8'));
+   assert.equal(record.copies.some(copy => Object.hasOwn(copy.files, workflow) && !copy.adapted?.[workflow]), false);
+   assert.equal(fs.existsSync(path.join(seed, 'scripts/future-helper.py')), false);
+  }
+  const after = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  result('refresh-base', '--ref', next, '--base', source, '--offline');
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
+ }
+ }
+ for (const alias of ['adoption', 'recorded', 'helper', 'namespace']) {
+  const {seed, source, old, result, run} = await fixture(t);
+  const workflow = '.github/workflows/verify.yml';
+  const original = 'jobs:\n  check:\n    steps:\n      - run: node scripts/helper.mjs\n';
+  write(source, 'export/verify.yml', original);
+  write(source, 'export/helper.mjs', 'export const helper = true;\n');
+  write(source, '.github/workflows/verify.yml', 'root CI must never ship\n');
+  const pin = commit(source);
+  old('record-base', 'vendor', 'module', pin, '--base', source);
+  old('record-base', 'one.mjs', 'singleton.mjs', pin, '--base', source);
+  if (alias === 'namespace') {
+   write(source, 'export/caller.yml', 'jobs:\n  check:\n    uses: ./.github/workflows/verify.yml\n  paths:\n    runs-on: ubuntu-24.04\n    steps:\n      - run: echo scripts/.github/workflows/verify.yml\n');
+   const next = commit(source);
+   write(seed, '.github/workflows/caller.yml', fs.readFileSync(path.join(source, 'export/caller.yml')));
+   old('record-base', '.github/workflows/caller.yml', 'export/caller.yml', next, '--base', source);
+   result('refresh-base', '--ref', next, '--base', source);
+   assert.equal(fs.readFileSync(path.join(seed, workflow), 'utf8'), original);
+   assert.equal(fs.existsSync(path.join(seed, 'scripts/.github/workflows/verify.yml')), false);
+   continue;
+  }
+  write(seed, workflow, original);
+  if (alias === 'helper') write(seed, 'scripts/helper.mjs', 'export const helper = "seed-owned";\n');
+  commit(seed);
+  if (alias !== 'adoption') old('record-base', workflow, 'export/verify.yml', pin, '--base', source);
+  const target = alias === 'helper' ? 'scripts/helper.mjs' : workflow;
+  const renamed = path.join(path.dirname(target), path.basename(target).toUpperCase());
+  fs.renameSync(path.join(seed, target), path.join(seed, target + '.middle'));
+  fs.renameSync(path.join(seed, target + '.middle'), path.join(seed, renamed));
+  if (!fs.existsSync(path.join(seed, target))) continue; // Case-sensitive volume.
+  const before = fs.readFileSync(path.join(seed, renamed)), record = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  const refreshed = run('refresh-base', '--ref', pin, '--base', source);
+  assert.equal(refreshed.status, alias === 'adoption' ? 0 : 4, refreshed.stdout + refreshed.stderr);
+  assert.deepEqual(fs.readFileSync(path.join(seed, renamed)), before);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
+  if (alias === 'adoption') assert.equal(JSON.parse(refreshed.stdout.trim().split('\n').at(-1)).notices.length, 1);
+ }
+
+});
+
+test('packed refresh fetches missing Base ancestry and refuses unreachable or offline history without writes', async t => {
+ for (const mode of ['online', 'unreachable', 'offline']) {
+  const {seed, source, revision, run, old, env} = await fixture(t);
+  write(source, 'singleton.mjs', 'export const singleton = "synthetic-base-1";\n');
+  const introduced = commit(source);
+  write(source, 'foundation/edition-migrations.json', JSON.stringify({schemaVersion: 1, migrations: [{
+   id: 'synthetic-base-1', introduced, origin: 'singleton.mjs', deliver: [], guide: 'guide.md', edit: 'Review synthetic Base data.',
+  }]}));
+  const next = commit(source);
+  const remote = source + '-remote.git', shallow = source + '-shallow.git';
+  git(source, 'clone', '--bare', '--', source, remote);
+  git(source, 'clone', '--bare', '--depth=1', '--', 'file://' + remote, shallow);
+  git(shallow, 'fetch', '--depth=1', '--no-tags', 'origin', revision, introduced);
+  assert.equal(git(shallow, 'rev-parse', '--is-shallow-repository'), 'true');
+  assert.equal(spawnSync('git', ['-C', shallow, 'merge-base', next, introduced]).status, 1);
+  fs.rmSync(source, {recursive: true});
+  const before = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  const singleton = fs.readFileSync(path.join(seed, 'one.mjs'));
+  if (mode === 'unreachable') fs.renameSync(remote, remote + '-unreachable');
+  // An offline attempt must not even try to contact the existing remote.
+  const trace = path.join(seed, 'git-trace.json');
+  env.GIT_TRACE2_EVENT = trace;
+  env.TMPDIR = path.dirname(seed);
+  const refreshed = run('refresh-base', '--ref', next, '--base', shallow, '--edition-migration', 'synthetic-base-1',
+   ...(mode === 'offline' ? ['--offline'] : []));
+  const traceText = fs.readFileSync(trace, 'utf8');
+  if (mode === 'online') {
+   assert.equal(refreshed.status, 0, refreshed.stdout + refreshed.stderr);
+   assert.equal(JSON.parse(refreshed.stdout.trim().split('\n').at(-1)).refreshed, next);
+   assert.equal(fs.readFileSync(path.join(seed, 'one.mjs'), 'utf8'), 'export const singleton = "synthetic-base-1";\n');
+   assert.ok(traceText.includes('"fetch","--no-tags","--no-recurse-submodules","--","file://' + remote + '","' + next + '","' + introduced + '"'));
+   assert.equal(old('verify-base', '--base', shallow).ok, true);
+   t.diagnostic('missing ancestry: exit 0; exact revisions fetched from local bare remote; copy refreshed');
+  } else {
+   assert.equal(refreshed.status, 4, refreshed.stdout + refreshed.stderr);
+   const error = JSON.parse(refreshed.stdout.trim().split('\n').find(line => JSON.parse(line).event === 'error')).message;
+   assert.ok(error.includes(next) && error.includes(introduced) && error.includes('file://' + remote), error);
+   assert.ok(error.includes('git init --bare') && error.includes('fetch --no-tags --no-recurse-submodules --'), error);
+   assert.ok(!error.includes('fetch full Base history'), error);
+   t.diagnostic(error);
+   assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), before);
+   assert.deepEqual(fs.readFileSync(path.join(seed, 'one.mjs')), singleton);
+   if (mode === 'offline') assert.ok(!traceText.includes('"fetch"') && !traceText.includes('upload-pack'), traceText);
+   else {
+    fs.renameSync(remote + '-unreachable', remote);
+    const command = error.match(/When online, run exactly:\n(.+)/)?.[1];
+    assert.ok(command, error);
+    const repaired = spawnSync('bash', ['-c', command], {cwd: seed, env, encoding: 'utf8'});
+    assert.equal(repaired.status, 0, repaired.stdout + repaired.stderr);
+   }
+   t.diagnostic(mode + ': exit 4; revisions, remote and executable repair named; record and copy unchanged');
+  }
+ }
 });

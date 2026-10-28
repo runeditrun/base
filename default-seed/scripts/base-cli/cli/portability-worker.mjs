@@ -1,8 +1,10 @@
+import { installD1Preflight } from '../modules/container/adapters/d1-workerd-setup.mjs';
 import { portabilityPlan, ensurePortabilitySchema } from '../modules/container/portability-schema.mjs';
 import { exportArchive, importArchive, fileRecords } from '../modules/portability/files.mjs';
 import { readLegacyArchive } from '../modules/portability/format.mjs';
 import { recoverLegacyArchive } from '../modules/portability/legacy-files.mjs';
-import { legacyTargetState, requireLegacyEmpty } from '../modules/portability/legacy-safety.mjs';
+import { requireEmptyTables } from '../modules/portability/restore-empty.mjs';
+import { legacyTargetState, requireLegacyEmpty, requireProductEmpty } from '../modules/portability/legacy-safety.mjs';
 import { migrationReplay } from '../modules/portability/migration-history.mjs';
 import { join } from 'node:path';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -25,7 +27,7 @@ async function dataConfiguration(root) {
  return path;
 }
 
-async function run(direction, { root, path, journal, binding, buckets, policy, policyModule, transient, legacyRecovery, platformMigrations }) {
+async function run(direction, { root, path, journal, binding, buckets, policy, policyModule, transient, legacyRecovery, acknowledgeUnverifiedSchemaObjects, platformMigrations }) {
  // Lines for the person go to the CLI over IPC, which prints them as the command's progress.
  const progress = transferProgress(line => process.send({ progress: line }));
  if (!legacyRecovery && ['export', 'import'].includes(direction)) progress({ phase: 'start', direction, bytes: direction === 'export' ? await stateBytes(join(root, '.wrangler/state')) : (await stat(path)).size });
@@ -35,10 +37,13 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
   for await (const record of fileRecords(path,legacyRecovery?readLegacyArchive:readArchive)) {}
   if(journal)for await(const record of fileRecords(journal)) {}
  }
- policy = await loadPolicy(root, policy, policyModule);
+ const inputPolicy = policy;
+ policy = await loadPolicy(root, inputPolicy, policyModule);
  const declaration=platformMigrationDeclaration(platformMigrations);
  if (direction === 'policy-preflight') return { checkedPolicy: true };
- const { getPlatformProxy, unstable_splitSqlQuery } = createRequire(join(root, 'package.json'))('wrangler');
+ const require = createRequire(join(root, 'package.json'));
+ const { getPlatformProxy, unstable_splitSqlQuery } = require('wrangler');
+ installD1Preflight(createRequire(require.resolve('wrangler/package.json'))('miniflare').D1_PLUGIN);
 
  // Unlike Wrangler's --persist-to base, the API takes the versioned directory.
  const configPath = await dataConfiguration(root);
@@ -47,19 +52,23 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
   proxy = await getPlatformProxy({ configPath, persist: { path: join(root, '.wrangler/state/v3') }, remoteBindings: false });
   if(direction==='migration-preflight')return await nativeMigrationPreflight({root,db:proxy.env[binding],binding,platformMigrations});
   const migrations=async()=>migrationReplay(await appliedMigrations(root,proxy.env[binding],binding,declaration,unstable_splitSqlQuery),policy,declaration);
-  const options={ db: proxy.env[binding], buckets: Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]])), policy, migrations };
+  const boundBuckets = Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]]));
+  policy = await loadPolicy(root, inputPolicy, policyModule, { db: proxy.env[binding], buckets: boundBuckets });
+  const options={ db: proxy.env[binding], buckets: boundBuckets, policy, migrations };
+  if(direction==='schema-recovery-preflight') { await requireProductEmpty(options);return {checkedEmpty:true}; }
   if(direction==='legacy-preflight') {
    await requireLegacyEmpty(options,await legacyTargetState(options.db,options.migrations));
    return {checkedEmpty:true};
   }
   await ensurePortabilitySchema(proxy.env[binding], await portabilityPlan(unstable_splitSqlQuery));
   if(legacyRecovery)return await recoverLegacyArchive(options,path,legacyRecovery.output,transient,legacyRecovery.acknowledged);
+  if (direction === 'import') await requireEmptyTables(options);
   const service = await createPortability(options);
   // This checkout's operation lock means no other import can be running. Abort
   // the recorded abandoned job, dropping only its exact staging copies and
   // sidecars before the replacement import creates its own scratch tables.
   if (direction === 'import' && await service.imports.abortAbandoned()) process.send({ progress: 'Cleaned up an unfinished earlier import: a restore that stopped part-way left its staged data here. Its staging is removed and this import starts from the beginning.' });
-  return await (direction === 'export' ? exportArchive(service,path,transient,progress) : importArchive(service,path,transient,journal,progress));
+  return await (direction === 'export' ? exportArchive(service,path,transient,progress) : importArchive(service,path,transient,journal,progress,{acknowledgeUnverifiedSchemaObjects}));
  } finally { await proxy?.dispose(); await rm(configPath, { force: true }); }
 }
 
@@ -74,6 +83,8 @@ catch (error) {
  const reason = error instanceof PortabilityError ? (error.code.startsWith('migration_ledger:') ? error.code : error.code.split(':')[0]) : /^[A-Z_]+$/.test(error.code ?? '') ? error.code : error.message === 'archive_json' ? 'archive_json' : 'native_error';
  // A later migration that changes restorable data is named: it is a file of this installation.
  const migration = error instanceof PortabilityError && error.code.startsWith('schema_mismatch:migration_data:') ? error.code.slice('schema_mismatch:migration_data:'.length) : undefined;
+ // An unapplied migration is a file of this checkout: it is named so it can be applied.
+ const unapplied = error instanceof PortabilityError && error.code === 'migration_ledger:unapplied' ? error.migration : undefined;
  const reExport = error instanceof PortabilityError && ['schema_mismatch:legacy_schema','schema_mismatch:unsupported_sql'].includes(error.code);
  // A populated destination names its table or bucket: schema names, never row data.
  const occupied = error instanceof PortabilityError && /^(target|bucket)_not_empty:/.test(error.code) ? error.code.slice(error.code.indexOf(':') + 1) : undefined;
@@ -82,5 +93,5 @@ catch (error) {
  // Anything that is not a portability refusal names its class and code, never its message: that can hold row data.
  const native = error instanceof PortabilityError || error.message === 'archive_json' ? undefined : nativeFailure(error);
  process.exitCode = exitCode;
- await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, ...(reExport ? { reExport: true } : {}), ...(migration ? { migration } : {}), ...(occupied ? { occupied } : {}), ...(safety ? { safety } : {}), ...(native ? { native } : {}), exitCode });
+ await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, ...(reExport ? { reExport: true } : {}), ...(migration ? { migration } : {}), ...(unapplied ? { unapplied } : {}), ...(occupied ? { occupied } : {}), ...(safety ? { safety } : {}), ...(native ? { native } : {}), exitCode });
 }

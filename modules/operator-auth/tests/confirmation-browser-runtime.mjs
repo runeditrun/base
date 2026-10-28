@@ -1,3 +1,4 @@
+import { installD1Preflight } from '../../container/adapters/d1-workerd-setup.mjs';
 import { createRequire } from 'node:module';
 import { readFile, readdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -10,7 +11,8 @@ const packages = await readdir(join(root, 'node_modules/.pnpm'));
 const wrangler = packages.find((name) => name.startsWith('wrangler@4.129.1_'));
 if (!wrangler) throw new Error('Install the frozen workspace dependencies before running browser auth tests.');
 const require = createRequire(join(root, 'node_modules/.pnpm', wrangler, 'node_modules/wrangler/package.json'));
-const { Miniflare, convertV4MiniflareOptions } = require('miniflare');
+const { Miniflare, convertV4MiniflareOptions, D1_PLUGIN } = require('miniflare');
+installD1Preflight(D1_PLUGIN);
 const { build } = require('esbuild');
 const browserRequire = createRequire(join(root, 'default-seed/package.json'));
 export const { chromium } = browserRequire('@playwright/test');

@@ -1,6 +1,7 @@
 import { installService, removeService } from './service.mjs';
 import { installPermissions, removePermissions } from './permissions.mjs';
 import { saveState } from './state.mjs';
+import { carryLive } from './carry.mjs';
 import { businessCommand } from './invocation.mjs';
 import { describe } from './errors.mjs';
 
@@ -47,12 +48,13 @@ const notApplicable = {
  * A choice that cannot be applied here (an agent sandbox that cannot write
  * outside its folder) is named with its cause and tried again next check-in.
  */
-export async function applyChoices(api, state) {
+export async function applyChoices(api, state, { reconnecting = false } = {}) {
  let self;
  // A server without this route answers a device credential with 403 (or 404):
  // nothing is decided yet. On a new computer this first request activates it.
  try { self = await api.get('/api/business/executors/self'); }
  catch (error) { if (![403, 404].includes(error.status)) throw error; }
+ await carryLive(state, self);
  const decided = Object.fromEntries(names.map(name => [name, typeof self?.optIns?.[name] === 'boolean' ? self.optIns[name] : null]));
  // The agent this computer reported when it paired, as the owner's browser words its choices:
  // the Claude Code rules apply only to Claude Code. An unknown agent (no route yet) decides nothing.
@@ -84,7 +86,7 @@ export async function applyChoices(api, state) {
  }
  const undecided = names.filter(name => decided[name] === null && !inapplicable[name]);
  if (undecided.length) {
-  once(`undecided:${undecided.join()}`, `The owner has not chosen yet:\n${undecided.map(name => `  - ${choices[name]}\n`).join('')}They choose on this computer's row in ${state.origin}/business/${encodeURIComponent(state.businessId)}/settings; the run and next commands apply the choices at their next check-in, so connect does not need to run again.\n`);
+  once(`undecided:${undecided.join()}`, `The owner has not chosen yet:\n${undecided.map(name => `  - ${choices[name]}\n`).join('')}They choose on this computer's row in ${state.origin}/business/${encodeURIComponent(state.businessId)}/settings; the run and next commands apply the choices at their next check-in, ${reconnecting ? 'without pairing again' : 'so connect does not need to run again'}.\n`);
  }
  return { applied: lines.length, serviceInstalled };
 }

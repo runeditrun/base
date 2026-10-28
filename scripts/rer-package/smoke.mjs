@@ -26,7 +26,7 @@ function run(program, args, options) {
   const child = spawn(program, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '', stderr = '';
   // Echoed for the log with any sign-in link's key fragment left out.
-  child.stdout.on('data', data => { stdout += data; process.stdout.write(String(data).replace(/(RER_OPEN \S+?)#\S+/g, '$1#(key withheld)')); });
+  child.stdout.on('data', data => { stdout += data; process.stdout.write(String(data).replace(/(https?:\/\/\S+?)#\S+/g, '$1#(key withheld)')); });
   child.stderr.on('data', data => { stderr += data; process.stderr.write(data); });
   child.once('error', reject);
   child.once('close', code => resolveRun({ code, stdout, stderr }));

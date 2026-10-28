@@ -1,3 +1,4 @@
+import { startCarryRefresh } from './carry.mjs';
 import { randomUUID } from 'node:crypto';
 import { access, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -38,13 +39,14 @@ export async function run({ once = false } = {}) {
  const interrupted = signal => () => { unlock.now(); stop.abort(Object.assign(Error('Business supervisor stopped.'), { signal })); };
  for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(signal, interrupted(signal));
  const monitor = setInterval(() => { access(join(directory, 'disconnect')).then(() => stop.abort(Error('Business supervisor stopped for disconnect.')), () => {}); }, 250);
- let progress, said = '', held = null, summaries = [];
+ let progress, stopCarry, said = '', held = null, summaries = [];
  const say = text => { if (text !== said) { said = text; process.stdout.write(text + '\n'); } };
  // An agent step that waits is said in its own words, never as "Nothing yet".
  const waits = () => [...new Set([...summaries.filter(task => parked.has(task.task_id)).map(task => parked.get(task.task_id).message), ...agentWaiting(summaries)])];
  // With no agent step waiting, a move's owner step (freeze, rollback, cancellation) is named with its link.
  const idle = () => { const owner = ownerWaiting(summaries, state); return owner.length ? owner.join('\n') : waitingFor(state); };
  try {
+  stopCarry = await startCarryRefresh(api, state, stop.signal);
   progress = await loadProgress();
   // A claim saved before this computer stopped is the task it was doing.
   held = progress.pendingClaim?.task_id ?? null;
@@ -147,6 +149,7 @@ export async function run({ once = false } = {}) {
    process.stderr.write(`Business pairing expired or was revoked, so this supervisor stopped. This computer was ${revokedText(revoked)}\n`);
   } else if (!stop.signal.aborted) throw error;
  } finally {
+  await stopCarry?.();
   clearInterval(monitor);
   await unlock();
   if (stop.signal.reason?.signal) process.stdout.write(`Business supervisor stopped (${stop.signal.reason.signal}); run.lock removed. Run ${businessCommand('run')} again to continue from the saved checkpoint.\n`);

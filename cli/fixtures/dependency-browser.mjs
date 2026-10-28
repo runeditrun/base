@@ -1,3 +1,4 @@
+import { retainStartupFailure } from './command-diagnostic.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,readFile} from 'node:fs/promises';
 import {createHmac} from 'node:crypto';
@@ -33,6 +34,7 @@ export async function linkedBrowser(f,origin,provider,env,kind,network) {
  let browser;
  try {
   const deadline=Date.now()+120000;while(!preview.stdoutText.includes('"event":"ready"')&&preview.exitCode===null&&Date.now()<deadline)await pause(100);
+  if (!preview.stdoutText.includes('"event":"ready"')) await retainStartupFailure(f.root, preview);
   assert.ok(preview.stdoutText.includes('"event":"ready"'),'dev reaches readiness');
   browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
   const evidence=resolve('evidence/auth-6');await mkdir(evidence,{recursive:true});

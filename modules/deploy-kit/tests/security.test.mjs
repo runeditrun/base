@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, mkdir, symlink, link, rm, readFile, realpath } from
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { deployDiagnostic, providerRefusal } from '../diagnostics.mjs';
+import { deployDiagnostic, providerRefusal, providerFailure, deploymentDiagnostics } from '../diagnostics.mjs';
 import { cloudflare } from '../provider.mjs';
 import { regularBytes, readArtifact, collectFiles } from '../artifact.mjs';
 import { assertCredentialFree } from '../prepare.mjs';
@@ -18,6 +18,29 @@ test('transport uses exact account, rejects arbitrary URLs, redacts provider err
   let calls=0;const api=cloudflare({accountId,token:'test-secret',fetch:async(url,init)=>{calls++;assert.equal(new URL(url).pathname,`/client/v4/accounts/${accountId}/queues`);assert.equal(init.redirect,'error');return Response.json({error:'test-secret'},{status:403});}});
   await assert.rejects(api.request('https://evil.test'),/invalid-provider-path/);assert.equal(calls,0);
   await assert.rejects(api.request('/queues'),error=>error.message==='provider-http-403');assert.equal(calls,1);
+  for (const [code,kind] of [['ENOTFOUND','DNS failure'],['EAI_AGAIN','DNS failure'],['ERR_TLS_CERT_ALTNAME_INVALID','TLS failure'],['CERT_HAS_EXPIRED','TLS failure'],['ECONNRESET','connection reset'],['EPIPE','connection reset']]) {
+    const failing = cloudflare({accountId,token:'synthetic-base-1',fetch:async () => {throw new TypeError('fetch failed',{cause:Object.assign(new Error('synthetic-base-2'),{code})});}});
+    await assert.rejects(failing.request('/queues'),error => {
+      assert.equal(deployDiagnostic(error,String).providerRequest.cause,kind);
+      assert.ok(providerFailure(error).includes(code));
+      assert.match(providerFailure(error),/Cloudflare transport failed/);
+      const wrapper = new Error('synthetic-base-3',{cause:error});
+      assert.equal(deployDiagnostic(wrapper,String),undefined,'a wrapper keeps its own failure code');
+      assert.equal(providerFailure(wrapper),providerFailure(error),'the provider cause remains diagnosable');
+      return true;
+    });
+  }
+  const observed = deploymentDiagnostics(cloudflare({accountId,token:'synthetic-base-4',fetch:async () => response([])}));
+  await observed.request('/queues');
+  const logical = observed.annotateFailure(new Error('secret-change-unsettled'),'secrets');
+  assert.equal(deployDiagnostic(logical,String).code,'secret-change-unsettled');
+  assert.equal(providerFailure(logical),undefined,'a successful call is not the cause of a logical failure');
+  const malformed = deploymentDiagnostics(cloudflare({accountId,token:'synthetic-base-5',fetch:async () => new Response('{')}));
+  await assert.rejects(malformed.request('/queues'),error => {
+    assert.match(providerFailure(error),/no Cloudflare error code or message supplied/);
+    assert.ok(!providerFailure(error).includes('transport failed'));
+    return true;
+  });
 });
 test('provider read retries share the original timeout, cancellation and request budget', async () => {
   const pending = signal => new Promise((resolve,reject) => {
@@ -104,8 +127,9 @@ test('operations v2 required mail fails with missing, blank or wrong selected ke
 });
 test('new template calls real authoring lock/check and refuses any existing destination/lock',async t=>{
   const dir=await temporary(t);const root=join(dir,'edition');const args={destination:root,project:'example/edition',sourcePaths:['app.mjs'],commands:{verify:{argv:['node','app.mjs'],inputs:['app.mjs'],effects:'Local app validation'}}};
-  await createTemplates(args);await writeFile(join(root,'app.mjs'),'export const value=1;');const git=(...argv)=>execFileSync('git',argv,{cwd:root,stdio:'pipe'});git('init');git('add','.');
+  const created=await createTemplates(args);await writeFile(join(root,'app.mjs'),'export const value=1;');const git=(...argv)=>execFileSync('git',argv,{cwd:root,stdio:'pipe'});git('init');git('add','.');
   await lockTemplates(root);const lock=JSON.parse(await readFile(join(root,'sources.lock.json'),'utf8'));assert(lock.toolchain?.sha256 ?? lock.tools?.sha256 ?? JSON.stringify(lock).includes(hash('export const value=1;')));
+  execFileSync(process.execPath,created.check.slice(1),{cwd:root,stdio:'pipe'});
   assert.equal((await inspectOperations(root,{})).ok,true);await assert.rejects(createTemplates(args));await assert.rejects(lockTemplates(root),/existing-source-lock/);
 });
 test('D1 documented pagination without total_pages follows total_count and rejects unstable counts',async()=>{

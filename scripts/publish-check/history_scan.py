@@ -18,6 +18,7 @@ from content_identities import ContentIdentities, candidate as identity_candidat
 from checksum_maps import ChecksumMaps
 from credential_assignments import text_rules, Findings
 from assignment import is_assignment
+from third_party_notices import RULE as NOTICE, blob_id
 
 
 def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, repository=None, *, cache_dir=None, timeout=300, annotation_file=None):
@@ -37,7 +38,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
         config = load_config(history.selected(CONFIG))
         reviewed_bytes = history.selected(REVIEWED)
         reviewed = load_reviewed(reviewed_bytes) if reviewed_bytes else {}
-        add = Findings(report, reviewed, hashes).add
+        add = Findings(report, reviewed, hashes, config['thirdPartyNotices']).add
         try:
             config['pendingDestination'] = destination(history, project, repository)
         except (ValueError, TypeError, UnicodeError):
@@ -87,7 +88,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                 rules, provenance, references = inspected[key]
                 entry_scope = 'pre-existing' if (scope != 'release-tree' and oid in public_blobs) or public_paths.get(path) == oid else scope
                 for rule in rules:
-                    add(rule, path, commit, oid, entry_scope)
+                    add(rule, path, commit, blob_id(history.blob(oid)) if rule == NOTICE else oid, entry_scope)
                 if references:
                     deferred.append((references, path, commit, oid, entry_scope))
                 if provenance:
@@ -109,7 +110,8 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             public_oid = public_paths.get(path)
             scope = 'pre-existing' if public_oid and (public_oid == oid or history.blob(public_oid) == data) else 'working-tree'
             for rule in rules:
-                add(rule, path, history.commit, oid, scope)
+                # A notice names the exact bytes it matched, tracked or not.
+                add(rule, path, history.commit, blob_id(data) if rule == NOTICE else oid, scope)
             if references:
                 deferred.append((references, path, history.commit, oid, scope))
             if path == 'LICENSE':

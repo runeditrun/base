@@ -61,6 +61,12 @@ emission. HTTP errors contain only a fixed code and numeric status; network,
 parsing and unexpected errors never expose response text, URLs or key values.
 429 stops with `RATE_LIMITED`; there is no hidden retry loop.
 
+The Business CLI supervisor currently captures a complete private bundle before
+uploading it. After a lease handover, its next run captures and uploads the export
+again under a fresh lease; it does not resume a partially uploaded bundle in
+place. Only a completed upload and the door's matching plan are reported as a
+preview. Calendly's folder layout remains outside this single-bundle path.
+
 ## Credentials in responses
 
 Every adapter strips credential values from a parsed response before it emits

@@ -18,7 +18,7 @@ SCHEME_CHARACTERS = frozenset('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVW
 # acquire trailer privileges. Only the address span is omitted from email checks.
 COAUTHOR = re.compile(
     rb'^Co-Authored-By:[ \t]+(?=[^ \t])[^<>\r\n]*[^<>\s][ \t]+<(?P<address>'
-    rb'noreply@(?:anthropic|github)\.com|'
+    rb'noreply@(?:anthropic|openai|github)\.com|'
     rb'[0-9]+\+[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){0,38}@users\.noreply\.github\.com'
     rb')>[ \t]*\r?$', re.I | re.M)
 

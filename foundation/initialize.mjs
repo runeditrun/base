@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { commit, select, sha256, tree } from '../composition/git-source.mjs'
 import { sourceRoots } from '../cli/export.mjs'
 import { stampedVersion } from '../cli/version.mjs'
+import { renderVerifySchedule, scheduleTransformation } from './verify-schedule.mjs'
 
 export async function initialize({ baseRepo, ref, output, family, edition, repository, siteDomain = `run-${edition}.example` }) {
   for (const id of [family, edition]) if (!/^[a-z][a-z0-9-]*$/.test(id) || id === 'base') throw new Error('Invalid family/edition id')
@@ -18,10 +19,10 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
   await mkdir(target) // Never overwrite an owner checkout.
   const provenance = {}
   const modules = [...new Set(sourceRoots.filter(source => source.startsWith('modules/')).map(source => source.split('/')[1]))]
-  async function put(path, bytes, origin) {
+  async function put(path, bytes, origin, transformation) {
     await mkdir(dirname(resolve(target, path)), { recursive: true })
     await writeFile(resolve(target, path), bytes)
-    provenance[path] = { sha256: sha256(bytes), ...(origin ? { source: origin } : { generated: true }) }
+    provenance[path] = { sha256: sha256(bytes), ...(origin ? { source: origin } : { generated: true }), ...(transformation ? { transformation } : {}) }
   }
   const json = (path, data) => put(path, JSON.stringify(data, null, 2) + '\n')
   try {
@@ -30,7 +31,9 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
     for (const file of files) await put(`editions/${edition}/${file.relative}`, startDocs.has(file.relative) ? file.bytes.toString().replaceAll('run-foundation', `run-${edition}`) : file.bytes, file.path)
     const workflows = ['verify.yml', 'verify-nightly.yml'].map(name => select(baseRepo, revision, `export/${name}`)[0])
     for (const workflow of workflows) {
-      await put(`editions/${edition}/.github/workflows/${workflow.path.slice('export/'.length)}`, workflow.bytes, workflow.path)
+      const scheduled = workflow.path === 'export/verify-nightly.yml'
+      const bytes = scheduled ? renderVerifySchedule(workflow.bytes.toString(), edition) : workflow.bytes
+      await put(`editions/${edition}/.github/workflows/${workflow.path.slice('export/'.length)}`, bytes, workflow.path, scheduled ? scheduleTransformation : undefined)
     }
     // Older pinned workflows install inline. A workflow using the helper must
     // supply it from that same revision; select still rejects a missing helper.
@@ -78,10 +81,12 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
     const versionSource = tree(baseRepo, revision).some(entry => entry.path === 'global/package.json') && select(baseRepo, revision, 'global/package.json')[0]
     const cliVersion = versionSource ? stampedVersion(baseRepo, JSON.parse(versionSource.bytes).version, revision) : undefined
     await json(`editions/${edition}/scripts/base-cli/inventory.json`, { version: 1, ...(cliVersion ? { cliVersion } : {}), onboarding: '../base-onboarding', onboardingFiles:Object.fromEntries(select(baseRepo, revision, 'onboarding', {includeTests:false}).map(file=>[file.relative,{source:file.path,sha256:sha256(file.bytes)}])), files: Object.fromEntries(cliFiles.map(file => [file.path, { source: file.path, sha256: sha256(file.bytes) }]).sort(([a], [b]) => a.localeCompare(b))) })
-    // The template contract's statuses were judged at the Base revision it comes from.
+    // The template contract and generated docs were judged at their Base revision.
     const contract = files.find(f => f.relative === 'CONTRACT.md')
     const judged = execFileSync('git', ['-C', baseRepo, 'show', '-s', '--format=%cs', revision], { encoding: 'utf8' }).trim()
-    await put(`editions/${edition}/CONTRACT.md`, contract.bytes.toString().replace('`BASE_COMMIT` (BASE_DATE)', `\`${revision.slice(0, 12)}\` (${judged})`), contract.path)
+    for (const doc of [contract, ...files.filter(f => ['ACCEPTANCE.md', 'docs/CLAIMS.md'].includes(f.relative))]) {
+      await put(`editions/${edition}/${doc.relative}`, doc.bytes.toString().replace('`BASE_COMMIT` (BASE_DATE)', `\`${revision.slice(0, 12)}\` (${judged})`), doc.path)
+    }
     const guide = files.find(f => f.relative === 'AGENTS.md')
     await put(`editions/${edition}/AGENTS.md`, guide.bytes.toString() + `\nPinned reference: https://github.com/runeditrun/base/blob/${revision}/TANSTACK-START-MIGRATION.md\nNative-session/runtime evidence: https://github.com/runeditrun/base/tree/${revision}/default-seed\n`, guide.path)
     const pkg = JSON.parse(files.find(f => f.relative === 'package.json').bytes)
@@ -92,7 +97,7 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
     // instructions name the edition's product repository by convention.
     const run = JSON.parse(files.find(f => f.relative === 'src/site/run.json').bytes)
     const publicRepository = `just-every/run-${edition}`
-    Object.assign(run, { name: edition, repository: `https://github.com/${publicRepository}`, clone: `npx -y @runeditrun/rer dev ${publicRepository}`, folder: `run-${edition}` })
+    Object.assign(run, { name: edition, repository: `https://github.com/${publicRepository}`, clone: `npx -y @runeditrun/rer dev ${publicRepository}` })
     await json(`editions/${edition}/src/site/run.json`, run)
     await json(`editions/${edition}/deploy-site.json`, { version: 1, domain: siteDomain })
     const browserSeed = files.find(f => f.relative === 'scripts/installer/ui/seed.mjs')

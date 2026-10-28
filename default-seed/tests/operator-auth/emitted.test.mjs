@@ -103,6 +103,7 @@ test('emitted Worker: the owner corrects their name at first-run setup and later
     const cookie = cookieOf(await runtime.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Owner' } }))
     const name = async () => (await runtime.call('/auth/session', { cookie }).then((response) => response.json())).operator.displayName
     const page = await runtime.call('/setup', { cookie }).then((response) => response.text())
+    assert.match(page, /This account lives on this computer and needs no email verification\./)
     assert.match(page, /<input name="displayName"[^>]* value="Owner">/, 'setup shows the name as an editable field')
     const form = (body) => runtime.call('/setup', { method: 'POST', cookie, body, headers: { 'content-type': 'application/x-www-form-urlencoded' } })
     assert.equal((await form('displayName=+&confirm=yes')).status, 400)

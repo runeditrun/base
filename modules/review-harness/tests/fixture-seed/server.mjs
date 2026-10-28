@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import { parseArgs } from 'node:util';
-import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions } from '../../../container/adapters/d1-workerd.mjs';
 
 const require = createRequire(new URL('../../../../default-seed/package.json', import.meta.url));
 const wranglerRequire = createRequire(require.resolve('wrangler'));

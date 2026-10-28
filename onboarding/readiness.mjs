@@ -48,6 +48,7 @@ export async function waitForReadiness(label, child, health, options, capture, r
    if(stopped())return await drain();
    if(signal?.aborted)return await fail('cancel');
    if(now()-start>=timeoutMs)return await fail('deadline');
+   if(typeof result.value?.fatal==='string')throw failure(result.value.fatal,{reason:'mismatch'});
    if(result.value===true||result.value?.ready===true)return result.value;
    if(typeof result.value==='string')lastHealth=result.value;
    else if(typeof result.value?.message==='string')lastHealth=result.value.message;

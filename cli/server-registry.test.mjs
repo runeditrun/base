@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {serverRegistry} from './server-registry.mjs';
 import { liveServers } from '../global/registry.mjs';
 import { checkCapacity } from '../global/launch/capacity.mjs';
+import { retainStartupFailure } from './fixtures/command-diagnostic.mjs';
 
 // Several checkouts share one machine registry. People keep the cap; a declared
 // journey on its own port does not count; no checkout ever stops another's server.
@@ -65,7 +66,12 @@ test('a start below the memory floor is refused with what is running and how to 
  const open=async(name,memory,extra={})=>{const root=join(directory,name);await mkdir(root,{recursive:true});const client=await serverRegistry(root,{env:{...env,...extra},memory});clients.push(client);return client;};
  try{
   const first=await open('first',()=>8*GIB);
-  assert.ok((await first.reserve('dev',options)).owned,'plenty of memory starts');
+  const reservation=await first.reserve('dev',options);
+  assert.ok(reservation.owned,'plenty of memory starts');
+  await first.serve(async()=>({ready:false}));
+  const start=performance.now();
+  await assert.rejects(first.waitReady(reservation.owned,undefined,{timeoutMs:40}),/still starting/);
+  assert.ok(performance.now()-start<1000,'the injected total readiness limit includes status requests and polling');
   const short=await open('second',()=>1.2*GIB);
   await assert.rejects(()=>short.reserve('preview',options),error=>error.exitCode===4&&/1\.2 GiB is available[^]*1\.5 GiB/.test(error.message)&&error.message.includes(join(directory,'first'))&&error.message.includes('--stop')&&error.message.includes('RER_SERVERS_MIN_MEMORY_BYTES'));
   assert.ok((await (await open('second',()=>1.2*GIB,{RER_SERVERS_MIN_MEMORY_BYTES:String(GIB)})).reserve('preview',options)).owned,'a lower floor starts it');
@@ -168,10 +174,12 @@ test('dev and demo stop only their checkout, preserving a caller-group sleeper a
   for(const f of [a,b]){
    const child=run(f,[mode,'--json',...(mode==='demo'?['--foreground']:[])]);
    const deadline=Date.now()+180_000;
-   while(!child.stdoutText.includes('"event":"ready"')){
-    assert.equal(child.exitCode,null,'server reaches readiness');
-    assert.ok(Date.now()<deadline,'server readiness deadline');await pause(50);
-   }
+   try {
+    while(!child.stdoutText.includes('"event":"ready"')){
+     assert.equal(child.exitCode,null,'server reaches readiness');
+     assert.ok(Date.now()<deadline,'server readiness deadline');await pause(50);
+    }
+   } catch (error) { await retainStartupFailure(f.root, child); throw error; }
    if(mode==='dev')assert.equal(await child.done,0,'piped dev detaches after readiness');
    const records=(await read()).running;
    for(const item of records)if(roots.includes(item.checkout)&&!owners.some(owner=>owner.pid===item.owner.pid))owners.push(item.owner);

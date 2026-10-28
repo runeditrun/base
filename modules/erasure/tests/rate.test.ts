@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions } from '../../container/adapters/d1-workerd.mjs';
 import { createErasure, defineErasure, rateCorrelation, rateEdges, rateWrite } from '../index.mjs';
 import { createPortability } from '../../portability/index.mjs';
 

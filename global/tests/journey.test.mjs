@@ -1,3 +1,4 @@
+import '../../modules/container/adapters/d1-workerd-preload.mjs';
 // The published rer, end to end through its public doors: build the tarball,
 // install it with npx into a scratch HOME, and launch the default-seed
 // reference in package mode (exported, then converted by the export tool to
@@ -14,7 +15,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, statSync } from 'node:fs';
 import { access, cp, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../modules/container/adapters/d1-sqlite.mjs';
 import { parseEnv } from 'node:util';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -70,7 +71,7 @@ test('an installed rer launches the package-mode default-seed reference with one
  // Only rer's children use the scratch HOME. The browser driver keeps the
  // real HOME and shares its downloaded browsers without changing its profile.
  const browserCache = dirname(checkoutPlaywright(join(base, 'default-seed')).registry.findExecutable('chromium').directory);
- const queued = await isolatedQueue(t, { PATH: process.env.PATH, HOME: home, PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH ?? browserCache, CI: 'true', WRANGLER_SEND_METRICS: 'false', RER_SERVERS_DIR: join(directory, 'servers'), ...Object.fromEntries(['TMPDIR', 'COREPACK_HOME', 'npm_config_store_dir'].filter(name => process.env[name]).map(name => [name, process.env[name]])) });
+ const queued = await isolatedQueue(t, { PATH: process.env.PATH, HOME: home, PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH ?? browserCache, CI: 'true', WRANGLER_SEND_METRICS: 'false', RER_SERVERS_DIR: join(directory, 'servers'), ...Object.fromEntries(['TMPDIR', 'COREPACK_HOME', 'npm_config_store_dir', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy', 'NODE_USE_ENV_PROXY', 'NODE_OPTIONS', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE'].filter(name => process.env[name]).map(name => [name, process.env[name]])) });
  const reference = await packageReference(base, root, tarball, { directory, env: queued });
  ({ registry } = reference);
  const { env } = reference;
@@ -157,7 +158,7 @@ test('an installed rer launches the package-mode default-seed reference with one
  assert.equal(repeated.code, 0, repeated.stderr + repeated.stdout);
  assert.ok(repeated.stdout.split('\n').includes(`RER_SITE ${lines.RER_SITE}`), 'a repeated rer dev reprints RER_SITE');
 
- const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] });
+ const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--use-mock-keychain', '--password-store=basic', ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? ['--no-sandbox'] : [])] });
  try {
   const context = await browser.newContext(), page = await context.newPage();
   await page.goto(lines.RER_OPEN);

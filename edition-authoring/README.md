@@ -50,6 +50,11 @@ Commands below use the historical local-script form. Package adopters run
 `node node_modules/@runeditrun/rer/edition-authoring/cli.mjs` in its place; Base
 authors can run `node /absolute/base/edition-authoring/cli.mjs` from the seed root.
 The public adoption and refresh verbs call these same implementation helpers.
+For release adoption, a copied CLI predating 0.2.82 must use the updated
+installed package: run `rer refresh-base --ref FULL_40_HEX_COMMIT --base
+/absolute/base-checkout`, or invoke that installed package's
+`edition-authoring/cli.mjs refresh-base` directly. The older copied CLI does not
+gain the release's refresh behavior until the package refresh delivers it.
 
 Commands, run at the edition root:
 
@@ -209,7 +214,7 @@ own source declaration; the default Base publisher identity uses its public URL.
 **Verify.** `... verify-base` checks three things and exits nonzero on any finding:
 
 - local bytes against the record: `modified`, `missing`, `unrecorded` (a file
-  in a copied path that the record does not name), `not-a-file` and `mode` (a
+  in a copied path that neither the record nor its ownership exceptions name), `not-a-file` and `mode` (a
   script copied without its executable bit, or the reverse);
 - the record against Base at each recorded commit: `origin-missing`,
   `origin-mismatch` and `origin-mode`;
@@ -227,10 +232,11 @@ local bytes against the record, without reading Base. Add `verify-base` to the
 edition's verify command next to `check`.
 
 **Upgrade to a new pin.** Run Base's export tools first (for example
-`node BASE/scripts/export-cli.mjs .`), then `... refresh-base FULL_40_HEX_COMMIT
---base /absolute/base-checkout` to move every recorded copy to that commit. It
-writes Base's bytes and modes for recorded files and for files already equal to
-Base, adopts files Base added under a copied path since the copy's pin (tests
+`node BASE/scripts/export-cli.mjs .`), then use the updated installed package's
+`rer refresh-base --ref FULL_40_HEX_COMMIT --base /absolute/base-checkout` to move
+every recorded copy to that commit. It
+writes Base's bytes and modes for recorded files, preserves tracked unrecorded
+files as seed-owned, adopts files Base added under a copied path since the copy's pin (tests
 only into copies that already carry tests), drops recorded files that Base or the
 export removed, keeps out unrelated files the copy had left out, and re-records each copy.
 An absent unadapted singleton is retired from the record entirely and named in
@@ -248,16 +254,50 @@ Base source disappeared still reports an error.
 If a retained runtime module still imports a deleted recorded dependency, refresh
 refuses before writes; restore the dependency or adapt the importing module
 before refreshing. Required unrecorded siblings are discovered as described below.
-Runtime copies also include the recursive relative imports and re-exports of
-their selected `foundation/runtime` modules, plus companion declarations. This
-recovers required siblings even when they existed before the old pin or each
-renderer was recorded individually. New siblings go beside the importing
-renderer at its recorded destination (for example `src/base/runtime/` in Slate),
-and receive copy records. The maintained exporters already ship the complete
-runtime directory. An unrecorded dependency equal to its old Base baseline can
-advance too. Existing unrecorded dependencies with different seed bytes stay
-in place. Recorded edits still require explicit adaptation acknowledgement;
-acknowledged adaptations are preserved.
+Every recorded code module is closed over relative imports and re-exports,
+including delivered workflow helpers and adapted modules (read from local bytes).
+A delivered `.mjs` also brings its Base declaration sibling. A dependency keeps
+its relative destination only when an existing copy mapping witnesses that
+namespace. Tracked unrecorded dependencies stay seed-owned and stop traversal;
+new imports from refreshed files must find their named, type and default exports.
+A JavaScript/TypeScript AST discovers imports, re-exports and literal runtime
+calls, including optional calls, templates and JSX. Runtime imports of every
+form resolve independently of declaration-only files;
+only erased type imports may use declarations. TypeScript sources retain
+emitted-filename substitutions and extensionless bundler resolution; JavaScript
+runtime imports require an explicit filename, as in Node. Relative `require` directory
+lookups use `package.json`'s runtime `main`, never its type metadata. Local package
+self-references and `imports` maps use Node's actual resolver and active runtime
+conditions; `types` is enabled only for erased edges. Export targets are exact
+files for both loaders. Unknown external packages remain package-manager inputs.
+Imports already unresolved in that same file before refresh remain untouched,
+except for missing authoring-toolkit bootstrap siblings and recorded removals.
+Refresh compares the retained ordinary unresolved set before writing.
+When a preserved tracked sibling becomes equal to incoming Base bytes, refresh
+adds its path to `ignore` as a discovery exception; it stays unrecorded and keeps
+its bytes and mode. Recorded files continue to receive their incoming Base mode.
+A newly adopted directory-copy module with no incoming planned import is withheld
+when a dependency has no witnessed destination; the result names it in `withheld`.
+A required module with that problem refuses the entire refresh.
+
+Base may declare edition migrations in `foundation/edition-migrations.json` at
+the target revision. A recorded, unadapted module crossing a declared introduction
+refuses before planning until each applicable id is consented, for example:
+
+```sh
+rer refresh-base --ref FULL_40_HEX_COMMIT --base /absolute/base-checkout \
+  --edition-migration run-data-paths --edition-migration run-data-pricing
+```
+
+The direct package authoring CLI accepts the same repeatable flag. Consent lets
+refresh deliver declared Base dependencies; it never writes edition-owned data.
+The result lists the ids, guides and edits still owed. Apply the documented
+RunData edit and run the edition tests. A repeat refresh needs no flag. An unknown
+id or invalid target migration data refuses without writes.
+
+Physical spelling is checked for every destination and dependency refresh relies
+on. An unrecorded workflow or guide with a physical case alias is preserved with
+one notice; a recorded path or relied-on helper alias refuses before any write.
 It refuses undeclared local edits that differ from both the recorded and incoming
 Base bytes; declare intentional adaptations as described below. To move one copy,
 copy its files from Base at the new commit over the old copy, deleting files
@@ -272,7 +312,7 @@ node scripts/edition-authoring/cli.mjs adapt-base .github/workflows/run-demo.yml
 node scripts/edition-authoring/cli.mjs adapt-base public/fonts/fonts.css
 node scripts/edition-authoring/cli.mjs adapt-base src/base/dispatch.ts
 node scripts/edition-authoring/cli.mjs adapt-base src/base/font-head.ts
-node scripts/edition-authoring/cli.mjs refresh-base FULL_40_HEX_COMMIT --base /absolute/base-checkout
+rer refresh-base --ref FULL_40_HEX_COMMIT --base /absolute/base-checkout
 ```
 
 `adapt-base <file> [--record <file>]` only accepts an existing regular recorded
@@ -356,3 +396,42 @@ maps only exact original bytes to their projected identity; every other byte,
 mode, addition and removal stays visible. Incoming candidate source is always
 read as ordinary Git and never inherits the projection identity. Lamp's
 `scripts/public-projections/` is the reference producer.
+
+
+Workflow refresh also supplies and records local scripts invoked in delivered
+workflows, deriving the paths from their run steps. Helpers and workflows share
+the existing preflight: a refused destination prevents every planned write.
+Workflow run scalars are read from the YAML document AST, including folded and
+continued scalars; literal shell paths use one quote-and-escape-aware scanner.
+Copied, default-seed and preserved seed-authored workflows use the same helper
+source search. Tracked unrecorded helpers remain seed-owned; untracked or ignored collisions
+refuse even when their bytes match Base. Tracked unrecorded Verify workflows
+and `VERIFY-WORKFLOW.md` can be adopted when their exact bytes match a template
+in the requested Base commit's history (there are no seed substitutions).
+Acknowledged adaptations and divergent workflows stay untouched and receive a
+notice with the template changes and explicit merge/record instructions.
+An absent workflow is not automatically installed by this adoption step.
+
+Authoring refresh closes relative imports from every recorded authoring module,
+including singleton copies and modules whose Base origin is another maintained
+authoring mirror. It follows the bytes that will remain in the seed, including
+acknowledged local adaptations, and gives newly delivered siblings source records
+and digests. Tracked unrecorded siblings remain seed-owned: refresh preserves
+them without traversing their imports. Untracked helper collisions, including
+ignored files and files matching Base bytes, refuse before writes, as do removed
+recorded dependencies still imported, conflicting mappings and symlinks. This
+delivery is limited to the authoring toolkit; it does not infer application
+dependencies. Use the updated installed package's `rer refresh-base --ref
+FULL_40_HEX_COMMIT --base /absolute/base-checkout` to adopt 0.2.82 when the seed's
+copied CLI predates it.
+
+Before writing, refresh checks destination types, existing filesystem casing,
+ownership and effective permissions with `lstat` and access checks. Overwriting
+a copy requires a writable file owned by the current user so its mode can be
+set; overwriting the record requires only a writable file. Neither overwrite
+requires directory write permission. Creating or removing a file requires a
+writable, searchable parent directory; missing directories are checked through
+their existing ancestors. The plan accounts for its own removals. These checks
+cannot predict races, disk or I/O failures, restrictive umasks on newly created
+directories, or collisions between two new case-distinct names on an insensitive
+volume.

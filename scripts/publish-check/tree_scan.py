@@ -10,6 +10,7 @@ from project_identity import tree_identity
 from licenses import license_rules
 from git_history import InspectionError
 from trust_bundle import bundles
+from third_party_notices import RULE as NOTICE, notice
 
 DEPENDENCY_DIRS = {'.git', 'node_modules'}
 
@@ -40,6 +41,11 @@ def context(history, commit, config):
 def text_rules(data, path, config, env_hashes, *, commit_message=False):
     """Rules, provenance and the repository references whose rules wait for one bulk resolution."""
     rules, provenance, references = inspect(data, path, config, commit_message=commit_message)
+    # A listed upstream licence text, byte for byte under a licence file name,
+    # keeps its copyright notice: it is reported as a notice, not a finding.
+    # The path itself, and every other rule, stays inspected.
+    if 'hygiene.email' in rules and notice(path, data, config['thirdPartyNotices']):
+        rules = rules - {'hygiene.email'} | {NOTICE}
     path_rules, _, path_references = inspect(path.encode('utf-8', 'surrogateescape'), '@path', config)
     rules.update(path_rules)
     if env_hashes and (environment_match(data, env_hashes) or environment_match(path.encode(), env_hashes)):

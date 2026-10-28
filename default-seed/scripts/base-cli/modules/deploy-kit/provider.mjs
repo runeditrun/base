@@ -1,32 +1,44 @@
 import { providerPages, providerListShape } from './pagination.mjs';
 import { deleteR2Object } from './r2-object-transport.mjs';
 import { isR2ObjectDelete } from './r2-objects.mjs';
-import { recordDeployFailure } from './diagnostics.mjs';
+import { recordDeployFailure, providerText } from './diagnostics.mjs';
 import { D1_IMPORT_POLL_LIMIT, importD1, importUploadURL } from './d1-import.mjs';
+import { importDiagnostic, importResponseText } from './d1-import-diagnostics.mjs';
 import { assert, hexId, uuid } from './validation.mjs';
-import { providerResponse, transportOutput, transportReason } from './provider-transport.mjs';
+import { providerResponse, transportOutput, transportReason, transportClass } from './provider-transport.mjs';
 
 // A gateway/server error can arrive after a write. An explicit API refusal cannot.
 export const definiteProviderRefusal = error => error.status === 200 || error.status >= 400 && error.status < 500;
 
-async function boundedBytes(response, limit, onReadError) {
+async function boundedBytes(response, limit, onReadError, prefix = false) {
   assert(response.body, 'empty-response');
   const reader = response.body.getReader(); const chunks = []; let length = 0;
   try { while (true) {
     let chunk;
     // Only a failed stream read is transport failure; retain size/shape codes.
-    try { chunk = await reader.read(); } catch (cause) { throw onReadError ? onReadError(cause) : cause; }
-    const { done, value } = chunk; if (done) break;
+    try { chunk = await reader.read(); } catch (cause) {
+      if (prefix) { chunks.push(Buffer.from(` [response read failed: ${transportReason(cause)}]`)); break; }
+      throw onReadError ? onReadError(cause) : cause;
+    }
+    const { done } = chunk; if (done) break;
+    const value = prefix ? chunk.value.subarray(0,limit-length) : chunk.value;
     length += value.length; assert(length <= limit, 'response-too-large'); chunks.push(value);
+    if (prefix && length >= limit) break;
   } }
   finally { await reader.cancel().catch(() => {}); }
   return Buffer.concat(chunks);
 }
-const boundedText = async (response, limit = 4 * 1024 * 1024, onReadError) => (await boundedBytes(response, limit, onReadError)).toString('utf8');
+const boundedText = async (response, limit = 4 * 1024 * 1024, onReadError, prefix) => (await boundedBytes(response, limit, onReadError, prefix)).toString('utf8');
 export async function boundedJSON(response, limit) {
   try { return JSON.parse(await boundedText(response,limit)); } catch (error) { if (error instanceof SyntaxError) throw new Error('malformed-response'); throw error; }
 }
-const redactValues = (text, values) => values.filter(Boolean).flatMap(value=>[value,encodeURIComponent(value),JSON.stringify(value).slice(1,-1)]).sort((a,b)=>b.length-a.length).reduce((value,secret)=>value.split(secret).join('[REDACTED]'),text);
+const redactValues = (text, values) => values.filter(Boolean).flatMap(value=>[value,encodeURIComponent(value),JSON.stringify(value).slice(1,-1)]).sort((a,b)=>b.length-a.length).reduce((value,secret)=>{
+  value = value.split(secret).join('[REDACTED]');
+  // A bounded response may end partway through a known credential. Withhold
+  // that suffix too, before the shorter public excerpt is selected.
+  const at = secret.length >= 8 ? value.lastIndexOf(secret.slice(0,8)) : -1;
+  return at >= 0 && secret.startsWith(value.slice(at)) ? value.slice(0,at)+'[REDACTED]' : value;
+},text);
 /** Only this fixed origin and the explicitly selected account ever receive the token. */
 export function cloudflare({ accountId, token, fetch: request = globalThis.fetch, objectDelete = deleteR2Object, timeoutMs = 30000, maxRequests = 500, removal = false, budgetMigrations = false, requestSignal = () => undefined }) {
   assert(hexId(accountId), 'invalid-cloudflare-account-id');
@@ -50,7 +62,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     maxRequests = limit;
   }
   // `zone` scope: the zone-level API (/zones/...), for a run site's zone lookup and redirect rule.
-  async function rawEnvelope(path, { method = 'GET', body, assetToken, zone = false, signal: callerSignal } = {}) {
+  async function rawEnvelope(path, { method = 'GET', body, assetToken, zone = false, signal: callerSignal, step, deadlineMs, onResponse } = {}) {
     assert(typeof path === 'string' && (isR2ObjectDelete(path, method) || /^\/[a-z0-9/_?=&.,%-]+$/i.test(path) && !path.includes('..') && !path.split('?')[0].includes('%')), 'invalid-provider-path');
     assert(!zone || /^\/zones(?:[/?]|$)/.test(path), 'invalid-provider-path');
     assert(++requests <= maxRequests, 'provider-request-budget');
@@ -62,21 +74,29 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     const redactAuth = text => /\/r2\/buckets\/[^/]+\/objects(?:[/?]|$)/.test(path) ? '[R2 object details omitted]' : /\/d1\/database\/[^/]+\/import$/.test(path) ? redactCredentials(text).replace(/\bhttps?:\/\/\S+/gi,'[URL omitted]') : redactCredentials(text);
     const operation = `${method} ${path.split('?')[0].replace(/(\/r2\/buckets\/[^/]+\/objects)\/.*/, '$1/[object]')}`;
     const endpoint = redactCredentials(`https://api.cloudflare.com/client/v4${zone ? '' : '/accounts/[REDACTED]'}${operation.slice(method.length + 1)}`);
+    const started = performance.now(), limitMs = Math.max(1,Math.ceil(Math.min(timeoutMs,deadlineMs ?? timeoutMs)));
+    const detail = (status, cause) => ({method,endpoint:endpoint.replace('https://api.cloudflare.com',''),status,elapsedMs:Math.round(performance.now()-started),timeoutMs:limitMs,cause});
+    const failureStep = step ?? `${method} ${operation.slice(method.length + 1)}`;
     const transportFailure = (cause, attempts, status = null) => {
       const error = new Error('provider-transport-failed');
       // Portable across vendored kit copies used by custom deploy hooks. Raw
       // network messages stay private until the CLI applies its redactor.
       error.providerTransport = {operation:redactCredentials(operation),endpoint,attempts,status,reason:transportReason(cause)};
-      return recordDeployFailure(error,{output:redactAuth(transportOutput(cause))});
+      return recordDeployFailure(error,{step:failureStep,providerRequest:detail(status,transportClass(cause)),output:providerText(transportOutput(cause),redactAuth,Infinity)});
     };
-    const {response,output = ''} = await providerResponse({method,timeoutMs,callerSignal:deadlineSignal(callerSignal),removal,
+    const {response,output = ''} = await providerResponse({method,timeoutMs:limitMs,callerSignal:deadlineSignal(callerSignal),removal,
       replayableAsset:method === 'POST' && (/^\/workers\/scripts\/[^/]+\/assets-upload-session$/.test(path) || path === '/workers/assets/upload?base64=true'),
       reserveRetry:() => requests < maxRequests && (++requests, true),failure:transportFailure,
-      consume:(response,attempts) => response.body ? boundedText(response,undefined,cause => transportFailure(cause,attempts,response.status)) : '',
+      consume:(response,attempts,signal) => {
+        onResponse?.({status:response.status,body:''});
+        const failedRead = cause => transportFailure(signal.aborted ? signal.reason : cause,attempts,response.status);
+        return onResponse && !response.ok ? importResponseText(response,failedRead) : response.body ? boundedText(response,response.ok ? undefined : 64 * 1024,failedRead,!response.ok) : '';
+      },
       send:signal => isR2ObjectDelete(path, method) ? objectDelete(`/client/v4/accounts/${accountId}${path}`, {headers:{Authorization:`Bearer ${token}`},signal}) : request(zone ? `https://api.cloudflare.com/client/v4${path}` : `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`, {
       method, redirect: 'error', signal, headers: { Authorization: `Bearer ${assetToken ?? token}`, ...(body && !(body instanceof FormData) ? { 'Content-Type':'application/json' } : {}) },
       ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }),
     })});
+    onResponse?.({status:response.status, body:output});
     // A successful DELETE may have no response body (including HTTP 200).
     // Nonempty replies and all other methods still require the API envelope.
     if (method === 'DELETE' && response.ok && output === '') return { success: true, result: null };
@@ -92,8 +112,8 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
       const said = (Array.isArray(payload?.errors) ? payload.errors : []).filter(x => Number.isSafeInteger(x?.code) || typeof x?.message === 'string').slice(0,3)
         .map(x => ({...(Number.isSafeInteger(x.code) ? {code:x.code} : {}),...(typeof x.message === 'string' ? {message:bounded(x.message)} : {})}));
       error.providerRefusal = {operation:redactCredentials(operation),errors:said.length || payload !== undefined || !output.trim() ? said : [{message:bounded(output.trim().split('\n')[0])}]};
-      throw recordDeployFailure(error,{providerCodes:(Array.isArray(payload?.errors) ? payload.errors : []).filter(x => Number.isSafeInteger(x?.code)).map(x=>x.code).slice(0,8),
-        output:redactAuth(Array.isArray(payload?.errors) ? payload.errors.filter(x=>typeof x?.message==='string').map(x=>x.message).join('\n') : output)});
+      throw recordDeployFailure(error,{step:failureStep,providerRequest:detail(response.status,'HTTP refusal'),providerCodes:(Array.isArray(payload?.errors) ? payload.errors : []).filter(x => Number.isSafeInteger(x?.code)).map(x=>x.code).slice(0,8),
+        output:providerText(/^\/d1\/database\//.test(path) && Array.isArray(payload?.errors) ? payload.errors.filter(x=>typeof x?.message==='string').map(x=>x.message).join('\n') : output,redactAuth,Infinity)});
     }
     assert(payload?.success === true && Object.hasOwn(payload,'result') && (!payload.errors || Array.isArray(payload.errors) && !payload.errors.length), 'provider-unsuccessful-or-malformed');
     if (/^\/d1\/database\/[^/]+\/query$/.test(path) && Array.isArray(payload.result)) {
@@ -140,11 +160,18 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     assert(/^[a-z0-9-]{1,63}$/.test(worker) && /^[0-9a-f-]{36}$/.test(versionId), 'invalid-provider-path');
     assert(++requests <= maxRequests, 'provider-request-budget');
     const operation = 'GET /workers/scripts/[worker]/content/v2';
+    const endpoint = '/client/v4/accounts/[REDACTED]/workers/scripts/[worker]/content/v2', started = performance.now();
+    const retain = (error,status,cause,output) => recordDeployFailure(error,{step:'reading Worker content',
+      providerRequest:{method:'GET',endpoint,status,elapsedMs:Math.round(performance.now()-started),timeoutMs,cause},
+      output:providerText(output,text => redactValues(text,[accountId,token]),Infinity)});
+    const failure = (cause,attempts,status = null) => {
+      const reason = transportReason(cause);
+      return retain(Object.assign(new Error('provider-transport-failed'),{providerTransport:{operation,endpoint,attempts,status,reason}}),status,transportClass(cause),transportOutput(cause));
+    };
     const {response,output} = await providerResponse({method:'GET',timeoutMs,callerSignal:deadlineSignal(),reserveRetry:() => requests < maxRequests && (++requests, true),
       send:signal => request(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${worker}/content/v2?version=${versionId}`, {method:'GET',redirect:'error',signal,headers:{Authorization:`Bearer ${token}`}}),
-      consume:response => response.body ? boundedBytes(response, 64 * 1024 * 1024) : Buffer.alloc(0),
-      failure:(cause,attempts) => Object.assign(new Error('provider-transport-failed'), {providerTransport:{operation,endpoint:`https://api.cloudflare.com/client/v4/accounts/[REDACTED]/workers/scripts/${worker}/content/v2`,attempts,status:null,reason:transportReason(cause)}})});
-    if (!response.ok) throw Object.assign(new Error(`provider-http-${response.status}`), {status:response.status,providerCall:{operation,reason:`provider-http-${response.status}`}});
+      consume:(response,attempts,signal) => response.body ? boundedBytes(response,response.ok ? 64 * 1024 * 1024 : 64 * 1024,cause => failure(signal.aborted ? signal.reason : cause,attempts,response.status),!response.ok) : Buffer.alloc(0),failure});
+    if (!response.ok) throw retain(Object.assign(new Error(`provider-http-${response.status}`), {status:response.status}),response.status,'HTTP refusal',output.toString('utf8'));
     const type = response.headers.get('content-type') ?? '', entry = response.headers.get('cf-entrypoint');
     assert(type.startsWith('multipart/form-data') && typeof entry === 'string' && entry, 'invalid-worker-content');
     const parts = await new Response(output, {headers:{'content-type':type}}).formData();
@@ -154,15 +181,23 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
   async function upload(url, bytes, etag) {
     const destination = importUploadURL(url);
     assert(++requests <= maxRequests, 'provider-request-budget');
-    const {response} = await providerResponse({method:'PUT',timeoutMs,callerSignal:deadlineSignal(),
+    const redact = text => redactValues(text,[accountId,token,destination]);
+    const failure = (cause, attempts, status = null) => recordDeployFailure(importDiagnostic(Object.assign(new Error('d1-import-upload-transport-failed'),
+      {providerTransport:{operation:'PUT D1 import upload',endpoint:'https://[REDACTED].r2.cloudflarestorage.com/[D1 import upload]',attempts,status,reason:transportReason(cause)}}),
+      {step:'upload',status,redact,cause}), {});
+    const {response,output = ''} = await providerResponse({method:'PUT',timeoutMs,callerSignal:deadlineSignal(),
       reserveRetry:() => requests < maxRequests && (++requests, true),
       send:signal => request(destination, { method:'PUT', redirect:'error', signal, headers:{'Content-Length':String(bytes.length)}, body:bytes }),
-      failure:(cause,attempts) => Object.assign(new Error('d1-import-upload-transport-failed'), {providerTransport:{operation:'PUT D1 import upload',endpoint:'https://[REDACTED].r2.cloudflarestorage.com/[D1 import upload]',attempts,status:null,reason:transportReason(cause)}}),
+      failure,
+      consume:async (response, attempts) => {
+        if (response.status === 200) { await response.body?.cancel().catch(() => {}); return ''; }
+        return importResponseText(response,cause => failure(cause,attempts,response.status));
+      },
     });
-    // Upload bodies and signed URLs are never diagnostics, including on failure.
-    await response.body?.cancel().catch(() => {});
-    assert(response.status === 200, 'd1-import-upload-failed');
-    assert(response.headers.get('etag')?.replace(/^"|"$/g, '') === etag, 'd1-import-upload-etag-mismatch');
+    let payload; try { payload = JSON.parse(output); } catch { /* R2 may return plain text or XML. */ }
+    const fail = code => recordDeployFailure(importDiagnostic(new Error(code),{step:'upload',status:response.status,body:output,payload,redact}), {});
+    if (response.status !== 200) throw fail('d1-import-upload-failed');
+    if (response.headers.get('etag')?.replace(/^"|"$/g, '') !== etag) throw fail('d1-import-upload-etag-mismatch');
   }
   return { accountId, envelope, list, reserveMigrationRequests, importSql(id, sql) { return importD1({envelope,upload,redact:text => redactValues(text,[accountId,token])}, id, sql); }, request:requestResult, workerContent,
     zoneRequest(path, options = {}) { return requestResult(path, { ...options, zone: true }); } };

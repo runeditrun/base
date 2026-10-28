@@ -22,6 +22,7 @@ import { sourceRoots } from './export.mjs';
 import { aliases, pins, verbs } from './contract.mjs';
 import { run } from '../global/tests/harness.mjs';
 import { pause } from './fixtures/reference.mjs';
+import { retainStartupFailure } from './fixtures/command-diagnostic.mjs';
 
 const base = resolve(import.meta.dirname, '..');
 const common = [...Object.keys(verbs), 'release'];
@@ -295,10 +296,12 @@ process.stdout.write(result.stdout);process.stderr.write(result.stderr);process.
  assert.ok(setupReady, 'the converted fresh seed reports its selected origin');
  const port = new URL(setupReady.url).port;
  dev = spawn(process.execPath, [join(root, driver), fresh, shim, 'dev', String(port)], {cwd: fresh, env, stdio: ['ignore', 'pipe', 'pipe']});
- let output = ''; dev.stdout.on('data', data => { output += data; }); dev.stderr.resume();
+ let output = ''; dev.stdoutText = ''; dev.stderrText = '';
+ dev.stdout.on('data', data => { output += data; dev.stdoutText += data; }); dev.stderr.on('data', data => { dev.stderrText += data; });
  done = new Promise((resolve, reject) => { dev.once('error', reject); dev.once('close', resolve); });
  const deadline = Date.now() + 120000;
  while (!output.includes('"event":"ready"') && dev.exitCode === null && Date.now() < deadline) await pause(100);
+ if (!output.includes('"event":"ready"')) await retainStartupFailure(fresh, dev);
  assert.ok(output.includes('"event":"ready"'), 'the converted pnpm README launch reaches app readiness');
  const info = output.split('\n').filter(line => line.startsWith('{')).map(JSON.parse).find(event => event.event === 'ready');
  assert.equal(typeof info.siteUrl, 'string', 'ordinary owner prose does not block the default owner label');

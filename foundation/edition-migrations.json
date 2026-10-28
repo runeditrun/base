@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "migrations": [
+    {
+      "id": "run-data-paths",
+      "introduced": "b41fc55f0c45df1cef40257564515ad572a5d6dc",
+      "origin": "foundation/runtime/run-site.ts",
+      "guide": "export/SEED-COMMAND-CONTRACT.md",
+      "edit": "Remove folder, requirements and hosted from edition RunData and add paths: { product: null }.",
+      "deliver": []
+    },
+    {
+      "id": "run-data-pricing",
+      "introduced": "e628089b77facaaa1a23bd18df2fb81c36239cd2",
+      "origin": "foundation/runtime/run-site.ts",
+      "guide": "export/SEED-COMMAND-CONTRACT.md",
+      "edit": "Add pricing from runPricing to edition RunData, importing runPricing or combining JSON run data as { ...run, pricing: runPricing } in pages.ts.",
+      "deliver": ["foundation/runtime/run-pricing.ts"]
+    }
+  ]
+}

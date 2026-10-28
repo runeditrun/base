@@ -25,9 +25,9 @@ export async function providerResponse({send, method, timeoutMs, callerSignal, r
     const timer = firstRead ? setTimeout(() => firstRead.abort(new DOMException('Provider read timed out','TimeoutError')), Math.max(1, Math.ceil(timeoutMs / 2))) : undefined;
     timer?.unref();
     const attemptSignal = firstRead ? AbortSignal.any([signal, firstRead.signal]) : signal;
-    let readingBody = false;
+    let readingBody = false, response;
     try {
-      const response = await send(attemptSignal);
+      response = await send(attemptSignal);
       clearTimeout(timer);
       // A retried delete can observe the first attempt's committed deletion.
       if (removalReplay && method === 'DELETE' && attempt > 1 && response.status === 404) {
@@ -40,14 +40,17 @@ export async function providerResponse({send, method, timeoutMs, callerSignal, r
         continue;
       }
       readingBody = true;
-      const output = consume ? await consume(response,attempt) : undefined;
+      const output = consume ? await consume(response,attempt,attemptSignal) : undefined;
       return {response,attempts:attempt,output};
     }
     catch (cause) {
+      // A received HTTP refusal remains an HTTP refusal if the shared deadline
+      // expires while preparing its existing safe replay.
+      if (response && !response.ok && signal.aborted) return {response,attempts:attempt,output:'[response retry deadline expired]'};
       const bodyReset = readingBody && replayableAsset && cause.message === 'provider-transport-failed';
       if (attempt === 1 && !signal.aborted && (bodyReset || !readingBody && (read || replayableAsset || unsent(cause))) && reserveRetry()) continue;
       if (readingBody) throw cause;
-      throw failure(cause, attempt);
+      throw failure(timeout.aborted ? timeout.reason : cause, attempt);
     }
     // Body consumption and scoped asset replays keep the total deadline.
     finally { clearTimeout(timer); }
@@ -76,4 +79,16 @@ export function transportReason(error) {
     if (cause.name === 'TimeoutError' || cause.name === 'AbortError') return cause.name;
   }
   return 'network error';
+}
+
+/** Structural classes only; raw network messages stay behind the redactor. */
+export function transportClass(error) {
+  const reason = transportReason(error);
+  if (reason === 'TimeoutError') return 'timeout';
+  if (reason === 'UND_ERR_CONNECT_TIMEOUT') return 'connection timeout';
+  if (/ECONNRESET|EPIPE|UND_ERR_SOCKET/.test(reason)) return 'connection reset';
+  if (/ENOTFOUND|EAI_AGAIN/.test(reason)) return 'DNS failure';
+  if (/TLS|CERT|SSL/.test(reason)) return 'TLS failure';
+  if (reason === 'AbortError') return 'cancelled';
+  return 'network failure';
 }
