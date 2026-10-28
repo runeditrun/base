@@ -2,7 +2,8 @@ import { cp, mkdir, readFile, readdir, rm, writeFile, lstat } from 'node:fs/prom
 import { createHash } from 'node:crypto';
 import { resolve, dirname, relative } from 'node:path';
 import { testSource } from '../composition/git-source.mjs';
-import { cliVersion } from './version.mjs';
+import { cliVersion, stampedVersion } from './version.mjs';
+import { execFileSync } from 'node:child_process';
 
 // Copy whole maintained source/tooling directories. Python publication scans
 // load sibling modules and data dynamically; they belong in the inventory too.
@@ -41,8 +42,16 @@ export async function exportCLI(base, destination) {
   record[path] = { source: path, sha256: createHash('sha256').update(bytes).digest('hex') };
  }
  const onboardingFiles=Object.fromEntries(await Promise.all((await inventory(base,['onboarding'])).map(async path=>[path.slice('onboarding/'.length),{source:path,sha256:createHash('sha256').update(await readFile(resolve(base,path))).digest('hex')}])));
- // cliVersion: the rer version of this Base source, which `rer describe` reports.
- const version = cliVersion(base);
+ // The maintained reference is committed beside its exporter. Stamp its last
+ // exported source change, so committing generated copies does not invalidate
+ // their version again. Exports to other checkouts still name the exact HEAD.
+ let version;
+ if (resolve(destination) === resolve(base, 'default-seed')) {
+  const revision = execFileSync('git', ['-C', base, 'log', '-1', '--format=%H', 'HEAD', '--',
+   'global/package.json', ...files, ...Object.values(onboardingFiles).map(file => file.source)], { encoding: 'utf8' }).trim();
+  const source = JSON.parse(await readFile(resolve(base, 'global/package.json'), 'utf8'));
+  version = stampedVersion(base, source.version, revision);
+ } else version = cliVersion(base);
  await writeFile(resolve(target, 'inventory.json'), JSON.stringify({ version: 1, ...(version ? { cliVersion: version } : {}), onboarding: '../base-onboarding', onboardingFiles, files: record }, null, 2) + '\n');
  await writeFile(resolve(destination, 'scripts/rer.mjs'), "#!/usr/bin/env node\nimport { main } from './base-cli/cli/main.mjs';\nprocess.exitCode = await main();\n");
 }

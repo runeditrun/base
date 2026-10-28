@@ -71,6 +71,7 @@ export function options(args, count) {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--offline') result.offline = true;
+    else if (arg === '--from-api') result.fromApi = true;
     else if (arg === '--edition-migration') {
       if (!args[i + 1] || args[i + 1].startsWith('--')) throw Error(`${arg} requires a value`);
       result.editionMigration.push(args[++i]);
@@ -81,9 +82,50 @@ export function options(args, count) {
     } else if (arg.startsWith('--')) throw Error(`Unknown option: ${arg}`);
     else result.positional.push(arg);
   }
-  if (result.positional.length !== count) throw Error('Usage: verify-base [--record <file>] [--base <checkout>] [--offline] | record-base <path> <origin-path> <revision> [--record <file>] [--base <checkout>] | adapt-base <file> [--record <file>] | refresh-base <revision> [--record <file>] [--base <checkout>]');
+  if (result.positional.length !== count) throw Error('Usage: verify-base [--record <file>] [--base <checkout>] [--offline] | record-base <path> <origin-path> <revision> [--record <file>] [--base <checkout> | --from-api | --offline --base <checkout>] | adapt-base <file> [--record <file>] | refresh-base <revision> [--record <file>] [--base <checkout>]');
+  if (result.fromApi && count !== 3) throw Error('--from-api is only supported by record-base');
   safe(result.record);
   return result;
+}
+
+// Read immutable Git objects through GitHub, without cloning Base or trusting
+// an archive's filesystem modes. Refuse incomplete trees and verify blob IDs.
+function apiReader(record, root, revision) {
+  const declared = record.repository ?? baseRepository(root);
+  const repository = /^(?:https:\/\/github\.com\/)?([\w.-]+\/[\w.-]+?)(?:\.git)?$/.exec(declared)?.[1];
+  if (!repository) throw Error('--from-api requires a GitHub Base repository');
+  const request = endpoint => {
+    try {
+      return JSON.parse(execFileSync('gh', ['api', `repos/${repository}/git/${endpoint}`], {
+        encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000, maxBuffer: 64 * 1024 * 1024,
+      }));
+    } catch { throw Error(`Cannot read immutable Base ${revision} from the GitHub API; no copy record was changed.`); }
+  };
+  const pinned = request(`commits/${revision}`);
+  if (pinned.sha !== revision || !commit.test(pinned.tree?.sha)) throw Error('Base API did not resolve the immutable commit; no copy record was changed.');
+  const tree = request(`trees/${pinned.tree.sha}?recursive=1`);
+  if (tree.sha !== pinned.tree.sha || tree.truncated !== false || !Array.isArray(tree.tree)) throw Error('Incomplete Base API tree; no copy record was changed.');
+  const entries = new Map();
+  for (const entry of tree.tree) {
+    safe(entry.path);
+    if (entry.type === 'blob' && FILE_MODES.includes(entry.mode)) {
+      if (!commit.test(entry.sha)) throw Error('Invalid Base API blob identity');
+      entries.set(entry.path, {object: entry.sha, mode: entry.mode});
+    }
+  }
+  return {
+    tree: () => entries,
+    digests(objects) {
+      return new Map([...new Set(objects)].map(object => {
+        const blob = request(`blobs/${object}`);
+        if (blob.sha !== object || blob.encoding !== 'base64' || typeof blob.content !== 'string') throw Error('Invalid Base API blob');
+        const bytes = Buffer.from(blob.content, 'base64');
+        const actual = crypto.createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+        if (blob.size !== bytes.length || actual !== object) throw Error('Base API blob integrity mismatch; no copy record was changed.');
+        return [object, hash(bytes)];
+      }));
+    },
+  };
 }
 
 export function validate(record) {
@@ -326,16 +368,18 @@ export function verifyCopies(root, {record: recordPath, base, offline}) {
   };
 }
 
-export function recordCopy(root, {positional: [localPath, originPath, revision], record: recordPath, base}) {
+export function recordCopy(root, {positional: [localPath, originPath, revision], record: recordPath, base, offline, fromApi}) {
   safe(localPath); safe(originPath);
   if (!commit.test(revision)) throw Error('Record an immutable full Base commit');
   const filename = recordFile(root, recordPath) || path.join(root, recordPath);
   const record = validate(fs.existsSync(filename) ? JSON.parse(fs.readFileSync(filename, 'utf8')) : {schemaVersion: 1, copies: []});
   const files = seedFiles(root);
-  const origin = open(record, base, root);
-  delete record.repository;
+  if (fromApi && (base || offline)) throw Error('--from-api cannot be combined with --base or --offline');
+  if (offline && !base) throw Error('record-base --offline requires --base <checkout>; use --from-api while online');
+  const origin = fromApi ? {close() {}} : open(record, base, root, offline);
   try {
-    const read = reader(origin);
+    const read = fromApi ? apiReader(record, root, revision) : reader(origin);
+    delete record.repository;
     const sources = [...read.tree(revision)].filter(([name]) => within(name, originPath));
     if (!sources.length) throw Error(`No Base source at ${originPath} in ${revision}`);
     const present = sources.filter(([name]) => files.get(mapped(name, originPath, localPath))?.regular);

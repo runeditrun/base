@@ -367,3 +367,28 @@ test('packed refresh fetches missing Base ancestry and refuses unreachable or of
   }
  }
 });
+
+
+test('packed refresh preserves literal workflow text and refreshes an acknowledged current template quietly', async t => {
+ const {seed, source, old, result} = await fixture(t);
+ const workflow = '.github/workflows/verify.yml', origin = 'export/verify.yml';
+ const current = `jobs:
+  check:
+    steps:
+      - run: |
+          echo "the owner's workflow"
+          node scripts/polish-helper.mjs
+`;
+ write(source, origin, current);
+ write(source, 'export/polish-helper.mjs', 'export const helper = true;\n');
+ const revision = commit(source);
+ write(seed, workflow, current);
+ old('record-base', workflow, origin, revision, '--base', source);
+ old('adapt-base', workflow);
+ commit(seed);
+ const refreshed = result('refresh-base', '--ref', revision, '--base', source);
+ assert.deepEqual(refreshed.notices, []);
+ assert.equal(fs.readFileSync(path.join(seed, workflow), 'utf8'), current);
+ assert.equal(fs.readFileSync(path.join(seed, 'scripts/polish-helper.mjs'), 'utf8'), fs.readFileSync(path.join(source, 'export/polish-helper.mjs'), 'utf8'));
+ assert.equal(old('verify-base', '--base', source).ok, true);
+});
