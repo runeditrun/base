@@ -6,7 +6,7 @@ import { autonomousPolicy } from '../conformance/crypto.mjs'
 const errorCode = (reply: any) => reply.result?._meta?.['com.runeditrun/error']?.code ?? reply.error?.data?.code
 const result = (reply: any) => reply.result?.structuredContent
 const job = () => ({ id: crypto.randomUUID(), idempotency_key: crypto.randomUUID() })
-const drain = async (r: any, id: string, override?: object) => (await r.post('/__queue', { id, override }, { cookie: r.c.person.cookie })).json()
+const drain = async (r: any, id: string, override?: object, args?: object) => (await r.post('/__queue', { id, override, args }, { cookie: r.c.person.cookie })).json()
 const saved = async (r: any, table: string, id: string) => {
  const row = await r.db.prepare(`SELECT saved FROM ${table} WHERE id=?`).bind(id).first()
  return row ? JSON.parse(row.saved) : null
@@ -39,10 +39,15 @@ test('native queue retains admission identity through one effect and replay', as
   assert.equal((await drain(r, first.id)).result.id, first.id)
   assert.equal((await drain(r, second)).result.id, second)
   assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM test_effects WHERE id IN (?,?)').bind(first.id, second).first()).n, 2)
+  assert.equal((await drain(r, first.id, undefined, { value: 'changed' })).code, 'idempotency_conflict')
   const fanoutRows = (await r.person('/agents/api/audit')).body.rows.filter((row: any) => row.tool === 'synthetic.queue.execute' && row.operation_id === (one.result as any).operationId)
   assert.deepEqual([...new Set(fanoutRows.map((row: any) => row.continuation_item_id))].sort(), [first.id, second].sort())
   for (const row of fanoutRows) { assert.equal(row.idempotency_key, first.idempotency_key); assert.equal(row.consent, admission.consent) }
   assert.equal(errorCode(await r.tool('queue.execute', { id: second, idempotency_key: first.idempotency_key })), 'operation_mismatch')
+  for (const id of [' ', `${crypto.randomUUID()}\0`, crypto.randomUUID().repeat(6)]) {
+   assert.ok(result(await r.tool('queue.prepare', { id, idempotency_key: crypto.randomUUID() }))?.operationId)
+   assert.equal((await drain(r, id)).code, 'operation_mismatch')
+  }
   // A caller cannot select another replay namespace or mutate an item's native origin.
   assert.equal((await drain(r, second, { continuationItemId: crypto.randomUUID() })).result.id, second)
   const secondAdmission = await saved(r, 'test_jobs', second)
