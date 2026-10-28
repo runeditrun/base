@@ -20,7 +20,7 @@ const cases = [
 ];
 
 for (const [label, sql] of cases) {
-  test(`rejects ${label} before migration reads or claims`, async t => {
+  test(`deployment rejects ${label} before any provider request or migration claim`, async t => {
     const fixture = providerFixture();
     t.after(() => fixture.close());
     const api = cloudflare(fixture);
@@ -32,11 +32,8 @@ for (const [label, sql] of cases) {
     assert.deepEqual(fixture.state.calls, []);
     assert.deepEqual(fixture.state.writes, []);
     assert.deepEqual(migrations, original);
-  });
 
-  test(`deployment rejects ${label} before any provider request`, async t => {
-    const fixture = providerFixture();
-    t.after(() => fixture.close());
+    // The same untouched provider proves the public deploy door enforces the refusal too.
     const source = 'export default {scheduled() {},fetch(){return new Response("test")}}';
     const artifact = {
       version: 1, source: { sha: '1'.repeat(40), tree: '2'.repeat(40) }, run: { id: '12345', attempt: '1' },
