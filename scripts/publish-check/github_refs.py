@@ -40,10 +40,15 @@ SOURCE = re.compile(r'(?i)\.[cm]?[jt]sx?$')
 TYPED_REPOSITORY = re.compile(r'''(?im)(?<![\w$])(?:repository|repo|github|sourceRepository)\s*:\s*string\s*=\s*["'`](''' + PAIR + r''')["'`]''')
 DECLARED_SHORTHAND = re.compile(r'''(?im)(?<![\w$])["'`]?(?:url|fullURL)["'`]?\s*[:=]\s*["'`](''' + PAIR + r''')["'`]''')
 REPOSITORY_ROUTE = re.compile(r'/(?:tree|blob|issues|pull|pulls|commit|commits|releases|actions|wiki|discussions|compare|tags)(?:/|$)')
-SHORTHAND = PAIR + r'(?:[/?#][^\s`<>]*)?'
+SHORTHAND = PAIR + r'(?:[/?#][^\s`<>|]*)?'
 REPOSITORY_CONTEXT = r'github|repository|repo|source|upstream|downstream|fork(?:ed)?(?:\s+(?:from|of|into))?|clone(?:d)?(?:\s+from)?|gh\s+repo\s+(?:clone|view|fork)'
 MARKUP = r'[`*_~\[\]]*'
-MARKDOWN_REFERENCE = re.compile(r'`(?P<code>' + SHORTHAND + r')`|(?<![A-Za-z])(?P<label>(?i:' + REPOSITORY_CONTEXT + r'))(?:\s+(?:repository|repo))?' + MARKUP + r'(?P<separator>\s*[:=|]\s*|\s+)(?P<markup>' + MARKUP + r')\s*(?P<reference>' + SHORTHAND + r')(?![A-Za-z0-9_./-])')
+MARKDOWN_REFERENCE = re.compile(
+    r'`(?P<code>' + SHORTHAND + r')`|(?<![A-Za-z])(?P<label>(?i:' +
+    REPOSITORY_CONTEXT.replace(r'\s', r'[ \t]') + r'))(?:[ \t]+(?i:repository|repo))?' + MARKUP +
+    r'(?P<separator>[ \t]*[:=][ \t]*(?:\r?\n[ \t]*)?|[ \t]*\|[ \t]*|[ \t]+)' +
+    r'(?P<markup>[`*_~\[\] \t]*)' +
+    r'(?P<reference>' + SHORTHAND + r')(?![A-Za-z0-9_./-])')
 
 EXPLICIT_URL = re.compile(r'''(?im)["']?(?:repository|repo|github|sourceRepository)["']?\s*[:=]\s*(?:\{\s*["']?(?:url|fullURL)["']?\s*:\s*)?[`*_~\["']*\s*(''' + URL.pattern.replace('(?i)', '') + ')', re.I)
 CONTEXT_URL = re.compile(r'(?i)(?<![A-Za-z])(?:' + REPOSITORY_CONTEXT + r')'
@@ -51,10 +56,29 @@ CONTEXT_URL = re.compile(r'(?i)(?<![A-Za-z])(?:' + REPOSITORY_CONTEXT + r')'
                          + r'''[`*_~\[\]\s"']*(?:''' + URL.pattern.replace('(?i)', '') + ')')
 LINK_URL = re.compile(r'(?i)\[(?P<label>[^]\n]+)\]\(\s*(?P<url>' + URL.pattern.replace('(?i)', '') + ')')
 REPOSITORY_LABEL = re.compile(r'(?i)\b(?:' + REPOSITORY_CONTEXT + r')\b')
-# Words that make a nearby `owner/name` a repository rather than an identifier.
-# A bare "source" is not one: "source commit/tree" is ordinary prose.
-NEARBY_CONTEXT = re.compile(r'(?i)\b(?:github|repositor(?:y|ies)|repos?|forks?|forked|clones?|cloned|upstream|downstream|origin|submodules?)\b')
-CONTEXT_WINDOW = 60
+
+
+def markdown_repository_context(match, text):
+    """A declaration or command must introduce this token in its own line/cell."""
+    if match['reference'] is None:
+        return False
+    separator, label = match['separator'], match['label']
+    if '|' in separator:
+        # A table field has a whole label cell. An outcome ending in a word
+        # like "repository" cannot declare the source path in the next cell.
+        start = max(text.rfind('\n', 0, match.start()), text.rfind('|', 0, match.start())) + 1
+        return re.fullmatch(r'[ \t]*' + MARKUP, text[start:match.start()]) is not None
+    if re.search(r'[:=]', separator) or re.match(r'(?i)github|gh\s|clone|fork|upstream|downstream', label):
+        return True
+    bare_source = re.fullmatch(r'(?i)source', label) and not re.search(
+        r'(?i)repository|repo', text[match.start():match.start('reference')])
+    start, end = text.rfind('\n', 0, match.start()) + 1, text.find('\n', match.end())
+    before, after = text[start:match.start()], text[match.end():end if end >= 0 else len(text)]
+    if not bare_source and not before.strip(' \t#*-+') and not after.strip(' \t`*_~.,;'):
+        return True
+    # A marked repository mention is intentional; an unmarked noun followed
+    # by word/word can just be prose. Bare "source" still names local concepts.
+    return '`' in match['markup'] and not bare_source
 
 
 def explicit_references(text, path):
@@ -109,7 +133,7 @@ def reference_sets(text, path, local_paths=frozenset(), project_identity=None):
         markdown = URL.sub('', text)
         markdown = re.sub(r'\]\((?![A-Za-z][A-Za-z0-9+.-]*://)[^)]*\)', ']()', markdown)
         for match in MARKDOWN_REFERENCE.finditer(markdown):
-            explicit = match['reference'] is not None
+            stated = markdown_repository_context(match, markdown)
             value = re.split(r'[?#]', match['reference'] or match['code'], maxsplit=1)[0]
             # Underscores are also legal slug characters; remove a closing
             # emphasis marker only when the reference has its matching opener.
@@ -118,22 +142,16 @@ def reference_sets(text, path, local_paths=frozenset(), project_identity=None):
                 value = value[:-len(emphasis.group())]
             repository = '/'.join(value.split('/')[:2])
             suffix = value[len(repository):]
-            if not explicit and (value in local_paths or repository in local_paths or FILE_SUFFIX.search(repository)
+            route = REPOSITORY_ROUTE.match(suffix)
+            if not stated and not route and (value in local_paths or repository in local_paths or FILE_SUFFIX.search(repository)
                                  or repository.split('/')[0] in LOCAL_DIRECTORIES):
                 continue
             # A plain multi-segment path is ambiguous; GitHub's repository
             # routes, a labeled field or a GitHub command disambiguate it.
-            labeled = explicit and (re.search(r'[:=|]', match['separator']) or re.match(r'(?i)github|gh\s', match['label']))
-            if REPOSITORY_ROUTE.match(suffix) or labeled:
+            if route or stated:
                 found.add(normalize(repository))
             elif not suffix:
-                if explicit:
-                    weak = re.fullmatch(r'(?i)source', match['label']) and not re.search(r'(?i)repository|repo', markdown[match.start():match.start('reference')])
-                else:
-                    line_start = markdown.rfind('\n', 0, match.start()) + 1
-                    around = markdown[max(line_start, match.start() - CONTEXT_WINDOW):match.end() + CONTEXT_WINDOW].split('\n', 1)[0]
-                    weak = not NEARBY_CONTEXT.search(around)
-                (ambiguous if weak else found).add(normalize(repository))
+                ambiguous.add(normalize(repository))
     elif METADATA.search(path) or SOURCE.search(path):
         if path.lower().endswith('.json'):
             try:

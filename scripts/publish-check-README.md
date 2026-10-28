@@ -116,10 +116,12 @@ aside); an MP4/AVIF file needs a sized `ftyp` box with a known brand and a
 still inspected whole. Known environment values and Gitleaks still see all
 media bytes. Other binary content keeps the shape rule above.
 A bare `word/word` in prose (`commit/tree`, `rer-delegation/1`,
-`` font resource version tokens ``) with no GitHub context nearby (a URL, a repository field, a
-label or command, `repository`, `clone`, `fork`, `upstream`, a repository route)
+`` font resource version tokens ``) without attached GitHub context (a URL, a repository field,
+a marked repository mention, a clone/fork command, upstream/downstream context or a repository route)
 is a repository only when one exists privately; a missing answer proves nothing.
-Stated references to missing repositories still fail.
+Headings, unrelated prose and preceding table outcomes do not provide that context.
+A table declaration needs a whole repository-label cell. Stated references to
+missing repositories still fail, even when their names also resemble local paths.
 
 POSIX home prefixes retain their canonical case (`/Users/` and `/home/`); Windows
 home paths are case insensitive. Lowercase application URLs such as `/users/profile`
