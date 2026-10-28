@@ -11,23 +11,44 @@ import { documentedFixture, digest, verifiedFixture } from './status/fixtures.ts
 
 async function fixture() {
   const existing = verifiedFixture();
+  // Test-only data shaped like a real export; this is no claim of a captured vendor export.
+  const tickets = [
+    { id: 'synthetic-receipt-1', subject: 'Invoice correction', status: 'closed', updatedAt: '2026-10-05T10:00:00.000Z' },
+    { id: 'synthetic-receipt-2', subject: 'Delivery follow-up', status: 'pending', updatedAt: '2026-10-05T11:00:00.000Z' },
+  ];
+  const attachment = { sourceId: tickets[0].id, name: 'invoice.txt', sha256: digest('Synthetic invoice attachment'), size: Buffer.byteLength('Synthetic invoice attachment') };
+  const sourceBytes = Buffer.from(tickets.map((ticket) => JSON.stringify(ticket)).join('\n') + '\n');
+  Object.assign(existing.payload.source, { sha256: digest(sourceBytes), size: sourceBytes.byteLength });
+  const manifests = {
+    rows: tickets,
+    provenance: tickets.map(({ id }) => ({ sourceId: id, targetId: id, mappingVersion: existing.payload.mapping.version })),
+    attachments: [attachment],
+  };
+  for (const kind of ['rows', 'provenance', 'attachments'] as const) {
+    const manifest = manifests[kind];
+    existing.payload.reconciliation[kind] = {
+      sourceCount: manifest.length, targetCount: manifest.length,
+      sourceManifestSha256: digest(canonicalReceiptJson(manifest)),
+      targetManifestSha256: digest(canonicalReceiptJson(structuredClone(manifest))),
+    };
+  }
   const keys = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
   const other = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
   const policy = {
-    environment: 'stage',
+    environment: 'test',
     keys: {
-      stage: { publicKey: keys.publicKey, environments: ['stage'] },
-      other: { publicKey: other.publicKey, environments: ['stage'] },
+      test: { publicKey: keys.publicKey, environments: ['test'] },
+      other: { publicKey: other.publicKey, environments: ['test'] },
     },
   };
-  const receipt = await signImporterVerificationReceipt(existing.payload, 'stage', keys.privateKey);
+  const receipt = await signImporterVerificationReceipt(existing.payload, 'test', keys.privateKey);
   return { ...existing, keys, policy, receipt };
 }
 
 test('public signer and verifier round trip canonical JSON independently of insertion order and host collation', async () => {
   const { receipt, policy, payload, keys } = await fixture();
   const reordered = Object.fromEntries(Object.entries(payload).reverse());
-  const signedAgain = await signImporterVerificationReceipt(reordered, 'stage', keys.privateKey);
+  const signedAgain = await signImporterVerificationReceipt(reordered, 'test', keys.privateKey);
   assert.equal(signedAgain.signature, receipt.signature);
   assert.equal((await verifyImporterVerificationReceipt(receipt, policy)).valid, true);
   assert.equal((await verifyImporterVerificationReceipt({ ...receipt, payload: reordered }, policy)).valid, true);
@@ -47,7 +68,7 @@ test('public signer and verifier round trip canonical JSON independently of inse
     const unmapped = structuredClone(payload);
     for (const run of [unmapped.runs.dryRun, unmapped.runs.apply]) run.unmapped = ordered.length;
     unmapped.unmapped = { count: ordered.length, itemManifestSha256: digest(canonicalReceiptJson(ordered)), items: ordered };
-    return signImporterVerificationReceipt(unmapped, 'stage', keys.privateKey);
+    return signImporterVerificationReceipt(unmapped, 'test', keys.privateKey);
   };
   const hostCompare = String.prototype.localeCompare;
   const danish = new Intl.Collator('da');
@@ -71,6 +92,7 @@ test('verification refuses tampering, unknown, wrong or misrestricted keys, synt
     { ...receipt, keyId: 'unknown' },
     { ...receipt, keyId: 'other' },
     { ...receipt, payload: { ...receipt.payload, synthetic: true } },
+    { ...receipt, payload: { ...receipt.payload, source: { ...receipt.payload.source, classification: 'synthetic' } } },
     { ...receipt, signature: Buffer.from(signature).toString('base64') },
   ];
   for (const value of altered) {
@@ -80,13 +102,14 @@ test('verification refuses tampering, unknown, wrong or misrestricted keys, synt
     assert.equal((await verifyImporterVerificationReceipt(receipt, outsidePolicy)).valid, false);
   }
   // Only an omitted list or an array naming the environment admits a key; any other restriction fails closed.
-  const production = (environments, environment = 'production') => ({ environment, keys: { stage: { publicKey: keys.publicKey, environments } } });
+  const production = (environments, environment = 'production') => ({ environment, keys: { test: { publicKey: keys.publicKey, environments } } });
   const misrestricted = ['non-production', 'preproduction', null, false, 0, '', {}, new Set(['production'])].map((environments) => production(environments));
   for (const odd of [...misrestricted, production(undefined, ['production'])]) {
     assert.equal((await verifyImporterVerificationReceipt(receipt, odd)).valid, false);
   }
-  assert.equal((await verifyImporterVerificationReceipt(receipt, production(['stage', 'production']))).valid, true);
-  await assert.rejects(signImporterVerificationReceipt({ ...receipt.payload, synthetic: true }, 'stage', keys.privateKey));
+  assert.equal((await verifyImporterVerificationReceipt(receipt, production(['test', 'production']))).valid, true);
+  await assert.rejects(signImporterVerificationReceipt({ ...receipt.payload, synthetic: true }, 'test', keys.privateKey));
+  await assert.rejects(signImporterVerificationReceipt({ ...receipt.payload, source: { ...receipt.payload.source, classification: 'synthetic' } }, 'test', keys.privateKey));
 });
 
 test('signed receipts must include source digest and all schema counts, and nothing outside the schema', async () => {
@@ -109,7 +132,7 @@ test('signed receipts must include source digest and all schema counts, and noth
     assert.equal(result.valid, false);
     assert.deepEqual(result.issues.map((issue) => issue.code), ['SCHEMA_ADDITIONAL_PROPERTY']);
     const payload = JSON.parse(canonicalReceiptJson(receipt.payload).replace('"source":{', `"source":{${JSON.stringify(name)}:"outside the schema",`));
-    await assert.rejects(signImporterVerificationReceipt(payload, 'stage', keys.privateKey), /SCHEMA_ADDITIONAL_PROPERTY/);
+    await assert.rejects(signImporterVerificationReceipt(payload, 'test', keys.privateKey), /SCHEMA_ADDITIONAL_PROPERTY/);
   }
 });
 
@@ -137,7 +160,55 @@ test('the evidence port admits verified only with a verifying receipt and preser
   assert.equal((await validateImporters(documented.document, port)).valid, true);
   publish(f.receipt);
   const production = createReceiptEvidencePort(port, { ...f.policy, environment: 'production' });
-  assert.equal((await validateImporters(document, production)).evidence.verifiedReceipts, 0);
+  const outsideEnvironment = await validateImporters(document, production);
+  assert.equal(outsideEnvironment.valid, false);
+  assert.equal(outsideEnvironment.evidence.verifiedReceipts, 0);
+  assert.ok(outsideEnvironment.issues.some((issue) => issue.code === 'RECEIPT_KEY_UNTRUSTED'));
+
+  const refuses = async (evidencePort, code) => {
+    const result = await validateImporters(document, evidencePort);
+    assert.equal(result.valid, false);
+    assert.equal(result.evidence.verifiedReceipts, 0);
+    assert.ok(result.issues.some((issue) => issue.code === code), JSON.stringify(result.issues));
+  };
+  // Check resolver and byte pins through the environment-scoped port, without changing the signed claims.
+  for (const link of [f.receiptLink, f.researchLink]) {
+    await refuses(createReceiptEvidencePort({ ...port, resolve: (requested) => requested === link ? undefined : artifacts.get(requested) }, f.policy), 'EVIDENCE_NOT_FOUND');
+    await refuses(createReceiptEvidencePort({ ...port, resolve: (requested) => {
+      const artifact = artifacts.get(requested);
+      return requested === link ? { ...artifact, url: link + '/redirected' } : artifact;
+    } }, f.policy), 'EVIDENCE_URL_MISMATCH');
+    const original = artifacts.get(link)!;
+    const changed = new Uint8Array(original.bytes);
+    changed[0] ^= 1;
+    artifacts.set(link, { ...original, bytes: changed });
+    await refuses(port, 'EVIDENCE_HASH_MISMATCH');
+    artifacts.set(link, original);
+  }
+  await refuses(createReceiptEvidencePort({ ...port, trustedHosts: ['docs.example.test'] }, f.policy), 'EVIDENCE_PUBLISHER_UNTRUSTED');
+  publish({ ...f.receipt, payload: { ...f.receipt.payload, command: f.receipt.payload.command + ' changed' } });
+  await refuses(port, 'RECEIPT_SIGNATURE_INVALID');
+  // A valid signature and updated artifact pins cannot repair inconsistent signed claims.
+  for (const [mutate, code] of [
+    [(payload) => { payload.mapping.policy += ' changed'; }, 'RECEIPT_MAPPING_HASH_MISMATCH'],
+    [(payload) => { payload.research.sha256 = digest('Other finished research'); }, 'RESEARCH_HASH_MISMATCH'],
+    ...['rows', 'provenance', 'attachments'].map((kind) => [
+      (payload) => { payload.reconciliation[kind].targetManifestSha256 = digest('Different persisted manifest'); },
+      'RECONCILIATION_MISMATCH',
+    ]),
+  ]) {
+    const payload = structuredClone(f.payload);
+    mutate(payload);
+    publish(await signImporterVerificationReceipt(payload, 'test', f.keys.privateKey));
+    await refuses(port, code);
+  }
+  // Bypass the signer's schema guard to model a trusted issuer wrongly labelling a synthetic source as real.
+  const syntheticPayload = { ...f.payload, source: { ...f.payload.source, classification: 'synthetic' } };
+  const signature = await crypto.subtle.sign('Ed25519', f.keys.privateKey, new TextEncoder().encode(canonicalReceiptJson(syntheticPayload)));
+  publish({ ...f.receipt, payload: syntheticPayload, signature: Buffer.from(signature).toString('base64') });
+  await refuses(port, 'SCHEMA_CONST');
+  publish(f.receipt);
+  assert.equal((await validateImporters(document, port)).valid, true);
 });
 
 test('Worker and Node exchange signed receipts using WebCrypto without nodejs_compat and judge export origins alike', async () => {
@@ -150,7 +221,7 @@ test('Worker and Node exchange signed receipts using WebCrypto without nodejs_co
     [`https://exampledesk.example.test/${'a'.repeat(2 ** 23)}`, true],
   ]);
   const originReceipts = await Promise.all([...origins.keys()].map((origin) => signImporterVerificationReceipt(
-    { ...f.payload, source: { ...f.payload.source, origin } }, 'stage', f.keys.privateKey)));
+    { ...f.payload, source: { ...f.payload.source, origin } }, 'test', f.keys.privateKey)));
   const entry = fileURLToPath(new URL('../src/receipt/index.ts', import.meta.url));
   const bundle = await build({
     stdin: { resolveDir: fileURLToPath(new URL('../src/receipt/', import.meta.url)), contents: `
@@ -158,7 +229,7 @@ test('Worker and Node exchange signed receipts using WebCrypto without nodejs_co
       export default { async fetch(request) {
         const input = await request.json();
         const publicKey = await crypto.subtle.importKey('raw', new Uint8Array(input.publicKey), 'Ed25519', false, ['verify']);
-        const policy = { environment: 'stage', keys: { stage: { publicKey, environments: ['stage'] } } };
+        const policy = { environment: 'test', keys: { test: { publicKey, environments: ['test'] } } };
         const accepted = await verifyImporterVerificationReceipt(input.receipt, policy);
         const refused = await verifyImporterVerificationReceipt(input.receipt, { ...policy, environment: 'production' });
         const origins = await Promise.all(input.originReceipts.map(async (receipt) => (await verifyImporterVerificationReceipt(receipt, policy)).valid));
@@ -181,7 +252,7 @@ test('Worker and Node exchange signed receipts using WebCrypto without nodejs_co
     const node = await Promise.all(originReceipts.map(async (receipt) => (await verifyImporterVerificationReceipt(receipt, f.policy)).valid));
     assert.deepEqual({ node, worker: result.origins }, { node: [...origins.values()], worker: [...origins.values()] });
     const publicKey = await crypto.subtle.importKey('raw', new Uint8Array(result.publicKey), 'Ed25519', false, ['verify']);
-    assert.equal((await verifyImporterVerificationReceipt(result.receipt, { environment: 'stage', keys: { worker: { publicKey } } })).valid, true);
+    assert.equal((await verifyImporterVerificationReceipt(result.receipt, { environment: 'test', keys: { worker: { publicKey } } })).valid, true);
   } finally {
     await mf.dispose();
   }

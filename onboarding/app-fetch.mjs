@@ -1,5 +1,5 @@
 // Requests rer itself makes to a local app's own origin (health, sign-in,
-// dev identity). A directly served origin uses fetch. A front-door
+// dev identity). Direct loopback fetches close each connection. A front-door
 // origin (http://NAME.localhost:PORT) is never resolved and never goes through
 // the door: rer connects with node:http to that checkout's own proxy on
 // 127.0.0.1, which keeps the Host header (fetch drops a Host override, and musl
@@ -10,6 +10,7 @@
 // whatever answers that name (the door, or a process that took its port) never
 // receives rer's own requests, which can carry the checkout's dev key.
 import http from 'node:http';
+import { loopbackFetch } from './loopback-fetch.mjs';
 import { basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 // The shared loopback predicate, beside this copy in Base or in a seed's scripts/.
@@ -32,7 +33,8 @@ export function loopbackRequest({ host = '127.0.0.1', port, path = '/', method =
    response.on('end', () => resolve({ status: response.statusCode, statusText: response.statusMessage ?? '', rawHeaders: response.rawHeaders, body: Buffer.concat(chunks) }));
    response.on('error', reject);
   });
-  request.setTimeout(timeoutMs, () => request.destroy(Object.assign(Error(`No answer from ${host}:${port} within ${timeoutMs / 1000} s.`), { code: 'ETIMEDOUT' })));
+  const timer=setTimeout(() => request.destroy(Object.assign(Error(`No answer from ${host}:${port} within ${timeoutMs / 1000} s.`), { code: 'ETIMEDOUT' })),timeoutMs);
+  request.once('close',()=>clearTimeout(timer));
   request.on('error', reject);
   request.end(body);
  });
@@ -53,14 +55,14 @@ function unrouted(url) {
 export async function appFetch(input, init = {}) {
  let url = new URL(input instanceof Request ? input.url : String(input));
  if (!routes.has(url.origin) && isLocalhostName(url.hostname)) throw unrouted(url);
- if (!routes.has(url.origin)) return fetch(input, init);
+ if (!routes.has(url.origin)) return loopbackFetch(input, init);
  let method = (init.method ?? 'GET').toUpperCase(), body = await bodyBytes(init.body);
  const sent = Object.fromEntries(new Headers(init.headers ?? {}));
  if (body !== undefined && init.body instanceof URLSearchParams && !sent['content-type']) sent['content-type'] = 'application/x-www-form-urlencoded;charset=UTF-8';
  for (let hops = 0; ; hops++) {
   const route = routes.get(url.origin);
   if (!route && isLocalhostName(url.hostname)) throw unrouted(url);
-  if (!route) return fetch(url, { ...init, method, body });
+  if (!route) return loopbackFetch(url, { ...init, method, body });
   const reply = await loopbackRequest({ port: route.port, path: url.pathname + url.search, method, headers: { ...sent, ...route.headers, host: url.host, ...(body ? { 'content-length': String(body.length) } : {}) }, body, signal: init.signal });
   const headers = new Headers();
   for (let i = 0; i < reply.rawHeaders.length; i += 2) headers.append(reply.rawHeaders[i], reply.rawHeaders[i + 1]);

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Api, identifier } from './api.mjs';
 import { sensitive } from './detector.mjs';
 import { paired } from './local-commands.mjs';
+import { applyOptIns } from './opt-ins.mjs';
 
 const protocolVersion = '2025-11-25';
 const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': protocolVersion };
@@ -51,7 +52,9 @@ function classification(task) {
 export async function next() {
  const signal = AbortSignal.timeout(55_000);
  const { state, credential } = await paired();
- const tasks = await nextQuestions(new Api(state.origin, credential), signal);
+ const api = new Api(state.origin, credential);
+ await applyOptIns(api, state, { report: false });
+ const tasks = await nextQuestions(api, signal);
  const item = tasks.find(task => task.kind === 'classify.row' || task.runner === 'owner' || ownerKinds.has(task.kind));
  if (!item) { process.stdout.write('Nothing yet.\n'); return; }
  const id = identifier(item.task_id);

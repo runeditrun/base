@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { localVariables } from '../onboarding/local/environment.mjs';
 import { personaLinks } from './fixtures/persona-links.mjs';
-import { commandDiagnostic } from './fixtures/command-diagnostic.mjs';
+import { commandDiagnostic, retainStartupFailure } from './fixtures/command-diagnostic.mjs';
 import { productionSender } from './fixtures/production-sender.mjs';
 import { originalArchiveIdentity, recoverArchiveIdentity } from './fixtures/archive-identity.mjs';
 import { archiveRecords, archiveRows, archiveItems, remakeArchive } from './fixtures/archive-records.mjs';
@@ -27,7 +27,12 @@ for(const kind of ['default-seed','foundation'])test(`${kind}: standalone real W
  const f=await fixture(kind,t);let port,url;
  await t.test('frozen install and real local application lifecycle', async local=>{
  const events=child=>child.stdoutText.trim().split('\n').map(line=>JSON.parse(line));
- const guide=await readFile(join(f.root,'RUN-LOCALLY.md'),'utf8'),steps=guide.match(/```sh\n([^`]+)\n```/)?.[1].trim().split('\n');assert.ok(steps,'exported operator recipe is available to execute');
+ const guide=await readFile(join(f.root,'RUN-LOCALLY.md'),'utf8');
+ // The opening block installs rer and launches a repository. This journey
+ // already owns a checkout and exercises the separate real-owner recipe.
+ const ownerGuide=guide.split(/^## Install for a real owner$/m)[1]?.split(/^## /m)[0];
+ const steps=ownerGuide?.match(/```sh\n([^`]+)\n```/)?.[1].trim().split('\n');
+ assert.deepEqual(steps,['rer install','rer setup --owner-email you@example.com','rer dev'],'the exported real-owner recipe installs, sets up, then starts this checkout');
  await f.run(['check','--profile','first-party','--json']);
  await f.documented(steps[0]);
  for (const output of ['journey.json','public/x.rer','dist/client/x.rer','src/x.rer']) await f.run(['export','--output',output,'--json'],4);
@@ -95,6 +100,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  port=await freePort();while(port===setupPort)port=await freePort();url=`http://127.0.0.1:${port}`;
  const dev=f.start(['dev','--port',String(port),'--json','--non-interactive']);local.after(()=>f.stop(dev));
  const deadline=Date.now()+120000;while(!dev.stdoutText.includes('"event":"ready"')&&dev.exitCode===null&&Date.now()<deadline)await pause(100);
+ if (!dev.stdoutText.includes('"event":"ready"')) await retainStartupFailure(f.root, dev);
  assert.ok(dev.stdoutText.includes('"event":"ready"'),'actual dev health must precede ready');
  await privateRuntime(url,f.root,{kind,runtime:'dev'});
  const ready=events(dev).find(e=>e.event==='ready');assert.equal(ready.url,url);assert.equal(ready.signInUrl,undefined);
@@ -130,7 +136,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  await f.run(['reset','--yes','--non-interactive','--json'],4);
  await signedOutSetup(url);
  assert.equal(await hostStatus(url+'/setup','example.invalid'),421,'setup rejects a forged Host before revealing its document');
- const browser=await chromium.launch();
+ const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
   // RER_OPEN opens the app signed in as the owner, at /setup until first-run is finished.
   const opened=await browser.newContext(),openedPage=await opened.newPage();
@@ -153,8 +159,9 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  await f.stop(dev);assert.equal(dev.exitCode,143);assert.ok(await fetch(ready.siteUrl).then(()=>false,()=>true),'the run site preview stops with dev');assert.equal(events(dev).filter(e=>e.event==='ready').length,1);assert.equal(events(dev).at(-1).event,'result');
  const login=f.start(['dev','--login','--port',String(port),'--json','--non-interactive']);
  const loginDeadline=Date.now()+120000;while(!login.stdoutText.includes('"event":"ready"')&&login.exitCode===null&&Date.now()<loginDeadline)await pause(100);
+ if (!login.stdoutText.includes('"event":"ready"')) await retainStartupFailure(f.root, login);
  assert.ok(login.stdoutText.includes('"event":"ready"'),JSON.stringify({requirement:'legacy rer dev --login starts automatic owner entry',...commandDiagnostic(login)}));
- const loginReady=events(login).find(e=>e.event==='ready'),loginBrowser=await chromium.launch();
+ const loginReady=events(login).find(e=>e.event==='ready'),loginBrowser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
   const context=await loginBrowser.newContext(),page=await context.newPage();
   await page.goto(loginReady.openUrl);await page.waitForURL(url+'/app');
@@ -162,6 +169,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  } finally {await loginBrowser.close();await f.stop(login);}
  const preview=f.start(['preview','--port',String(port),'--json','--non-interactive']);
  const previewDeadline=Date.now()+120000;while(!preview.stdoutText.includes('"event":"ready"')&&preview.exitCode===null&&Date.now()<previewDeadline)await pause(100);
+ if (!preview.stdoutText.includes('"event":"ready"')) await retainStartupFailure(f.root, preview);
  assert.ok(preview.stdoutText.includes('"event":"ready"'),'real preview starts');
  await privateRuntime(url,f.root,{kind,runtime:'preview'});await f.stop(preview);
  assert.deepEqual((await f.data('SELECT email FROM oa_first_run JOIN oa_operators ON completed_by = id'))[0].results,[{email:'cli-owner@example.test'}],'first-run completion persists in real D1 after app shutdown');
@@ -184,7 +192,7 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  try {
   declaration.vars.MAIL_FROM=productionSender;await writeFile(deployPath,JSON.stringify(declaration));
   await writeFile(deploySettings,'MAIL_API_KEY=test-only-outbound-key\n',{mode:0o600});
-  const dry=await f.run(['deploy','--dry-run','--env-file','.seed/installer/dry-run.env','--json'],3);assert.equal(events(dry).at(-1).ok,false);assert.match(events(dry).find(event=>event.event==='error').message,/cannot read the target secret bindings/);
+  const dry=await f.run(['deploy','--dry-run','--env-file','.seed/installer/dry-run.env','--json']);assert.equal(events(dry).at(-1).ok,true);assert.equal(events(dry).at(-1).plan.d1[0].binding,'DB');assert.match(dry.stdoutText+dry.stderrText,/no credentials were needed/);
  } finally {await writeFile(deployPath,deployment);await rm(deploySettings,{force:true});}
  // The run site builds from edition identity alone, even in a set-up checkout.
  const site=events(await f.run(['build','--site','--json'])).at(-1).site,siteRoot=join(f.root,site.path);

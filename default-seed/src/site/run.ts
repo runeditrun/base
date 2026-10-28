@@ -2,13 +2,14 @@
 // repository, so this reference names it as a reference only; its run site is
 // never deployed (deploy-site.json names a reserved .example domain).
 import type { RunData } from '../../../foundation/runtime/run-site'
+import { runPricing } from '../../../foundation/runtime/run-pricing'
 
 export const run: RunData = {
   name: 'Default seed',
   repository: 'https://github.com/runeditrun/base',
   clone: 'npx -y @runeditrun/rer dev runeditrun/base',
-  folder: 'base/default-seed',
   licence: 'MIT',
   docs: false,
-  hosted: [],
+  paths: { product: null },
+  pricing: runPricing,
 }

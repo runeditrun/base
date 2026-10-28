@@ -19,7 +19,11 @@ export async function demoHostCommand(project, options, store, signal, out, oper
  if (process.env.RER_DEMO_OPERATOR_TOKEN && (process.env.RER_DEMO_OPERATOR_TOKEN.length < 32 || process.env.RER_DEMO_OPERATOR_TOKEN.length > 512)) throw invalid('RER_DEMO_OPERATOR_TOKEN must contain 32 to 512 characters.');
  const supplied = process.env.RER_DEMO_MEASUREMENT_TOKEN?.trim();
  if (supplied && (supplied.length < 32 || supplied.length > 512 || /[\s;,]/.test(supplied))) throw invalid('RER_DEMO_MEASUREMENT_TOKEN must contain 32 to 512 characters, with no spaces, semicolons or commas.');
- return (await import('./demo-native.mjs')).nativeDemoCommand(project, options, store, signal, out, operation, app, plan);
+ // The Vite build is a child of this operation; pass the already resolved exit.
+ const previousRunUrl = process.env.RER_DEMO_RUN_URL;
+ process.env.RER_DEMO_RUN_URL = plan.wrangler.vars.DEMO_RUN_URL;
+ try { return await (await import('./demo-native.mjs')).nativeDemoCommand(project, options, store, signal, out, operation, app, plan); }
+ finally { if (previousRunUrl === undefined) delete process.env.RER_DEMO_RUN_URL; else process.env.RER_DEMO_RUN_URL = previousRunUrl; }
 }
 
 async function removeDemo(plan, store, signal) {

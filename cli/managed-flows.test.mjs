@@ -1,3 +1,4 @@
+import { nativeOwnerBrowser } from './fixtures/native-owner-entry.mjs';
 import test, {before, after} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile, writeFile, rm, symlink, stat, statfs, access, readdir, readlink, mkdir, mkdtemp, truncate} from 'node:fs/promises';
@@ -11,6 +12,7 @@ import {processTree, remainingProcesses} from './fixtures/process-tree.mjs';
 import {queuedCommands} from './fixtures/queued-commands.mjs';
 import {serverResources} from './server-resources.mjs';
 import {createHash} from 'node:crypto';
+import {retainStartupFailure} from './fixtures/command-diagnostic.mjs';
 
 // Three seed-author journeys. Exercise the public dispatcher and real reference;
 // deadlines bound a broken test, never assert operating-system scheduling speed.
@@ -37,6 +39,7 @@ async function ready(child, {root = f.root, origin = url} = {}) {
  if (!child.stdoutText.includes('"event":"ready"')) {
   if (child.exitCode !== null || child.signalCode !== null) await child.done;
   const rows = events(child), error = rows.find(row => row.event === 'error'), result = rows.find(row => row.event === 'result');
+  await retainStartupFailure(root, child);
   const codes = new Set(['safety_refusal', 'missing_input', 'command_failed', 'app_exited', 'cancelled']);
   // Print only fixed classifications and numbers, never private app output,
   // generated settings, sign-in messages, command arguments or log paths.
@@ -155,6 +158,15 @@ test('rer dev shares one canonical checkout, returns its URL, and stops after id
  assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,privateMode);
  assert.deepEqual((await f.data('SELECT value FROM managed_saved'))[0].results,[{value:'owner content'}],'failed startup retains canonical data and releases its state lock');
 
+ const route = join(f.root, 'src/routes/reference.tsx'), routeBytes = await readFile(route, 'utf8');
+ const sourceDirectory = join(f.root, 'src/synthetic-base-1/exports');
+ await mkdir(sourceDirectory, {recursive: true});
+ await mkdir(join(f.root, 'exports'), {recursive: true});
+ await writeFile(join(sourceDirectory, 'doors.ts'), "export const doors = 'synthetic-base-1';\n");
+ await writeFile(join(f.root, 'exports/synthetic-base-2.txt'), 'synthetic-base-2');
+ await writeFile(join(f.root, 'src/synthetic-base-3.rer'), 'synthetic-base-3');
+ await writeFile(route, "import { doors } from '../synthetic-base-1/exports/doors';\n" + routeBytes.replace('<h1>Reference snapshot</h1>', '<h1>Reference snapshot</h1><p>{doors}</p>'));
+
  const dev = await ready(f.launch(['--import', join(import.meta.dirname,'fixtures/slow-state-inspection.mjs'), 'scripts/rer.mjs', 'dev', '--port', String(port), '--json']));
  const original = await processTree(dev.pid);
  const alias = f.root + '-alias'; await symlink(f.root, alias);
@@ -168,6 +180,24 @@ test('rer dev shares one canonical checkout, returns its URL, and stops after id
  const runtime = tree => tree.filter(row => row.executable === 'workerd').map(row => [row.pid,row.start]);
  assert.deepEqual(runtime(await processTree(dev.pid)), runtime(original), 'reuse keeps the actual runtime lifetime');
  assert.equal((await fetch(url + '/@vite/client')).status, 200, 'dev retains real Vite');
+ const module = await fetch(url + '/src/synthetic-base-1/exports/doors.ts');
+ assert.equal(module.status, 200, 'a source folder named exports remains loadable');
+ assert.match(await module.text(), /synthetic-base-1/);
+ const document = await fetch(url + '/reference');
+ assert.equal(document.status, 200, 'the app imports the source module through real Vite');
+ assert.match(await document.text(), /synthetic-base-1/);
+ assert.ok(!(dev.stdoutText + dev.stderrText).includes('Failed to load url /src/synthetic-base-1/exports/doors.ts'));
+ for (const [path, value] of [['exports/synthetic-base-2.txt', 'synthetic-base-2'], ['src/synthetic-base-3.rer', 'synthetic-base-3']]) {
+  for (const request of ['/' + path, '/@fs' + join(f.root, path)]) {
+   const denied = await fetch(url + request);
+   assert.notEqual(denied.status, 200, 'export output and installation archives remain refused');
+   assert.ok(!(await denied.text()).includes(value), 'refused file bytes stay private');
+  }
+ }
+ await writeFile(route, routeBytes);
+ await rm(join(f.root, 'src/synthetic-base-1'), {recursive: true});
+ await rm(join(f.root, 'exports'), {recursive: true});
+ await rm(join(f.root, 'src/synthetic-base-3.rer'));
  await f.run(['dev', '--stop', '--json']);
  await stopped(dev, original);
 
@@ -293,10 +323,22 @@ test('managed startup reports a real misbound application port and stops its des
  // sockets (Miniflare starts before Vite binds) can then never take it first.
  const loopbackPorts=JSON.stringify(new URL('./runtime-front-door.mjs',import.meta.url).href);
  for(const mode of ['dev','preview']){
+  const targetName=mode==='dev'?'developmentTarget':'previewTarget';
+  const squatted=`${mode}: async context=>{const {createServer}=await import('node:net');const squatter=createServer();await new Promise((done,fail)=>{squatter.once('error',fail);squatter.listen(context.runtimePort,'127.0.0.1',done);});context.store.ownCleanup(context.signal,()=>new Promise(done=>squatter.close(done)));return ${targetName}(context);}`;
+  let collision;
+  try{
+   await writeFile(adapter,original.replace(`${mode}: ${targetName}`,squatted));
+   const began=Date.now();collision=f.start([mode,'--json']);await ready(collision);
+   t.diagnostic(`${mode}: squatted assigned port reached public readiness in ${Date.now()-began} ms`);
+   assert.equal((await healthStatus(url)).healthy,true,'the application binds a free socket while the assigned port is squatted');
+  }finally{try{if(collision)await f.stop(collision);}finally{await writeFile(adapter,original);}}
   const target=mode==='dev'?'developmentTarget':'previewTarget';
-  const portsFile=join(f.root,`.rer-misbound-${mode}-ports.json`),partialPortsFile=portsFile+'.partial';
-  const replacement=`${mode}: async context=>{const fs=await import('node:fs/promises'),wrongPort=await (await import(${loopbackPorts})).runtimeLoopbackPort(context.runtimePort);await fs.writeFile(${JSON.stringify(partialPortsFile)},JSON.stringify({assigned:context.runtimePort,wrong:wrongPort}),{mode:0o600});await fs.rename(${JSON.stringify(partialPortsFile)},${JSON.stringify(portsFile)});const target=${target}(context);${mode==='dev'?`target[1][target[1].indexOf('--port')+1]=String(wrongPort);`:`target[2].env.RER_RUNTIME_PORT=String(wrongPort);`}return target;}`;
-  const observed=new Map(),controls=new Set();let child,ports,listener,expectedPort,wrongPort,healthyWrongPort=false,proxyFailed=false,primaryFailure;
+  const portsFile=join(f.root,`.rer-misbound-${mode}-ports.json`),partialPortsFile=portsFile+'.partial',observedFile=portsFile+'.observed';
+  const replacement=`${mode}: async context=>{const fs=await import('node:fs/promises'),wrongPort=await (await import(${loopbackPorts})).runtimeLoopbackPort(context.runtimePort);await fs.writeFile(${JSON.stringify(partialPortsFile)},JSON.stringify({assigned:context.runtimePort,wrong:wrongPort}),{mode:0o600});await fs.rename(${JSON.stringify(partialPortsFile)},${JSON.stringify(portsFile)});const target=${target}(context);${mode==='dev'?`target[1][target[1].indexOf('--port')+1]=String(wrongPort);`:`target[2].env.RER_RUNTIME_PORT=String(wrongPort);`}delete target[2].runtimePortHandshake;target[2].ready=async(_url,signal)=>{while(!signal.aborted){try{await fs.access(${JSON.stringify(observedFile)});return {ready:false,message:'synthetic-base-1 independently observed'};}catch(error){if(error.code!=='ENOENT')throw error;}await new Promise(done=>setTimeout(done,10));}signal.throwIfAborted();};return target;}`;
+  // Hold the fixture's readiness callback until the independent observer has
+  // confirmed both health and the failed proxy. Fast refusal must not race the
+  // test's evidence collection; this callback never declares the app ready.
+  const observed=new Map(),controls=new Set();let child,ports,listener,expectedPort,wrongPort,healthyWrongPort=false,proxyFailed=false,primaryFailure,observedAt;
   try{
    await writeFile(adapter,original.replace(`${mode}: ${target}`,replacement));
    child=f.start([mode,'--json']);
@@ -316,12 +358,17 @@ test('managed startup reports a real misbound application port and stops its des
     if(ports)listener??=await ownedListener(tree,ports.wrong);
     if(listener&&!proxyFailed&&tree.some(item=>item.pid===listener.pid&&item.start===listener.start)){
      healthyWrongPort=(await healthStatus(`http://127.0.0.1:${ports.wrong}`)).healthy;
+     if(healthyWrongPort)observedAt??=Date.now();
      if(healthyWrongPort)proxyFailed=(await healthStatus(url)).status===404;
+     if(healthyWrongPort&&proxyFailed)await writeFile(observedFile,'synthetic-base-1',{mode:0o600});
     }
     await pause(250);
    }
    assert.notEqual(child.exitCode,null,'misbound real application cannot wait indefinitely');
    assert.equal(await child.done,1);
+   const mismatchMs=Date.now()-observedAt;
+   assert.ok(mismatchMs<10000,`mismatch fails within ten seconds of independently confirming the application on its owned listener (${mismatchMs} ms)`);
+   t.diagnostic(`${mode}: observed listener mismatch failed and stopped in ${mismatchMs} ms`);
    ({assigned:expectedPort,wrong:wrongPort}=JSON.parse(await readFile(portsFile,'utf8')));
    const failure=events(child).find(event=>event.event==='error');
    assert.ok(listener&&Number.isInteger(listener.pid),'an owned process really listened on the misbound port');
@@ -331,7 +378,7 @@ test('managed startup reports a real misbound application port and stops its des
    assert.notEqual(expectedPort,wrongPort);
    const portPatterns=[listener.port,expectedPort].map(value=>new RegExp(`(?<!\\d)${value}(?!\\d)`));
    for(const pattern of portPatterns)assert.match(failure.message,pattern,'the final diagnostic retains both observed and assigned ports');
-   assert.ok(failure.message.split('\n').some(line=>portPatterns.every(pattern=>pattern.test(line))),'one composed diagnostic line relates the observed listener to the assigned port');
+   assert.match(failure.message,new RegExp(`the application listened on port ${wrongPort} but the CLI expected ${expectedPort}`));
    assert.ok(!events(child).some(event=>event.event==='ready'));
    assert.equal((await remainingProcesses([...observed.values()])).length,0,'all observed owned descendants stopped');
    assert.ok(controls.size,'misbound startup registered its lifecycle control');
@@ -345,7 +392,7 @@ test('managed startup reports a real misbound application port and stops its des
    primaryFailure=error;throw error;
   }finally{
    try{await writeFile(adapter,original);}
-   finally{try{if(child)try{await f.stop(child);}catch(error){if(!primaryFailure)throw error;t.diagnostic('Owned teardown also failed after the reported startup failure');}}finally{await rm(portsFile,{force:true});await rm(partialPortsFile,{force:true});}}
+   finally{try{if(child)try{await f.stop(child);}catch(error){if(!primaryFailure)throw error;t.diagnostic('Owned teardown also failed after the reported startup failure');}}finally{await rm(portsFile,{force:true});await rm(partialPortsFile,{force:true});await rm(observedFile,{force:true});}}
   }
  }
 });
@@ -354,6 +401,7 @@ test('rer preview serves one fixed production workerd at the saved origin and ke
  const sourceAsset = join(f.root,'public/preview-change.txt');
  await writeFile(sourceAsset,'original preview asset');
  const child = await ready(f.start(['preview', '--json']));
+ await nativeOwnerBrowser(f, 'preview', events(child).find(row=>row.event==='ready'), 'managed-owner@example.test');
  const topology = await processTree(child.pid);
  assert.equal(topology.filter(row => row.executable === 'workerd').length, 1);
  assert.equal(topology.some(row => row.vite), false);

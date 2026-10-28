@@ -1,10 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { cp, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { sourceRoots } from '../cli/export.mjs'
+import { renderVerifySchedule } from './verify-schedule.mjs'
 
 const root = resolve(import.meta.dirname, '..')
 async function contents(directory) {
@@ -18,7 +20,7 @@ async function contents(directory) {
   return files
 }
 
-test('public foundation CLI preserves pinned workflows and requires their committed installer', async () => {
+test('public foundation CLI renders pinned schedules and requires their committed installer', async () => {
   const temporary = await mkdtemp(resolve(tmpdir(), 'rer-pinned-foundation-'))
   const base = resolve(temporary, 'base')
   const git = (...args) => execFileSync('git', ['-C', base, ...args], { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim()
@@ -35,6 +37,11 @@ test('public foundation CLI preserves pinned workflows and requires their commit
     return output
   }
   try {
+    for (const name of await readdir(resolve(root, 'export'))) {
+      if (/\.ya?ml$/.test(name) || name === 'VERIFY-WORKFLOW.md') {
+        assert.doesNotMatch(await readFile(resolve(root, 'export', name), 'utf8'), /^\s*runs-on:\s*ubuntu-latest\b/m, name)
+      }
+    }
     for (const path of new Set([...sourceRoots, 'foundation', 'onboarding', 'export'])) {
       await cp(resolve(root, path), resolve(base, path), { recursive: true })
     }
@@ -43,19 +50,29 @@ test('public foundation CLI preserves pinned workflows and requires their commit
     const workflowPath = resolve(base, 'export/verify.yml')
     const helper = await readFile(helperPath)
     const workflow = await readFile(workflowPath, 'utf8')
+    assert.doesNotMatch(workflow, /~\/\.cache\/(?:ms-playwright|rer-apt)/)
     await rm(helperPath)
     await writeFile(workflowPath, workflow.replace(/^.*python3 scripts\/install-chromium-deps\.py$/m, '          pnpm exec playwright install-deps chromium'))
+    const nightlyPath = resolve(base, 'export/verify-nightly.yml')
+    const nightly = await readFile(nightlyPath, 'utf8')
+    await writeFile(nightlyPath, nightly.replace(/cron: '[^']+'/, "cron: '7 1 * * *'"))
     const older = commit()
     const before = await contents(generate(older, 'before'))
 
     await writeFile(helperPath, helper)
     await writeFile(workflowPath, workflow)
+    await writeFile(nightlyPath, nightly)
     const current = commit()
     // Advancing the source checkout must not change an older pinned result.
     assert.deepEqual(await contents(generate(older, 'after')), before)
     const generated = generate(current, 'current')
     assert.deepEqual(await readFile(resolve(generated, 'editions/prior/scripts/install-chromium-deps.py')), helper)
     assert.equal(await readFile(resolve(generated, 'editions/prior/.github/workflows/verify.yml'), 'utf8'), workflow)
+    assert.equal(await readFile(resolve(generated, 'editions/prior/.github/workflows/verify-nightly.yml'), 'utf8'), renderVerifySchedule(nightly, 'prior'))
+    const provenance = JSON.parse(await readFile(resolve(generated, 'foundation.lock.json'), 'utf8'))
+    const recorded = provenance.files['editions/prior/.github/workflows/verify-nightly.yml']
+    assert.ok(recorded.transformation, 'rendered schedule declares its transformation')
+    assert.equal(recorded.sha256, createHash('sha256').update(renderVerifySchedule(nightly, 'prior')).digest('hex'))
 
     await rm(helperPath)
     const broken = commit()

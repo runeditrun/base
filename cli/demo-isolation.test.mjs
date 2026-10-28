@@ -1,9 +1,12 @@
+import '../modules/container/adapters/d1-workerd-preload.mjs';
+import { retainStartupFailure } from './fixtures/command-diagnostic.mjs';
+import { nativeOwnerBrowser } from './fixtures/native-owner-entry.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { access, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../modules/container/adapters/d1-sqlite.mjs';
 import { fixture, pause } from './fixtures/reference.mjs';
 
 const events = child => child.stdoutText.trim().split('\n').filter(Boolean).map(JSON.parse);
@@ -77,7 +80,10 @@ commandAdapter.localPrerequisites = async ({root, email}) => {
   const deadline = Date.now() + 180_000;
   while (!child.stdoutText.includes('"event":"ready"') && child.exitCode === null && child.signalCode === null && Date.now() < deadline) await pause(100);
   const ready = events(child).find(event => event.event === 'ready');
+  if (!child.stdoutText.includes('"event":"ready"')) await retainStartupFailure(f.root, child);
   assert.ok(ready, 'the real demo reaches readiness');
+  assert.ok(ready.openUrl, 'demo retains its persona entry');
+  await nativeOwnerBrowser(f, 'demo', ready, 'demo-owner@example.test');
   assert.equal((await fetch(ready.url + '/health')).status, 200);
   const directory = join(ready.demo.state, 'v3/d1/miniflare-D1DatabaseObject');
   let isolated = false;

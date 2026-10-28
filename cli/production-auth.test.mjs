@@ -109,9 +109,9 @@ test('rer deploy refuses missing production sign-in before building and accepts 
  await writeFile(join(seed.root,'deploy.json'),JSON.stringify({...declaration,vars:{...declaration.vars,RER_DEMO:'1'}}));
  for(const flags of [[],['--dry-run']])assert.match(error(await seed.run(['deploy','--env-file','production.env',...flags],4)).message,/local-only key RER_DEMO/);
  await writeFile(join(seed.root,'deploy.json'),JSON.stringify(declaration));
- // With the owner identified, missing credentials refuse instead of claiming the target was checked.
- const dry=(await seed.text(['deploy','--dry-run','--owner-name','Maya Chen'],3)).stderr;
- assert.match(dry,/cannot read the target secret bindings/);assert.doesNotMatch(dry,/dry run complete/);
+ // With the owner identified, local validation needs no credentials and leaves target checks for deploy.
+ const result=await seed.text(['deploy','--dry-run','--owner-name','Maya Chen']);const dry=result.stdout+result.stderr;
+ assert.match(dry,/no credentials were needed/);assert.match(dry,/remote readiness were not checked/);
  const needed=dry.slice(dry.indexOf('Needed for a real deploy'));
  for(const name of ['CLOUDFLARE_ACCOUNT_ID','OWNER_EMAIL','MAIL_API_KEY','https://dash.cloudflare.com/profile/api-tokens','Workers Scripts: Edit','D1: Edit','Queues: Edit'])assert.ok(needed.includes(name),dry);
  // MAIL_API_KEY is the declared credential for resend: the list also names the provider's own key, and no other provider's.
@@ -119,7 +119,7 @@ test('rer deploy refuses missing production sign-in before building and accepts 
  assert.ok(!needed.includes('SENDGRID_API_KEY'),dry);
  for(const [provider,key] of [['sendgrid','MAIL_API_KEY (or SENDGRID_API_KEY)'],['cloudflare','MAIL_API_KEY']]){
   await writeFile(join(seed.root,'deploy.json'),JSON.stringify({...declaration,vars:{...declaration.vars,MAIL_PROVIDER:provider}}));
-  const text=(await seed.text(['deploy','--dry-run','--owner-name','Maya Chen'],3)).stderr,other=text.slice(text.indexOf('Needed for a real deploy'));
+  const result=await seed.text(['deploy','--dry-run','--owner-name','Maya Chen']);const text=result.stdout+result.stderr,other=text.slice(text.indexOf('Needed for a real deploy'));
   assert.ok(other.includes(key),other);
   assert.equal(other.includes('(or '),provider==='sendgrid','a provider with no key of its own names only MAIL_API_KEY: '+other);
  }
@@ -134,7 +134,7 @@ test('rer deploy refuses missing production sign-in before building and accepts 
  await writeFile(join(seed.root,'deploy.json'),JSON.stringify({...declaration,deployGuide:guide}));
  const guided=(await seed.text(['deploy','--owner-name','Maya Chen','--env-file','production.env'],3)).stderr;
  assert.ok(guided.includes(guide),guided);
- const guidedDry=(await seed.text(['deploy','--dry-run','--owner-name','Maya Chen'],3)).stderr;
+ const guidedResult=await seed.text(['deploy','--dry-run','--owner-name','Maya Chen']);const guidedDry=guidedResult.stdout+guidedResult.stderr;
  assert.match(guidedDry,new RegExp(`production sign-in mail: MAIL_API_KEY \\(or RESEND_API_KEY\\).* \\(see ${guide.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\)`),guidedDry);
  assert.doesNotMatch(guided,/profile\/api-tokens/);
  await writeFile(join(seed.root,'deploy.json'),JSON.stringify({...declaration,deployGuide:'http://guide.example.test'}));

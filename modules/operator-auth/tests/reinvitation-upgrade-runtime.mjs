@@ -1,3 +1,4 @@
+import { installD1Preflight } from '../../container/adapters/d1-workerd-setup.mjs';
 // Explicit upgrade probe: point OA_BASELINE_SOURCE at an independently copied
 // old module plus its pre-cancellation.sql migration, never the live source.
 import { createRequire } from 'node:module';
@@ -9,7 +10,8 @@ const root = fileURLToPath(new URL('../../../', import.meta.url));
 const packages = await readdir(join(root, 'node_modules/.pnpm'));
 const wrangler = packages.find(name => name.startsWith('wrangler@4.129.1_'));
 const require = createRequire(join(root, 'node_modules/.pnpm', wrangler, 'node_modules/wrangler/package.json'));
-const { Miniflare, convertV4MiniflareOptions } = require('miniflare');
+const { Miniflare, convertV4MiniflareOptions, D1_PLUGIN } = require('miniflare');
+installD1Preflight(D1_PLUGIN);
 const { build } = require('esbuild');
 const setup = 'upgrade-only-setup-token-at-least-32-characters';
 export const post = (input, cookie) => ({ method: 'POST', input, cookie });

@@ -1,3 +1,4 @@
+import { retainStartupFailure } from './command-diagnostic.mjs';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -26,6 +27,7 @@ export async function archiveIdentityRuntime(f, origin, action) {
  try {
   const deadline = Date.now() + 120000;
   while (!child.stdoutText.includes('"event":"ready"') && child.exitCode === null && Date.now() < deadline) await pause(100);
+  if (!child.stdoutText.includes('"event":"ready"')) await retainStartupFailure(f.root, child);
   assert.ok(child.stdoutText.includes('"event":"ready"'), 'archive identity runtime reaches readiness');
   return await action();
  } finally { await f.stop(child); }

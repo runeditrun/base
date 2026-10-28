@@ -1,3 +1,4 @@
+import { installD1Preflight } from '../../container/adapters/d1-workerd-setup.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -13,7 +14,9 @@ import { deniedAddresses, literalUrl } from '../../integrations/tests/core/publi
 
 const certs = await certificates();
 
-const { Miniflare } = await import(process.env.INTEGRATIONS_MINIFLARE_MODULE ?? 'miniflare');
+const miniflare = await import(process.env.INTEGRATIONS_MINIFLARE_MODULE ?? 'miniflare');
+installD1Preflight(miniflare.D1_PLUGIN);
+const { Miniflare } = miniflare;
 
 const host = 'receiver.example.com', url = `https://${host}/hooks/delivery`, tenant = 'installation', destinationId = 'dest-v1';
 const key = new Uint8Array(32).fill(9); // Test-only signing key.

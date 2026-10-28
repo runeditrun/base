@@ -1,4 +1,4 @@
-import { commandDiagnostic } from './command-diagnostic.mjs';
+import { commandDiagnostic, retainStartupFailure } from './command-diagnostic.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cp, mkdir, mkdtemp, readFile, writeFile, rm, stat, access, symlink } from 'node:fs/promises';
@@ -88,8 +88,24 @@ export async function fixture(kind,t) {
  }
  const start=args=>launch(['scripts/rer.mjs',...args]);
  async function data(query) {const child=launch(['node_modules/wrangler/bin/wrangler.js','d1','execute',kind==='default-seed'?'default-seed-reference':'foundation','--local','--persist-to','.wrangler/state','--config','dist/server/wrangler.json','--command',query,'--json']);assert.equal(await child.done,0,'actual local D1 fixture command');return JSON.parse(child.stdoutText);}
- async function run(args,expected=0) { const child=start(args);const code=await child.done;if(code!==expected){const log=await readFile(join(root,'.seed/installer/install.log'),'utf8').catch(()=>child.stderrText);if(process.env.RER_TEST_EVIDENCE_DIRECTORY)await writeFile(join(process.env.RER_TEST_EVIDENCE_DIRECTORY,kind+'-failure.log'),log,{mode:0o600});t.diagnostic(log.split('\n').filter(line=>/error TS|ERROR|Error|ERR_PNPM|HTTP [45]|did not|First owner|already claimed|sign-in|health status|not ok|ENOENT|failureType:/.test(line)).map(line=>line.replace(/https?:\/\/\S+/g,'[URL]')).slice(-20).join('\n'));}assert.equal(code,expected,`Safe command outcome: ${args[0]} exited ${code}; ${args[0]==='install'?child.stdoutText.slice(-2500):'private diagnostics suppressed'}`);return child; }
- async function documented(line,overrides={}) {const [program,...args]=documentedCommand(line);const child=launch(args,program,overrides);const code=await child.done;assert.equal(code,0,`documented command succeeds: ${line} exited ${code}; ${JSON.stringify(commandDiagnostic(child))}\n${(child.stdoutText+child.stderrText).split('\n').filter(text=>/error TS|ERROR|Error|ERR_PNPM|HTTP [45]|did not|ENOENT|failed/.test(text)).map(text=>text.replace(/https?:\/\/\S+/g,'[URL]')).slice(-20).join('\n')}`);return child;}
+ async function run(args,expected=0) {
+  const child=start(args),code=await child.done;
+  let diagnostic='';
+  if(code!==expected){
+   // Setup can refuse before opening its capture log. Its own error event and
+   // stderr must survive even when a successful install left a log behind.
+   const reasons=child.stdoutText.split('\n').flatMap(line=>{
+    try{const row=JSON.parse(line);return row.event==='error'?[`${row.code}: ${row.message}`]:[];}catch{return [];}
+   });
+   const installLog=await readFile(join(root,'.seed/installer/install.log'),'utf8').catch(()=>'');
+   await retainStartupFailure(root, child);
+   diagnostic=[...reasons,child.stderrText.slice(-2500),...installLog.split('\n').filter(line=>/error TS|ERROR|Error|ERR_PNPM|HTTP [45]|did not|First owner|already claimed|sign-in|health status|not ok|ENOENT|failureType:/.test(line)).slice(-20)].join('\n').replace(/https?:\/\/\S+/g,'[URL]');
+   t.diagnostic(diagnostic);
+  }
+  assert.equal(code,expected,`Safe command outcome: ${args[0]} exited ${code}; ${JSON.stringify(commandDiagnostic(child))}\n${args[0]==='install'?child.stdoutText.slice(-2500):diagnostic}`);
+  return child;
+ }
+ async function documented(line,overrides={}) {const [program,...args]=documentedCommand(line);const child=launch(args,program,overrides);const code=await child.done;if(code!==0)await retainStartupFailure(root,child);assert.equal(code,0,`documented command succeeds: ${line} exited ${code}; ${JSON.stringify(commandDiagnostic(child))}\n${(child.stdoutText+child.stderrText).split('\n').filter(text=>/error TS|ERROR|Error|ERR_PNPM|HTTP [45]|did not|ENOENT|failed/.test(text)).map(text=>text.replace(/https?:\/\/\S+/g,'[URL]')).slice(-20).join('\n')}`);return child;}
  const sql=query=>localD1(root,query);
  return {root,registry:env.RER_SERVERS_DIR,run,start,stop,data,sql,documented,launch,timingSummary};
 }

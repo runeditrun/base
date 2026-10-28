@@ -28,10 +28,11 @@ export const declaresJourney = env => {
  if(env.RER_SERVER_JOURNEY==='1')return true;
  throw invalid('RER_SERVER_JOURNEY must be 1 to declare a test or CI journey.');
 };
-async function request(record, action) {
+async function request(record, action, {timeoutMs=35000,signal}={}) {
  return new Promise((resolveRequest,reject)=>{
-  const socket=createConnection(record.control);let text='';
-  socket.setTimeout(35000,()=>socket.destroy(Error('Managed server did not complete cleanup.')));
+  const socket=createConnection({path:record.control,signal});let text='';
+  const timer=setTimeout(()=>socket.destroy(Error('Managed server did not complete cleanup.')),timeoutMs);
+  socket.once('close',()=>clearTimeout(timer));
   socket.on('connect',()=>socket.end(JSON.stringify({token:record.token,checkout:record.checkout,generation:record.generation,action})));
   socket.on('data',chunk=>{text+=chunk;if(text.length>16384)socket.destroy(Error('Invalid managed server reply.'));});
   socket.on('end',()=>{try{const value=JSON.parse(text);if(value.token!==record.token||value.checkout!==record.checkout||value.generation!==record.generation)throw Error('Unverified checkout server');resolveRequest(value);}catch(error){reject(error);}});
@@ -198,15 +199,19 @@ export async function serverRegistry(root,{env=process.env,memory=availableMemor
  }
  async function update(fields){Object.assign(owned,fields);await change(state=>{const item=state.running.find(item=>item.generation===owned.generation);if(!item)throw Error('Server reservation disappeared');Object.assign(item,fields);});}
  async function updateActivity(fields){await change(state=>{const item=state.running.find(item=>item.generation===owned.generation);if(item)Object.assign(item,fields);});}
- async function waitReady(record,signal){
-  for(let attempt=0;attempt<1200;attempt++){
+ async function waitReady(record,signal,{timeoutMs=300000,now=()=>performance.now()}={}){
+  const deadline=now()+timeoutMs;
+  while(now()<deadline){
    signal?.throwIfAborted();if(!await alive(record.owner))throw refuse('Concurrent server startup failed. Retry after recovery.');
-   try{const status=await request(record,'status');if(status.ready)return {...record,...status};}catch(error){if(attempt===1199)throw error;}
-   await delay(250,undefined,{signal});
+   const remaining=deadline-now();if(remaining<=0)break;
+   try{const status=await request(record,'status',{timeoutMs:Math.min(35000,remaining),signal});if(now()<deadline&&status.ready)return {...record,...status};}
+   catch(error){if(signal?.aborted)throw error;}
+   if(now()<deadline)await delay(Math.min(250,deadline-now()),undefined,{signal});
   }
   throw refuse('The existing server is still starting. Wait for its ready output.');
  }
- return {checkout,existing,stop,reserve,serve,update,updateActivity,waitReady,custodyToken:()=>owned?.token,
+
+ return {checkout,existing,stop,reserve,serve,update,updateActivity,waitReady,ownerEntry:record=>request(record,'owner-entry'),custodyToken:()=>owned?.token,
   // The sockets close even when the record cannot be removed (its registry
   // deleted under it, say): an open listener would keep this process alive.
   close(){return closing??=(async()=>{

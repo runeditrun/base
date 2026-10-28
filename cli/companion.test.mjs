@@ -1,7 +1,8 @@
+import '../modules/container/adapters/d1-workerd-preload.mjs';
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../modules/container/adapters/d1-sqlite.mjs';
 import { existsSync } from 'node:fs';
 import { chmod, mkdir, mkdtemp, readFile, realpath, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

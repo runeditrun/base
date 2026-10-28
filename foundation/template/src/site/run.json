@@ -2,8 +2,7 @@
   "name": "Foundation",
   "repository": "https://github.com/runeditrun/base",
   "clone": "npx -y @runeditrun/rer dev runeditrun/base",
-  "folder": "foundation",
   "licence": "MIT",
   "docs": false,
-  "hosted": []
+  "paths": { "product": null }
 }

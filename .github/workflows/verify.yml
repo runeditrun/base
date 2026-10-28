@@ -226,7 +226,17 @@ jobs:
           CLI_SHARD: ${{ matrix.shard }}
           MODULE_SHARD: ${{ matrix.shard }}
           REFERENCE_SHARD: ${{ matrix.shard }}
-        run: node scripts/ci/verify.mjs "$VERIFY_GROUP"
+          RER_TEST_EVIDENCE_DIRECTORY: ${{ runner.temp }}/rer-test-evidence
+        run: |
+          mkdir -p "$RER_TEST_EVIDENCE_DIRECTORY"
+          node scripts/ci/verify.mjs "$VERIFY_GROUP"
+      - name: Retain command diagnostics when verification fails
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: verify-evidence-${{ matrix.group }}-${{ matrix.shard || 'all' }}
+          path: ${{ runner.temp }}/rer-test-evidence
+          if-no-files-found: ignore
       - name: Fetch pinned active HappyToHelp source without credentials
         if: ${{ !cancelled() && matrix.group == 'launcher' }}
         env:

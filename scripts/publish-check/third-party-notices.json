@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "notices": [
+    {
+      "blob": "e060aaa1fe0f933e699c8feb3fdcc51c2999bf0c",
+      "package": "yaml",
+      "version": "2.9.1",
+      "licence": "ISC",
+      "source": "https://registry.npmjs.org/yaml/-/yaml-2.9.1.tgz",
+      "reason": "The LICENSE file of the yaml 2.9.1 npm package, byte for byte (git hash-object of package/LICENSE in that registry tarball), vendored under edition-authoring/vendor/yaml. The ISC licence requires retaining its copyright notice, whose maintainer attribution is third-party public text, not an identity of ours."
+    }
+  ]
+}

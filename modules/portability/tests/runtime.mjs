@@ -3,7 +3,7 @@ import { mkdtemp,rm,readFile,readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
-import { Miniflare,convertV4MiniflareOptions } from 'miniflare';
+import { Miniflare,convertV4MiniflareOptions } from '../../container/adapters/d1-workerd.mjs';
 import { createPortability } from '../index.mjs';
 import { fixturePolicy } from './fixture-policy.mjs';
 import { captureD1Baseline } from '../../../tests/support/d1-baseline.mjs';

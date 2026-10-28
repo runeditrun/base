@@ -1,6 +1,7 @@
 import { cp, rm } from 'node:fs/promises';
 import { resolve, relative } from 'node:path';
 import { exportCLI } from '../cli/export.mjs';
+import { exportRunData } from './export-run-data.mjs';
 import { testSource } from '../composition/git-source.mjs';
 import { existsSync } from 'node:fs';
 // node scripts/export-cli.mjs SEED_ROOT refreshes a seed's vendored copy;
@@ -17,6 +18,7 @@ if (args[0] === '--to-package') {
 }
 if (args.length !== 1) throw Error('Usage: node scripts/export-cli.mjs SEED_ROOT, or node scripts/export-cli.mjs --to-package SEED_ROOT [--version X]');
 const target = resolve(args[0]);
+await exportRunData(base);
 await exportCLI(base, target);
 await rm(resolve(target, 'scripts/base-onboarding'), { recursive: true, force: true });
 await cp(resolve(base, 'onboarding'), resolve(target, 'scripts/base-onboarding'), { recursive: true, filter: path => !testSource(relative(resolve(base, 'onboarding'), path)) });

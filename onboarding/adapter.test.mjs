@@ -9,6 +9,7 @@ import { createHmac } from 'node:crypto';
 import { createState } from './state.mjs';
 import { adapterFeatures, localInstaller, ownerAccountHosting } from './adapter.mjs';
 import { localVariables } from './local/environment.mjs';
+import { appFetch } from './app-fetch.mjs';
 
 // Test-only owner bootstrap and health transport; the real development
 // identity journey runs against the default seed.
@@ -72,8 +73,9 @@ function hooks(overrides = {}) {
 }
 const input = { email: 'owner@example.test', displayName: 'First Owner' };
 
-async function installOnce(f, kit, { signal } = {}) {
+async function installOnce(f, kit, { signal, onReadiness } = {}) {
  const store = await f.open();
+ if(onReadiness){const wait=store.waitForReady;store.waitForReady=(label,child,health,options)=>{onReadiness(options);return wait(label,child,health,options);};}
  let app;
  await kit.install(f.root, input, store, child => { app = child; }, signal);
  return { store, app };
@@ -88,8 +90,34 @@ test('feature flags must describe the hooks the adapter really runs', () => {
 });
 
 test('a complete install generates private settings, hides them from the build, claims the owner and opens the application', async t => {
+ // Cross a server-side idle close through the same public transport as readiness
+ // and owner claims. POST must arrive exactly once; replay is unsafe.
+ const received = [], connections = new Set(), headers = [];
+ const server = http.createServer((request, response) => {
+  connections.add(request.socket);
+  headers.push({ connection: request.headers.connection, marker: request.headers['x-base-test'] });
+  request.resume();
+  request.on('end', () => { received.push(request.method); response.end('synthetic-base-1'); });
+ });
+ server.listen(0, '127.0.0.1'); await once(server, 'listening');
+ t.after(() => { server.closeAllConnections(); server.close(); });
+ const origin = 'http://127.0.0.1:' + server.address().port;
+ for (let pair = 0; pair < 20; pair++) {
+  assert.equal(await (await appFetch(new Request(origin, { headers: { connection: 'keep-alive', 'x-base-test': 'synthetic-base-3' } }))).text(), 'synthetic-base-1');
+  server.closeIdleConnections();
+  try {
+   assert.equal(await (await appFetch(new URL(origin), { method: 'POST', body: 'synthetic-base-2', headers: new Headers({ connection: 'keep-alive', 'x-base-test': 'synthetic-base-4' }) })).text(), 'synthetic-base-1');
+  } catch (error) { t.diagnostic(`idle-close transport cause: ${error.cause?.code}`); throw error; }
+ }
+ assert.equal(connections.size, 40, 'each request owns a fresh connection');
+ assert.deepEqual(headers, Array.from({ length: 20 }, () => [
+  { connection: 'close', marker: 'synthetic-base-3' },
+  { connection: 'close', marker: 'synthetic-base-4' },
+ ]).flat(), 'Request and init headers survive while keep-alive is overridden');
+ assert.deepEqual(received, Array.from({ length: 20 }, () => ['GET', 'POST']).flat(), 'no request was replayed');
+ t.diagnostic('20 idle-close pairs; 40 distinct connections; 40 requests, no replay');
  const f = await fixture(t);
- const { store, app } = await installOnce(f, localInstaller(hooks()));
+ const { store, app } = await installOnce(f, localInstaller(hooks()), {onReadiness:options=>assert.equal(options.timeoutMs,60000,'the application readiness budget is sixty seconds, including setup')});
  t.after(async () => { if (app) await store.stop(app); });
  assert.equal(store.state.phase, 'complete', store.state.error);
  const varsPath = join(f.root, '.dev.vars'), text = await readFile(varsPath, 'utf8'), vars = localVariables(text);

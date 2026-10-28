@@ -10,13 +10,16 @@ import { unpublishedIdentities } from './site-private.mjs';
 import { privateSitePaths } from './site-inputs.mjs';
 import { redactSiteText } from './site-diagnostics.mjs';
 import { siteRuntime, buildSiteRuntime, runtimeSummary } from './site-runtime.mjs';
+import { deployDiagnostic, providerFailure } from '../modules/deploy-kit/diagnostics.mjs';
+import { siteHosting } from './site-hosting.mjs';
 
 // The run site: a seed's static marketing pages, /run and docs, built from
 // edition identity with no installation data. A seed opts in with
 // commandAdapter's `site: { entry, output, declaration, config?, runtime? }`: the module
 // whose sitePages({ styles }) returns the pages, the ignored folder the build
 // writes, the deploy declaration naming the run site's domain, and optionally
-// the Vite config holding the plugins the site pages need.
+// the Vite config holding the plugins the site pages need. sitePages also gets
+// `hosting`, what /docs/hosting says, read from the seed's deploy declarations.
 const relativePath = value => typeof value === 'string' && /^[A-Za-z0-9._/-]+$/.test(value) && !value.split('/').some(part => !part || part === '.' || part === '..');
 
 export function declaredSite(project) {
@@ -62,7 +65,8 @@ export async function buildSite(project, store, signal, { prepare = false, deplo
  await rm(staging, { recursive: true, force: true });
  try {
   await mkdir(staging);
-  try { await store.run('Building the run site', process.execPath, [fileURLToPath(new URL('./site-render.mjs', import.meta.url)), project.root, site.entry, staging, site.config ?? '', JSON.stringify({entries:site.clients ?? {}, config:site.clientConfig, privatePaths:privateSitePaths(project.adapter), ...(site.runtime ? {runtime:site.runtime, corpus:`${staging}.corpus.json`} : {})})], { cwd: project.root, signal, heavy: false }); }
+  const { hosting } = await siteHosting(project);
+  try { await store.run('Building the run site', process.execPath, [fileURLToPath(new URL('./site-render.mjs', import.meta.url)), project.root, site.entry, staging, site.config ?? '', JSON.stringify({entries:site.clients ?? {}, config:site.clientConfig, privatePaths:privateSitePaths(project.adapter), hosting, ...(site.runtime ? {runtime:site.runtime, corpus:`${staging}.corpus.json`} : {})})], { cwd: project.root, signal, heavy: false }); }
   catch (error) {
    const code = await readFile(`${staging}.refusal`, 'utf8').catch(() => '');
    if (code === 'site_private_input') throw new RerError(code, 'Run site client imports a private installation file or a file outside the seed and its declared dependencies.', 4);
@@ -151,7 +155,11 @@ export async function siteCommand(project, options, store, signal, out) {
   return { dryRun: false, deployed: true, origin: result.origin, site: summary };
  } catch (error) {
   if (error instanceof RerError) throw error;
-  throw new RerError('deploy_refused', `Run site deploy stopped: ${/^[a-z0-9-]{1,80}$/.test(error.message) ? error.message : 'site-deploy-failed'}${error.resource ? ` (${error.resource})` : ''}.${siteReadbackSummary(error)}`, 1);
+  const { createRedaction } = await shared('redaction.mjs');
+  const redaction = createRedaction();
+  redaction.addSecrets(names.map(name => process.env[name]));
+  const diagnostic = deployDiagnostic(error,redaction.redact), provider = providerFailure(error,redaction.redact);
+  throw new RerError('deploy_refused', redaction.redact(`Run site deploy stopped: ${/^[a-z0-9-]{1,80}$/.test(error.message) ? error.message : 'site-deploy-failed'}${error.resource ? ` (${error.resource})` : ''}.${provider ? ` ${provider}.` : ''}${siteReadbackSummary(error)}`), 1, {step:diagnostic?.step, ...(diagnostic ? {siteDeploy:diagnostic} : {})});
  }
 }
 

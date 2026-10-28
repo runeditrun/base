@@ -40,12 +40,11 @@ async function writeLauncher(paths) {
  await rename(temporary, paths.launcher);
 }
 
-// The next step, then (when needed) the exact line that puts rer on PATH, last.
-// install.sh running a command itself, and rer update, set RER_INSTALL_NO_NEXT.
-// Business connect also suppresses PATH advice: it uses the launcher directly.
+// The absolute launcher works immediately, without editing shell files.
+const shellQuote = value => "'" + value.replaceAll("'", "'\"'\"'") + "'";
 async function closing(paths) {
- const advice = process.env.RER_INSTALL_NO_PATH ? '' : await pathAdvice(paths);
- return `${process.env.RER_INSTALL_NO_NEXT ? '' : 'Next, start an app: rer dev <owner>/<repo>\n'}${advice ? advice + '\n' : ''}`;
+ const notices = await pathAdvice(paths, process.env, { includeShellStep: false });
+ return (notices ? notices + '\n' : '') + (process.env.RER_INSTALL_NO_NEXT ? '' : `Next, start an app: ${shellQuote(paths.launcher)} dev <owner>/<repo>\n`);
 }
 
 export async function install({ quiet = false } = {}) {

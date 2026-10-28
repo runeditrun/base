@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DatabaseSync} from 'node:sqlite';
+import {DatabaseSync} from '../../container/adapters/d1-sqlite.mjs';
 import {randomBytes} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {createOperatorAuth,createAuthHandler} from '../../operator-auth/index.mjs';

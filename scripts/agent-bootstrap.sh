@@ -111,6 +111,7 @@ apt_phase 'toolchain packages' bash -c '
     ca-certificates curl git libatomic1 python3 tar unzip
 '
 "${root[@]}" env GITLEAKS_INSTALL_DIR="$BIN_DIR" bash "$repo_root/scripts/install-gitleaks.sh"
+"${root[@]}" env ACTIONLINT_INSTALL_DIR="$BIN_DIR" bash "$repo_root/scripts/install-actionlint.sh"
 if [[ ! -x "$node_home/bin/node" ]] || [[ $("$node_home/bin/node" --version) != "v${NODE_VERSION}" ]]; then
   archive="node-v${NODE_VERSION}-linux-${arch}.tar.gz"
   curl --fail --silent --show-error --location --retry 5 --retry-all-errors --retry-delay 5 \

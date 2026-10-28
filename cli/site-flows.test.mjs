@@ -11,6 +11,7 @@ import { sitePreview } from './site-preview.mjs';
 import { codeChipBreaksWord, commandBlocks, runLayoutTheme } from './fixtures/run-page.mjs';
 import { headerLayout, splitCardLayout } from './fixtures/contract-page.mjs';
 import { parseContract } from '../foundation/runtime/seed-contract.mjs';
+import { deployPermissions } from './deploy-needs.mjs';
 const {chromium} = createRequire(resolve(import.meta.dirname,'../default-seed/package.json'))('@playwright/test');
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
@@ -74,8 +75,9 @@ test('built run-site uses US dates and keeps the one-line command start together
   await page.evaluate(() => document.fonts.ready);
   assert.deepEqual(await page.locator('link[rel=icon], link[rel=apple-touch-icon]').evaluateAll(links => links.map(link => ({ href: link.getAttribute('href'), sizes: link.getAttribute('sizes') }))), [{ href: '/favicon.svg', sizes: 'any' }], 'the built shared head selects the existing small icon instead of the full mark');
   assert.equal((await context.request.get(preview.url + '/favicon.svg')).status(), 200, 'the selected icon is exported with the site');
+  await page.locator('.other-ways').evaluate(element => { element.open = true; });
   assert.ok(await page.locator('p code').count(), 'the built page has inline commands');
-  const commandStartLines = () => page.locator('.alt code').evaluate(code => {
+  const commandStartLines = () => page.locator('.alt code').first().evaluate(code => {
    const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT), tops = new Set();
    let offset = 0;
    for (let node = walker.nextNode(); node; node = walker.nextNode()) for (let i = 0; i < node.length; i++, offset++) {
@@ -146,6 +148,64 @@ test('built run-site uses US dates and keeps the one-line command start together
    await page.setViewportSize({width:320,height:700});
    assert.deepEqual(await headerLayout(page), { sideways:false, links:3, offscreen:[], small:[], overlaps:[] }, `header at 320px on ${path}`);
   }
+  await context.close();
+ } finally { await browser.close(); await preview.close(); }
+});
+
+test('built run site writes /docs/hosting from the seed\'s own declarations, the one line first', async t => {
+ const f = await seed(t);
+ const runData = join(f.root, 'src/site/run.ts'), declaration = join(f.root, 'deploy.json'), theme = join(f.root, 'public/rer-theme.css');
+ await writeFile(runData, (await readFile(runData, 'utf8')).replaceAll('runeditrun/base', 'just-every/run-buoy'));
+ // A seed theme can outrank the page's own rules for Base's command blocks, as Buoy's keeps a command on one line on phones.
+ await writeFile(theme, await readFile(theme, 'utf8') + 'body:has(> header.bar) .code pre { white-space: pre; overflow-x: auto; overflow-wrap: normal; }\n');
+ const declared = JSON.parse(await readFile(declaration, 'utf8'));
+ let result = await f.build();
+ assert.equal(result.code, 0, result.stdout + result.stderr);
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ try {
+  const context = await browser.newContext({viewport:{width:390,height:844},permissions:['clipboard-read','clipboard-write']}), page = await context.newPage();
+  const hosting = async () => {
+   await page.goto(preview.url + '/docs/hosting');
+   return page.evaluate(() => ({
+    sections: [...document.querySelectorAll('main > section')].map(section => section.getAttribute('aria-labelledby')),
+    first: document.querySelector('main .copy')?.dataset.copy,
+    request: document.querySelector('.assisted a')?.href,
+    token: document.querySelector('#token')?.closest('li')?.textContent ?? '',
+    deployFile: [...document.querySelectorAll('.code pre code')].map(code => code.textContent).find(text => text.includes('CLOUDFLARE_API_TOKEN=')) ?? '',
+   }));
+  };
+  await page.goto(preview.url + '/run');
+  const line = await page.locator('.copy').getAttribute('data-copy');
+  const built = await hosting();
+  assert.deepEqual(built.sections, ['self', 'assisted', 'diy'], 'the one line, then Run Edit Run, then the do-it-yourself steps; no Managed without a listing');
+  assert.equal(built.first, line, 'the first command is the Run page\'s one line');
+  const request = new URL(built.request);
+  assert.deepEqual([request.origin, request.searchParams.get('product'), request.searchParams.get('plan')], ['https://app.runeditrun.com', 'run-buoy', 'assisted']);
+  for (const permission of deployPermissions(declared)) assert.ok(built.token.includes(permission), `the token step asks for ${permission}`);
+  assert.equal(built.token.includes('R2 Storage'), false, 'nothing the declaration does not use');
+  for (const width of [320, 390, 1440]) {
+   await page.setViewportSize({width,height:900});
+   assert.deepEqual((await commandBlocks(page)).filter(block => block.covered || block.clipped), [], `command blocks at ${width}px`);
+   assert.deepEqual(await codeChipBreaksWord(page), [], `inline code at ${width}px`);
+   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 0.5), false, `sideways overflow at ${width}px`);
+   assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('body *')].filter(element => [...element.childNodes].some(node => node.nodeType === 3 && node.textContent.trim())).map(element => parseFloat(getComputedStyle(element).fontSize)).filter(size => size < 13)), [], `text under 13px at ${width}px`);
+  }
+  for (const button of await page.locator('.copy').all()) {
+   const command = await button.getAttribute('data-copy');
+   assert.equal(command, await button.evaluate(element => element.closest('.code').querySelector('pre code').textContent), 'Copy holds the command shown');
+   await button.click();
+   await page.waitForFunction(async expected => await navigator.clipboard.readText() === expected, command);
+  }
+  // The page follows the declaration: an R2 binding adds its permission, and one rer deploy
+  // refuses leaves Run Edit Run's help alone while the run site still builds.
+  await writeFile(declaration, JSON.stringify({ ...declared, r2: [{ binding: 'FILES' }] }));
+  result = await f.build();
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  assert.ok((await hosting()).token.includes('Workers R2 Storage: Edit'));
+  await writeFile(declaration, JSON.stringify({ ...declared, platforms: ['cloudflare'] }));
+  result = await f.build();
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  assert.deepEqual((await hosting()).sections, ['self', 'assisted']);
   await context.close();
  } finally { await browser.close(); await preview.close(); }
 });
@@ -345,6 +405,51 @@ test('built Roadmap preserves product prose while removing explicit source citat
   for (const word of prose.split(' ')) {
    await page.locator('input[type="search"]').fill(word);
    assert.equal(await clause.isVisible(), true, `search finds ${word}`);
+  }
+ } finally { await browser.close(); await preview.close(); }
+});
+
+test('built chooser keeps self first and carries each paid plan through the shared entry', async t => {
+ const f = await seed(t), data = join(f.root, 'src/site/run.ts'), renderer = join(f.root, 'src/base/run-site.ts');
+ const original = await readFile(data, 'utf8'), source = await readFile(renderer, 'utf8');
+ // Read the route data through the same site build as the visible chooser.
+ const pages = await readFile(f.pages, 'utf8');
+ await writeFile(f.pages, pages.replace('import { runPageHtml,', 'import { PATHS, runPageHtml,').replace('pages: [', `pages: [{ path: '/pricing', html: '<!doctype html><body>' + encodeURIComponent(JSON.stringify({ assisted: PATHS.assisted.price(run), managed: PATHS.managed.price(run), note: PATHS.priceNote(run) })) + '</body>' },`));
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
+ try {
+  const page = await browser.newPage();
+  for (const [mode, product, managed] of [['request', 'errors-workbench', true], ['app', 'errors-workbench', true], ['app', 'errors-workbench', false], ['app', null, true]]) {
+   const pricing = { assisted: `assisted-${mode}-${product} <&>`, managed: `managed-${mode}-${managed} <&>`, note: `note-${mode} <&>` };
+   await writeFile(data, original.replaceAll("runeditrun/base", 'just-every/run-spool').replace("product: null", `product: ${JSON.stringify(product)}, managed: { open: ${managed} }`).replace('pricing: runPricing', `pricing: ${JSON.stringify(pricing)}`));
+   await writeFile(renderer, source.replace("signups: 'request' as", `signups: '${mode}' as`));
+   const result = await f.build();
+   assert.equal(result.code, 0, result.stdout + result.stderr);
+   await page.goto(preview.url + '/run');
+   for (const plan of ['assisted', 'managed']) assert.equal(await page.locator(`.${plan} .price`).textContent(), `${pricing[plan]} · ${pricing.note}`, 'the built chooser reads and escapes RunData pricing');
+   assert.deepEqual(await page.locator('.chooser section[aria-labelledby]').evaluateAll(sections => sections.filter(s => !s.closest('.paste-panel')).map(s => s.getAttribute('aria-labelledby'))), ['self', 'assisted', 'managed']);
+   assert.equal(await page.locator('button').count(), 1);
+   assert.equal(await page.locator('.code pre').textContent(), 'curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-spool');
+   assert.equal(await page.locator('.other-ways').getAttribute('open'), null, 'secondary recipes stay collapsed during the one-line run');
+   assert.equal(await page.locator('.alt:visible').count(), 0);
+   assert.equal(await page.locator('.quiet a').count(), 1);
+   assert.equal(await page.locator('.quiet a').getAttribute('href'), 'https://app.runeditrun.com/business');
+   const closed = mode === 'request' || product === null;
+   assert.equal(await page.locator('.assisted .chip').count(), Number(closed));
+   assert.equal(await page.locator('.managed .chip').count(), Number(closed || !managed));
+   for (const plan of ['assisted', 'managed']) {
+    const href = new URL(await page.locator(`.${plan} a`).getAttribute('href'));
+    assert.deepEqual([href.origin, href.searchParams.get('product'), href.searchParams.get('plan')], ['https://app.runeditrun.com', product ?? 'run-spool', plan]);
+   }
+   const entries = { assisted: await page.locator('.assisted a').getAttribute('href'), managed: await page.locator('.managed a').getAttribute('href') };
+   await page.goto(preview.url + '/docs/hosting');
+   const offered = product !== null && managed;
+   assert.deepEqual(await page.locator('main > section').evaluateAll(sections => sections.map(s => s.getAttribute('aria-labelledby'))), ['self', 'assisted', ...(offered ? ['managed'] : []), 'diy'], 'Managed only for a listing that offers it');
+   for (const plan of offered ? ['assisted', 'managed'] : ['assisted']) {
+    assert.equal(await page.locator(`.${plan} .btn`).getAttribute('href'), entries[plan]);
+    assert.equal(await page.locator(`.${plan} .go p`).count(), Number(closed), 'hosting follows the same sign-ups and listing state');
+   }
+   await page.goto(preview.url + '/pricing');
+   assert.deepEqual(JSON.parse(decodeURIComponent(await page.locator('body').textContent())), pricing, 'PATHS route data reads the same RunData pricing');
   }
  } finally { await browser.close(); await preview.close(); }
 });

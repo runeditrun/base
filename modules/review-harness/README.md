@@ -330,7 +330,8 @@ actual source origin, and the revision must be its full immutable commit:
 
 Before `lock`, `check`, `record-base` or `verify-base`, upgrade older seeds'
 edition-authoring tool from the same pinned Base checkout. Copy all non-test
-`.mjs` files from `edition-authoring/` byte for byte into
+`.mjs` files and the whole `vendor/` directory (the vendored parsers and their
+licences) from `edition-authoring/` byte for byte into
 `scripts/edition-authoring/`, deleting retired tool files, and update the tool's
 recorded source revision. See the [edition-authoring guide](../../edition-authoring/README.md)
 for tool adoption and Base copy provenance. Upgrade the complete tool together;

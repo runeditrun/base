@@ -2,6 +2,7 @@
 import json
 import re
 from publication_config import intended_public_repositories
+from third_party_notices import third_party_notices
 
 # A home segment within a relative path is not an absolute home directory.
 # Match the username itself so a bare home, including one with spaces, counts.
@@ -34,7 +35,7 @@ def load_config(data=None):
     except re.error:
         raise ValueError('invalid internal reference regex') from None
     return {'publicEmails': {e.lower() for e in emails}, 'internalReferencePatterns': compiled,
-            'intendedPublicRepositories': intended_public_repositories()}
+            'intendedPublicRepositories': intended_public_repositories(), 'thirdPartyNotices': third_party_notices()}
 
 
 def public_email(address, config):

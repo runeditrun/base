@@ -84,7 +84,7 @@ Read `rer-setup.json` and pass a private, mode-0600 JSON object keyed by those
 names using `rer setup --answers PATH --non-interactive`,
 for example `{"OWNER_EMAIL":"owner@example.com"}`. Secret values stay in
 private inputs and never go in command arguments. A setup rerun with the saved
-owner and origin preserves existing owner/data and exact private settings.
+owner and origin preserves the existing owner, data and exact private settings.
 Conflicting saved identity or origin reports an actionable recovery path.
 Review reset's exact removal inventory before confirmation. If data must be
 kept, back up this installation first; restore that archive
@@ -137,12 +137,29 @@ flags, private state, deployment inputs and remote limitations.
 ## Work on this foundation
 
 Choose and verify the edition UX before adding product functionality. This
-source includes minimal real owner/operator auth, D1 and silent development
+source includes minimal real owner and operator auth, D1 and silent development
 mail suppression. It has no product domain or background jobs.
 
 A change that ships or alters a contract clause updates that clause's row in
-`CONTRACT.md`'s Status table in the same PR; `rer check` refuses a table that
-disagrees with the contract.
+`CONTRACT.md`'s Status table in the same PR. Follow the contract standard in
+`SEED-COMMAND-CONTRACT.md` under "Contract status". Keep acceptance text and
+status only in `CONTRACT.md`; never hand-edit `ACCEPTANCE.md`,
+`docs/CLAIMS.md` or the generated Status summary rows. Run
+`node src/base/contract-docs.mjs write` after each contract edit, then run
+`node src/base/contract-docs.mjs check` and `rer check`. CI runs the generator's
+`check` command. Report Core done and full-target done together. Read
+`src/base/CONTRACT-DOCS.md` for the format, provenance and generation commands.
+
+Foundation initialization stamps the judged commit and date consistently in
+the contract and generated documents. In an edition that carries the
+edition-authoring tool and source lock, regenerate after contract edits before
+running its lock command. Landers apply these commands in order; the lock line
+applies when that tool and lock are present:
+
+```text
+Lander-Regenerate: node src/base/contract-docs.mjs write
+Lander-Regenerate: node scripts/edition-authoring/cli.mjs lock
+```
 
 When adding private HTTP routes or Start functions, reuse native sessions and
 enforce authorization in every server function handler, including direct
@@ -151,7 +168,7 @@ and dynamic imports inside `createServerFn` handlers so secrets never enter the
 client. Consult the pinned Base migration recipe and default-seed reference and
 run equivalent direct unauthenticated transport checks.
 
-Keep actual Queue/Cron handlers and named Worker exports in `src/server.ts`
+Keep actual Queue and Cron handlers and named Worker exports in `src/server.ts`
 when adding those capabilities. The dispatcher only selects HTTP ownership; it
 does not authenticate or catch failures.
 

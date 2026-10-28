@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../scripts/base-cli/modules/container/adapters/d1-sqlite.mjs';
 import { readFile } from 'node:fs/promises';
 import { createD1DevelopmentOutbox } from '../../../modules/mail/src/development/index.mjs';
 
@@ -37,6 +37,9 @@ function database(t) {
 
 test('list and get are query-only reads and leave expired rows for the next write to purge', async t => {
   const { db, sqlite } = database(t);
+  assert.equal(sqlite.prepare(`SELECT max(${Array(32).fill(1).join(',')}) AS n`).get().n, 1);
+  assert.throws(() => sqlite.prepare(`SELECT max(${Array(33).fill(1).join(',')})`), /SQL function arguments maximum 32, measured 33/);
+  t.diagnostic('Exported seed harness accepts 32 function arguments and rejects 33 through shared preflight.');
   let time = 1000;
   const outbox = createD1DevelopmentOutbox({ db, maxAgeMs: 100, clock: () => time });
   await outbox.put(message('first'));

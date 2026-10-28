@@ -3,10 +3,14 @@ import {deliveryDeclarationSources} from '../../cli/delivery-declarations.mjs';
 import {sourcePath} from '../delivery-producer/migrations.mjs';
 import {usesManagedMail,validateMailSpec} from '../delivery-producer/mail.mjs';
 
-/** Admit only the managed-mail contract's public config through legacy secret declarations. */
+/** Drop empty runtime-secret placeholders; admit only managed-mail public legacy values. */
 export async function checkImageVariables(root,vars,secrets) {
- const overlaps=secrets.filter(secret=>Object.hasOwn(vars,secret.binding));
- if (!overlaps.length) return;
+ const placeholders=secrets.filter(secret=>Object.hasOwn(vars,secret.binding) && vars[secret.binding] === '');
+ const overlaps=secrets.filter(secret=>Object.hasOwn(vars,secret.binding) && vars[secret.binding] !== '');
+ if (!overlaps.length) {
+  for (const {binding} of placeholders) delete vars[binding];
+  return;
+ }
  const publicMail=new Set(),privateNames=new Set();
  for (const [candidate,select] of deliveryDeclarationSources) {
   const path=await sourcePath(root,candidate,{optional:true});
@@ -23,5 +27,6 @@ export async function checkImageVariables(root,vars,secrets) {
  for (const {binding} of overlaps) if (!publicMail.has(binding) || privateNames.has(binding)) {
   throw new Error('Secret declared as an image variable: '+binding);
  }
+ for (const {binding} of placeholders) delete vars[binding];
  console.warn(overlaps.map(secret=>secret.binding).join(', ')+' are public mail configuration, not secrets. Remove these bindings from deploy.json secrets; keep them in the mail spec public variables and Wrangler vars. Accepting the legacy declaration; runtime demo settings override the image defaults.');
 }

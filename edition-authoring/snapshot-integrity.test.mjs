@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {toolFiles} from './files.mjs';
 
 const implementation = path.dirname(fileURLToPath(import.meta.url));
 function run(cwd, command, args) {
@@ -19,8 +20,8 @@ function author(directory, parent) {
   git(directory, 'init');
   git(directory, 'config', 'user.email', 'fixture@example.invalid');
   git(directory, 'config', 'user.name', 'Authoring integrity test');
-  fs.mkdirSync(path.join(directory, 'scripts/edition-authoring'), {recursive: true});
-  for (const name of fs.readdirSync(implementation).filter(name => name.endsWith('.mjs') && !name.endsWith('.test.mjs'))) {
+  for (const name of toolFiles(implementation)) {
+    fs.mkdirSync(path.dirname(path.join(directory, 'scripts/edition-authoring', name)), {recursive: true});
     fs.copyFileSync(path.join(implementation, name), path.join(directory, 'scripts/edition-authoring', name));
   }
   fs.writeFileSync(path.join(directory, 'app.mjs'), 'export const preserved = true;\n');

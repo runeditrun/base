@@ -7,6 +7,7 @@ export function authoringCommand(options) {
  if (options.verb === 'refresh-base' && !options.ref) throw invalid('Provide --ref with the full immutable Base commit. Run rer refresh-base --help.');
  try {
   return options.verb === 'adopt-edition' ? adoptEdition(options.cwd) : refreshCopies(options.cwd, copyOptions([
+   ...(options.editionMigration ? options.editionMigration.split(',').flatMap(id => ['--edition-migration', id]) : []),
    options.ref, '--record', options.record ?? 'base-copies.json',
    ...(options.base ? ['--base', resolve(options.cwd, options.base)] : []), ...(options.offline ? ['--offline'] : []),
   ], 1));

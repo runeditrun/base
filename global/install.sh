@@ -12,7 +12,7 @@
 # package's own `rer cli install`: the same layout as
 # `npx -y @runeditrun/rer cli install`. A failure leaves any previous install
 # selected and working. It never edits shell profiles: when ~/.local/bin is not
-# on PATH for new terminals, its last line is the one to run that adds it.
+# on PATH, the absolute launcher works now; shell setup is optional after launch.
 #
 # Needs curl and tar. If Node 22 or later is absent, installs the pinned official
 # Node release in rer's own data directory. macOS/Linux x64/arm64; Windows: WSL2.
@@ -20,6 +20,13 @@
 # Everything runs from main, so a partly downloaded script does nothing.
 main() {
  set -eu
+ # BEGIN COLD RUN BUDGET (generated from foundation/runtime/run-data.mjs)
+ cold_run_budget='Allow roughly 500 MB–1 GB of downloads and 1–3 GB of disk space for a first run, including Node, rer, the app and its dependencies. The app and your computer can need more; later runs reuse downloads.'
+ # END COLD RUN BUDGET
+ printf '%s\n' "$cold_run_budget"
+ RER_BUDGET_SHOWN=1
+ RER_TRANSFER_NODE_BYTES=0
+ export RER_BUDGET_SHOWN RER_TRANSFER_NODE_BYTES
  if [ "${1:-}" = -- ]; then shift; fi
  package='@runeditrun/rer'
 
@@ -139,15 +146,15 @@ if (!ended || pax) stop('the archive is truncated.');
 if (process.argv[4] !== '' && Number(process.argv[4]) !== count) stop('the archive holds ' + count + ' entries; the registry says ' + process.argv[4] + '.');
 if (process.argv[5] !== '' && Number(process.argv[5]) !== total) stop('the archive unpacks to ' + total + ' bytes; the registry says ' + process.argv[5] + '.');
 NODE
+ RER_TRANSFER_RER_BYTES=$(wc -c < "$work/rer.tgz" | tr -d ' ')
+ export RER_TRANSFER_RER_BYTES
  mkdir "$work/stage"
  tar -xzf "$work/rer.tgz" -C "$work/stage" || fail "could not unpack rer $version; nothing was installed."
- # A supplied command replaces the app next step. Business connect runs the
- # launcher directly, so it also needs no PATH advice.
+ # A supplied command replaces the app next step. Shell setup is offered only
+ # after the app is ready, through the optional rer cli path command.
  no_next=
- no_path=
  if [ "$#" -gt 0 ]; then no_next=1; fi
- if [ "${1:-}" = business ] && [ "${2:-}" = connect ]; then no_path=1; fi
- RER_INSTALL_CHANNEL=script RER_INSTALL_NO_NEXT=$no_next RER_INSTALL_NO_PATH=$no_path "$node_binary" "$work/stage/package/global/rer.mjs" cli install </dev/null \
+ RER_INSTALL_CHANNEL=script RER_INSTALL_NO_NEXT=$no_next "$node_binary" "$work/stage/package/global/rer.mjs" cli install </dev/null \
   || fail "rer cli install failed; any previous install is still selected."
  if [ "$#" -eq 0 ]; then return; fi
  # The command can tell the person how to run rer again from their own shell,
@@ -174,6 +181,8 @@ install_node() {
    || fail "could not download Node $node_version checksums from nodejs.org."
   curl -fL --proto '=https' "$release/$archive" -o "$work/$archive" \
    || fail "could not download Node $node_version from nodejs.org."
+  RER_TRANSFER_NODE_BYTES=$(wc -c < "$work/$archive" | tr -d ' ')
+  export RER_TRANSFER_NODE_BYTES
   expected=$(awk -v file="$archive" '$2 == file { print $1 }' "$work/SHASUMS256.txt")
   [ "${#expected}" -eq 64 ] || fail "nodejs.org gives no unique SHA-256 for $archive."
   case "$expected" in *[!0-9a-f]*) fail "nodejs.org gives an invalid SHA-256 for $archive." ;; esac
@@ -203,6 +212,8 @@ try {
  fs.renameSync(temporary, path.join(root, 'node'));
 } finally { try { fs.unlinkSync(temporary); } catch (error) { if (error.code !== 'ENOENT') throw error; } }
 NODE
+ RER_TRANSFER_NODE_DISK=$(du -sk "$node_home" | awk '{printf "%.0f", $1 * 1024}')
+ export RER_TRANSFER_NODE_DISK
  node_binary="$node_home/bin/node"
  PATH="$PATH:$node_home/bin"
  export PATH

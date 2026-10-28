@@ -1,3 +1,4 @@
+import '../../modules/container/adapters/d1-workerd-preload.mjs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { createPortability, readArchive } from '../../modules/portability/index.mjs';
