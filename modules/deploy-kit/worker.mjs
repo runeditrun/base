@@ -64,26 +64,26 @@ export async function secretBindings(api, worker, plan, env, exists) {
   }
   return {bindings,names,unset,missing:plan.secrets.filter(x => !names.includes(x.binding) && !unset.includes(x.binding)).map(x => x.binding)};
 }
-export async function uploadAssets(api, worker, files) {
+export async function uploadAssets(api, worker, files, {label = 'assets'} = {}) {
   const manifest = {}; const byHash = new Map();
   for (const file of files) {
     const digest = hash(file.base64 + extname(file.path).slice(1)).slice(0,32);
     manifest[`/${file.path}`] = {hash:digest,size:Buffer.from(file.base64,'base64').length};
     byHash.set(digest,file);
   }
-  const session = await api.request(`/workers/scripts/${worker}/assets-upload-session`,{method:'POST',body:{manifest}})
+  const session = await api.request(`/workers/scripts/${worker}/assets-upload-session`,{method:'POST',body:{manifest},step:`creating ${label} upload session`})
     .catch(error => { throw nameAssetFailure(error,files.map(file => file.path)); });
   assert(typeof session.jwt === 'string' && session.jwt && Array.isArray(session.buckets),'invalid-asset-session');
   let completion = session.buckets.length ? null : session.jwt;
   const seen = new Set();
-  for (const bucket of session.buckets) {
+  for (const [index,bucket] of session.buckets.entries()) {
     assert(Array.isArray(bucket) && bucket.length,'invalid-asset-bucket');
     const data = new FormData();
     for (const key of bucket) {
       assert(byHash.has(key) && !seen.has(key),'invalid-asset-request'); seen.add(key);
       const file = byHash.get(key); data.set(key,new Blob([file.base64],{type:assetType(file.path)}),file.path.split('/').at(-1));
     }
-    const uploaded = await api.request('/workers/assets/upload?base64=true',{method:'POST',body:data,assetToken:session.jwt})
+    const uploaded = await api.request('/workers/assets/upload?base64=true',{method:'POST',body:data,assetToken:session.jwt,step:`uploading ${label}, batch ${index + 1} of ${session.buckets.length}`})
       .catch(error => { throw nameAssetFailure(error,bucket.map(key => byHash.get(key).path)); });
     if (uploaded.jwt) completion = uploaded.jwt;
   }

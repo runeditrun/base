@@ -7,6 +7,7 @@
 - Fix an import at the planner's accepted cap failing part-way with `IMPORT_D1_REQUEST_LIMIT`: count each D1 batch call as one paid-plan query, share creation admission with execution, keep existing erasure statement ceilings separate, and size plan read pages from their actual chunk bytes so the public door retains room for its own queries. The canonical plan byte cap stays unchanged.
 - Fix local D1 checks that made export of a table with very many or very long column names fail: split encoded row measurement into bounded column queries and sum each row before enforcing the unchanged size limit. Keep internal row guards out of column removal so valid schema changes retain SQLite semantics.
 - Enforce D1 query limits in local test stand-ins on the pinned Node 22 runtime, using shared preflight and native driver options. Native demo SQLite bindings use the same helper. Refresh brings checks for SQL bytes, parameters, function arguments, pattern bytes, bound values and encoded table rows; tests may now fail for queries that production would reject. Expression depth 100 is OBSERVED-NOT-DOCUMENTED, with an estimated parser-tree check proved against workerd at 100 and 101. Invocation query counts and provider deadlines require provider verification.
+- Retain the failing Run site provider step, sanitized endpoint, elapsed time, timeout limit and network cause or HTTP refusal body in human and JSON deploy failures.
 
 ## 0.2.84
 

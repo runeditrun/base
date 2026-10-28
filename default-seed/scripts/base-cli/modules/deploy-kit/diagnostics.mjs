@@ -11,18 +11,30 @@ export function deployDiagnostic(error, redact) {
   const clean = value => (redact ?? String)(String(value)).replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g,'').replace(/\b[a-f0-9]{32}\b/gi,'[REDACTED]');
   const failureCode = detail.code ?? error.message;
   const code = /^[a-zA-Z0-9_-]{1,120}$/.test(failureCode) ? clean(failureCode) : 'deploy-failed';
-  return {code,step:detail.step ?? 'deploy',created:(detail.created ?? []).map(clean),
+  return {code,step:clean(detail.step ?? 'deploy'),created:(detail.created ?? []).map(clean),
+    ...(detail.providerRequest ? {providerRequest:{...detail.providerRequest,endpoint:clean(detail.providerRequest.endpoint),step:clean(detail.step ?? 'deploy'),body:redact ? providerText(detail.output ?? '',redact) : '(provider output withheld; rer deploy provides redacted details)'}} : {}),
     ...(typeof error.resource==='string' && /^(?:d1|r2|kv|queues|worker|service):[a-z0-9-]+$/.test(error.resource) ? {resource:clean(error.resource)} : {}),
     ...(detail.providerCodes?.length ? {providerCodes:detail.providerCodes} : {}),
     ...(redact && providerFailure(error,redact) ? {provider:providerFailure(error,redact)} : {}),
     output:(detail.output ? (redact ? clean(detail.output) : '(provider output withheld; rer deploy provides redacted details)') : '(no provider output)').split(/\r?\n/).slice(0,8).map(line=>line.slice(0,500)).join('\n')};
 }
+// Reuse the D1 upload retention boundary: redact complete text, omit URLs,
+// then bound UTF-8 bytes so a credential cannot straddle the public excerpt.
+export function providerText(text, redact = String, limit = 2048) {
+  const safe = redact(String(text)).replace(/\\\//g, '/').replace(/\bhttps?:\/\/[^\s<>"']+/gi, '[URL omitted]')
+    .replace(/[\x00-\x1f\x7f-\x9f]+/g, ' ').replace(/\b[a-f0-9]{32}\b/gi,'[REDACTED]').trim();
+  let end = Math.min(safe.length, limit);
+  while (Buffer.byteLength(safe.slice(0, end)) > limit) end--;
+  if (/[\uD800-\uDBFF]/.test(safe[end - 1] ?? '')) end--;
+  return safe.slice(0, end);
+}
+
 /** One line naming the provider call that was refused and what Cloudflare said, from
  * the error's own `providerRefusal` (set by any copy of the kit); undefined otherwise. */
 export function providerRefusal(error, redact = String) {
   const refusal = error?.providerRefusal;
   if (typeof refusal?.operation !== 'string' || !Array.isArray(refusal.errors)) return undefined;
-  const said = refusal.errors.map(item => [item?.code, typeof item?.message === 'string' ? redact(item.message).slice(0,300) : undefined].filter(part => part !== undefined && part !== '').join(' ')).filter(Boolean).slice(0,3);
+  const said = refusal.errors.map(item => [item?.code, typeof item?.message === 'string' ? providerText(item.message,redact,300) : undefined].filter(part => part !== undefined && part !== '').join(' ')).filter(Boolean).slice(0,3);
   return `Cloudflare refused ${redact(refusal.operation).slice(0,200)}${said.length ? `: ${said.join('; ')}` : ''}`;
 }
 /** What a migration that failed or stays refused means for the next run, from the
@@ -101,7 +113,6 @@ export function deploymentDiagnostics(api, {onCreated} = {}) {
     },
     annotateFailure(error, step = currentStep) {
       const prior = failures.get(error);
-      if (currentCall) error.providerCall ??= {operation:currentCall,reason:error.message};
       // Node filesystem/CLI codes are structural; their messages can hold paths
       // and inputs, so retain them privately for the caller's redaction boundary.
       const cliCode = typeof error.code === 'string' && /^(?:E[A-Z0-9_]{1,63}|health-[a-z-]+)$/.test(error.code) ? error.code : undefined;
@@ -113,6 +124,15 @@ export function deploymentDiagnostics(api, {onCreated} = {}) {
 
 /** All provider failure paths share the same safe, portable rendering. */
 export function providerFailure(error, redact = String) {
+  const retained = failures.get(error)?.providerRequest;
+  if (retained) {
+    const step = providerText(failures.get(error).step,redact,200);
+    const cause = retained.cause === 'timeout' ? `timeout after ${retained.timeoutMs / 1000} s (limit ${retained.timeoutMs} ms)` : retained.cause === 'connection timeout' ? `connection timeout (per-call limit ${retained.timeoutMs} ms)` : retained.cause;
+    const body = providerText(failures.get(error).output ?? '',redact,300);
+    const outcome = retained.status === null ? cause : `HTTP ${retained.status}${retained.cause === 'HTTP refusal' ? '' : `; ${cause}`}`;
+    const specific = providerRefusal(error,redact) ?? providerTransport(error,redact);
+    return `${step}: ${retained.method} ${providerText(retained.endpoint,redact,300)}; elapsed ${retained.elapsedMs} ms; ${outcome}${specific ? `; ${specific}` : ''}${body ? `; ${body}` : ''}`;
+  }
   const specific = providerRefusal(error,redact) ?? providerTransport(error,redact);
   if (!specific && error?.cause instanceof Error) return providerFailure(error.cause,redact);
   if (specific) return specific;

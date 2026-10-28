@@ -113,6 +113,19 @@ A refused provider call also carries `providerRefusal` on the thrown error: the 
 
 A transport failure carries `providerTransport`: the operation, sanitized endpoint, attempt count, whether an HTTP status was received and a structural network reason. Both standard and custom-hook `rer deploy` failures name the call and retain the same-input recovery command. Endpoint details omit URL credentials, queries, account ids and R2 object keys; signed D1 import destinations are withheld.
 
+Run site failures retain the same error diagnostic in human output and in
+`siteDeploy` on both JSON failure events. `providerRequest` gives the failed
+step, method, endpoint path with account and Worker-content identifiers replaced
+by placeholders, elapsed milliseconds, effective per-call timeout limit, and a
+network cause class or HTTP status. Response excerpts omit URLs and credentials
+before being bounded to 2 KiB of UTF-8. An HTTP refusal keeps its status even
+when reading its body or preparing an existing safe replay reaches the deadline.
+The provider limit remains 30 seconds per call, shared across its existing
+replays and body reads; the remaining site readiness window can shorten it.
+Asset upload buckets each get a separate call and name their batch position.
+File count alone does not establish a required transfer time, so this diagnostic
+change adds no retries and does not increase any timeout.
+
 ### rer deploy: inputs, the hosted owner, secret changes and removal
 
 `rer deploy` runs these steps for a seed whose adapter uses `ownerDeploy` from `cli/deploy.mjs`.
