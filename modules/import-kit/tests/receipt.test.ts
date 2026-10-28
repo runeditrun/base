@@ -107,7 +107,7 @@ test('verification refuses tampering, unknown, wrong or misrestricted keys, synt
   for (const odd of [...misrestricted, production(undefined, ['production'])]) {
     assert.equal((await verifyImporterVerificationReceipt(receipt, odd)).valid, false);
   }
-  assert.equal((await verifyImporterVerificationReceipt(receipt, production(['test', 'production']))).valid, true);
+  assert.equal((await verifyImporterVerificationReceipt(receipt, production(['test', 'review'], 'review'))).valid, true);
   await assert.rejects(signImporterVerificationReceipt({ ...receipt.payload, synthetic: true }, 'test', keys.privateKey));
   await assert.rejects(signImporterVerificationReceipt({ ...receipt.payload, source: { ...receipt.payload.source, classification: 'synthetic' } }, 'test', keys.privateKey));
 });
