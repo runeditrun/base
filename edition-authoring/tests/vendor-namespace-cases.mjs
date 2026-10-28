@@ -27,6 +27,7 @@ export function vendorNamespaceCases({init, write, commit, git, snapshotTree}) {
       write(base, origin + '/unit.tsx', unit);
       write(base, origin + '/report.ts', 'export const report = "synthetic hydration report";\n');
       write(base, 'foundation/runtime/run-site.ts', 'export const run = "synthetic run";\n');
+      write(base, 'foundation/runtime/setup.ts', 'export const needsSetup = false;\n');
       write(base, 'default-seed/src/routes/index.ts', 'export const page = "synthetic home";\n');
       const pin = commit(base);
       write(seed, 'src/routes/index.ts', 'export const page = "synthetic home";\n');
@@ -37,6 +38,7 @@ export function vendorNamespaceCases({init, write, commit, git, snapshotTree}) {
         ok(seed, 'record-base', vendor, origin, pin, '--base', base);
         if (shape === 'directory') for (const broader of ['src/base', 'src/site/base']) {
           write(seed, broader + '/run-site.ts', 'export const run = "synthetic run";\n');
+          if (broader === 'src/base') write(seed, broader + '/setup.ts', 'export const needsSetup = false;\n');
           ok(seed, 'record-base', broader, 'foundation/runtime', pin, '--base', base);
         }
         if (shape === 'ambiguous') {
@@ -47,7 +49,8 @@ export function vendorNamespaceCases({init, write, commit, git, snapshotTree}) {
       commit(seed);
       // A newly delivered route has Base's source layout, while the seed has
       // explicitly selected a vendor namespace for hydration.
-      write(base, source, "import {HydrationUnit} from '../../../foundation/runtime/hydration/unit';\nexport const page = HydrationUnit();\n");
+      write(base, source, "import {HydrationUnit} from '../../../foundation/runtime/hydration/unit';\n" +
+        (shape === 'directory' ? "import {needsSetup} from '../../../foundation/runtime/setup';\nexport const page = needsSetup || HydrationUnit();\n" : 'export const page = HydrationUnit();\n'));
       write(base, 'default-seed/src/routes/index.ts', "export {page} from './reference';\n");
       write(base, 'foundation/edition-migrations.json', JSON.stringify({schemaVersion: 1, migrations:
         ['run-data-paths', 'run-data-pricing'].map(id => ({id, introduced: pin, origin: 'default-seed/src/routes/index.ts', guide: 'guide.md', edit: 'Review synthetic RunData.', deliver: []}))}));
@@ -64,6 +67,7 @@ export function vendorNamespaceCases({init, write, commit, git, snapshotTree}) {
       const bytes = fs.readFileSync(path.join(seed, route), 'utf8');
       const specifier = /from ['"]([^'"]+)['"]/.exec(bytes)[1];
       assert.equal(path.posix.normalize(path.posix.join(path.posix.dirname(route), specifier)) + '.tsx', vendor + '/unit.tsx');
+      if (shape === 'directory') assert.match(bytes, /from ["']\.\.\/base\/setup["']/);
       assert.equal(fs.existsSync(path.join(temp, 'foundation')), false);
       const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json')));
       assert.equal(record.copies.filter(copy => copy.path.startsWith(vendor)).length, 1);

@@ -51,9 +51,12 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   function recordedDestination(source) {
     // Prefer the explicitly selected subtree over a broader, sparse runtime
     // copy. Never choose between equally specific namespaces for the seed.
-    const candidates = mappings.filter(copy => inside(source, copy.originPath));
+    let candidates = mappings.filter(copy => inside(source, copy.originPath));
     const specificity = Math.max(...candidates.map(copy => copy.originPath.length));
-    return [...new Set(candidates.filter(copy => copy.originPath.length === specificity).map(copy => mapped(source, copy)))];
+    candidates = candidates.filter(copy => copy.originPath.length === specificity);
+    const members = candidates.filter(copy => Object.hasOwn(copy.files, mapped(source, copy)));
+    if (members.length) candidates = members;
+    return [...new Set(candidates.map(copy => mapped(source, copy)))];
   }
   function include(source, target) {
     required.add(target);
@@ -129,7 +132,8 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     // retain their current imports and ownership, including old missing edges.
     if (specifier.startsWith('.') && dependency && !recorded.has(target) && !witness(expected, dependency)) {
       const destinations = recordedDestination(dependency);
-      if (destinations.length > 1) refuse(target, `ambiguous Base copy mappings for ${dependency}: ${destinations.join(', ')}`, '${EDITOR:-vi} base-copies.json');
+      if (destinations.length > 1) return {...request, manifests, dependency, destination: expected,
+        reason: `ambiguous Base copy mappings for ${dependency}: ${destinations.join(', ')}`};
       if (destinations.length === 1) {
         const destination = destinations[0];
         // Preserve extensionless TS and emitted-JS spellings by moving the
@@ -217,7 +221,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
       if (!dependency) refuse(target, edge.reason ?? `no Base source for ${specifier}`, `\${EDITOR:-vi} ${quote(target)}`);
       if (!witness(destination, dependency)) {
         if (novel) { hold = {path: target, originPath: source, dependency}; break; }
-        refuse(target, `no copy mapping witnesses ${destination} from ${dependency}`, '${EDITOR:-vi} base-copies.json');
+        refuse(target, edge.reason ?? `no copy mapping witnesses ${destination} from ${dependency}`, '${EDITOR:-vi} base-copies.json');
       }
     }
     if (hold) {

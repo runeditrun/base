@@ -12,7 +12,9 @@ mapping, refresh uses the most specific recorded origin subtree. For example,
 `src/vendor/base/hydration` mapped to `foundation/runtime/hydration` covers
 `unit.tsx`; no nested singleton record is needed. A new reference route can import
 that existing vendor namespace instead of requiring `foundation` outside the
-edition. Existing resolvable edition imports keep their destinations.
+edition. Within equally specific directory mappings, an already recorded file
+takes precedence over an omitted member. Existing resolvable edition imports
+keep their destinations.
 
 Refresh rewrites parsed dependency literals only. The result's `relocated` list
 names the delivered files whose imports changed. These files become acknowledged
