@@ -54,8 +54,101 @@ async function generatedJourney(root) {
   assert.equal(await read(root, 'ACCEPTANCE.md'), acceptance)
 }
 
+async function statusLineJourney(root) {
+  const source = await read(root, 'CONTRACT.md')
+  const requirement = "Owners can change an entry's description without changing its identity."
+  const acceptance = '**Acceptance:**\n1. Save the description.\n2. Keep the entry owner.'
+  const formats = [state => `*Status:* ${state}.`, state => `Status: ${state}`, state => `**Status:** ${state}.`, state => `**Status: ${state}.**`]
+  const save = text => {
+    return edit(root, 'CONTRACT.md', text).then(() => {
+      git(root, 'add', 'CONTRACT.md')
+      git(root, 'commit', '-qm', 'Synthetic status source')
+    })
+  }
+  for (const format of formats) {
+    const text = source
+      .replace('** Visitors can read published entries.', `** ${format('done')}\n  Visitors can read published entries.`)
+      .replace(requirement, `${format('partial')}\n\n${requirement}`)
+      .replace('**Acceptance evidence:** The editor saves the description and keeps the entry\'s owner.', acceptance)
+      .replace('Archive collections for a long retention period.', `${format('missing')}\n\nArchive collections for a long retention period.`)
+    await save(text)
+    const old = parseContract(text)
+    succeeds(root, 'convert', '--old', 'HEAD')
+    succeeds(root, 'check')
+    succeeds(root, 'coverage', 'check', '--old', 'HEAD')
+    const convertedText = await read(root, 'CONTRACT.md')
+    const converted = parseContract(convertedText)
+    assert.deepEqual(converted.clauses.map(({ id, status, evidence, gap, kind }) => ({ id, status, evidence, gap, kind })),
+      old.clauses.map(({ id, status, evidence, gap, kind }) => ({ id, status, evidence, gap, kind })))
+    assert.equal(converted.commit, old.commit)
+    assert.equal(converted.date, old.date)
+    assert.ok(convertedText.includes(`**Requirement.** ${requirement}\n\n**Acceptance.**\n1. Save the description.\n2. Keep the entry owner.`))
+    assert.ok(convertedText.includes('**Requirement.** Visitors can read published entries.\nDraft entries stay private.'))
+    assert.ok(convertedText.includes('**Requirement.** Archive collections for a long retention period. Archived entries remain readable.'))
+    assert.ok(!convertedText.includes(format('partial')), 'recorded status became requirement or acceptance text')
+    assert.ok((await read(root, 'CHANGELOG.md')).includes(format('partial')), 'the original status was not retained in history')
+    git(root, 'reset', '--hard', 'HEAD')
+    git(root, 'clean', '-fd')
+    for (const [invalid, diagnostic] of [
+      [text.replace(requirement, ''), 'An old clause has no requirement prose to convert.'],
+      [text.replace(format('partial'), format('done')), 'Status'],
+    ]) {
+      await save(invalid)
+      const before = await snapshot(root)
+      refuses(root, diagnostic, 'convert', '--old', 'HEAD')
+      assert.deepEqual(await snapshot(root), before, 'refused conversion changed source documents')
+    }
+  }
+}
+
+async function blockquoteJourney(root) {
+  const source = await read(root, 'CONTRACT.md')
+  const original = '- **PUBLISH-01 — Publish the catalogue.** Visitors can read published entries.\n  Draft entries stay private.'
+  const heading = '- **PUBLISH-01 — Publish the catalogue.**'
+  const prose = 'Visitors can read published entries.\nDraft entries stay private.\n\n**Acceptance:**\n1. Read the catalogue.\n2. Refuse the private draft.'
+  const save = async text => {
+    await edit(root, 'CONTRACT.md', text)
+    git(root, 'add', 'CONTRACT.md')
+    git(root, 'commit', '-qm', 'Synthetic blockquote source')
+  }
+  let indented
+  for (const prefix of ['  ', '> ', '  > ']) {
+    const body = prefix.includes('>') ? `*Status:* done.\n\n${prose}` : prose
+    const text = source.replace(original, `${heading}\n${body.split('\n').map(line => prefix + line).join('\n')}\n\n- An unrelated bullet stays outside this clause.`)
+    await save(text)
+    const old = parseContract(text)
+    succeeds(root, 'convert', '--old', 'HEAD')
+    succeeds(root, 'check')
+    succeeds(root, 'coverage', 'check', '--old', 'HEAD')
+    const convertedText = await read(root, 'CONTRACT.md')
+    const converted = parseContract(convertedText)
+    assert.deepEqual(converted.clauses.map(({ id, status, evidence, gap, kind }) => ({ id, status, evidence, gap, kind })),
+      old.clauses.map(({ id, status, evidence, gap, kind }) => ({ id, status, evidence, gap, kind })))
+    assert.equal(converted.commit, old.commit)
+    assert.equal(converted.date, old.date)
+    const clause = convertedText.split('#### PUBLISH-01')[1].split('## Target clauses')[0]
+    assert.ok(clause.includes('**Requirement.** Visitors can read published entries.\nDraft entries stay private.\n\n**Acceptance.**\n1. Read the catalogue.\n2. Refuse the private draft.'))
+    assert.ok(!clause.includes('unrelated bullet'))
+    if (indented === undefined) indented = clause
+    else assert.equal(clause, indented, 'a quoted body must convert like an indented body')
+    assert.ok((await read(root, 'CHANGELOG.md')).includes(text.trim()), 'the original quote was not retained in history')
+    git(root, 'reset', '--hard', 'HEAD')
+    git(root, 'clean', '-fd')
+  }
+  // A quote marker, status or acceptance list alone is not requirement prose.
+  // Neither the following clause bullet nor a heading can supply missing prose.
+  for (const boundary of ['- **', '#### ']) {
+    const text = source.replace(original, `${heading}\n> *Status:* done.\n>\n> **Acceptance:**\n> 1. Read the catalogue.`)
+      .replace('**E1 — Maintain an entry.** ', `${boundary}E1 — Maintain an entry.${boundary === '- **' ? '**' : ''}\n\n`)
+    await save(text)
+    const before = await snapshot(root)
+    refuses(root, 'An old clause has no requirement prose to convert.', 'convert', '--old', 'HEAD')
+    assert.deepEqual(await snapshot(root), before, 'refused conversion changed source documents')
+  }
+}
+
 test('contract docs convert handwritten contracts and keep generated documents and migration maps accountable', async () => {
-  const roots = await Promise.all(['standard', 'legacy'].map(installation))
+  const roots = await Promise.all(['standard', 'legacy', 'legacy', 'legacy'].map(installation))
   try {
     const results = await Promise.allSettled([
       (async () => {
@@ -82,6 +175,8 @@ test('contract docs convert handwritten contracts and keep generated documents a
         assert.ok((await read(root, 'ACCEPTANCE.md')).includes(revised))
         assert.ok((await read(root, 'docs/CLAIMS.md')).includes('Section'))
       })(),
+      statusLineJourney(roots[2]),
+      blockquoteJourney(roots[3]),
       (async () => {
         const root = roots[1]
         const oldSource = await read(root, 'CONTRACT.md')
