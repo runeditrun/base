@@ -1,3 +1,4 @@
+import { checkCases } from '../onboarding/test-fixture.mjs'
 import { test } from 'node:test'
 import { randomBytes } from 'node:crypto'
 import assert from 'node:assert/strict'
@@ -142,7 +143,7 @@ test('every complete relocated module copy passes native publication with zero f
   const modules = [...new Set(files.map(file => file.split('/').slice(0, 2).join('/')))].sort()
   assert.ok(files.length > 600, 'All tracked module files, not just production entry points')
   assert.ok(modules.includes('modules/import-kit'))
-  for (const module of modules) await t.test(module, t => {
+  await checkCases(modules.map(module => [module, t => {
     const copy = files.filter(file => file.startsWith(module + '/'))
     assert.ok(copy.length, module)
     const { run, report, references } = scanModuleCopy(t, copy)
@@ -153,7 +154,7 @@ test('every complete relocated module copy passes native publication with zero f
     assert.deepEqual(report.findings, [])
     assert.equal(report.status, 'PASS')
     assert.equal(run.status, 0)
-  })
+  }]))
 })
 
 test('module reference check rejects private, missing and unreviewed repositories', async t => {
