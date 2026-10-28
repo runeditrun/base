@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Refresh read-only native revision prerequisites before argument-injection probes, while retaining class/fact/decision checks and fresh write keys.
+- Follow audit cursors when checking pending and completed native targets, including targets beyond the first audit page.
+- Accept a native reviewer's final HTTP 200 session response alongside 303, retaining independent-cookie, one-use proof and lifecycle checks.
+- Match current workflow templates from a Base archive's supplied snapshot; preserve unmatched seed-owned workflow bytes without requesting unavailable history. Historical migration and legacy-membership refusals remain explicit.
+
+- Document remaining native integration prerequisites: receipt fixtures need their native client and retained key before mandatory steps; creation adapters with consumed preparation need explicit current replay authorization. Neither native guard is bypassed by these probe fixes.
+
 ## 0.2.86
 
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.

@@ -85,17 +85,24 @@ export function archiveSourceCases(temp, run, snapshotTree) {
   assert.deepEqual(snapshotTree(archived), repeated);
   fs.rmSync(path.join(incoming, 'linked.mjs'));
 
-  // Matching old workflow bytes and migration introductions require history,
-  // which an archive must never invent from its caller-supplied revision.
+  // Archive refresh preserves unproven old workflow bytes and can match only
+  // the supplied snapshot. Migration ancestry still requires real history.
   write(base, 'export/verify.yml', 'jobs: {}\n');
   commit(base);
   write(base, 'export/verify.yml', 'name: Verify\njobs: {}\n');
   const withWorkflow = commit(base), workflowArchive = archive(withWorkflow, 'workflow-archive');
   write(archived, '.github/workflows/verify.yml', 'jobs: {}\n');
   git(archived, 'add', '.github/workflows/verify.yml');
-  const beforeHistory = snapshotTree(archived);
-  assert.match(run(archived, 'refresh-base', '--ref', withWorkflow, '--base-archive', workflowArchive).error, /archive has no Git history.*--base <checkout>/);
-  assert.deepEqual(snapshotTree(archived), beforeHistory);
+  ok(archived, 'refresh-base', '--ref', withWorkflow, '--base-archive', workflowArchive);
+  assert.equal(fs.readFileSync(path.join(archived, '.github/workflows/verify.yml'), 'utf8'), 'jobs: {}\n');
+  assert.ok(!JSON.parse(record(archived)).copies.some(copy => copy.path === '.github/workflows/verify.yml'));
+  write(archived, '.github/workflows/verify.yml', 'name: Verify\njobs: {}\n');
+  ok(archived, 'refresh-base', '--ref', withWorkflow, '--base-archive', workflowArchive);
+  assert.ok(JSON.parse(record(archived)).copies.some(copy => copy.path === '.github/workflows/verify.yml'));
+  // Remove the adopted workflow record before testing migration ancestry.
+  const adopted = JSON.parse(record(archived));
+  adopted.copies = adopted.copies.filter(copy => copy.path !== '.github/workflows/verify.yml');
+  write(archived, 'base-copies.json', JSON.stringify(adopted));
   fs.rmSync(path.join(archived, '.github/workflows/verify.yml'));
   git(archived, 'reset', '--quiet', '--', '.github/workflows/verify.yml');
   write(base, 'foundation/edition-migrations.json', JSON.stringify({schemaVersion: 1, migrations: [{id: 'sample-edit', introduced: first, origin: 'modules/sample/index.mjs', guide: 'GUIDE.md', edit: 'Review sample edit.', deliver: []}]}));

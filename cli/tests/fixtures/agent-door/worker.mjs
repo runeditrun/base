@@ -224,6 +224,11 @@ export default {
     if (path === '/auth/owner-claim' && env.OWNER_MODE === 'signed') return createOwnerClaimHandler({ db: env.DB, authConfig: config, clientIp, ...trust, expectedEmail: config.OWNER_EMAIL })(request);
     if (path === '/auth/bootstrap' && env.OWNER_MODE === 'signed') return new Response('Not found', { status: 404 });
     try {
+      if (path === '/auth/reviewer-confirm') {
+        requirePost(request, config);
+        const value = await auth.confirmLink(request, await readInput(request));
+        return Response.json({ confirmed: true }, { headers: { ...securityHeaders(), 'Set-Cookie': value.cookie } });
+      }
       if (path === '/app/review' && env.OWNER_MODE === 'native-reviewer') {
         requirePost(request, config);
         const session = await auth.getSession(request);

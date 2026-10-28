@@ -236,8 +236,10 @@ distinguish omitted older files from new upstream additions without inventing a
 historical tree. Older records remain readable; to move one to a different pin
 from an archive, first refresh using `--base <checkout>` containing the recorded
 and target commits. A same-pin archive refresh can retain membership directly.
-Operations needing Git history, including migration ancestry and historical
-workflow adoption, refuse before writing and require a checkout. Use
+Archive workflow matching uses only the supplied revision: exact current
+template bytes can be recorded; unmatched workflow bytes remain seed-owned.
+Migration ancestry and historical source reads still refuse before writing and
+require a checkout. Use
 `verify-base --offline` to check local recorded bytes after an archive refresh,
 or `verify-base --base <checkout>` to also check Git provenance.
 

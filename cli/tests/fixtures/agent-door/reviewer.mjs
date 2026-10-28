@@ -12,12 +12,12 @@ export default async function initialize({ request, origin, email, owner, mail }
  assert.equal(messages.length, 1);
  const link = new URL(messages[0].text.match(/https:\/\/[^\s]+/)[0]);
  assert.equal(link.origin, origin);
- const denied = await post('/auth/confirm', { token: randomBytes(32).toString('hex') });
+ const denied = await post('/auth/reviewer-confirm', { token: randomBytes(32).toString('hex') });
  assert.equal(denied.status, 400);
  await denied.body?.cancel();
- const response = await post('/auth/confirm', { token: link.searchParams.get('token') });
- assert.equal(response.status, 303);
- const replay = await post('/auth/confirm', { token: link.searchParams.get('token') });
+ const response = await post('/auth/reviewer-confirm', { token: link.searchParams.get('token') });
+ assert.equal(response.status, 200);
+ const replay = await post('/auth/reviewer-confirm', { token: link.searchParams.get('token') });
  assert.equal(replay.status, 400);
  await replay.body?.cancel();
  return response;
