@@ -68,8 +68,7 @@ export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer
      assert.equal(unnamed.code, 3);
      assert.match(unnamed.error, /--owner-name/);
      const credentialFree = await run('deploy', '--dry-run', '--owner-name', 'Alex Morgan');
-     assert.equal(credentialFree.code, 3);
-     assert.match(credentialFree.error, /CLOUDFLARE_API_TOKEN/);
+     assert.equal(credentialFree.code, 0, credentialFree.error);
      assert.equal(provider.state.calls.length, calls, 'credential-free refusals never reach the provider');
     } finally { process.env.CLOUDFLARE_API_TOKEN = token; }
     const named = await run('deploy', '--dry-run', '--owner-name', 'Alex Morgan');

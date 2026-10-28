@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ownerDeploy } from './deploy.mjs';
 
-test('owner deploy dry run validates the kit artifact and declaration with only provider reads',async t=>{
+test('owner deploy dry run validates the kit artifact and declaration without provider requests',async t=>{
  // Kit artifact data only; real application acceptance is in reference-journey.
  const root=await realpath(await mkdtemp(join(tmpdir(),'rer-deploy-kit-')));t.after(()=>rm(root,{recursive:true,force:true}));
  for(const path of ['dist/server','dist/client','migrations/core'])await mkdir(join(root,path),{recursive:true});
@@ -21,8 +21,8 @@ test('owner deploy dry run validates the kit artifact and declaration with only 
  const {localOperation}=await import('../onboarding/local/operation.mjs');const lock=await localOperation(root);t.after(()=>lock.release());
  const deploy=ownerDeploy('deploy.json',{run:async(...args)=>{builds++;assert.equal(args.at(-1).verb,'build');assert.equal(args.at(-1).operationToken,lock.token);}});
  const args={root,options:{dryRun:true},store,signal:new AbortController().signal,operationToken:lock.token};
- assert.deepEqual(await deploy(args),{dryRun:true,deployed:false});assert.equal(builds,1);assert.equal(provider.state.writes.length,0);
- assert.ok(provider.state.calls.length>0);assert.ok(provider.state.calls.every(call=>call.method==='GET'));
+ const dry=await deploy(args);assert.equal(dry.dryRun,true);assert.equal(dry.deployed,false);assert.equal(dry.plan.d1[0].binding,'DB');assert.equal(builds,1);assert.equal(provider.state.writes.length,0);
+ assert.equal(provider.state.calls.length,0);
  const requests=provider.state.calls.length;
  await writeFile(join(root,'deploy.json'),JSON.stringify({...declaration,d1:[]}));
  await assert.rejects(deploy(args),/undeclared-migration-binding/);assert.equal(provider.state.calls.length,requests);

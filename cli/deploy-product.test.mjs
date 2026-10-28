@@ -13,8 +13,7 @@ test('declared custom product survives dry run and ships its staged bytes with o
  assert.equal(dry.code, 0, dry.error);
  assert.equal(await readFile(join(f.root, productDirectory, 'dist/server/index.js'), 'utf8'), stagedModule);
  assert.equal(f.provider.state.writes.length, 0);
- assert.ok(f.provider.state.calls.length > 0);
- assert.ok(f.provider.state.calls.every(call => call.method === 'GET'));
+ assert.equal(f.provider.state.calls.length, 0, 'local dry run makes no provider requests');
  await assert.rejects(access(join(f.root, '.rer/deploy/production.json')), {code:'ENOENT'});
  const ship = await f.run();
  assert.equal(ship.code, 0, ship.error);
@@ -70,12 +69,12 @@ test('rer deploy refuses unsafe or absent declared products before provider chan
  }
 });
 
-test('staging a custom product does not let dry run succeed without provider credentials', async t => {
+test('staging a custom product lets dry run succeed without provider credentials', async t => {
  const f = await deployProductFixture(t);
  delete process.env.CLOUDFLARE_ACCOUNT_ID;
  delete process.env.CLOUDFLARE_API_TOKEN;
  const result = await f.run('--dry-run');
- assert.equal(result.code, 3, result.error);
+ assert.equal(result.code, 0, result.error);
  assert.equal(await readFile(join(f.root, productDirectory, 'dist/client/index.html'), 'utf8'), stagedHtml);
  assert.equal(f.provider.state.calls.length, 0);
  assert.equal(f.provider.state.writes.length, 0);
