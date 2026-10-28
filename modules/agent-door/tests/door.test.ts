@@ -206,6 +206,9 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
     {id:'send',tool:'synthetic.records.send',args:{id:'synthetic-base-1'},expect:[{class:'external'},{class:'sensitive'}]},
     {id:'access',tool:'synthetic.access.change',args:{id:'synthetic-base-other'},expect:[{class:'access'}]},
     {id:'erase',tool:'synthetic.records.erase',args:{id:'synthetic-base-1'},expect:[{class:'destructive'}]},
+    // Keep one real native record so its retained event remains visible after
+    // erasure; invisible/deleted resources must not gain a sponsor bypass.
+    {id:'retained',tool:'synthetic.records.write',args:{id:'synthetic-base-retained',value:'visible native event'},expect:[{class:'standard'}]},
     {id:'events',tool:'synthetic.events.list',args:{},expect:[{class:'standard'}]}]}
   const result=await runAgentDoorConformance({fetch:fresh.fetch,origin:fresh.c.origin,surface,signer:fresh.c.signer,person:fresh.c.person,now:()=>fresh.c.now})
   assert.deepEqual(result.points.filter((p:any)=>!p.ok),[])
