@@ -1,6 +1,7 @@
 import { installService } from './service.mjs';
 import { installPermissions } from './permissions.mjs';
 import { saveState } from './state.mjs';
+import { carryLive } from './carry.mjs';
 import { rerCommand } from './invocation.mjs';
 
 // The server's field names stay internal; people see the browser's sentences.
@@ -17,6 +18,7 @@ export async function applyOptIns(api, state, { report = true } = {}) {
  // nothing is decided yet. This first authenticated request activates the computer.
  try { self = await api.get('/api/business/executors/self'); }
  catch (error) { if (![403, 404].includes(error.status)) throw error; }
+ await carryLive(state, self);
  const decisions = Object.fromEntries(optInNames.map(name => [name, self?.optIns?.[name] === true ? true : self?.optIns?.[name] === false ? false : null]));
  if (decisions.installPermissions === true) await installPermissions({ consent: true });
  state.awakeConsent = decisions.awakeConsent === true;

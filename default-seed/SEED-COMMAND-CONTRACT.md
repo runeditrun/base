@@ -50,6 +50,36 @@ the signed-in app shell and preserve approved public pages and product marks.
 The recipe documents source-copy dependencies, mail display-name integration
 and the assembled-seed checks; it does not promise a package export.
 
+## Local Business carry
+
+The installed rer carries the paired Business into each first-party checkout at
+`.rer/local/business.json`. The folder is 0700 and the file is 0600. Writes use a
+temporary file and atomic rename. A refresh with unchanged values leaves the file
+byte-identical, including `refreshed_at`, which records when the carried values
+last changed.
+
+```json
+{"version":1,"origin":"https://billing-qualification.runeditrun.com","business_id":"<id>","business_url":"https://billing-qualification.runeditrun.com/business/<id>","name":"Example Business Co","legal_name":null,"accent":"#264f45","logo_url":null,"refreshed_at":"<ISO time>"}
+```
+
+`origin` is the paired state origin. `business_id` must match that state's
+Business id; `business_url` is the origin plus `/business/` plus the id encoded
+with `encodeURIComponent`. `name` has 1 to 200 characters. `legal_name` is a
+string or null. `accent` is the profile's `brand_color` as lower case `#rrggbb`,
+or null; `logo_url` is HTTPS or null. A missing Business block or a mismatched
+id writes nothing. An unavailable or refusing platform preserves the file;
+launch continues. Connect and re-connect refresh live first-party checkouts;
+setup and dev refresh their checkout before its pinned rer runs. Business run
+refreshes live checkouts at start, including `--once`, and at most once a minute.
+Disconnect removes carries from recorded and live checkouts.
+
+These values are prefills and display only, never authority. Never overwrite a
+value the owner saved. A legal-name prefill uses `legal_name ?? name`.
+Seeds read and validate this JSON only under `vite dev`, as one plain binding
+`RER_BUSINESS` holding the validated JSON. Exclude it from build output and never
+read or bind it when `RER_DEMO=1`. Seeds restart their dev server when the carry
+file is added, changed or removed.
+
 ## Browser-free agent check
 
 After the pinned `pnpm install --frozen-lockfile`, run `pnpm run verify:agent`.

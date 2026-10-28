@@ -14,6 +14,7 @@ Advanced commands (Usage: rer business VERB)
   connect [--code CODE] [--origin URL]
                                  Pair this computer, waiting until the owner approves in the browser
                                  (up to the code's 10 minutes); run it again to resume
+                                 Connect carries the Business name into local apps
   run [--once]                   Run consented local discovery; vendor upload integration pending
   next                           Return one templated question or nothing yet within 60 seconds
   answer ID VENDOR USAGE [CONFIDENCE]

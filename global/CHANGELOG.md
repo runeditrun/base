@@ -17,6 +17,7 @@
 - Explain refused dependency downloads, invalid ports and checkout archive paths with a plain cause and a runnable next command. Keep technical diagnostics in the unchanged JSON output and omit error classes and stacks from human failure summaries.
 - After Business pairing, name `business next` as the next step; both `next` and `run` apply the owner's latest computer choices without reconnecting.
 - Lead Business setup and local launch with one plain next step, defer optional shell setup until ready, and show a shared cold-run budget plus measured archive downloads and disk use.
+- Carry the paired Business name and display settings into local first-party apps at connect, setup and dev; refresh live apps while Business runs and remove the local carry on disconnect.
 
 ## 0.2.84
 

@@ -20,6 +20,7 @@ export async function repoCommand(request) {
  const root = await realpath(request.root);
  const next = command => `cd ${shellQuote(directory)} && rer ${command}`;
  if (verb === 'setup') {
+  await (await import('../../cli/business/carry.mjs')).refreshCheckout(root);
   const state = await launchDirectory(root), children = new Set(), controller = new AbortController();
   const log = createWriteStream(join(state, 'launch.log'), { flags: 'a', mode: 0o600 });
   const handlers = new Map(['SIGINT', 'SIGTERM'].map(signal => [signal, () => { controller.abort(); for (const child of children) child.kill(signal); }]));
