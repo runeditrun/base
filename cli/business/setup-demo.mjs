@@ -93,4 +93,3 @@ export async function setupDemo({origin,cookie,hosting='managed',waitSeconds=240
  for(const seed of receipt.seeds)if(!seed.complete&&errors.has(seed.app))seed.cause=errors.get(seed.app);
  return receipt;
 }
-
