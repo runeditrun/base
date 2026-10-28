@@ -234,5 +234,10 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
   const families=['BASE-AGENT-004.durable','BASE-AGENT-004.principal','BASE-AGENT-005.narrowing','BASE-AGENT-005.proof']
   t.diagnostic(`module conformance ${result.points.filter((p:any)=>p.ok).length}/${result.points.length}; ${families.map(family=>`${family} ${result.points.filter((p:any)=>p.id.startsWith(family)).length}`).join(', ')}`)
   assert.deepEqual(result.points.filter((p:any)=>!p.ok),[])
+  // widens:false over an argument that can add a grant fails validation, before any call.
+  const widening=structuredClone(surface), revoke=widening.tools.find((tool:any)=>tool.name==='synthetic.access.revoke') as any
+  revoke.inputSchema.properties.grant={type:'string'}
+  const refused=await runAgentDoorConformance({fetch:fresh.fetch,origin:fresh.c.origin,surface:widening,signer:fresh.c.signer,person:fresh.c.person,now:()=>fresh.c.now,jobs,prove})
+  assert.deepEqual(refused.points.filter((p:any)=>!p.ok).map((p:any)=>p.id),['BASE-AGENT-005.surface.synthetic.access.revoke.narrowing'])
  } finally { await fresh.close() }
 })
