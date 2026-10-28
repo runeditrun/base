@@ -1,10 +1,11 @@
-import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { scheduledHarness, definition } from './scheduled-harness.mjs'
 import { emittedRuntime, setupToken } from './emitted-runtime.mjs'
 import { AuthError } from '../../../modules/operator-auth/errors.mjs'
 
-test('scheduled approval hashes and executes the same validated getter snapshot; unknown actions refuse', async () => {
+export const recoveryRows = []
+
+recoveryRows.push(['scheduled approval hashes and executes the same validated getter snapshot; unknown actions refuse', {}, async () => {
   let getters = false
   const definitions = () => {
     let reads = 0
@@ -34,9 +35,9 @@ test('scheduled approval hashes and executes the same validated getter snapshot;
     const visible = (await h.history(owner.cookie)).runs.find(run => run.id === refused.id)
     assert.equal(visible.actions[0].value.attemptedAction, 'operators:role')
   } finally { await h.close() }
-})
+}])
 
-test('the scheduled action cap includes every audit action linked to the run', async () => {
+recoveryRows.push(['the scheduled action cap includes every audit action linked to the run', {}, async () => {
   const h = await scheduledHarness({ definitions: () => [definition({ maxActionsPerRun: 1 })] })
   try {
     const owner = await h.person('owner@example.test', 'owner', { sessionDaysAgo: 0 })
@@ -52,9 +53,9 @@ test('the scheduled action cap includes every audit action linked to the run', a
     assert.equal(await h.status(member.id), 'active')
     assert.equal((await h.history(owner.cookie)).runs[0].actions.length, 2)
   } finally { await h.close() }
-})
+}])
 
-test('a live admitted scheduled run blocks overlap; a crash beyond the handler limit expires with owner-readable audit', async () => {
+recoveryRows.push(['a live admitted scheduled run blocks overlap; a crash beyond the handler limit expires with owner-readable audit', {}, async () => {
   const h = await scheduledHarness()
   try {
     const owner = await h.person('owner@example.test', 'owner', { sessionDaysAgo: 0 })
@@ -90,10 +91,9 @@ test('a live admitted scheduled run blocks overlap; a crash beyond the handler l
     assert.equal(history.runs.find(run => run.id === capability.id).error, 'policy_expired')
     assert.equal((await h.runWith(async () => {})).error, 'policy_interval')
   } finally { await h.close() }
-})
+}])
 
-
-test('refused and expired audit events leave the scheduled action budget available', async () => {
+recoveryRows.push(['refused and expired audit events leave the scheduled action budget available', {}, async () => {
   const h = await scheduledHarness({ definitions: () => [definition({ maxActionsPerRun: 1 })] })
   try {
     const owner = await h.person('owner@example.test', 'owner', { sessionDaysAgo: 0 })
@@ -113,9 +113,9 @@ test('refused and expired audit events leave the scheduled action budget availab
     const visible = (await h.history(owner.cookie)).runs.find(run => run.id === result.id)
     assert.deepEqual(visible.actions.map(action => action.action), ['policy:refused', 'policy:expired', 'operators:deactivate'])
   } finally { await h.close() }
-})
+}])
 
-test('a callback cannot claim expiry or bypass the interval with a forged expiry code', async () => {
+recoveryRows.push(['a callback cannot claim expiry or bypass the interval with a forged expiry code', {}, async () => {
   const h = await scheduledHarness()
   try {
     const owner = await h.person('owner@example.test', 'owner', { sessionDaysAgo: 0 })
@@ -136,9 +136,9 @@ test('a callback cannot claim expiry or bypass the interval with a forged expiry
     h.advance(definition().minIntervalMinutes * 60000 + 1)
     assert.equal((await h.runWith(async () => {})).status, 'completed')
   } finally { await h.close() }
-})
+}])
 
-test('owner history presents an expired scheduled run as expiry rather than a committed action', async () => {
+recoveryRows.push(['owner history presents an expired scheduled run as expiry rather than a committed action', {}, async () => {
   const r = await emittedRuntime()
   try {
     const claimed = await r.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Rivera Lee' } })
@@ -171,9 +171,9 @@ test('owner history presents an expired scheduled run as expiry rather than a co
     assert.match(event, /policy_expired/)
     assert.ok(event.includes(id), 'expiry keeps the original run id')
   } finally { await r.close() }
-})
+}])
 
-test('crashed unadmitted ticks expire atomically with their original ids even before approval', async () => {
+recoveryRows.push(['crashed unadmitted ticks expire atomically with their original ids even before approval', {}, async () => {
   const h = await scheduledHarness()
   try {
     const owner = await h.person('owner@example.test', 'owner', { sessionDaysAgo: 0 })
@@ -204,9 +204,9 @@ test('crashed unadmitted ticks expire atomically with their original ids even be
     await h.approveAs((await h.sessionFor(owner)).cookie)
     assert.equal((await h.runWith(async () => {})).status, 'completed')
   } finally { await h.close() }
-})
+}])
 
-test('the owner approves and revokes a scheduled policy through the forms the page renders', async () => {
+recoveryRows.push(['the owner approves and revokes a scheduled policy through the forms the page renders', {}, async () => {
   const r = await emittedRuntime()
   try {
     const claimed = await r.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Rivera Lee' } })
@@ -245,4 +245,4 @@ test('the owner approves and revokes a scheduled policy through the forms the pa
     assert.notEqual((await (await r.call('/auth/policies', { cookie })).json()).policies[0].approval?.revokedAt ?? null, null)
     assert.equal(formFields(await html()).some(fields => fields.action === 'revoke'), false, 'a revoked approval offers no second revoke')
   } finally { await r.close() }
-})
+}])

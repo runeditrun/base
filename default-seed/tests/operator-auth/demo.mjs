@@ -1,10 +1,12 @@
-import test from 'node:test'
 import assert from 'node:assert/strict'
 import { emittedRuntime, owner, setupToken } from './emitted-runtime.mjs'
 
+export const demoRows = []
+
+
 const cookies = response => response.headers.getSetCookie().map(line => line.split(';')[0]).join('; ')
 
-test('hosted demo: owner invites a person who enters /app in one click with their role and no mail', async () => {
+demoRows.push(['hosted demo: owner invites a person who enters /app in one click with their role and no mail', {}, async () => {
   const r = await emittedRuntime({ demo: true })
   const post = (input, cookie) => ({ method: 'POST', input, cookie })
   try {
@@ -61,4 +63,4 @@ test('hosted demo: owner invites a person who enters /app in one click with thei
       } finally { await ordinary.close() }
     }
   } finally { await r.close() }
-})
+}])

@@ -1,8 +1,12 @@
+import { runRows } from '../rows.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { emittedRuntime, setupToken } from './emitted-runtime.mjs'
 
-test('cron failure isolation: a broken policy cannot strand a pending person erasure or later policies', async () => {
+const maintenanceRows = []
+
+
+maintenanceRows.push(['cron failure isolation: a broken policy cannot strand a pending person erasure or later policies', {}, async () => {
   const r = await emittedRuntime({ files: true })
   try {
     const claimed = await r.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Rivera Lee' } })
@@ -32,9 +36,9 @@ test('cron failure isolation: a broken policy cannot strand a pending person era
     }
     assert.deepEqual(state, { laterPolicyRan: true, personRemains: false, pendingRequest: false, erasureComplete: true })
   } finally { await r.close() }
-})
+}])
 
-test('erasure preview changes nothing, and an explicit resume finishes an interrupted erasure while an unrelated person is untouched', async () => {
+maintenanceRows.push(['erasure preview changes nothing, and an explicit resume finishes an interrupted erasure while an unrelated person is untouched', {}, async () => {
   const r = await emittedRuntime({ files: true })
   try {
     const claimed = await r.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Rivera Lee' } })
@@ -67,4 +71,8 @@ test('erasure preview changes nothing, and an explicit resume finishes an interr
     assert.equal((await r.call(`/api/people/${id}/export`, { cookie })).status, 404)
     assert.deepEqual(await (await r.call(`/api/people/${peer}/export`, { cookie })).json(), peerExport, 'the unrelated person is preserved exactly')
   } finally { await r.close() }
+}])
+
+test('erasure recovery keeps preview inert and resumes after explicit interruption or a broken cron policy', async t => {
+  await runRows(t, maintenanceRows)
 })

@@ -1,8 +1,13 @@
+import { upgradeRows } from './upgrade-readback.mjs'
+import { runRows } from '../../default-seed/tests/rows.mjs'
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { digest } from '../../scripts/qualification/operations.mjs';
 import { snapshotState, recheckState } from '../t016/state.mjs';
+
+const messageRows = []
+const continuityRows = []
 
 // Real SQL readback over test-only representative records. No provider calls.
 function fixture(t) {
@@ -40,12 +45,12 @@ function fixture(t) {
     origin: 'https://proof.example.test', migrations: [{ name: '0001_initial.sql', sha256: digest('sql') }] };
   return { db, input, mediaReads: () => mediaReads };
 }
-test('initial snapshot binds two durable messages and captures a stable continuity baseline', async t => {
+messageRows.push(['initial snapshot binds two durable messages and captures a stable continuity baseline', {}, async t => {
   const f = fixture(t), first = await snapshotState(f.input), second = await snapshotState(f.input);
   assert.deepEqual(first, second); assert.equal(f.mediaReads(), 2);
   assert.equal(first.mediaSha256, f.input.state.media.sha256);
   assert.equal(first.sourceMigrationsSha256, digest(f.input.migrations));
-});
+}]);
 for (const [name, sql] of [
   ['visitor message ID', "UPDATE messages SET id='other' WHERE id='visitor-message'"],
   ['operator message ID', "UPDATE messages SET id='other' WHERE id='operator-message'"],
@@ -56,15 +61,15 @@ for (const [name, sql] of [
   ['request content', "UPDATE messages SET content='Corrupted request' WHERE id='visitor-message'"],
   ['reply content', "UPDATE messages SET content='Corrupted reply' WHERE id='operator-message'"],
   ['exact content whitespace', "UPDATE messages SET content=content || ' ' WHERE id='operator-message'"],
-]) test('initial snapshot rejects wrong ' + name + ' in the correct conversation', async t => {
+]) messageRows.push(['initial snapshot rejects wrong ' + name + ' in the correct conversation', {}, async t => {
   const f = fixture(t); f.db.exec(sql);
   await assert.rejects(snapshotState(f.input), /prior-data-changed/); assert.equal(f.mediaReads(), 0);
-});
-test('moving a required message out of the conversation fails readback', async t => {
+}]);
+messageRows.push(['moving a required message out of the conversation fails readback', {}, async t => {
   const f = fixture(t); f.db.exec("UPDATE messages SET conversation_id='unrelated' WHERE id='operator-message'");
   await assert.rejects(snapshotState(f.input), /representative-data-incomplete/);
-});
-test('a readback returning the right ID from the wrong conversation is rejected', async t => {
+}]);
+messageRows.push(['a readback returning the right ID from the wrong conversation is rejected', {}, async t => {
   const f = fixture(t), read = f.input.read;
   // Deliberately corrupt the readback envelope after executing the real query.
   f.input.read = async (...args) => {
@@ -73,7 +78,7 @@ test('a readback returning the right ID from the wrong conversation is rejected'
     return rows;
   };
   await assert.rejects(snapshotState(f.input), /prior-data-changed/); assert.equal(f.mediaReads(), 0);
-});
+}]);
 for (const [name, mutate] of [
   ['request hash', state => state.reply.requestSha256 = digest('different')],
   ['reply hash', state => state.reply.replySha256 = digest('different')],
@@ -81,28 +86,32 @@ for (const [name, mutate] of [
   ['distinct message identities', state => state.reply.operatorMessageId = state.reply.visitorMessageId],
   ['missing operator identity', state => delete state.reply.operatorMessageId],
   ['missing content', state => delete state.replyContent],
-]) test('snapshot rejects inconsistent journey ' + name, async t => {
+]) messageRows.push(['snapshot rejects inconsistent journey ' + name, {}, async t => {
   const f = fixture(t); mutate(f.input.state);
   await assert.rejects(snapshotState(f.input), /representative-data-incomplete/); assert.equal(f.mediaReads(), 0);
-});
+}]);
 for (const [name, sql, failure] of [
   ['owner membership', "UPDATE memberships SET role='agent'", /representative-data-incomplete/],
   ['media message binding', "UPDATE media SET message_id='other'", /representative-data-incomplete/],
   ['migration ledger', "UPDATE d1_migrations SET name='other.sql'", /migration-ledger-incomplete/],
-]) test('snapshot retains ' + name + ' invariant', async t => {
+]) continuityRows.push(['snapshot retains ' + name + ' invariant', {}, async t => {
   const f = fixture(t); f.db.exec(sql); await assert.rejects(snapshotState(f.input), failure);
-});
-test('valid message binding cannot mask changed prior rows during recheck', async t => {
+}]);
+continuityRows.push(['valid message binding cannot mask changed prior rows during recheck', {}, async t => {
   const f = fixture(t), before = await snapshotState(f.input); f.db.exec("UPDATE contacts SET name='Changed'");
   await assert.rejects(recheckState({ ...f.input, before, previousMigrations: f.input.migrations,
     browser: () => assert.fail('Changed rows must fail before browser/login') }), /prior-data-changed/);
-});
-test('valid message binding cannot mask missing media bytes', async t => {
+}]);
+continuityRows.push(['valid message binding cannot mask missing media bytes', {}, async t => {
   const f = fixture(t); t.mock.method(globalThis, 'fetch', async () => new Response('lost'));
   await assert.rejects(snapshotState(f.input), /prior-media-changed/);
-});
-test('recheck retains applied migration byte immutability before reading state', async t => {
+}]);
+continuityRows.push(['recheck retains applied migration byte immutability before reading state', {}, async t => {
   const f = fixture(t), before = await snapshotState(f.input);
   await assert.rejects(recheckState({ ...f.input, before, previousMigrations: [{ name: '0001_initial.sql', sha256: digest('different sql') }],
     browser: () => assert.fail('Changed history must fail before browser/login') }), /applied-migration-bytes-changed/);
-});
+}]);
+
+test("snapshot and recheck bind the exact journey and preserve data, media and applied history", async t => {
+  await runRows(t, [...messageRows, ...continuityRows, ...upgradeRows])
+})

@@ -1,8 +1,13 @@
+import { startupRows } from './browser-startup.mjs'
+import { runRows } from '../../default-seed/tests/rows.mjs'
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { browserJourney } from '../../scripts/qualification/browser.mjs';
 import { claimAndReply, sendAndReadMail } from '../../scripts/qualification/happytohelp.mjs';
 import { digest } from '../../scripts/qualification/operations.mjs';
+
+const replayRows = []
+const transcriptRows = []
 
 // Protocol fixtures only. The production journey still drives actual Chromium.
 function browserFixture(t, fault) {
@@ -58,7 +63,7 @@ function browserFixture(t, fault) {
 }
 for (const fault of [undefined, 'earlier-corrupt-event', 'missing-initial', 'wrong-initial-content', 'missing-replay',
   'wrong-replay-content', 'wrong-replay-event', 'widget-reload-missing', 'operator-reload-missing']) {
-  test('browser replay boundary: ' + (fault ?? 'valid delivery'), async t => {
+  replayRows.push(['browser replay boundary: ' + (fault ?? 'valid delivery'), {}, async t => {
     const fixture = browserFixture(t, fault);
     if (!fault || fault === 'earlier-corrupt-event') {
       const result = await fixture.run(); assert.equal(result.reply.socketEventId, '7'); assert(result.reply.replayVerified);
@@ -67,7 +72,7 @@ for (const fault of [undefined, 'earlier-corrupt-event', 'missing-initial', 'wro
       assert(fixture.trace.includes('attachment') && fixture.trace.includes('operator:reload'));
     } else await assert.rejects(fixture.run(), /socket-event-missing|reload-content-missing/);
     assert(fixture.closed(), 'browser closed on success and failure');
-  });
+  }]);
 }
 function durableFixture(t, fault) {
   let claimed = false;
@@ -94,11 +99,11 @@ function durableFixture(t, fault) {
   return { observations, run: () => claimAndReply({ origin: 'https://qualification.example', env: {}, browser: async () => journey,
     observe: phase => observations.push(phase) }) };
 }
-for (const fault of [undefined, 'missing', 'content', 'identity', 'actor']) test('durable transcript boundary: ' + (fault ?? 'persisted'), async t => {
+for (const fault of [undefined, 'missing', 'content', 'identity', 'actor']) transcriptRows.push(['durable transcript boundary: ' + (fault ?? 'persisted'), {}, async t => {
   const fixture = durableFixture(t, fault);
   if (fault) { await assert.rejects(fixture.run(), /reply-readback-failed/); assert.deepEqual(fixture.observations, []); }
   else { await fixture.run(); assert.deepEqual(fixture.observations, ['owner', 'widget', 'reply', 'media']); }
-});
+}]);
 test('accepted provider send still fails when its durable mail row is missing', async t => {
   t.mock.method(globalThis, 'fetch', async (url, options) => url.includes('gmail.googleapis.com') ?
     Response.json(url.endsWith('/profile') ? { emailAddress: 'test@example.test' } : {}) :
@@ -108,3 +113,7 @@ test('accepted provider send still fails when its durable mail row is missing', 
     state: { owner: { projectId: 'project', token: 'test-only' } }, deliveryReadback: async () => ({}),
     observe() { assert.fail('No successful mail observation without durable provider association'); } }), /sendgrid-durable-readback-failed/);
 });
+
+test("reply delivery requires exact socket replay, visible reloads and a durable transcript", async t => {
+  await runRows(t, [...replayRows, ...transcriptRows, ...startupRows])
+})

@@ -1,3 +1,4 @@
+import { runRows } from '../../default-seed/tests/rows.mjs'
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
@@ -9,6 +10,9 @@ import { reviewedExecutor } from '../standalone/executor.mjs';
 import { Containers } from '../t016/isolation.mjs';
 import { digest, deployDescriptor } from '../../scripts/qualification/operations.mjs';
 import { runStandalone } from '../standalone/run.mjs';
+
+const executorRows = []
+const authorityRows = []
 
 function scratch(t) {
   assert(process.env.T016_TEST_TMP); const root = mkdtempSync(join(process.env.T016_TEST_TMP, 'generic-'));
@@ -30,7 +34,7 @@ async function brokerRequest(root) {
     }); req.on('error', reject); req.end();
   });
 }
-test('committed snapshot excludes ignored credentials and mutable checkout files', async t => {
+authorityRows.push(['committed snapshot excludes ignored credentials and mutable checkout files', {}, async t => {
   const root = scratch(t), f = standaloneFixture(root), destination = join(root, 'snapshot');
   const original = readFileSync(join(f.directory, 'product/build.mjs'), 'utf8');
   writeFileSync(join(f.directory, 'product/build.mjs'), 'throw new Error("dirty-checkout-must-not-run");');
@@ -39,8 +43,8 @@ test('committed snapshot excludes ignored credentials and mutable checkout files
   assert.equal(readFileSync(join(destination, 'product/build.mjs'), 'utf8'), original);
   assert.throws(() => copyControllerFiles(destination, join(root, 'bad'), { 'product/setup.mjs': 'f'.repeat(64) }), /controller-file-mismatch/);
   await assert.rejects(snapshotSource({ ...f, sourceSha: 'a'.repeat(40), destination: join(root, 'other') }), /revision-mismatch/);
-});
-test('review admits declared credentials and exact literal shell/cwd, rejects changed contracts', t => {
+}]);
+authorityRows.push(['review admits declared credentials and exact literal shell/cwd, rejects changed contracts', {}, t => {
   const f = standaloneFixture(scratch(t)); const review = reviewDescriptor(f.descriptor, f.adapter);
   assert.deepEqual(review.names, ['PROVIDER_TOKEN']); assert.deepEqual(review.commands[1].argv, f.descriptor.commands.deploy.argv);
   assert.equal(review.commands[1].cwd, 'product');
@@ -51,13 +55,13 @@ test('review admits declared credentials and exact literal shell/cwd, rejects ch
   assert.throws(() => reviewDescriptor(descriptor, { ...f.adapter, descriptorSha256: digest(descriptor) }), /unsafe-source-path/);
   assert.throws(() => reviewDescriptor(f.descriptor, { ...f.adapter, builds: [{ ...f.adapter.builds[0], output: 'product' }] }), /artifact-controller-overlap/);
   assert.throws(() => reviewDescriptor(f.descriptor, { ...f.adapter, builds: [{ ...f.adapter.builds[0], publicEnvironment: ['PROVIDER_TOKEN'] }] }), /unreviewed-public-environment/);
-});
-test('legacy local command helper cannot bypass the reviewed credential route', t => {
+}]);
+authorityRows.push(['legacy local command helper cannot bypass the reviewed credential route', {}, t => {
   const f = standaloneFixture(scratch(t));
   assert.throws(() => deployDescriptor({ cwd: f.directory, env: { PATH: process.env.PATH, PROVIDER_TOKEN: 'test-only' } }), /reviewed-executor-required/);
   assert(!existsSync(join(f.directory, 'product/prepared.json')));
-});
-for (const fault of [undefined, 'install', 'build', 'ignored-build-failure', 'artifact']) test('reviewed executor routes real argv through isolated boundary: ' + (fault ?? 'success'), async t => {
+}]);
+for (const fault of [undefined, 'install', 'build', 'ignored-build-failure', 'artifact']) executorRows.push(['reviewed executor routes real argv through isolated boundary: ' + (fault ?? 'success'), {}, async t => {
   const root = scratch(t), f = standaloneFixture(root), work = join(root, 'work'); mkdirSync(work);
   const calls = [], creates = [], observations = []; let next = 1;
   // Docker protocol fixtures are local to this test; production has no substitute
@@ -98,9 +102,17 @@ for (const fault of [undefined, 'install', 'build', 'ignored-build-failure', 'ar
   } finally { await executor.close(); }
   assert.equal(calls.filter(args => args[0] === 'remove').length, 2);
   assert(!existsSync(join(work, 'broker')));
-});
-test('generic runner refuses missing Linux attestation before source or adapter execution', async () => {
+}]);
+authorityRows.push(['generic runner refuses missing Linux attestation before source or adapter execution', {}, async () => {
   await assert.rejects(runStandalone({}, {}), /live-environment-required/);
   await assert.rejects(runStandalone({}, { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'runeditrun/base', GITHUB_REF: 'refs/heads/main',
     GITHUB_EVENT_NAME: 'workflow_dispatch', T016_CONTROLLER_IMAGE: images.controller, T016_BUILD_IMAGE: images.build, T016_BROWSER_IMAGE: images.browser }), /isolation-unqualified/);
-});
+}]);
+
+test("reviewed executor routes literal commands through isolated build and artifact custody", async t => {
+  await runRows(t, executorRows)
+})
+
+test("reviewed source authority excludes dirty files, contract drift and credential bypass", async t => {
+  await runRows(t, authorityRows)
+})

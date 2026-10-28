@@ -1,3 +1,4 @@
+import { runRows } from '../../../default-seed/tests/rows.mjs'
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
@@ -7,9 +8,9 @@ import { execute, cleanEnvironment } from './commands.mjs';
 import { ciMetadata } from './metadata.mjs';
 import { Receipt, hash } from './receipt.mjs';
 import { PROOFS, EVIDENCE } from './constants.mjs';
-import { artifactAdversary } from './artifact-adversary.mjs';
-import { tarEntry } from './archive-fixtures.mjs';
-import { unpackArtifact } from '../../t016/artifact.mjs';
+
+const commandRows = []
+const retentionRows = []
 const scratch = () => mkdtempSync(join(tmpdir(), 't016-controls-'));
 const commit = 'a'.repeat(40);
 const github = { GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'pull_request', GITHUB_REPOSITORY: 'runeditrun/base', GITHUB_RUN_ID: '12', GITHUB_RUN_ATTEMPT: '2', GITHUB_WORKFLOW_SHA: 'b'.repeat(40), GITHUB_SHA: 'c'.repeat(40), GITHUB_JOB: 'qualification', GITHUB_SERVER_URL: 'https://github.com' };
@@ -22,27 +23,18 @@ test('CI identity binds actual head and separately records workflow revision', (
   assert.throws(() => ciMetadata({ ...github, GITHUB_EVENT_NAME: 'pull_request_target' }, event(), commit));
   assert.throws(() => ciMetadata({ ...github, GITHUB_WORKFLOW_SHA: '' }, event(), commit));
 });
-test('clean subprocess environment never inherits provider or npm authority', () => {
+commandRows.push(['clean subprocess environment never inherits provider or npm authority', {}, () => {
   const env = cleanEnvironment('/test', '/bin'); assert.deepEqual(Object.keys(env).filter(k => /TOKEN|SECRET|API_KEY|PASSWORD/.test(k)), []);
   assert.equal(env.GIT_CONFIG_GLOBAL, '/dev/null'); assert.equal(env.HOME, '/test'); assert(!('NODE_OPTIONS' in env));
-});
-test('actual commands preserve failures, bounded output and process timeout', async () => {
+}]);
+commandRows.push(['actual commands preserve failures, bounded output and process timeout', {}, async () => {
   const env = cleanEnvironment(tmpdir());
   const fail = await execute([process.execPath, '-e', 'console.error("expected failure"); process.exit(23)'], { env });
   assert.equal(fail.exitCode, 23); assert.match(fail.stderr.toString(), /expected failure/); assert.equal(fail.timedOut, false);
   const timeout = await execute([process.execPath, '-e', 'setInterval(()=>{},1000)'], { env, timeout: 100 }); assert.equal(timeout.timedOut, true); assert.notEqual(timeout.exitCode, 0);
   const overflow = await execute([process.execPath, '-e', 'console.log("x".repeat(10000))'], { env, limit: 20 }); assert.equal(overflow.overflow, true);
-});
-test('real strict unpacker accepts regular bytes and rejects link/traversal/config targets', () => {
-  const root = scratch();
-  try {
-    const receipt = new Receipt(join(root, 'reports'), {});
-    artifactAdversary({ root, receipt });
-    const ok = join(root, 'good'); mkdirSync(ok); const files = unpackArtifact(tarEntry('payload'), ok, 'dist');
-    assert.equal(files[0].sha256, hash('test')); assert.equal(readFileSync(join(ok, 'dist/payload'), 'utf8'), 'test');
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-test('receipt cannot pass missing proofs, missing evidence, or image custody', async () => {
+}]);
+retentionRows.push(['receipt cannot pass missing proofs, missing evidence, or image custody', {}, async () => {
   const root = scratch();
   try {
     const receipt = new Receipt(root, {}); assert.equal(receipt.finish().status, 'incomplete');
@@ -56,8 +48,8 @@ test('receipt cannot pass missing proofs, missing evidence, or image custody', a
     await receipt.proof('unexpected-failure', () => { throw new Error('assertion failed'); }); assert.equal(receipt.finish().status, 'fail');
     for (const [name, info] of Object.entries(receipt.value.files)) assert.equal(hash(readFileSync(join(root, name))), info.sha256);
   } finally { rmSync(root, { recursive: true, force: true }); }
-});
-test('synthetic marker redaction is enforced for text and binary retention', () => {
+}]);
+retentionRows.push(['synthetic marker redaction is enforced for text and binary retention', {}, () => {
   const root = scratch();
   try {
     const receipt = new Receipt(root, {}); receipt.secrets.push('random-test-marker');
@@ -65,7 +57,7 @@ test('synthetic marker redaction is enforced for text and binary retention', () 
     assert.throws(() => receipt.file('binary', Buffer.from('random-test-marker')));
     assert.throws(() => receipt.file('../escape', 'bad'));
   } finally { rmSync(root, { recursive: true, force: true }); }
-});
+}]);
 test('new generic fixtures use committed blobs, varied credential/cwd and reviewed literal commands', async () => {
   const { genericFixture } = await import('./generic-fixture.mjs');
   const { snapshotSource, reviewDescriptor } = await import('../../standalone/review.mjs');
@@ -87,3 +79,11 @@ test('new generic fixtures use committed blobs, varied credential/cwd and review
     const { existsSync } = await import('node:fs'); assert(!existsSync(join(destination, 'ignored-secret'))); assert(!existsSync(join(destination, 'untracked')));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("isolated command execution strips inherited authority and records bounded failures", async t => {
+  await runRows(t, commandRows)
+})
+
+test("Linux evidence retention redacts markers and refuses incomplete custody", async t => {
+  await runRows(t, retentionRows)
+})

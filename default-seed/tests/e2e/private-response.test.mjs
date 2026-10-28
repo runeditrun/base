@@ -1,3 +1,4 @@
+import { runRows } from '../rows.mjs'
 import { completeFirstRun } from '../operator-auth/first-run.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -6,6 +7,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { emittedRuntime, root, owner, setupToken, decodeStart } from '../operator-auth/emitted-runtime.mjs'
+
+const transportRows = []
 
 async function privateFunctions() {
   const sources = await Promise.all((await readdir(join(root, 'dist/server/assets')))
@@ -23,7 +26,7 @@ const transportHeaders = (origin) => ({
   'x-tsr-serverFn': 'true', accept: 'application/json', origin, 'sec-fetch-site': 'same-origin',
 })
 
-test('emitted Worker keeps private documents and each RPC uncached through every admission state', async () => {
+transportRows.push(['emitted Worker keeps private documents and each RPC uncached through every admission state', {}, async () => {
   const runtime = await emittedRuntime({ noMail: true })
   try {
     const functions = await privateFunctions()
@@ -109,12 +112,12 @@ test('emitted Worker keeps private documents and each RPC uncached through every
     await matrix(cookie, false)
 
   } finally { await runtime.close() }
-})
+}])
 
-test('emitted Worker browser retains uncached SSR and hydrated native RPC navigation', async () => {
+transportRows.push(['emitted Worker browser retains uncached SSR and hydrated native RPC navigation', {}, async () => {
   const { privateResponseBrowser } = await import('./private-response-browser.mjs')
   await privateResponseBrowser(await privateFunctions())
-})
+}])
 
 test('the owner moves people in through the import screen: upload, review, approve, reconcile, reload, undo and the Business setting', async (t) => {
   const runtime = await emittedRuntime({ noMail: true })
@@ -195,4 +198,8 @@ test('the owner moves people in through the import screen: upload, review, appro
       assert.deepEqual(problems, [])
     } finally { await context.close() }
   }
+})
+
+test('private Start documents and native RPC stay uncached across admission and hydrated navigation', async t => {
+  await runRows(t, transportRows)
 })

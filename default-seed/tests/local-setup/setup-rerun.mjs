@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { test } from 'node:test'
 import { scriptFixture } from './script-fixture.mjs'
+
+export const setupRerunRows = []
+
 
 const kept = /Kept the existing \.dev\.vars settings/
 
-test('a rerun without --force says when --port or --owner-email differ from the kept settings', async (t) => {
+setupRerunRows.push(['a rerun without --force says when --port or --owner-email differ from the kept settings', {}, async (t) => {
   const { dir, run } = await scriptFixture(t)
   const path = join(dir, '.dev.vars')
   const first = await run('local-setup', ['--owner-email', 'first@example.test', '--port', '8890'])
@@ -36,4 +38,4 @@ test('a rerun without --force says when --port or --owner-email differ from the 
   const vars = await readFile(path, 'utf8')
   assert.match(vars, /^OWNER_EMAIL=second@example\.test$/m)
   assert.match(vars, /^AUTH_ORIGIN=http:\/\/127\.0\.0\.1:8891$/m)
-})
+}])

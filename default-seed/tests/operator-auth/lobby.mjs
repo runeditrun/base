@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
 import { emittedRuntime, setupToken, owner } from './emitted-runtime.mjs'
 
-test('the claimed Lobby opens the local sign-in flow without deployment credentials', async () => {
+export const lobbyRows = []
+
+lobbyRows.push(['the claimed Lobby opens the local sign-in flow without deployment credentials', {}, async () => {
   for (const options of [{ hostname: 'localhost', noMail: true }, { demoHost: true }]) {
     const runtime = await emittedRuntime(options)
     try {
@@ -20,9 +21,9 @@ test('the claimed Lobby opens the local sign-in flow without deployment credenti
       assert.equal(runtime.mails.length, 0, 'opening sign-in needs no deployed credentials or email delivery')
     } finally { await runtime.close() }
   }
-})
+}])
 
-test('a current session opens the app from the Lobby and signout restores the sign-in action', async () => {
+lobbyRows.push(['a current session opens the app from the Lobby and signout restores the sign-in action', {}, async () => {
   const runtime = await emittedRuntime({ noMail: true })
   try {
     const claim = await runtime.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Morgan' } })
@@ -38,9 +39,9 @@ test('a current session opens the app from the Lobby and signout restores the si
     const signedOut = await runtime.call('/', { cookie })
     assert.match(await signedOut.text(), /class="btn" href="\/signin/)
   } finally { await runtime.close() }
-})
+}])
 
-test('the installed Lobby offers sign-in as soon as the owner is claimed, before first-run confirmation', async () => {
+lobbyRows.push(['the installed Lobby offers sign-in as soon as the owner is claimed, before first-run confirmation', {}, async () => {
   const runtime = await emittedRuntime({ noMail: true })
   try {
     const before = await runtime.call('/')
@@ -74,9 +75,9 @@ test('the installed Lobby offers sign-in as soon as the owner is claimed, before
     assert.equal(head.status, 200)
     assert.equal(await head.text(), '')
   } finally { await runtime.close() }
-})
+}])
 
-test('the Lobby Sign in link opens the sign-in form with the claimed owner already typed', async () => {
+lobbyRows.push(['the Lobby Sign in link opens the sign-in form with the claimed owner already typed', {}, async () => {
   const runtime = await emittedRuntime()
   try {
     await runtime.call('/auth/bootstrap', { method: 'POST', input: { token: setupToken, displayName: 'Morgan' } })
@@ -86,4 +87,4 @@ test('the Lobby Sign in link opens the sign-in form with the claimed owner alrea
     assert.match(await signin.text(), /<input id="signin-email"[^>]* value="owner@example\.test"/)
     assert.equal(runtime.mails.length, 0, 'opening the form sends nothing')
   } finally { await runtime.close() }
-})
+}])
