@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "cap": 200,
+  "platforms": [
+    "linux",
+    "darwin",
+    "win32"
+  ]
+}
