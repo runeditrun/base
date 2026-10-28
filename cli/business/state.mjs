@@ -1,4 +1,5 @@
-import { mkdir, readFile, readdir, writeFile, rename, chmod, open, unlink, rm, rmdir, lstat } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile, rename, chmod, open, unlink, rm, rmdir, lstat, utimes } from 'node:fs/promises';
+import { readFileSync, unlinkSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
@@ -81,7 +82,15 @@ export async function checkStateWritable() {
 
 // Files this CLI writes in its state folder. A folder named by RER_BUSINESS_STATE_DIR
 // may hold other things, so only these are removed from it.
-const owned = /^(?:(?:state|pairing|progress|permissions|service|carried)\.json|run\.lock|disconnect|service(?:-error)?\.log|discovery-[A-Za-z0-9_.:-]+\.(?:json|tmp)|.*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.tmp(?:\.check)?)$/;
+const owned = /^(?:(?:state|pairing|progress|permissions|service|carried)\.json|run\.lock|disconnect|service(?:-error)?\.log|discovery-[A-Za-z0-9_.:-]+\.(?:json|tmp)|export-[0-9a-f]{32}\.bundle|.*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.tmp(?:\.check)?)$/;
+/** After a revocation whose local cleanup was refused, keep only what a later
+ * disconnect needs to finish: the state and the receipts of what remains. */
+export async function removeWorkFiles(keep = ['state.json', 'permissions.json', 'service.json']) {
+ let entries;
+ try { entries = await readdir(stateDirectory()); } catch (error) { if (error.code === 'ENOENT') return; throw error; }
+ for (const name of entries) if (owned.test(name) && !keep.includes(name)) await rm(join(stateDirectory(), name), { force: true });
+}
+
 export async function removeStateDirectory() {
  const directory = stateDirectory();
  if (!chosenStateDirectory()) {
@@ -96,22 +105,47 @@ export async function removeStateDirectory() {
  await rmdir(directory).catch(error => { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error; });
 }
 
+// run.lock holds the supervisor's process id, and its time is refreshed while
+// it runs. A lock whose process is gone, or that has not been refreshed for
+// two minutes (a process id a sandbox cannot check), is stale and replaced.
+const lockFresh = 120_000;
+export const lockPath = () => join(stateDirectory(), 'run.lock');
+export async function liveSupervisor(path = lockPath()) {
+ let text, info;
+ try { [text, info] = await Promise.all([readFile(path, 'utf8'), lstat(path)]); }
+ catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+ // A lock is written right after it is created; give an empty one a moment.
+ if (!text) return Date.now() - info.mtimeMs < 5_000 ? 'starting' : null;
+ const pid = Number(text);
+ if (!Number.isSafeInteger(pid) || pid <= 0) return null;
+ try { process.kill(pid, 0); }
+ catch (error) { if (error.code === 'ESRCH') return null; if (error.code !== 'EPERM') throw error; }
+ return Date.now() - info.mtimeMs > lockFresh ? null : pid;
+}
+
+/** Take run.lock, replacing a stale one. The returned release removes it; it is
+ * also removed on every exit of this process, including after a signal. */
 export async function lockSupervisor() {
- const directory = stateDirectory();
+ const directory = stateDirectory(), path = lockPath();
  await mkdir(directory, { recursive: true, mode: 0o700 });
- const path = join(directory, 'run.lock');
  for (let attempt = 0; attempt < 2; attempt++) {
   try {
    const file = await open(path, 'wx', 0o600);
    await file.writeFile(String(process.pid)); await file.close();
-   return async () => { await unlink(path).catch(error => { if (error.code !== 'ENOENT') throw error; }); };
+   const refresh = setInterval(() => { const now = new Date(); utimes(path, now, now).catch(() => {}); }, 30_000);
+   refresh.unref();
+   const exit = () => { try { if (readFileSync(path, 'utf8') === String(process.pid)) unlinkSync(path); } catch { /* Already gone. */ } };
+   process.once('exit', exit);
+   const release = async () => { clearInterval(refresh); process.off('exit', exit); exit(); };
+   // A signal is often followed closely by SIGKILL (an agent closing its
+   // terminal), so a signal handler removes the lock synchronously at once.
+   release.now = exit;
+   return release;
   } catch (error) {
    if (error.code !== 'EEXIST') throw error;
-   const pid = Number(await readFile(path, 'utf8'));
-   if (!Number.isSafeInteger(pid) || pid <= 0) throw Error('Business supervisor lock is invalid.');
-   try { process.kill(pid, 0); throw Error('A Business supervisor is already running.'); }
-   catch (check) { if (check.code !== 'ESRCH') throw check; }
-   await unlink(path);
+   const pid = await liveSupervisor(path);
+   if (pid) throw Error(`A Business supervisor is already running for this computer${pid === 'starting' ? '' : ` (process ${pid})`}. Let it keep working, or stop it before starting another.`);
+   await unlink(path).catch(error => { if (error.code !== 'ENOENT') throw error; });
   }
  }
  throw Error('Could not acquire Business supervisor lock.');

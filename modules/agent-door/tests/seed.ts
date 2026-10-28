@@ -8,7 +8,7 @@ const text = { type: 'string', minLength: 1 }, idInput = object({ id: text })
 const output = object({ id: text, value: text, version: { type: 'integer' } })
 let time: number | null = null
 let allowList: string[] | undefined
-interface Env { DB: D1Database; CONFIG: string; TRUST: string; BUSINESS_TRUST: string }
+interface Env { DB: D1Database; CONFIG: string; TRUST: string; BUSINESS_TRUST: string; LOCAL_TOKEN: string }
 export default {
   async fetch(incoming: Request, env: Env): Promise<Response> {
     const dispatch = await incoming.json() as { url: string; method: string; headers: HeadersInit; body?: string }
@@ -45,7 +45,7 @@ export default {
     ]
     const door = createAgentDoor({ seed: 'synthetic', name: 'Synthetic Base', specialist: 'operations', origin: config.origin, db: env.DB, trust: JSON.parse(env.TRUST), now,
       tools, limits: config.limits, people: operatorAuthPeople({ db: env.DB, allowList, session: request => auth.getSession(request) }),
-      localCredentials: async request => request.headers.get('authorization') === 'Bearer synthetic-base-local' ? { sponsor: { id: (await env.DB.prepare('SELECT claim_id FROM oa_bootstrap WHERE singleton=1').first<{claim_id:string}>())!.claim_id }, agent: { id: 'synthetic-base-local', name: 'Synthetic Local' }, scopes: ['records:read','records:write','events:read'] } : null,
+      localCredentials: async request => request.headers.get('authorization') === `Bearer ${env.LOCAL_TOKEN}` ? { sponsor: { id: (await env.DB.prepare('SELECT claim_id FROM oa_bootstrap WHERE singleton=1').first<{claim_id:string}>())!.claim_id }, agent: { id: 'synthetic-base-local', name: 'Synthetic Local' }, scopes: ['records:read','records:write','events:read'] } : null,
       resources: [{ uriTemplate: 'synthetic://record/{id}', name: 'Record', scope: config.resourceScope, classes: ['sensitive'], classify: () => [{ class: 'sensitive', facts: { measure: 1, kind: 'tax' } }], read: async uri => { const row = await read(uri.split('/').pop()!); return row && row.exposure !== 'hidden' ? { json: row, untrusted: true } : null } }],
       onEvent: async event => { await env.DB.prepare('INSERT INTO test_callbacks(id,event) VALUES(?,?)').bind(event.id, JSON.stringify(event)).run() },
     })

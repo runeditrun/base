@@ -163,6 +163,137 @@ failed outcome evidence for at least 24 hours. This module currently retains it
 indefinitely; adoption must not introduce earlier cleanup. Report the exact
 edition behavior verified, separately from Base module or CLI results.
 
+## Verification owner lifecycle
+
+`rer verify` reads the same `rer-setup.json` owner-claim step as installation.
+For `mode: "signed"` it signs a fresh five-minute `rer-owner-claim+jwt` with
+the disposable installation's per-run key, matching its configured issuer,
+installation ID, origin and owner email. It posts that claim to the declared
+path through the production handler. Setup-token mode retains the native token
+POST. No production key is read, and signed admission still rejects raw tokens.
+
+Seeds with a native initializer or a different owner binding declare this in
+`agent-surface.json`:
+
+```json
+{
+  "verification": {
+    "owner": {
+      "email": "synthetic-owner@example.com",
+      "emailField": "SETUP_OPERATOR_EMAIL",
+      "tokenField": "H2H_SETUP_TOKEN",
+      "initializer": "tests/initialize-agent-owner.mjs"
+    }
+  }
+}
+```
+
+All four keys are optional. Email defaults to `synthetic-base-1@example.com`;
+the manifest's email and token fields are always bound too. The initializer is
+a contained seed module default-exporting an async function receiving
+`{request, origin, email, sub, displayName, token, claim, returnTo}`. `claim` is
+`{mode, path, token}` with the signed credential when signed mode is declared;
+`token` is the private per-run setup token. Use `request(absoluteURL, init)` to
+drive the seed's real project/password, owner and member-linking lifecycle.
+It permits only the fresh hosted origin. Return the native final 303 `Response`
+with its session cookies; then the runner posts the signed Business settings
+document and runs the journey. Never create an owner with direct SQL, substitute
+an auth adapter, or add a verification-only production route. Initializer code
+runs as trusted test tooling in Node; it must use the supplied request function
+and must not contact providers or read real credentials.
+
+## Verification provider edges
+
+`agent-surface.json.verification.network` declares an optional test-only edge:
+
+```json
+{
+  "module": "tests/provider-edge.mjs",
+  "origins": ["https://api.openai.com", "https://receiver.example.invalid"]
+}
+```
+
+The contained ES module default-exports `{async fetch(request) { ... }}`.
+It receives the full Web `Request`: method, exact URL, headers and raw body,
+and returns a Web `Response`, including JSON or a streaming body. Relative
+helper imports are supported. Run the seed's own signature/payload validation
+and return realistic provider receipts here; keep native preparation, permission
+checks, state commits and receipt validation in the application.
+The module runs in an isolated workerd with no application bindings, Node
+capabilities or network access. Its own `fetch` requests are denied, including
+requests to declared origins. Only declared exact origins reach the module;
+other outbound effects receive HTTP 502. Built-in Resend, SendGrid and Cloudflare
+mail adapters remain available by default. Never place production credentials
+in this declaration or ship the test adapter as application authority.
+
+## Native independent reviewers in verification
+
+An owner initializer that needs a second person during fixture preparation can
+declare that person's native lifecycle separately:
+
+```json
+{
+  "verification": {
+    "owner": { "initializer": "tests/initialize-owner.mjs" },
+    "reviewers": [
+      { "label": "quality", "email": "synthetic-quality@example.invalid", "initializer": "tests/initialize-reviewer.mjs" }
+    ]
+  }
+}
+```
+
+The owner initializer receives `reviewers.initialize(label, {cookie})`. Pass its
+real native owner session. The declared reviewer initializer receives
+`{request, origin, label, email, owner: {email,cookie}, returnTo, mail}`. Use the
+same-origin `request` to invite the reviewer, consume their invitation through
+the native confirmation handler, and return its final 303 `Response` with the
+reviewer's session cookie. `initialize` returns `{email,cookie}` to the owner
+initializer, which then performs the native independent review. No agent token,
+signer, database writer or production test route is supplied. Native roles,
+independence, expiry, one-use proofs and step-up checks remain authoritative.
+This test session grants no authority to a queued agent job.
+
+`mail.read({limit, maxAgeMs, after})` returns only this declared reviewer's
+accepted Resend, SendGrid or Cloudflare mail submissions as
+`{id,at,subject,text,html}`. The provider edge remains isolated. Rejected or
+oversized submissions and undeclared recipients are unavailable. Capture is
+limited to twenty messages, 64 KiB per submission and five minutes of age;
+defaults are ten messages and five minutes. No headers or provider credentials
+are exposed. Each initializer runs at most once, there are at most eight unique
+reviewers distinct from the owner, and capture is destroyed when verification
+closes. The harness requires every declared reviewer lifecycle to complete;
+its fixed failure diagnostic never prints mail, proofs or initializer errors.
+Keep lifecycle modules in test tooling outside the production graph.
+
+## Client custody boundary
+
+The door retains idempotent outcomes, pending approval arguments, review
+summaries, trace text, audit and events. Native client erasure must account for
+these stores; a native record deletion alone cannot remove retained content or
+prevent replay. No generic client-scoped erasure adapter is supplied yet.
+Keep a native custody exception closed when these stores contain client data.
+An adoption must establish the native mapping from retained artifacts to
+clients, the permitted redaction of retained decision evidence, and the atomic
+fence against pending execution and concurrent capture before enabling it.
+The existing evidence-retention requirement still applies.
+
+## Base source from an archive
+
+A plain directory export can supply the source without a Base Git checkout:
+
+```sh
+node node_modules/@runeditrun/rer/edition-authoring/cli.mjs record-base src/base/modules/agent-door modules/agent-door --base-archive /absolute/base-export --ref FULL_BASE_COMMIT
+rer refresh-base --base-archive /absolute/base-export --ref FULL_BASE_COMMIT
+```
+
+Use the full 40-character commit SHA from the authenticated archive acquisition.
+The directory must preserve Base's paths and executable modes. It is the source
+at that declared SHA; the CLI cannot authenticate an archive's commit without
+Git history. Copy mapping and byte digests follow the same rules as a checkout.
+History-dependent refresh operations require the historical source evidence
+described in the [authoring guide](../../edition-authoring/README.md); they fail
+closed when that evidence is absent.
+
 ## Interim policy boundaries
 
 Do not register provider `cost`: construction refuses it until spend reservations

@@ -1,10 +1,45 @@
 # Changelog
 
-## Unreleased
+## 0.2.86
+
+- Agent-door verification can declare independent native reviewer lifecycles with bounded, recipient-scoped captured mail; invitations, confirmation and two-person decisions still pass through the seed's production handlers.
+
+- Agent-door verification fixtures generate disposable setup, session, local bearer, delivery and provider credentials at runtime while retaining signed receipts and isolated provider checks.
+
+- Local `rer export` and `rer import` accept the historical `_rer_deploy_migrations` plus `d1_migrations` pair: the deploy ledger remains authoritative and Wrangler is skipped. Incomplete, pending or conflicting histories still refuse before transfer.
+- **Known adapter change in 0.2.85:** the worker's `migration-preflight` receipt changed from `{platformLedger}` to `{nativeApply}`, and `platformMigrationPreflight` was renamed to `nativeMigrationPreflight`. Seeds wrapping the worker or importing the internal adapter must update; the supported adapter entry is `@runeditrun/rer/portability-migrations`, and native migrations run only when `nativeApply` is true.
+- `rer deploy --dry-run` now accepts valid senders on reserved fixture domains and no longer requires an owner name to print its local plan. Real deploys keep placeholder-sender refusals and managed adapters check the owner email before asking for a missing name; deploy help documents that order.
+- Contract conversion now reads requirement prose and acceptance lists in a blockquote after a legacy clause bullet, while preserving clause boundaries and refusing clauses with no requirement prose.
+
+- Contract conversion now keeps requirement prose and acceptance points after a leading plain, italic or bold Status line, preserves the recorded status, and still refuses a clause with no requirement prose or a conflicting status.
+
+- Import door sources may declare `format: 'raw'` and a seed-owned `readRaw` reader for ZIP and other binary exports. Verified upload bytes, hash and size reach that reader before text decoding; exact custody, reviewed plans and the existing apply, reconciliation, catch-up and Undo lifecycle are shared with JSON/NDJSON sources.
+- Managed data restores now accept downloads that omit policy-declared derived virtual tables while retaining their triggers. Base creates those sandbox tables from destination migrations and atomically rebuilds external-content FTS5 search indexes from restored rows. Virtual-table SQL in downloads remains refused, and copy-normalization failures now have a named error.
+- Refuse inherited names in the front-door CLI verb table and agent conformance schema predicates before dispatch. Unknown door commands keep exit 2, and unsupported schema types produce validation diagnostics.
+- Agent-door verification follows signed and native owner lifecycles, supports isolated seed provider adapters, and accepts Base source archives for copy authoring.
+- Fix unused bindings in the copied contract generator; add `check-prose` to `check` for generated acceptance and unclassified tools, with source-linked warnings for Base restatements and misplaced records, and require guarded request-name registries in foundation guidance.
 
 - Bind agent sponsors to durable Business person ids from signed settings, enforce native admission including the allow-list, and honour signed agent and consent revocation. Resources now use the policy and audit pipeline. Approvals show saved summaries, bind decisions to their hash, execute with named approvers and leave a separate execution audit; Undo is the reviewer's act. Running audits commit before effects and recover from recorded outcomes. Standalone spend caps and unscoped Business daily limits are refused until their enforcement exists. The reference journey exercises self-escalation fixtures and real settings pairing.
 
 - Add the server-side agent-door source entry `modules/agent-door/index.ts`, native-action adoption guidance, signed policy adoption on existing owner-claim trust, MCP and person routes, approvals, reviews, audit and retained events. Document request capacities and indefinitely retained idempotency outcomes; distinguish implemented conformance point registrations from edition-specific coverage. Policy behavior derives from platform commit `72aa71c03d943b53ed43dc73cac17d412c00d8fb`, `src/business/agent-policy/{catalogue,document,decide}.ts`; runtime copy pins and CLI versions remain independent.
+- Re-exporting the maintained reference leaves its CLI inventory unchanged after generated copies are committed; its development version tracks the last exported source change.
+- Contract conversion retains observed homepage table headers, escaped pipes, quoted prose and historical claim statuses, and refuses dropped or changed source claims. `record-base --from-api` records verified immutable Base copies through the GitHub API when a local checkout is unavailable.
+- Convert handwritten homepage claims with reviewed alias maps bound to the original revision, file, line and claim text, preserving the original obligations and judgments.
+- Keep reviewed license, launcher and hosted-demo facts in converted claims as explicit non-product rows, with their historical status separate from current unassessed status.
+- Preserve an explicitly recorded negative-scope boundary without inventing a product clause, using the supported `boundary` basis and the original source record.
+- Publication scans use each retained revision's repository context so local source paths beside repository prose do not become remote declarations; explicit repository references still receive the existing visibility checks.
+- After computer choices change in Business, name `business next` as the next step and report which local apps received the Business name, including when none did.
+- `rer refresh-base` accepts literal apostrophes in double-quoted workflow text while still refusing unclosed shell quotes before writing files.
+- Editions can declare reviewed test-reader dependencies in `verification.json` so contract, source-lock and evidence-only changes can select the Verify light tier; unknown readers still require full coverage.
+- `rer refresh-base` no longer prints the template-adoption notice when a preserved workflow already matches the incoming template, including acknowledged adaptations.
+- Older v2 backups without `schemaObjects` now restore without acknowledgment when their recorded migrations prove the complete destination schema and archived tables. Unverifiable backups retain the explicit recovery option. Managed data ZIP intake also accepts old native staging-table leftovers, and its fixture preserves parent-before-child creation order for foreign keys.
+- `rer import` now restores into an existing local D1 file with no product schema, including a file created by Wrangler after reset. Migrations run before restore as they do when no file exists; occupied destinations and unknown foreign tables remain refused.
+- `rer refresh-base` refused sparse historical module copies when required dependency additions also resolved their old missing imports. Refresh now delivers and records those planned dependencies without a manual copy-record edit; ordinary unresolved imports without a planned dependency remain preserved.
+
+### Known issues
+
+- The two refresh recovery guidance issues documented in 0.2.82 still apply, with the same manual recoveries.
+- The delivered Verify template's runner-temporary pnpm store, Chromium and apt cache lifecycle is not yet exercised end to end on a GitHub Ubuntu 24.04 runner; Base Verify covers only Base's own bootstrap.
 
 ## 0.2.85
 

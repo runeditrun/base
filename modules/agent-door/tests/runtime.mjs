@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { webcrypto } from 'node:crypto';
+import { randomBytes, webcrypto } from 'node:crypto';
 import { signJws, policyEnvelope, autonomousPolicy, accessToken } from '../conformance/crypto.mjs';
 const require = createRequire(new URL('../../../default-seed/package.json', import.meta.url));
 const { build } = require('esbuild');
@@ -14,8 +14,9 @@ export async function runtime({ paired = true, limits, resourceScope = 'records:
  const publicKey = await webcrypto.subtle.exportKey('jwk', keys.publicKey);
  const businessTrust = { v:1,issuer,audience:origin,subject:installationId,keys:{[kid]:publicKey} };
  const signer = { issuer, installationId, kid, privateKey: keys.privateKey };
- const config = { origin, limits, resourceScope, OWNER_EMAIL: 'synthetic-base-1@example.com', SETUP_TOKEN: 'synthetic-base-1-setup-credential-32-bytes', SESSION_SECRET: 'synthetic-base-1-session-credential-32-bytes', MAIL_FROM: 'synthetic-base-1@example.com', ipLimit: 1000, emailLimit: 1000 };
- const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, script: output.outputFiles[0].text, compatibilityDate: '2026-09-01', d1Databases: { DB: 'synthetic-base-1' }, bindings: { CONFIG: JSON.stringify(config), BUSINESS_TRUST: JSON.stringify(businessTrust), TRUST: JSON.stringify(paired ? { issuer, installationId, appOrigin: origin, publicKeys: { [kid]: publicKey } } : null) } }));
+ const localToken = randomBytes(32).toString('hex');
+ const config = { origin, limits, resourceScope, OWNER_EMAIL: 'synthetic-base-1@example.com', SETUP_TOKEN: randomBytes(32).toString('hex'), SESSION_SECRET: randomBytes(32).toString('hex'), MAIL_FROM: 'synthetic-base-1@example.com', ipLimit: 1000, emailLimit: 1000 };
+ const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, script: output.outputFiles[0].text, compatibilityDate: '2026-09-01', d1Databases: { DB: 'synthetic-base-1' }, bindings: { LOCAL_TOKEN: localToken, CONFIG: JSON.stringify(config), BUSINESS_TRUST: JSON.stringify(businessTrust), TRUST: JSON.stringify(paired ? { issuer, installationId, appOrigin: origin, publicKeys: { [kid]: publicKey } } : null) } }));
  try {
   const db = await mf.getD1Database('DB');
   for (const file of ['../../operator-auth/accounts/schema/operator-auth.sql','../schema/agent-door.sql','../../business-settings/schema/0001_business_settings.sql','../../business-settings/schema/0002_business_people.sql']) for (const sql of split(await readFile(new URL(file, import.meta.url), 'utf8'))) await db.prepare(sql).run();
@@ -55,6 +56,6 @@ export async function runtime({ paired = true, limits, resourceScope = 'records:
   };
   const setNow = async now => { c.now = now; await post('/__clock', { now }); };
   await setNow(c.now);
-  return { mf, db, c, fetch, post, mcp, person, adopt, setNow, settings, signIn, tool: (name, args, options) => mcp('tools/call', { name: `synthetic.${name}`, arguments: args }, options), token: overrides => accessToken(c, overrides), sign: (typ, payload, otherKid = kid) => signJws(keys.privateKey, otherKid, typ, payload), close: () => mf.dispose() };
+  return { mf, db, c, localToken, fetch, post, mcp, person, adopt, setNow, settings, signIn, tool: (name, args, options) => mcp('tools/call', { name: `synthetic.${name}`, arguments: args }, options), token: overrides => accessToken(c, overrides), sign: (typ, payload, otherKid = kid) => signJws(keys.privateKey, otherKid, typ, payload), close: () => mf.dispose() };
  } catch (error) { await mf.dispose(); throw error; }
 }
