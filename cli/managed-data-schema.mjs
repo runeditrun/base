@@ -24,7 +24,10 @@ export async function managedSchema(db, plan, policy, ledger) {
   if (!normalized.has(object.sql)) normalized.set(object.sql, schemaSQL(object.sql));
   return normalized.get(object.sql);
  };
- const objects = source.filter(object => ['table', 'trigger', 'index', 'view'].includes(object.type));
+ // Older native restores left engine-owned staging tables behind. They are
+ // transient copies, excluded from portability identity, not unknown product DDL.
+ const objects = source.filter(object => ['table', 'trigger', 'index', 'view'].includes(object.type)
+  && !(object.type === 'table' && object.name.toLowerCase().startsWith('rer_portability_stage_')));
  const retired = new Map();
  let previous = new Map();
  try {
