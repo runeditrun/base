@@ -5,7 +5,13 @@ import { spawn } from 'node:child_process';
 
 const journeys = new Set(['reference-journey.test.mjs']);
 const isolated = ['cli/dependency-setup.test.mjs', 'cli/package-mode.test.mjs'];
-export const CLI_SHARDS = 2;
+export const CLI_SHARDS = 4;
+// Whole independent files moved after the first packed run. Their measured
+// top-level test totals were 854s and 458s; the original partition timed out.
+const moved = {
+  '3': ['cli/additive-restore.test.mjs', 'cli/managed-flows.test.mjs', 'cli/legacy-recovery.test.mjs'],
+  '4': ['cli/schema-portability.test.mjs', 'cli/generated-portability.test.mjs', 'cli/server-registry.test.mjs'],
+};
 
 export async function cliTestFiles({ journey = false } = {}) {
   const files = (await readdir('cli')).filter(name => name.endsWith('.test.mjs')).sort();
@@ -16,16 +22,18 @@ export async function cliTestFiles({ journey = false } = {}) {
 export async function cliShardPlan() {
   const files = await cliTestFiles();
   for (const file of isolated) assert.ok(files.includes(file), `Missing CLI suite: ${file}`);
+  for (const file of Object.values(moved).flat()) assert.ok(files.includes(file), `Missing moved CLI suite: ${file}`);
   const regular = files.filter(file => !isolated.includes(file));
   const groups = Object.fromEntries([1, 2].map(shard => [String(shard), [
-    ...regular.filter((_, index) => index % CLI_SHARDS === shard - 1), isolated[shard - 1],
+    ...regular.filter((file, index) => index % 2 === shard - 1 && !Object.values(moved).flat().includes(file)), isolated[shard - 1],
   ]]));
+  Object.assign(groups, moved);
   assert.deepEqual(Object.values(groups).flat().sort(), files, 'CLI CI must cover every push file exactly once');
   return groups;
 }
 
 export async function verifyCLIShard(shard, { journey = false } = {}) {
-  if (!journey) assert.match(shard ?? '', /^[1-2]$/, `CLI_SHARD must be one of the ${CLI_SHARDS} matrix shards`);
+  if (!journey) assert.match(shard ?? '', /^[1-4]$/, `CLI_SHARD must be one of the ${CLI_SHARDS} matrix shards`);
   const files = journey ? await cliTestFiles({ journey }) : (await cliShardPlan())[shard];
   assert.ok(files.length, 'No CLI test files found');
   const started = performance.now();

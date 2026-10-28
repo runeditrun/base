@@ -12,14 +12,14 @@ import { referenceShardPlan, verifyReferenceShard } from './reference-shard.mjs'
 const stage = name => ({ stage: `verify:${name}` });
 const partition = (name, shard) => ({ stage: `verify:${name}`, shard });
 export const groups = {
-  '1': [partition('modules', 1), stage('portability')],
+  '1': [partition('modules', 1)],
   '2': [partition('modules', 2), stage('release')],
   '3': [partition('cli', 1), stage('foundation'), stage('publish-check')],
-  '4': [partition('cli', 2), stage('editor'), stage('review-harness')],
+  '4': [partition('cli', 2), stage('editor')],
   '5': [stage('reference'), stage('operator-auth'), stage('onboarding-browser')],
-  '6': ['composition', 'edition-authoring', 'authoring', 'delivery-producer', 'schema', 'operations'].map(stage),
+  '6': [partition('cli', 3), ...['composition', 'edition-authoring', 'authoring', 'delivery-producer', 'schema', 'operations'].map(stage)],
   '7': ['container', 'job-queue', 'owner-claim', 'boundary-checker', 'deployment', 'rer'].map(stage),
-  '8': ['onboarding', 'launcher', 'mail-relay'].map(stage),
+  '8': [partition('cli', 4), ...['portability', 'review-harness', 'onboarding', 'launcher', 'mail-relay'].map(stage)],
 };
 
 export async function ciPlan({ journeys = false } = {}) {
@@ -36,7 +36,7 @@ export async function ciPlan({ journeys = false } = {}) {
   await Promise.all([moduleShardPlan(), cliShardPlan(), referenceShardPlan()]);
   // Only the native editor consumer requires hosted disk reclamation. Both
   // module browser files live in partition A; partition B needs only workerd.
-  const include = Object.keys(groups).map(group => ({ group, browser: !['2', '6'].includes(group), native: group === '4' }));
+  const include = Object.keys(groups).map(group => ({ group, browser: group !== '2', native: group === '4' }));
   if (journeys) include.push({ group: 'journeys', browser: true, native: false });
   return { include };
 }
