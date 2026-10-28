@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import assert from 'node:assert/strict';
@@ -5,7 +7,7 @@ import { sqliteRuntime, sqliteSource, sqliteMapping } from './sqlite-runtime.ts'
 import { planD1Import, planD1ImportStream } from '../../src/d1/index.ts';
 import { observeReads, totalChanges } from './read-only-tools.ts';
 
-for(const stream of [false,true])test(`public ${stream?'stream':'ordinary'} planning uses live plan authority and zero writes`,async t=>{
+for(const stream of [false,true])familyRows[0].push([`public ${stream?'stream':'ordinary'} planning uses live plan authority and zero writes`, async t=>{
   const r=await sqliteRuntime(t),source=sqliteSource(1);
   if(stream)source.artifacts[0].original={status:'unavailable',reason:'not-supplied'};
   const observed=observeReads(r.db()),actions:string[]=[];
@@ -24,4 +26,6 @@ for(const stream of [false,true])test(`public ${stream?'stream':'ordinary'} plan
   await assert.rejects(plan(source,revoking,context),/IMPORT_ATOMIC_GUARD/);
   assert.ok(actions.length>0&&actions.every(action=>action==='plan'));
   assert.equal(totalChanges(r.native()),changes);observed.assertSelectOnly();
-});
+}]);
+
+ test("d1 planning read only preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

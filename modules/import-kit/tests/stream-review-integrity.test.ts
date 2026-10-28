@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, source, mapping, targets } from './d1/fixtures.ts';
@@ -6,7 +8,7 @@ import { compressedPlan, expandCompressedPlan, streamView } from '../src/d1/stre
 import { planFingerprint } from '../src/plan/index.ts';
 import type { D1PlanCodec, ImportPlan, Json } from '../src/d1/index.ts';
 
-test('a reviewed stream cache never approves mutated header, page, layout or record custody', async t => {
+familyRows[0].push(['a reviewed stream cache never approves mutated header, page, layout or record custody', async t => {
   const r = await runtime(t), bundle = source(103);
   bundle.artifacts[0].original = { status: 'unavailable', reason: 'not-supplied' };
   let calls = 0;
@@ -33,9 +35,9 @@ test('a reviewed stream cache never approves mutated header, page, layout or rec
   assert.notDeepEqual(streamView(plan).entries[0].source.payload, bundle.records[0].payload);
   await createD1ImportStream(plan, { ...r.context(), reviewedFingerprint: plan.fingerprint });
   assert.equal(calls, 103);
-});
+}]);
 
-test('publication refuses accessor-backed pages that change after the private snapshot', async t => {
+familyRows[0].push(['publication refuses accessor-backed pages that change after the private snapshot', async t => {
   const r = await runtime(t), bundle = source(3);
   bundle.artifacts[0].original = { status: 'unavailable', reason: 'not-supplied' };
   const stream = await planD1ImportStream(bundle, mapping, r.context());
@@ -48,9 +50,9 @@ test('publication refuses accessor-backed pages that change after the private sn
   await assert.rejects(createD1ImportStream(stream, { ...r.context(), reviewedFingerprint: stream.fingerprint }), /REVIEW_FINGERPRINT_MISMATCH/);
   assert.ok(reads > 1);
   for (const table of ['ik_jobs','ik_d1_streams','ik_d1_stream_pages','ik_d1_staging']) assert.equal((await r.db().prepare(`SELECT COUNT(*) n FROM ${table}`).first())!.n, 0);
-});
+}]);
 
-test('an exact replay still refuses missing or changed codec implementations', async t => {
+familyRows[0].push(['an exact replay still refuses missing or changed codec implementations', async t => {
   const r = await runtime(t), bundle = source(3);
   bundle.artifacts[0].original = { status: 'unavailable', reason: 'not-supplied' };
   const codec: D1PlanCodec = { id: 'identity-v1', encode: plan => plan as unknown as Json, decode: payload => structuredClone(payload) as unknown as ImportPlan };
@@ -65,4 +67,6 @@ test('an exact replay still refuses missing or changed codec implementations', a
   codec.decode = decode;
   assert.equal((await createD1ImportStream(stream, reviewed)).id, job.id);
   assert.equal((await r.db().prepare('SELECT COUNT(*) n FROM ik_d1_streams').first())!.n, 1);
-});
+}]);
+
+ test("stream review integrity preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

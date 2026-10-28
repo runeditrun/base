@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { nativeSetTargets, classification } from './preserved-native-set.ts';
@@ -15,12 +17,12 @@ for (const [name, mutate] of [
   ['same-size changed value', (s: D1UndoSnapshot) => { s.observations[0].current = { ...s.nativeRows![0], value: { number: 1, nullable: null } }; }],
   ['changed value type', (s: D1UndoSnapshot) => { s.observations[0].current = { ...s.nativeRows![0], value: { number: '0', nullable: null } }; }],
   ['missing nullable field', (s: D1UndoSnapshot) => { s.observations[0].current = { ...s.nativeRows![0], value: { number: 0 } }; }],
-] as const) test(`complete native set rejects ${name} observation`, () => {
+] as const) familyRows[0].push([`complete native set rejects ${name} observation`, () => {
   const { effects, snapshot, context } = classification(); mutate(snapshot);
   assert.throws(() => classifyUndo(effects, snapshot, context), /IMPORT_UNDO_SNAPSHOT_MISMATCH/);
-});
+}]);
 
-test('native set coverage and nonempty bulk predicates are required; custom guards survive', () => {
+familyRows[0].push(['native set coverage and nonempty bulk predicates are required; custom guards survive', () => {
   const { effects, snapshot, context } = classification();
   for (const matchesMany of [undefined, () => []]) assert.throws(() => classifyUndo(effects, snapshot, { ...context, storage: { ...context.storage, targets: { ...nativeSetTargets, matchesMany } } }), /IMPORT_NATIVE_SET_GUARD_REQUIRED/);
   snapshot.nativeRows!.splice(0, 1); snapshot.observations[0].current = null;
@@ -28,9 +30,9 @@ test('native set coverage and nonempty bulk predicates are required; custom guar
   const decision = classifyUndo(effects, snapshot, context);
   assert.equal(decision.ordered.find(d => d.effectId === '0')!.reason, 'edited');
   assert.ok(decision.guards.some(g => g.params?.includes('marker-owner')));
-});
+}]);
 
-test('mixed absent, typed edited, unrelated and unchanged rows keep exact public undo semantics', async t => {
+familyRows[0].push(['mixed absent, typed edited, unrelated and unchanged rows keep exact public undo semantics', async t => {
   const r = await sqliteRuntime(t), ctx = { ...r.context(), reversalPolicy: 'preserve-conflicts' as const, storage: { database: r.db(), targets: nativeSetTargets } };
   const plan = await planD1Import(sqliteSource(3), sqliteMapping, ctx), job = await createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint });
   await applyD1ImportBatches(job.id, ctx);
@@ -43,9 +45,9 @@ test('mixed absent, typed edited, unrelated and unchanged rows keep exact public
   assert.equal(report.dispositions.find(d => d.targetId === '1')!.reason, 'edited');
   assert.equal(report.dispositions.find(d => d.targetId === '2')!.disposition, 'reversed');
   assert.deepEqual(r.native().prepare('SELECT id FROM native_records ORDER BY id').all().map(r => r.id), ['1','unrelated']);
-});
+}]);
 
-test('complete native sets keep domain-specific absent-row ownership guards atomic', async t => {
+familyRows[0].push(['complete native sets keep domain-specific absent-row ownership guards atomic', async t => {
   const r = await sqliteRuntime(t), ctx = { ...r.context(), reversalPolicy: 'preserve-conflicts' as const, storage: { database: r.db(), targets: nativeSetTargets } };
   const plan = await planD1Import(sqliteSource(1), sqliteMapping, ctx), job = await createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint });
   await applyD1ImportBatches(job.id, ctx);
@@ -61,7 +63,7 @@ test('complete native sets keep domain-specific absent-row ownership guards atom
   assert.equal(r.native().prepare('SELECT COUNT(*) AS n FROM ik_d1_reversal_reports').get()!.n, 0);
   assert.equal(r.native().prepare('SELECT reversal_cursor FROM ik_jobs').get()!.reversal_cursor, 0);
   assert.equal(r.native().prepare('SELECT COUNT(*) AS n FROM ik_d1_assertions').get()!.n, 0);
-});
+}]);
 
 for (const mutation of [
   "DELETE FROM native_records WHERE id='0'",
@@ -71,7 +73,7 @@ for (const mutation of [
   "UPDATE native_records SET revision='changed' WHERE id='0'",
   "UPDATE native_records SET value_json='null' WHERE id='0'",
   "UPDATE native_records SET value_json=CAST(value_json AS BLOB) WHERE id='0'",
-]) test(`full native set atomically rejects late mutation: ${mutation}`, async t => {
+]) familyRows[0].push([`full native set atomically rejects late mutation: ${mutation}`, async t => {
   const r = await sqliteRuntime(t), ctx = { ...r.context(), reversalPolicy: 'preserve-conflicts' as const, storage: { database: r.db(), targets: nativeSetTargets } };
   const plan = await planD1Import(sqliteSource(3), sqliteMapping, ctx), job = await createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint });
   await applyD1ImportBatches(job.id, ctx);
@@ -84,4 +86,6 @@ for (const mutation of [
   await assert.rejects(undoD1Import(job.id, { ...ctx, storage: { database: r.db(), targets } }), /IMPORT_ATOMIC_GUARD/);
   assert.deepEqual(state(), before!);
   assert.equal(r.native().prepare('SELECT COUNT(*) AS n FROM ik_d1_assertions').get()!.n, 0);
-});
+}]);
+
+ test("d1 preserved native set preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

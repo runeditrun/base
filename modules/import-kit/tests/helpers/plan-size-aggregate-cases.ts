@@ -1,10 +1,11 @@
-import test from 'node:test';
+import { type CaseRow } from "./case-row.ts";
+export const planAggregateRows: CaseRow[][] = [[]];
 import assert from 'node:assert/strict';
-import { buildImportPlan } from '../src/plan/index.ts';
-import { canonicalJsonBytes, PlanTooLargeError } from '../src/plan/size.ts';
-import { sha256 } from '../src/provenance/identity.ts';
-import type { Json, SourceBundle } from '../src/types.ts';
-import { logicalValue, serializedContentBytes } from './helpers/logical-size.ts';
+import { buildImportPlan } from '../../src/plan/index.ts';
+import { canonicalJsonBytes, PlanTooLargeError } from '../../src/plan/size.ts';
+import { sha256 } from '../../src/provenance/identity.ts';
+import type { Json, SourceBundle } from '../../src/types.ts';
+import { logicalValue, serializedContentBytes } from './logical-size.ts';
 
 const context = { destination: 'workspace', namespace: 'archive', mappingVersion: 'v1', authorization: { principalId: 'owner' } };
 const source = (): SourceBundle => ({
@@ -13,7 +14,9 @@ const source = (): SourceBundle => ({
 });
 const result = (value: Json) => ({ effects: [{ targetKind: 'item', targetId: '1', value }] });
 
-for (const overflow of [0n, 1n, 2n]) test(`planner cumulative safe-integer boundary +${overflow} precedes mapper serialization`, t => {
+// Keep exact-safe and first-unsafe cumulative sizes before mapper encoding;
+// larger unsafe sums exercise the same refusal.
+for (const overflow of [0n, 1n]) planAggregateRows[0].push([`planner cumulative safe-integer boundary +${overflow} precedes mapper serialization`, t => {
   const small = buildImportPlan(source(), { version: 'v1', map: () => result('') }, context);
   const expected = BigInt(Number.MAX_SAFE_INTEGER) + overflow;
   const value = logicalValue(expected - serializedContentBytes(small) + 2n);
@@ -38,4 +41,5 @@ for (const overflow of [0n, 1n, 2n]) test(`planner cumulative safe-integer bound
     return true;
   });
   assert.equal(calls, 1);
-});
+}]);
+

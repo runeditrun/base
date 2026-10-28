@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, source } from './fixtures.ts';
@@ -11,7 +13,7 @@ const additions = [
   { table: 'ik_sources', insert: "INSERT INTO ik_sources(identity,source_hash,mapping_version,effects_hash,job_id) VALUES('rogue-source','rogue','v1','rogue',?)" },
 ];
 
-for (const addition of additions) test(`real D1: reused owner ${addition.table} additions invalidate the complete selected set`, async t => {
+for (const addition of additions) familyRows[0].push([`real D1: reused owner ${addition.table} additions invalidate the complete selected set`, async t => {
   const r = await runtime(t), ctx = { ...r.context(), maxBatches: 1 }, db = r.db();
   const plan = await planD1Import(source(2), mapping, ctx);
   const create = (operationKey: string) => createD1ImportJob(plan, { ...ctx, operationKey, reviewedFingerprint: plan.fingerprint });
@@ -52,4 +54,6 @@ for (const addition of additions) test(`real D1: reused owner ${addition.table} 
   assert.equal((await applyD1ImportBatches(replay.id, ctx)).state, 'completed');
   assert.equal((await undoD1Import(replay.id, ctx)).state, 'undone');
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM ik_sources WHERE job_id=?').bind(owner.id).first())?.n, 2);
-});
+}]);
+
+ test("d1 reused inventory preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

@@ -1,10 +1,12 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { nativeStagingFixture } from './retained-fixtures.ts';
 import { nativePrivateTables } from './native-staging-fixture.ts';
 import { canonicalJson,sha256,planD1ImportStream,createD1ImportStream,resumeD1ImportStream,eraseD1ImportTarget } from '../../src/d1/index.ts';
 
-for(const afterRegistration of [false,true])test(`erasure reuses its measured closure when an import commits after ${afterRegistration?'registration':'begin'}`,async t=>{
+for(const afterRegistration of [false,true])familyRows[0].push([`erasure reuses its measured closure when an import commits after ${afterRegistration?'registration':'begin'}`, async t=>{
   const r=await nativeStagingFixture(t),targets={...r.targets,write(row:any){return [...r.targets.remove(row.destination,row.targetKind,row.targetId),...r.targets.write(row)];}},owner=()=>({...r.context(),storage:{database:r.db(),targets}});
   let current:any;
   for(let i=0;i<8;i++){
@@ -38,4 +40,6 @@ for(const afterRegistration of [false,true])test(`erasure reuses its measured cl
   assert.equal(r.native().prepare('SELECT count(*) n FROM ik_d1_erased_targets').get()!.n,0);
   for(const table of nativePrivateTables)assert.equal(r.native().prepare(`SELECT count(*) n FROM ${table}`).get()!.n,0,table);
   t.diagnostic(JSON.stringify({queries,measurements,lateMeasurements,maxBatchBytes:Math.max(...wire)}));
-});
+}]);
+
+ test("d1 erasure replay budget preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

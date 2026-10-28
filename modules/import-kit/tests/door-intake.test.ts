@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
@@ -12,7 +14,7 @@ const fields = ['id','title','email','name','blocked','status'];
 const intake: ImportDoorIntake = {formats:['csv','ndjson','json'],allow:{csv:fields,
   ndjson:fields.map(key=>'/'+key),json:[...fields.map(key=>'/'+key),'/profile/email','/profile/login','/profile/displayName','/profile/firstName','/profile/lastName','/profile/department']}};
 
-test('declared intake never persists forbidden bytes across boundaries; sanitized custody plans, replays and undoes through both entries',async t=>{
+familyRows[0].push(['declared intake never persists forbidden bytes across boundaries; sanitized custody plans, replays and undoes through both entries', async t=>{
   const d = await door(t), marker = 'synthetic-forbidden-intake-84d9';
   await d.enable();
   const operator = createImportOperatorHandler({...d.options,intake,installationId:d.options.claim.installationId,
@@ -115,9 +117,9 @@ test('declared intake never persists forbidden bytes across boundaries; sanitize
   const network=await d.request(d.origin+'/api/operator/import/uploads',{method:'POST',headers:{Origin:d.origin,Cookie:'test-owner-session','Content-Type':'application/octet-stream','X-Import-Format':'ndjson','X-Import-Name':'owner-export'},body:`{"id":"network","credentials":"${marker}"}\n`});
   assert.equal(network.status,200,await network.clone().text());await clean('Operator HTTP streaming entry');
   if(process.env.INTAKE_RESULTS) await writeFile(process.env.INTAKE_RESULTS,JSON.stringify({rawLargeBytes:rawSize,propertyOffsets:results.filter((r:any)=>r.name.startsWith('every-offset')).length,results},null,2)+'\n');
-});
+}]);
 
-test('undeclared door retains exact existing bytes and uses its ordinary public lifecycle',async t=>{
+familyRows[0].push(['undeclared door retains exact existing bytes and uses its ordinary public lifecycle', async t=>{
   const d=await door(t,'operator');
   const unsupported=await d.request(d.origin+'/api/operator/import/uploads',{method:'POST',headers:{Origin:d.origin,Cookie:'test-owner-session','Content-Type':'application/octet-stream'},body:'[]'});
   assert.equal(unsupported.status,400);
@@ -129,4 +131,6 @@ test('undeclared door retains exact existing bytes and uses its ordinary public 
   assert.equal((await d.apply(plan.body)).state,'completed');
   assert.equal((await d.call('reconcile',{planId:plan.body.planId})).body.ok,true);
   assert.equal((await d.undo(plan.body.planId)).body.job.state,'undone');
-});
+}]);
+
+ test("door intake preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

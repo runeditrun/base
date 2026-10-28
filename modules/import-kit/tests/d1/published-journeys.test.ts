@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -10,7 +12,7 @@ import { normalizedPreparation, emptyPreparationTables, publicPreparationTables 
 import { returnFixture, returnObserver, isPublication, assertPublishedOnly, type ReturnPath } from './published-return-fixture.ts';
 
 for (const path of ['fresh', 'cold'] as ReturnPath[]) {
-  test(`${path} publication returns a create-authorized job and exact replay survives stale cancellation`, async t => {
+  familyRows[0].push([`${path} publication returns a create-authorized job and exact replay survives stale cancellation`, async t => {
     const r = await returnFixture(t, path), actions: string[] = [];
     const context = { ...r.context(), authorization: { ...r.context().authorization,
       predicate(action: any, destination: string) {
@@ -30,9 +32,9 @@ for (const path of ['fresh', 'cold'] as ReturnPath[]) {
     await cancelD1ImportStaging(r.plan.fingerprint, r.context());
     assert.equal((await readD1ImportStream(job.id, r.context())).id, job.id);
     assertPublishedOnly(r);
-  });
+  }]);
 
-  test(`${path} publication cannot return success after current authority is revoked`, async t => {
+  familyRows[0].push([`${path} publication cannot return success after current authority is revoked`, async t => {
     const r = await returnFixture(t, path);
     let revoked = false;
     const observer = returnObserver(r.db(), (phase, queries) => {
@@ -46,10 +48,10 @@ for (const path of ['fresh', 'cold'] as ReturnPath[]) {
     assertPublishedOnly(r);
     const winner = r.native().prepare('SELECT id FROM ik_d1_streams').get()!;
     await assert.rejects(readD1ImportStream(String(winner.id), r.context()));
-  });
+  }]);
 }
 
-test('erasure removes a private preparation and prevents cold publication or a new import of the same source', async t => {
+familyRows[0].push(['erasure removes a private preparation and prevents cold publication or a new import of the same source', async t => {
   const r = await sqliteRuntime(t), source = normalizedPreparation(3);
   const plan = await planD1ImportStream(source, sqliteMapping, r.context());
   const context = { ...r.context(), reviewedFingerprint: plan.fingerprint };
@@ -62,4 +64,6 @@ test('erasure removes a private preparation and prevents cold publication or a n
   await assert.rejects(createD1ImportStream(plan, context), /IMPORT_SOURCE_ERASED|IMPORT_ATOMIC_GUARD/);
   emptyPreparationTables(r.native());
   emptyPreparationTables(r.native(), publicPreparationTables);
-});
+}]);
+
+ test("d1 published journeys preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { canonicalJson, jsonString } from '../src/provenance/identity.ts';
@@ -12,16 +14,16 @@ const values: unknown[] = [
   [], [1, 'two', [3, { four: 4 }]], {}, { b: 1, a: [null, { 'k"ey\n': 'v' }], '漢': '🌱', '': '' }, Object.assign(Object.create(null), { z: 'null prototype' }),
 ];
 
-test('canonicalJsonBytes equals the UTF-8 length of canonicalJson for every JSON shape, without encoding', () => {
+familyRows[0].push(['canonicalJsonBytes equals the UTF-8 length of canonicalJson for every JSON shape, without encoding', () => {
   for (const [index, value] of values.entries()) assert.equal(canonicalJsonBytes(value), Buffer.byteLength(canonicalJson(value)), `value ${index}`);
   assert.equal(canonicalJsonBytes(values), Buffer.byteLength(canonicalJson(values)));
   for (const invalid of [undefined, NaN, Infinity, new Date(0), new Map(), { nested: undefined }, [() => 1]]) {
     assert.throws(() => canonicalJson(invalid), /INVALID_JSON/);
     assert.throws(() => canonicalJsonBytes(invalid), /INVALID_JSON/);
   }
-});
+}]);
 
-test('long strings are escaped in slices identical to JSON.stringify, including pairs and lone surrogates at slice edges', () => {
+familyRows[0].push(['long strings are escaped in slices identical to JSON.stringify, including pairs and lone surrogates at slice edges', () => {
   const slice = 1 << 20, filler = (n: number) => 'a"\\\n'.repeat(Math.ceil(n / 4)).slice(0, n);
   const cases = [
     filler(slice - 1) + '🌱' + filler(slice + 5),
@@ -34,9 +36,9 @@ test('long strings are escaped in slices identical to JSON.stringify, including 
     assert.equal(jsonString(text), JSON.stringify(text));
     assert.equal(canonicalJson({ [text.slice(0, 40)]: text }), JSON.stringify({ [text.slice(0, 40)]: text }));
   }
-});
+}]);
 
-test('a two-byte string whose JSON passes 256 MiB is encoded instead of aborting the process', () => {
+familyRows[0].push(['a two-byte string whose JSON passes 256 MiB is encoded instead of aborting the process', () => {
   // A flat two-byte string: one JSON.stringify call of it aborts V8 with
   // "Zone Allocation failed" (its output buffer passes 2^28 bytes).
   const bytes = Buffer.alloc(140_000_003, 120); bytes.write('漢', 140_000_000);
@@ -45,9 +47,9 @@ test('a two-byte string whose JSON passes 256 MiB is encoded instead of aborting
   assert.equal(encoded.length, text.length + 2);
   assert.equal(JSON.parse(encoded), text);
   assert.equal(canonicalJsonBytes(text), Buffer.byteLength(encoded));
-});
+}]);
 
-test('planning and SQLite creation refuse an over-cap source or plan with IMPORT_PLAN_TOO_LARGE and write nothing', async t => {
+familyRows[0].push(['planning and SQLite creation refuse an over-cap source or plan with IMPORT_PLAN_TOO_LARGE and write nothing', async t => {
   const { ctx } = setup(t), huge = 'y'.repeat(PLAN_BYTES_LIMIT);
   const oversized = source(1);
   oversized.diagnostics.push({ severity: 'warning', code: 'NOTE', message: huge });
@@ -60,4 +62,6 @@ test('planning and SQLite creation refuse an over-cap source or plan with IMPORT
   ctx.reviewedFingerprint = plan.fingerprint;
   await assert.rejects(createImportJob(grown, ctx), (error: any) => error instanceof PlanTooLargeError && error.subject === 'plan' && error.bytes === expected);
   assert.equal(ctx.storage.database.prepare('SELECT count(*) n FROM ik_jobs').get().n, 0);
-});
+}]);
+
+ test("plan size preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

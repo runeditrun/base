@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import { fullScale } from './scale-size.ts';
 const guardCount = fullScale ? 500 : 20;
@@ -10,7 +12,7 @@ import { guard, prepare, atomic, sql } from '../../src/d1/database.ts';
 import { packGuards } from '../../src/d1/budget.ts';
 import { planD1Import, createD1ImportJob, resumeD1Import, readD1ImportOriginals, readD1PersistedImport } from '../../src/d1/index.ts';
 
-test('real D1: packed wide native snapshots fit expression depth and retain every condition', async t => {
+familyRows[0].push(['real D1: packed wide native snapshots fit expression depth and retain every condition', async t => {
   const r = await runtime(t), db = r.db();
   await db.prepare(`CREATE TABLE details(id TEXT PRIMARY KEY,${fields.map(f => `${f} TEXT`).join(',')})`).run();
   const rows = Array.from({ length: guardCount }, (_, i) => ({ destination: 'workspace', targetKind: 'contact', targetId: String(i), revision: 'r', value: { email: `${i}@example.test`, evidence: 'source', details: detail(String(i)) } }));
@@ -29,9 +31,9 @@ test('real D1: packed wide native snapshots fit expression depth and retain ever
     await db.prepare('UPDATE details SET f17=? WHERE id=?').bind(detail(row.targetId).f17, row.targetId).run();
   }
   await atomic(r.context(), 'read', predicates.map(guard));
-});
+}]);
 
-test('real D1: wide native records retain exact originals and guarded export custody', async t => {
+familyRows[0].push(['real D1: wide native records retain exact originals and guarded export custody', async t => {
   const r = await runtime(t), db = r.db(), m = meter(db);
   await db.prepare(`CREATE TABLE details(id TEXT PRIMARY KEY,${fields.map(f => `${f} TEXT`).join(',')})`).run();
   const ctx = { ...r.context(), batchSize: 10, maxBatches: 1, storage: { database: m.database, targets: wideTargets } };
@@ -60,4 +62,6 @@ test('real D1: wide native records retain exact originals and guarded export cus
   await assert.rejects(m.request('late-export', () => readD1PersistedImport({ ...ctx, storage: { ...ctx.storage, targets: racing } })), /IMPORT_ATOMIC_GUARD/);
   assert.equal((await db.prepare("SELECT f17 FROM details WHERE id=?").bind(String(count - 1)).first())!.f17, 'late change');
   console.log(JSON.stringify({ wideCustody: m.snapshots.length, maxStatements: Math.max(...m.snapshots.map(s => s.count)) }));
-});
+}]);
+
+ test("d1 guard depth preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

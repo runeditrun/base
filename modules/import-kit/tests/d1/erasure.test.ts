@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[], []];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { planD1Import, createD1ImportJob, resumeD1Import, undoD1Import, readD1PersistedImport, readD1ImportJob, readD1ImportOriginals, retireD1ImportCustody, readD1ErasureJournal, planD1ImportStream, prepareD1ImportStream, publishD1ImportPreparation, readD1ImportFieldMatches, eraseD1ImportTarget, upgradeD1ImportErasureIndex, d1ErasureSchema, canonicalJson, sha256 } from '../../src/d1/index.ts';
@@ -28,7 +30,7 @@ async function create(r: Awaited<ReturnType<typeof runtime>>, large = false) {
 }
 const erase = (r: Awaited<ReturnType<typeof runtime>>, id = '0') => eraseD1ImportTarget('contact', id, targets.remove('workspace', 'contact', id), r.context());
 
-test('real D1: named reaction-user redaction commits with the erasure journal and keeps default-seed peer custody, resume and undo valid', async t => {
+familyRows[0].push(['real D1: named reaction-user redaction commits with the erasure journal and keeps default-seed peer custody, resume and undo valid', async t => {
   const r = await runtime(t), actor = 'U-ERASE-REACTION-A';
   const census = async () => {
     const { results } = await r.db().prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_cf_%'").all<{ name: string }>();
@@ -135,9 +137,9 @@ test('real D1: named reaction-user redaction commits with the erasure journal an
     }
     assert.ok(!(await census()).includes(actor), `${mode}: resume/undo never restores the identity`);
   }
-});
+}]);
 
-test('real D1: optional field discovery fences late references and cancels staging-only peer copies atomically', async t => {
+familyRows[0].push(['real D1: optional field discovery fences late references and cancels staging-only peer copies atomically', async t => {
   const r = await runtime(t), actor = 'PRIVATE-STAGED-IDENTITY';
   for (const mode of ['staging-only', 'late-job', 'late-native']) {
     await r.reset();
@@ -180,9 +182,9 @@ test('real D1: optional field discovery fences late references and cancels stagi
     assert.ok(!JSON.stringify(await personTargets.list(r.db(), 'people')).includes(actor));
     assert.equal((await r.db().prepare('SELECT epoch FROM privacy_epoch').first())!.epoch, 1);
   }
-});
+}]);
 
-for (const partial of [false, true]) test(`real D1: erasure removes normalized ${partial ? 'partially applied chunked' : 'completed'} custody, preserves peers and survives reopen/replay/undo`, async t => {
+for (const partial of [false, true]) familyRows[0].push([`real D1: erasure removes normalized ${partial ? 'partially applied chunked' : 'completed'} custody, preserves peers and survives reopen/replay/undo`, async t => {
   const r = await runtime(t), { plan, job } = await create(r, partial);
   const published = await resumeD1Import(job.id, { ...r.context(), ...(partial ? { maxBatches: 1 } : {}) });
   assert.equal(published.state, partial ? 'applying' : 'completed');
@@ -202,9 +204,9 @@ for (const partial of [false, true]) test(`real D1: erasure removes normalized $
   await assert.rejects(createD1ImportJob(plan, { ...r.context(), operationKey: 'after-undo', reviewedFingerprint: plan.fingerprint }), /IMPORT_SOURCE_ERASED/);
   assert.doesNotMatch(await retained(r.db()), /person0@example\.test|private-long-answer-/);
   assert.equal((await targets.list(r.db(), 'workspace')).length, 0);
-});
+}]);
 
-test('real D1: erasure is atomic with native statements, current authority and exact postconditions', async t => {
+familyRows[0].push(['real D1: erasure is atomic with native statements, current authority and exact postconditions', async t => {
   const r = await runtime(t), { job } = await create(r);
   await resumeD1Import(job.id, r.context());
   const before = await retained(r.db());
@@ -219,9 +221,9 @@ test('real D1: erasure is atomic with native statements, current authority and e
   await assert.rejects(undoD1Import(job.id, r.context()), /NATIVE_EDIT_CONFLICT/);
   assert.equal((await r.db().prepare("SELECT detail FROM evidence WHERE id='1'").first())?.detail, 'later unrelated edit');
   assert.doesNotMatch(await retained(r.db()), /person0@example\.test/);
-});
+}]);
 
-test('real D1: erased source reuse reconciles original, reused and previously reversed jobs', async t => {
+familyRows[0].push(['real D1: erased source reuse reconciles original, reused and previously reversed jobs', async t => {
   const r = await runtime(t), { plan, job } = await create(r);
   await resumeD1Import(job.id, r.context()); await undoD1Import(job.id, r.context());
   const next = await createD1ImportJob(plan, { ...r.context(), operationKey: 'second', reviewedFingerprint: plan.fingerprint });
@@ -233,9 +235,9 @@ test('real D1: erased source reuse reconciles original, reused and previously re
   assert.equal((await undoD1Import(reused.id, r.context())).state, 'undone');
   assert.equal((await undoD1Import(next.id, r.context())).state, 'undone');
   assert.doesNotMatch(await retained(r.db()), /person0@example\.test/);
-});
+}]);
 
-test('real D1: an apply prepared before erasure loses its atomic boundary and cannot resurrect data', async t => {
+familyRows[0].push(['real D1: an apply prepared before erasure loses its atomic boundary and cannot resurrect data', async t => {
   const r = await runtime(t), { job } = await create(r);
   await resumeD1Import(job.id, { ...r.context(), maxBatches: 1 });
   const ctx = r.context(); let erased = false;
@@ -247,9 +249,9 @@ test('real D1: an apply prepared before erasure loses its atomic boundary and ca
   assert.equal((await readD1ImportJob(job.id, r.context())).checkpoint, 1);
   assert.equal((await resumeD1Import(job.id, r.context())).state, 'completed');
   assert.doesNotMatch(await retained(r.db()), /person0@example\.test/);
-});
+}]);
 
-test('real D1: a create prepared before erasure cannot retain an obsolete private plan', async t => {
+familyRows[0].push(['real D1: a create prepared before erasure cannot retain an obsolete private plan', async t => {
   const r = await runtime(t), { plan, job } = await create(r);
   await resumeD1Import(job.id, r.context());
   const ctx = r.context(); let erased = false;
@@ -260,18 +262,18 @@ test('real D1: a create prepared before erasure cannot retain an obsolete privat
   await assert.rejects(createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint, operationKey: 'racing-new-job', storage: { ...ctx.storage, database: racing } }), /IMPORT_ATOMIC_GUARD/);
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM ik_jobs').first())?.n, 1);
   assert.doesNotMatch(await retained(r.db()), /person0@example\.test/);
-});
+}]);
 
-test('real D1: unsupported retained artifacts fail before native erasure or plan changes', async t => {
+familyRows[0].push(['real D1: unsupported retained artifacts fail before native erasure or plan changes', async t => {
   const r = await runtime(t), plan = await planD1Import(source(1), mapping, r.context());
   const job = await createD1ImportJob(plan, { ...r.context(), reviewedFingerprint: plan.fingerprint });
   await resumeD1Import(job.id, r.context());
   const before = await retained(r.db());
   await assert.rejects(erase(r), /IMPORT_ERASURE_RETAINED_ORIGINAL/);
   assert.equal(await retained(r.db()), before);
-});
+}]);
 
-for (const partial of [false, true]) test(`real D1: additive erasure index upgrades prior ${partial ? 'partial chunked' : 'completed inline'} jobs without changing their plans`, async t => {
+for (const partial of [false, true]) familyRows[1].push([`real D1: additive erasure index upgrades prior ${partial ? 'partial chunked' : 'completed inline'} jobs without changing their plans`, async t => {
   const r = await runtime(t), { plan, job } = await create(r, partial);
   await resumeD1Import(job.id, { ...r.context(), ...(partial ? { maxBatches: 1 } : {}) });
   const before = await r.db().prepare('SELECT plan_json,fingerprint FROM ik_jobs WHERE id=?').bind(job.id).first();
@@ -290,9 +292,9 @@ for (const partial of [false, true]) test(`real D1: additive erasure index upgra
   assert.equal((await createD1ImportJob(plan, { ...r.context(), operationKey: 'original-file', reviewedFingerprint: plan.fingerprint })).id, job.id);
   await undoD1Import(job.id, r.context());
   await assert.rejects(createD1ImportJob(plan, { ...r.context(), operationKey: 'after-upgrade', reviewedFingerprint: plan.fingerprint }), /IMPORT_SOURCE_ERASED/);
-});
+}]);
 
-test('real D1: erasure reconciles completed reused plans within one request and does not load unrelated plans', async t => {
+familyRows[0].push(['real D1: erasure reconciles completed reused plans within one request and does not load unrelated plans', async t => {
   const r = await runtime(t), { plan, job } = await create(r);
   await resumeD1Import(job.id, r.context());
   const copies = [job.id];
@@ -316,9 +318,9 @@ test('real D1: erasure reconciles completed reused plans within one request and 
   await undoD1Import(copies.at(-1)!, r.context());
   await assert.rejects(createD1ImportJob(plan, { ...r.context(), operationKey: 'after-many-copies', reviewedFingerprint: plan.fingerprint }), /IMPORT_SOURCE_ERASED/);
   assert.equal((await targets.list(r.db(), 'workspace')).length, 5);
-});
+}]);
 
-test('real D1: erasure removes a queued different-source plan targeting the same native entity', async t => {
+familyRows[0].push(['real D1: erasure removes a queued different-source plan targeting the same native entity', async t => {
   const r = await runtime(t), { job } = await create(r);
   await resumeD1Import(job.id, r.context());
   const other = normalized(); other.records[0].sourceId = 'other-source';
@@ -330,9 +332,9 @@ test('real D1: erasure removes a queued different-source plan targeting the same
   await resumeD1Import(queued.id, r.context());
   assert.equal(await targets.read(r.db(), 'workspace', 'contact', '0'), undefined);
   await assert.rejects(createD1ImportJob(plan, { ...r.context(), operationKey: 'new-source-after-erase', reviewedFingerprint: plan.fingerprint }), /IMPORT_SOURCE_ERASED/);
-});
+}]);
 
-test('real D1: index upgrades fence the exact prior plan and current session', async t => {
+familyRows[1].push(['real D1: index upgrades fence the exact prior plan and current session', async t => {
   const r = await runtime(t), { job } = await create(r);
   await r.db().prepare('DELETE FROM ik_d1_plan_index WHERE job_id=?').bind(job.id).run();
   await r.db().prepare('DELETE FROM ik_d1_indexed_jobs WHERE job_id=?').bind(job.id).run();
@@ -351,9 +353,9 @@ test('real D1: index upgrades fence the exact prior plan and current session', a
   assert.equal((await r.db().prepare('SELECT COUNT(*) n FROM ik_d1_plan_index').first())?.n, 0);
   await r.db().prepare('UPDATE sessions SET enabled=1').run();
   assert.deepEqual(await upgradeD1ImportErasureIndex(r.context()), { indexed: 1, complete: true });
-});
+}]);
 
-for (const mutation of ['DELETE FROM ik_d1_plan_index WHERE job_id=? AND ordinal=0', "UPDATE ik_d1_plan_index SET target_identity='corrupt' WHERE job_id=? AND ordinal=0"]) test('real D1: changed or missing derived rows invalidate index completeness before erasure', async t => {
+for (const mutation of ['DELETE FROM ik_d1_plan_index WHERE job_id=? AND ordinal=0', "UPDATE ik_d1_plan_index SET target_identity='corrupt' WHERE job_id=? AND ordinal=0"]) familyRows[1].push(['real D1: changed or missing derived rows invalidate index completeness before erasure', async t => {
   const r = await runtime(t), { plan, job } = await create(r);
   await resumeD1Import(job.id, r.context());
   const pending = await createD1ImportJob(plan, { ...r.context(), operationKey: 'queued-copy', reviewedFingerprint: plan.fingerprint });
@@ -368,9 +370,9 @@ for (const mutation of ['DELETE FROM ik_d1_plan_index WHERE job_id=? AND ordinal
   await resumeD1Import(pending.id, r.context());
   assert.equal(await targets.read(r.db(), 'workspace', 'contact', '0'), undefined);
   assert.doesNotMatch(await retained(r.db()), /person0@example\.test/);
-});
+}]);
 
-for (const tombstone of ['source', 'target']) test(`real D1: every retained replay independently refuses an erased ${tombstone}`, async t => {
+for (const tombstone of ['source', 'target']) familyRows[1].push([`real D1: every retained replay independently refuses an erased ${tombstone}`, async t => {
   const r = await runtime(t), { plan, job } = await create(r);
   const identity = tombstone === 'source' ? plan.entries[0].identity : sha256(canonicalJson(['workspace', 'contact', '0']));
   await r.db().prepare(`INSERT INTO ik_d1_erased_${tombstone}s(destination,identity) VALUES(?,?)`).bind('workspace', identity).run();
@@ -381,9 +383,9 @@ for (const tombstone of ['source', 'target']) test(`real D1: every retained repl
     await upgradeD1ImportErasureIndex(r.context());
   }), /IMPORT_SOURCE_ERASED/);
   assert.equal((await targets.list(r.db(), 'workspace')).length, 0);
-});
+}]);
 
-test('real D1: a cancelled invitee sharing an active invitee\'s imported source is erased from custody by fields alone; the active peer keeps resume and undo', async t => {
+familyRows[0].push(['real D1: a cancelled invitee sharing an active invitee\'s imported source is erased from custody by fields alone; the active peer keeps resume and undo', async t => {
   const r = await runtime(t), cancelled = 'cancelled-invitee@example.test', active = 'active-invitee@example.test';
   await r.db().batch([
     'CREATE TABLE people(id TEXT PRIMARY KEY,name TEXT,email TEXT,details TEXT,created_at TEXT,import_revision TEXT)',
@@ -423,9 +425,9 @@ test('real D1: a cancelled invitee sharing an active invitee\'s imported source 
   assert.equal((await undoD1Import(job.id, context())).state, 'undone', 'and undoes');
   assert.equal(await personTargets.read(r.db(), 'people', 'person', 'booking-1'), undefined);
   assert.ok(!(await census()).includes(cancelled));
-});
+}]);
 
-test('real D1: shared-source reimport keeps the active claim owner through invitee erasure and resumed undo', async t => {
+familyRows[0].push(['real D1: shared-source reimport keeps the active claim owner through invitee erasure and resumed undo', async t => {
   const r = await runtime(t), cancelled = 'cancelled-invitee@example.test', cancelledName = 'Cancelled Carl', active = 'active-invitee@example.test';
   await r.db().batch([
     'CREATE TABLE people(id TEXT PRIMARY KEY,name TEXT,email TEXT,details TEXT,created_at TEXT,import_revision TEXT)',
@@ -487,7 +489,7 @@ test('real D1: shared-source reimport keeps the active claim owner through invit
   await assertErased();
   assert.equal((await undoD1Import(current.job.id, context())).state, 'undone', 'repeated undo is safe');
   await assertErased();
-});
+}]);
 
 test('real D1: a resumable redaction whose one import job is more than a request finishes in metered steps, each inside the request limit, and the job still undoes', { timeout: 10 * 60_000 }, async t => {
   const r = await runtime(t), actor = 'U-ERASE-ONE-LARGE-JOB', people = 1100;
@@ -525,3 +527,7 @@ test('real D1: a resumable redaction whose one import job is more than a request
   assert.equal(undo.state, 'undone', 'the redacted job still undoes');
   assert.equal((await r.db().prepare('SELECT count(*) AS n FROM people').first<{ n: number }>())!.n, 0);
 });
+
+ test("D1 privacy withdrawal stays atomic and preserves valid peer custody", async t => { await caseRows(t, familyRows[0]); });
+
+ test("D1 erasure indexes and tombstones prevent incomplete withdrawal and resurrection", async t => { await caseRows(t, familyRows[1]); });

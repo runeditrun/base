@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyImportBatches, createImportJob, planImport, undoImport, rollbackImport, resumeImport, readPersistedImport, reconcileImport, canonicalJson } from '../../src/index.ts';
@@ -11,7 +13,7 @@ async function distinctJob(ctx, prefix) {
   return { plan, job: await createImportJob(plan, ctx) };
 }
 
-for (const terminal of ['completed', 'undone', 'rolled_back']) test(`${terminal} job refuses another real publisher's conflicting JSON target while its SQL target remains distinct`, async t => {
+for (const terminal of ['completed', 'undone', 'rolled_back']) familyRows[0].push([`${terminal} job refuses another real publisher's conflicting JSON target while its SQL target remains distinct`, async t => {
   const { ctx } = nativeSetup(t), first = await nativeJob(ctx);
   await applyImportBatches(first.job, ctx);
   if (terminal === 'undone') await undoImport(first.job.id, ctx);
@@ -41,4 +43,6 @@ for (const terminal of ['completed', 'undone', 'rolled_back']) test(`${terminal}
   assert.equal((await resumeImport(third.job.id, ctx)).state, 'completed');
   assert.equal((await undoImport(third.job.id, ctx)).state, 'undone');
   assert.deepEqual(nativeRows(ctx), before.native);
-});
+}]);
+
+ test("core target inventory preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });
