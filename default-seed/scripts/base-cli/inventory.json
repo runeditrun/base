@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g0cad22d3",
+  "cliVersion": "0.2.85-dev.g45f4aafd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -931,7 +931,7 @@
     },
     "cli/managed-data-schema.mjs": {
       "source": "cli/managed-data-schema.mjs",
-      "sha256": "db3cffdbe605fb8ca9833032f7ef645f0d2ae6a185bfd25ce8ddb86bbe585d9c"
+      "sha256": "1a8b09daa5e8e6b0deca04b03ef40c62060cd1b5f355f1085c058e6098854534"
     },
     "cli/managed-data-zip.mjs": {
       "source": "cli/managed-data-zip.mjs",
@@ -4295,7 +4295,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "c0a41c6ebb25b2e40aad834151ed2aadea3e2860d63d0ae824dbea62371e901a"
+      "sha256": "bc10e2cec6880910ac34ec74604223194078071655caa56aa8dbf999042437ed"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
@@ -4323,7 +4323,11 @@
     },
     "modules/portability/copies.mjs": {
       "source": "modules/portability/copies.mjs",
-      "sha256": "a09c8f4706611cbaf64274faeb1903eb5bb736ae0914f8efe52765c161300c44"
+      "sha256": "1de06490a5eda233e74eee516671b5b2ef0b4f7069b9219a046623f85df479f0"
+    },
+    "modules/portability/derived.mjs": {
+      "source": "modules/portability/derived.mjs",
+      "sha256": "71c14a3aa115be21ba6a6ea19b69d227adb1d56cdb9137affc1a07a2c4c0211e"
     },
     "modules/portability/dev-data.mjs": {
       "source": "modules/portability/dev-data.mjs",
@@ -4359,7 +4363,7 @@
     },
     "modules/portability/http-errors.mjs": {
       "source": "modules/portability/http-errors.mjs",
-      "sha256": "b7d0ab905e81728c9b5cda2e7f7e045c872b0bb07fc0943d98cd8faca557664c"
+      "sha256": "01cccd7b1908d1a6b9bb8e23e87b4e7177f7db8bdea150848c6d372ce2074ba5"
     },
     "modules/portability/http.mjs": {
       "source": "modules/portability/http.mjs",
@@ -4379,7 +4383,7 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "991fc8e7537cf3344b313f7b3f0088d20e5d7f9b6c622c65315bc890225ec1b2"
+      "sha256": "327dcb2f60eb8cd6f35aa57920d571819ef6a74f2e002fe518854596d29dce5a"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
