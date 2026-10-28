@@ -1,3 +1,4 @@
+import { narrowingContract } from './narrowing-contract.mjs';
 export const AGENT_CLASSES = Object.freeze(['standard', 'external', 'money', 'commitment', 'accounts', 'gated', 'access', 'security', 'destructive', 'sensitive', 'live']);
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const hasClause = (contract, clause) => typeof clause === 'string' && contract.split(/[^A-Za-z0-9_.-]+/).includes(clause);
@@ -27,6 +28,8 @@ export function validateAgentSurface(surface, { contract } = {}) {
   const clauses = Array.isArray(tool?.clauses) ? tool.clauses : [];
   add(`${label}.clauses`, clauses.length > 0 && clauses.every(text), `${label} must name its contract clauses.`);
   if (contract !== undefined) for (const clause of clauses) add(`${label}.clause.${clause}`, hasClause(contract, clause), `${label} names clause ${clause}, absent from CONTRACT.md.`);
+  if (tool?.widens !== undefined || tool?.narrowing !== undefined) escalation(`${label}.narrowing-contract`, narrowingContract(tool), `${label} widens:false requires a closed target-only input schema and revoke/narrow effect.`);
+  if (tool?.proof !== undefined || tool?.proofKind !== undefined) add(`${label}.proof`, tool.proof === 'native' && text(tool.proofKind) && text(surface.verification?.proof), `${label} requires a named native proof and verification.proof module.`);
   tools.set(name, tool); coverage.set(name, new Set());
  }
  for (const [i, item] of (Array.isArray(surface.notTools) ? surface.notTools : []).entries()) {
@@ -60,7 +63,24 @@ export function validateAgentSurface(surface, { contract } = {}) {
   checkReferences(step?.args, `escalations.${id}`, steps, escalation);
   escalationIds.add(step?.id); escalationTools.add(step?.tool);
  }
- for (const [name, tool] of tools) if (Array.isArray(tool?.classes) && tool.classes.some(cls => ['access', 'security'].includes(cls))) escalation(`${name}.coverage`, escalationTools.has(name), `${name} has no sponsor escalation fixture.`);
+ if (surface.narrowings !== undefined) escalation('narrowings', Array.isArray(surface.narrowings), 'narrowings must be an array of targeted grant-set checks.');
+ const narrowingTools = new Set();
+ for (const [i, step] of (Array.isArray(surface.narrowings) ? surface.narrowings : []).entries()) {
+  const tool = tools.get(step?.tool), id = step?.id ?? `narrowings[${i}]`;
+  escalation(`${id}.narrowing`, text(step?.id) && !narrowingTools.has(step?.tool) && tool?.widens === false && object(step.args)
+   && object(step.witness) && tools.get(step.witness.tool)?.readOnly === true && object(step.witness.args)
+   && object(step.smuggle) && Object.keys(step.smuggle).length > 0 && step.subject !== undefined
+   && (surface.journey ?? []).some(item => item.tool === step.tool && JSON.stringify(item.args) === JSON.stringify(step.args)), `${id} requires a journey call, targeted subject, grant-set read witness and smuggled widening argument.`);
+  checkReferences(step?.subject, `narrowings.${id}.subject`, steps, escalation);
+  checkReferences(step?.args, `narrowings.${id}.args`, steps, escalation);
+  checkReferences(step?.witness?.args, `narrowings.${id}.witness`, steps, escalation);
+  narrowingTools.add(step?.tool);
+ }
+ for (const [name, tool] of tools) if (Array.isArray(tool?.classes) && tool.classes.some(cls => ['access', 'security'].includes(cls))) {
+  const narrowing = tool.widens === false;
+  escalation(`${name}.coverage`, narrowing ? narrowingTools.has(name) : escalationTools.has(name), `${name} has no ${narrowing ? 'narrowing check' : 'sponsor escalation fixture'}.`);
+  if (narrowing) points.push({ id: `BASE-AGENT-005.surface.${name}.uses-narrowing-check`, ok: true });
+ }
  for (const [name, tool] of tools) for (const cls of Array.isArray(tool?.classes) ? tool.classes : []) add(`${name}.coverage.${cls}`, coverage.get(name).has(cls), `${name} has no journey fixture for declared class ${cls}.`);
  add('events', tools.has(`${surface.seed}.events.list`), `Declare built-in ${surface.seed}.events.list in the Agent surface.`);
  add('witness', object(surface.witness) && tools.get(surface.witness.tool)?.readOnly === true && object(surface.witness.args), 'witness must name a declared readOnly tool and arguments.');

@@ -21,6 +21,7 @@ import { importDoorResponse } from './core/features/people/door.server'
 import { importPageResponse } from './core/features/people/import-page.server'
 import { rejectedResponse } from '../../foundation/runtime/rejected-response'
 import { businessSettings } from './core/platform/business.server'
+import { nativeProofResponse } from './agent-door/native-proof.server'
 import { baseAgentDoor } from './agent-door/index.server'
 
 const api = createApi()
@@ -32,6 +33,8 @@ export default withDemo({
     const asset = await staticAssetResponse(request, bindings)
     if (asset) return asset
     bindings = requireBindings(bindings)
+    const proofResponse = await nativeProofResponse(request, bindings)
+    if (proofResponse) return proofResponse
     const agentPath = new URL(request.url).pathname
     if (agentPath === '/mcp' || agentPath === '/agents' || agentPath.startsWith('/agents/') || agentPath === '/api/rer/agent-policy' || agentPath.startsWith('/.well-known/oauth-protected-resource')) {
       const agentResponse = await baseAgentDoor(bindings).handle(request)

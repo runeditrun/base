@@ -1,4 +1,5 @@
 import { isClass } from './policy/catalogue.ts'
+import { narrowingContract } from './conformance/narrowing-contract.mjs'
 import { schemaValid } from './json-schema.ts'
 import type { AgentDoorOptions, ToolDefinition } from './types.ts'
 
@@ -19,6 +20,10 @@ export function registry(options: AgentDoorOptions): ToolDefinition[] {
     if ('cost' in tool) throw new TypeError(`Provider cost is not enforced: ${tool.name}`)
     if (!tool.readOnly && typeof tool.summary !== 'function') throw new TypeError(`Missing approval summary: ${tool.name}`)
     if (tool.classes.some(cls => cls === 'access' || cls === 'security') && typeof tool.authority !== 'function') throw new TypeError(`Missing authority: ${tool.name}`)
+    if (tool.widens !== undefined && !narrowingContract(tool)) throw new TypeError(`Invalid narrowing contract: ${tool.name}`)
+    if (tool.narrowing && tool.widens !== false) throw new TypeError(`Missing widens:false: ${tool.name}`)
+    if (tool.proof !== undefined && (tool.proof !== 'native' || !tool.proofKind || !options.nativeProofs?.[tool.proofKind] || typeof options.nativeProofs[tool.proofKind]!.verify !== 'function' || typeof options.nativeProofs[tool.proofKind]!.handoff !== 'function')) throw new TypeError(`Missing native proof verifier: ${tool.name}`)
+    if (tool.proofKind && !tool.proof) throw new TypeError(`Missing native proof declaration: ${tool.name}`)
     const properties = { ...tool.inputSchema.properties }
     if ('idempotency_key' in properties || 'expected_revision' in properties) throw new TypeError(`Reserved argument: ${tool.name}`)
     const required = [...tool.inputSchema.required ?? []]
@@ -30,7 +35,7 @@ export function registry(options: AgentDoorOptions): ToolDefinition[] {
 export function describeTool(tool: ToolDefinition) {
   return { name: tool.name, title: tool.title, description: tool.description, inputSchema: tool.inputSchema, outputSchema: tool.outputSchema,
     annotations: { readOnlyHint: tool.readOnly, destructiveHint: tool.classes.includes('destructive'), openWorldHint: tool.classes.includes('external') },
-    _meta: { 'com.runeditrun/classes': tool.classes, 'com.runeditrun/clauses': tool.clauses, 'com.runeditrun/scope': tool.scope } }
+    _meta: { 'com.runeditrun/classes': tool.classes, 'com.runeditrun/clauses': tool.clauses, 'com.runeditrun/scope': tool.scope, ...(tool.widens === false ? { 'com.runeditrun/narrowing': tool.narrowing, 'com.runeditrun/widens': false } : {}), ...(tool.proof ? { 'com.runeditrun/proof': { proof: tool.proof, kind: tool.proofKind } } : {}) } }
 }
 export function templateMatches(template: string, uri: string) {
   const pattern = template.split(/\{[^}]+\}/).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^/?#]+')

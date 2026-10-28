@@ -3,6 +3,7 @@ import type { Bindings } from '../core/platform/bindings.server'
 import { authConfig } from '../core/platform/auth/config.server'
 import { operatorAuth } from '../core/platform/auth/session.server'
 import { accessTools } from './access-tools'
+import { nativeProofs } from './native-proof.server'
 import { peopleTools, personResource } from './people-tools'
 
 function trust(bindings: Bindings): Trust | null {
@@ -17,6 +18,7 @@ export function baseAgentDoor(bindings: Bindings) {
   return createAgentDoor({
     seed: 'base', name: 'Base', specialist: 'operations', db: bindings.DB, origin: bindings.AUTH_ORIGIN, trust: trust(bindings),
     people: operatorAuthPeople({ db: bindings.DB, allowList: authConfig(bindings).allowList, session: request => operatorAuth(bindings).getSession(request) }),
+    nativeProofs: nativeProofs(bindings),
     tools: [...peopleTools(bindings), ...accessTools(bindings)], resources: [personResource],
     notTools: [
       { clauses: ['BASE-AGENT-003'], reason: 'import-door' },

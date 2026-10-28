@@ -64,7 +64,9 @@
         "BASE-AGENT-002",
         "BASE-AGENT-006",
         "BASE-AGENT-004"
-      ]
+      ],
+      "proof": "native",
+      "proofKind": "recent_sign_in"
     },
     {
       "name": "base.people.list",
@@ -113,6 +115,51 @@
         "BASE-AGENT-002",
         "BASE-AGENT-006"
       ]
+    },
+    {
+      "name": "base.access.demote",
+      "scope": "access:write",
+      "readOnly": false,
+      "classes": [
+        "access"
+      ],
+      "clauses": [
+        "BASE-AGENT-002",
+        "BASE-AGENT-006",
+        "BASE-AGENT-009"
+      ],
+      "widens": false,
+      "narrowing": {
+        "effect": "narrow",
+        "reason": "closed-target-input"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "base.access.grants",
+      "scope": "access:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "BASE-AGENT-002",
+        "BASE-AGENT-006",
+        "BASE-AGENT-009"
+      ]
     }
   ],
   "notTools": [
@@ -142,7 +189,9 @@
       "tool": "base.access.invite",
       "args": {
         "name": "Synthetic Sponsor",
-        "email": { "$sponsor": "email" },
+        "email": {
+          "$sponsor": "email"
+        },
         "role": "admin"
       }
     },
@@ -150,7 +199,9 @@
       "id": "widen-sponsor",
       "tool": "base.access.role",
       "args": {
-        "id": { "$sponsor": "id" },
+        "id": {
+          "$sponsor": "id"
+        },
         "role": "admin"
       }
     }
@@ -217,7 +268,10 @@
       "expect": [
         {
           "class": "sensitive",
-          "facts": { "measure": 1, "kind": "personal" }
+          "facts": {
+            "measure": 1,
+            "kind": "personal"
+          }
         }
       ]
     },
@@ -228,7 +282,9 @@
       "expect": [
         {
           "class": "sensitive",
-          "facts": { "kind": "personal" }
+          "facts": {
+            "kind": "personal"
+          }
         }
       ]
     },
@@ -258,7 +314,61 @@
       ]
     },
     {
+      "id": "grants",
+      "tool": "base.access.grants",
+      "args": {
+        "id": {
+          "$from": "invite",
+          "pointer": "/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
       "id": "widen",
+      "tool": "base.access.role",
+      "args": {
+        "id": {
+          "$from": "invite",
+          "pointer": "/id"
+        },
+        "role": "admin"
+      },
+      "expect": [
+        {
+          "class": "access",
+          "facts": {
+            "measure": 1,
+            "direction": "widens"
+          }
+        }
+      ]
+    },
+    {
+      "id": "demote",
+      "tool": "base.access.demote",
+      "args": {
+        "id": {
+          "$from": "invite",
+          "pointer": "/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "access",
+          "facts": {
+            "measure": 1,
+            "direction": "narrows"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rewiden",
       "tool": "base.access.role",
       "args": {
         "id": {
@@ -326,6 +436,37 @@
           "class": "standard"
         }
       ]
+    }
+  ],
+  "verification": {
+    "proof": "tests/agent-native-proof.mjs"
+  },
+  "narrowings": [
+    {
+      "id": "demote-only",
+      "tool": "base.access.demote",
+      "args": {
+        "id": {
+          "$from": "invite",
+          "pointer": "/id"
+        }
+      },
+      "subject": {
+        "$from": "invite",
+        "pointer": "/id"
+      },
+      "witness": {
+        "tool": "base.access.grants",
+        "args": {
+          "id": {
+            "$from": "invite",
+            "pointer": "/id"
+          }
+        }
+      },
+      "smuggle": {
+        "role": "admin"
+      }
     }
   ]
 }

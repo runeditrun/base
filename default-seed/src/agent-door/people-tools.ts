@@ -88,7 +88,7 @@ export function peopleTools(bindings: Bindings): ToolDefinition[] {
     }),
     defineTool({
       name: 'base.people.erase', title: 'Erase a person', description: 'Erase a person, native files and import custody using the existing resumable erasure.',
-      scope: 'people:erase', readOnly: false, inputSchema: object({ id }), outputSchema: object({ id, erasure: { type: 'object' } }),
+      scope: 'people:erase', readOnly: false, proof: 'native', proofKind: 'recent_sign_in', inputSchema: object({ id }), outputSchema: object({ id, erasure: { type: 'object' } }),
       classes: ['destructive'], clauses: [...clauses, 'BASE-AGENT-004'],
       classify(_args, ctx) { requirePeopleAccess(ctx.person); return [{ class: 'destructive', facts: { measure: 1 } }] },
       async summary(args, ctx) {
