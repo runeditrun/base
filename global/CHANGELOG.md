@@ -8,6 +8,7 @@
 - Fix local D1 checks that made export of a table with very many or very long column names fail: split encoded row measurement into bounded column queries and sum each row before enforcing the unchanged size limit. Keep internal row guards out of column removal so valid schema changes retain SQLite semantics.
 - Enforce D1 query limits in local test stand-ins on the pinned Node 22 runtime, using shared preflight and native driver options. Native demo SQLite bindings use the same helper. Refresh brings checks for SQL bytes, parameters, function arguments, pattern bytes, bound values and encoded table rows; tests may now fail for queries that production would reject. Expression depth 100 is OBSERVED-NOT-DOCUMENTED, with an estimated parser-tree check proved against workerd at 100 and 101. Invocation query counts and provider deadlines require provider verification.
 - Retain the failing Run site provider step, sanitized endpoint, elapsed time, timeout limit and network cause or HTTP refusal body in human and JSON deploy failures.
+- Drop empty Wrangler placeholders for declared runtime secrets from container and native demo bundles; keep runtime secret declarations and refuse non-empty secret image values.
 
 ## 0.2.84
 
