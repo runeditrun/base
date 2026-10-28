@@ -50,6 +50,15 @@ seed's declared lock/check commands afterward. Commit source provenance with
 the adoption. Provenance verifies source bytes; it does not prove runtime
 behavior. Applied seed migrations are outside the refreshed source directory.
 
+The disposable copied-consumer proof used the published authoring package
+`@runeditrun/rer@0.2.85`, independently of its full runtime-source commit. It
+recorded a committed module snapshot, refreshed with the installed package's
+`rer refresh-base`, verified zero drift, bundled every production import and
+ran all four conformance groups against the copied Worker/D1 integration.
+A deliberate seed category adapter outside the copied directory and a numbered
+schema migration remained unchanged. Use the seed's own TypeScript config;
+Base's integration typecheck lives under `tests/` and is not a runtime input.
+
 ## Apply a new numbered migration
 
 Copy [schema/time-billing.sql](schema/time-billing.sql) into the seed's actual
