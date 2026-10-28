@@ -415,6 +415,37 @@ Sensitive-looking outbound names are dropped and counted in `withheld`.
 Symlinks, generated outputs and dependency trees are skipped; unsupported
 formats and syntax may yield no signals.
 
+## Provision the synthetic business demo
+
+```sh
+rer business setup --origin https://your-platform.example \
+  --session-file /path/to/session.json --hosting managed --confirm-demo-policy --json
+```
+
+Use the owner's session at the selected platform origin. The session file must
+be owned by the current user, have mode 0600, and contain only
+`{"cookie":"<session cookie>"}`. Symlinks are refused. Keep the session in that
+file; it is never a command argument or terminal output.
+
+All four flags are required: `--origin`, `--session-file`, `--hosting` and
+`--confirm-demo-policy`. Hosting accepts exactly `self_host`, `managed` or
+`assisted`. Confirmation authorizes the demo's starting agent policy; the
+command refuses without it before any network call.
+
+Setup follows the platform's ordinary Business routes to find or create the
+synthetic company, fill missing profile fields, confirm its starting policy and
+approve an M4 plan for the available reviewed seeds. Existing conflicting
+profile, policy or hosting choices require the owner; setup does not overwrite
+them. A repeat reuses the business, policy and plan, and reports that run's
+counts without a second set of mutations. No local setup marker is stored.
+
+With or without `--json`, stdout is the platform's JSON receipt. Exit 0 means
+`complete: true`; exit 2 reports outstanding dependencies; a named refusal
+exits 1 on stderr. The currently mirrored platform setup reports
+`status: "dependencies_required"`, `complete: false`, and door proofs
+`"not_run"`. Provisioned apps do not by themselves prove token issuance,
+fixture loading or agent-door acceptance.
+
 ## Business device commands
 
 `rer business connect --code ABCD-1234 [--origin https://app.runeditrun.com]`

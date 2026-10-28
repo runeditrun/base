@@ -1,0 +1,9 @@
+{
+  "schema": "rer-agent-policy/1",
+  "catalogue": "rer-agent-classes/1",
+  "rules": [
+    {"id": "internal", "class": "standard", "do": "autonomous"},
+    {"id": "owner-first", "class": "*", "do": "approval", "approver": ["role:owner"], "wait": "P1D"}
+  ],
+  "spend": {"none": true}
+}

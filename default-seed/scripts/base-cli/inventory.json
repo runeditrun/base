@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g0cad22d3",
+  "cliVersion": "0.2.85-dev.g45f4aafd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -439,7 +439,7 @@
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "eb8cea2e7b0c5e025cd1052d01f6b92c4bc9541d48048fd5eea9531ebfd7b4fb"
+      "sha256": "8ecd7cc33d3ff5bb28ad6d9d71a26b28c84a181765256bc70efe83d9bbddbe91"
     },
     "cli/business/config-policy.mjs": {
       "source": "cli/business/config-policy.mjs",
@@ -448,6 +448,14 @@
     "cli/business/connect.mjs": {
       "source": "cli/business/connect.mjs",
       "sha256": "c465492e86abb1350029abf58f9492769761528bf9a94013a6127aaab9b103f1"
+    },
+    "cli/business/demo-company.json": {
+      "source": "cli/business/demo-company.json",
+      "sha256": "d5420f972c6ea991c8c4e9deec7326d093f8cfb1617f76632b6929812c75ec6f"
+    },
+    "cli/business/demo-policy.json": {
+      "source": "cli/business/demo-policy.json",
+      "sha256": "6c467b82d11eaa00e8dec1cd132bd96f065330a768adadd4c612eded6805f69b"
     },
     "cli/business/detector.mjs": {
       "source": "cli/business/detector.mjs",
@@ -552,6 +560,14 @@
     "cli/business/service.mjs": {
       "source": "cli/business/service.mjs",
       "sha256": "504c6b7516574bbf0dbf8e0346f29b4a041144d853249a6b7f9e07f899171c2a"
+    },
+    "cli/business/setup-command.mjs": {
+      "source": "cli/business/setup-command.mjs",
+      "sha256": "302ce4e9248c799ab4033dceadca2f25cf4698af4aa91adbb4d66c1807b5ce59"
+    },
+    "cli/business/setup.mjs": {
+      "source": "cli/business/setup.mjs",
+      "sha256": "5326347ee0a726506db2272ab1ad26ea3b30791ae368816e93bff0ec4374e74f"
     },
     "cli/business/state.mjs": {
       "source": "cli/business/state.mjs",
