@@ -772,3 +772,74 @@ A missing or true declaration still requires the escalation fixture. It never
 disables the runtime's self-widening refusal. Checked `widens: false` tools still
 need their narrowing schema and grant-subset witness; this flag cannot waive
 those checks. Owner-to-admin is a native demotion, never a widening operation.
+
+## Contract clauses
+
+[`CLAUSES.md`](CLAUSES.md) is the single canonical source for
+`BASE-AGENT-001` through `BASE-AGENT-013`: transport, tools, resources,
+identity, authority, classes, policy, attribution, audit, events, limits and
+Pause, idempotency, and the manifest and conformance journey. Its requirement
+text and numbered acceptance points preserve the shared duties previously
+printed in `export/BASELINE.md`. Copying a duty never proves its implementation.
+The baseline keeps the implementation coverage and outstanding gaps separately.
+
+The static surface validator checks every clause ID named by tools and
+`notTools` against the seed contract. The built-in `events.list` tool cites
+`BASE-AGENT-010`; conformance point prefixes cover all thirteen shared duties.
+There is no fixed shared set of `AGENT-*` or `SURFACE-*` IDs: those remain the
+seed's own specialist jobs and deltas. The sync never creates or changes them.
+
+A directory copy of `modules/agent-door` delivers `CLAUSES.md` automatically
+through the existing `record-base` and `refresh-base` workflow above, including
+its digest in `base-copies.json`. If the edition instead records individual
+module files, copy and record this additional file from the same immutable
+commit (replace the destination with the edition's actual module path):
+
+```sh
+git -C /absolute/base-checkout archive FULL_BASE_COMMIT modules/agent-door/CLAUSES.md | tar -x -C src/base
+node node_modules/@runeditrun/rer/edition-authoring/cli.mjs record-base src/base/modules/agent-door/CLAUSES.md modules/agent-door/CLAUSES.md FULL_BASE_COMMIT --base /absolute/base-checkout
+```
+
+Do not add a singleton record under an existing directory record. The CLI also
+ships this canonical file in its portable source inventory for editions that
+have not copied the runtime yet. When a module copy is recorded, the command
+uses that copy and verifies its recorded digest. An older runtime record
+without the clause file uses the CLI-delivered source, so a contract sync does
+not require moving the runtime ahead of its own adoption work. The CLI and runtime remain separate pins.
+
+From the runnable seed root, using a CLI containing this command:
+
+```sh
+rer door clauses --check
+rer door clauses --write
+rer door clauses --check
+```
+
+If the seed's pinned CLI predates the command, use the selected Base checkout
+directly, without changing that pin or the runtime copy:
+
+```sh
+node /absolute/base-checkout/bin/rer.mjs door clauses --write --cwd /absolute/seed
+node /absolute/base-checkout/bin/rer.mjs door clauses --check --cwd /absolute/seed
+```
+
+`--cwd DIR` selects a different seed root. `--check` is read-only, exits 1 and
+names every missing or stale shared clause, and checks the generated documents
+when all clauses are current. `--write` inserts missing clauses in
+`### Agent surface (Base-delivered)` under Target clauses, before the seed's
+last `### Agent surface` area, and updates existing shared definitions in place.
+It preserves all other contract bytes except the generator-owned summary rows.
+Existing shared Status, Evidence and Gap cells stay verbatim; canonical title
+updates change only the Title cell. New clauses have status `missing`, with a
+gap requiring judgment through this seed's own doors. The judged revision and
+date stay unchanged, and a second write produces no diff.
+
+The command runs the seed's `Lander-Regenerate` contract-docs `write` command
+from `AGENTS.md`, followed by the corresponding `check`, retaining any declared
+arguments. Without that declaration it uses
+`node src/base/contract-docs.mjs write`, then `check`. Restore or copy the real
+contract generator before syncing; legacy contracts must first be converted to
+the standard level-four clause and Status table shape. Review the contract,
+`ACCEPTANCE.md` and `docs/CLAIMS.md` together, run touched seed checks, then run
+the edition's documented source-lock command **last**, followed by its source
+check. Locking and committing remain explicit edition-authoring steps.
