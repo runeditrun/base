@@ -39,6 +39,21 @@ test('native queue retains admission identity through one effect and replay', as
   assert.equal((await drain(r, first.id)).result.id, first.id)
   assert.equal((await drain(r, second)).result.id, second)
   assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM test_effects WHERE id IN (?,?)').bind(first.id, second).first()).n, 2)
+  const fanoutRows = (await r.person('/agents/api/audit')).body.rows.filter((row: any) => row.tool === 'synthetic.queue.execute' && row.operation_id === (one.result as any).operationId)
+  assert.deepEqual([...new Set(fanoutRows.map((row: any) => row.continuation_item_id))].sort(), [first.id, second].sort())
+  for (const row of fanoutRows) { assert.equal(row.idempotency_key, first.idempotency_key); assert.equal(row.consent, admission.consent) }
+  assert.equal(errorCode(await r.tool('queue.execute', { id: second, idempotency_key: first.idempotency_key })), 'operation_mismatch')
+  // A caller cannot select another replay namespace or mutate an item's native origin.
+  assert.equal((await drain(r, second, { continuationItemId: crypto.randomUUID() })).result.id, second)
+  const secondAdmission = await saved(r, 'test_jobs', second)
+  await r.db.prepare('UPDATE test_jobs SET saved=? WHERE id=?').bind(JSON.stringify({ ...secondAdmission, operationId: crypto.randomUUID() }), second).run()
+  assert.equal((await drain(r, second)).code, 'operation_mismatch')
+  await r.db.prepare('UPDATE test_jobs SET saved=? WHERE id=?').bind(JSON.stringify(secondAdmission), second).run()
+  await r.adopt(autonomousPolicy(), { revoked: { agents: [], consents: [r.c.consent] } })
+  assert.equal((await drain(r, first.id)).code, 'consent_revoked')
+  assert.equal((await drain(r, second)).code, 'consent_revoked')
+  assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM test_effects WHERE id IN (?,?)').bind(first.id, second).first()).n, 2)
+
   t.diagnostic('a/b PASS: saved admission equals native effect identity; prepare replay and worker replay retain one effect.')
  } finally { await r.close() }
 })
