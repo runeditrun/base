@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { assert, uuid } from './validation.mjs';
 import { recordDeployFailure } from './diagnostics.mjs';
+import { importDiagnostic } from './d1-import-diagnostics.mjs';
 
 export const D1_IMPORT_POLL_LIMIT = 100;
 
@@ -26,7 +27,18 @@ function importFailure(code, id, response, redact) {
 export async function importD1({ envelope, upload, redact = String }, id, sql) {
   assert(uuid(id) && typeof sql === 'string' && Buffer.byteLength(sql) <= 4 * 1024 * 1024, 'invalid-d1-import');
   const bytes = Buffer.from(sql), etag = createHash('md5').update(bytes).digest('hex');
-  const post = async body => (await envelope(`/d1/database/${id}/import`, { method:'POST', body })).result;
+  let exchange, step;
+  const post = async body => {
+    step = body.action; exchange = undefined;
+    try {
+      return (await envelope(`/d1/database/${id}/import`, { method:'POST', body, onResponse:value => { exchange = value; } })).result;
+    } catch (error) {
+      let payload; try { payload = JSON.parse(exchange?.body); } catch { /* Non-JSON refusals still keep their excerpt. */ }
+      throw recordDeployFailure(importDiagnostic(error,{step,status:exchange?.status ?? error.status ?? error.providerTransport?.status ?? null,
+        body:exchange?.body,payload,redact,cause:error.providerTransport ? {code:error.providerTransport.reason,name:error.providerTransport.reason} : undefined}), {});
+    }
+  };
+  const fail = code => importDiagnostic(importFailure(code, id, response, redact),{step,status:exchange?.status ?? null,body:exchange?.body,payload:response,redact});
   let response = await post({ action:'init', etag });
   if (response && Object.hasOwn(response, 'upload_url')) {
     assert(typeof response.filename === 'string' && response.filename.length > 0 && response.filename.length <= 1024 && !/[\x00-\x1f\x7f]/.test(response.filename), 'invalid-d1-import-filename');
@@ -35,15 +47,15 @@ export async function importD1({ envelope, upload, redact = String }, id, sql) {
   }
   for (let polls = 0; polls < D1_IMPORT_POLL_LIMIT; polls++) {
     // REST places errors on the envelope; validate nested errors when supplied.
-    if (!(response?.success === true && response.type === 'import' && response.status !== 'error' && (!Object.hasOwn(response, 'errors') || Array.isArray(response.errors) && !response.errors.length))) throw importFailure('d1-import-failed', id, response, redact);
+    if (!(response?.success === true && response.type === 'import' && response.status !== 'error' && (!Object.hasOwn(response, 'errors') || Array.isArray(response.errors) && !response.errors.length))) throw fail('d1-import-failed');
     if (response.status === 'complete') {
-      if (!(Number.isSafeInteger(response.result?.num_queries) && response.result.num_queries > 0 && typeof response.result.final_bookmark === 'string' && response.result.final_bookmark.length > 0)) throw importFailure('d1-import-invalid-result', id, response, redact);
+      if (!(Number.isSafeInteger(response.result?.num_queries) && response.result.num_queries > 0 && typeof response.result.final_bookmark === 'string' && response.result.final_bookmark.length > 0)) throw fail('d1-import-invalid-result');
       return;
     }
-    if (!(response.status === 'active' && typeof response.at_bookmark === 'string' && response.at_bookmark.length > 0 && response.at_bookmark.length <= 1024)) throw importFailure('d1-import-uncertain', id, response, redact);
+    if (!(response.status === 'active' && typeof response.at_bookmark === 'string' && response.at_bookmark.length > 0 && response.at_bookmark.length <= 1024)) throw fail('d1-import-uncertain');
     response = await post({ action:'poll', current_bookmark:response.at_bookmark });
   }
-  throw new Error('d1-import-poll-limit');
+  throw fail('d1-import-poll-limit');
 }
 
 export function importUploadURL(value) {

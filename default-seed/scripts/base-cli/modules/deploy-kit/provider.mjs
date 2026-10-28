@@ -3,6 +3,7 @@ import { deleteR2Object } from './r2-object-transport.mjs';
 import { isR2ObjectDelete } from './r2-objects.mjs';
 import { recordDeployFailure, providerText } from './diagnostics.mjs';
 import { D1_IMPORT_POLL_LIMIT, importD1, importUploadURL } from './d1-import.mjs';
+import { importDiagnostic, importResponseText } from './d1-import-diagnostics.mjs';
 import { assert, hexId, uuid } from './validation.mjs';
 import { providerResponse, transportOutput, transportReason, transportClass } from './provider-transport.mjs';
 
@@ -31,7 +32,13 @@ const boundedText = async (response, limit = 4 * 1024 * 1024, onReadError, prefi
 export async function boundedJSON(response, limit) {
   try { return JSON.parse(await boundedText(response,limit)); } catch (error) { if (error instanceof SyntaxError) throw new Error('malformed-response'); throw error; }
 }
-const redactValues = (text, values) => values.filter(Boolean).flatMap(value=>[value,encodeURIComponent(value),JSON.stringify(value).slice(1,-1)]).sort((a,b)=>b.length-a.length).reduce((value,secret)=>value.split(secret).join('[REDACTED]'),text);
+const redactValues = (text, values) => values.filter(Boolean).flatMap(value=>[value,encodeURIComponent(value),JSON.stringify(value).slice(1,-1)]).sort((a,b)=>b.length-a.length).reduce((value,secret)=>{
+  value = value.split(secret).join('[REDACTED]');
+  // A bounded response may end partway through a known credential. Withhold
+  // that suffix too, before the shorter public excerpt is selected.
+  const at = secret.length >= 8 ? value.lastIndexOf(secret.slice(0,8)) : -1;
+  return at >= 0 && secret.startsWith(value.slice(at)) ? value.slice(0,at)+'[REDACTED]' : value;
+},text);
 /** Only this fixed origin and the explicitly selected account ever receive the token. */
 export function cloudflare({ accountId, token, fetch: request = globalThis.fetch, objectDelete = deleteR2Object, timeoutMs = 30000, maxRequests = 500, removal = false, budgetMigrations = false, requestSignal = () => undefined }) {
   assert(hexId(accountId), 'invalid-cloudflare-account-id');
@@ -55,7 +62,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     maxRequests = limit;
   }
   // `zone` scope: the zone-level API (/zones/...), for a run site's zone lookup and redirect rule.
-  async function rawEnvelope(path, { method = 'GET', body, assetToken, zone = false, signal: callerSignal, step, deadlineMs } = {}) {
+  async function rawEnvelope(path, { method = 'GET', body, assetToken, zone = false, signal: callerSignal, step, deadlineMs, onResponse } = {}) {
     assert(typeof path === 'string' && (isR2ObjectDelete(path, method) || /^\/[a-z0-9/_?=&.,%-]+$/i.test(path) && !path.includes('..') && !path.split('?')[0].includes('%')), 'invalid-provider-path');
     assert(!zone || /^\/zones(?:[/?]|$)/.test(path), 'invalid-provider-path');
     assert(++requests <= maxRequests, 'provider-request-budget');
@@ -80,11 +87,16 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     const {response,output = ''} = await providerResponse({method,timeoutMs:limitMs,callerSignal:deadlineSignal(callerSignal),removal,
       replayableAsset:method === 'POST' && (/^\/workers\/scripts\/[^/]+\/assets-upload-session$/.test(path) || path === '/workers/assets/upload?base64=true'),
       reserveRetry:() => requests < maxRequests && (++requests, true),failure:transportFailure,
-      consume:(response,attempts,signal) => response.body ? boundedText(response,response.ok ? undefined : 64 * 1024,cause => transportFailure(signal.aborted ? signal.reason : cause,attempts,response.status),!response.ok) : '',
+      consume:(response,attempts,signal) => {
+        onResponse?.({status:response.status,body:''});
+        const failedRead = cause => transportFailure(signal.aborted ? signal.reason : cause,attempts,response.status);
+        return onResponse && !response.ok ? importResponseText(response,failedRead) : response.body ? boundedText(response,response.ok ? undefined : 64 * 1024,failedRead,!response.ok) : '';
+      },
       send:signal => isR2ObjectDelete(path, method) ? objectDelete(`/client/v4/accounts/${accountId}${path}`, {headers:{Authorization:`Bearer ${token}`},signal}) : request(zone ? `https://api.cloudflare.com/client/v4${path}` : `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`, {
       method, redirect: 'error', signal, headers: { Authorization: `Bearer ${assetToken ?? token}`, ...(body && !(body instanceof FormData) ? { 'Content-Type':'application/json' } : {}) },
       ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }),
     })});
+    onResponse?.({status:response.status, body:output});
     // A successful DELETE may have no response body (including HTTP 200).
     // Nonempty replies and all other methods still require the API envelope.
     if (method === 'DELETE' && response.ok && output === '') return { success: true, result: null };
@@ -169,15 +181,23 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
   async function upload(url, bytes, etag) {
     const destination = importUploadURL(url);
     assert(++requests <= maxRequests, 'provider-request-budget');
-    const {response} = await providerResponse({method:'PUT',timeoutMs,callerSignal:deadlineSignal(),
+    const redact = text => redactValues(text,[accountId,token,destination]);
+    const failure = (cause, attempts, status = null) => recordDeployFailure(importDiagnostic(Object.assign(new Error('d1-import-upload-transport-failed'),
+      {providerTransport:{operation:'PUT D1 import upload',endpoint:'https://[REDACTED].r2.cloudflarestorage.com/[D1 import upload]',attempts,status,reason:transportReason(cause)}}),
+      {step:'upload',status,redact,cause}), {});
+    const {response,output = ''} = await providerResponse({method:'PUT',timeoutMs,callerSignal:deadlineSignal(),
       reserveRetry:() => requests < maxRequests && (++requests, true),
       send:signal => request(destination, { method:'PUT', redirect:'error', signal, headers:{'Content-Length':String(bytes.length)}, body:bytes }),
-      failure:(cause,attempts) => Object.assign(new Error('d1-import-upload-transport-failed'), {providerTransport:{operation:'PUT D1 import upload',endpoint:'https://[REDACTED].r2.cloudflarestorage.com/[D1 import upload]',attempts,status:null,reason:transportReason(cause)}}),
+      failure,
+      consume:async (response, attempts) => {
+        if (response.status === 200) { await response.body?.cancel().catch(() => {}); return ''; }
+        return importResponseText(response,cause => failure(cause,attempts,response.status));
+      },
     });
-    // Upload bodies and signed URLs are never diagnostics, including on failure.
-    await response.body?.cancel().catch(() => {});
-    assert(response.status === 200, 'd1-import-upload-failed');
-    assert(response.headers.get('etag')?.replace(/^"|"$/g, '') === etag, 'd1-import-upload-etag-mismatch');
+    let payload; try { payload = JSON.parse(output); } catch { /* R2 may return plain text or XML. */ }
+    const fail = code => recordDeployFailure(importDiagnostic(new Error(code),{step:'upload',status:response.status,body:output,payload,redact}), {});
+    if (response.status !== 200) throw fail('d1-import-upload-failed');
+    if (response.headers.get('etag')?.replace(/^"|"$/g, '') !== etag) throw fail('d1-import-upload-etag-mismatch');
   }
   return { accountId, envelope, list, reserveMigrationRequests, importSql(id, sql) { return importD1({envelope,upload,redact:text => redactValues(text,[accountId,token])}, id, sql); }, request:requestResult, workerContent,
     zoneRequest(path, options = {}) { return requestResult(path, { ...options, zone: true }); } };

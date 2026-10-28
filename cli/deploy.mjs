@@ -137,7 +137,9 @@ export function ownerDeploy(declarationPath, lifecycle) {
   } catch (error) {
    if (error instanceof RerError) throw error;
    const { commandFailure } = await shared('failures.mjs');
-   throw commandFailure(failureText({ error, step, created, again, retry, secretChange: Boolean(change.length && !options.remove), deployed, redact: redaction.redact }));
+   const d1Import = deployDiagnostic(error,redaction.redact)?.d1Import;
+   throw commandFailure(failureText({ error, step, created, again, retry, secretChange: Boolean(change.length && !options.remove), deployed, redact: redaction.redact }),
+    d1Import ? {d1Import} : {});
   }
  }, { declaration: declarationPath, managesHostedOwner: true });
 }

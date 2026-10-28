@@ -84,7 +84,7 @@ export async function main(argv = process.argv.slice(2)) {
   out.result(true, 0, result); return 0;
  } catch (error) {
   const failure = error instanceof RerError ? error : unexpectedFailure(error);
-  out.error(failure); out.result(false, failure.exitCode, { ...failure.exportDetails, ...(failure.siteDeploy ? {siteDeploy:failure.siteDeploy} : {}), ...(failure.childExitCode === undefined ? {} : { childExitCode: failure.childExitCode, signal: failure.signal }) }); return failure.exitCode;
+  out.error(failure); out.result(false, failure.exitCode, { ...failure.exportDetails, ...(failure.siteDeploy ? {siteDeploy:failure.siteDeploy} : {}), ...(failure.d1Import ? {d1Import:failure.d1Import} : {}), ...(failure.childExitCode === undefined ? {} : { childExitCode: failure.childExitCode, signal: failure.signal }) }); return failure.exitCode;
  }
 }
 

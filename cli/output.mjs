@@ -24,7 +24,7 @@ export function output(options) {
    else if (!['describe', 'check', 'dev', 'preview', 'setup'].includes(options.verb) || !ok) this.human(`${options.verb}: ${ok ? 'complete' : 'failed'} (exit ${exitCode})`);
   },
   error(error) {
-   if (structuredResult) this.event('error', { code: error.code, message: error.message, exitCode: error.exitCode, ...(error.availableDeployments ? { environment: error.environment, availableDeployments: error.availableDeployments } : {}), ...(error.siteDeploy ? {siteDeploy:error.siteDeploy} : {}), ...(error.step ? { step: error.step } : {}) });
+   if (structuredResult) this.event('error', { code: error.code, message: error.message, exitCode: error.exitCode, ...(error.availableDeployments ? { environment: error.environment, availableDeployments: error.availableDeployments } : {}), ...(error.siteDeploy ? {siteDeploy:error.siteDeploy} : {}), ...(error.step ? { step: error.step } : {}), ...(error.d1Import ? {d1Import:error.d1Import} : {}) });
    else write(2, error.message + '\n');
   },
  };
