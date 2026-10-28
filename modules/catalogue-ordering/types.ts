@@ -62,13 +62,13 @@ export type Draft = { id: string; revision: number; selection: Selection; previo
 export type Review = Draft & { fingerprint: string; commercial: ResolvedSelection };
 export type CommercialSnapshot = ResolvedSelection & {
   status: 'specified'; id: string; revision: number; previous: string | null;
-  fingerprint: string; actor: Actor;
+  fingerprint: string; actor: Actor; authorityRevision: string;
 };
 /** Imported historical bytes are never interpreted as new-write authority. */
 export type LegacySnapshot = {
   status: 'legacy'; id: string; subject: PartyRef; source: ItemRef;
   currency: string | null; arithmetic: string | null; original: string;
-  fingerprint: string;
+  fingerprint: string; visibility?: 'commercial' | 'cost';
 };
 export type Snapshot = CommercialSnapshot | LegacySnapshot;
 export type NativeOutcome = { kind: string; id: string; revision: string };
@@ -87,7 +87,7 @@ export interface NativeCommands {
 }
 export type ErrorCode = 'invalid_input' | 'capacity' | 'invalid_quantity' | 'unavailable_offer' | 'unpriced_offer' | 'currency_mismatch' | 'stale_review' | 'revision_conflict' | 'authority_refused' | 'idempotency_conflict' | 'not_found' | 'source_unavailable' | 'native_conflict' | 'storage_failure' | 'invalid_artifact';
 export type Result<T> = { ok: true; value: T } | { ok: false; error: { code: ErrorCode } };
-export type ExportRecord = { snapshot: Snapshot; receipts: readonly { operation: string; key: string; actor: Actor; outcome: NativeOutcome }[]; events: readonly { kind: string; actor: Actor; fingerprint: string }[]; sources: readonly { source: string; kind: string; legacyId: string; revision: string }[] };
+export type ExportRecord = { snapshot: Snapshot; receipts: readonly { operation: string; key: string; actor: Actor; digest: string; outcome: NativeOutcome }[]; events: readonly { id: string; kind: string; actor: Actor; fingerprint: string }[]; sources: readonly { source: string; kind: string; legacyId: string; revision: string }[] };
 export type ExportArtifact = { format: 'catalogue-ordering/1'; records: readonly ExportRecord[]; fingerprint: string };
 export interface CatalogueOrdering {
   listOffers(context: Context, input: { subject: PartyRef; cursor: string | null; limit: number }): Promise<Result<{ offers: readonly Offer[]; next: string | null }>>;

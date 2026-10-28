@@ -79,6 +79,10 @@ export async function resolve(options: Options, ctx: Context, input: Selection):
   return { commercial, guards: [loaded.guard, quote.guard] };
 }
 export function project<T extends ResolvedSelection | Snapshot>(value: T, fields: AuthorityGrant['fields']): T {
-  if (fields === 'cost' || ('status' in value && value.status === 'legacy')) return value;
+  if (fields === 'cost') return value;
+  if ('status' in value && value.status === 'legacy') {
+    if (value.visibility !== 'commercial') refuse('authority_refused');
+    return value;
+  }
   return { ...value, lines: (value as ResolvedSelection).lines.map(line => ({ ...line, breakdown: line.breakdown.filter(part => part.visibility !== 'cost') })) };
 }

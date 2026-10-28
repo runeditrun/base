@@ -20,7 +20,7 @@ export async function exportRecords(options: Options,ctx: Context,input:{subject
   const pageBindings=[ctx.installation,input.subject.kind,input.subject.id,input.after??'',input.limit];
   const results=await db.batch([
     db.prepare('SELECT id,body FROM co_snapshots WHERE installation=? AND subject_kind=? AND subject_id=? AND published=1 AND id>? ORDER BY id LIMIT ?').bind(ctx.installation,input.subject.kind,input.subject.id,input.after??'',input.limit+1),
-    db.prepare(`SELECT snapshot_id,operation,key,actor,outcome FROM co_receipts WHERE installation=? AND snapshot_id IN (${pageSql}) ORDER BY snapshot_id,operation,key`).bind(ctx.installation,...pageBindings),
+    db.prepare(`SELECT snapshot_id,operation,key,actor,digest,outcome FROM co_receipts WHERE installation=? AND snapshot_id IN (${pageSql}) ORDER BY snapshot_id,operation,key`).bind(ctx.installation,...pageBindings),
     db.prepare(`SELECT * FROM co_events WHERE installation=? AND snapshot_id IN (${pageSql}) ORDER BY id`).bind(ctx.installation,...pageBindings),
     db.prepare(`SELECT * FROM co_source_map WHERE installation=? AND snapshot_id IN (${pageSql}) ORDER BY source,kind,legacy_id,revision`).bind(ctx.installation,...pageBindings),
     db.prepare(`SELECT CASE WHEN (${access.guard.sql}) THEN 1 ELSE 0 END AS ok`).bind(...access.guard.bindings)
@@ -28,8 +28,8 @@ export async function exportRecords(options: Options,ctx: Context,input:{subject
   if(!results[4]?.results[0]?.ok)refuse('authority_refused');
   const rows=results[0]!.results, more=rows.length>input.limit;
   const records:ExportRecord[]=rows.slice(0,input.limit).map(row=>({snapshot:project(JSON.parse(row.body as string) as Snapshot,access.fields),
-    receipts:results[1]!.results.filter(r=>r.snapshot_id===row.id).map(r=>({operation:r.operation as string,key:r.key as string,actor:JSON.parse(r.actor as string),outcome:JSON.parse(r.outcome as string)})),
-    events:results[2]!.results.filter(r=>r.snapshot_id===row.id).map(r=>({kind:r.kind as string,actor:JSON.parse(r.actor as string),fingerprint:r.fingerprint as string})),
+    receipts:results[1]!.results.filter(r=>r.snapshot_id===row.id).map(r=>({operation:r.operation as string,key:r.key as string,actor:JSON.parse(r.actor as string),digest:r.digest as string,outcome:JSON.parse(r.outcome as string)})),
+    events:results[2]!.results.filter(r=>r.snapshot_id===row.id).map(r=>({id:r.id as string,kind:r.kind as string,actor:JSON.parse(r.actor as string),fingerprint:r.fingerprint as string})),
     sources:results[3]!.results.filter(r=>r.snapshot_id===row.id).map(r=>({source:r.source as string,kind:r.kind as string,legacyId:r.legacy_id as string,revision:r.revision as string}))}));
   const payload={format:'catalogue-ordering/1' as const,records}; bounded(payload,LIMITS.exportBytes-128);
   const artifact:ExportArtifact={...payload,fingerprint:await fingerprint(payload)};
@@ -62,8 +62,8 @@ export async function restoreHistory(db:Database,input:{installation:string;arti
       const snap=record.snapshot;
       if(snap.status==='specified') statements.push(...snapshotStatements({db},input.installation,snap,null,null,'restored'));
       else statements.push(db.prepare('INSERT INTO co_snapshots(installation,id,subject_kind,subject_id,status,body,fingerprint,line_count,published,origin) VALUES(?,?,?,?,?,?,?,0,0,?)').bind(input.installation,snap.id,snap.subject.kind,snap.subject.id,'legacy',bounded(snap),snap.fingerprint,'restored'),db.prepare('UPDATE co_snapshots SET published=1 WHERE installation=? AND id=?').bind(input.installation,snap.id));
-      for(const r of record.receipts)statements.push(db.prepare('INSERT INTO co_receipts(installation,subject_kind,subject_id,operation,key,actor,digest,snapshot_id,outcome,live) VALUES(?,?,?,?,?,?,?,?,?,0)').bind(input.installation,snap.subject.kind,snap.subject.id,r.operation,r.key,canonical(r.actor),'inert-history',snap.id,canonical(r.outcome)));
-      for(const e of record.events)statements.push(db.prepare('INSERT INTO co_events(installation,id,snapshot_id,kind,actor,fingerprint) VALUES(?,?,?,?,?,?)').bind(input.installation,crypto.randomUUID(),snap.id,e.kind,canonical(e.actor),e.fingerprint));
+      for(const r of record.receipts)statements.push(db.prepare('INSERT INTO co_receipts(installation,subject_kind,subject_id,operation,key,actor,digest,snapshot_id,outcome,live) VALUES(?,?,?,?,?,?,?,?,?,0)').bind(input.installation,snap.subject.kind,snap.subject.id,r.operation,r.key,canonical(r.actor),r.digest,snap.id,canonical(r.outcome)));
+      for(const e of record.events)statements.push(db.prepare('INSERT INTO co_events(installation,id,snapshot_id,kind,actor,fingerprint) VALUES(?,?,?,?,?,?)').bind(input.installation,e.id,snap.id,e.kind,canonical(e.actor),e.fingerprint));
       for(const s of record.sources)statements.push(db.prepare('INSERT INTO co_source_map(installation,source,kind,legacy_id,revision,snapshot_id) VALUES(?,?,?,?,?,?)').bind(input.installation,s.source,s.kind,s.legacyId,s.revision,snap.id));
     }
     if(statements.length>900)refuse('capacity');

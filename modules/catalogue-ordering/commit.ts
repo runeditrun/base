@@ -26,7 +26,8 @@ export async function freeze(options: Options,ctx: Context,input: FreezeInput): 
   // Replay remains a current authorized operation; no old authority is restored.
   const replay=await existing(options,ctx,input,subject(row));
   if(replay) return replay;
-  if(row.frozen || row.revision!==input.expectedRevision || !row.review || row.fingerprint!==input.fingerprint) refuse('stale_review');
+  if(row.frozen) refuse('idempotency_conflict');
+  if(row.revision!==input.expectedRevision || !row.review || row.fingerprint!==input.fingerprint) refuse('stale_review');
   const resolved=await resolve(options,ctx,JSON.parse(row.selection));
   if(await reviewFingerprint(ctx,row,resolved.commercial,access.revision)!==input.fingerprint || !equal(JSON.parse(row.review),resolved.commercial)) refuse('stale_review');
   let revision=1;
@@ -35,7 +36,7 @@ export async function freeze(options: Options,ctx: Context,input: FreezeInput): 
     if(!previous) refuse('revision_conflict');
     const parsed=JSON.parse(previous.body); revision=parsed.status==='specified'?parsed.revision+1:1;
   }
-  const snapshot: CommercialSnapshot={...resolved.commercial,status:'specified',id:crypto.randomUUID(),revision,previous:row.previous,fingerprint:input.fingerprint,actor:ctx.actor};
+  const snapshot: CommercialSnapshot={...resolved.commercial,status:'specified',id:crypto.randomUUID(),revision,previous:row.previous,fingerprint:input.fingerprint,actor:ctx.actor,authorityRevision:access.revision};
   const native=await options.native.prepareCommit(ctx,{snapshot,operation:input.operation,key:input.key});
   text(native.outcome.kind);text(native.outcome.id);text(native.outcome.revision);
   if(native.statements.length>LIMITS.nativeStatements || native.statements.some(s=>s.bindings.length>80 || s.sql.length>8000)) refuse('capacity');
