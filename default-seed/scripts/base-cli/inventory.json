@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.84-dev.gb9e6f5bf",
+  "cliVersion": "0.2.84-dev.g4b4c69d1",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -883,7 +883,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "65e9cb02b8f1f073b05b76b0ee301a0dff26a5a8c1d5dfafcfa1410859d33626"
+      "sha256": "1d3040242c59744ad9a2b7c0716707f3176d96d624059d2cdc16058d2f78ccd0"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",

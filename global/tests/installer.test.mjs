@@ -14,9 +14,9 @@ import { readPackage } from '../update/archive.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
 
-function run(program, args, env, input) {
+function run(program, args, env, input, cwd) {
  return new Promise((resolveRun, reject) => {
-  const child = spawn(program, args, { env, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
+  const child = spawn(program, args, { env, cwd, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
   if (input !== undefined) child.stdin.end(input);
   let stdout = '', stderr = '';
   child.stdout.on('data', data => { stdout += data; });
@@ -85,7 +85,64 @@ test('install.sh and rer update install verified registry releases, the Run page
  const installed = await run('sh', [installer], env);
  assert.equal(installed.code, 0, installed.stderr);
  assert.equal(await selected(), manifest.version);
+ const readme = entries.find(entry => entry.path === 'README.md').data.toString();
+ const separate = /```sh\ncurl[^\n]+\n([^\n]+)\n```/.exec(readme)?.[1];
+ assert.ok(separate?.startsWith('"$HOME/.local/bin/rer" dev '), 'the literal README second step names the installed launcher');
+ const literal = await run('sh', ['-c', separate + ' --help'], env);
+ assert.equal(literal.code, 0, literal.stderr);
+ assert.match(literal.stdout, /Usage: rer dev/);
+
  assert.deepEqual(await readdir(bin), ['node'], 'installation never writes into another writable PATH directory');
+ // A stale lockfile reaches the packed CLI, with the real pinned pnpm and a
+ // local dependency, so diagnosis and its next command need no registry.
+ const fixture = join(directory, 'synthetic-base-1');
+ await mkdir(fixture);
+ await writeFile(join(fixture, '.node-version'), process.versions.node + '\n');
+ const packagePath = join(fixture, 'package.json');
+ const pkg = { name: 'synthetic-base-1', private: true, packageManager: 'pnpm@10.12.4', engines: { node: process.versions.node } };
+ await writeFile(packagePath, JSON.stringify(pkg));
+ const pnpmEnv = { ...process.env, HOME: home, CI: 'true' };
+ const locked = await run('pnpm', ['install', '--lockfile-only'], pnpmEnv, undefined, fixture);
+ assert.equal(locked.code, 0, locked.stderr);
+ await mkdir(join(fixture, 'dependency'));
+ await writeFile(join(fixture, 'dependency/package.json'), JSON.stringify({ name: 'synthetic-base-2', version: '1.0.0' }));
+ pkg.dependencies = { 'synthetic-base-2': 'file:./dependency' };
+ await writeFile(packagePath, JSON.stringify(pkg));
+ const current = join(home, '.local/share/rer/current');
+ await writeFile(join(fixture, 'adapter.mjs'), `import { localInstaller } from ${JSON.stringify('file://' + join(current, 'onboarding/adapter.mjs'))};
+import { commandAdapter as declare } from ${JSON.stringify('file://' + join(current, 'cli/adapter.mjs'))};
+export const commandAdapter = declare(localInstaller({ tools: [] }), { scheduled: false });
+`);
+ await writeFile(join(fixture, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'synthetic-base-1', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { install: { argv: ['node', 'adapter.mjs'], inputs: [], effects: 'Install dependencies.' } } }));
+ const failed = await run(rer, ['install', '--no-queue'], pnpmEnv, undefined, fixture);
+ t.diagnostic(`Stale packed install: ${failed.code}\n${failed.stdout}${failed.stderr}`);
+ assert.equal(failed.code, 1);
+ assert.match(failed.stderr, /pnpm-lock.yaml does not match package.json/);
+ assert.match(failed.stderr, /pnpm-lock.yaml does not match package.json[^\n]*\nInstall step failed: Installing frozen dependencies\nCommand: pnpm install --frozen-lockfile\nExit code: 1\nLast 20 lines of output:\n[\s\S]*ERR_PNPM_OUTDATED_LOCKFILE[\s\S]*\nFull log: \.seed\/installer\/(?:commands-\d+\/)?install\.log\n$/);
+ const failedLog = /\nFull log: (\S+)\n$/.exec(failed.stderr)[1];
+ assert.match(await readFile(join(fixture, failedLog), 'utf8'), /ERR_PNPM_OUTDATED_LOCKFILE/);
+ t.diagnostic(`Stale full log exists and contains the failure: ${failedLog}`);
+ const data = await run(rer, ['install', '--no-queue', '--json'], pnpmEnv, undefined, fixture);
+ const diagnostic = data.stdout.trim().split('\n').map(JSON.parse).find(row => row.event === 'error');
+ assert.equal(diagnostic.code, 'ERR_PNPM_OUTDATED_LOCKFILE');
+ assert.ok(diagnostic.step.output.some(line => line.includes('ERR_PNPM_OUTDATED_LOCKFILE')));
+ const next = /run (.+) to update it, then retry/.exec(failed.stderr)?.[1];
+ assert.ok(next, failed.stderr);
+ const repaired = await run('sh', ['-c', next], pnpmEnv, undefined, fixture);
+ assert.equal(repaired.code, 0, repaired.stdout + repaired.stderr);
+ assert.equal((await run(rer, ['install', '--no-queue'], pnpmEnv, undefined, fixture)).code, 0);
+ await rm(join(fixture, 'pnpm-lock.yaml'));
+ const absent = await run(rer, ['install', '--no-queue'], pnpmEnv, undefined, fixture);
+ t.diagnostic(`Missing packed install: ${absent.code}\n${absent.stdout}${absent.stderr}`);
+ assert.equal(absent.code, 1);
+ assert.match(absent.stderr, /pnpm-lock.yaml is missing/);
+ assert.match(absent.stderr, /pnpm-lock.yaml is missing[^\n]*\nInstall step failed: Installing frozen dependencies\nCommand: pnpm install --frozen-lockfile\nExit code: 1\nLast 20 lines of output:\n[\s\S]*\nFull log: \.seed\/installer\/(?:commands-\d+\/)?install\.log\n$/);
+ const absentLog = /\nFull log: (\S+)\n$/.exec(absent.stderr)[1];
+ assert.match(await readFile(join(fixture, absentLog), 'utf8'), /Headless installation requires a pnpm-lock.yaml file/);
+ t.diagnostic(`Missing full log exists and contains the failure: ${absentLog}`);
+ const missingData = await run(rer, ['install', '--no-queue', '--json'], pnpmEnv, undefined, fixture);
+ assert.equal(missingData.stdout.trim().split('\n').map(JSON.parse).find(row => row.event === 'error').code, 'ERR_PNPM_NO_LOCKFILE');
+
  // The installer's last line puts rer on PATH: in the shell that runs it, and
  // in a new login shell of the person's SHELL that starts without it.
  const activate = output => { const last = output.trimEnd().split('\n').at(-1).trim(); return last.includes('.local/bin') ? last : undefined; };

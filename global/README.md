@@ -21,13 +21,15 @@ Start a seed from an empty folder, with or without Node:
 
 ```sh
 curl -fsSL https://runeditrun.com/install.sh | sh
-rer dev just-every/run-inkwell
+"$HOME/.local/bin/rer" dev just-every/run-inkwell
 ```
 
 The installer needs no Node: without Node 22 or later on PATH it installs a
-private one for `rer` (see below). It edits no shell profile: it names the next
-command, `rer dev <owner>/<repo>`, and when `~/.local/bin` is not on PATH for new
-terminals its last line is the one to run first, which adds it for your shell.
+private one for `rer` (see below). The second step uses the installed launcher
+directly, so it works in the same shell without changing PATH. A child installer
+cannot change its parent shell’s PATH; bare `rer` needs `~/.local/bin` on PATH.
+The installer edits no shell profile. Its printed PATH advice is optional when
+you use the absolute launcher or the one-line start below.
 The same start also fits on one line:
 
 ```sh
