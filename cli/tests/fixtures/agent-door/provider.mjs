@@ -1,14 +1,14 @@
-import { createReceiver } from './receiver.mjs';
-import { deliverySecret, openAiAuthorization } from './credentials.mjs';
-const receiver = createReceiver(deliverySecret);
+import receiver from './receiver.mjs';
+import { openAiAuthorization } from './credentials.mjs';
 
 const refused = message => new Response(message, { status: 502 });
 export default {
-  async fetch(request, { fixture } = {}) {
+  async fetch(request, env = {}) {
+    const { fixture } = env;
     const url = new URL(request.url);
     if (url.origin === 'https://receiver.example.invalid') {
       if (fixture && (await request.clone().json()).value !== fixture.value) return new Response('Native challenge mismatch', { status: 409 });
-      return receiver.fetch(request);
+      return receiver.fetch(request, env);
     }
     if (url.origin !== 'https://api.openai.com' || url.pathname !== '/v1/responses' || url.search || request.method !== 'POST') return refused('Undeclared provider operation');
     if (request.headers.get('authorization') !== openAiAuthorization || request.headers.get('content-type') !== 'application/json') return refused('Invalid provider authentication or media type');

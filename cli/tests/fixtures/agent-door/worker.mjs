@@ -4,9 +4,9 @@ import { requirePost, escapeHtml, securityHeaders } from '../../../../modules/op
 import { readInput } from '../../../../modules/operator-auth/input.mjs';
 import { createOwnerClaimHandler } from '../../../../modules/owner-claim/index.mjs';
 import { createBusinessSettings } from '../../../../modules/business-settings/index.ts';
-import { createReceiver } from './receiver.mjs';
-import { deliverySecret, openAiAuthorization } from './credentials.mjs';
-const { deliveryRequest, verifyDeliveryReceipt } = createReceiver(deliverySecret);
+import receiver, { deliveryRequest, verifyDeliveryReceipt } from './receiver.mjs';
+import { accessTools } from './access.mjs';
+import { openAiAuthorization } from './credentials.mjs';
 import { authorityTools, nativeProof, issueProof } from './authority.mjs';
 import { createMailSender } from '../../../../modules/mail/index.mjs';
 
@@ -123,10 +123,11 @@ function recordTools(db, records) {
       summary: (args, ctx) => target(args, ctx, 'https://receiver.example.invalid'),
       async run(args, ctx) {
         const record = await records.read(args.id, ctx.person), deliveryId = crypto.randomUUID();
-        const response = await fetch(await deliveryRequest(record, deliveryId));
+        const { secret } = await db.prepare('SELECT secret FROM fixture_installation WHERE id=1').first();
+        const response = await fetch(await deliveryRequest(record, deliveryId, secret));
         if (response.status !== 202) throw new ToolRefusal('delivery_failed');
         const document = await response.json();
-        if (!await verifyDeliveryReceipt(document, { deliveryId, recordId: record.id, value: record.value })) throw new ToolRefusal('delivery_receipt_invalid');
+        if (!await verifyDeliveryReceipt(document, { deliveryId, recordId: record.id, value: record.value }, secret)) throw new ToolRefusal('delivery_receipt_invalid');
         const receipt = await records.receipt(record, ctx.person, 'delivery', response.status, { ...document, signatureVerified: true }, deliveryId);
         ctx.emit('record.delivered', uri(record.id), { receiptId: receipt.id }); return { result: receipt };
       } }),
@@ -145,6 +146,38 @@ function recordTools(db, records) {
   ];
 }
 
+// Native record readers and editors share the same ownership fence as deliveries.
+function privateRecordTools(db, records) {
+ const input = object({ id: text, value: { ...text, maxLength: 2000 } });
+ return [
+  defineTool({ name: 'fixture.records.read', title: 'Read a private record', description: 'Read a record owned by your current native person.', scope: 'records:read', readOnly: true,
+   inputSchema: object({ id: text }), outputSchema: recordSchema, classes: ['standard'], clauses: ['BASE-AGENT-002'], classify: standard,
+   async run(args, ctx) { return { result: await records.read(args.id, ctx.person) }; } }),
+  defineTool({ name: 'fixture.records.update', title: 'Edit a private record', description: 'Edit your own native record.', scope: 'records:write', readOnly: false,
+   inputSchema: input, outputSchema: recordSchema, classes: ['standard'], clauses: ['BASE-AGENT-002'], classify: standard,
+   summary: args => ({ target: { id: args.id }, items: [args.value] }),
+   async run(args, ctx) {
+    await records.read(args.id, ctx.person);
+    await db.prepare('UPDATE fixture_records SET value=?,version=version+1 WHERE id=? AND operator_id=?').bind(args.value, args.id, ctx.person.id).run();
+    ctx.emit('record.updated', uri(args.id)); return { result: await records.read(args.id, ctx.person) };
+   } }),
+ ];
+}
+
+// TLS policy belongs to a native record and has no standing authority subject.
+function securityTools(db, records) {
+ return [defineTool({ name: 'fixture.security.tls', title: 'Require TLS for a record', description: 'Change the record delivery TLS requirement without changing any principal authority.',
+  scope: 'records:write', readOnly: false, authority: 'none', effect: { kind: 'record', justification: 'Updates only fixture_records.tls_required; no person, role, scope, grant or credential is accepted.' },
+  inputSchema: object({ id: text, required: { type: 'boolean' } }), outputSchema: recordSchema, classes: ['security'], clauses: ['BASE-AGENT-006'],
+  classify: () => [{ class: 'security', facts: { measure: 1, setting: 'record-tls' } }],
+  summary: args => ({ target: { id: args.id }, items: [args.required ? 'Require TLS' : 'Use record delivery defaults'] }),
+  async run(args, ctx) {
+   await records.read(args.id, ctx.person);
+   await db.prepare('UPDATE fixture_records SET tls_required=?,version=version+1 WHERE id=? AND operator_id=?').bind(args.required ? 1 : 0, args.id, ctx.person.id).run();
+   ctx.emit('record.security.updated', uri(args.id)); return { result: await records.read(args.id, ctx.person) };
+  } })];
+}
+
 function memberPeople(people, db, nativeMode) {
   const allowed = async person => person && (!nativeMode || await db.prepare('SELECT operator_id FROM fixture_members WHERE operator_id=?').bind(person.id).first()) ? person : null;
   return { ...people, person: async id => allowed(await people.person(id)), sponsor: async claims => allowed(await people.sponsor(claims)), session: async request => allowed(await people.session(request)) };
@@ -157,10 +190,12 @@ export default {
     if (path === '/' && ['GET', 'HEAD'].includes(request.method)) return new Response(request.method === 'HEAD' ? null : '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Records</title></head><body><main><h1>Records</h1><p>Save internal records, request a provider review, and retain signed delivery receipts.</p><p><a href="/app">Open your records workspace</a></p></main></body></html>', { headers: { ...securityHeaders(), 'Content-Type': 'text/html; charset=utf-8' } });
     const origin = env.RER_OWNER_CLAIM_APP_ORIGIN, nativeMode = env.OWNER_MODE === 'native';
     if (!['signed', 'native', 'setup-token'].includes(env.OWNER_MODE)) return new Response('Invalid owner configuration', { status: 503 });
+    await env.DB.prepare('INSERT INTO fixture_installation(id,secret) VALUES(1,?) ON CONFLICT(id) DO NOTHING').bind(crypto.randomUUID() + crypto.randomUUID()).run();
     const config = { origin, OWNER_EMAIL: nativeMode ? env.SETUP_OPERATOR_EMAIL : env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, SETUP_TOKEN: env.SETUP_TOKEN,
       MAIL_FROM: 'synthetic-records@example.com', branding: { productName: 'Records' } };
     const clientIp = incoming => incoming.headers.get('CF-Connecting-IP') ?? '';
-    const teamAuth = createOperatorAuth({ db: env.DB, config, clientIp });
+    const mailSender = { async send(message) { await env.DB.prepare('INSERT INTO fixture_mail(email,body) VALUES(?,?)').bind(message.to[0], message.text).run(); return { status: 'accepted', provider: 'fixture', providerMessageId: null }; } };
+    const teamAuth = createOperatorAuth({ db: env.DB, config, clientIp, mailSender });
     const settings = createBusinessSettings({ db: env.DB, trust: env.RER_BUSINESS_TRUST,
       business: { settings: 1, values: ['display_name'], team: { roles: { admin: 'admin', member: 'member' } } }, team: teamAuth.businessTeam });
     const auth = createOperatorAuth({ db: env.DB, config, clientIp, businessSettings: settings, mailSender: createMailSender({ provider: 'resend', mode: 'production', apiKey: env.MAIL_API_KEY }) });
@@ -170,8 +205,19 @@ export default {
     if (!trust.issuer || !trust.installationId) return new Response('Native owner bindings required', { status: 503 });
     const records = nativeRecords(env.DB, nativeMode);
     const door = createAgentDoor({ seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [{ uriTemplate: 'fixture://record/{id}', name: 'Record', scope: 'records:read', classes: ['standard'], classify: standard, async read(resource, ctx) { try { return { json: await records.read(resource.split('/').pop(), ctx.person) }; } catch (error) { if (error instanceof ToolRefusal) return null; throw error; } } }],
-      limits: { requestsPerMinute: 10000 }, tools: [...recordTools(env.DB, records), ...authorityTools(env.DB, records)], nativeProof: nativeProof(env.DB),
+      limits: { requestsPerMinute: 10000 }, tools: [...recordTools(env.DB, records), ...authorityTools(env.DB, records), ...(env.SPONSOR_PROOF ? privateRecordTools(env.DB, records) : []), ...(env.SECURITY_PROOF ? [...securityTools(env.DB, records), ...accessTools(env.DB, auth, records)] : [])], nativeProof: nativeProof(env.DB),
       people: memberPeople(operatorAuthPeople({ db: env.DB, session: incoming => auth.getSession(incoming) }), env.DB, nativeMode) });
+    if (path === '/deliveries' && request.method === 'POST') {
+      const input = await request.clone().json().catch(() => null);
+      const { secret } = await env.DB.prepare('SELECT secret FROM fixture_installation WHERE id=1').first();
+      const response = await receiver.fetch(new Request('https://receiver.example.invalid/deliveries', request), { secrets: { DELIVERY_SECRET: secret } });
+      if (response.status !== 202) return response;
+      const record = input && await env.DB.prepare('SELECT id,value,operator_id FROM fixture_records WHERE id=?').bind(input.recordId).first();
+      if (!record || record.value !== input.value) return new Response('Unknown native record', { status: 404 });
+      const result = await response.clone().json();
+      await records.receipt(record, { id: record.operator_id }, 'inbound', response.status, result, input.deliveryId);
+      return response;
+    }
     const handled = await door.handle(request) ?? await settings.handle(request);
     if (handled) return handled;
     if (path === '/auth/owner-claim' && env.OWNER_MODE === 'signed') return createOwnerClaimHandler({ db: env.DB, authConfig: config, clientIp, ...trust, expectedEmail: config.OWNER_EMAIL })(request);
@@ -187,7 +233,7 @@ export default {
       if (path === '/app/membership/link' && nativeMode) {
         requirePost(request, config);
         const session = await auth.getSession(request);
-        if (!session || session.operator.role !== 'owner') return new Response('Owner session required', { status: 403 });
+        if (!session || !['owner', 'admin', 'member'].includes(session.operator.role)) return new Response('Owner session required', { status: 403 });
         await env.DB.prepare('INSERT INTO fixture_members(operator_id,email,joined_at) VALUES(?,?,?) ON CONFLICT(operator_id) DO NOTHING').bind(session.operator.id, session.operator.email, Date.now()).run();
         return request.headers.get('content-type') === 'application/json' ? Response.json({ linked: true }) : redirect();
       }

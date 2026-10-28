@@ -502,3 +502,114 @@ corresponding relative paths or retain the seed's supported native adapters.
 The fresh-copy journey records and refreshes door, settings and prerequisites
 through the exported authoring CLI, then typechecks the entire copy under strict
 TypeScript without excluding any copied files.
+
+## Current admission on replay
+
+Idempotency keys retain outcomes, not authority. Every retry rechecks the current
+credential, sponsor, agent and consent revocation, scope, pause, native
+classification and policy before returning saved content. A refusal has its own
+audit row and never includes the saved result. A new approval or review
+requirement returns `approval_required` or `review_required`; an old approval
+cannot authorize a newer policy revision. Accepted replay does not execute or
+count the native effect again. Record revision preconditions guard first
+execution; they do not reject a successful replay merely because that execution
+advanced the record revision.
+
+For an explicit current-authority proof, declare
+`verification.replayAdmission: {prepare:['create']}`. Preparation names existing
+journey steps and must end with an idempotent write. Its public-door phase
+proves identical once-only replay, pause and changed-policy refusal, a newly
+required approval, current scope and the refused replay's complete audit.
+
+## Verify multiple sponsors
+
+Keep `verification.owner` for the first owner's existing bindings and lifecycle.
+Optionally declare `verification.sponsors` as a nonempty list of principals with
+unique stable `label` values and distinct canonical emails:
+
+```json
+{
+  "sponsors": [
+    { "label": "owner" },
+    { "label": "member", "email": "synthetic-member@example.com", "role": "member", "initializer": "tests/initialize-member.mjs" }
+  ],
+  "crossSponsor": {
+    "prepare": ["create"],
+    "read": { "tool": "example.records.read", "args": { "id": { "$from": "create", "pointer": "/id" } } },
+    "change": { "tool": "example.records.update", "args": { "id": { "$from": "create", "pointer": "/id" }, "value": "Edited" } }
+  }
+}
+```
+
+These keys live under `verification`. The first principal inherits `owner` and
+runs all existing phases. Each later principal requires its own contained
+initializer and receives `{label,email,sub,displayName,claim,owner,request,
+origin,database,returnTo}`. Its fresh signed claim uses the same disposable
+installation ring; `owner` carries the first principal's native session for
+normal invitations. A signed Business settings roster binds each subject with
+its declared `admin` or `member` role (default `member`). Complete the seed's
+native member lifecycle and return its final 303 session response. Never create
+accounts or sessions through direct SQL.
+
+`database(binding)` exposes read-only SELECT statements against declared
+**disposable verification** D1 databases, for test-owned mailbox or native
+installation state. It has no production bindings or served endpoint. All
+account creation and record effects still go through production doors. A seed
+with another identity lifecycle uses its initializer and supplied signed claim.
+
+`crossSponsor.prepare` names journey steps that create private native records.
+The `read` and `change` fixtures use those outputs. Each additional sponsor must
+successfully act on its own records, fail to read or change the first sponsor's
+records, and fail to read or approve the first sponsor's private approval using
+both its session and agent credential. Audits must attribute both principals
+correctly. An omitted list or one sponsor runs no extra phase or points.
+
+## Provision verification webhook secrets
+
+A seed that creates its own random installation HMAC keys can declare
+`verification.network.secretSource: "tests/read-webhook-secrets.mjs"` alongside
+its existing network module and origins. The contained test-only module
+exports `async function ({database})`, reads the fresh installation's own state
+and returns a nonempty map of uppercase binding names to string values. The
+isolated receiver receives that map as `env.secrets` in its `fetch(request,env)`.
+It still has no application bindings, Node capabilities or outbound network.
+Provisioning occurs after native initialization and Business binding, before
+journey effects. Values and accessor failures are never printed. No accessor
+is bundled into the app or mounted as a production route.
+
+For callbacks into the seed, also declare:
+
+```json
+{ "webhooks": { "module": "tests/inbound-webhook.mjs", "prepare": ["create"] } }
+```
+
+This is another key under `verification`. Its contained module default-exports
+an async builder receiving `{origin,outputs,secrets}` and returns
+`{valid: Request, invalid: Request}`. Sign the seed's exact native payload with
+its per-run key and with a wrong key, respectively. Both requests must POST to
+the disposable installation origin. The verifier requires a 401 or 403 with no
+native change for the invalid signature, then a successful response and a
+retained native effect for the valid signature. Native signature validation,
+replay checks and state commits remain in the seed.
+
+## Security changes with no authority subject
+
+A security tool changing only a record may explicitly declare `authority:
+'none'` instead of an authority callback. Declare the same `inputSchema` and
+`effect: {kind:'record', justification:'...specific native record change...'}`
+in its runtime definition and `agent-surface.json` tool. Validation requires a
+mutating security tool, no access class, a nonempty justification, and a closed
+recursive schema containing only typed record inputs. Open or opaque objects,
+references and schema composition are refused. Person, user, owner, sponsor,
+agent, role, scope, grant, credential, permission, consent and token fields,
+including nested and camel-case variants, are refused.
+
+The registry publishes this class and record effect; conformance matches them
+to the runtime schema. Normal policy, approval, execution and audit still apply.
+Undeclared arguments return `undeclared_arguments` instead of being ignored.
+Every success, pending execution and refusal records `authority: 'none'` in its
+audit row. The extra conformance phase probes widening arguments, unchanged
+native state, audit attribution and a rejected authority-bearing declaration.
+A tool that can change someone's authority retains its callback and
+`self_escalation` fixture. Narrowing callbacks continue returning
+`{subject, widens:false}`; this record class does not replace narrowing checks.
