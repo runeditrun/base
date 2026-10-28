@@ -4,6 +4,7 @@ import { classIds, subset, errorCode, APPROVAL } from './protocol.mjs';
 import { grantSet } from './narrowing.mjs';
 import { schemaErrors } from './schema.mjs';
 import { checkTarget } from './target.mjs';
+import { injectionArgs } from './injection.mjs';
 
 export function checkClasses(c, step, answer, phase) {
  const actual = answer.decision?.classes;
@@ -89,7 +90,7 @@ export async function runJourney(c, phase, { held = false, injections = false, r
     (c.effectEvents ??= []).push(...snapshot.result.structuredContent.events);
    }
    if (injections && step.inject) {
-    const injected = { ...args, ...c.resolve(step.inject, outputs), ...(!c.surface.tools.find(tool => tool.name === step.tool)?.readOnly ? { idempotency_key: randomUUID() } : {}) };
+    const injected = await injectionArgs(c, step, outputs);
     const checked = await c.tool(step.tool, injected, proof);
     c.add(`BASE-AGENT-005.5.${phase}.${step.id}`, isDeepStrictEqual(checked.decision?.classes, answer.decision?.classes) && checked.decision?.disposition === answer.decision?.disposition && !checked.result?.isError, `${step.tool} changed class, facts or decision for additional arguments.`);
    }

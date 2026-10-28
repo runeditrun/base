@@ -70,12 +70,18 @@ test('a package-pinned seed adopts authoring and refreshes through the packed pu
   fs.rmSync(path.join(seed, 'one.mjs'));
   fs.rmSync(path.join(seed, 'vendor/two.mjs'));
   write(source, 'module/one.mjs', 'export const one = 2;\n');
+  write(source, 'export/verify.yml', 'name: Verify\njobs: {}\n');
+  write(seed, '.github/workflows/verify.yml', 'name: Verify\njobs: {}\n');
+  git(seed, 'add', '.github/workflows/verify.yml');
   const next = commit(source);
   const archive = path.join(path.dirname(source), 'base-export');
   fs.mkdirSync(archive);
   execFileSync('tar', ['-xf', '-', '-C', archive], { input: execFileSync('git', ['-C', source, 'archive', next]), stdio: ['pipe', 'pipe', 'pipe'] });
   const refreshed = result('refresh-base', '--ref', next, ...(untrackedRecord ? ['--base-archive', archive] : []));
   assert.deepEqual(refreshed.retired, ['one.mjs']);
+  const copies = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json'))).copies;
+  assert.ok(copies.some(copy => copy.path === '.github/workflows/verify.yml'));
+  assert.equal(fs.readFileSync(path.join(seed, '.github/workflows/verify.yml'), 'utf8'), 'name: Verify\njobs: {}\n');
   assert.ok(refreshed.copies.find(c => c.path === 'one.mjs').removed.includes('one.mjs'));
   assert.equal(fs.existsSync(path.join(seed, 'one.mjs')), false);
   assert.equal(fs.existsSync(path.join(seed, 'vendor/two.mjs')), false);
@@ -86,7 +92,7 @@ test('a package-pinned seed adopts authoring and refreshes through the packed pu
   assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
   assert.deepEqual(result('refresh-base', '--ref', next, '--base-archive', archive, '--offline').retired, []);
   assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
-  t.diagnostic('Packed rer refresh-base --base-archive --ref: PASS; checkout/archive mappings and digests retained.');
+  t.diagnostic('Packed rer refresh-base --base-archive --ref: PASS; current workflow matched from snapshot; checkout/archive mappings and digests retained.');
   assert.notEqual(revision, next);
  }
 });

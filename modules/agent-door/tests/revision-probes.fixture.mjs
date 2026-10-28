@@ -52,6 +52,7 @@ export async function revisionProbeCases(r, t) {
  const pagination = paged.points[0]?.ok;
  await checkTarget(paged, { id: 'wrong', tool: 'synthetic.records.write', target: { kind: 'record', id: 'wrong' } }, outputs, answer, 'revision');
  assert.equal(paged.points.at(-1).ok, false);
+ t.diagnostic('Wrong paginated native target: FAIL as required.');
  await r.db.prepare('DELETE FROM test_records').run();
  assert.equal(injection?.ok, true);
  assert.equal(pagination, true);

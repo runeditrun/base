@@ -865,3 +865,21 @@ workflow bytes during refresh. Unknown older workflow bytes remain seed-owned;
 the archive provides no historical versions or migration ancestry. Archive
 refresh still refuses legacy records lacking prior source membership and
 migrations whose applicability requires unavailable Git history.
+
+## Native-client receipts and consumed preparation
+
+A native-client receipt reader may require both a retained operation key and a
+real native client. Its journey fixture must obtain those through the seed's
+contained native lifecycle. Empty receipt arguments and the verifier's default
+Business credential do not establish that client or operation. The final native
+journey hook runs after the standard phases; it cannot prepare a mandatory step
+that has already run. Keep native receipt ownership and service-grant checks.
+
+An idempotent native creation can consume its own preparation precondition
+(for example, an unused schedule identity or revision zero). Native target and
+classification callbacks currently run again before returning a saved outcome.
+If those callbacks reject already-completed work, the adapter must distinguish
+current replay authorization from fresh-effect preparation. Returning a cached
+result before native authorization or current policy would remove required
+admission checks. This needs a native replay-admission contract; the shared
+runtime does not infer one from a revision refusal.

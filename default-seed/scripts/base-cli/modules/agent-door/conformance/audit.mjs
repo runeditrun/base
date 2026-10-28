@@ -3,17 +3,9 @@ import { classIds } from './protocol.mjs';
 import { AGENT_CLASSES } from './surface.mjs';
 import { targetIdentity } from './target.mjs';
 
-export async function auditRows(c) {
- const rows = []; let cursor = null, differs = 0;
- for (let page = 0; page < 100; page++) {
-  const result = await c.personJson(`/agents/api/audit?agent=${encodeURIComponent(c.agentId)}${cursor ? `&after=${encodeURIComponent(cursor)}` : ''}`);
-  if (!Array.isArray(result.rows) || !Number.isInteger(result.differs_from_policy)) throw new Error('Audit API must return rows and differs_from_policy');
-  rows.push(...result.rows); differs += result.differs_from_policy;
-  if (result.cursor == null || result.cursor === cursor) return { rows, differs };
-  cursor = result.cursor;
- }
- throw new Error('Audit pagination exceeded 100 pages');
-}
+import { auditRows } from './audit-pages.mjs';
+export { auditRows } from './audit-pages.mjs';
+
 export async function auditPhase(c) {
  const { rows, differs } = await auditRows(c), expected = [...c.calls];
  c.add('BASE-AGENT-009.1.count', rows.length === expected.length, `Expected exactly ${expected.length} audit rows for tool calls, resource reads and approval executions, found ${rows.length}.`);
