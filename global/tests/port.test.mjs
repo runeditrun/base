@@ -91,7 +91,7 @@ test('a zero-setup rer dev reclaims stale saved ports, keeps live owners and mov
  await writeFile(join(own, 'install.json'), JSON.stringify({ state: 'failed', at: Date.now() }));
  const launched = await rer(['dev']);
  assert.equal(launched.code, 0, launched.stderr + launched.stdout);
- assert.doesNotMatch(launched.stderr, /installing dependencies/, 'current dependencies are kept');
+ assert.doesNotMatch(launched.stderr + launched.stdout, /installing dependencies/, 'current dependencies are kept');
  const taken = Number(await readFile(join(directory, 'taken-port'), 'utf8'));
  const ready = new URL(launched.stdout.match(/^RER_READY (\S+)$/m)?.[1] ?? 'http://invalid');
  assert.equal(taken, available[2], 'stopped records are reclaimed while both live owners are skipped');
