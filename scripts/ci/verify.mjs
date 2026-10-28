@@ -14,11 +14,11 @@ const partition = (name, shard) => ({ stage: `verify:${name}`, shard });
 export const groups = {
   '1': [partition('modules', 1)],
   '2': [partition('modules', 2), stage('release')],
-  '3': [partition('cli', 1), stage('foundation'), stage('publish-check')],
+  '3': [partition('cli', 1), stage('foundation')],
   '4': [partition('cli', 2), stage('editor')],
   '5': [stage('reference'), stage('operator-auth'), stage('onboarding-browser')],
   '6': [partition('cli', 3), ...['composition', 'edition-authoring', 'authoring', 'delivery-producer', 'schema', 'operations'].map(stage)],
-  '7': ['container', 'job-queue', 'owner-claim', 'boundary-checker', 'deployment', 'rer'].map(stage),
+  '7': ['container', 'job-queue', 'owner-claim', 'boundary-checker', 'deployment', 'rer', 'publish-check'].map(stage),
   '8': [partition('cli', 4), ...['portability', 'review-harness', 'onboarding', 'launcher', 'mail-relay'].map(stage)],
 };
 
