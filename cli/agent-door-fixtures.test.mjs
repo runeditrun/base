@@ -42,7 +42,7 @@ test('native client receipts and consumed phase state require real fresh fixture
  assert.equal(noClient.ok, false);
  assert.ok(noClient.points.some(point => !point.ok && point.detail?.includes('native client fixture is unavailable')));
  surface.verification.fixtures = { module: 'stale-fixtures.mjs' };
- await writeFile(join(root, 'stale-fixtures.mjs'), "import prepare from './phase-fixtures.mjs'; let saved; export default async c => saved ??= await prepare(c);\n");
+ await writeFile(join(root, 'stale-fixtures.mjs'), "import prepare from './phase-fixtures.mjs'; let saved; export default async c => c.phase === 'initial' ? prepare(c) : saved ??= await prepare(c);\n");
  await writeFile(surfaceFile, JSON.stringify(surface));
  const stale = await verify();
  assert.equal(stale.ok, false);

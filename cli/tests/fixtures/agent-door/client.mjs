@@ -96,12 +96,15 @@ export function createPhaseClients({ db, records, ToolRefusal }) {
   if (path === '/api/v1/records') {
    if (request.method !== 'POST') return new Response(null, { status: 405 });
    if (!credentials.scopes.includes('records:write')) return Response.json({ error: 'insufficient_scope' }, { status: 403 });
-   const record = await records.create((await readInput(request)).value, person);
+   const input = await readInput(request);
+   const invoked = await door.invoke('fixture.records.create', { value: input.value, idempotency_key: crypto.randomUUID() },
+    { person: { id: person.id }, agent: credentials.agent, clientId: credentials.clientId, scopes: credentials.scopes });
+   if (invoked.outcome !== 'done') return Response.json({ error: invoked.code ?? invoked.outcome }, { status: 403 });
+   const record = invoked.result;
    const key = crypto.randomUUID();
    await db.prepare('INSERT INTO fixture_native_operations(key,client_id,operator_id,record_id,value,created_at) VALUES(?,?,?,?,?,?)')
     .bind(key, credentials.clientId, person.id, record.id, record.value, Date.now()).run();
-   await door.emit({ type: 'record.created', uri: uri(record.id), person, data: { clientId: credentials.clientId, operationKey: key } });
-   return Response.json({ record, operation: await receipt(key, person, credentials.clientId) }, { status: 201 });
+   return Response.json({ record, operation: await receipt(key, person, credentials.clientId), decision: invoked.decision }, { status: 201 });
   }
   if (request.method !== 'GET') return new Response(null, { status: 405 });
   if (!credentials.scopes.includes('records:read')) return Response.json({ error: 'insufficient_scope' }, { status: 403 });

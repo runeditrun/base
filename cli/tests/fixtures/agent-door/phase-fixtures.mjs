@@ -9,11 +9,13 @@ export default async function phaseFixtures({ phase, request, origin, cookie }) 
  require(issued.status === 201, `Native client issuance returned HTTP ${issued.status}`);
  const local = await issued.json();
  require(local.token && local.clientId && local.agent?.id && local.agent?.name && local.agent?.specialist, 'Native client issuance omitted its credential or identity');
+ if (phase === 'initial') return { values: {}, clients: { local } };
  const headers = { Authorization: `Bearer ${local.token}`, 'Content-Type': 'application/json' };
  const value = crypto.randomUUID();
  const created = await request(new URL('/api/v1/records', origin).href, { method: 'POST', headers, body: JSON.stringify({ value }) });
  require(created.status === 201, `Native record mutation returned HTTP ${created.status}`);
- const { record, operation } = await created.json();
+ const { record, operation, decision } = await created.json();
+ require(decision?.disposition === 'autonomous', 'Native preparation must finish before the tested policy is installed');
  require(record?.id && record.value === value && operation?.key && operation.clientId === local.clientId && operation.recordId === record.id, 'Native mutation did not retain client operation custody');
  const receiptUrl = new URL(`/api/v1/operations/${encodeURIComponent(operation.key)}`, origin).href;
  const invalid = await request(receiptUrl, { headers: { Authorization: `Bearer invalid-${crypto.randomUUID()}` } });
