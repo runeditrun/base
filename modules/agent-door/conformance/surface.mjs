@@ -33,6 +33,7 @@ export function validateAgentSurface(surface, { contract } = {}) {
   add(`${label}.clauses`, clauses.length > 0 && clauses.every(text), `${label} must name its contract clauses.`);
   if (contract !== undefined) for (const clause of clauses) add(`${label}.clause.${clause}`, hasClause(contract, clause), `${label} names clause ${clause}, absent from CONTRACT.md.`);
   if (tool?.proof !== undefined || tool?.proofKind !== undefined) add(`${label}.proof`, tool.proof === 'native' && typeof tool.proofKind === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(tool.proofKind), `${label} must declare proof native and its named proofKind.`);
+  if (tool?.sponsorEscalation !== undefined) escalation(`${label}.sponsor-escalation`, typeof tool.sponsorEscalation === 'boolean' && Array.isArray(tool.classes) && tool.classes.some(cls => ['access', 'security'].includes(cls)), `${label} sponsorEscalation must be a boolean on an access or security tool.`);
   if (tool?.widens !== undefined || tool?.narrowing !== undefined) escalation(`${label}.narrowing-contract`, tool.widens === false && tool.readOnly === false && tool.classes?.some(cls => ['access', 'security'].includes(cls)) && narrowingContract(tool), `${label} narrowing requires revoke/narrow and a closed target-only string schema.`);
   tools.set(name, tool); coverage.set(name, new Set());
  }
@@ -55,6 +56,11 @@ export function validateAgentSurface(surface, { contract } = {}) {
   add(`journey.${id}.classes`, new Set(expect.map(item => item?.class)).size === expect.length && expect.every(item => object(item) && Array.isArray(tool?.classes) && tool.classes.includes(item.class) && (item.facts === undefined || object(item.facts))), `${id} expects duplicate, undeclared or malformed classes.`);
   for (const item of expect) coverage.get(step?.tool)?.add(item?.class);
   checkReferences(step?.args, `journey.${id}`, steps);
+  if (step?.target !== undefined) {
+   const target = step.target;
+   add(`journey.${id}.target`, object(target) && Object.keys(target).sort().join(',') === 'id,kind' && text(target.kind) && (text(target.id) || object(target.id) && ('$from' in target.id || '$sponsor' in target.id)), `${id}.target must contain only a nonempty kind and an id string or journey reference.`);
+   checkReferences(target, `journey.${id}.target`, steps);
+  }
   if (step?.inject !== undefined) add(`journey.${id}.inject`, object(step.inject), `${id}.inject must be an object of additional arguments.`);
   checkReferences(step?.inject, `journey.${id}.inject`, steps);
   steps.add(step?.id);
@@ -63,7 +69,7 @@ export function validateAgentSurface(surface, { contract } = {}) {
  for (const [i, step] of (Array.isArray(surface.escalations) ? surface.escalations : []).entries()) {
   const id = text(step?.id) ? step.id : `escalations[${i}]`, tool = tools.get(step?.tool);
   escalation(id, object(step) && text(step.id) && !escalationIds.has(step.id) && Boolean(tool) && object(step.args), `Invalid or duplicate escalation ${id}, tool ${JSON.stringify(step?.tool)}.`);
-  escalation(`${id}.authority`, Array.isArray(tool?.classes) && tool.classes.some(cls => ['access', 'security'].includes(cls)), `${id} must exercise an access or security tool.`);
+  escalation(`${id}.authority`, Array.isArray(tool?.classes) && tool.classes.some(cls => ['access', 'security'].includes(cls)) && tool.widens !== false && tool.sponsorEscalation !== false, `${id} must exercise a tool declared capable of widening its sponsor's authority.`);
   checkReferences(step?.args, `escalations.${id}`, steps, escalation);
   escalationIds.add(step?.id); escalationTools.add(step?.tool);
  }
@@ -74,7 +80,7 @@ export function validateAgentSurface(surface, { contract } = {}) {
   checkReferences(witness?.args, `narrowing.${i}.witness`, steps, escalation);
   narrowingTools.add(fixture?.tool);
  }
- for (const [name, tool] of tools) if (Array.isArray(tool?.classes) && tool.classes.some(cls => ['access', 'security'].includes(cls))) escalation(`${name}.coverage`, tool.authority === 'none' && recordOnlyAuthority(tool) || (tool.widens === false ? narrowingTools.has(name) : escalationTools.has(name)), `${name} has no ${tool.widens === false ? 'narrowing check' : 'sponsor escalation fixture'}.`);
+ for (const [name, tool] of tools) if (Array.isArray(tool?.classes) && tool.classes.some(cls => ['access', 'security'].includes(cls))) escalation(`${name}.coverage`, tool.authority === 'none' && recordOnlyAuthority(tool) || (tool.widens === false ? narrowingTools.has(name) : tool.sponsorEscalation === false || escalationTools.has(name)), `${name} has no ${tool.widens === false ? 'narrowing check' : 'sponsor escalation fixture'}.`);
  for (const [name, tool] of tools) for (const cls of Array.isArray(tool?.classes) ? tool.classes : []) add(`${name}.coverage.${cls}`, coverage.get(name).has(cls), `${name} has no journey fixture for declared class ${cls}.`);
  add('events', tools.has(`${surface.seed}.events.list`), `Declare built-in ${surface.seed}.events.list in the Agent surface.`);
  add('witness', object(surface.witness) && tools.get(surface.witness.tool)?.readOnly === true && object(surface.witness.args), 'witness must name a declared readOnly tool and arguments.');

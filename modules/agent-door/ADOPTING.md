@@ -110,7 +110,7 @@ person id, email or agent id; the door normalises these and refuses self-widenin
 before classification and again at approval execution. Return null only when
 no standing authority is changed. Other people's changes still follow policy.
 Declare `escalations: [{ id, tool, args }]` in `agent-surface.json`, covering each
-access or security tool that can widen authority. Use `{ "$sponsor": "id" }` or
+access or security tool that can widen the sponsor’s authority. Use `{ "$sponsor": "id" }` or
 `{ "$sponsor": "email" }` as argument values; the conformance journey resolves
 these and requires `self_escalation` with an unchanged native witness. Retain a
 journey call proving an ordinary narrowing change too.
@@ -121,7 +121,7 @@ its runtime definition and surface tool. Include its exact native `inputSchema`
 in the surface. This checked contract accepts a closed object with one required
 string target identifier (`id` or a name ending `_id`); it refuses extra fields,
 open objects, references and schema unions. An operation accepting roles, scopes
-or grants to add must retain its escalation fixture. Separate the revoke-only
+or grants to add must retain its escalation fixture when it can widen the sponsor. Separate the revoke-only
 operation from an operation that also grants authority when needed.
 
 A narrowing-only tool still declares `authority`, returning `widens: false`.
@@ -148,6 +148,64 @@ The journey prepares a nonempty grant set through native tools, then proves a
 strict subset after the action and refuses a smuggled grant-adding argument
 without an effect. Output point names identify every narrowing tool. No tool
 is exempted from execution, policy, audit, schema or journey coverage.
+
+## Resolve native targets for audit and approval
+
+A record tool declares `target(args, ctx)` alongside `classify`, `summary` and
+`revision`. Return `{ kind: 'invoice', id: nativeRecord.id }`, or `null` if the
+call has no native record target. Resolve through the native service; arguments
+and returned resource links do not establish identity. The resolver receives the
+current sponsor, agent/client and narrowed scopes. It must enforce native
+visibility and return only audit-safe, policy-redacted identifiers. Do not put
+credentials, private record content or unauthorized existence signals in them.
+The door validates an exact nonempty string `kind`/`id` pair and refuses malformed
+answers as `target_invalid`; a resolver is attribution, never an authorization
+grant. Keep native access checks inside classification and execution too.
+
+Tool audit rows store that pair in `resource`; undeclared or absent targets stay
+`null`. Resource reads retain their requested URI in `resource`. Pending approval
+summaries also contain the server-resolved pair as `summary.nativeTarget`, bound
+to `summary_sha256`. Approval execution resolves again under the current native
+principal; a changed target refuses `approval_evidence_changed` before effects.
+Read-only record tools may declare the same resolver.
+
+A journey step may declare `target: {kind, id}` to check the native identity in
+its audit, pending summary and execution audit. The `id` may use a prior-result
+`$from` reference. Supply the expected redacted native identity independently of
+the proposed arguments; a wrong pair must fail conformance.
+
+## Keep refusal attribution and classification
+
+For schema-valid, resolvable calls, policy-unset, unavailable and paused refusals
+retain the native target and computed classes/facts. Their rules use a null rule
+id and the stopping disposition (`unset`, `unavailable` or `paused`): no policy
+rule authorized an effect. Classification and target hooks are read-only and
+must work without an adopted policy. If native authorization or missing state
+causes a `ToolRefusal`, the audit retains `classification_refusal` with that
+code, without inventing facts or bypassing the policy refusal. Invalid arguments
+and principals lacking the tool scope do not resolve native targets.
+
+## Return resource refusal machine codes
+
+Every resource refusal carries its named code in JSON-RPC `error.data.code`,
+including `resource_unavailable`, `tool_not_found`, `insufficient_scope`, policy
+refusals and `approval_required`. Missing and hidden native records both return
+`resource_unavailable` with no content or distinct existence signal. The code is
+the same one produced by the tool pipeline; no seed response hook is needed.
+
+## Declare sponsor escalation per native surface
+
+An access/security surface tool may declare `sponsorEscalation: false` only when
+its native authority resolver cannot widen the admitted sponsor. Examples are
+record visibility changes with no standing authority subject, and admin-only
+teammate edits whose sponsor already has full native authority. This declaration
+replaces only an inapplicable sponsor-escalation fixture. Every declared class
+still needs ordinary journey coverage, including real native widening/narrowing
+changes where supported, with policy, approval, audit and native guards intact.
+A missing or true declaration still requires the escalation fixture. It never
+disables the runtime's self-widening refusal. Checked `widens: false` tools still
+need their narrowing schema and grant-subset witness; this flag cannot waive
+those checks. Owner-to-admin is a native demotion, never a widening operation.
 
 ## Hand off native human proof
 
