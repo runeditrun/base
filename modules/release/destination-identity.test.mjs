@@ -1,3 +1,4 @@
+import { caseRows } from '../deploy-kit/tests/fold-case.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -5,6 +6,11 @@ import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fixture } from './test-fixture.mjs';
+
+const responseCaseRows = [];
+const responseCase = (name, run) => responseCaseRows.push({name,run});
+const destinationCaseRows = [];
+const destinationCase = (name, run) => destinationCaseRows.push({name,run});
 
 const cli = resolve(import.meta.dirname, '../../bin/rer.mjs');
 const project = 'catalogue-publisher/product';
@@ -86,7 +92,7 @@ const responses = [
 
 for (const type of ['module', 'commonjs']) {
   for (const [state, visibility, code, body] of responses) {
-    test(`generated GitHub ${state} response works inside a ${type} package`, t => {
+    responseCase(`generated GitHub ${state} response works inside a ${type} package`, t => {
       const temporary = mkdtempSync(resolve(tmpdir(), 'rer-destination-api-'));
       t.after(() => rmSync(temporary, { recursive: true, force: true }));
       writeFileSync(resolve(temporary, 'package.json'), JSON.stringify({ type }));
@@ -135,7 +141,7 @@ function run(f, mode) {
 
 for (const mode of modes) {
   for (const [declared, state] of [[true, 'public'], [true, 'missing'], [false, 'public']]) {
-    test(`${declared ? 'declared' : 'legacy'} distinct identity with ${state} source completes ${mode.name} dry run`, t => {
+    destinationCase(`${declared ? 'declared' : 'legacy'} distinct identity with ${state} source completes ${mode.name} dry run`, t => {
       const f = source(t, declared, state);
       const { result, receipt, report } = run(f, mode);
       assert.equal(result.status, 0, JSON.stringify(receipt));
@@ -175,7 +181,7 @@ for (const [declared, state, status, rule] of [
   [true, 'malformed', 'INCOMPLETE', 'scan.github-incomplete'],
   [true, 'unavailable', 'INCOMPLETE', 'scan.github-incomplete'],
 ]) {
-  test(`${declared ? 'declared' : 'legacy'} distinct identity with ${state} source blocks clean dry run`, t => {
+  destinationCase(`${declared ? 'declared' : 'legacy'} distinct identity with ${state} source blocks clean dry run`, t => {
     const f = source(t, declared, state);
     const { result, receipt, report } = run(f, modes[2]);
     assert.equal(result.status, 1);
@@ -188,3 +194,11 @@ for (const [declared, state, status, rule] of [
     assert.equal(existsSync(resolve(f.options.output, 'public-git')), false);
   });
 }
+
+test('GitHub response classification preserves public, private, missing and incomplete evidence across package modes', async (t) => {
+  await caseRows(t, responseCaseRows.map(({name,run}) => [name,run]));
+});
+
+test('publication destination admission binds distinct identities across history modes and refuses unsafe evidence', async (t) => {
+  await caseRows(t, destinationCaseRows.map(({name,run}) => [name,run]));
+});

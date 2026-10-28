@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { caseRows } from './fold-case.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -61,7 +62,7 @@ test('site fingerprints preserve assets-only identity and bind search code, mode
 
 test('search deploy uploads the generated runtime and verifies exact serving version modules and AI bindings', async t => {
   const { siteProvider } = await import('./site-provider.mjs');
-  for (const scenario of ['search upload', 'missing AI', 'missing ASSETS', 'wrong AI type', 'extra binding', 'module changed', 'model changed', 'pooling changed', 'corpus changed', 'wrong entry', 'extra module', 'settings differ', 'final readback changed']) await t.test(scenario, async t => {
+  await caseRows(t, (['search upload', 'missing AI', 'missing ASSETS', 'wrong AI type', 'extra binding', 'module changed', 'model changed', 'pooling changed', 'corpus changed', 'wrong entry', 'extra module', 'settings differ', 'final readback changed']).map((scenario) => [scenario, async t => {
     const provider = siteProvider({ domain: 'run-cradle.com' }), { folder, receiptPath } = await site(t);
     t.after(() => provider.close());
     await writeFile(join(folder, 'docs-search-vectors.json'), JSON.stringify({ model: '@cf/baai/bge-base-en-v1.5', pooling: 'cls', corpusHash: hash('search corpus'), chunks: [] }));
@@ -103,12 +104,12 @@ test('search deploy uploads the generated runtime and verifies exact serving ver
       assert.equal(provider.state.domains.length, scenario === 'final readback changed' ? 2 : 0, 'both Worker readbacks enforce the runtime');
       await assert.rejects(readFile(receiptPath), { code: 'ENOENT' });
     }
-  });
+  }]));
 });
 
 test('search deploy waits for the uploaded runtime instead of checking an older serving runtime, and waits for its version content visibility', async t => {
   const { siteProvider } = await import('./site-provider.mjs');
-  for (const scenario of ['previous runtime', 'missing content']) await t.test(scenario, async t => {
+  await caseRows(t, (['previous runtime', 'missing content']).map((scenario) => [scenario, async t => {
     const provider = siteProvider({ domain: 'run-cradle.com' }), { folder, receiptPath } = await site(t);
     t.after(() => provider.close());
     const api = cloudflare({ accountId: provider.accountId, token: provider.token, fetch: provider.fetch });
@@ -133,7 +134,7 @@ test('search deploy waits for the uploaded runtime instead of checking an older 
     assert.equal(sleeps, 2);
     assert.ok(lagging >= 3);
     assert.equal(provider.state.writes.slice(writes).filter(write => write.path === `/workers/scripts/${result.receipt.worker}`).length, 1);
-  });
+  }]));
 });
 
 // Ownership is read from the provider: a fresh checkout (a CI runner, no .rer/)
@@ -206,7 +207,7 @@ test('site deploy refuses a Worker or domain it did not make, a rolled-back Work
 
 test('site upload waits for its own version through lagging provider reads without accepting replacements', async t => {
   const { siteProvider } = await import('./site-provider.mjs');
-  for (const scenario of ['deployments', 'versions', 'missing deployments', 'missing version', 'fresh Worker missing', 'final readback', 'timeout', 'foreign version', 'foreign newest', 'foreign fingerprint', 'foreign owner', 'split deployment']) await t.test(scenario, async t => {
+  await caseRows(t, (['deployments', 'versions', 'missing deployments', 'missing version', 'fresh Worker missing', 'final readback', 'timeout', 'foreign version', 'foreign newest', 'foreign fingerprint', 'foreign owner', 'split deployment']).map((scenario) => [scenario, async t => {
     const provider = siteProvider({ domain: 'run-cradle.com' }), { files, folder, receiptPath } = await site(t);
     t.after(() => provider.close());
     const api = cloudflare({ accountId: provider.accountId, token: provider.token, fetch: provider.fetch });
@@ -259,12 +260,12 @@ test('site upload waits for its own version through lagging provider reads witho
       assert.ok(elapsed > 0 && elapsed < readiness.totalMs);
     }
     assert.equal(provider.state.writes.slice(writes).filter(write => write.path === `/workers/scripts/${plan.worker}`).length, 1, 'only readback is retried');
-  });
+  }]));
 });
 
 test('site deploy polls the zone domain list within the readiness window: a lagging list succeeds, a hostname never listed fails at the deadline naming it, another Worker fails at once', async t => {
   const { siteProvider } = await import('./site-provider.mjs');
-  for (const scenario of ['lags two polls', 'never lists www', 'bound to another Worker']) await t.test(scenario, async t => {
+  await caseRows(t, (['lags two polls', 'never lists www', 'bound to another Worker']).map((scenario) => [scenario, async t => {
     const provider = siteProvider({ domain: 'run-cradle.com' }), { files, folder, receiptPath } = await site(t);
     t.after(() => provider.close());
     let attached = false, lists = 0, elapsed = 0, sleeps = 0;
@@ -291,5 +292,5 @@ test('site deploy polls the zone domain list within the readiness window: a lagg
       if (scenario === 'never lists www') assert.equal(elapsed, readiness.totalMs, 'the wait ends at the deploy deadline');
       else assert.equal(sleeps, 0, 'a foreign Worker is refused without a retry');
     }
-  });
+  }]));
 });

@@ -1,3 +1,4 @@
+import { caseRows } from '../deploy-kit/tests/fold-case.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -7,6 +8,9 @@ import { execFileSync } from 'node:child_process';
 import { contractText } from './contract-fixture.mjs';
 import { release } from './produce.mjs';
 import { publicationScan, validatePublicationDestination } from './publication-scan.mjs';
+
+const logicalCaseRows = [];
+const logicalCase = (name, run) => logicalCaseRows.push({name,run});
 
 const root = resolve(import.meta.dirname, '../..');
 const project = 'author/logical-product';
@@ -83,7 +87,7 @@ test('empty GitHub 404 remains incomplete and blocks producer export and tag', a
 });
 
 for (const source of [publicSlug, repository]) {
-  test(`producer validator and real publication scan accept a separate logical identity with ${source.startsWith('https:') ? 'URL' : 'bare'} source`, t => {
+  logicalCase(`producer validator and real publication scan accept a separate logical identity with ${source.startsWith('https:') ? 'URL' : 'bare'} source`, t => {
     const f = fixture(t, source);
     assert.doesNotThrow(() => validatePublicationDestination({ repo: f.repo, commit: f.selected }, project, repository));
     const report = publicationScan(f.repo, f.selected, undefined, project, repository);
@@ -98,7 +102,7 @@ for (const source of [publicSlug, repository]) {
 
 for (const scenario of ['cli-logical', 'cli-destination', 'project-id', 'project-schema', 'source-destination', 'source-bare-dotgit',
   'custody-conflict', 'unknown-opt-in', 'recipe-schema', 'lock-identity', 'lock-hash', 'lock-toolchain']) {
-  test(`producer rejects logical ${scenario} before install, output or tag`, async t => {
+  logicalCase(`producer rejects logical ${scenario} before install, output or tag`, async t => {
     const f = fixture(t);
     const options = { ...f.options };
     const projectDocument = { schema: 1, projectId: project, sourceRepository: publicSlug };
@@ -130,3 +134,7 @@ for (const scenario of ['cli-logical', 'cli-destination', 'project-id', 'project
     }
   });
 }
+
+test('logical publication identity binds committed project, repository, recipe and lock metadata', async (t) => {
+  await caseRows(t, logicalCaseRows.map(({name,run}) => [name,run]));
+});
