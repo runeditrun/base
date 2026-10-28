@@ -14,6 +14,7 @@
 - **Import the Platform data download natively.** The Managed data ZIP previously failed as a damaged archive. The reference adapter now opts into a bounded ZIP intake that stages the source in isolation, translates its Platform migration ledger and uses the existing empty-install restore. Malformed downloads report a specific refusal before destination data changes. Adapters can opt in with `managedData: true` or wrap their native restore with `withManagedDataImport`.
 - Keep trigger definitions literal during Managed data intake; bind string cells only in top-level INSERT statements so trigger bodies containing VALUES and semicolons import successfully. Reconcile retired schema objects against destination migrations, retain database-bound policy payloads, and replay dependent new-table backfills during native restore. Refuse occupied destinations before creating a restore job and skip already-applied native migrations.
 - Make the separate install and start recipe use the installed launcher without a PATH prerequisite. Explain frozen lockfile refusals with one cause and a runnable repair command; retain pnpm codes and captured output in JSON.
+- Explain refused dependency downloads, invalid ports and checkout archive paths with a plain cause and a runnable next command. Keep technical diagnostics in the unchanged JSON output and omit error classes and stacks from human failure summaries.
 
 ## 0.2.84
 

@@ -1,3 +1,4 @@
+import { humanError } from '../../cli/human-error.mjs';
 // What `rer dev` prints while it launches: a progress line at least every 30
 // seconds (a `progress` event with --json), then the dispatcher's ready lines.
 const elapsed = ms => { const s = Math.round(ms / 1000); return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`; };
@@ -39,7 +40,7 @@ export function printer({ json, stopHint, keyless = false }) {
     if (failure.event) process.stdout.write(JSON.stringify(failure.event) + '\n');
     else event('error', { code: 'launch_refused', message: failure.message, exitCode: failure.exitCode });
     event('result', { ok: false, exitCode: failure.exitCode });
-   } else process.stderr.write(failure.message + '\n');
+   } else process.stderr.write(humanError(failure, { retry: /Correct the cause, then run (.+) again\./.exec(failure.message)?.[1] }) + '\n');
   },
  };
 }

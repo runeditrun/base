@@ -1,6 +1,6 @@
 import { isManagedDataZip } from './managed-data-zip.mjs';
 import { stat } from 'node:fs/promises';
-import { relative } from 'node:path';
+import { basename, relative } from 'node:path';
 import {localDependencyLinks} from './dependency-doctor.mjs';
 import { contained } from './project.mjs';
 import { missing, refuse } from './errors.mjs';
@@ -19,14 +19,25 @@ export async function transfer(project, options, signal, custody) {
   if(target!=='local'||options.platform==='container'||api?.legacyRecovery!==true)throw refuse('Legacy v1 recovery is supported only by the local Workers portability adapter in an empty isolated installation.');
  }else if(direction==='import' && (options.acknowledgeUnverifiedMetadata||options.output))throw refuse('--acknowledge-unverified-metadata and import --output require --legacy-v1.');
  if (!api || typeof api[direction] !== 'function' || (target === 'remote' && api.remote !== true)) throw refuse(`Complete ${target} ${direction} is unsupported: the reviewed portability API and binding policy must be adopted first.`);
- const located = direction === 'export' ? await locateExport(project.root, file) : await locateImport(project.root, file), path = located.path;
+ const pathArgument = async (flag, action) => {
+  try { return await action(); } catch (error) {
+   if (error.code === 'safety_refusal' && error.message === 'Path must be a contained checkout path without traversal.') {
+    const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
+    const staged = value => `.rer/recovery/${basename(value.replaceAll('\\', '/'))}`;
+    const args = ['rer import', '--input', quote(flag === '--input' ? staged(options.input) : options.input), ...(options.journal ? ['--journal', quote(staged(options.journal))] : []), '--yes', '--cwd', quote(project.root)];
+    error.humanMessage = `${flag} ${JSON.stringify(options[flag.slice(2)])} must stay inside this checkout, without .. or an absolute path, for example .rer/recovery/<name>.rer. Stage the archives there as owned private files (0600), then run: ${args.join(' ')}`;
+   }
+   throw error;
+  }
+ };
+ const located = direction === 'export' ? await locateExport(project.root, file) : await pathArgument('--input', () => locateImport(project.root, file)), path = located.path;
  const legacyOutput = options.legacyV1 ? await locateExport(project.root, options.output) : undefined;
  const legacyRecovery=legacyOutput?{output:legacyOutput.path,acknowledged:options.acknowledgeUnverifiedMetadata}:undefined;
  const sessionFile = options.sessionFile ? await contained(project.root, options.sessionFile, { privateFile: true }) : undefined;
  if(options.journal && legacyRecovery)throw refuse('--journal requires normal v2 import; legacy v1 metadata cannot authenticate a later-journal recovery.');
  if (options.journal && (direction !== 'import' || target !== 'local')) throw refuse('--journal applies to a local import only.');
  // A later archive of the same installation carries its latest erasure journal.
- const journal = options.journal ? await contained(project.root, options.journal, { privateFile: true }) : undefined;
+ const journal = options.journal ? await pathArgument('--journal', () => contained(project.root, options.journal, { privateFile: true })) : undefined;
  await project.adapter.prepareData?.(project.root, custody.store, signal);
  await custody.store.step(`${target === 'remote' ? 'Hosted' : 'Local'} ${direction}`);
  // Only now can the seed's Vite configuration load in a checkout that never built.

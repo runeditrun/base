@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.84-dev.gf7a0640a",
+  "cliVersion": "0.2.84-dev.g2d782393",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -407,7 +407,7 @@
     },
     "cli/bounded.mjs": {
       "source": "cli/bounded.mjs",
-      "sha256": "17b4fb00aef63e77b5fb8c8efb3b103682daafd7aeaaa2b00c8781d28da4200a"
+      "sha256": "21bb69fafd2531e185c62fd88609218b12a591eed9c1bce0f31f3ed740bdee21"
     },
     "cli/browser-runtime.mjs": {
       "source": "cli/browser-runtime.mjs",
@@ -833,6 +833,10 @@
       "source": "cli/hosted-output.mjs",
       "sha256": "5c5ebeaf9fe4ed6859ce4a2a81db54a1ee443c789b16cf5a7bc973c3b2108f1f"
     },
+    "cli/human-error.mjs": {
+      "source": "cli/human-error.mjs",
+      "sha256": "29a67b0d4967d3ad493f8afeb1a4baaeb187b55e0313f801f923d43c369d9776"
+    },
     "cli/hydration/browser.mjs": {
       "source": "cli/hydration/browser.mjs",
       "sha256": "df47fdb798c70cd6882654ac48f0c4bb39149dddb2e7867fb25a48521baf8e4f"
@@ -939,7 +943,7 @@
     },
     "cli/output.mjs": {
       "source": "cli/output.mjs",
-      "sha256": "e0a3e1aae70c68d4e239fa06009163bf3d1f2aaffc3ac594998e23e8d655fb4f"
+      "sha256": "55f0be3a231f56638d4475260ff04ad73270a4ccc12b4d409de7bfc6f890f310"
     },
     "cli/package-calls.mjs": {
       "source": "cli/package-calls.mjs",
@@ -951,7 +955,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "dbb39a1cc168536089f8a82dca0edbbb1ceae50f4ebd51c900c07a156f8aed2d"
+      "sha256": "96c47b9bedfc865740b7b126af2d69fabde3cf5aad38ece8c49da41e72232dd7"
     },
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",
@@ -1151,7 +1155,7 @@
     },
     "cli/transfers.mjs": {
       "source": "cli/transfers.mjs",
-      "sha256": "d5ea5de63049a0d077da2778338c4a686983763dbf5ff7e8baf52855b3b0687e"
+      "sha256": "9e1f522e4a704d780156a1e9f3bef8fcc97681638eb236d2a0da4517886e5109"
     },
     "cli/upstream-agent.mjs": {
       "source": "cli/upstream-agent.mjs",

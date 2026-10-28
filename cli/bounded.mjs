@@ -72,7 +72,7 @@ export async function boundedCommand(project,options,argv,out){
  }else if(finalEvent&&finalEvent.exitCode===exitCode){
   if(errorEvent){
    let deployment={};
-   try{deployment=JSON.parse(store.redact(JSON.stringify({environment:errorEvent.environment,availableDeployments:errorEvent.availableDeployments,step:errorEvent.step})));}catch{}
+   try{deployment=JSON.parse(store.redact(JSON.stringify({environment:errorEvent.environment,availableDeployments:errorEvent.availableDeployments,step:errorEvent.step,...(!options.json&&errorEvent.humanMessage?{humanMessage:errorEvent.humanMessage}:{})})));}catch{}
    out.error(new RerError(errorEvent.code,store.redact(errorEvent.message),exitCode,deployment));
   }
   const {version,verb,event,ok,exitCode:childExit,...details}=finalEvent;
