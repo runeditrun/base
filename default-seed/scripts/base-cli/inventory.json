@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.gdb888446",
+  "cliVersion": "0.2.85-dev.g02c14769",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -423,7 +423,7 @@
     },
     "cli/business/carry.mjs": {
       "source": "cli/business/carry.mjs",
-      "sha256": "acbe454c9e61b2b3076eec1ef1d3e51e5f875c15d3c4924fd1afc9f3d709e0db"
+      "sha256": "384219fb6aa8ddfbf174d75a3577678d94f25335967cd88805faad02609762ff"
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
@@ -475,7 +475,7 @@
     },
     "cli/business/opt-ins.mjs": {
       "source": "cli/business/opt-ins.mjs",
-      "sha256": "b136d5f44671b7f831af9ac2cf9f564e0c69f6df4bf64c75a218fc9bf942c440"
+      "sha256": "bb3412c5d0175b566ff66089e61178fdcf1071ab47f06f99f36adb429d4e0993"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
@@ -819,7 +819,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "3af3c189c71b2688e48ab9c8e844d53ef4352e9b721fb5cfa7560e3aa396aa75"
+      "sha256": "26f84c7c817479fc5b1600eb8273e7f44a84a7881ee382e83e37e1fb17501bc6"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1219,11 +1219,11 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "2a69f0b033d178f04746f0a25c4ef4bb2b7adec770147ad1a7da7716ee95629c"
+      "sha256": "088612d5ed58acd3d6b43a52590dade1ed2c425b2c6ce190e1e23542be607818"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
-      "sha256": "ea39cb9b8c101a446d6fdf023866bb2c86965926f316f6030a0394f1cffeaf17"
+      "sha256": "16ce1f72f7078b67def503e307f44f39714772a9bafb413c9573aa1d4784283a"
     },
     "edition-authoring/copy-checkout.mjs": {
       "source": "edition-authoring/copy-checkout.mjs",
@@ -1783,15 +1783,15 @@
     },
     "edition-authoring/workflow-copies.mjs": {
       "source": "edition-authoring/workflow-copies.mjs",
-      "sha256": "f547ecff71a5d8da41dc5c12a0183c4dcc098ecdfeecaf0c3b06a21651db2e5f"
+      "sha256": "be15199b125ca10e19991469f65efe49e441d8e518df234b4f47ebb1d3727ec7"
     },
     "edition-authoring/workflow-scripts.mjs": {
       "source": "edition-authoring/workflow-scripts.mjs",
-      "sha256": "5861735ba452b54a0902c2c47ff44dc17722dd830807ad21cfb2565183c76245"
+      "sha256": "d0e747277142e54d86acd1c01549ee8b76bf15c060366387bd074c57f77f7d2d"
     },
     "foundation/runtime/contract-docs.mjs": {
       "source": "foundation/runtime/contract-docs.mjs",
-      "sha256": "d98e14f489c57f60446c2cc68310db09f298f7974d77026dbaa2c62868cc4838"
+      "sha256": "706e5eb0c227eb33ed101d0489a7ce62a4b3d11ec57920b653731ada2773bf50"
     },
     "foundation/runtime/run-data.d.mts": {
       "source": "foundation/runtime/run-data.d.mts",
@@ -4691,7 +4691,7 @@
     },
     "scripts/publish-check/github_refs.py": {
       "source": "scripts/publish-check/github_refs.py",
-      "sha256": "2bcc18b36162af8e29ef463704b2cbf85147286eeecf86f8c909c24a9c0adee7"
+      "sha256": "2cdf8b05242aacb508d8d0131063782eea85ab710b9dd510b7b052c2cdf2bab7"
     },
     "scripts/publish-check/gitleaks.py": {
       "source": "scripts/publish-check/gitleaks.py",
