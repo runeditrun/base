@@ -91,7 +91,7 @@ export async function authenticate(
       return {
         person,
         agent: { id: claims.act.sub, name: claims.act.name, specialist: claims.act.specialist as string | null | undefined },
-        scopes: claims.scope === '' ? [] : claims.scope.split(' '), consent: claims.consent,
+        scopes: claims.scope === '' ? [] : claims.scope.split(' '), clientId: claims.client_id, consent: claims.consent,
       }
     }
     const local = await options.localCredentials?.(request)

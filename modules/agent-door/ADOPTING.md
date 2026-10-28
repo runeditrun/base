@@ -129,7 +129,24 @@ edition with a different domain. Use `door.invoke` for embedded agents and
 
 Expose resources through explicit readers and treat imported or external
 content as untrusted. Every resource declares non-empty catalogue `classes`
-and `classify(record,ctx)`, based on the record itself. Resource reads pass through
+and `classify(record,ctx)`, based on the record itself. Resource readers and classifiers receive `{person, agent, clientId, scopes, db}`.
+Use this authenticated authority for service and client fences, including events
+and subscriptions; a sponsor's administrator role never bypasses a registered
+resource's reader. `ToolContext` carries the same scopes and client id.
+`door.invoke(name,args,{person,agent,scopes,clientId})` requires explicit scopes
+and never supplies registry scopes. Omit `clientId` only for a native agent with
+no separate client identity.
+
+If the seed has mutable client grants, declare `currentScopes(principal)` to
+read them from its native store. The door intersects this with the original
+credential scopes before calls and again at approval execution and subscription
+delivery. It cannot widen the token or saved approval. Removing the tool's scope
+before approval execution returns `insufficient_scope`, runs no native action,
+and retains the execution audit linked to its original decision. Seeds without
+client grants can omit the hook. Keep grant checks in the native transaction too
+when the seed needs a fence against concurrent grant edits.
+
+Resource reads pass through
 the same policy, approval, review and audit path as tools. A resource read must enforce the current person's native
 access. Mark device, screen, connector, import-door and installation operations
 as outside the tool registry when they require another supported door.

@@ -23,6 +23,7 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
     const principal = await livePrincipal(rt, saved.principal), state = await policyState(rt), tool = savedTool(rt, saved.tool, saved.args)
     const refusal = policyRefusal(rt, state, tool?.classes)
     if (!principal || !tool) result = { ...result, outcome: 'refused', code: 'sponsor_unavailable' }
+    else if (tool.scope && !principal.scopes.includes(tool.scope)) result = { ...result, outcome: 'refused', code: 'insufficient_scope' }
     else if (refusal) result = { ...result, outcome: 'refused', ...refusal }
     else if (state.revision !== saved.revision) result = { ...result, outcome: 'refused', code: 'approval_evidence_changed' }
     else {

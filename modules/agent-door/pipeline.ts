@@ -12,6 +12,7 @@ import { appendEvents } from './events.ts'
 import { acquireDecision, releaseDecision, startExecution, startPending } from './counting.ts'
 import { preparedBy } from './people.ts'
 import type { ToolDefinition } from './types.ts'
+import { narrowPrincipal } from './principal.ts'
 
 export interface PipelineAnswer { result: CallResult; status?: number; scope?: string }
 export async function callTool(rt: Runtime, name: string, input: unknown, principal: Principal, door: ToolContext['door'], trace?: unknown, resourceTool?: ToolDefinition, requestState?: unknown): Promise<PipelineAnswer> {
@@ -29,6 +30,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     row.ignored_arguments = Object.keys(raw ?? {}).filter(key => !Object.hasOwn(properties, key)).sort()
     const key = !tool.readOnly && typeof raw?.idempotency_key === 'string' && raw.idempotency_key.length > 0 && raw.idempotency_key.length <= 200 ? raw.idempotency_key : null
     row.idempotency_key = key
+    principal = await narrowPrincipal(rt, principal)
     if (tool.scope && !principal.scopes.includes(tool.scope)) { status = 403; scope = tool.scope; return refuse('insufficient_scope') }
     const state = await policyState(rt)
     row.revision = state.revision

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Carry agent/client scopes into resource authorization, delayed approvals and event/subscription filtering. Embedded callers supply explicit scopes; native current-grant hooks may only narrow their original authority.
+
 - Agent-door verification follows signed and native owner lifecycles, supports isolated seed provider adapters, and accepts Base source archives for copy authoring.
 
 - Bind agent sponsors to durable Business person ids from signed settings, enforce native admission including the allow-list, and honour signed agent and consent revocation. Resources now use the policy and audit pipeline. Approvals show saved summaries, bind decisions to their hash, execute with named approvers and leave a separate execution audit; Undo is the reviewer's act. Running audits commit before effects and recover from recorded outcomes. Standalone spend caps and unscoped Business daily limits are refused until their enforcement exists. The reference journey exercises self-escalation fixtures and real settings pairing.
