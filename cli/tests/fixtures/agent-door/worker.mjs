@@ -195,7 +195,7 @@ export default {
       MAIL_FROM: 'synthetic-records@example.com', branding: { productName: 'Records' } };
     const clientIp = incoming => incoming.headers.get('CF-Connecting-IP') ?? '';
     const sender = createMailSender({ provider: 'resend', mode: 'production', apiKey: env.MAIL_API_KEY });
-    const mailSender = { async send(message) { const result = await sender.send(message); await env.DB.prepare('INSERT INTO fixture_mail(email,body) VALUES(?,?)').bind(message.to[0], message.text).run(); return result; } } };
+    const mailSender = { async send(message) { const result = await sender.send(message); await env.DB.prepare('INSERT INTO fixture_mail(email,body) VALUES(?,?)').bind(message.to[0], message.text).run(); return result; } };
     const teamAuth = createOperatorAuth({ db: env.DB, config, clientIp, mailSender });
     const settings = createBusinessSettings({ db: env.DB, trust: env.RER_BUSINESS_TRUST,
       business: { settings: 1, values: ['display_name'], team: { roles: { admin: 'admin', member: 'member' } } }, team: teamAuth.businessTeam });

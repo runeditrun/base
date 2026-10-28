@@ -1,4 +1,4 @@
-import type { ClassAndFacts, CallResult, Principal, Runtime, ToolContext, ToolDefinition, UndoContext, ApprovalDisplaySummary } from './types.ts'
+import type { ClassAndFacts, CallResult, NativeTarget, Principal, Runtime, ToolContext, ToolDefinition, UndoContext, ApprovalDisplaySummary } from './types.ts'
 import { validateSchema } from './json-schema.ts'
 import { ToolRefusal } from './errors.ts'
 import { canonical } from './policy/document.ts'
@@ -6,6 +6,7 @@ import { preparedBy } from './people.ts'
 import { classDefinition } from './policy/catalogue.ts'
 import { removeUsage } from './counting.ts'
 import { policyState } from './policy-store.ts'
+import { nativeTarget } from './target.ts'
 import { nativeProof } from './native-proof.ts'
 import { narrowPrincipal } from './principal.ts'
 
@@ -57,8 +58,10 @@ export function undoContext(rt: Runtime, person: Principal['person'], door: Tool
   return { db: rt.options.db, person, agent: null, actor: { kind: 'person', person: { id: person.id, name: person.name }, label: person.name }, seed: rt.options.seed, origin: rt.options.origin, now: rt.now, door,
     emit(type, uri, data) { effects.push({ type, uri, data }) } }
 }
-export async function summary(tool: ToolDefinition, args: Record<string, unknown>, ctx: ToolContext): Promise<ApprovalDisplaySummary> {
-  if (tool.readOnly) return tool.name === 'resources/read' ? { uri: String(args.uri) } : { arguments: args }
+export async function summary(tool: ToolDefinition, args: Record<string, unknown>, ctx: ToolContext, target?: NativeTarget | null): Promise<ApprovalDisplaySummary> {
+  target = target === undefined ? await nativeTarget(tool, args, ctx) : target
+  const attribution = target ? { nativeTarget: target } : {}
+  if (tool.readOnly) return { ...(tool.name === 'resources/read' ? { uri: String(args.uri) } : { arguments: args }), ...attribution }
   const value = await tool.summary!(args, ctx)
   const schema = { type: 'object', additionalProperties: false, properties: {
     target: { type: 'object', additionalProperties: false, properties: { id: { type: 'string' }, name: { type: 'string' }, email: { type: 'string' } } },
@@ -66,5 +69,5 @@ export async function summary(tool: ToolDefinition, args: Record<string, unknown
     payee: { type: 'string' }, role: { type: 'string' }, items: { type: 'array', items: { type: 'string' } },
   } }
   if (!validateSchema(schema, value)) throw new Error('summary_invalid')
-  return value
+  return { ...value, ...attribution }
 }

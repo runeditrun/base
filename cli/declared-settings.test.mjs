@@ -139,7 +139,7 @@ export const commandAdapter = declare(lifecycle, { setup: { manifestFile: 'rer-s
 `);
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'example/declared-dependency', runtime: { requirements: [] }, requiredEnvironment: [],
   seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['setup', 'dev', 'doctor'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Local declared-dependency flow.' }])) }));
- const result = spawnSync(process.execPath, [join(base, 'bin/rer.mjs'), 'setup', '--owner-email', 'owner@example.test', '--port', String(await freePort()), '--json', '--non-interactive'], { cwd: root, env, encoding: 'utf8', timeout: 60000 });
+ const result = spawnSync(process.execPath, [join(base, 'bin/rer.mjs'), 'setup', '--owner-email', 'owner@example.test', '--json', '--non-interactive'], { cwd: root, env, encoding: 'utf8', timeout: 60000 });
  assert.ifError(result.error);
  assert.equal(result.status, 0, result.stdout + result.stderr);
  await assert.rejects(readFile(join(root, 'completion-requests')), 'nothing was connected, so setup asks the app to complete nothing');

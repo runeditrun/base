@@ -8,14 +8,14 @@ const { build } = require('esbuild');
 const { Miniflare, convertV4MiniflareOptions } = require('miniflare');
 const { unstable_splitSqlQuery: split } = require('wrangler');
 const output = await build({ entryPoints: [fileURLToPath(new URL('./seed.ts', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022' });
-export async function runtime({ paired = true, limits, resourceScope = 'records:read', ring, seed = 'synthetic', toolNames, revisionType } = {}) {
+export async function runtime({ paired = true, limits, resourceScope = 'records:read', ring, seed = 'synthetic', toolNames, revisionType, nativeTargets = false, sponsorSurface = false } = {}) {
  const origin = 'https://synthetic-base-1.invalid', issuer = 'https://synthetic-base-2.invalid', installationId = 'synthetic-base-1', kid = 'synthetic-base-1';
  const keys = ring ?? await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign','verify']);
  const publicKey = await webcrypto.subtle.exportKey('jwk', keys.publicKey);
  const businessTrust = { v:1,issuer,audience:origin,subject:installationId,keys:{[kid]:publicKey} };
  const signer = { issuer, installationId, kid, privateKey: keys.privateKey };
  const localToken = randomBytes(32).toString('hex');
- const config = { origin, limits, resourceScope, seed, toolNames, revisionType, OWNER_EMAIL: 'synthetic-base-1@example.com', SETUP_TOKEN: randomBytes(32).toString('hex'), SESSION_SECRET: randomBytes(32).toString('hex'), MAIL_FROM: 'synthetic-base-1@example.com', ipLimit: 1000, emailLimit: 1000 };
+ const config = { origin, limits, resourceScope, seed, toolNames, revisionType, nativeTargets, sponsorSurface, OWNER_EMAIL: 'synthetic-base-1@example.com', SETUP_TOKEN: randomBytes(32).toString('hex'), SESSION_SECRET: randomBytes(32).toString('hex'), MAIL_FROM: 'synthetic-base-1@example.com', ipLimit: 1000, emailLimit: 1000 };
  const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, script: output.outputFiles[0].text, compatibilityDate: '2026-09-01', d1Databases: { DB: 'synthetic-base-1' }, bindings: { LOCAL_TOKEN: localToken, CONFIG: JSON.stringify(config), BUSINESS_TRUST: JSON.stringify(businessTrust), TRUST: JSON.stringify(paired ? { issuer, installationId, appOrigin: origin, publicKeys: { [kid]: publicKey } } : null) } }));
  try {
   const db = await mf.getD1Database('DB');
