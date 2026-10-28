@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g0cad22d3",
+  "cliVersion": "0.2.85-dev.g45f4aafd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -379,7 +379,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "f96acb39255babe41a42889960e04a3fa04b3410459ba9b7ab44121736bbd249"
+      "sha256": "a2887f41d34e7ead05d78952148a53329b8a9bf8ab0717909ee69fa5478c67c9"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -679,7 +679,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "cfe2bffc0bfd20bee2fd68629461ad858bde620a93a84fd3a42cdcb925cd9b87"
+      "sha256": "1e9f5fc264cf6835c0d9feba1f1227ee58ed1317b1898fb93ce50a9328074c5d"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -763,7 +763,7 @@
     },
     "cli/deploy-owner-input.mjs": {
       "source": "cli/deploy-owner-input.mjs",
-      "sha256": "e828e0e128a264276ff98b92949cfc0f9219ebc4f37cb6ec4c6d062b1af69916"
+      "sha256": "8ad58b7d0aee494ae6059a46e06e6fb3548b3f7f7e51709accf3ed07e78bafac"
     },
     "cli/deploy-owner.mjs": {
       "source": "cli/deploy-owner.mjs",
@@ -1027,11 +1027,11 @@
     },
     "cli/production-auth.mjs": {
       "source": "cli/production-auth.mjs",
-      "sha256": "579c0525859c5e092f90ea023f8b77bd111064a5efda74e00aff1b8022f7310c"
+      "sha256": "1f33c14d2182e8770d841e91d4864692f2c765407688fbb74e54d75671196425"
     },
     "cli/production-mail.mjs": {
       "source": "cli/production-mail.mjs",
-      "sha256": "6eb18f8f855add909297ddca04f0b7f106b22a967f3b059c6484ab06f975fe4d"
+      "sha256": "81abf2837900e30f7b61be03a47e6334f1302ea11d999c6f617d4259c9106601"
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
