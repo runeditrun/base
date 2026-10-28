@@ -5,7 +5,7 @@ export type JsonSchema = boolean | { [key: string]: unknown }
 export interface JsonSchemaObject { type: 'object'; properties?: Record<string, JsonSchema>; required?: string[]; [key: string]: unknown }
 export interface Person { id: string; email: string; name: string; role: string; active: boolean }
 export interface Agent { id: string; name: string; specialist?: string | null }
-export interface Principal { person: Person; agent: Agent; scopes: string[]; clientId?: string; consent?: string; nativeProof?: { kind: string; reference: string } }
+export interface Principal { person: Person; agent: Agent; scopes: string[]; clientId?: string; consent?: string; nativeProof?: { kind: string; reference: string }; operationId?: string; idempotencyKey?: string | null }
 export interface PeopleAdapter {
   sponsor(claims: { sub: string }): Promise<Person | null>
   person(id: string): Promise<Person | null>
@@ -19,10 +19,23 @@ export interface PreparedBy { agent: { id: string; name: string }; for: { id: st
 export type EventActor = ({ kind: 'agent' } & PreparedBy) | { kind: 'person'; person: { id: string; name: string } } | { kind: 'business' }
 export interface AgentEvent { id: string; type: string; uri: string; actor: EventActor; at: string; [key: string]: unknown }
 export interface ToolContext {
-  db: D1Database; person: Person; agent: Agent; consent?: string; scopes: string[]; clientId?: string; nativeProof?: { kind: string; reference: string }; actor: PreparedBy; seed: string; origin: string
-  now(): number; door: 'mcp' | 'embedded'; approvers: Array<{ id: string; name: string }>
-  emit(type: string, uri: string, data?: Record<string, unknown>): void
+  readonly db: D1Database
+  readonly person: Readonly<Person>; readonly agent: Readonly<Agent>
+  readonly consent?: string; readonly scopes: readonly string[]; readonly clientId?: string
+  readonly operationId: string; readonly idempotencyKey: string | null
+  readonly nativeProof?: Readonly<{ kind: string; reference: string }>
+  readonly actor: { readonly agent: Readonly<PreparedBy['agent']>; readonly for: Readonly<PreparedBy['for']>; readonly label: string }
+  readonly seed: string; readonly origin: string; readonly door: 'mcp' | 'embedded'
+  readonly approvers: readonly Readonly<{ id: string; name: string }>[]
+  readonly now: () => number
+  readonly emit: (type: string, uri: string, data?: Record<string, unknown>) => void
 }
+export interface InvocationIdentity {
+  person: Pick<Person, 'id'>; agent: Agent; scopes: readonly string[]; clientId?: string; consent?: string
+  /** Resume a native queue item using its door-issued admission identity. */
+  operationId?: string
+}
+
 export interface ApprovalSummary {
   target?: { id?: string; name?: string; email?: string }; recipients?: string[]
   amount?: { value: number; currency: string }; payee?: string; role?: string; items?: string[]
@@ -76,7 +89,7 @@ export interface CallResult {
 }
 export interface AgentDoor {
   handle(request: Request): Promise<Response | null>
-  invoke(name: string, args: Record<string, unknown>, who: { person: Pick<Person, 'id'>; agent: Agent; scopes: string[]; clientId?: string; consent?: string }, proofReference?: string): Promise<CallResult>
+  invoke(name: string, args: Record<string, unknown>, who: InvocationIdentity, proofReference?: string): Promise<CallResult>
   emit(event: { type: string; uri: string; person: Person; data?: Record<string, unknown> }): Promise<void>
 }
 export interface PolicyState {

@@ -6,6 +6,7 @@ import { preparedBy } from './people.ts'
 
 export interface AuditRow {
   sequence?: number; id: string; at: string; door: 'mcp' | 'embedded'; agent: Principal['agent']; sponsor: { id: string; name: string }; label: string
+  operation_id: string; scopes: string[]; client_id: string | null
   consent: string | null; tool: string; resource: string | null; decision_id: string | null; classes: ClassAndFacts[]; revision: number | null; rules: Array<{ class: string; rule: string | null; do: string }>
   decision: string; outcome: 'running' | 'done' | 'refused' | 'pending' | 'failed' | 'replayed'; code: string | null
   approval: { id: string; by: string[] } | null; review: { id: string; by: string | null } | null
@@ -13,7 +14,8 @@ export interface AuditRow {
 }
 export interface Evidence { document: PolicyDocument; usage: Record<string, number>; classes: ClassAndFacts[]; result: string; rules: unknown }
 export function newAudit(rt: Runtime, principal: Principal, tool: string, door: AuditRow['door'], trace: unknown): AuditRow {
-  return { id: crypto.randomUUID(), at: new Date(rt.now()).toISOString(), door, agent: { ...principal.agent, specialist: principal.agent.specialist ?? null }, sponsor: { id: principal.person.id, name: principal.person.name }, label: preparedBy(principal).label,
+  const id = crypto.randomUUID()
+  return { id, operation_id: principal.operationId ?? id, scopes: [...principal.scopes], client_id: principal.clientId ?? null, at: new Date(rt.now()).toISOString(), door, agent: { ...principal.agent, specialist: principal.agent.specialist ?? null }, sponsor: { id: principal.person.id, name: principal.person.name }, label: preparedBy(principal).label,
     consent: principal.consent ?? null, tool, resource: null, decision_id: null, classes: [], revision: null, rules: [], decision: 'none', outcome: 'refused', code: null, approval: null, review: null, idempotency_key: null,
     trace: typeof trace === 'string' ? trace.slice(0, 512) : null, ignored_arguments: [], replay_of: null }
 }

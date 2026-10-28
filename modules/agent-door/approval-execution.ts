@@ -14,17 +14,18 @@ import { savedTool } from './resource-tool.ts'
 export async function executeApproval(rt: Runtime, id: string, saved: SavedApproval, approvals: ApprovalMark[]) {
   const row = newAudit(rt, saved.principal, saved.tool, saved.door, null)
   row.decision_id = saved.decision_id
+  row.operation_id = saved.principal.operationId ?? saved.decision_id
   row.idempotency_key = saved.key
   if (saved.tool === 'resources/read') row.resource = String(saved.args.uri)
   let result = { ...saved.result }, locked = false, effects: Effect[] = [], evidence = saved.evidence
   const by = [...new Set(approvals.map(mark => mark.person))]
   const approvers: Array<{ id: string; name: string }> = []
   try {
-    const principal = await livePrincipal(rt, saved.principal), state = await policyState(rt), tool = savedTool(rt, saved.tool, saved.args)
+    const principal = await livePrincipal(rt, { ...saved.principal, operationId: saved.principal.operationId ?? saved.decision_id, idempotencyKey: saved.key }), state = await policyState(rt), tool = savedTool(rt, saved.tool, saved.args)
     const refusal = policyRefusal(rt, state, tool?.classes)
     if (saved.principal.consent && state.revoked.consents.includes(saved.principal.consent)) result = { ...result, outcome: 'refused', code: 'consent_revoked' }
     else if (!principal || !tool) result = { ...result, outcome: 'refused', code: 'sponsor_unavailable' }
-    else if (tool.scope && !principal.scopes.includes(tool.scope)) result = { ...result, outcome: 'refused', code: 'insufficient_scope' }
+    else if (saved.principal.scopes.some(scope => !principal.scopes.includes(scope)) || tool.scope && !principal.scopes.includes(tool.scope)) result = { ...result, outcome: 'refused', code: 'insufficient_scope' }
     else if (refusal) result = { ...result, outcome: 'refused', ...refusal }
     else if (state.revision !== saved.revision) result = { ...result, outcome: 'refused', code: 'approval_evidence_changed' }
     else {
@@ -66,7 +67,7 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
   // Keep the recorded outcome durable before attempting the final audit write.
   await rt.options.db.batch([
     rt.options.db.prepare('UPDATE agent_door_approvals SET state=?,result=? WHERE id=?').bind(state, JSON.stringify(result), id),
-    ...(saved.key === null ? [] : [rt.options.db.prepare('UPDATE agent_door_calls SET state=?,outcome=? WHERE agent=? AND key=?').bind(result.outcome, JSON.stringify(result), saved.principal.agent.id, saved.key)]),
+    ...(saved.key === null ? [] : [rt.options.db.prepare('UPDATE agent_door_calls SET state=?,outcome=? WHERE agent=? AND key=?').bind(result.outcome, JSON.stringify(result), saved.principal.agent.id, saved.claimKey ?? saved.key)]),
   ])
   if (row.outcome === 'running') row.outcome = result.outcome
   outcomeRow(row, result); row.approval = { id, by }
