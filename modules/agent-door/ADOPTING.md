@@ -256,3 +256,15 @@ so promoting a seed admin does not confer Business approval authority.
 Business can revoke agents or consents in the signed envelope's optional
 `revoked` lists. Tokens require `consent`; affected pending approvals expire and
 execution rechecks revocation. Retain both these lists and historical attribution.
+
+## Current admission on replay
+
+Idempotency keys retain outcomes, not authority. Every retry rechecks the current
+credential, sponsor, agent and consent revocation, scope, pause, native
+classification and policy before returning saved content. A refusal has its own
+audit row and never includes the saved result. A new approval or review
+requirement returns `approval_required` or `review_required`; an old approval
+cannot authorize a newer policy revision. Accepted replay does not execute or
+count the native effect again. Record revision preconditions guard first
+execution; they do not reject a successful replay merely because that execution
+advanced the record revision.
