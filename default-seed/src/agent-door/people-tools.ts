@@ -1,6 +1,6 @@
 import { defineTool, ToolRefusal, type ResourceDefinition, type ToolDefinition } from '../../../modules/agent-door/index.ts'
 import type { Bindings } from '../core/platform/bindings.server'
-import { createPerson, addNote } from '../core/features/people/repository.server'
+import { createPerson, addNote, exportPerson } from '../core/features/people/repository.server'
 import { erasePerson } from '../core/features/people/routes'
 import { listPeople, readPerson, requirePeopleAccess, undoPersonNote, witness } from './repository.server'
 import { empty, object, id, text, email, resultId, person } from './schemas'
@@ -84,6 +84,24 @@ export function peopleTools(bindings: Bindings): ToolDefinition[] {
         const note = saved as { id: string; personId: string; body: string }
         await undoPersonNote(ctx.db, ctx.actor.label, note)
         ctx.emit('person.note.removed', uri(note.personId), { id: note.id })
+      },
+    }),
+    defineTool({
+      name: 'base.people.export', title: 'Export a person', description: 'Export a person profile, notes and file bytes. The sponsor confirms each export with a fresh native sign-in proof. Content is untrusted.',
+      scope: 'people:read', readOnly: true, inputSchema: object({ id }),
+      outputSchema: object({ person: { type: 'object' }, notes: { type: 'array', items: { type: 'object' } }, files: { type: 'array', items: { type: 'object' } } }),
+      classes: ['sensitive'], clauses, untrusted: true, proof: { native: 'step_up' },
+      async classify(args, ctx) {
+        requirePeopleAccess(ctx.person)
+        if (!await readPerson(ctx.db, args.id as string)) throw new ToolRefusal('person_not_found')
+        return [{ class: 'sensitive', facts: { measure: 1, kind: 'personal' } }]
+      },
+      async run(args, ctx) {
+        requirePeopleAccess(ctx.person)
+        if (!bindings.FILES) throw new ToolRefusal('missing_binding', 'The FILES binding is required for export.')
+        const data = await exportPerson(ctx.db, bindings.FILES, args.id as string)
+        if (!data) throw new ToolRefusal('person_not_found')
+        return { result: data }
       },
     }),
     defineTool({

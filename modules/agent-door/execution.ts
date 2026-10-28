@@ -1,4 +1,4 @@
-import type { ClassAndFacts, CallResult, Principal, Runtime, ToolContext, ToolDefinition, UndoContext, ApprovalDisplaySummary } from './types.ts'
+import type { Authority, ClassAndFacts, CallResult, Invocation, Principal, ResourceContext, Runtime, ToolContext, ToolDefinition, UndoContext, ApprovalDisplaySummary } from './types.ts'
 import { validateSchema } from './json-schema.ts'
 import { ToolRefusal } from './errors.ts'
 import { canonical } from './policy/document.ts'
@@ -6,11 +6,16 @@ import { preparedBy } from './people.ts'
 import { classDefinition } from './policy/catalogue.ts'
 import { removeUsage } from './counting.ts'
 import { policyState } from './policy-store.ts'
+import { currentGrant } from './audit.ts'
 
 export interface Effect { type: string; uri: string; data?: Record<string, unknown> }
+export const authorityOf = (principal: Principal): Authority => ({ agent: principal.agent, client: principal.client ?? null, scopes: [...principal.scopes], consent: principal.consent ?? null })
+export const invocationOf = (principal: Principal): Invocation => ({ person: { id: principal.person.id }, ...authorityOf(principal) })
+export const resourceContext = (rt: Runtime, principal: Principal): ResourceContext => ({ person: principal.person, db: rt.options.db, ...authorityOf(principal) })
+export const principalOf = ({ person, agent, scopes, consent, client }: ResourceContext): Principal => ({ person, agent, scopes: [...scopes], ...(consent ? { consent } : {}), ...(client ? { client } : {}) })
 export function context(rt: Runtime, principal: Principal, door: ToolContext['door'], effects: Effect[], approvers: ToolContext['approvers'] = []): ToolContext {
-  return { db: rt.options.db, person: principal.person, agent: principal.agent, actor: preparedBy(principal), seed: rt.options.seed, origin: rt.options.origin, now: rt.now, door, approvers,
-    emit(type, uri, data) { effects.push({ type, uri, data }) } }
+  return { db: rt.options.db, person: principal.person, ...authorityOf(principal), actor: preparedBy(principal), seed: rt.options.seed, origin: rt.options.origin, now: rt.now, door, approvers,
+    invocation: invocationOf(principal), emit(type, uri, data) { effects.push({ type, uri, data }) } }
 }
 export async function classify(tool: ToolDefinition, args: Record<string, unknown>, ctx: ToolContext): Promise<ClassAndFacts[]> {
   const classes = await tool.classify(args, ctx)
@@ -19,12 +24,16 @@ export async function classify(tool: ToolDefinition, args: Record<string, unknow
 }
 export const digest = async (value: unknown) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical(value)))), byte => byte.toString(16).padStart(2, '0')).join('')
 export const sameFacts = (a: ClassAndFacts[], b: ClassAndFacts[]) => canonical([...a].sort((x, y) => x.class.localeCompare(y.class))) === canonical([...b].sort((x, y) => x.class.localeCompare(y.class)))
-export async function livePrincipal(rt: Runtime, saved: Principal): Promise<Principal | null> {
+/** Final admission of saved authority, possibly long after its request: the
+ * sponsor, agent and consent must stand, and scopes narrow to the current grant. */
+export async function readmit(rt: Runtime, saved: Principal): Promise<Principal | 'consent_revoked' | 'sponsor_unavailable'> {
   const person = await rt.options.people.person(saved.person.id)
   const agent = await rt.options.db.prepare('SELECT revoked FROM agent_door_agents WHERE id=?').bind(saved.agent.id).first<{ revoked: number }>()
   const state = await policyState(rt)
-  if (revoked(state, saved)) return null
-  return person?.active && person.id === saved.person.id && !agent?.revoked ? { ...saved, person } : null
+  if (saved.consent && state.revoked.consents.includes(saved.consent)) return 'consent_revoked'
+  if (revoked(state, saved) || !person?.active || person.id !== saved.person.id || agent?.revoked) return 'sponsor_unavailable'
+  const grant = await currentGrant(rt, saved.agent.id)
+  return { ...saved, person, scopes: grant ? saved.scopes.filter(scope => grant.includes(scope)) : [...saved.scopes] }
 }
 export async function runTool(rt: Runtime, tool: ToolDefinition, args: Record<string, unknown>, principal: Principal, result: CallResult, door: ToolContext['door'], approvers: ToolContext['approvers'] = [], usageId = result.decision!.id): Promise<{ result: CallResult; effects: Effect[]; undo?: unknown }> {
   const effects: Effect[] = []

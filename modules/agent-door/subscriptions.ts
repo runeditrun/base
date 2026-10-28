@@ -2,7 +2,7 @@ import type { AgentEvent, Principal, Runtime } from './types.ts'
 import { authenticate } from './credentials.ts'
 import { decide } from './policy/decide.ts'
 import { eventVisible } from './events.ts'
-import { livePrincipal } from './execution.ts'
+import { readmit, resourceContext } from './execution.ts'
 import { policyRefusal, policyState } from './policy-store.ts'
 import { templateMatches } from './registry.ts'
 import { answered } from './policy/document.ts'
@@ -16,7 +16,7 @@ export async function subscriptions(rt: Runtime, request: Request, rpc: Rpc, pri
     if (typeof uri !== 'string' || uris.includes(uri)) continue
     const resource = rt.options.resources?.find(resource => templateMatches(resource.uriTemplate, uri))
     if (resource && (!resource.scope || principal.scopes.includes(resource.scope))) {
-      try { if (await resource.read(uri, { person: principal.person, db: rt.options.db })) uris.push(uri) } catch { /* Visibility refusals do not reveal existence. */ }
+      try { if (await resource.read(uri, resourceContext(rt, principal))) uris.push(uri) } catch { /* Visibility refusals do not reveal existence. */ }
     }
   }
   const filter = { ...(requested?.toolsListChanged === true ? { toolsListChanged: true } : {}), ...(uris.length ? { resourceSubscriptions: uris } : {}) }
@@ -44,15 +44,15 @@ export async function subscriptions(rt: Runtime, request: Request, rpc: Rpc, pri
         if (stopped) return
         try {
           const state = await policyState(rt), authenticated = await authenticate(rt.options, request, state.business)
-          const person = authenticated && await livePrincipal(rt, authenticated)
-          if (!person || policyRefusal(rt, state, ['standard']) || rt.now() - started >= subscriptionLifetimeMs) return close()
-          const decision = decide({ document: state.document, revision: state.revision, call: { seed: rt.options.seed, specialist: person.agent.specialist ?? null, agent: person.agent.id, classes: [{ class: 'standard', facts: { measure: 1 } }] }, usageToday: () => 0 })
+          const live = authenticated && await readmit(rt, authenticated)
+          if (!live || typeof live === 'string' || policyRefusal(rt, state, ['standard']) || rt.now() - started >= subscriptionLifetimeMs) return close()
+          const decision = decide({ document: state.document, revision: state.revision, call: { seed: rt.options.seed, specialist: live.agent.specialist ?? null, agent: live.agent.id, classes: [{ class: 'standard', facts: { measure: 1 } }] }, usageToday: () => 0 })
           if (decision.result === 'blocked' || decision.result === 'approval') return close()
           const rows = (await rt.options.db.prepare('SELECT sequence,event FROM agent_door_events WHERE sequence>? ORDER BY sequence LIMIT 200').bind(cursor).all<{ sequence: number; event: string }>()).results
           for (const row of rows) {
             cursor = row.sequence
             const event: AgentEvent = JSON.parse(row.event)
-            if (uris.includes(event.uri) && await eventVisible(rt, person.person, event)) notify('notifications/resources/updated', { uri: event.uri })
+            if (uris.includes(event.uri) && await eventVisible(rt, live, event)) notify('notifications/resources/updated', { uri: event.uri })
           }
           if (filter.toolsListChanged) {
             const next = await listed()

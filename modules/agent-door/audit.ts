@@ -10,12 +10,20 @@ export interface AuditRow {
   decision: string; outcome: 'running' | 'done' | 'refused' | 'pending' | 'failed' | 'replayed'; code: string | null
   approval: { id: string; by: string[] } | null; review: { id: string; by: string | null } | null
   idempotency_key: string | null; trace: string | null; ignored_arguments: string[]; replay_of: string | null
+  client: string | null; scopes: string[]; consent: string | null; grant: string[] | null; proof: { kind: string; reference: string } | null
 }
 export interface Evidence { document: PolicyDocument; usage: Record<string, number>; classes: ClassAndFacts[]; result: string; rules: unknown }
-export function newAudit(rt: Runtime, principal: Principal, tool: string, door: AuditRow['door'], trace: unknown): AuditRow {
+/** `grant` is the scopes a request authenticated with; executions and durable invocations have none. */
+export function newAudit(rt: Runtime, principal: Principal, tool: string, door: AuditRow['door'], trace: unknown, grant: string[] | null = null): AuditRow {
   return { id: crypto.randomUUID(), at: new Date(rt.now()).toISOString(), door, agent: { ...principal.agent, specialist: principal.agent.specialist ?? null }, sponsor: { id: principal.person.id, name: principal.person.name }, label: preparedBy(principal).label,
     tool, resource: null, decision_id: null, classes: [], revision: null, rules: [], decision: 'none', outcome: 'refused', code: null, approval: null, review: null, idempotency_key: null,
-    trace: typeof trace === 'string' ? trace.slice(0, 512) : null, ignored_arguments: [], replay_of: null }
+    trace: typeof trace === 'string' ? trace.slice(0, 512) : null, ignored_arguments: [], replay_of: null,
+    client: principal.client ?? null, scopes: [...principal.scopes], consent: principal.consent ?? null, grant: grant && [...grant], proof: null }
+}
+/** The agent's latest authenticated grant. Later approval executions and durable invocations narrow to it. */
+export async function currentGrant(rt: Runtime, agent: string): Promise<string[] | null> {
+  const record = await rt.options.db.prepare("SELECT json_extract(row,'$.grant') AS scopes FROM agent_door_audit WHERE agent=? AND json_extract(row,'$.grant') IS NOT NULL ORDER BY sequence DESC LIMIT 1").bind(agent).first<{ scopes: string }>()
+  return record ? JSON.parse(record.scopes) : null
 }
 export function recordDecision(row: AuditRow, decision: DecisionMeta) {
   row.revision = decision.revision; row.decision = decision.disposition

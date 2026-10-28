@@ -7,6 +7,7 @@ import { SCHEMA } from './policy/document.ts'
 import { reviewDoor, type reviewView } from './reviews.ts'
 import type { ApprovalDisplaySummary, Person, PolicyState, Runtime } from './types.ts'
 import { pageScript, pageStyle } from './page-style.ts'
+import { handoffPath } from './proof.ts'
 
 type Approval = ReturnType<typeof approvalView>
 type Review = ReturnType<typeof reviewView>
@@ -121,6 +122,18 @@ async function approvalPage(rt: Runtime, request: Request, person: Person, id: s
   return shell(rt, 'Approval', content + '</section>')
 }
 
+/** The handoff an agent's native-proof refusal names. The seed's own form and
+ * check decide the proof; this page only links the person to them. */
+async function proofPage(rt: Runtime, person: Person, kind: string, id: string): Promise<Response> {
+  const proof = Object.hasOwn(rt.options.nativeProof ?? {}, kind) ? rt.options.nativeProof![kind] : undefined
+  if (!proof) return shell(rt, 'Confirm', '<h1>Not found</h1><a href="/agents">Back to Agents</a>', 404)
+  const confirmed = await proof.verify(id, { kind, person, db: rt.options.db, agent: null, tool: null })
+  const fields = Object.entries({ ...proof.start.fields, returnTo: handoffPath(kind, id) }).map(([name, value]) => `<input type="hidden" name="${escape(name)}" value="${escape(value)}">`).join('')
+  return shell(rt, 'Confirm', `<a href="/agents">Back to Agents</a><h1>Confirm it is you</h1><section><p>An agent acting for you asked for an action that needs your own recent confirmation (${escape(kind)}). Request <code>${escape(id)}</code>.</p>${confirmed
+    ? '<p data-proof-state="confirmed"><strong>Confirmed.</strong> Your agent can retry the action now. Policy and approval still apply.</p>'
+    : `<form action="${escape(proof.start.action)}" method="post" data-proof-state="unconfirmed">${fields}<button type="submit">Confirm with your sign-in</button></form>`}</section>`)
+}
+
 /** Server-rendered person door. Visibility is delegated to the same JSON APIs. */
 export async function agentPage(rt: Runtime, request: Request, person: Person | null): Promise<Response> {
   if (request.method !== 'GET' && request.method !== 'HEAD') return shell(rt, 'Agents', '<h1>Method not allowed</h1>', 405)
@@ -128,8 +141,13 @@ export async function agentPage(rt: Runtime, request: Request, person: Person | 
   const path = new URL(request.url).pathname
   const read = request.method === 'HEAD' ? new Request(request.url, { method: 'GET', headers: request.headers }) : request
   let response: Response
+  const proof = /^\/agents\/proofs\/([^/]+)\/([^/]+)$/.exec(path)
   if (path === '/agents' || path === '/agents/') response = await dashboard(rt, read, person)
-  else {
+  else if (proof) {
+    let kind: string, id: string
+    try { kind = decodeURIComponent(proof[1]!); id = decodeURIComponent(proof[2]!) } catch { return shell(rt, 'Confirm', '<h1>Invalid confirmation link</h1>', 400) }
+    response = await proofPage(rt, person, kind, id)
+  } else {
     const match = /^\/agents\/approvals\/([^/]+)\/?$/.exec(path)
     if (!match) return shell(rt, 'Agents', '<h1>Not found</h1><a href="/agents">Back to Agents</a>', 404)
     let id: string

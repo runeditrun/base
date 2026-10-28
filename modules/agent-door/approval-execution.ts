@@ -1,7 +1,7 @@
 import type { SavedApproval, ApprovalMark } from './approvals.ts'
 import type { Runtime } from './types.ts'
 import { audit, newAudit, recordDecision, outcomeRow, usage, usageToday } from './audit.ts'
-import { classify, context, livePrincipal, runTool, sameFacts, digest, selfEscalation, summary, type Effect } from './execution.ts'
+import { classify, context, readmit, runTool, sameFacts, digest, selfEscalation, summary, type Effect } from './execution.ts'
 import { appendEvents } from './events.ts'
 import { matchingRefs, preparedBy } from './people.ts'
 import { acquireDecision, releaseDecision, startExecution } from './counting.ts'
@@ -20,9 +20,12 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
   const by = [...new Set(approvals.map(mark => mark.person))]
   const approvers: Array<{ id: string; name: string }> = []
   try {
-    const principal = await livePrincipal(rt, saved.principal), state = await policyState(rt), tool = savedTool(rt, saved.tool, saved.args)
+    const principal = await readmit(rt, saved.principal), state = await policyState(rt), tool = savedTool(rt, saved.tool, saved.args)
     const refusal = policyRefusal(rt, state, tool?.classes)
-    if (!principal || !tool) result = { ...result, outcome: 'refused', code: 'sponsor_unavailable' }
+    if (typeof principal !== 'string') row.scopes = principal.scopes
+    if (typeof principal === 'string' || !tool) result = { ...result, outcome: 'refused', code: typeof principal === 'string' ? principal : 'sponsor_unavailable' }
+    // A scope narrowed since the call refuses with the request's own scope code.
+    else if (tool.scope && !principal.scopes.includes(tool.scope)) result = { ...result, outcome: 'refused', code: 'insufficient_scope' }
     else if (refusal) result = { ...result, outcome: 'refused', ...refusal }
     else if (state.revision !== saved.revision) result = { ...result, outcome: 'refused', code: 'approval_evidence_changed' }
     else {

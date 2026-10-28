@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Agent-door authority follows one principal: person, agent, client, scopes and consent reach tools, resource reads, events, subscriptions and approval executions. A narrowed grant refuses approved work with `insufficient_scope`, `door.invoke` takes the caller's scopes and consent (it no longer grants every registry scope), and a durable job under a revoked consent refuses `consent_revoked` with a complete audit row. Events on a declared resource reach only agents holding its scope whose read admits them.
+- Narrowing-only access tools declare `widens: false` with a checked argument shape and a grant-set narrowing fixture instead of an escalation fixture; they refuse undeclared arguments. Tools can require the person's native proof: agents get `native_proof_required` with a credential-free handoff, and the seed's own check admits the retry. The reference app adds teammate access reads, invitation cancellation and a step-up export.
+- Agent-door verification binds a seed's declared native names to per-run values, runs durable fixtures through the Worker's scheduled event and completes native proof through the seed's declared test module.
 - Agent-door verification follows signed and native owner lifecycles, supports isolated seed provider adapters, and accepts Base source archives for copy authoring.
 
 - Bind agent sponsors to durable Business person ids from signed settings, enforce native admission including the allow-list, and honour signed agent and consent revocation. Resources now use the policy and audit pipeline. Approvals show saved summaries, bind decisions to their hash, execute with named approvers and leave a separate execution audit; Undo is the reviewer's act. Running audits commit before effects and recover from recorded outcomes. Standalone spend caps and unscoped Business daily limits are refused until their enforcement exists. The reference journey exercises self-escalation fixtures and real settings pairing.

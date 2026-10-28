@@ -1,6 +1,7 @@
 import type { Runtime, ToolDefinition } from './types.ts'
 import { templateMatches } from './registry.ts'
 import { ToolRefusal } from './errors.ts'
+import { principalOf, resourceContext } from './execution.ts'
 
 /** A resource read uses the same admission, decision and execution as a tool. */
 export function resourceTool(rt: Runtime, uri: string): ToolDefinition | undefined {
@@ -12,10 +13,12 @@ export function resourceTool(rt: Runtime, uri: string): ToolDefinition | undefin
     scope: resource.scope ?? '', readOnly: true, classes: resource.classes, clauses: [],
     inputSchema: { type: 'object', properties: { uri: { type: 'string' } }, required: ['uri'], additionalProperties: false },
     outputSchema: { type: 'object', properties: { contents: { type: 'array', items: { type: 'object' } } }, required: ['contents'], additionalProperties: false },
+    // The reader decides with the calling principal, including an approved read executed later.
     async classify(_args, ctx) {
-      try { record = await resource.read(uri, { person: ctx.person, db: ctx.db }) } catch { record = null }
+      const reader = resourceContext(rt, principalOf(ctx))
+      try { record = await resource.read(uri, reader) } catch { record = null }
       if (!record) throw new ToolRefusal('resource_unavailable')
-      return resource.classify(record, { person: ctx.person, db: ctx.db })
+      return resource.classify(record, reader)
     },
     async run() {
       if (!record) throw new ToolRefusal('resource_unavailable')

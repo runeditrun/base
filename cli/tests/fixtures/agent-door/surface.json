@@ -8,11 +8,15 @@
     { "name": "fixture.records.send", "scope": "records:write", "readOnly": false, "classes": ["external"], "clauses": ["BASE-AGENT-006"] },
     { "name": "fixture.records.deliver", "scope": "records:write", "readOnly": false, "classes": ["external"], "clauses": ["BASE-AGENT-006"] },
     { "name": "fixture.records.denied", "scope": "records:write", "readOnly": false, "classes": ["external"], "clauses": ["BASE-AGENT-006"] },
+    { "name": "fixture.records.schedule", "scope": "records:write", "readOnly": false, "classes": ["standard"], "clauses": ["BASE-AGENT-004"] },
     { "name": "fixture.events.list", "scope": "events:read", "readOnly": true, "classes": ["standard"], "clauses": ["BASE-AGENT-010"] }
   ],
   "notTools": [],
   "resources": [],
   "escalations": [],
+  "durable": [
+    { "id": "scheduled-create", "tool": "fixture.records.schedule", "args": { "value": "Scheduled operations note" }, "expect": [{ "class": "standard", "facts": { "measure": 1 } }], "runs": "fixture.records.create" }
+  ],
   "witness": { "tool": "fixture.records.list", "args": {} },
   "journey": [
     { "id": "create", "tool": "fixture.records.create", "args": { "value": "Quarterly operations note" }, "expect": [{ "class": "standard", "facts": { "measure": 1 } }], "inject": { "classes": ["external"], "counterparty": "public", "policy": "blocked" } },

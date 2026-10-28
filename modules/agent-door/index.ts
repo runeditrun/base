@@ -1,4 +1,4 @@
-import type { AgentDoor, AgentDoorOptions, Runtime } from './types.ts'
+import type { AgentDoor, AgentDoorOptions, Principal, Runtime } from './types.ts'
 import { registry } from './registry.ts'
 import { eventsTool, appendEvents } from './events.ts'
 import { personDoor } from './person-doors.ts'
@@ -8,6 +8,7 @@ import { adoptPolicy, policyState } from './policy-store.ts'
 import { admit } from './admission.ts'
 import { callTool } from './pipeline.ts'
 import { revoked } from './execution.ts'
+import { currentGrant } from './audit.ts'
 import { json } from './errors.ts'
 
 export { defineTool } from './registry.ts'
@@ -35,20 +36,28 @@ export function createAgentDoor(options: AgentDoorOptions): AgentDoor {
       }
       if (path === '/mcp' || options.paths?.includes(path)) return mcp(rt, request)
       if (path.startsWith('/agents/api/')) return personDoor(rt, request)
-      if (path === '/agents' || /^\/agents\/approvals\/[^/]+$/.test(path)) {
+      if (path === '/agents' || /^\/agents\/(?:approvals\/[^/]+|proofs\/[^/]+\/[^/]+)$/.test(path)) {
         if (request.method !== 'GET') return new Response(null, { status: 405 })
         const person = request.headers.has('authorization') ? null : await options.people.session(request)
         return agentPage(rt, request, person?.active ? person : null)
       }
       return null
     },
+    // A durable job passes the invocation it saved: its sponsor, agent, client,
+    // scopes and consent. The scopes are only those granted, narrowed to the
+    // agent's current grant; a revoked consent refuses at this final admission.
     async invoke(name, args, who) {
       const person = await options.people.person(who.person.id)
       if (!person?.active || person.id !== who.person.id) return { outcome: 'refused', code: 'unauthenticated', decision: null }
-      const principal = { person, agent: who.agent, scopes: [...new Set(rt.tools.map(tool => tool.scope))] }
-      if (revoked(await policyState(rt), principal)) return { outcome: 'refused', code: 'unauthenticated', decision: null }
+      const scopes = Array.isArray(who.scopes) ? [...new Set(who.scopes.filter(scope => typeof scope === 'string'))] : []
+      const principal: Principal = { person, agent: who.agent, scopes, ...(who.consent ? { consent: who.consent } : {}), ...(who.client ? { client: who.client } : {}) }
+      const state = await policyState(rt)
+      if (principal.consent && state.revoked.consents.includes(principal.consent)) return (await callTool(rt, name, args, principal, 'embedded', undefined, undefined, undefined, 'consent_revoked')).result
+      if (revoked(state, principal)) return { outcome: 'refused', code: 'unauthenticated', decision: null }
       const capacity = await admit(rt, principal)
       if (capacity !== null) return { outcome: 'refused', code: capacity === 'revoked' ? 'unauthenticated' : 'rate_limited', decision: null }
+      const grant = await currentGrant(rt, principal.agent.id)
+      if (grant) principal.scopes = scopes.filter(scope => grant.includes(scope))
       return (await callTool(rt, name, args, principal, 'embedded')).result
     },
     async emit(event) {

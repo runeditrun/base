@@ -53,8 +53,7 @@ export async function pausePhase(c) {
  const before = await c.witness();
  await c.adopt(autonomousPolicy(), { paused: true });
  for (const tool of c.surface.tools) {
-  const step = c.surface.journey.find(item => item.tool === tool.name);
-  const paused = await c.tool(tool.name, c.args(step, new Map(), { unresolved: true }));
+  const paused = await c.tool(tool.name, c.args(c.fixture(tool.name), new Map(), { unresolved: true }));
   c.add(`BASE-AGENT-011.6.pause.${tool.name}`, errorCode(paused) === 'agents_paused', `${tool.name} ran while Business Pause was set.`);
  }
  const state = await c.personJson('/agents/api/state');

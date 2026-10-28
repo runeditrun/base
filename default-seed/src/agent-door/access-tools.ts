@@ -2,17 +2,20 @@ import { defineTool, ToolRefusal, type ToolContext, type ToolDefinition } from '
 import type { Bindings } from '../core/platform/bindings.server'
 import { AuthError } from '../../../modules/operator-auth/index.mjs'
 import { operatorAuth } from '../core/platform/auth/session.server'
-import { operatorByEmail, readOperator, requirePeopleAccess } from './repository.server'
+import { operatorByEmail, readOperator, requirePeopleAccess, type OperatorRow } from './repository.server'
 import { email, id, object, text } from './schemas'
 
 const clauses = ['BASE-AGENT-002', 'BASE-AGENT-006', 'BASE-AGENT-009']
 const role = { type: 'string', enum: ['admin', 'member'] }
 const result = object({ id, role: { type: 'string' }, status: { type: 'string' }, version: { type: 'integer' } })
 const operatorUri = (id: string) => `base://operator/${encodeURIComponent(id)}`
+// The access a teammate holds now; an admin also holds member access.
+const grants = (target: OperatorRow) => target.status === 'inactive' ? [] : ['member', 'admin', 'owner'].slice(0, ['member', 'admin', 'owner'].indexOf(target.role) + 1)
 function native(bindings: Bindings, ctx: ToolContext) {
   const commands = operatorAuth(bindings).delegatedAdministration({ personId: ctx.person.id, auditLabel: ctx.actor.label, agentId: ctx.agent.id })
   const act = async <T>(work: () => Promise<T>) => { try { return await work() } catch (cause) { if (cause instanceof AuthError) throw new ToolRefusal(cause.code); throw cause } }
-  return { invite: (input: Parameters<typeof commands.invite>[0]) => act(() => commands.invite(input)), setRole: (id: string, role: 'admin' | 'member') => act(() => commands.setRole(id, role)) }
+  return { invite: (input: Parameters<typeof commands.invite>[0]) => act(() => commands.invite(input)), setRole: (id: string, role: 'admin' | 'member') => act(() => commands.setRole(id, role)),
+    cancelInvitation: (id: string) => act(() => commands.cancelInvitation(id)) }
 }
 async function roleTarget(args: Record<string, unknown>, ctx: ToolContext) {
   requirePeopleAccess(ctx.person)
@@ -64,6 +67,39 @@ export function accessTools(bindings: Bindings): ToolDefinition[] {
         await roleTarget(args, ctx)
         const target = await native(bindings, ctx).setRole(args.id as string, args.role as 'admin' | 'member')
         ctx.emit('operator.role.changed', operatorUri(target.id), { id: target.id, role: target.role, version: target.version, approved_by: ctx.approvers })
+        return { result: { id: target.id, role: target.role, status: target.status, version: target.version } }
+      },
+    }),
+    defineTool({
+      name: 'base.access.read', title: 'Read teammate access', description: 'Read a teammate role, status and the access it holds now.',
+      scope: 'access:read', readOnly: true, inputSchema: object({ id }), outputSchema: object({ id, role: { type: 'string' }, status: { type: 'string' }, version: { type: 'integer' }, grants: { type: 'array', items: { type: 'string' } } }),
+      classes: ['standard'], clauses,
+      classify(_args, ctx) { requirePeopleAccess(ctx.person); return [{ class: 'standard', facts: { measure: 1 } }] },
+      async run(args, ctx) {
+        requirePeopleAccess(ctx.person)
+        const target = await readOperator(ctx.db, args.id as string)
+        if (!target) throw new ToolRefusal('operator_not_found')
+        return { result: { id: target.id, role: target.role, status: target.status, version: target.version, grants: grants(target) } }
+      },
+    }),
+    defineTool({
+      name: 'base.access.cancel', title: 'Cancel a pending invitation', description: 'Withdraw a teammate invitation before it is accepted, using native authorization. It only removes access.',
+      scope: 'access:write', readOnly: false, inputSchema: object({ id }), outputSchema: result, classes: ['access'], clauses, widens: false,
+      async classify(args, ctx) {
+        const target = await roleTarget(args, ctx)
+        if (target.status !== 'invited') throw new ToolRefusal('invitation_conflict')
+        return [{ class: 'access', facts: { measure: 1, direction: 'narrows' } }]
+      },
+      async revision(args, ctx) { return (await readOperator(ctx.db, args.id as string))?.version ?? null },
+      async authority(args, ctx) { const target = await readOperator(ctx.db, args.id as string); return target ? { subject: target.id, widens: false } : null },
+      async summary(args, ctx) {
+        const target = await roleTarget(args, ctx)
+        return { target: { id: target.id, name: target.displayName, email: target.email }, role: target.role }
+      },
+      async run(args, ctx) {
+        await roleTarget(args, ctx)
+        const target = await native(bindings, ctx).cancelInvitation(args.id as string)
+        ctx.emit('operator.invitation.cancelled', operatorUri(target.id), { id: target.id, status: target.status, version: target.version, approved_by: ctx.approvers })
         return { result: { id: target.id, role: target.role, status: target.status, version: target.version } }
       },
     }),

@@ -21,6 +21,7 @@ export default {
     const path = new URL(request.url).pathname
     if (path === '/__clock') { time = (await request.json() as { now: number }).now; return Response.json({ ok: true }) }
     const read = (id: string) => env.DB.prepare('SELECT id,value,version,exposure FROM test_records WHERE id=?').bind(id).first<{ id: string; value: string; version: number; exposure: string }>()
+    const operator = (id: string) => env.DB.prepare('SELECT id,role FROM oa_operators WHERE id=?').bind(id).first<{ id: string; role: string }>()
     const tools: ToolDefinition[] = [
       defineTool({ name: 'synthetic.records.list', title: 'Read records', description: 'Read native records.', scope: 'records:read', readOnly: true, inputSchema: object({}), outputSchema: object({ records: { type: 'array', items: { type: 'object' } }, sent: { type: 'array', items: { type: 'object' } } }), classes: ['standard'], clauses: ['BASE-AGENT-002'], classify: () => [{ class: 'standard', facts: { measure: 1 } }],
         async run() { return { result: { records: (await env.DB.prepare('SELECT * FROM test_records ORDER BY id').all()).results, sent: (await env.DB.prepare('SELECT * FROM test_sent ORDER BY rowid').all()).results } } } }),
@@ -41,15 +42,41 @@ export default {
       defineTool({ name: 'synthetic.records.send', title: 'Send record', description: 'External exposure is stored on the native record.', scope: 'records:write', readOnly: false, summary: args => ({ target: { id: String(args.id) } }), inputSchema: idInput, outputSchema: idInput, classes: ['external', 'sensitive'], clauses: ['BASE-AGENT-006'],
         classify: async args => [{ class: 'external', facts: { measure: 1, counterparty: (await read(args.id as string))?.exposure === 'known' ? 'known' : 'new' } }, { class: 'sensitive', facts: { measure: 1, kind: 'tax' } }],
         async run(args, ctx) { await env.DB.prepare('INSERT INTO test_sent(id) VALUES(?)').bind(args.id).run(); ctx.emit('record.sent', `synthetic://record/${args.id}`); return { result: { id: args.id } } } }),
+      defineTool({ name: 'synthetic.records.schedule', title: 'Schedule a record write', description: 'Save a record later, under the consent this call acts with.', scope: 'records:write', readOnly: false, summary: args => ({ target: { id: String(args.id) } }), inputSchema: object({ id: text, value: text }), outputSchema: idInput, classes: ['standard'], clauses: ['BASE-AGENT-004'], classify: () => [{ class: 'standard', facts: { measure: 1 } }],
+        async run(args, ctx) { const id = crypto.randomUUID(); await env.DB.prepare("INSERT INTO test_jobs(id,args,invocation,state) VALUES(?,?,?,'pending')").bind(id, JSON.stringify(args), JSON.stringify(ctx.invocation)).run(); return { result: { id } } } }),
+      defineTool({ name: 'synthetic.access.read', title: 'Read authority', description: 'Read the access a person holds now.', scope: 'records:read', readOnly: true, inputSchema: idInput, outputSchema: object({ id: text, grants: { type: 'array', items: text } }), classes: ['standard'], clauses: ['BASE-AGENT-005'], classify: () => [{ class: 'standard', facts: { measure: 1 } }],
+        async run(args) { const row = await operator(args.id as string); if (!row) throw new ToolRefusal('person_not_found'); return { result: { id: row.id, grants: ['member', 'admin', 'owner'].slice(0, ['member', 'admin', 'owner'].indexOf(row.role) + 1) } } } }),
+      defineTool({ name: 'synthetic.access.revoke', title: 'Revoke admin authority', description: 'Remove a person\'s admin authority; it only narrows.', scope: 'records:write', readOnly: false, widens: false, summary: args => ({ target: { id: String(args.id) }, role: 'member' }), inputSchema: idInput, outputSchema: idInput, classes: ['access'], clauses: ['BASE-AGENT-005'],
+        authority: async args => ({ subject: args.id as string, widens: false }), classify: () => [{ class: 'access', facts: { measure: 1, direction: 'narrows' } }],
+        async run(args) { await env.DB.prepare("UPDATE oa_operators SET role='member' WHERE id=? AND role='admin'").bind(args.id).run(); return { result: { id: args.id } } } }),
+      defineTool({ name: 'synthetic.records.export', title: 'Export record', description: 'Export a native record after the sponsor\'s fresh native proof.', scope: 'records:read', readOnly: true, proof: { native: 'step_up' }, inputSchema: idInput, outputSchema: output, classes: ['sensitive'], clauses: ['BASE-AGENT-005'],
+        classify: () => [{ class: 'sensitive', facts: { measure: 1, kind: 'tax' } }],
+        async run(args) { const row = await read(args.id as string); if (!row) throw new ToolRefusal('record_not_found'); return { result: { id: row.id, value: row.value, version: row.version } } } }),
       defineTool({ name: 'synthetic.access.change', title: 'Change authority', description: 'Change authority of a named person.', scope: 'records:write', readOnly: false, summary: args => ({ target: { id: String(args.id) }, role: String(args.role ?? 'admin') }), inputSchema: object({ id: text, role: {type:'string',enum:['admin','member']} }, ['id']), outputSchema: idInput, classes: ['access'], clauses: ['BASE-AGENT-006'], authority: async args => ({ subject: args.id as string, widens: args.role !== 'member' }), classify: (args,ctx) => { if (args.role !== 'member' && String(args.id).toLowerCase() === ctx.person.email.toLowerCase()) throw new ToolRefusal('classifier_refused'); return [{ class: 'access', facts: { measure: 1, direction: args.role === 'member' ? 'narrows' : 'widens' } }] }, async run(args) { await env.DB.prepare("UPDATE oa_operators SET role=? WHERE id=? AND role<>'owner'").bind(args.role ?? 'admin',args.id).run(); return { result: { id: args.id } } } }),
     ]
     const door = createAgentDoor({ seed: 'synthetic', name: 'Synthetic Base', specialist: 'operations', origin: config.origin, db: env.DB, trust: JSON.parse(env.TRUST), now,
       tools, limits: config.limits, people: operatorAuthPeople({ db: env.DB, allowList, session: request => auth.getSession(request) }),
+      // The native email-link step-up, confirmed in a session that returned to this handoff.
+      nativeProof: { step_up: { start: { action: '/auth/step-up', fields: { action: 'export' } }, verify: async (reference, ctx) => !!await env.DB.prepare("SELECT 1 FROM oa_step_up_challenges WHERE operator_id=? AND action='export' AND return_to=? AND consumed_at>=?").bind(ctx.person.id, `/agents/proofs/${ctx.kind}/${reference}`, now() - 600000).first() } },
       localCredentials: async request => request.headers.get('authorization') === 'Bearer synthetic-base-local' ? { sponsor: { id: (await env.DB.prepare('SELECT claim_id FROM oa_bootstrap WHERE singleton=1').first<{claim_id:string}>())!.claim_id }, agent: { id: 'synthetic-base-local', name: 'Synthetic Local' }, scopes: ['records:read','records:write','events:read'] } : null,
       resources: [{ uriTemplate: 'synthetic://record/{id}', name: 'Record', scope: config.resourceScope, classes: ['sensitive'], classify: () => [{ class: 'sensitive', facts: { measure: 1, kind: 'tax' } }], read: async uri => { const row = await read(uri.split('/').pop()!); return row && row.exposure !== 'hidden' ? { json: row, untrusted: true } : null } }],
       onEvent: async event => { await env.DB.prepare('INSERT INTO test_callbacks(id,event) VALUES(?,?)').bind(event.id, JSON.stringify(event)).run() },
     })
-    if (path === '/__embedded') return Response.json(await door.invoke('synthetic.records.list', {}, { person: (await doorPerson(auth, request))!, agent: { id: 'synthetic-base-embedded', name: 'Synthetic Embedded' } }))
+    if (path === '/__embedded') {
+      const body = await request.json() as { tool?: string; args?: Record<string, unknown>; scopes?: string[] }
+      return Response.json(await door.invoke(body.tool ?? 'synthetic.records.list', body.args ?? {}, { person: (await doorPerson(auth, request))!, agent: { id: 'synthetic-base-embedded', name: 'Synthetic Embedded' }, scopes: body.scopes ?? ['records:read'] }))
+    }
+    // The seed's own job runner: each scheduled write runs with the invocation it saved.
+    if (path === '/__jobs') {
+      const jobs = (await env.DB.prepare("SELECT id,args,invocation FROM test_jobs WHERE state='pending' ORDER BY rowid").all<{ id: string; args: string; invocation: string }>()).results
+      const results = []
+      for (const job of jobs) {
+        const result = await door.invoke('synthetic.records.write', { ...JSON.parse(job.args), idempotency_key: job.id }, JSON.parse(job.invocation))
+        await env.DB.prepare('UPDATE test_jobs SET state=? WHERE id=?').bind(result.outcome, job.id).run()
+        results.push({ id: job.id, outcome: result.outcome, code: result.code ?? null })
+      }
+      return Response.json({ jobs: results })
+    }
     if (path === '/__emit') { const person = await doorPerson(auth, request); if (!person) return new Response(null, { status: 401 }); await door.emit({ type: 'record.person', uri: 'synthetic://record/synthetic-base-1', person }); return Response.json({ ok: true }) }
     return await door.handle(request) ?? await settings.handle(request) ?? await createAuthHandler(auth)(request) ?? new Response(null, { status: 404 })
   },

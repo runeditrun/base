@@ -125,6 +125,15 @@ function recordTools(db, records) {
         const receipt = await records.receipt(record, ctx.person, 'delivery', response.status, { ...document, signatureVerified: true }, deliveryId);
         ctx.emit('record.delivered', uri(record.id), { receiptId: receipt.id }); return { result: receipt };
       } }),
+    defineTool({ name: 'fixture.records.schedule', title: 'Schedule a record', description: 'Save a record when the scheduled job runs, under the consent this call acts with.', scope: 'records:write', readOnly: false,
+      inputSchema: object({ value: { ...text, maxLength: 2000 } }), outputSchema: object({ id: text }), classes: ['standard'], clauses: ['BASE-AGENT-004'], classify: standard,
+      summary: args => ({ target: { name: args.value } }),
+      async run(args, ctx) {
+        await records.authorize(ctx.person);
+        const id = crypto.randomUUID();
+        await db.prepare("INSERT INTO fixture_jobs(id,value,invocation,state) VALUES(?,?,?,'pending')").bind(id, args.value, JSON.stringify(ctx.invocation)).run();
+        return { result: { id } };
+      } }),
     defineTool({ name: 'fixture.records.denied', title: 'Check denied destination', description: 'Attempt an undeclared external destination and retain the network refusal.', scope: 'records:write', readOnly: false,
       inputSchema: object({ id: text }), outputSchema: receiptSchema, classes: ['external'], clauses: ['BASE-AGENT-006'],
       classify: () => [{ class: 'external', facts: { measure: 1, counterparty: 'new' } }],
@@ -145,25 +154,32 @@ function memberPeople(people, db, nativeMode) {
   return { ...people, person: async id => allowed(await people.person(id)), sponsor: async claims => allowed(await people.sponsor(claims)), session: async request => allowed(await people.session(request)) };
 }
 
+function installation(env) {
+  const origin = env.RER_OWNER_CLAIM_APP_ORIGIN, nativeMode = env.OWNER_MODE === 'native';
+  const config = { origin, OWNER_EMAIL: nativeMode ? env.SETUP_OPERATOR_EMAIL : env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, SETUP_TOKEN: env.SETUP_TOKEN,
+    branding: { productName: 'Records' } };
+  const clientIp = incoming => incoming.headers.get('CF-Connecting-IP') ?? '';
+  const teamAuth = createOperatorAuth({ db: env.DB, config, clientIp });
+  const settings = createBusinessSettings({ db: env.DB, trust: env.RER_BUSINESS_TRUST,
+    business: { settings: 1, values: ['display_name'], team: { roles: { admin: 'admin', member: 'member' } } }, team: teamAuth.businessTeam });
+  const auth = createOperatorAuth({ db: env.DB, config, clientIp, businessSettings: settings });
+  const trust = { issuer: env.RER_OWNER_CLAIM_ISSUER, installationId: env.RER_OWNER_CLAIM_INSTALLATION_ID, appOrigin: origin, publicKeys: JSON.parse(env.RER_OWNER_CLAIM_PUBLIC_KEYS) };
+  const records = nativeRecords(env.DB, nativeMode);
+  const door = createAgentDoor({ seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [],
+    limits: { requestsPerMinute: 10000 }, tools: recordTools(env.DB, records),
+    people: memberPeople(operatorAuthPeople({ db: env.DB, session: incoming => auth.getSession(incoming) }), env.DB, nativeMode) });
+  return { config, clientIp, settings, auth, trust, records, door, nativeMode };
+}
+
 export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
     if (path === '/health') return Response.json({ ok: true, deployment: { sourceSha: env.RER_DEPLOY_SOURCE, fingerprint: env.RER_DEPLOY_FINGERPRINT, versionId: env.RER_VERSION.id } });
     if (path === '/' && ['GET', 'HEAD'].includes(request.method)) return new Response(request.method === 'HEAD' ? null : '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Records</title></head><body><main><h1>Records</h1><p>Save internal records, request a provider review, and retain signed delivery receipts.</p><p><a href="/app">Open your records workspace</a></p></main></body></html>', { headers: { ...securityHeaders(), 'Content-Type': 'text/html; charset=utf-8' } });
-    const origin = env.RER_OWNER_CLAIM_APP_ORIGIN, nativeMode = env.OWNER_MODE === 'native';
     if (!['signed', 'native', 'setup-token'].includes(env.OWNER_MODE)) return new Response('Invalid owner configuration', { status: 503 });
-    const config = { origin, OWNER_EMAIL: nativeMode ? env.SETUP_OPERATOR_EMAIL : env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, SETUP_TOKEN: env.SETUP_TOKEN,
-      branding: { productName: 'Records' } };
-    const clientIp = incoming => incoming.headers.get('CF-Connecting-IP') ?? '';
-    const teamAuth = createOperatorAuth({ db: env.DB, config, clientIp });
-    const settings = createBusinessSettings({ db: env.DB, trust: env.RER_BUSINESS_TRUST,
-      business: { settings: 1, values: ['display_name'], team: { roles: { admin: 'admin', member: 'member' } } }, team: teamAuth.businessTeam });
-    const auth = createOperatorAuth({ db: env.DB, config, clientIp, businessSettings: settings });
-    const trust = { issuer: env.RER_OWNER_CLAIM_ISSUER, installationId: env.RER_OWNER_CLAIM_INSTALLATION_ID, appOrigin: origin, publicKeys: JSON.parse(env.RER_OWNER_CLAIM_PUBLIC_KEYS) };
-    const records = nativeRecords(env.DB, nativeMode);
-    const door = createAgentDoor({ seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [],
-      limits: { requestsPerMinute: 10000 }, tools: recordTools(env.DB, records),
-      people: memberPeople(operatorAuthPeople({ db: env.DB, session: incoming => auth.getSession(incoming) }), env.DB, nativeMode) });
+    // Like Mango's server, admission needs its own native issuer and installation bindings.
+    if (env.FIXTURE_MANAGEMENT_ORIGIN !== env.RER_OWNER_CLAIM_ISSUER || env.FIXTURE_INSTALLATION_ID !== env.RER_OWNER_CLAIM_INSTALLATION_ID) return new Response('Native issuer bindings are missing', { status: 503 });
+    const { config, clientIp, settings, auth, trust, records, door, nativeMode } = installation(env);
     const handled = await door.handle(request) ?? await settings.handle(request);
     if (handled) return handled;
     if (path === '/auth/owner-claim' && env.OWNER_MODE === 'signed') return createOwnerClaimHandler({ db: env.DB, authConfig: config, clientIp, ...trust, expectedEmail: config.OWNER_EMAIL })(request);
@@ -199,6 +215,15 @@ export default {
       if (error instanceof AuthError) return Response.json({ error: error.code }, { status: error.status });
       if (error instanceof ToolRefusal) return Response.json({ error: error.code }, { status: 403 });
       throw error;
+    }
+  },
+  // Scheduled records are created by the job, with the invocation each schedule saved.
+  async scheduled(_controller, env) {
+    const { door } = installation(env);
+    const jobs = (await env.DB.prepare("SELECT id,value,invocation FROM fixture_jobs WHERE state='pending' ORDER BY rowid").all()).results;
+    for (const job of jobs) {
+      const result = await door.invoke('fixture.records.create', { value: job.value, idempotency_key: job.id }, JSON.parse(job.invocation));
+      await env.DB.prepare('UPDATE fixture_jobs SET state=? WHERE id=?').bind(result.outcome, job.id).run();
     }
   },
 };

@@ -43,6 +43,12 @@ export function delegatedAdministration(context, { personId, auditLabel, agentId
       if (operatorId === personId || target?.role === 'owner' || role === 'owner') deny('delegated_owner_change', 403);
       return (await commands()).setRole(request, operatorId, role);
     },
+    async cancelInvitation(operatorId) {
+      const target = await store.operator(operatorId);
+      // Cancellation only withdraws a pending invitation, never the sponsor's or an owner's access.
+      if (operatorId === personId || target?.role === 'owner') deny('delegated_owner_change', 403);
+      return (await commands()).cancelInvitation(request, operatorId);
+    },
     async listOperators() { return (await commands()).listOperators(request); },
   });
 }

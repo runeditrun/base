@@ -19,18 +19,23 @@ export function registry(options: AgentDoorOptions): ToolDefinition[] {
     if ('cost' in tool) throw new TypeError(`Provider cost is not enforced: ${tool.name}`)
     if (!tool.readOnly && typeof tool.summary !== 'function') throw new TypeError(`Missing approval summary: ${tool.name}`)
     if (tool.classes.some(cls => cls === 'access' || cls === 'security') && typeof tool.authority !== 'function') throw new TypeError(`Missing authority: ${tool.name}`)
+    if (tool.widens !== undefined && (tool.widens !== false || !tool.classes.some(cls => cls === 'access' || cls === 'security'))) throw new TypeError(`Only access or security tools declare widens:false: ${tool.name}`)
+    const kind = tool.proof?.native, proof = typeof kind === 'string' && Object.hasOwn(options.nativeProof ?? {}, kind) ? options.nativeProof![kind] : undefined
+    if (tool.proof !== undefined && (typeof kind !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/.test(kind) || typeof proof?.verify !== 'function' || typeof proof.start?.action !== 'string' || !proof.start.action.startsWith('/'))) throw new TypeError(`Native proof needs a declared nativeProof kind: ${tool.name}`)
     const properties = { ...tool.inputSchema.properties }
-    if ('idempotency_key' in properties || 'expected_revision' in properties) throw new TypeError(`Reserved argument: ${tool.name}`)
+    if ('idempotency_key' in properties || 'expected_revision' in properties || 'native_proof' in properties) throw new TypeError(`Reserved argument: ${tool.name}`)
     const required = [...tool.inputSchema.required ?? []]
     if (!tool.readOnly) { properties.idempotency_key = { type: 'string', minLength: 1, maxLength: 200 }; required.push('idempotency_key') }
     if (tool.revision) properties.expected_revision = { type: 'integer' }
+    if (tool.proof) properties.native_proof = { type: 'string', minLength: 1, maxLength: 200 }
     return { ...tool, inputSchema: { ...tool.inputSchema, properties, required }, classes: [...tool.classes], clauses: [...tool.clauses] }
   }).sort((a, b) => a.name.localeCompare(b.name))
 }
 export function describeTool(tool: ToolDefinition) {
   return { name: tool.name, title: tool.title, description: tool.description, inputSchema: tool.inputSchema, outputSchema: tool.outputSchema,
     annotations: { readOnlyHint: tool.readOnly, destructiveHint: tool.classes.includes('destructive'), openWorldHint: tool.classes.includes('external') },
-    _meta: { 'com.runeditrun/classes': tool.classes, 'com.runeditrun/clauses': tool.clauses, 'com.runeditrun/scope': tool.scope } }
+    _meta: { 'com.runeditrun/classes': tool.classes, 'com.runeditrun/clauses': tool.clauses, 'com.runeditrun/scope': tool.scope,
+      ...(tool.widens === false ? { 'com.runeditrun/widens': false } : {}), ...(tool.proof ? { 'com.runeditrun/proof': tool.proof } : {}) } }
 }
 export function templateMatches(template: string, uri: string) {
   const pattern = template.split(/\{[^}]+\}/).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^/?#]+')
