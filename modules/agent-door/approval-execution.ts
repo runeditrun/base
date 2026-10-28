@@ -21,6 +21,7 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
   const approvers: Array<{ id: string; name: string }> = []
   try {
     const principal = await livePrincipal(rt, saved.principal), state = await policyState(rt), tool = savedTool(rt, saved.tool, saved.args)
+    if (tool?.authority === 'none') row.authority = 'none'
     const refusal = policyRefusal(rt, state, tool?.classes)
     if (saved.principal.consent && state.revoked.consents.includes(saved.principal.consent)) result = { ...result, outcome: 'refused', code: 'consent_revoked' }
     else if (!principal || !tool) result = { ...result, outcome: 'refused', code: 'sponsor_unavailable' }
@@ -34,7 +35,7 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
         if (!approvers.some(item => item.id === person.id)) approvers.push({ id: person.id, name: person.name })
       }
       const ctx = context(rt, principal, saved.door, [], approvers)
-      const authority = await tool.authority?.(saved.args, ctx)
+      const authority = typeof tool.authority === 'function' ? await tool.authority(saved.args, ctx) : null
       const currentRevision = tool.revision && saved.expected_revision !== undefined ? await tool.revision(saved.args, ctx) : undefined
       if (tool.widens === false && authority?.widens) result = { ...result, outcome: 'refused', code: 'narrowing_contract_violation' }
       else if (selfEscalation(authority, principal)) result = { ...result, outcome: 'refused', code: 'self_escalation' }
