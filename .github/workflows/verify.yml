@@ -82,7 +82,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.RER_RUNNER_WIN == 'online' && fromJSON('["self-hosted","rer-win"]') || 'ubuntu-24.04' }}
     permissions:
       contents: read
       packages: read
@@ -115,6 +115,7 @@ jobs:
             exit 1
           fi
       - name: Reclaim unused hosted Android tools for native consumer verification
+        if: ${{ runner.environment != 'self-hosted' }}
         run: |
           set -euo pipefail
           df -Pk "$GITHUB_WORKSPACE"

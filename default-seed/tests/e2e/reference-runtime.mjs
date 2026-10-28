@@ -4,6 +4,7 @@ import { queuedEntrypoint } from '../../../onboarding/queued-entry.mjs';
 const queuedExit=await queuedEntrypoint(import.meta.url,'verify:browser');
 if(queuedExit!==null)process.exit(queuedExit);
 import assert from 'node:assert/strict'
+import { randomBytes } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -18,8 +19,8 @@ import { freshSeedImportDoor } from './import-door.mjs'
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const email = 'operator@example.test'
-const setupToken = 'reference-test-only-setup-token-32-bytes'
-const sessionSecret = 'reference-test-only-session-secret-32-bytes'
+const setupToken = randomBytes(32).toString('hex')
+const sessionSecret = randomBytes(32).toString('hex')
 
 function command(name, args, options = {}) {
   return new Promise((resolveCommand, rejectCommand) => {
@@ -78,7 +79,7 @@ async function serverFunctionId(name) {
 }
 
 async function browserNavigationCheck(baseUrl, cookie) {
-  const browser = await chromium.launch({ headless: true, args: ["--use-mock-keychain", "--password-store=basic"] })
+  const browser = await chromium.launch({ headless: true, executablePath: process.env.RER_TEST_CHROMIUM, args: ['--no-sandbox', "--use-mock-keychain", "--password-store=basic"] })
   try {
     const context = await browser.newContext()
     const page = await context.newPage()
