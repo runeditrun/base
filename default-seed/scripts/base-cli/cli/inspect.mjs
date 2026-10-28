@@ -1,3 +1,4 @@
+import { deployVariableClause } from './deploy-variables.mjs';
 import { browserDoctor } from './browser-runtime.mjs';
 import { dependencyDoctor } from './dependency-doctor.mjs';
 import { inventory } from './export.mjs';
@@ -82,6 +83,7 @@ export async function check(project, explicitProfile) {
  // A warning, never a failing clause: live run sites redeploy while seeds keep Base's mark.
  let placeholderMarks = [];
  clauses.push(...await deliveryDeclarationClauses(project.root));
+ clauses.push(await deployVariableClause(project.root, project.adapter));
  clauses.push(...await agentSurfaceClauses(project.root));
  for (const command of project.commands) add('SC-10.inputs.' + command.name, command.available, `Restore the declared inputs for ${command.name}.`);
  for (const loop of project.descriptor.loops ?? []) add('SC-10.loop.' + loop.id, !loop.required || loop.enabled, `Enable the required ${loop.id} loop or correct its declaration.`);

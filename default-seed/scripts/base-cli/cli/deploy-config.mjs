@@ -28,7 +28,7 @@ export function tomlMain(source) {
  }
 }
 export function jsoncMain(source) {
- try { return JSON.parse(source.replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, '')).main; } catch { return undefined; }
+ try { return parseJsonc(source).main; } catch { return undefined; }
 }
 
 // The deployed Worker entry (`main`) from the first of those files that exists.
