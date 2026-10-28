@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix unused bindings in the copied contract generator; add `check-prose` to `check` for generated acceptance and unclassified tools, with source-linked warnings for Base restatements and misplaced records, and require guarded request-name registries in foundation guidance.
+
 - Bind agent sponsors to durable Business person ids from signed settings, enforce native admission including the allow-list, and honour signed agent and consent revocation. Resources now use the policy and audit pipeline. Approvals show saved summaries, bind decisions to their hash, execute with named approvers and leave a separate execution audit; Undo is the reviewer's act. Running audits commit before effects and recover from recorded outcomes. Standalone spend caps and unscoped Business daily limits are refused until their enforcement exists. The reference journey exercises self-escalation fixtures and real settings pairing.
 
 - Add the server-side agent-door source entry `modules/agent-door/index.ts`, native-action adoption guidance, signed policy adoption on existing owner-claim trust, MCP and person routes, approvals, reviews, audit and retained events. Document request capacities and indefinitely retained idempotency outcomes; distinguish implemented conformance point registrations from edition-specific coverage. Policy behavior derives from platform commit `72aa71c03d943b53ed43dc73cac17d412c00d8fb`, `src/business/agent-policy/{catalogue,document,decide}.ts`; runtime copy pins and CLI versions remain independent.

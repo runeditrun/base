@@ -466,6 +466,7 @@ rer check
 
 Use the generator beside the seed's actual parser when its path differs. Commit
 the generated outputs with the contract, and run the generator's `check` in CI.
+Follow `platform/CONTRACT-STANDARD.md`; `node src/base/contract-docs.mjs check-prose` (also run by `check`) fails generated acceptance mappings and tools without a class, and warns on literal Base-duty and ruling/history/mechanism phrases.
 For an edition carrying the source-lock tool, regenerate before refreshing its
 lock. Its `AGENTS.md` carries these lines in order, with its actual paths:
 
