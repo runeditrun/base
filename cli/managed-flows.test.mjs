@@ -1,3 +1,4 @@
+import { nativeOwnerBrowser } from './fixtures/native-owner-entry.mjs';
 import test, {before, after} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile, writeFile, rm, symlink, stat, statfs, access, readdir, readlink, mkdir, mkdtemp, truncate} from 'node:fs/promises';
@@ -400,6 +401,7 @@ test('rer preview serves one fixed production workerd at the saved origin and ke
  const sourceAsset = join(f.root,'public/preview-change.txt');
  await writeFile(sourceAsset,'original preview asset');
  const child = await ready(f.start(['preview', '--json']));
+ await nativeOwnerBrowser(f, 'preview', events(child).find(row=>row.event==='ready'), 'managed-owner@example.test');
  const topology = await processTree(child.pid);
  assert.equal(topology.filter(row => row.executable === 'workerd').length, 1);
  assert.equal(topology.some(row => row.vite), false);
