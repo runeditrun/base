@@ -4,6 +4,7 @@ import { requirePost, escapeHtml, securityHeaders } from '../../../../modules/op
 import { readInput } from '../../../../modules/operator-auth/input.mjs';
 import { createOwnerClaimHandler } from '../../../../modules/owner-claim/index.mjs';
 import { createBusinessSettings } from '../../../../modules/business-settings/index.ts';
+import { createMailSender } from '../../../../modules/mail/index.mjs';
 import { deliveryRequest, verifyDeliveryReceipt, OPENAI_AUTHORIZATION } from './receiver.mjs';
 
 const object = (properties, required = Object.keys(properties)) => ({ type: 'object', properties, required, additionalProperties: false });
@@ -153,12 +154,12 @@ export default {
     const origin = env.RER_OWNER_CLAIM_APP_ORIGIN, nativeMode = env.OWNER_MODE === 'native';
     if (!['signed', 'native', 'setup-token'].includes(env.OWNER_MODE)) return new Response('Invalid owner configuration', { status: 503 });
     const config = { origin, OWNER_EMAIL: nativeMode ? env.SETUP_OPERATOR_EMAIL : env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, SETUP_TOKEN: env.SETUP_TOKEN,
-      branding: { productName: 'Records' } };
+      MAIL_FROM: 'synthetic-records@example.com', branding: { productName: 'Records' } };
     const clientIp = incoming => incoming.headers.get('CF-Connecting-IP') ?? '';
     const teamAuth = createOperatorAuth({ db: env.DB, config, clientIp });
     const settings = createBusinessSettings({ db: env.DB, trust: env.RER_BUSINESS_TRUST,
       business: { settings: 1, values: ['display_name'], team: { roles: { admin: 'admin', member: 'member' } } }, team: teamAuth.businessTeam });
-    const auth = createOperatorAuth({ db: env.DB, config, clientIp, businessSettings: settings });
+    const auth = createOperatorAuth({ db: env.DB, config, clientIp, businessSettings: settings, mailSender: createMailSender({ provider: 'resend', mode: 'production', apiKey: env.MAIL_API_KEY }) });
     const trust = { issuer: env.RER_OWNER_CLAIM_ISSUER, installationId: env.RER_OWNER_CLAIM_INSTALLATION_ID, appOrigin: origin, publicKeys: JSON.parse(env.RER_OWNER_CLAIM_PUBLIC_KEYS) };
     const records = nativeRecords(env.DB, nativeMode);
     const door = createAgentDoor({ seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [{ uriTemplate: 'fixture://record/{id}', name: 'Record', scope: 'records:read', classes: ['standard'], classify: standard, async read(resource, ctx) { try { return { json: await records.read(resource.split('/').pop(), ctx.person) }; } catch (error) { if (error instanceof ToolRefusal) return null; throw error; } } }],

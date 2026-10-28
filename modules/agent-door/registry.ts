@@ -5,7 +5,7 @@ import { validToolName } from './conformance/tool-name.mjs'
 
 export const defineTool = (tool: ToolDefinition): ToolDefinition => tool
 export function registry(options: AgentDoorOptions): ToolDefinition[] {
-  if (!/^[a-z][a-z0-9-]*$/.test(options.seed)) throw new TypeError('Invalid seed id')
+  if (!/^[a-z][a-z0-9-]*$/.test(options.seed) || !validToolName(`${options.seed}.events.list`, options.seed)) throw new TypeError('Invalid seed id')
   if (new URL(options.origin).origin !== options.origin) throw new TypeError('Agent origin must be canonical')
   for (const resource of options.resources ?? []) {
     if (!resource.classes?.length || new Set(resource.classes).size !== resource.classes.length || resource.classes.some(cls => !isClass(cls)) || typeof resource.classify !== 'function') throw new TypeError(`Invalid resource classes: ${resource.uriTemplate}`)

@@ -86,9 +86,15 @@ test('G4 integer and UUID revision tokens survive approval and execution without
    const view = (await r.person(`/agents/api/approvals/${id}`)).body.approval
    const result = await r.person(`/agents/api/approvals/${id}/approve`, { revision: view.revision, summary_sha256: view.summary_sha256 })
    assert.equal(result.body.approval.state, 'refused')
-   assert.equal(result.body.approval.code, 'approval_evidence_changed')
+   assert.equal(result.body.approval.code, 'revision_conflict')
    assert.equal((await r.db.prepare('SELECT value FROM test_records').first()).value, 'initial')
-   assert.equal(code(await r.tool('records.write', heldInput)), 'approval_evidence_changed')
+   assert.equal(code(await r.tool('records.write', heldInput)), 'revision_conflict')
+   const fresh = await r.tool('records.write', input('approved-fresh', await current()))
+   const freshId = fresh.result._meta['com.runeditrun/approval'].id
+   const freshView = (await r.person(`/agents/api/approvals/${freshId}`)).body.approval
+   const executed = await r.person(`/agents/api/approvals/${freshId}/approve`, { revision: freshView.revision, summary_sha256: freshView.summary_sha256 })
+   assert.equal(executed.body.approval.state, 'executed')
+   assert.equal((await r.db.prepare('SELECT value FROM test_records').first()).value, 'approved-fresh')
   } finally { await r.close() }
  }
 })

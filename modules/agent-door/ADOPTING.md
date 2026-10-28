@@ -277,8 +277,8 @@ record exists. Declare `revisionType: 'string'` for UUIDs or other string tokens
 `'number'` for numeric tokens, or retain the default `'integer'`. The generated
 `expected_revision` input schema uses that type. Tokens are compared strictly
 and saved unchanged with pending approvals. A stale initial token returns
-`revision_conflict`; a token changed before approved execution returns the
-existing `approval_evidence_changed` without running the tool. Native services
+`revision_conflict`; a token changed before approved execution also returns
+`revision_conflict` without running the tool. Native services
 still own atomic revision checks at their effect boundary.
 
 ## MCP version compatibility
@@ -293,3 +293,66 @@ protocol-version HTTP header and modern method/name metadata. Supporting it
 would require a batch dispatcher and a separate legacy result/approval shape,
 not merely adding a version string. Seed contracts should use a supported
 version until that transport work is implemented.
+
+## Captured native email in verification
+
+The owner initializer and optional `verification.journey` test module receive
+`mail.read({limit, maxAgeMs, after})`. This reads only accepted Resend, SendGrid
+or Cloudflare sending submissions for this run's configured synthetic owner
+mailbox. Results contain `{id, at, subject, text, html}`; provider headers,
+credentials and other recipients are never returned. Defaults are ten messages
+and five minutes. Hard limits are twenty retained/read messages, 64 KiB per
+submission and five minutes of age. `after` is an optional millisecond timestamp.
+Capture exists only in verifier memory and is cleared when the run closes.
+There is no HTTP outbox, application binding or production reader.
+
+Drive the native email request through `request`, read the captured code or
+link, and submit it to the seed's real confirmation handler. Preserve native
+one-use, expiry, session and step-up checks. Never print the message or proof.
+Return the final native 303 response with its confirmed session cookie from the
+initializer. The reference verifier fixture uses the real operator-auth email
+lifecycle and production mail sender, with only the paid sending edge replaced.
+
+`verification.journey: "tests/native-agent-journey.mjs"` optionally names a
+contained module default-exporting an async function. It receives
+`{request, origin, email, cookie, mail, fixtures, tool}` after the standard
+policy/authentication phases and before the final audit. `tool(name,args)` uses
+the run's real agent credential and records calls for that audit; no signer or
+credential is passed to the module. The standard phases still run, and a failed
+native journey fails verification. Errors are redacted to a fixed diagnostic.
+Keep these modules in test tooling outside the production dependency graph.
+
+## Per-run provider fixture control
+
+The same initializer and native journey receive
+`fixtures.set(exactDeclaredOrigin, jsonValue)`. It permits at most 100 updates,
+16 KiB of JSON per value and only origins in `verification.network.origins`.
+Read challenges or other values through native HTTP or declared tools first,
+then set the isolated edge's response fixture. No production state accessor,
+route, credential or authorization bypass is supplied by the verifier.
+
+The network module's default `fetch(request, {fixture})` receives the most
+recent value for that request's declared origin, or null. The request retains
+its original method, URL, headers and body. A private loopback transport carries
+the fixture and strips its carrier headers before invoking the adapter; app
+headers cannot override it. Fixture controls are host functions, never served
+routes. Values are isolated to the run and cleared on close. Undeclared origins
+still receive 502, and the adapter's own outbound fetch remains denied. Keep
+native DNS/challenge, signature and receipt validation inside the application.
+
+## Copy source without Base's upstream tests
+
+Copy runtime source and declarations with the authoring export's `testSource`
+filter (`composition/git-source.mjs`), then `record-base` the files actually
+copied and `rer refresh-base` the exact selected revision. Do not bulk-copy the
+upstream `tests/`, fixtures or test typings into a seed's application source.
+Refresh preserves deliberately omitted upstream tests; the record's
+`notCopied` result makes those omissions inspectable. Existing intentional test
+copies remain their owner's choice and are not silently removed.
+
+The door's operator-people adapter also needs `modules/operator-auth`; Business
+settings needs `foundation/runtime`. Copy/record those dependencies at their
+corresponding relative paths or retain the seed's supported native adapters.
+The fresh-copy journey records and refreshes door, settings and prerequisites
+through the exported authoring CLI, then typechecks the entire copy under strict
+TypeScript without excluding any copied files.

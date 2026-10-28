@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { validateNetworkAdapter, NetworkAdapterError } from '../modules/agent-door/conformance/network-modules.mjs';
 import { isolatedNetworkAdapter } from '../modules/agent-door/conformance/network-runtime.mjs';
 import { RerError } from './errors.mjs';
+import { createCapturedMail } from './agent-mail.mjs';
+import { createFixtureControl } from './agent-fixtures.mjs';
 
 const denied = () => new Response('Conformance has no network adapter for this external effect.', { status: 502 });
 
@@ -27,19 +29,29 @@ export async function agentConformanceNetwork(request) {
 
 /** Extend the paid network edge for declared origins, without running seed
  * modules in this process or giving them any route to the real network. */
-export async function createAgentConformanceNetwork(root, config) {
- if (config === undefined) return { fetch: agentConformanceNetwork, close: async () => {} };
- let declaration, adapter;
+export async function createAgentConformanceNetwork(root, config, { email } = {}) {
+ const mail = createCapturedMail(email);
+ let declaration, adapter, fixtures;
  try {
-  declaration = validateNetworkAdapter(config);
-  adapter = await isolatedNetworkAdapter(root, declaration.module, denied);
+  if (config !== undefined) {
+   declaration = validateNetworkAdapter(config);
+   adapter = await isolatedNetworkAdapter(root, declaration.module, denied);
+  }
+  fixtures = createFixtureControl(declaration?.origins ?? new Set());
  } catch (error) {
+  mail.close();
   if (error instanceof NetworkAdapterError) throw new RerError('agent_network_invalid', error.message, 1);
   throw error;
  }
- return { close: adapter.close, fetch: async request => {
-  if (!declaration.origins.has(new URL(request.url).origin)) return agentConformanceNetwork(request);
-  try { return await adapter.fetch(request); }
-  catch { throw new RerError('agent_network_failed', 'The isolated conformance network adapter failed to handle a provider request. Its default fetch export must return a Response.', 1); }
+ return { mail: { read: options => mail.read(options) }, fixtures: { set: (origin, value) => fixtures.set(origin, value) },
+ close: async () => { mail.close(); fixtures.close(); await adapter?.close(); }, fetch: async request => {
+  const capture = request.clone(), origin = new URL(request.url).origin;
+  try {
+   const response = declaration?.origins.has(origin) ? await adapter.fetch(request, fixtures.get(origin)) : await agentConformanceNetwork(request);
+   if (response.ok) await mail.capture(capture);
+   else void capture.body?.cancel();
+   return response;
+  }
+  catch { void capture.body?.cancel(); throw new RerError('agent_network_failed', 'The isolated conformance network adapter failed to handle a provider request. Its default fetch export must return a Response.', 1); }
  } };
 }

@@ -21,7 +21,7 @@ CREATE TABLE fixture_receipts (id TEXT PRIMARY KEY, record_id TEXT NOT NULL REFE
 
 export async function buildFixture(root) {
  const require = createRequire(join(base, 'default-seed/package.json'));
- await require('esbuild').build({ entryPoints: [join(import.meta.dirname, 'worker.mjs')], outfile: join(root, 'dist/server/index.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022' });
+ return require('esbuild').build({ metafile: true, entryPoints: [join(import.meta.dirname, 'worker.mjs')], outfile: join(root, 'dist/server/index.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022' });
 }
 
 export async function fixtureSeed(t, mode) {
@@ -30,9 +30,9 @@ export async function fixtureSeed(t, mode) {
  await mkdir(join(root, 'dist/server/migrations'), { recursive: true });
  await mkdir(join(root, 'dist/client'), { recursive: true });
  await symlink(join(base, 'default-seed/node_modules'), join(root, 'node_modules'));
- for (const file of ['provider.mjs', 'receiver.mjs', 'initializer.mjs']) await cp(join(import.meta.dirname, file), join(root, file));
+ for (const file of ['provider.mjs', 'receiver.mjs', 'initializer.mjs', 'confirm-mail.mjs', 'journey.mjs']) await cp(join(import.meta.dirname, file), join(root, file));
  const surface = JSON.parse(await readFile(join(import.meta.dirname, 'surface.json'), 'utf8'));
- surface.verification = { network: { module: 'provider.mjs', origins: ['https://api.openai.com', 'https://receiver.example.invalid'] },
+ surface.verification = { journey: 'journey.mjs', network: { module: 'provider.mjs', origins: ['https://api.openai.com', 'https://receiver.example.invalid'] },
   ...(mode === 'native' ? { owner: { email: 'native-owner@example.com', emailField: 'SETUP_OPERATOR_EMAIL', initializer: 'initializer.mjs' } } : {}),
  };
  await writeFile(join(root, 'agent-surface.json'), JSON.stringify(surface));
@@ -50,7 +50,7 @@ export const commandAdapter = declare(localInstaller({}), { verify: [process.exe
  await writeFile(join(root, 'rer-setup.json'), JSON.stringify({ schema: 1, title: 'Fixture installation', fields: [
   { name: 'OWNER_EMAIL', kind: 'email', required: true }, { name: 'SETUP_TOKEN', kind: 'secret', required: true, generate: 'hex' },
  ], steps: mode === 'native' ? [{ type: 'extension', id: 'lamp-native-owner' }] : [{ type: 'owner-claim', mode, emailField: 'OWNER_EMAIL', tokenField: 'SETUP_TOKEN', path: mode === 'signed' ? '/auth/owner-claim' : '/auth/bootstrap' }] }));
- await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, vars: { OWNER_MODE: mode }, secrets: [{ binding: 'SESSION_SECRET' }] }));
+ await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, vars: { OWNER_MODE: mode }, secrets: [{ binding: 'SESSION_SECRET' }, { binding: 'MAIL_API_KEY' }] }));
  await writeFile(join(root, 'dist/server/wrangler.json'), JSON.stringify({ main: 'index.js', compatibility_date: '2026-09-01', d1_databases: [{ binding: 'DB', database_name: 'fixture', migrations_dir: 'migrations' }] }));
  const schemas = [...await Promise.all(productionSchemas.map(file => readFile(join(base, file), 'utf8'))), nativeSchema];
  for (const [i, sql] of schemas.entries()) await writeFile(join(root, `dist/server/migrations/${String(i + 1).padStart(4, '0')}.sql`), sql);

@@ -40,7 +40,10 @@ test('rer verify drives signed, setup-token and native owner lifecycles through 
 
 test('rer verify refuses provider modules that import Node APIs or escape the seed', { timeout: 120000 }, async t => {
  const root = await fixtureSeed(t, 'signed'), env = await isolatedQueue(t, { ...process.env, CI: 'true', WRANGLER_SEND_METRICS: 'false' });
- await buildFixture(root);
+ const build = await buildFixture(root);
+ assert.ok(Object.keys(build.metafile.inputs).every(path => !/cli\/agent-(?:mail|fixtures)\.mjs$/.test(path)), 'Verifier mail and fixture control must be absent from the production dependency graph');
+ const built = await readFile(join(root, 'dist/server/index.js'), 'utf8');
+ assert.doesNotMatch(built, /rer-conformance-captured-mail|createCapturedMail|createFixtureControl/);
  const surfaceFile = join(root, 'agent-surface.json'), surface = JSON.parse(await readFile(surfaceFile, 'utf8'));
  await writeFile(join(root, 'node-api.mjs'), "import fs from 'node:fs'; export default {fetch(){return new Response(fs.readFileSync('/etc/hosts'))}}\n");
  await symlink(join(base, 'cli/agent-network.mjs'), join(root, 'escape.mjs'));
