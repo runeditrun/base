@@ -1,0 +1,10 @@
+{
+  "repository": { "id": 31, "full_name": "synthetic-base-1/synthetic-base-2" },
+  "push": [
+    { "name": "source", "browser": false, "hosted": false, "commands": ["pnpm run check --profile first-party"] },
+    { "name": "runtime", "browser": true, "hosted": true, "commands": ["pnpm run build", "node tests/e2e/reference-runtime.mjs"] }
+  ],
+  "nightly": [
+    { "name": "journey", "browser": true, "hosted": false, "commands": ["node --test tests/local-journey/journey.test.mjs"] }
+  ]
+}
