@@ -288,40 +288,89 @@ the same policy, approval, review and audit path as tools. A resource read must 
 access. Mark device, screen, connector, import-door and installation operations
 as outside the tool registry when they require another supported door.
 
-## Durable invocation consent
+## Durable invocation consent and operation identity
 
-Persist the originating `ctx.consent` alongside the native sponsor id, agent
-attribution, scopes, client id, tool, arguments and idempotency key when preparing scheduled or
-durable work. The trusted worker later calls the public door with that saved
-identity:
+Every tool callback receives this admission metadata on `ToolContext`:
 
 ```ts
-const result = await door.invoke(job.tool, job.args, {
-  person: { id: job.sponsorId }, agent: job.agent, consent: job.consent,
-  scopes: job.scopes, clientId: job.clientId,
-})
+readonly consent?: string             // originating Business consent record id
+readonly scopes: readonly string[]    // effective grant recorded at admission
+readonly operationId: string          // door-issued original decision/audit id
+readonly idempotencyKey: string | null // original key; null for reads
+readonly clientId?: string
+readonly person: Readonly<Person>      // native sponsor, including id
+readonly agent: Readonly<Agent>        // originating agent, including id
+readonly approvers: readonly Readonly<{ id: string; name: string }>[]
 ```
 
-`invoke` re-reads the native person; saved role or email is unnecessary. Consent
-is optional for work that originated independently of Business consent. Work
-prepared under a consent must retain that exact id rather than omit or replace
-it at execution. The door puts it on the Principal and `ToolContext`, re-reads
-current signed revocations at worker admission and fences execution reservation
-against revocation. A revoked consent returns
-`{outcome: 'refused', code: 'consent_revoked'}` without calling the native effect.
-Both successful and refused invocation audit rows include `consent`, agent,
-sponsor, tool, time, policy revision and outcome. The edition owns its scheduler
-and native transaction boundaries; retain that result with the job.
+The context and its copied identity, scope, actor, proof and approver objects are
+frozen at runtime and read-only in TypeScript. `db` remains the native service
+capability, and `emit` still records effects. Mutation of a context cannot edit
+the door's principal or a later callback. A tool returning a native queued-effect
+handle should include `ctx.operationId` in that handle. Its audit row carries the
+same `operation_id`, plus `consent`, `scopes`, `client_id` and `idempotency_key`.
+Approved execution retains the original operation id and key, while its own
+execution audit still has a distinct `id` and original `decision_id`.
 
-The shared `runAgentDoorConformance` journey accepts an optional
-`invoke(name,args,who)` callback wired to that same trusted worker door. `who`
-carries `{person: {id}, agent, consent}`. The module's journey uses it to run
-serialized job input, prove a native effect and consent-attributed audit, then
-revoke the consent before admitting saved work and prove `consent_revoked`,
-a complete refusal audit and an unchanged native witness. Supply this callback
-in the edition's integrated module journey; no production test route is needed.
-The HTTP-only CLI journey checks signed consent revocation and audit attribution
-separately, without claiming to run the edition's scheduler.
+Persist the originating context alongside the native queue item. For example,
+a preparation tool records the following identity before returning its handle:
+
+```ts
+const identity = {
+  person: { id: ctx.person.id }, agent: ctx.agent, consent: ctx.consent,
+  scopes: ctx.scopes, clientId: ctx.clientId, operationId: ctx.operationId,
+}
+// Persist identity, ctx.idempotencyKey and native job arguments atomically.
+```
+
+The trusted worker re-enters a registered native execution tool through the
+public door, using exactly those saved values and the same public key:
+
+```ts
+const result = await door.invoke('example.queue.execute', {
+  id: job.id, idempotency_key: job.idempotencyKey,
+}, job.identity)
+```
+
+`invoke` accepts `operationId` only at the trusted worker boundary; MCP arguments
+cannot supply it. The door checks it against the retained completed admission,
+including the exact sponsor, agent (id, name and specialist), consent, client,
+granted scope set and key. The execution context restores recorded scope order
+and agent metadata from that admission.
+Missing, incomplete or mismatched admissions return `operation_mismatch` without
+running the tool. It does not reconstruct scopes from the registry. The door
+re-reads the current native person, current grants and signed policy. A removed
+admission scope returns `insufficient_scope` and requires fresh preparation;
+revoked consent still returns `consent_revoked` with no effect. Keep the same
+checks in the native effect transaction when concurrent edits need a fence.
+
+Each continuation tool has its own once-only claim under the original operation
+and public key, so replay returns its one recorded result rather than the
+preparation handle. Reusing that continuation with changed arguments returns
+`idempotency_conflict`. Public keys may not contain NUL, which separates these
+internal claims from ordinary keys. The existing calls table stores the claims;
+no new schema migration is needed. Keep the originating audit, approvals and
+idempotency records for as long as the queue may execute or replay them.
+Approver ids come from the retained approved execution and are re-resolved to
+active native people; a seed cannot supply them.
+
+For independently prepared scheduled work with no earlier tool admission, omit
+`operationId` and supply its original native sponsor, agent, explicit scopes,
+client id and consent to `invoke`. This makes a fresh door admission. Consent is
+optional only for work originating independently of Business consent. Never drop
+or replace an originating consent at execution. Older pending approvals retain
+their original decision id as operation identity; older queue handles without a
+recorded admission snapshot require fresh preparation.
+
+The shared `runAgentDoorConformance` journey can take an optional
+`invoke(name,args,who)` callback wired to the same trusted worker door. Its
+existing consent checks remain unchanged. Base's public-door fixture additionally
+proves native queue persistence, one-effect replay, execution-time revocation,
+immutable identity, scope narrowing and named approver continuity. These module
+proofs do not establish a seed's integrated queue behavior. Client-data custody
+and erasure remain outside this adoption proof until retained fields and fences
+are agreed. This change does not promote those claims or supply seed-side
+`BASE-AGENT-010` contract citations.
 
 ## Keep runtime and CLI evidence separate
 

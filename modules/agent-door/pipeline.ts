@@ -15,11 +15,14 @@ import type { ToolDefinition } from './types.ts'
 import { nativeProof } from './native-proof.ts'
 import { narrowPrincipal } from './principal.ts'
 import { nativeTarget } from './target.ts'
+import { operationKey, resumeOperation } from './operation.ts'
 
 export interface PipelineAnswer { result: CallResult; status?: number; scope?: string }
-export async function callTool(rt: Runtime, name: string, input: unknown, principal: Principal, door: ToolContext['door'], trace?: unknown, resourceTool?: ToolDefinition, requestState?: unknown, proofReference?: unknown): Promise<PipelineAnswer> {
+export async function callTool(rt: Runtime, name: string, input: unknown, principal: Principal, door: ToolContext['door'], trace?: unknown, resourceTool?: ToolDefinition, requestState?: unknown, proofReference?: unknown, operationId?: string): Promise<PipelineAnswer> {
   const row = newAudit(rt, principal, name, door, trace)
+  if (operationId !== undefined) row.operation_id = operationId
   if (name === 'resources/read') row.resource = String((input as { uri: string }).uri)
+  let claimKey: string | null = null
   let evidence: Evidence | undefined, owned = false, effected = false, locked = false
   let result: CallResult = { outcome: 'refused', decision: null }, status: number | undefined, scope: string | undefined
   const refuse = (code: string, fields?: Record<string, unknown>) => { result = { ...result, outcome: 'refused', code, fields }; return { result, status, scope } }
@@ -31,9 +34,16 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     const properties = tool.inputSchema.properties ?? {}
     const declared = Object.fromEntries(Object.entries(raw ?? {}).filter(([key]) => Object.hasOwn(properties, key)))
     row.ignored_arguments = Object.keys(raw ?? {}).filter(key => !Object.hasOwn(properties, key)).sort()
-    const key = !tool.readOnly && typeof raw?.idempotency_key === 'string' && raw.idempotency_key.length > 0 && raw.idempotency_key.length <= 200 ? raw.idempotency_key : null
+    const key = !tool.readOnly && typeof raw?.idempotency_key === 'string' && raw.idempotency_key.length > 0 && raw.idempotency_key.length <= 200 && !raw.idempotency_key.includes('\0') ? raw.idempotency_key : null
     row.idempotency_key = key
-    principal = await narrowPrincipal(rt, principal)
+    const operation = operationId === undefined ? undefined : await resumeOperation(rt, operationId, principal, key)
+    const approvers = operation?.approvers ?? []
+    principal = operation?.principal ?? principal
+    claimKey = key === null ? null : operationId === undefined ? key : operationKey(operationId, name, key)
+    const current = await narrowPrincipal(rt, principal)
+    if (operationId !== undefined && principal.scopes.some(scope => !current.scopes.includes(scope))) return refuse('insufficient_scope')
+    principal = { ...current, operationId: row.operation_id, idempotencyKey: key }
+    row.scopes = [...principal.scopes]
     if (tool.scope && !principal.scopes.includes(tool.scope)) { status = 403; scope = tool.scope; return refuse('insufficient_scope') }
     const state = await policyState(rt)
     row.revision = state.revision
@@ -41,7 +51,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     const agent = await rt.options.db.prepare('SELECT revoked,sponsor FROM agent_door_agents WHERE id=?').bind(principal.agent.id).first<{ revoked: number; sponsor: string }>()
     if (revoked(state, principal) || agent?.revoked || agent && agent.sponsor !== principal.person.id) { status = 401; return refuse('unauthenticated') }
     const { idempotency_key: _key, expected_revision: expected, ...args } = declared
-    const ctx = context(rt, principal, door, [])
+    let ctx = context(rt, principal, door, [], approvers)
     const validInput = raw && validateSchema(tool.inputSchema, declared)
     const refusal = policyRefusal(rt, state, tool.classes)
     if (refusal) {
@@ -74,12 +84,18 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       previous = { outcome: JSON.stringify(saved.result), decision_id: saved.decision_id }
     }
     if (key !== null) {
-      const saved = await rt.options.db.prepare('SELECT digest,outcome,decision_id FROM agent_door_calls WHERE agent=? AND key=?').bind(principal.agent.id, key).first<{ digest: string; outcome: string | null; decision_id: string }>()
+      const saved = await rt.options.db.prepare('SELECT digest,outcome,decision_id FROM agent_door_calls WHERE agent=? AND key=?').bind(principal.agent.id, claimKey).first<{ digest: string; outcome: string | null; decision_id: string }>()
       if (saved) {
         if (saved.digest !== requestDigest) return refuse('idempotency_conflict')
         if (!saved.outcome) return refuse('call_in_progress')
         previous = saved
       }
+    }
+    if (previous) {
+      const original = await rt.options.db.prepare('SELECT row FROM agent_door_audit WHERE id=?').bind(previous.decision_id).first<{ row: string }>()
+      row.operation_id = original ? JSON.parse(original.row).operation_id ?? previous.decision_id : previous.decision_id
+      principal = { ...principal, operationId: row.operation_id }
+      ctx = context(rt, principal, door, [], approvers)
     }
     if (!validInput) return refuse('invalid_arguments')
     if (!previous && tool.revision && expected !== undefined) {
@@ -117,15 +133,15 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     const savedSummary = await summary(tool, args, ctx, target)
     const summary_sha256 = await digest(savedSummary)
     recordDecision(row, meta)
-    const claim = key === null ? undefined : { key, digest: requestDigest }
+    const claim = claimKey === null ? undefined : { key: claimKey, digest: requestDigest }
     if (principal.consent && (await policyState(rt)).revoked.consents.includes(principal.consent)) return refuse('consent_revoked')
     if (decision.result === 'approval') {
       await startPending(rt, row, principal, evidence, claim); owned = key !== null
-      result = await openApproval(rt, { decision_id: row.id, revision: state.revision, tool: name, args, digest: requestDigest, key,
+      result = await openApproval(rt, { decision_id: row.id, revision: state.revision, tool: name, args, digest: requestDigest, key, claimKey,
         classes, principal, summary: savedSummary, summary_sha256, approvers: decision.approvers!, expires_at: new Date(rt.now() + durationSeconds(decision.wait)! * 1000).toISOString(), door, evidence,
         result, ...(expected === undefined ? {} : { expected_revision: expected as string | number }) })
       effected = true
-      await saveCall(rt, principal, key, result)
+      await saveCall(rt, principal, claimKey, result)
       await appendEvents(rt, [{ type: 'approval.pending', uri: result.approval!.url, actor: { kind: 'agent', ...preparedBy(principal) }, data: { decision_id: row.id, classes } }])
     } else {
       // Once execution begins, retain the claim even on an unexpected failure:
@@ -134,11 +150,11 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       owned = key !== null
       await releaseDecision(rt, row.id); locked = false
       effected = true
-      const run = await runTool(rt, tool, args, principal, result, door)
+      const run = await runTool(rt, tool, args, principal, result, door, approvers)
       result = run.result
       if (result.outcome === 'done' && decision.result === 'review') result.review = await openReview(rt, name, principal, row.id, evidence, run.undo, door, savedSummary)
       if (result.code && result.code !== 'output_invalid') effected = false
-      if (effected) await saveCall(rt, principal, key, result)
+      if (effected) await saveCall(rt, principal, claimKey, result)
       await appendEvents(rt, run.effects.map(effect => ({ ...effect, actor: { kind: 'agent', ...preparedBy(principal) } })))
     }
     return { result }
@@ -146,11 +162,11 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     if (cause instanceof ToolRefusal) return refuse(cause.code, cause.details)
     row.outcome = 'failed'; status = 500
     const failed = refuse('execution_failed')
-    if (owned && effected) await saveCall(rt, principal, row.idempotency_key, result)
+    if (owned && effected) await saveCall(rt, principal, claimKey, result)
     return failed
   } finally {
     if (locked) await releaseDecision(rt, row.id)
-    if (owned && !effected) await rt.options.db.prepare('DELETE FROM agent_door_calls WHERE agent=? AND key=? AND decision_id=?').bind(principal.agent.id, row.idempotency_key, row.id).run()
+    if (owned && !effected) await rt.options.db.prepare('DELETE FROM agent_door_calls WHERE agent=? AND key=? AND decision_id=?').bind(principal.agent.id, claimKey, row.id).run()
     if (row.outcome === 'running') row.outcome = result.outcome
     outcomeRow(row, result)
     await audit(rt, row, evidence)
