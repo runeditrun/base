@@ -105,8 +105,9 @@ product IDs and compute statuses from the unchanged clause statuses.
 ### Source-bound non-product facts
 
 The ct ruling of 28 October 2026 permits an explicit non-product extension to
-the standard's claims and rewrite records. A historical license, launcher
-identity or hosted-demo action with no faithful product clause remains a
+the standard's claims and rewrite records, including the 07:40Z boundary ruling.
+A historical license, launcher identity, hosted-demo action or stated negative
+scope boundary with no faithful product clause remains a
 Homepage claims row. Its current derived status is **unassessed**. Its original
 status remains historical, including an original `done`; this adds no product
 ID, acceptance point or proof and changes no clause or tier counts.
@@ -142,16 +143,27 @@ The supported bases are deliberately bounded:
 | `license/public-repository ownership` | The complete `100% free, open source alternative to …`, `100% free and open source. MIT licensed.` or standalone `MIT license`/`MIT licensed` fact (optional quotation marks). Coaster's original `OWN` means MIT/license/public repository; it is not a product clause. |
 | `launcher identity` | The complete literal `` `npx -y @runeditrun/rer dev …` starts <product name> `` action, optionally prefixed `Terminal:`, identifying the launcher and product; no installation, capacity or runtime duty is inferred. |
 | `hosted-demo action` | The literal `"Try the demo" opens the hosted demo` action; no product or hosting proof is inferred. |
+| `boundary` | A complete `Limits: "No …"` negative-scope claim whose original clause cell explicitly says `none needed: a boundary, true of the code` (optional final period). This records a limit true of the code, without inventing a product obligation. |
 
-Original references must be empty, an em dash or the historical `OWN` token,
-and cannot contain a real product ID. These are necessary checks after explicit
+For the first three bases, original references must be empty, an em dash or the
+historical `OWN` token. The `boundary` basis requires the explicit original
+boundary explanation above; an empty cell, `OWN` or a generic boundary label
+does not qualify. No basis permits a real product ID. These are necessary checks after explicit
 review, never automatic exemptions inferred from an empty link or unknown ID.
 An arbitrary non-product label, a mismatched basis, a real product reference,
 or both `clauses` and `nonProduct` refuses conversion. Text matching does not
 establish semantic equivalence: the reviewer must confirm the entire original
 claim is the named fact. Other ownership/boundary/product promises continue to
-need faithful real clause links or a further standard ruling; these three
+need faithful real clause links or a further standard ruling; these four
 bases are the entire supported non-product scope.
+
+For Crank original `7231b3fbdc1151210c2af9bbd607370f7c0af3e3`, map only
+claim 37 at `CONTRACT.md:1068` to `"nonProduct": "boundary"`, retaining the
+exact claim cell `Limits: "No desktop or screen-scraping robots"`. Its original
+clause cell is `none needed: a boundary, true of the code` and historical status
+is `done`. The final view labels it `Non-product: boundary` with current status
+`unassessed`; all 40 claims remain counted. Other rows still need faithful real
+links or separately reviewed mappings. An unmapped boundary refuses conversion.
 
 For Nectar original `24303c4b9cfe4d055c4683397ebd7971bb861efb`, use the
 same map shape with exact claim cells at `CONTRACT.md:500` (claim 6, license),

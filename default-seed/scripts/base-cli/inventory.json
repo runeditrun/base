@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g3fff20bd",
+  "cliVersion": "0.2.85-dev.g0aa9af42",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1791,7 +1791,7 @@
     },
     "foundation/runtime/contract-docs.mjs": {
       "source": "foundation/runtime/contract-docs.mjs",
-      "sha256": "dfad6698582e6d22bfd7e9a28d5e444edc483f46adb1ed610008ee720ec9683a"
+      "sha256": "6ca67857ddb69d4425335dabb787ed034bbbb3b3e4ad2e1882a727aa6d277a3e"
     },
     "foundation/runtime/run-data.d.mts": {
       "source": "foundation/runtime/run-data.d.mts",

@@ -55,8 +55,8 @@ async function generatedJourney(root) {
 }
 
 async function nonProductJourney() {
-  // Small public-command reproductions of the two immutable source forms:
-  // Coaster's OWN alias and Nectar's explicit em-dash exemptions. These facts
+  // Small public-command reproductions of the immutable source forms:
+  // Coaster's OWN alias, Nectar's em dash and Crank's explicit boundary. These facts
   // have no product duty; a real product promise remains beside them.
   const sources = [
     [
@@ -69,15 +69,20 @@ async function nonProductJourney() {
       [73, '"100% free and open source. MIT licensed."', '—', 'license/public-repository ownership'],
       [76, '"Try the demo" opens the hosted demo', '—', 'hosted-demo action'],
     ],
+    [
+      [37, 'Limits: "No desktop or screen-scraping robots"', 'none needed: a boundary, true of the code', 'boundary'],
+    ],
   ]
   for (const facts of sources) {
     const root = await installation('legacy')
     try {
       await rm(join(root, 'docs/CLAIMS.md'))
       const initial = await read(root, 'CONTRACT.md')
+      const basis = facts[0][3]
+      const productClaim = basis === 'boundary' ? 'Limits: "No unreviewed publishing"' : "Publish the studio's entries"
       const table = [
         '| # | Section | Claim | Clause(s) | Status |', '| --- | --- | --- | --- | --- |',
-        '| 1 | Hero | Publish the studio\'s entries | PUBLISH-01 | done |',
+        `| 1 | Hero | ${productClaim} | PUBLISH-01 | done |`,
         ...facts.map(([number, claim, reference]) => `| ${number} | Closing | ${claim} | ${reference} | done |`),
         '| 2 | Catalogue | Publish entries as open source | — | partial |',
       ].join('\n')
@@ -97,7 +102,7 @@ async function nonProductJourney() {
         [{ claims: [{ ...claims[0], nonProduct: 'arbitrary exemption' }, ...claims.slice(1)] }, 'non-product basis'],
         [{ claims: [{ ...claims[0], clauses: ['PUBLISH-01'] }, ...claims.slice(1)] }, 'cannot also supply clauses'],
         [{ claims: [...claims.slice(0, -1), { ...productAlias, clauses: undefined, nonProduct: 'license/public-repository ownership' }] }, 'product promises need real clauses'],
-        [{ claims: [...claims, { file: 'CONTRACT.md', line: originalText.split('\n').findIndex(line => line.includes('| 1 | Hero |')) + 1, claim: "Publish the studio's entries", nonProduct: 'license/public-repository ownership' }] }, 'product promises need real clauses'],
+        [{ claims: [...claims, { file: 'CONTRACT.md', line: originalText.split('\n').findIndex(line => line.includes('| 1 | Hero |')) + 1, claim: productClaim, nonProduct: basis }] }, 'product promises need real clauses'],
       ]) {
         await edit(root, 'claim-map.json', JSON.stringify({ ...map, ...change }))
         refuses(root, explanation, 'convert', '--old', old, '--claim-map', 'claim-map.json')
@@ -136,7 +141,7 @@ async function nonProductJourney() {
         [converted.replace('| PUBLISH-01 | Product |', '|  | Product |'), 'existing clause ids'],
         [converted.replace('| PUBLISH-01 | Product |', '| ABSENT-001 | Product |'), 'existing clause ids'],
         [converted.replace('| PUBLISH-01 | Product |', '|  | Non-product: license/public-repository ownership |'), 'product claim cannot acquire'],
-        [mutateRecord(record => { record.claims[0].nonProduct = 'license/public-repository ownership' }).replace('| PUBLISH-01 | Product |', '|  | Non-product: license/public-repository ownership |'), 'product promises need real clauses'],
+        [mutateRecord(record => { record.claims[0].nonProduct = basis }).replace('| PUBLISH-01 | Product |', `|  | Non-product: ${basis} |`), 'product promises need real clauses'],
         [converted.replace(/<!-- contract-claim-source\n[\s\S]*?\n-->/, ''), 'require a contract-claim-source'],
       ]) {
         await edit(root, 'CONTRACT.md', text)
@@ -148,6 +153,19 @@ async function nonProductJourney() {
       const coveragePath = 'docs/contract/COVERAGE.json', coverageText = await read(root, coveragePath)
       await edit(root, coveragePath, coverageText.replace(old, '0'.repeat(40)))
       refuses(root, 'original SHA', 'check')
+      if (basis === 'boundary') {
+        // A negative-looking claim alone cannot grant the exception. Each
+        // variant is a new immutable source, with a map bound to that source.
+        for (const reference of ['', '—', 'OWN', 'a boundary', 'none needed: a boundary, true of the code; PUBLISH-01']) {
+          const text = originalText.replace(facts[0][2], reference)
+          await edit(root, 'CONTRACT.md', text)
+          git(root, 'add', 'CONTRACT.md')
+          git(root, '-c', 'user.name=Synthetic author', '-c', 'user.email=synthetic@example.invalid', 'commit', '-qm', 'Synthetic unsupported boundary reference')
+          await edit(root, 'claim-map.json', JSON.stringify({ ...map, old: git(root, 'rev-parse', 'HEAD') }))
+          refuses(root, 'product promises need real clauses', 'convert', '--old', 'HEAD', '--claim-map', 'claim-map.json')
+          assert.equal(await read(root, 'CONTRACT.md'), text, 'refused boundary reference changed source')
+        }
+      }
     } finally { await rm(root, { recursive: true, force: true }) }
   }
 }

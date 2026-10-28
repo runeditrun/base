@@ -307,11 +307,15 @@ function nonProductBasis(source, basis, ids, label) {
     'license/public-repository ownership': /^["“]?(?:100% free, open source alternative to [^"”\n]+|100% free and open source\. MIT licensed\.|MIT licen[cs](?:e|ed)\.?)["”]?$/i,
     'launcher identity': /^(?:Terminal:\s*)?`npx -y @runeditrun\/rer dev [^`]+` starts [\w -]+\.?$/,
     'hosted-demo action': /^["“]Try the demo["”] opens the hosted demo\.?$/i,
+    'boundary': /^Limits:\s*["“]No [^"”\n]+["”]\.?$/i,
   }
   const references = plainText(source.clauses).trim()
+  const allowedReferences = basis === 'boundary'
+    ? /^none needed: a boundary, true of the code\.?$/i.test(references)
+    : ['', '—', 'OWN'].includes(references)
   if (!Object.hasOwn(allowed, basis) || !allowed[basis].test(source.claim) ||
-      !['', '—', 'OWN'].includes(references) || idsIn(source.clauses).some(id => ids.has(id)))
-    throw Error(`${label}: non-product basis must explicitly describe a license/public-repository ownership, launcher identity or hosted-demo action with no original product clause link; product promises need real clauses.`)
+      !allowedReferences || idsIn(source.clauses).some(id => ids.has(id)))
+    throw Error(`${label}: non-product basis must explicitly describe a license/public-repository ownership, launcher identity, hosted-demo action or boundary with its required original references and no original product clause link; product promises need real clauses.`)
 }
 function sourceClaim(file, row, index) {
   return { file, line: row.line, number: claimValue(row, '#') || String(index + 1), claim: claimValue(row, 'Claim'), status: claimValue(row, 'Status'), clauses: claimValue(row, 'Clauses?'), text: row.raw }
