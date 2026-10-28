@@ -1,16 +1,17 @@
 import { decide, scopeMatches } from './policy/decide.ts'
 import type { Rule, PolicyDocument } from './policy/document.ts'
 import type { ClassId } from './policy/catalogue.ts'
-import type { ClassAndFacts, DecisionMeta, Principal, Runtime } from './types.ts'
+import type { ClassAndFacts, DecisionMeta, NativeTarget, Principal, Runtime } from './types.ts'
 import { preparedBy } from './people.ts'
 
 export interface AuditRow {
   authority?: 'none'
   sequence?: number; id: string; at: string; door: 'mcp' | 'embedded'; agent: Principal['agent']; sponsor: { id: string; name: string }; label: string
-  consent: string | null; tool: string; resource: string | null; decision_id: string | null; classes: ClassAndFacts[]; revision: number | null; rules: Array<{ class: string; rule: string | null; do: string }>
+  consent: string | null; tool: string; resource: string | NativeTarget | null; decision_id: string | null; classes: ClassAndFacts[]; revision: number | null; rules: Array<{ class: string; rule: string | null; do: string }>
   decision: string; outcome: 'running' | 'done' | 'refused' | 'pending' | 'failed' | 'replayed'; code: string | null
   approval: { id: string; by: string[] } | null; review: { id: string; by: string | null } | null
   idempotency_key: string | null; trace: string | null; ignored_arguments: string[]; replay_of: string | null
+  classification_refusal?: string
 }
 export interface Evidence { document: PolicyDocument; usage: Record<string, number>; classes: ClassAndFacts[]; result: string; rules: unknown }
 export function newAudit(rt: Runtime, principal: Principal, tool: string, door: AuditRow['door'], trace: unknown): AuditRow {

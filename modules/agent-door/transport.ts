@@ -48,7 +48,7 @@ export async function mcp(rt: Runtime, request: Request): Promise<Response> {
     const uri = String(params.uri ?? ''), resource = resourceTool(rt, uri)
     const answer = await callTool(rt, 'resources/read', { uri }, principal, 'mcp', meta.traceparent, resource, params.requestState)
     if (answer.status === 403) return rpcError(rpc.id, -32000, 'Insufficient scope', 403, { code: 'insufficient_scope' }, challenge(rt, answer.scope))
-    if (['resource_unavailable', 'tool_not_found'].includes(answer.result.code ?? '')) return rpcError(rpc.id, -32602, 'Resource unavailable', 200)
+    if (['resource_unavailable', 'tool_not_found'].includes(answer.result.code ?? '')) return rpcError(rpc.id, -32602, 'Resource unavailable', 200, { code: answer.result.code })
     if (answer.result.outcome === 'pending') return rpcError(rpc.id, -32000, 'approval_required', 200, { code: 'approval_required', approval: answer.result.approval, requestState: answer.result.requestState, _meta: { 'com.runeditrun/decision': answer.result.decision } })
     if (answer.result.outcome !== 'done') return rpcError(rpc.id, -32000, answer.result.code ?? 'Read refused', answer.status ?? 200, { code: answer.result.code, ...answer.result.fields, _meta: { 'com.runeditrun/decision': answer.result.decision } })
     return rpcResult(rpc, { ...cache, ...answer.result.result as object, _meta: { 'com.runeditrun/decision': answer.result.decision, ...(answer.result.review ? { 'com.runeditrun/review': answer.result.review } : {}) } })

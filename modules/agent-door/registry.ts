@@ -22,6 +22,7 @@ export function registry(options: AgentDoorOptions): ToolDefinition[] {
     if ((tool.proof !== undefined || tool.proofKind !== undefined) && (tool.proof !== 'native' || typeof tool.proofKind !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/.test(tool.proofKind) || typeof options.nativeProof?.verify !== 'function' || typeof options.nativeProof?.handoff !== 'function')) throw new TypeError(`Missing native proof verifier or kind: ${tool.name}`)
     if ('cost' in tool) throw new TypeError(`Provider cost is not enforced: ${tool.name}`)
     if (!tool.readOnly && typeof tool.summary !== 'function') throw new TypeError(`Missing approval summary: ${tool.name}`)
+    if (tool.target !== undefined && typeof tool.target !== 'function') throw new TypeError(`Invalid target resolver: ${tool.name}`)
     if (tool.authority === 'none' && !recordOnlyAuthority(tool)) throw new TypeError(`Invalid no-subject authority: ${tool.name}`)
     if (tool.classes.some(cls => cls === 'access' || cls === 'security') && tool.authority !== 'none' && typeof tool.authority !== 'function') throw new TypeError(`Missing authority: ${tool.name}`)
     if ((tool.widens !== undefined || tool.narrowing !== undefined) && (!tool.classes.some(cls => cls === 'access' || cls === 'security') || tool.readOnly || !narrowingContract(tool))) throw new TypeError(`Invalid narrowing-only contract: ${tool.name}`)
