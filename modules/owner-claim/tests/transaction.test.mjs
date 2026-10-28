@@ -1,3 +1,4 @@
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createOperatorAuth } from '../../operator-auth/index.mjs';
@@ -27,52 +28,58 @@ async function verifiedClaim(iat, exp) {
   return verifyOwnerClaim(token, { ...claimConfig(publicKey), now: iat });
 }
 
-for (const ahead of [1, 30, 31]) {
-  test(`atomic admission recheck ${ahead <= 30 ? 'accepts' : 'refuses'} issuance ${ahead}s ahead`, async t => {
-    const db = transactionDb(); t.after(() => db.close());
-    const claim = await verifiedClaim(now + ahead, now + ahead + 300);
-    const before = db.snapshot();
-    const result = bootstrap(admission(db, claim, now));
-    if (ahead > 30) {
-      await assert.rejects(result, { code: 'invalid_claim', status: 403 });
-      assert.deepEqual(db.snapshot(), before, 'refusal writes no claim, auth or rate rows');
-    } else {
-      const owner = await result;
-      assert.equal(owner.operator.email, claim.email);
-      assert.equal(owner.operator.role, 'owner');
-      const state = db.snapshot();
-      assert.equal(state.oc_owner_claims[0].completed, 1);
-      assert.equal(state.oc_owner_claims[0].consumed_at, now);
-      assert.equal(state.oc_owner_claims[0].issued_at, now + ahead);
-      assert.equal(state.oa_operators.length, 1);
-      assert.equal(state.oa_sessions.length, 1);
-      assert.equal(state.oa_bootstrap.length, 1);
-      assert.equal(state.oa_limits.length, 1);
-      assert.ok(state.oa_limits.every(row => row.count === 1));
-    }
-  });
-}
+test("atomic admission rechecks the complete timing boundary corpus", async t => {
+  await caseRows(t, [["atomic admission rechecks the complete timing boundary corpus", async t => {
+  const step = namedSteps(t);
+  for (const ahead of [1, 30, 31]) {
+    await step(`atomic admission recheck ${ahead <= 30 ? 'accepts' : 'refuses'} issuance ${ahead}s ahead`, async t => {
+      const db = transactionDb(); t.after(() => db.close());
+      const claim = await verifiedClaim(now + ahead, now + ahead + 300);
+      const before = db.snapshot();
+      const result = bootstrap(admission(db, claim, now));
+      if (ahead > 30) {
+        await assert.rejects(result, { code: 'invalid_claim', status: 403 });
+        assert.deepEqual(db.snapshot(), before, 'refusal writes no claim, auth or rate rows');
+      } else {
+        const owner = await result;
+        assert.equal(owner.operator.email, claim.email);
+        assert.equal(owner.operator.role, 'owner');
+        const state = db.snapshot();
+        assert.equal(state.oc_owner_claims[0].completed, 1);
+        assert.equal(state.oc_owner_claims[0].consumed_at, now);
+        assert.equal(state.oc_owner_claims[0].issued_at, now + ahead);
+        assert.equal(state.oa_operators.length, 1);
+        assert.equal(state.oa_sessions.length, 1);
+        assert.equal(state.oa_bootstrap.length, 1);
+        assert.equal(state.oa_limits.length, 1);
+        assert.ok(state.oa_limits.every(row => row.count === 1));
+      }
+    });
+  }
 
-for (const elapsed of [299, 300, 301]) {
-  test(`atomic admission rechecks expiry after ${elapsed}s elapsed since verification`, async t => {
-    const db = transactionDb(); t.after(() => db.close());
-    const claim = await verifiedClaim(now, now + 300);
-    const before = db.snapshot();
-    const result = bootstrap(admission(db, claim, now + elapsed));
-    if (elapsed < 300) {
-      assert.equal((await result).operator.role, 'owner');
-      assert.equal(db.snapshot().oc_owner_claims[0].consumed_at, now + elapsed);
-    } else {
-      await assert.rejects(result, { code: 'invalid_claim', status: 403 });
-      assert.deepEqual(db.snapshot(), before, 'expiry at commit leaves every table unchanged');
-    }
-  });
-}
+  for (const elapsed of [299, 300, 301]) {
+    await step(`atomic admission rechecks expiry after ${elapsed}s elapsed since verification`, async t => {
+      const db = transactionDb(); t.after(() => db.close());
+      const claim = await verifiedClaim(now, now + 300);
+      const before = db.snapshot();
+      const result = bootstrap(admission(db, claim, now + elapsed));
+      if (elapsed < 300) {
+        assert.equal((await result).operator.role, 'owner');
+        assert.equal(db.snapshot().oc_owner_claims[0].consumed_at, now + elapsed);
+      } else {
+        await assert.rejects(result, { code: 'invalid_claim', status: 403 });
+        assert.deepEqual(db.snapshot(), before, 'expiry at commit leaves every table unchanged');
+      }
+    });
+  }
 
-test('atomic admission guard independently refuses a lifetime over 300 seconds', async t => {
-  const db = transactionDb(); t.after(() => db.close());
-  const claim = { ...await verifiedClaim(now, now + 300), exp: now + 301 };
-  const before = db.snapshot();
-  await assert.rejects(bootstrap(admission(db, claim, now)), { code: 'invalid_claim', status: 403 });
-  assert.deepEqual(db.snapshot(), before);
-});
+  await step('atomic admission guard independently refuses a lifetime over 300 seconds', async t => {
+    const db = transactionDb(); t.after(() => db.close());
+    const claim = { ...await verifiedClaim(now, now + 300), exp: now + 301 };
+    const before = db.snapshot();
+    await assert.rejects(bootstrap(admission(db, claim, now)), { code: 'invalid_claim', status: 403 });
+    assert.deepEqual(db.snapshot(), before);
+  });
+
+  }]]);
+})

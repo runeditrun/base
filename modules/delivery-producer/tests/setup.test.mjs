@@ -1,3 +1,4 @@
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
@@ -68,108 +69,114 @@ async function filesUnder(directory, prefix = '') {
   return entries;
 }
 
-test('setup manifest is validated and emitted as deterministic sibling bytes with a matching descriptor digest', async t => {
-  const root = await fixture(t);
-  const policy = config({manifestFile: 'setup.json'});
-  const first = await producePackage({root, config: policy, output: 'with-setup'});
-  const input = JSON.parse(await readFile(join(root, 'setup.json'), 'utf8'));
-  const setupBytes = await readFile(first.setup);
-  assert.deepEqual(setupBytes, Buffer.from(`${JSON.stringify(input, null, 2)}\n`));
-  assert.equal(first.setup, join(root, 'with-setup/rer-setup.json'));
+test("setup manifest packaging preserves canonical bytes and refuses invalid or unsafe selection", async t => {
+  await caseRows(t, [["setup manifest packaging preserves canonical bytes and refuses invalid or unsafe selection", async t => {
+  const step = namedSteps(t);
+  await step('setup manifest is validated and emitted as deterministic sibling bytes with a matching descriptor digest', async t => {
+    const root = await fixture(t);
+    const policy = config({manifestFile: 'setup.json'});
+    const first = await producePackage({root, config: policy, output: 'with-setup'});
+    const input = JSON.parse(await readFile(join(root, 'setup.json'), 'utf8'));
+    const setupBytes = await readFile(first.setup);
+    assert.deepEqual(setupBytes, Buffer.from(`${JSON.stringify(input, null, 2)}\n`));
+    assert.equal(first.setup, join(root, 'with-setup/rer-setup.json'));
 
-  const descriptorBytes = await readFile(first.project);
-  const descriptor = JSON.parse(descriptorBytes);
-  assert.deepEqual(descriptor.setup, {
-    path: 'rer-setup.json',
-    sha256: createHash('sha256').update(setupBytes).digest('hex')
+    const descriptorBytes = await readFile(first.project);
+    const descriptor = JSON.parse(descriptorBytes);
+    assert.deepEqual(descriptor.setup, {
+      path: 'rer-setup.json',
+      sha256: createHash('sha256').update(setupBytes).digest('hex')
+    });
+    assert.equal(descriptor.schema, 1);
+
+    const second = await producePackage({root, config: policy, output: 'with-setup-again'});
+    assert.deepEqual(await readFile(second.setup), setupBytes);
+    assert.deepEqual(await readFile(second.project), descriptorBytes);
   });
-  assert.equal(descriptor.schema, 1);
 
-  const second = await producePackage({root, config: policy, output: 'with-setup-again'});
-  assert.deepEqual(await readFile(second.setup), setupBytes);
-  assert.deepEqual(await readFile(second.project), descriptorBytes);
-});
-
-test('no-manifest packaging keeps the prior descriptor shape and adds no setup output', async t => {
-  const root = await fixture(t);
-  const policy = config();
-  const result = await producePackage({root, config: policy, output: 'without-setup'});
-  assert.deepEqual(await readFile(result.project), Buffer.from(`${JSON.stringify(policy.project, null, 2)}\n`));
-  assert.deepEqual(await readFile(result.workflow), Buffer.from(generateManagedWorkflow(policy.managed)));
-  await produceArtifact({
-    ...policy.artifact,
-    root,
-    output: 'without-setup-reference/delivery-artifact/app.json'
-  });
-  assert.deepEqual(
-    await filesUnder(join(root, 'without-setup/delivery-artifact')),
-    await filesUnder(join(root, 'without-setup-reference/delivery-artifact'))
-  );
-  assert.equal(result.setup, undefined);
-  assert.deepEqual(Object.keys(await filesUnder(join(root, 'without-setup'))).sort(), [
-    '.github/workflows/rer-managed.yml',
-    'delivery-artifact/app.json',
-    'delivery-artifact/payload/assets/000000',
-    'delivery-artifact/payload/modules/000000',
-    'rer-project.json'
-  ]);
-  await assert.rejects(readFile(join(root, 'without-setup/rer-setup.json')));
-});
-
-test('unsafe, missing, malformed and symlink setup manifests fail without a partial package', async t => {
-  const root = await fixture(t);
-  const policy = config();
-  for (const selection of [
-    {manifestFile: '../setup.json'},
-    {manifestFile: '/setup.json'},
-    {manifestFile: 'setup.yaml'},
-    {manifestFile: 'setup.json', extra: true}
-  ]) assert.throws(() => packagingConfig({...policy, setup: selection}));
-
-  for (const [name, setup, expected] of [
-    ['missing', {manifestFile: 'missing.json'}, /ENOENT/],
-    ['invalid-json', {manifestFile: 'invalid.json'}, /valid JSON/],
-    ['invalid-schema', {manifestFile: 'invalid-schema.json'}, /Invalid setup manifest/]
-  ]) {
-    if (name === 'invalid-json') await writeFile(join(root, 'invalid.json'), '{');
-    if (name === 'invalid-schema') await writeFile(join(root, 'invalid-schema.json'), '{"schema":1,"title":"x","groups":[],"fields":[],"steps":[]}');
-    await assert.rejects(producePackage({root, config: config(setup), output: `rejected-${name}`}), expected);
-    await assert.rejects(readdir(join(root, `rejected-${name}`)));
-  }
-
-  await symlink(join(root, 'setup.json'), join(root, 'linked.json'));
-  await assert.rejects(producePackage({root, config: config({manifestFile: 'linked.json'}), output: 'rejected-symlink'}), /symlink refused/);
-  await assert.rejects(readdir(join(root, 'rejected-symlink')));
-});
-
-test('semantic-invalid and duplicate-key manifests fail before artifact-only output', async t => {
-  const root = await fixture(t);
-  const invalid = JSON.parse(await readFile(join(root, 'setup.json'), 'utf8'));
-  invalid.fields[1].name = invalid.fields[0].name;
-  await writeFile(join(root, 'setup.json'), `${JSON.stringify(invalid)}\n`);
-  await writeFile(join(root, 'rer-packaging.json'), JSON.stringify(config({manifestFile: 'setup.json'})));
-  await assert.rejects(packaging(['artifact', '--root', root, '--config', 'rer-packaging.json']), /Invalid setup manifest/);
-  await assert.rejects(readFile(join(root, 'delivery-artifact/app.json')));
-
-  await writeFile(join(root, 'setup.json'), '{"schema":1,"schema":1}');
-  await assert.rejects(packaging(['artifact', '--root', root, '--config', 'rer-packaging.json']), /duplicate JSON field/);
-  await assert.rejects(readFile(join(root, 'delivery-artifact/app.json')));
-
-  await assert.rejects(exportProducer({root, config: config({manifestFile: 'setup.json'}), output: 'rejected-export'}), /duplicate JSON field/);
-  await assert.rejects(readdir(join(root, 'rejected-export')));
-});
-
-test('export vendors the setup schema and validators and its artifact command validates selected manifests', async t => {
-  const root = await fixture(t);
-  const policy = config({manifestFile: 'setup.json'});
-  const exported = await exportProducer({root, config: policy});
-  for (const name of ['SETUP.schema.json', 'json-schema.mjs', 'setup-validation.mjs']) {
+  await step('no-manifest packaging keeps the prior descriptor shape and adds no setup output', async t => {
+    const root = await fixture(t);
+    const policy = config();
+    const result = await producePackage({root, config: policy, output: 'without-setup'});
+    assert.deepEqual(await readFile(result.project), Buffer.from(`${JSON.stringify(policy.project, null, 2)}\n`));
+    assert.deepEqual(await readFile(result.workflow), Buffer.from(generateManagedWorkflow(policy.managed)));
+    await produceArtifact({
+      ...policy.artifact,
+      root,
+      output: 'without-setup-reference/delivery-artifact/app.json'
+    });
     assert.deepEqual(
-      await readFile(join(exported, 'schema', name)),
-      await readFile(new URL(`../../../schema/${name}`, import.meta.url))
+      await filesUnder(join(root, 'without-setup/delivery-artifact')),
+      await filesUnder(join(root, 'without-setup-reference/delivery-artifact'))
     );
-  }
-  execFileSync(process.execPath, [join(exported, 'cli.mjs'), 'artifact', '--root', root, '--config', 'scripts/delivery/base/packaging.json'], {cwd: root, stdio: 'pipe'});
-  const artifact = JSON.parse(await readFile(join(root, 'delivery-artifact/app.json'), 'utf8'));
-  assert.equal(artifact.schema, 2);
-});
+    assert.equal(result.setup, undefined);
+    assert.deepEqual(Object.keys(await filesUnder(join(root, 'without-setup'))).sort(), [
+      '.github/workflows/rer-managed.yml',
+      'delivery-artifact/app.json',
+      'delivery-artifact/payload/assets/000000',
+      'delivery-artifact/payload/modules/000000',
+      'rer-project.json'
+    ]);
+    await assert.rejects(readFile(join(root, 'without-setup/rer-setup.json')));
+  });
+
+  await step('unsafe, missing, malformed and symlink setup manifests fail without a partial package', async t => {
+    const root = await fixture(t);
+    const policy = config();
+    for (const selection of [
+      {manifestFile: '../setup.json'},
+      {manifestFile: '/setup.json'},
+      {manifestFile: 'setup.yaml'},
+      {manifestFile: 'setup.json', extra: true}
+    ]) assert.throws(() => packagingConfig({...policy, setup: selection}));
+
+    for (const [name, setup, expected] of [
+      ['missing', {manifestFile: 'missing.json'}, /ENOENT/],
+      ['invalid-json', {manifestFile: 'invalid.json'}, /valid JSON/],
+      ['invalid-schema', {manifestFile: 'invalid-schema.json'}, /Invalid setup manifest/]
+    ]) {
+      if (name === 'invalid-json') await writeFile(join(root, 'invalid.json'), '{');
+      if (name === 'invalid-schema') await writeFile(join(root, 'invalid-schema.json'), '{"schema":1,"title":"x","groups":[],"fields":[],"steps":[]}');
+      await assert.rejects(producePackage({root, config: config(setup), output: `rejected-${name}`}), expected);
+      await assert.rejects(readdir(join(root, `rejected-${name}`)));
+    }
+
+    await symlink(join(root, 'setup.json'), join(root, 'linked.json'));
+    await assert.rejects(producePackage({root, config: config({manifestFile: 'linked.json'}), output: 'rejected-symlink'}), /symlink refused/);
+    await assert.rejects(readdir(join(root, 'rejected-symlink')));
+  });
+
+  await step('semantic-invalid and duplicate-key manifests fail before artifact-only output', async t => {
+    const root = await fixture(t);
+    const invalid = JSON.parse(await readFile(join(root, 'setup.json'), 'utf8'));
+    invalid.fields[1].name = invalid.fields[0].name;
+    await writeFile(join(root, 'setup.json'), `${JSON.stringify(invalid)}\n`);
+    await writeFile(join(root, 'rer-packaging.json'), JSON.stringify(config({manifestFile: 'setup.json'})));
+    await assert.rejects(packaging(['artifact', '--root', root, '--config', 'rer-packaging.json']), /Invalid setup manifest/);
+    await assert.rejects(readFile(join(root, 'delivery-artifact/app.json')));
+
+    await writeFile(join(root, 'setup.json'), '{"schema":1,"schema":1}');
+    await assert.rejects(packaging(['artifact', '--root', root, '--config', 'rer-packaging.json']), /duplicate JSON field/);
+    await assert.rejects(readFile(join(root, 'delivery-artifact/app.json')));
+
+    await assert.rejects(exportProducer({root, config: config({manifestFile: 'setup.json'}), output: 'rejected-export'}), /duplicate JSON field/);
+    await assert.rejects(readdir(join(root, 'rejected-export')));
+  });
+
+  await step('export vendors the setup schema and validators and its artifact command validates selected manifests', async t => {
+    const root = await fixture(t);
+    const policy = config({manifestFile: 'setup.json'});
+    const exported = await exportProducer({root, config: policy});
+    for (const name of ['SETUP.schema.json', 'json-schema.mjs', 'setup-validation.mjs']) {
+      assert.deepEqual(
+        await readFile(join(exported, 'schema', name)),
+        await readFile(new URL(`../../../schema/${name}`, import.meta.url))
+      );
+    }
+    execFileSync(process.execPath, [join(exported, 'cli.mjs'), 'artifact', '--root', root, '--config', 'scripts/delivery/base/packaging.json'], {cwd: root, stdio: 'pipe'});
+    const artifact = JSON.parse(await readFile(join(root, 'delivery-artifact/app.json'), 'utf8'));
+    assert.equal(artifact.schema, 2);
+  });
+
+  }]]);
+})
