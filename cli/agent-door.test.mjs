@@ -23,12 +23,13 @@ test('rer verify drives signed, setup-token and native owner lifecycles through 
    // This is outside the runner: the same production signed route with its
    // trusted configuration must still refuse a bare setup token.
    const pair = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
-   const hosted = await serveHosted(root, { bindings: { OWNER_EMAIL: 'synthetic-base-1@example.com', SETUP_TOKEN: 'fixture-raw-setup-token',
+   const rawToken = 'fixture-raw-setup-token-at-least-32-bytes';
+   const hosted = await serveHosted(root, { bindings: { OWNER_EMAIL: 'synthetic-base-1@example.com', SETUP_TOKEN: rawToken,
     RER_OWNER_CLAIM_ISSUER: 'https://issuer.example.invalid', RER_OWNER_CLAIM_INSTALLATION_ID: randomUUID(), RER_OWNER_CLAIM_APP_ORIGIN: HOSTED_ORIGIN,
     RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify({ fixture: await webcrypto.subtle.exportKey('jwk', pair.publicKey) }),
    } });
    try {
-    const denied = await hosted.fetch('auth/owner-claim', { method: 'POST', headers: { Origin: hosted.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: 'fixture-raw-setup-token', displayName: 'Owner' }) });
+    const denied = await hosted.fetch('auth/owner-claim', { method: 'POST', headers: { Origin: hosted.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: rawToken, displayName: 'Owner' }) });
     assert.equal(denied.status, 403);
     assert.equal((await denied.json()).error, 'invalid_claim');
     t.diagnostic('Outside runner: raw owner token HTTP 403 invalid_claim.');
