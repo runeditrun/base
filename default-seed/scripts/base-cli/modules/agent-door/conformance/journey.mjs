@@ -31,6 +31,40 @@ async function checkResources(c, step, answer, phase, held) {
   }
  }
 }
+// Arguments a narrowing-only tool can never declare; each names authority to add.
+const smuggled = { role: 'owner', scopes: ['*'], grant: 'all', permissions: ['*'] };
+const grantSet = value => new Set((Array.isArray(value) ? value : value === undefined || value === null ? [] : [value]).map(item => typeof item === 'string' ? item : JSON.stringify(item)));
+/** A tool that cannot widen proves it only reduces its subject's grant set, and refuses a widening argument. */
+async function narrowing(c, step, outputs) {
+ const grants = async () => {
+  const answer = await c.tool(step.grants.tool, c.resolve(step.grants.args, outputs));
+  if (answer.result?.isError || answer.result?.structuredContent === undefined) throw new Error(`Grant probe ${step.grants.tool} failed (${errorCode(answer) ?? answer.status})`);
+  let value = answer.result.structuredContent;
+  for (const part of step.grants.pointer.split('/').slice(1)) value = value?.[part.replace(/~1/g, '/').replace(/~0/g, '~')];
+  return grantSet(value);
+ };
+ const declared = c.listed.get(step.tool), names = Object.keys(c.surface.tools.find(tool => tool.name === step.tool)?.inputSchema?.properties ?? {});
+ c.add(`BASE-AGENT-005.narrowing.${step.id}.schema`, Object.keys(declared?.inputSchema?.properties ?? {}).every(name => names.includes(name) || ['idempotency_key', 'expected_revision', 'native_proof'].includes(name)) && declared?._meta?.['com.runeditrun/widens'] === false, `${step.tool} must list widens:false and only the arguments its declared narrowing schema names.`);
+ const args = c.args(step, outputs), before = await grants(), witness = await c.witness();
+ const smuggle = await c.tool(step.tool, { ...args, ...Object.fromEntries(Object.entries(smuggled).filter(([name]) => !names.includes(name))), idempotency_key: randomUUID() });
+ c.add(`BASE-AGENT-005.narrowing.${step.id}.smuggle`, errorCode(smuggle) === 'undeclared_arguments' && isDeepStrictEqual(before, await grants()) && isDeepStrictEqual(witness, await c.witness()), `${step.tool} must refuse a smuggled widening argument with undeclared_arguments and no effect (${errorCode(smuggle) ?? smuggle.status}).`);
+ const answer = await c.tool(step.tool, args);
+ checkClasses(c, step, answer, 'narrowing');
+ const after = await grants();
+ c.add(`BASE-AGENT-005.narrowing.${step.id}.subset`, !answer.result?.isError && [...after].every(grant => before.has(grant)), `${step.tool} must complete and leave its subject a subset of its grants (${errorCode(answer) ?? answer.status}; before ${[...before].join(', ')}; after ${[...after].join(', ')}).`);
+}
+/** The journey replayed up to its first destructive step: fresh records for the fixtures outside it. */
+export async function journeyPrefix(c) {
+ const outputs = new Map(), links = [];
+ for (const step of c.surface.journey) {
+  if (step.expect.some(item => item.class === 'destructive')) break;
+  const answer = await c.tool(step.tool, c.args(step, outputs));
+  if (answer.result?.isError || answer.result?.structuredContent === undefined) throw new Error(`Could not prepare ${step.id} for fixtures outside the journey (${errorCode(answer) ?? answer.status})`);
+  outputs.set(step.id, answer.result.structuredContent);
+  for (const link of answer.result.content?.filter(item => item.type === 'resource_link') ?? []) if (!links.includes(link.uri)) links.push(link.uri);
+ }
+ return { outputs, links };
+}
 export async function runJourney(c, phase, { held = false, injections = false, replay = false } = {}) {
  const outputs = new Map(); let replayed = false;
  try {
@@ -77,6 +111,7 @@ export async function runJourney(c, phase, { held = false, injections = false, r
    c.add(`BASE-AGENT-005.1.${step.id}`, errorCode(answer) === 'self_escalation', `${step.tool} must refuse sponsor escalation with self_escalation (${errorCode(answer) ?? answer.status}).`);
    c.add(`BASE-AGENT-005.2.${step.id}`, isDeepStrictEqual(before, after), `${step.tool} changed native state while attempting sponsor escalation.`);
   });
+  if (!held) for (const step of c.surface.narrowings ?? []) await c.phase(`BASE-AGENT-005.narrowing.${step.id}`, () => narrowing(c, step, outputs));
  }
  return outputs;
 }

@@ -11,11 +11,13 @@ import { openReview } from './reviews.ts'
 import { appendEvents } from './events.ts'
 import { acquireDecision, releaseDecision, startExecution, startPending } from './counting.ts'
 import { preparedBy } from './people.ts'
+import { proofRefusal } from './proof.ts'
 import type { ToolDefinition } from './types.ts'
 
 export interface PipelineAnswer { result: CallResult; status?: number; scope?: string }
-export async function callTool(rt: Runtime, name: string, input: unknown, principal: Principal, door: ToolContext['door'], trace?: unknown, resourceTool?: ToolDefinition, requestState?: unknown): Promise<PipelineAnswer> {
-  const row = newAudit(rt, principal, name, door, trace)
+/** `admission` is a refusal decided before the call, still audited with its arguments. */
+export async function callTool(rt: Runtime, name: string, input: unknown, principal: Principal, door: ToolContext['door'], trace?: unknown, resourceTool?: ToolDefinition, requestState?: unknown, admission?: string): Promise<PipelineAnswer> {
+  const row = newAudit(rt, principal, name, door, trace, door === 'mcp' ? principal.scopes : null)
   if (name === 'resources/read') row.resource = String((input as { uri: string }).uri)
   let evidence: Evidence | undefined, owned = false, effected = false, locked = false
   let result: CallResult = { outcome: 'refused', decision: null }, status: number | undefined, scope: string | undefined
@@ -29,6 +31,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     row.ignored_arguments = Object.keys(raw ?? {}).filter(key => !Object.hasOwn(properties, key)).sort()
     const key = !tool.readOnly && typeof raw?.idempotency_key === 'string' && raw.idempotency_key.length > 0 && raw.idempotency_key.length <= 200 ? raw.idempotency_key : null
     row.idempotency_key = key
+    if (admission) return refuse(admission)
     if (tool.scope && !principal.scopes.includes(tool.scope)) { status = 403; scope = tool.scope; return refuse('insufficient_scope') }
     const state = await policyState(rt)
     row.revision = state.revision
@@ -39,6 +42,8 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       return refuse(refusal.code, refusal.fields)
     }
     if (!tool.readOnly && !key) return refuse('idempotency_key_required')
+    // A narrowing-only tool refuses, rather than ignores, an argument it does not declare.
+    if (tool.widens === false && row.ignored_arguments.length) return refuse('undeclared_arguments', { arguments: row.ignored_arguments })
     const requestDigest = await digest({ name, arguments: declared })
     if (tool.readOnly && requestState !== undefined) {
       if (typeof requestState !== 'string') return refuse('invalid_arguments')
@@ -63,18 +68,24 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       }
     }
     if (!raw || !validateSchema(tool.inputSchema, declared)) return refuse('invalid_arguments')
-    const { idempotency_key: _key, expected_revision: expected, ...args } = declared
+    const { idempotency_key: _key, expected_revision: expected, native_proof: proof, ...args } = declared
     const ctx = context(rt, principal, door, [])
     if (tool.revision && expected !== undefined) {
       const current = await tool.revision(args, ctx)
       if (expected !== current) return refuse('revision_conflict', { current_revision: current })
     }
     const authority = await tool.authority?.(args, ctx)
+    if (tool.widens === false && authority?.widens) throw new Error('authority_contradicts_declaration')
     if (selfEscalation(authority, principal)) {
       result.decision = { id: row.id, disposition: 'self_escalation', revision: state.revision, classes: [] }
       return refuse('self_escalation')
     }
     const classes = await classify(tool, args, ctx)
+    const unproven = tool.proof && await proofRefusal(rt, tool, proof, principal, row)
+    if (unproven) {
+      result.decision = { id: row.id, disposition: 'native_proof', revision: state.revision, classes: [] }
+      return refuse(unproven.code, unproven.fields)
+    }
     locked = await acquireDecision(rt, row.id)
     if (!locked) return refuse('decision_busy')
     const sums = await usage(rt, state.document!, principal)

@@ -225,6 +225,7 @@ export interface OperatorAuth<R extends string = Role> {
   delegatedAdministration(input: { personId: string; auditLabel: string; agentId: string }): {
     invite(input: { email: string; displayName: string; role?: 'admin' | 'member'; returnTo?: string }): Promise<{ status: 'accepted' }>;
     setRole(operatorId: string, role: 'admin' | 'member'): Promise<Operator<R>>;
+    cancelInvitation(operatorId: string): Promise<Operator<R>>;
     listOperators(): Promise<Operator<R>[]>;
   };
   listSessions(request: Request, operatorId?: string): Promise<Array<{ id: string; kind: SessionKind; createdAt: number; expiresAt: number; active: boolean }>>;

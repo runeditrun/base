@@ -126,7 +126,7 @@ test('approval waits, names its person, executes once, rejects, expires and dete
  } finally { await r.close() }
 })
 
-test('credentials, pause, embedded calls, subscriptions and the generic conformance journey share the live door', async () => {
+test('credentials, pause, embedded calls, subscriptions and the generic conformance journey share the live door', async t => {
  const r = await runtime()
  try {
   await r.adopt()
@@ -140,6 +140,9 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
   await r.adopt(autonomousPolicy(),{paused:true}); assert.equal(code(await r.tool('records.list',{})),'agents_paused'); assert.equal((await r.person('/agents/api/state')).status,200)
   await r.adopt(); await r.person('/agents/api/pause',{paused:true}); assert.equal(code(await r.tool('records.list',{})),'agents_paused'); await r.person('/agents/api/pause',{paused:false})
   const embedded=await r.person('/__embedded',{}); assert.equal(embedded.body.outcome,'done')
+  // An embedded or durable caller reaches only the scopes it passes.
+  const outside=await r.person('/__embedded',{tool:'synthetic.records.write',args:args('synthetic-base-embedded'),scopes:['records:read']})
+  assert.equal(outside.body.code,'insufficient_scope'); assert.deepEqual(await rows(r),[])
   await r.tool('records.write',args())
   const listenBody={jsonrpc:'2.0',id:'synthetic-base-subscription',method:'subscriptions/listen',params:{notifications:{resourceSubscriptions:['synthetic://record/synthetic-base-1'],toolsListChanged:true},_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28'}}}
   const stream=await r.post('/mcp',listenBody,{'MCP-Protocol-Version':'2026-07-28','Mcp-Method':'subscriptions/listen',Authorization:`Bearer ${await r.token()}`})
@@ -194,7 +197,17 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
  } finally { await local.close() }
  const fresh=await runtime({resourceScope:'resources:read'})
  try {
-  const surface={escalations:[{id:'self',tool:'synthetic.access.change',args:{id:{$sponsor:'id'}}}],schema:'rer-agent-surface/1',seed:'synthetic',specialist:'operations',tools:[
+  await fresh.db.prepare("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('synthetic-base-teammate','synthetic-base-teammate@example.com','Synthetic Teammate','admin','active',0)").run()
+  const teammate={id:'synthetic-base-teammate'}
+  const surface={escalations:[{id:'self',tool:'synthetic.access.change',args:{id:{$sponsor:'id'}}}],schema:'rer-agent-surface/1',seed:'synthetic',specialist:'operations',
+   narrowings:[{id:'revoke',tool:'synthetic.access.revoke',args:teammate,expect:[{class:'access',facts:{direction:'narrows'}}],grants:{tool:'synthetic.access.read',args:teammate,pointer:'/grants'}}],
+   proofs:[{id:'export',tool:'synthetic.records.export',args:{id:'synthetic-base-1'},expect:[{class:'sensitive'}]}],
+   durable:[{id:'scheduled',tool:'synthetic.records.schedule',args:{id:'synthetic-base-durable',value:'synthetic-base-durable'},expect:[{class:'standard'}],runs:'synthetic.records.write'}],
+   verification:{proof:{module:'tests/native-proof.mjs'}},tools:[
+   {name:'synthetic.records.schedule',scope:'records:write',readOnly:false,classes:['standard'],clauses:['BASE-AGENT-004']},
+   {name:'synthetic.access.read',scope:'records:read',readOnly:true,classes:['standard'],clauses:['BASE-AGENT-005']},
+   {name:'synthetic.access.revoke',scope:'records:write',readOnly:false,classes:['access'],clauses:['BASE-AGENT-005'],widens:false,effect:'revoke',subject:'id',inputSchema:{type:'object',properties:{id:{type:'string',minLength:1}},required:['id'],additionalProperties:false}},
+   {name:'synthetic.records.export',scope:'records:read',readOnly:true,classes:['sensitive'],clauses:['BASE-AGENT-005'],proof:{native:'step_up'}},
    {name:'synthetic.records.list',scope:'records:read',readOnly:true,classes:['standard'],clauses:['BASE-AGENT-002']},
    {name:'synthetic.records.write',scope:'records:write',readOnly:false,classes:['standard'],clauses:['BASE-AGENT-002']},
    {name:'synthetic.records.erase',scope:'records:write',readOnly:false,classes:['destructive'],clauses:['BASE-AGENT-006']},
@@ -206,8 +219,20 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
     {id:'send',tool:'synthetic.records.send',args:{id:'synthetic-base-1'},expect:[{class:'external'},{class:'sensitive'}]},
     {id:'access',tool:'synthetic.access.change',args:{id:'synthetic-base-other'},expect:[{class:'access'}]},
     {id:'erase',tool:'synthetic.records.erase',args:{id:'synthetic-base-1'},expect:[{class:'destructive'}]},
-    {id:'events',tool:'synthetic.events.list',args:{},expect:[{class:'standard'}]}]}
-  const result=await runAgentDoorConformance({fetch:fresh.fetch,origin:fresh.c.origin,surface,signer:fresh.c.signer,person:fresh.c.person,now:()=>fresh.c.now})
+    {id:'events',tool:'synthetic.events.list',args:{},expect:[{class:'standard'}]},
+    {id:'grants',tool:'synthetic.access.read',args:teammate,expect:[{class:'standard'}]}]}
+  // The person's native email-link step-up for the handoff, then the seed's own job runner.
+  const prove=async ({handoff}:any)=>{
+   const cookie=fresh.c.person.cookie
+   assert.equal((await fresh.post('/auth/step-up',{action:'export',returnTo:new URL(handoff.url).pathname},{cookie})).status,202)
+   const mail=await fresh.db.prepare('SELECT body FROM test_mail WHERE email=? ORDER BY rowid DESC LIMIT 1').bind(fresh.c.person.email).first()
+   const confirmed=await fresh.post('/auth/confirm',{token:new URL(mail.body.match(/https:\/\/\S+/)[0]).searchParams.get('token')},{cookie})
+   assert.equal(confirmed.status,303); await confirmed.body?.cancel()
+  }
+  const jobs=async ()=>{ const ran=await fresh.post('/__jobs',{}); assert.equal(ran.status,200); await ran.body?.cancel() }
+  const result=await runAgentDoorConformance({fetch:fresh.fetch,origin:fresh.c.origin,surface,signer:fresh.c.signer,person:fresh.c.person,now:()=>fresh.c.now,jobs,prove})
+  const families=['BASE-AGENT-004.durable','BASE-AGENT-004.principal','BASE-AGENT-005.narrowing','BASE-AGENT-005.proof']
+  t.diagnostic(`module conformance ${result.points.filter((p:any)=>p.ok).length}/${result.points.length}; ${families.map(family=>`${family} ${result.points.filter((p:any)=>p.id.startsWith(family)).length}`).join(', ')}`)
   assert.deepEqual(result.points.filter((p:any)=>!p.ok),[])
  } finally { await fresh.close() }
 })

@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { classIds } from './protocol.mjs';
 import { AGENT_CLASSES } from './surface.mjs';
 
-async function auditRows(c) {
+export async function auditRows(c) {
  const rows = []; let cursor = null, differs = 0;
  for (let page = 0; page < 100; page++) {
   const result = await c.personJson(`/agents/api/audit?agent=${encodeURIComponent(c.agentId)}${cursor ? `&after=${encodeURIComponent(cursor)}` : ''}`);
@@ -19,17 +19,20 @@ export async function auditPhase(c) {
  c.add('BASE-AGENT-009.1.unique', new Set(rows.map(row => row.id)).size === rows.length, 'Every tool call, resource read and approval execution must have its own audit ID.');
  for (const [index, call] of expected.entries()) {
   const row = rows[index], decision = call.decision;
-  c.add(`BASE-AGENT-009.1.call.${index}`, Boolean(row) && row.tool === call.name && row.agent?.id === c.agentId && row.agent?.specialist === c.surface.specialist && row.sponsor?.id === c.sponsor.id && typeof row.label === 'string' && row.label.includes(' for ') && Number.isFinite(Date.parse(row.at)) && row.door === 'mcp', `${call.name} lacks its complete ordered audit row.`);
+  const durable = call.kind === 'durable/execute';
+  c.add(`BASE-AGENT-009.1.call.${index}`, Boolean(row) && row.tool === call.name && row.agent?.id === c.agentId && row.agent?.specialist === c.surface.specialist && row.sponsor?.id === c.sponsor.id && typeof row.label === 'string' && row.label.includes(' for ') && Number.isFinite(Date.parse(row.at)) && row.door === (durable ? 'embedded' : 'mcp'), `${call.name} lacks its complete ordered audit row.`);
   if (!row) continue;
-  c.add(`BASE-AGENT-009.1.resource.${index}`, row.resource === (call.kind === 'resources/read' ? call.args.uri : null), `${call.name} audit resource must identify exactly the requested URI, or be null for a tool.`);
+  c.add(`BASE-AGENT-009.1.consent.${index}`, row.consent === call.consent && Array.isArray(row.scopes), `${call.name} audit must name the consent ${call.consent} and the scopes it acted under.`);
+  c.add(`BASE-AGENT-009.1.resource.${index}`, row.resource === (call.name === 'resources/read' ? call.args.uri : null), `${call.name} audit resource must identify exactly the requested URI, or be null for a tool.`);
   c.add(`BASE-AGENT-009.2.link.${index}`, call.kind === 'approval/execute' ? row.id !== decision?.id && row.decision_id === decision?.id : row.decision_id === null, `${call.name} must ${call.kind === 'approval/execute' ? 'link its own execution row to the pending decision' : 'have its own call row without an approval execution link'}.`);
   const validClasses = Array.isArray(row.classes) && new Set(classIds(row.classes)).size === row.classes.length && row.classes.every(item => AGENT_CLASSES.includes(item.class) && item.facts && typeof item.facts === 'object');
-  c.add(`BASE-AGENT-006.6.audit.${index}`, validClasses && (decision ? isDeepStrictEqual(classIds(row.classes), classIds(decision.classes)) && decision.classes.every(item => row.classes.some(actual => actual.class === item.class && isDeepStrictEqual(actual.facts, item.facts))) : call.kind === 'resources/read' || row.classes.length === 0), `${call.name} audit classes/facts differ from its computed decision.`);
+  c.add(`BASE-AGENT-006.6.audit.${index}`, validClasses && (decision ? isDeepStrictEqual(classIds(row.classes), classIds(decision.classes)) && decision.classes.every(item => row.classes.some(actual => actual.class === item.class && isDeepStrictEqual(actual.facts, item.facts))) : durable || call.kind === 'resources/read' || row.classes.length === 0), `${call.name} audit classes/facts differ from its computed decision.`);
+  if (durable) c.add(`BASE-AGENT-004.durable.audit.${index}`, row.outcome === call.outcome && row.code === call.code, `${call.name} durable execution audit outcome differs from the job's result.`);
   if (decision) c.add(`BASE-AGENT-009.2.decision.${index}`, (call.kind === 'approval/execute' || row.id === decision.id) && row.decision === decision.disposition && row.revision === decision.revision && isDeepStrictEqual(row.rules, decision.classes.map(({ class: cls, rule, do: disposition }) => ({ class: cls, rule, do: disposition }))), `${call.name} audit decision or revision differs from the response.`);
   else if (call.kind === 'resources/read') c.add(`BASE-AGENT-009.2.resource-rules.${index}`, Array.isArray(row.rules) && isDeepStrictEqual(classIds(row.rules), classIds(row.classes)) && row.rules.every(rule => typeof rule.rule === 'string' && ['autonomous', 'review', 'approval', 'blocked', 'unset'].includes(rule.do)), 'Resource audit classes must each carry the applied policy rule and disposition.');
   if (decision?.disposition === 'review') c.add(`BASE-AGENT-009.4.review.${index}`, Boolean(row.review?.id), `${call.name} was decided review without a review row.`);
   if (call.pending) c.add(`BASE-AGENT-009.2.pending.${index}`, row.outcome === 'pending' && Boolean(call.approval?.id) && row.approval?.id === call.approval.id, `${call.name} must retain its original pending audit outcome and approval handle after the approval executes.`);
-  if (call.kind === 'approval/execute') c.add(`BASE-AGENT-008.5.execution.${index}`, row.approval?.id === call.approvalId && row.approval.by?.includes(c.sponsor.id) && row.outcome === 'done', `${call.name} approved execution lacks its completed row and named sponsor approval.`);
+  if (call.kind === 'approval/execute') c.add(`BASE-AGENT-008.5.execution.${index}`, row.approval?.id === call.approvalId && row.approval.by?.includes(c.sponsor.id) && row.outcome === (call.state === 'refused' ? 'refused' : 'done') && row.code === (call.state === 'refused' ? call.code : null), `${call.name} approved execution lacks its ${call.state === 'refused' ? 'refused' : 'completed'} row and named sponsor approval.`);
   if (call.result?._meta?.['com.runeditrun/receipt']) c.add(`BASE-AGENT-008.5.audit.${index}`, Boolean(row.approval?.id) && row.approval.by?.includes(row.sponsor.id), `${call.name} approval receipt lacks the signed-in sponsor as approver.`);
  }
  c.add('BASE-AGENT-007.7.differs-from-policy', differs === 0, `Audit evidence has ${differs} decisions that differ from the policy in force.`);

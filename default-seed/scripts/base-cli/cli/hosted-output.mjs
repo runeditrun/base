@@ -85,7 +85,12 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   }
  } catch (error) { await mf.dispose(); throw error; }
  return { client, identity, origin: HOSTED_ORIGIN, close: () => mf.dispose(),
-  fetch: (path, { headers, ...init } = {}) => fetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }) };
+  fetch: (path, { headers, ...init } = {}) => fetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }),
+  // One cron firing of the app's scheduled handler, as rer deploy's trigger runs it.
+  async scheduled() {
+   const result = await (await mf.getWorker('app')).scheduled({ cron: config.triggers?.crons?.[0] ?? '* * * * *', scheduledTime: new Date() });
+   if (result.outcome !== 'ok') throw new RerError('hosted_scheduled_failed', `The production build's scheduled handler finished with outcome ${result.outcome}.`, 1);
+  } };
 }
 
 export async function checkHostedOutput(root, options) {

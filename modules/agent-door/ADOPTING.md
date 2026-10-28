@@ -115,6 +115,81 @@ access or security tool. Use `{ "$sponsor": "id" }` or
 these and requires `self_escalation` with an unchanged native witness. Retain a
 journey call proving an ordinary narrowing change too.
 
+A tool whose native inputs can only remove authority (revoke a client, an
+endpoint, a monitor or runner grant, a pending invitation) declares
+`widens: false` in its definition and returns `widens: false` from `authority`;
+the door refuses, rather than ignores, any argument it does not declare
+(`undeclared_arguments`), and fails the call if `authority` ever reports
+widening. Its `agent-surface.json` tool entry repeats `"widens": false` with
+`"effect": "revoke"` or `"narrow"`, its `"subject"` (a string identifier
+argument without `enum`) and its closed `"inputSchema"`. Validation fails when
+any other argument at any depth names a person, role, scope or grant, or the
+schema stays open. Instead of an escalation it needs
+`narrowings: [{ id, tool, args, expect, grants: { tool, args, pointer } }]`:
+`grants` is a read-only tool whose `structuredContent` at `pointer` is the
+subject's grant set. Conformance drives the tool as an agent, refuses a
+smuggled widening argument with no effect, and requires the set after the call
+to be a subset of the set before. Points named `BASE-AGENT-005.surface.<tool>.narrowing`
+and `BASE-AGENT-005.narrowing.<id>.*` show which tools used this check; a tool that
+can widen keeps its escalation fixture.
+
+### Principal custody
+
+Every check receives the authenticated principal: the sponsoring `person`, the
+`agent`, its OAuth `client`, granted `scopes` and Business `consent`.
+`ToolContext` carries all of them, and resource `read(uri, ctx)` and
+`classify(record, ctx)` receive the same fields beside `db`; use them for
+per-client service fences. Event delivery and subscriptions follow the
+principal's access to each record: an event on a declared resource reaches an
+agent only when it holds the resource's `scope` and its `read` admits it, before
+any Business role; an unreadable record keeps only that agent's own changes
+and the sponsor's personal ones. Other events keep the sponsor and role rules.
+Approval executions re-admit the saved principal: a revoked consent refuses with
+`consent_revoked`, and its scopes narrow to the agent's latest authenticated
+grant (the scopes its most recent MCP call presented), so a scope removed after
+approval refuses with `insufficient_scope`, no effect and a complete audit row.
+Audit rows name `client`, `scopes`, `consent` and the request's `grant`.
+
+### Durable invocations
+
+`door.invoke(name, args, who)` runs embedded and scheduled work through the same
+pipeline. `who` is `{ person: { id }, agent, scopes, client?, consent? }`; the
+principal gets only the scopes passed, narrowed to the agent's current grant,
+never every registry scope. A job the agent schedules saves `ctx.invocation`
+(the same shape, JSON-serialisable) with its native work and later calls
+`door.invoke(tool, args, invocation)`. At that final admission the door re-reads
+the signed revocation lists: a revoked consent refuses with `consent_revoked`,
+runs nothing and writes a complete `embedded` audit row naming the consent and
+agent. Declare `durable: [{ id, tool, args, expect, runs }]` in
+`agent-surface.json`: `tool` schedules the work and `runs` names the tool the
+job invokes. `rer verify` fires the Worker's `scheduled` handler as cron does;
+conformance runs one job under a fresh consent, then revokes it and requires the
+next job to refuse.
+
+### Native proof
+
+A tool needing the person's recent native proof (two-factor step-up, for example)
+declares `proof: { native: 'step_up' }` and the seed passes
+`nativeProof: { step_up: { start: { action, fields }, verify(reference, ctx) } }`
+to `createAgentDoor`. The door never runs such a call on agent authority alone:
+without `native_proof` it refuses `native_proof_required` with
+`{ proof: { kind, handoff: { id, url } } }` and a complete audit row. The handoff
+URL is `/agents/proofs/<kind>/<id>` on the edition origin; it carries no secret.
+That signed-in page posts `start.fields` and `returnTo` to the seed's native
+`start.action`. Once the person proves it natively, the agent retries with
+`native_proof: <id>`; the door asks the seed's `verify` (with the person,
+agent, tool and `db`), refuses `native_proof_invalid` when it answers false, and
+otherwise continues through policy and approval. Base never sees the
+credential; the seed's own records decide recency. Proof tools stay out of the
+journey: declare `proofs: [{ id, tool, args, expect }]` and
+`verification.proof.module`, a contained test module default-exporting an async
+function receiving `{request, origin, email, cookie, kind, handoff, mail}`. It
+completes the seed's real native proof for the signed-in owner through `request`;
+`mail.latest(address)` returns the text of the newest message this run's
+disposable installation sent there. Conformance asserts the challenge, its audit
+row, refusal of a bogus and of an unproven reference, the confirmed handoff page
+and the proven call.
+
 Return resource references for outcomes the user can inspect. Supply undo only
 when the native action has a real reversal; review and approval do not invent one.
 
@@ -152,7 +227,7 @@ are separate from this installation journey and the edition's browser and UI par
 work. `rer verify` pairs its per-run ring through `RER_BUSINESS_TRUST`, posts a
 real signed settings document with the owner's Business `owner_id`, then mints
 journey tokens carrying that subject and `consent`. No setup-mode bypass exists. Retain explicit gaps for Business consent propagation, spend and byte budgets,
-long jobs, grant narrowing, outside mail, standalone policy forms and token
+Business-pushed grant narrowing, outside mail, standalone policy forms and token
 issuance, self-host delivery and stranger-specialist completion. Platform adoption
 of the shared policy source is also separate from copying it into an edition.
 
@@ -188,8 +263,16 @@ Seeds with a native initializer or a different owner binding declare this in
 }
 ```
 
-All four keys are optional. Email defaults to `synthetic-base-1@example.com`;
-the manifest's email and token fields are always bound too. The initializer is
+All keys are optional. Email defaults to `synthetic-base-1@example.com`;
+the manifest's email and token fields are always bound too. A seed whose own
+server reads native names for its trust adds `"bindings"`, mapping each name to
+a value minted for the run: `issuer` (the per-run issuer origin),
+`installationId`, `origin`, `email`, `token` (the setup token), `sub` (the
+owner's Business subject) or `business`, for example
+`{"RER_MANAGEMENT_ORIGIN":"issuer","RER_INSTALLATION_ID":"installationId"}`. Only
+declared names are injected, only for that run, and the verifier reports their
+names and kinds, never their values. Names the verifier already sets, and the
+owner email and token fields, cannot be rebound. Signed admission is unchanged. The initializer is
 a contained seed module default-exporting an async function receiving
 `{request, origin, email, sub, displayName, token, claim, returnTo}`. `claim` is
 `{mode, path, token}` with the signed credential when signed mode is declared;

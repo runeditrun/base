@@ -70,15 +70,16 @@ export function createProtocol(context) {
  context.personJson = async path => { const response = await context.personRequest(path); if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`); return responseBody(response); };
  context.decideApproval = async (pending, action = 'approve') => {
   if (!['approve', 'reject'].includes(action)) throw new Error('Approval decision must be approve or reject');
-  const handle = pending.result?._meta?.[APPROVAL], path = `/agents/api/approvals/${encodeURIComponent(handle.id)}`;
+  const handle = pending.result?._meta?.[APPROVAL] ?? pending.body?.error?.data?.approval, path = `/agents/api/approvals/${encodeURIComponent(handle.id)}`;
   const { approval } = await context.personJson(path);
   const valid = approval?.id === handle.id && approval.decision_id === pending.decision?.id && approval.revision === pending.decision?.revision && /^[a-f0-9]{64}$/.test(approval.summary_sha256);
   context.add(`BASE-AGENT-008.5.summary.${handle.id}`, valid, 'The person approval must expose its exact decision, revision and summary SHA-256.');
   if (!valid) throw new Error('Cannot decide an approval without its exact summary evidence');
   const response = await context.personRequest(`${path}/${action}`, { method: 'POST', body: JSON.stringify({ revision: approval.revision, summary_sha256: approval.summary_sha256 }) });
   const body = await responseBody(response);
-  if (response.ok && action === 'approve' && body.approval?.state === 'executed') context.calls.push({
-   kind: 'approval/execute', name: approval.tool, decision: structuredClone(pending.decision), approvalId: handle.id,
+  if (response.ok && action === 'approve' && ['executed', 'refused'].includes(body.approval?.state)) context.calls.push({
+   kind: 'approval/execute', name: approval.tool, decision: structuredClone(pending.decision), approvalId: handle.id, state: body.approval.state, code: body.approval.code,
+   consent: context.consent, ...(approval.tool === 'resources/read' ? { args: { uri: approval.summary?.uri } } : {}),
   });
   return { ok: response.ok, status: response.status, body };
  };
@@ -96,7 +97,7 @@ export function createProtocol(context) {
   if (['tools/call', 'resources/read'].includes(method) && track && response.status !== 401) context.calls.push({
    kind: method, name: method === 'resources/read' ? 'resources/read' : params.name,
    args: structuredClone(method === 'resources/read' ? { uri: params.uri } : params.arguments ?? {}),
-   decision: structuredClone(decision ?? null), code: errorCode(answer), result: structuredClone(result),
+   decision: structuredClone(decision ?? null), code: errorCode(answer), result: structuredClone(result), consent: context.consent,
    approval: structuredClone(result?._meta?.[APPROVAL] ?? body.error?.data?.approval ?? null),
    pending: result?.resultType === 'input_required' || method === 'resources/read' && errorCode(answer) === 'approval_required',
   });
@@ -108,6 +109,20 @@ export function createProtocol(context) {
   const args = context.resolve(step.args, outputs, options);
   if (!context.surface.tools.find(tool => tool.name === step.tool)?.readOnly) args.idempotency_key = randomUUID();
   return args;
+ };
+ // The first declared fixture for a tool, wherever the surface exercises it.
+ context.fixture = name => [...context.surface.journey, ...context.surface.narrowings ?? [], ...context.surface.proofs ?? [], ...context.surface.durable ?? []].find(step => step.tool === name);
+ // An SSE subscription's acknowledgement; the stream is then closed by the client.
+ context.listen = async (uris, options = {}) => {
+  const response = await context.request('/mcp', { method: 'POST', headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json', Origin: context.origin, 'MCP-Protocol-Version': VERSION, 'Mcp-Method': 'subscriptions/listen', Authorization: `Bearer ${options.token ?? await accessToken(context)}` },
+   body: JSON.stringify({ jsonrpc: '2.0', id: `rer-conformance-${++requestId}`, method: 'subscriptions/listen', params: { notifications: { resourceSubscriptions: uris }, _meta: { 'io.modelcontextprotocol/protocolVersion': VERSION } } }) });
+  if (!response.body) return null;
+  const reader = response.body.getReader(), decoder = new TextDecoder();
+  let text = '';
+  try {
+   while (!text.includes('\n\n')) { const chunk = await reader.read(); if (chunk.done) break; text += decoder.decode(chunk.value, { stream: true }); }
+  } finally { await reader.cancel().catch(() => {}); }
+  try { return JSON.parse(text.split('\n').find(line => line.startsWith('data:'))?.slice(5) ?? 'null')?.params?.notifications ?? null; } catch { return null; }
  };
  context.witness = async () => {
   const answer = await context.tool(context.surface.witness.tool, context.resolve(context.surface.witness.args));

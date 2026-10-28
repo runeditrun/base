@@ -17,14 +17,17 @@ const nativeSchema = `
 CREATE TABLE fixture_members (operator_id TEXT PRIMARY KEY REFERENCES oa_operators(id), email TEXT NOT NULL UNIQUE, joined_at INTEGER NOT NULL);
 CREATE TABLE fixture_records (id TEXT PRIMARY KEY, value TEXT NOT NULL, version INTEGER NOT NULL CHECK(version>0), operator_id TEXT NOT NULL REFERENCES oa_operators(id));
 CREATE TABLE fixture_receipts (id TEXT PRIMARY KEY, record_id TEXT NOT NULL REFERENCES fixture_records(id), kind TEXT NOT NULL, status INTEGER NOT NULL, body TEXT NOT NULL, operator_id TEXT NOT NULL REFERENCES oa_operators(id), created_at INTEGER NOT NULL);
+CREATE TABLE fixture_jobs (id TEXT PRIMARY KEY, value TEXT NOT NULL, invocation TEXT NOT NULL, state TEXT NOT NULL);
 `;
+// Like Mango's own server: the issuer origin and installation id under native names.
+export const nativeBindings = { FIXTURE_MANAGEMENT_ORIGIN: 'issuer', FIXTURE_INSTALLATION_ID: 'installationId' };
 
 export async function buildFixture(root) {
  const require = createRequire(join(base, 'default-seed/package.json'));
  await require('esbuild').build({ entryPoints: [join(import.meta.dirname, 'worker.mjs')], outfile: join(root, 'dist/server/index.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022' });
 }
 
-export async function fixtureSeed(t, mode) {
+export async function fixtureSeed(t, mode, bindings = nativeBindings) {
  const root = await mkdtemp(join(tmpdir(), 'rer-agent-door-'));
  t.after(() => rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
  await mkdir(join(root, 'dist/server/migrations'), { recursive: true });
@@ -33,7 +36,7 @@ export async function fixtureSeed(t, mode) {
  for (const file of ['provider.mjs', 'receiver.mjs', 'initializer.mjs']) await cp(join(import.meta.dirname, file), join(root, file));
  const surface = JSON.parse(await readFile(join(import.meta.dirname, 'surface.json'), 'utf8'));
  surface.verification = { network: { module: 'provider.mjs', origins: ['https://api.openai.com', 'https://receiver.example.invalid'] },
-  ...(mode === 'native' ? { owner: { email: 'native-owner@example.com', emailField: 'SETUP_OPERATOR_EMAIL', initializer: 'initializer.mjs' } } : {}),
+  owner: { bindings, ...(mode === 'native' ? { email: 'native-owner@example.com', emailField: 'SETUP_OPERATOR_EMAIL', initializer: 'initializer.mjs' } : {}) },
  };
  await writeFile(join(root, 'agent-surface.json'), JSON.stringify(surface));
  const reference = JSON.parse(await readFile(join(base, 'default-seed/package.json'), 'utf8'));
