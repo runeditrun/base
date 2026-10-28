@@ -18,3 +18,16 @@ function loginName() { try { return userInfo().username; } catch { return ''; } 
 export function workingFolder(folder = process.cwd()) {
  return typeof folder === 'string' && folder.startsWith('/') && folder.length <= 1000 && !/[\x00-\x1f\x7f]/.test(folder) ? folder : '';
 }
+
+/** The agent running this command, as the pairing reports it. Codex sets
+ * CODEX_THREAD_ID (or CODEX_SANDBOX) in every command it runs, so those two mark
+ * a command Codex itself is running and win; Claude Code sets CLAUDECODE. Only
+ * then does CODEX_HOME count: it is a user setting Codex reads, and anyone who
+ * exports it in a shell profile passes it on to Claude Code and its commands, so
+ * it is no proof of Codex. Anything else is "other".
+ */
+export function agentKind(env = process.env) {
+ if (env.CODEX_THREAD_ID || env.CODEX_SANDBOX) return 'codex';
+ if (env.CLAUDECODE) return 'claude';
+ return env.CODEX_HOME ? 'codex' : 'other';
+}
