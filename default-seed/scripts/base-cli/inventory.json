@@ -387,11 +387,15 @@
     },
     "cli/agent-door.mjs": {
       "source": "cli/agent-door.mjs",
-      "sha256": "3990b48b1731fa39f1ed6143188532de058716146a4838946265a31c3f2d10a3"
+      "sha256": "d04dae819a2c40fdc17c3225aea0dbf3a9cf823e389f75f66c5dcf76b6314098"
     },
     "cli/agent-network.mjs": {
       "source": "cli/agent-network.mjs",
       "sha256": "642fb6fd095ea82fb69f32f5eb0381b4a54bc6122bcac92dcfd0ef8b8abf4741"
+    },
+    "cli/agent-reviewers.mjs": {
+      "source": "cli/agent-reviewers.mjs",
+      "sha256": "4d4696dcc6043b391a93ea22f4877323d2e0bfa0f33bc18cfc5931fb47bc3d7a"
     },
     "cli/agent-surface.mjs": {
       "source": "cli/agent-surface.mjs",

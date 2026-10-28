@@ -2,6 +2,8 @@
 
 ## 0.2.86
 
+- Agent-door verification can declare independent native reviewer lifecycles with bounded, recipient-scoped captured mail; invitations, confirmation and two-person decisions still pass through the seed's production handlers.
+
 - Agent-door verification fixtures generate disposable setup, session, local bearer, delivery and provider credentials at runtime while retaining signed receipts and isolated provider checks.
 
 - Local `rer export` and `rer import` accept the historical `_rer_deploy_migrations` plus `d1_migrations` pair: the deploy ledger remains authoritative and Wrangler is skipped. Incomplete, pending or conflicting histories still refuse before transfer.

@@ -226,6 +226,57 @@ other outbound effects receive HTTP 502. Built-in Resend, SendGrid and Cloudflar
 mail adapters remain available by default. Never place production credentials
 in this declaration or ship the test adapter as application authority.
 
+## Native independent reviewers in verification
+
+An owner initializer that needs a second person during fixture preparation can
+declare that person's native lifecycle separately:
+
+```json
+{
+  "verification": {
+    "owner": { "initializer": "tests/initialize-owner.mjs" },
+    "reviewers": [
+      { "label": "quality", "email": "synthetic-quality@example.invalid", "initializer": "tests/initialize-reviewer.mjs" }
+    ]
+  }
+}
+```
+
+The owner initializer receives `reviewers.initialize(label, {cookie})`. Pass its
+real native owner session. The declared reviewer initializer receives
+`{request, origin, label, email, owner: {email,cookie}, returnTo, mail}`. Use the
+same-origin `request` to invite the reviewer, consume their invitation through
+the native confirmation handler, and return its final 303 `Response` with the
+reviewer's session cookie. `initialize` returns `{email,cookie}` to the owner
+initializer, which then performs the native independent review. No agent token,
+signer, database writer or production test route is supplied. Native roles,
+independence, expiry, one-use proofs and step-up checks remain authoritative.
+This test session grants no authority to a queued agent job.
+
+`mail.read({limit, maxAgeMs, after})` returns only this declared reviewer's
+accepted Resend, SendGrid or Cloudflare mail submissions as
+`{id,at,subject,text,html}`. The provider edge remains isolated. Rejected or
+oversized submissions and undeclared recipients are unavailable. Capture is
+limited to twenty messages, 64 KiB per submission and five minutes of age;
+defaults are ten messages and five minutes. No headers or provider credentials
+are exposed. Each initializer runs at most once, there are at most eight unique
+reviewers distinct from the owner, and capture is destroyed when verification
+closes. The harness requires every declared reviewer lifecycle to complete;
+its fixed failure diagnostic never prints mail, proofs or initializer errors.
+Keep lifecycle modules in test tooling outside the production graph.
+
+## Client custody boundary
+
+The door retains idempotent outcomes, pending approval arguments, review
+summaries, trace text, audit and events. Native client erasure must account for
+these stores; a native record deletion alone cannot remove retained content or
+prevent replay. No generic client-scoped erasure adapter is supplied yet.
+Keep a native custody exception closed when these stores contain client data.
+An adoption must establish the native mapping from retained artifacts to
+clients, the permitted redaction of retained decision evidence, and the atomic
+fence against pending execution and concurrent capture before enabling it.
+The existing evidence-retention requirement still applies.
+
 ## Base source from an archive
 
 A plain directory export can supply the source without a Base Git checkout:

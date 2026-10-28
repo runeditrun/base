@@ -4,8 +4,9 @@ import { requirePost, escapeHtml, securityHeaders } from '../../../../modules/op
 import { readInput } from '../../../../modules/operator-auth/input.mjs';
 import { createOwnerClaimHandler } from '../../../../modules/owner-claim/index.mjs';
 import { createBusinessSettings } from '../../../../modules/business-settings/index.ts';
+import { createMailSender } from '../../../../modules/mail/index.mjs';
 import { createReceiver } from './receiver.mjs';
-import { deliverySecret, openAiAuthorization } from './credentials.mjs';
+import { deliverySecret, openAiAuthorization, mailApiKey } from './credentials.mjs';
 const { deliveryRequest, verifyDeliveryReceipt } = createReceiver(deliverySecret);
 
 const object = (properties, required = Object.keys(properties)) => ({ type: 'object', properties, required, additionalProperties: false });
@@ -152,15 +153,16 @@ export default {
     const path = new URL(request.url).pathname;
     if (path === '/health') return Response.json({ ok: true, deployment: { sourceSha: env.RER_DEPLOY_SOURCE, fingerprint: env.RER_DEPLOY_FINGERPRINT, versionId: env.RER_VERSION.id } });
     if (path === '/' && ['GET', 'HEAD'].includes(request.method)) return new Response(request.method === 'HEAD' ? null : '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Records</title></head><body><main><h1>Records</h1><p>Save internal records, request a provider review, and retain signed delivery receipts.</p><p><a href="/app">Open your records workspace</a></p></main></body></html>', { headers: { ...securityHeaders(), 'Content-Type': 'text/html; charset=utf-8' } });
-    const origin = env.RER_OWNER_CLAIM_APP_ORIGIN, nativeMode = env.OWNER_MODE === 'native';
-    if (!['signed', 'native', 'setup-token'].includes(env.OWNER_MODE)) return new Response('Invalid owner configuration', { status: 503 });
+    const origin = env.RER_OWNER_CLAIM_APP_ORIGIN, nativeMode = ['native', 'native-reviewer'].includes(env.OWNER_MODE);
+    if (!['signed', 'native', 'native-reviewer', 'setup-token'].includes(env.OWNER_MODE)) return new Response('Invalid owner configuration', { status: 503 });
     const config = { origin, OWNER_EMAIL: nativeMode ? env.SETUP_OPERATOR_EMAIL : env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, SETUP_TOKEN: env.SETUP_TOKEN,
-      branding: { productName: 'Records' } };
+      MAIL_FROM: 'records@example.invalid', branding: { productName: 'Records' } };
+    const mailSender = createMailSender({ provider: 'resend', mode: 'production', apiKey: mailApiKey });
     const clientIp = incoming => incoming.headers.get('CF-Connecting-IP') ?? '';
-    const teamAuth = createOperatorAuth({ db: env.DB, config, clientIp });
+    const teamAuth = createOperatorAuth({ db: env.DB, config, clientIp, mailSender });
     const settings = createBusinessSettings({ db: env.DB, trust: env.RER_BUSINESS_TRUST,
       business: { settings: 1, values: ['display_name'], team: { roles: { admin: 'admin', member: 'member' } } }, team: teamAuth.businessTeam });
-    const auth = createOperatorAuth({ db: env.DB, config, clientIp, businessSettings: settings });
+    const auth = createOperatorAuth({ db: env.DB, config, clientIp, mailSender, businessSettings: settings });
     const trust = { issuer: env.RER_OWNER_CLAIM_ISSUER, installationId: env.RER_OWNER_CLAIM_INSTALLATION_ID, appOrigin: origin, publicKeys: JSON.parse(env.RER_OWNER_CLAIM_PUBLIC_KEYS) };
     const records = nativeRecords(env.DB, nativeMode);
     const door = createAgentDoor({ seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [],
@@ -171,6 +173,21 @@ export default {
     if (path === '/auth/owner-claim' && env.OWNER_MODE === 'signed') return createOwnerClaimHandler({ db: env.DB, authConfig: config, clientIp, ...trust, expectedEmail: config.OWNER_EMAIL })(request);
     if (path === '/auth/bootstrap' && env.OWNER_MODE === 'signed') return new Response('Not found', { status: 404 });
     try {
+      if (path === '/app/review' && env.OWNER_MODE === 'native-reviewer') {
+        requirePost(request, config);
+        const session = await auth.getSession(request);
+        if (!session) return Response.json({ error: 'unauthenticated' }, { status: 401 });
+        const input = await readInput(request);
+        if (input.action === 'prepare' && session.operator.role === 'owner') {
+          const id = crypto.randomUUID();
+          await env.DB.prepare('INSERT INTO fixture_reviews(id,preparer_id) VALUES(?,?)').bind(id, session.operator.id).run();
+          return Response.json({ id });
+        }
+        const row = await env.DB.prepare('SELECT preparer_id,reviewer_id FROM fixture_reviews WHERE id=?').bind(input.id).first();
+        if (!row || !['owner', 'admin'].includes(session.operator.role) || row.preparer_id === session.operator.id) return Response.json({ error: 'independent_reviewer_required' }, { status: 403 });
+        const marked = await env.DB.prepare('UPDATE fixture_reviews SET reviewer_id=? WHERE id=? AND reviewer_id IS NULL AND preparer_id<>?').bind(session.operator.id, input.id, session.operator.id).run();
+        return Response.json({ reviewed: marked.meta.changes === 1 });
+      }
       if (path === '/app/membership/link' && nativeMode) {
         requirePost(request, config);
         const session = await auth.getSession(request);
