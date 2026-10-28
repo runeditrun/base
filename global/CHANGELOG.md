@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Refresh acquires missing Base ancestry by fetching the two immutable comparison tips into a temporary bare repository, without requiring a full checkout. Failed or offline acquisition names both revisions, the Base remote and an exact repair command; copy records and files remain unchanged.
+
 ## 0.2.84
 
 - The publication scan accepts the upstream copyright notice of a Base-listed third-party licence text only under an exact licence file name with the listed Git blob ID (initially the vendored yaml 2.9.1 `LICENSE`) and reports each in `thirdPartyNotices`; seed configuration cannot extend the list, and scans of the unpacked rer tarball and of refreshed seeds pass without review records.

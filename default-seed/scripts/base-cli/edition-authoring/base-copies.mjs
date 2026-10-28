@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {hash, json, git, raw, gitReader, safe, noLinks, requirePhysical, testSource} from './files.mjs';
 import {snapshot, acknowledgementDrift} from './base-acknowledgements.mjs';
 import {requireMaterializedCopies, preflightRefresh} from './copy-checkout.mjs';
@@ -37,16 +38,24 @@ function baseRepository(root) {
   return (source?.kind === 'git' ? source.repository : source?.origin?.repository) || 'runeditrun/base';
 }
 
+function declaredRemote(record, root) {
+  const declared = record.repository ?? baseRepository(root);
+  return declared === 'runeditrun/base' ? 'https://github.com/runeditrun/base.git' : declared;
+}
+
 // An explicit checkout, else the record's legacy repository, else the seed's declaration.
 function open(record, base, root, offline = false) {
   if (base) {
     const repository = fs.realpathSync(base);
     const source = gitReader(repository, offline);
-    try { return {repository, source, head: source.git('rev-parse', 'HEAD'), offline, close: source.close}; }
+    try { return {repository, source, head: source.git('rev-parse', 'HEAD'), offline, close: source.close,
+      remote: () => {
+        try { return git(repository, 'remote', 'get-url', 'origin'); }
+        catch { return declaredRemote(record, root); }
+      }}; }
     catch (error) { source.close(); throw error; }
   }
-  const declared = record.repository ?? baseRepository(root);
-  const source = declared === 'runeditrun/base' ? 'https://github.com/runeditrun/base.git' : declared;
+  const source = declaredRemote(record, root);
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-'));
   try {
     execFileSync('git', ['clone', '--bare', '--quiet', '--', source, temporary], {env: {...process.env, GIT_NO_REPLACE_OBJECTS: '1'}, stdio: 'pipe'});
@@ -54,7 +63,7 @@ function open(record, base, root, offline = false) {
     fs.rmSync(temporary, {recursive: true, force: true});
     throw Error('Cannot acquire Base source. Clone https://github.com/runeditrun/base.git when online, then repeat with --base <checkout>.');
   }
-  return {repository: temporary, head: null, close: () => fs.rmSync(temporary, {recursive: true, force: true})};
+  return {repository: temporary, head: null, remote: () => source, close: () => fs.rmSync(temporary, {recursive: true, force: true})};
 }
 
 export function options(args, count) {
@@ -139,10 +148,47 @@ function seedFiles(root) {
   return files;
 }
 
+const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
+
+// A fresh object store avoids inheriting shallow boundaries from the supplied
+// checkout. Fetch only the two immutable tips, with no tags or other branches.
+function containsHistory(origin, source, revision, introduced) {
+  try {
+    const ancestor = source.git('merge-base', revision, introduced);
+    if (ancestor === introduced) return true;
+    if (git(origin.repository, 'rev-parse', '--is-shallow-repository') === 'false') return false;
+  } catch { /* Missing ancestry must be acquired before deciding applicability. */ }
+  const remote = origin.remote();
+  const format = source.git('rev-parse', '--show-object-format');
+  const fetch = ['fetch', '--no-tags', '--no-recurse-submodules', '--', remote, revision, introduced];
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'base-history-'));
+  try {
+    if (origin.offline) throw Error('offline');
+    execFileSync('git', ['init', '--bare', '--quiet', '--template=', '--object-format=' + format, temporary], {stdio: 'pipe'});
+    execFileSync('git', ['-C', temporary, ...fetch], {
+      env: {...process.env, GIT_NO_REPLACE_OBJECTS: '1', GIT_TERMINAL_PROMPT: '0'}, stdio: 'pipe', timeout: 60_000,
+    });
+    return git(temporary, 'merge-base', revision, introduced) === introduced;
+  } catch {
+    const {revision: target, recordPath, editionMigration} = origin.refresh;
+    const refs = [...new Set([revision, introduced, target])];
+    const cli = fileURLToPath(new URL('../bin/rer.mjs', import.meta.url));
+    const repair = 'history=$(mktemp -d) && git init --bare --quiet --template= --object-format=' + format +
+      ' "$history" && git -C "$history" fetch --no-tags --no-recurse-submodules -- ' +
+      [remote, ...refs].map(quote).join(' ') + ' && ' +
+      [process.execPath, cli, 'refresh-base', '--ref', target, '--base'].map(quote).join(' ') +
+      ' "$history" --record ' + quote(recordPath) +
+      editionMigration.map(id => ' --edition-migration ' + quote(id)).join('');
+    throw Error(`Cannot compare Base history for ${revision} and ${introduced} from remote ${remote}${origin.offline ? ' while offline' : '; fetching the required revisions failed or their ancestry is unavailable'}. No files were refreshed. When online, run exactly:\n${repair}`);
+  } finally {
+    fs.rmSync(temporary, {recursive: true, force: true});
+  }
+}
+
 function reader(origin) {
   const source = origin.source ?? gitReader(origin.repository);
   const format = source.git('rev-parse', '--show-object-format');
-  const trees = new Map();
+  const trees = new Map(), ancestry = new Map();
   return {
     // Git object identity of local bytes, to find copies by content without reading Base blobs.
     objectId: bytes => crypto.createHash(format).update(`blob ${bytes.length}\0`).update(bytes).digest('hex'),
@@ -185,8 +231,9 @@ function reader(origin) {
     },
     contains(revision, introduced) {
       this.tree(revision); this.tree(introduced);
-      try { return source.git('merge-base', revision, introduced) === introduced; }
-      catch { throw Error(`Cannot compare Base history for ${revision} and ${introduced}; fetch full Base history, then repeat refresh-base; no files were refreshed.`); }
+      const key = revision + ':' + introduced;
+      if (!ancestry.has(key)) ancestry.set(key, containsHistory(origin, source, revision, introduced));
+      return ancestry.get(key);
     },
     history(revision, name) {
       return source.git('log', '--format=%H', revision, '--', name).split('\n').filter(Boolean)
@@ -349,6 +396,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
   const files = seedFiles(root);
   requireMaterializedCopies(root, record, files);
   const origin = open(record, base, root, offline);
+  origin.refresh = {revision, recordPath, editionMigration};
   let writing = false, notices = [];
   try {
     const read = reader(origin);
