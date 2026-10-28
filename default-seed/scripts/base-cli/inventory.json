@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g0cad22d3",
+  "cliVersion": "0.2.85-dev.g45f4aafd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4707,7 +4707,7 @@
     },
     "scripts/publish-check/copy_identities.py": {
       "source": "scripts/publish-check/copy_identities.py",
-      "sha256": "9b2e620930bf9756939d0f013effb2eb3208dfcb8ad470d8face849359a40961"
+      "sha256": "bfdb64c44b0db14d7fb1f549b27154e67790037f8212fd16c712b5219995b14a"
     },
     "scripts/publish-check/credential_assignments.mjs": {
       "source": "scripts/publish-check/credential_assignments.mjs",
