@@ -1,3 +1,4 @@
+import { checkCases } from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp, mkdir, writeFile, readFile, rm} from 'node:fs/promises';
@@ -37,7 +38,8 @@ async function session(t,root,options={}) {
  return {server,call:async(path,value)=>fetch(server.origin+path,{headers,...(value===undefined?{}:{method:'POST',body:JSON.stringify(value)})})};
 }
 
-for(const format of ['dotenv','json']) test(`approved public and entered replacements win over saved ${format} settings, generated values and exact reruns survive`,async t=>{
+test("approved settings lifecycle replaces public and entered answers without reviving invalidated secrets", () => checkCases([
+  ...['dotenv','json'].map(format => [`approved public and entered replacements win over saved ${format} settings, generated values and exact reruns survive`, async t=>{
  const root=await fixture(t);
  const saved={MODE:'first',OPAQUE_VALUE:'synthetic prior private value',COOKIE_KEY:'synthetic generated cookie',BOOTSTRAP_KEY:'synthetic generated bootstrap',UNRELATED:'owner setting'};
  const file=format==='json'?'settings.json':'.dev.vars';
@@ -62,18 +64,16 @@ for(const format of ['dotenv','json']) test(`approved public and entered replace
  const first=await readFile(join(root,file));
  await kit.install(root,input,store,()=>{});
  assert.equal((await readFile(join(root,file))).equals(first),true,'rerun settings bytes changed');
-});
-
-test('startup answers permanently invalidate saved entered secrets even when dependencies change back',async t=>{
+}]),
+  ['startup answers permanently invalidate saved entered secrets even when dependencies change back', async t=>{
  const root=await fixture(t);
  await writeFile(join(root,'.dev.vars'),'MODE=first\nOPAQUE_VALUE=synthetic-saved-private-value\n');
  const {call}=await session(t,root,{answers:{MODE:'second'}});
  assert.equal((await (await call('/api/state')).json()).known.secretReadiness.OPAQUE_VALUE,false);
  assert.equal((await call('/api/draft',{MODE:'first'})).status,200);
  assert.equal((await (await call('/api/state')).json()).known.secretReadiness.OPAQUE_VALUE,false);
-});
-
-test('Start applies an approved replacement after saved credentials are invalidated',async t=>{
+}],
+  ['Start applies an approved replacement after saved credentials are invalidated', async t=>{
  const root=await fixture(t);
  await writeFile(join(root,'.dev.vars'),'MODE=first\nOPAQUE_VALUE=synthetic-old-private-value\nCOOKIE_KEY=synthetic-saved-cookie\nBOOTSTRAP_KEY=synthetic-saved-bootstrap\n');
  let observed;
@@ -87,7 +87,12 @@ test('Start applies an approved replacement after saved credentials are invalida
  assert.equal(observed.OPAQUE_VALUE==='synthetic-approved-private-value',true);
  assert.equal(observed.COOKIE_KEY==='synthetic-saved-cookie',true);
  assert.equal(observed.BOOTSTRAP_KEY==='synthetic-saved-bootstrap',true);
-});
+}]
+]));
+
+
+
+
 
 test('saved manifest secrets are redacted before any seed artwork callback captures a command',async t=>{
  const root=await fixture(t),privateValue='synthetic saved callback private value';
@@ -107,7 +112,8 @@ test('saved manifest secrets are redacted before any seed artwork callback captu
  }
 });
 
-test('valid manifest values at the shared limit survive defaults, answers files, drafts, secure input, transport and resume',async t=>{
+test("manifest boundary inputs retain valid values and refuse an external selection before execution", () => checkCases([
+  ['valid manifest values at the shared limit survive defaults, answers files, drafts, secure input, transport and resume', async t=>{
  const publicValue='🙂'.repeat(8192),privateValue='x'.repeat(16384);
  const value={schema:1,title:'Limits',groups:[],fields:[{name:'NOTE',label:'Note',kind:'text',default:publicValue},{name:'PRIVATE_NOTE',label:'Private note',kind:'secret',input:'entered',ownerVisible:true,required:true}],steps:[{type:'extension',id:'limits'}]};
  const root=await fixture(t,value);
@@ -126,9 +132,8 @@ test('valid manifest values at the shared limit survive defaults, answers files,
  await server.close();
  const resumed=await session(t,root,{resume:true});
  assert.equal(resumed.server.state.draft.NOTE===publicValue,true);
-});
-
-test('an existing valid external manifest is refused before adapter execution',async t=>{
+}],
+  ['an existing valid external manifest is refused before adapter execution', async t=>{
  const root=await fixture(t),outside=await mkdtemp(join(tmpdir(),'gate-outside-'));
  t.after(()=>rm(outside,{recursive:true,force:true}));
  await writeFile(join(outside,'escape.json'),JSON.stringify(manifest));
@@ -137,4 +142,5 @@ test('an existing valid external manifest is refused before adapter execution',a
  const attempt=startInstaller(root,{seed:{product:'Gate fixture',setup:{manifestFile:selection},install:async()=>{installs++;}}}).then(server=>{t.after(()=>server.close());return server;});
  await assert.rejects(attempt,error=>error.message.includes(selection)&&error.message.includes('root-relative'));
  assert.equal(installs,0);
-});
+}]
+]));

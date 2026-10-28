@@ -1,3 +1,4 @@
+import { checkCases } from './test-fixture.mjs';
 import {writeTestManifest, manifestContract} from './test-manifest-support.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,13 +25,14 @@ async function waitPhase(client,phase){
  for(let n=0;n<200;n++){const state=await client.state();if(state.phase===phase)return state;await new Promise(resolve=>setTimeout(resolve,5));}
  assert.fail(`Never reached ${phase}`);
 }
-for(const [name,failure,expected] of [
+test("HTTP failure recovery keeps a safe resumable draft and clears the preceding error on explicit retry", () => checkCases([
+  ...[
  ['runtime',async()=>{throw installationFailure('node_version',{version:'26.8.1'});},/Install Node.js 26\.8\.1/],
  ['missing npm',async root=>{try{await run('npm',['--version'],{cwd:root,env:{PATH:root},stdio:'ignore'});}catch(error){assert.equal(error.code,'ENOENT');throw installationFailure('missing_tool',{tool:'npm'});}},/npm was not found.*PATH/],
  ['command exit',async root=>{try{await run(process.execPath,['-e','process.exit(7)'],{cwd:root,stdio:'ignore'});}catch{throw installationFailure('command_failed',{step:'build'});}},/stopped while building the application/],
  ['unknown',async()=>{throw Object.assign(new Error(secret),{code:'missing_tool',tool:'npm',cause:new Error(secret)});},/stopped unexpectedly.*last installation step/],
  ['modified typed error',async()=>{const error=installationFailure('missing_tool',{tool:'git'});error.message=secret;error.cause=new Error(secret);throw error;},/Git was not found/]
-])test(`HTTP reports ${name} safely and preserves a resumable draft`,async t=>{
+].map(([name,failure,expected]) => [`HTTP reports ${name} safely and preserves a resumable draft`, async t=>{
  const root=await mkdtemp(join(tmpdir(),'rer-failure-'));let calls=0,client;
  const seed={product:'Failure fixture',model:{fields:{NAME:{valid:v=>typeof v==='string'}},safeKeys:['NAME'],secretScopes:{API_TOKEN:['NAME']}},validateInput:v=>v,install:async(root,input,store)=>{calls++;await store.step('Building application');if(calls===1)await failure(root);else await store.phase('complete');}};
  t.after(async()=>{await client?.server.close();await rm(root,{recursive:true,force:true});});
@@ -50,15 +52,16 @@ for(const [name,failure,expected] of [
  assert.equal((await client.post({NAME:'Owner'})).status,202);assert.equal((await waitPhase(client,'complete')).error,undefined);
  await client.server.close();client=await session(root,seed,true);
  assert.deepEqual((await client.state()).draft,{NAME:'Owner'});assert.equal(calls,2);
-});
-test('failure contract rejects arbitrary diagnostic fields as display text',()=>{
- for(const [code,details] of [['unknown',{}],['missing_tool',{tool:secret}],['node_version',{version:secret}],['command_failed',{step:secret}]])assert.throws(()=>installationFailure(code,details),TypeError);
-});
-test('explicit retry clears the preceding failure in the same HTTP session',async t=>{
+}]),
+  ['explicit retry clears the preceding failure in the same HTTP session', async t=>{
  const root=await mkdtemp(join(tmpdir(),'rer-retry-'));let calls=0;
  const seed={product:'Retry fixture',model:{fields:{},safeKeys:[]},validateInput:v=>v,install:async(_root,_input,store)=>{if(++calls===1)throw installationFailure('command_failed',{step:'setup'});await store.phase('complete');}};
  const client=await session(root,seed);
  t.after(async()=>{await client.server.close();await rm(root,{recursive:true,force:true});});
  assert.equal((await client.post({})).status,202);assert.match((await waitPhase(client,'failed')).error,/setting up/);
  assert.equal((await client.post({})).status,202);assert.equal((await waitPhase(client,'complete')).error,undefined);
+}]
+]));
+test('failure contract rejects arbitrary diagnostic fields as display text',()=>{
+ for(const [code,details] of [['unknown',{}],['missing_tool',{tool:secret}],['node_version',{version:secret}],['command_failed',{step:secret}]])assert.throws(()=>installationFailure(code,details),TypeError);
 });

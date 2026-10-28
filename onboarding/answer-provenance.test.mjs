@@ -1,3 +1,4 @@
+import { checkCases } from './test-fixture.mjs';
 import {writeTestManifest, manifestContract} from './test-manifest-support.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,7 +29,8 @@ async function client(root, options = {}) {
  return { server, post: (path, input) => fetch(server.origin + path, { method: 'POST', headers, body: JSON.stringify(input) }) };
 }
 
-for (const source of ['browser', 'agent']) test(`a partial ${source} answer leaves unrelated suggestions unanswered through resume`, async t => {
+test("answer provenance distinguishes submitted owner answers from suggestions across API, Start and resume", () => checkCases([
+  ...['browser', 'agent'].map(source => [`a partial ${source} answer leaves unrelated suggestions unanswered through resume`, async t => {
  const root = await directory(t), store = await createState(root, seed);
  t.after(() => store.closeCommands());
  store.state.draft = seed.defaults();
@@ -42,9 +44,8 @@ for (const source of ['browser', 'agent']) test(`a partial ${source} answer leav
  assert.deepEqual(resumed.state.draft, { TITLE: 'Owner TITLE', REGION: 'suggested-REGION' });
  assert.deepEqual(resumed.state.answered, ['TITLE']);
  assert.deepEqual(model.summaryKeys(resumed.state.draft, resumed.state), ['TITLE']);
-});
-
-test('an explicitly empty persisted answer set stays empty and legacy owner answers survive', async t => {
+}]),
+  ['an explicitly empty persisted answer set stays empty and legacy owner answers survive', async t => {
  const root = await directory(t), path = join(root, '.seed/installer/state.json');
  await mkdir(join(root, '.seed/installer'), { recursive: true });
  for (const saved of [{ answered: [] }, {}]) {
@@ -53,9 +54,8 @@ test('an explicitly empty persisted answer set stays empty and legacy owner answ
   try { assert.deepEqual(store.state.answered, 'answered' in saved ? [] : ['TITLE', 'REGION']); }
   finally { await store.closeCommands(); }
  }
-});
-
-test('API draft saves only submitted answers, resume retains them, and Start approves the full input', async t => {
+}],
+  ['API draft saves only submitted answers, resume retains them, and Start approves the full input', async t => {
  const root = await directory(t); let session = await client(root);
  t.after(() => session.server.close());
  assert.deepEqual(model.summaryKeys(session.server.state.draft, session.server.state), []);
@@ -70,4 +70,5 @@ test('API draft saves only submitted answers, resume retains them, and Start app
  await session.server.close();
  assert.equal(session.server.state.phase, 'complete');
  assert.deepEqual(session.server.state.answered, ['TITLE', 'REGION']);
-});
+}]
+]));

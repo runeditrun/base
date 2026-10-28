@@ -1,3 +1,4 @@
+import { checkCases } from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
@@ -15,12 +16,13 @@ const execute=promisify(execFile);
 async function workspace(t) {const root=await mkdtemp(join(tmpdir(),'output-safety-'));t.after(()=>rm(root,{recursive:true,force:true}));return root;}
 function childDouble() {
  const child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();child.exitCode=null;child.signalCode=null;
- child.finish=code=>{child.exitCode=code;child.emit('exit',code,null);child.emit('close',code,null);};return child;
+ child.finish=code=>{child.exitCode=code;child.emit('exit',code,null);child.emit('close',code,null);};child.kill=()=>child.finish(1);return child;
 }
 
 // All credentials below are invented here. Assertions never include environment
 // values, raw child diagnostics, or secret-bearing subprocess error objects.
-test('real child output is redacted in browser state, log, terminal and failure while flags and trusted status survive',async t=>{
+test("command output custody keeps private bytes out of sinks and survives closed or blocked terminal readers", () => checkCases([
+  ['real child output is redacted in browser state, log, terminal and failure while flags and trusted status survive', async t=>{
  const root=await workspace(t),state={logs:[]};let terminal='';
  const store=await createCommands(root,state,{terminal:text=>{terminal+=text;}});t.after(()=>store.closeCommands());
  const environment={DATABASE_URL:'postgres://example-user:db-private-test-pass@db.invalid/database',STRIPE_KEY:'stripe-private-test-value',GITHUB_PAT:'github-private-test-value',key:'key-private-test-value',pat:'pat-private-test-value',dsn:'dsn-private-test-value',auth:'auth-private-test-value',pass:'pass-private-test-value',signature:'signature-private-test-value',sig:'sig-private-test-value',COOKIE_SECURE:'1',AUTH_ENABLED:'true'};
@@ -41,18 +43,16 @@ test('real child output is redacted in browser state, log, terminal and failure 
  assert.match(message,/exit 40, signal none/);
  assert.ok(message.endsWith('Log: '+store.redact(store.logPath)));
  assert.equal(message.includes(root),false,'private path metadata escaped the diagnostic');
-});
-
-for(const code of ['EPIPE','EAGAIN'])test(`terminal ${code} does not interrupt capture and cleanup`,async t=>{
+}],
+  ...['EPIPE','EAGAIN'].map(code => [`terminal ${code} does not interrupt capture and cleanup`, async t=>{
  const root=await workspace(t),state={logs:[]};let calls=0,terminal='',child;
  const store=await createCommands(root,state,{spawn:()=>child=childDouble(),terminal:text=>{calls++;if(calls===1)throw Object.assign(new Error('synthetic terminal error'),{code});terminal+=text;}});
  t.after(()=>store.closeCommands());const pending=store.run('Sink test','synthetic-command');
  child.stdout.write('FIRST_MARKER\n');child.stderr.write('FINAL_MARKER\n');child.finish(0);await pending;await store.closeCommands();
  assert.match(state.logs.join('\n'),/FINAL_MARKER/);assert.match(await readFile(store.logPath,'utf8'),/FINAL_MARKER/);
  if(code==='EPIPE'){assert.equal(calls,1);assert.equal(terminal,'');}else{assert.ok(calls>1);assert.match(terminal,/FINAL_MARKER/);}
-});
-
-test('real pipe reader exits while installer retains cleanup custody of its detached child',async t=>{
+}]),
+  ['real pipe reader exits while installer retains cleanup custody of its detached child', async t=>{
  const root=await workspace(t),marker=join(root,'cleanup.json');
  const producer="setInterval(()=>process.stdout.write('child output\\n'),10)";
  const source=`import { createCommands } from ${JSON.stringify(new URL('./commands.mjs',import.meta.url).href)};
@@ -90,9 +90,15 @@ test('real pipe reader exits while installer retains cleanup custody of its deta
  assert.throws(()=>process.kill(receipt.pid,0),error=>error.code==='ESRCH');
  cleanupConfirmed=true;
  assert.match(await readFile(join(root,'install.log'),'utf8'),/AFTER_READER_EXIT/);
-});
+}]
+]));
 
-test('private log starts a fresh session and caps output with exactly one marker',async t=>{
+
+
+
+
+test("command output bounds retain final diagnostics while limiting page, heap and private log storage", () => checkCases([
+  ['private log starts a fresh session and caps output with exactly one marker', async t=>{
  const root=await workspace(t),path=join(root,'install.log');await writeFile(path,'OLD_SESSION_PRIVATE_OUTPUT',{mode:0o600});
  const log=await openPrivateLog(path);assert.equal(await readFile(path,'utf8'),'');
  const chunk='bounded output\n'.repeat(4096);
@@ -101,9 +107,8 @@ test('private log starts a fresh session and caps output with exactly one marker
  assert.ok(bytes.length<=PRIVATE_LOG_LIMIT);assert.equal(bytes.toString().split('[log truncated]').length-1,1);assert.ok(!bytes.includes('OLD_SESSION_PRIVATE_OUTPUT'));
  assert.equal((await stat(path)).mode&0o777,0o600);
  const resumed=await openPrivateLog(path);resumed.write('NEW_SESSION\n');await resumed.close();assert.equal(await readFile(path,'utf8'),'NEW_SESSION\n');
-});
-
-test('100 MiB real command output stays within a small heap and bounded browser and disk logs',async t=>{
+}],
+  ['100 MiB real command output stays within a small heap and bounded browser and disk logs', async t=>{
  const root=await workspace(t);
  // Serialize the producer once: a nested script string must retain its newline
  // escapes until the producer parses it, rather than inserting literal newlines.
@@ -120,24 +125,31 @@ test('100 MiB real command output stays within a small heap and bounded browser 
  try{result=await execute(process.execPath,['--max-old-space-size=64','--input-type=module','-e',source],{timeout:60000,maxBuffer:4096});}
  catch(error){assert.fail(`bounded-output subprocess failed (code ${error.code ?? 'none'}, signal ${error.signal ?? 'none'}, killed ${error.killed ?? false})`);}
  const receipt=JSON.parse(result.stdout);assert.ok(receipt.bytes<=PRIVATE_LOG_LIMIT);assert.equal(receipt.markers,1);assert.ok(receipt.pageBytes<=65536);assert.ok(receipt.lines<=400);assert.equal(receipt.final,true);assert.ok(receipt.terminalBytes>=100*1024*1024);
-});
+}]
+]));
 
-for(const existing of [false,true])test(`private directory self-ignore covers ${existing?'existing':'new'} .seed storage`,async t=>{
+
+
+test("private directory self-ignore preserves unrelated targets and secures new and existing storage", () => checkCases([
+  ...[false,true].map(existing => [`private directory self-ignore covers ${existing?'existing':'new'} .seed storage`, async t=>{
  const root=await workspace(t);if(existing){await mkdir(join(root,'.seed'));await writeFile(join(root,'.seed/.gitignore'),'old rules\n');}
  const path=await privateDirectory(root,['.seed','installer']);
  assert.equal(path,join(root,'.seed/installer'));assert.equal(await readFile(join(root,'.seed/.gitignore'),'utf8'),'*\n');assert.equal((await stat(join(root,'.seed'))).mode&0o777,0o700);
-});
-
-for(const kind of ['symlink','hardlink'])test(`self-ignore refuses a permissive ${kind} without modifying its target`,async t=>{
+}]),
+  ...['symlink','hardlink'].map(kind => [`self-ignore refuses a permissive ${kind} without modifying its target`, async t=>{
  const root=await workspace(t),target=join(root,'target');await mkdir(join(root,'.seed'));await writeFile(target,'UNCHANGED',{mode:0o644});
  await (kind==='symlink'?symlink:link)(target,join(root,'.seed/.gitignore'));
  await assert.rejects(privateDirectory(root,['.seed']));assert.equal(await readFile(target,'utf8'),'UNCHANGED');assert.equal((await stat(target)).mode&0o777,0o644);
-});
-
-test('self-ignore replaces an owned private hardlink without mutating its other name',async t=>{
+}]),
+  ['self-ignore replaces an owned private hardlink without mutating its other name', async t=>{
  const root=await workspace(t),target=join(root,'target');await mkdir(join(root,'.seed'));await writeFile(target,'UNCHANGED',{mode:0o600});await link(target,join(root,'.seed/.gitignore'));
  await privateDirectory(root,['.seed']);assert.equal(await readFile(target,'utf8'),'UNCHANGED');assert.equal(await readFile(join(root,'.seed/.gitignore'),'utf8'),'*\n');
-});
+}]
+]));
+
+
+
+
 
 test('log revalidates replacement links before appending or changing permissions',async t=>{
  const root=await workspace(t),target=join(root,'target'),path=join(root,'install.log');await writeFile(target,'UNCHANGED',{mode:0o644});

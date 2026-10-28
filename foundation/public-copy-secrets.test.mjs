@@ -1,3 +1,4 @@
+import { checkCases } from '../onboarding/test-fixture.mjs'
 import { test } from 'node:test'
 import { randomBytes } from 'node:crypto'
 import assert from 'node:assert/strict'
@@ -75,7 +76,8 @@ process.exitCode = code === 200 ? 0 : 1
   return directory
 }
 
-test('publish-check passes over a repository holding only the copied folders', t => {
+test("native publication accepts complete copied folders and exact reviewed fictional references with full guarantees", () => checkCases([
+  ['publish-check passes over a repository holding only the copied folders', t => {
   const work = realpathSync(mkdtempSync(join(tmpdir(), 'public-copy-secrets-')))
   t.after(() => rmSync(work, { recursive: true, force: true }))
   const repo = join(work, 'repo'), commands = fakeGh(join(work, 'commands'))
@@ -103,7 +105,38 @@ test('publish-check passes over a repository holding only the copied folders', t
   assert.equal(report.complete, true)
   assert.equal(report.status, 'PASS')
   assert.equal(run.status, 0)
-})
+}],
+  ['every complete relocated module copy passes native publication with zero findings', async t => {
+  const files = execFileSync('git', ['-C', root, 'ls-files', '-z', '--', 'modules']).toString().split('\0').filter(Boolean)
+  const modules = [...new Set(files.map(file => file.split('/').slice(0, 2).join('/')))].sort()
+  assert.ok(files.length > 600, 'All tracked module files, not just production entry points')
+  assert.ok(modules.includes('modules/import-kit'))
+  await checkCases(modules.map(module => [module, t => {
+    const copy = files.filter(file => file.startsWith(module + '/'))
+    assert.ok(copy.length, module)
+    const { run, report, references } = scanModuleCopy(t, copy)
+    assert.deepEqual(references.map(f => `${f.rule} ${f.path}`), [])
+    assert.equal(report.complete, true)
+    assert.equal(report.guarantees.historyScanned, true)
+    assert.equal(report.guarantees.environmentChecked, true)
+    assert.deepEqual(report.findings, [])
+    assert.equal(report.status, 'PASS')
+    assert.equal(run.status, 0)
+  }]))
+}],
+  ['module reference check accepts only the exact reviewed fictional identities', t => {
+  const file = 'src/base/modules/import-kit/future/source.json'
+  const { run, report, references } = scanModuleCopy(t, ['modules/import-kit/schema/importers.schema.json'], {
+    [file]: JSON.stringify(Object.keys(fictionalRepositories).map(repository => ({
+      sourceRepository: `https://github.com/${repository}.git`,
+    }))),
+  })
+  assert.deepEqual(references, [])
+  assert.equal(report.complete, true)
+  assert.equal(report.status, 'PASS')
+  assert.equal(run.status, 0)
+}]
+]));
 
 // Every tracked module file, including tests and fixtures, must also pass after
 // relocation to the edition-authoring layout. No finding class is filtered out.
@@ -137,32 +170,15 @@ function scanModuleCopy(t, files, extra = {}, states = {}) {
   return { run, report, references: report.findings.filter(f => referenceRules.has(f.rule)) }
 }
 
-test('every complete relocated module copy passes native publication with zero findings', async t => {
-  const files = execFileSync('git', ['-C', root, 'ls-files', '-z', '--', 'modules']).toString().split('\0').filter(Boolean)
-  const modules = [...new Set(files.map(file => file.split('/').slice(0, 2).join('/')))].sort()
-  assert.ok(files.length > 600, 'All tracked module files, not just production entry points')
-  assert.ok(modules.includes('modules/import-kit'))
-  for (const module of modules) await t.test(module, t => {
-    const copy = files.filter(file => file.startsWith(module + '/'))
-    assert.ok(copy.length, module)
-    const { run, report, references } = scanModuleCopy(t, copy)
-    assert.deepEqual(references.map(f => `${f.rule} ${f.path}`), [])
-    assert.equal(report.complete, true)
-    assert.equal(report.guarantees.historyScanned, true)
-    assert.equal(report.guarantees.environmentChecked, true)
-    assert.deepEqual(report.findings, [])
-    assert.equal(report.status, 'PASS')
-    assert.equal(run.status, 0)
-  })
-})
+
 
 test('module reference check rejects private, missing and unreviewed repositories', async t => {
   const file = 'src/base/modules/import-kit/future/source.json'
-  for (const [state, rule, status, exit] of [
+  await checkCases([
     ['private', 'hygiene.github-private', 'FAIL', 1],
     ['missing', 'hygiene.github-missing', 'FAIL', 1],
     ['unknown', 'scan.github-incomplete', 'INCOMPLETE', 2],
-  ]) await t.test(state, t => {
+  ].map(([state, rule, status, exit]) => [state, t => {
     const repository = `fixture-${randomBytes(8).toString('hex')}/source`
     const { run, report, references } = scanModuleCopy(t, ['modules/import-kit/schema/importers.schema.json'],
       { [file]: JSON.stringify({ sourceRepository: repository }) }, { [repository]: state })
@@ -170,12 +186,12 @@ test('module reference check rejects private, missing and unreviewed repositorie
     assert.equal(report.status, status)
     assert.equal(report.complete, state !== 'unknown')
     assert.equal(run.status, exit)
-  })
+  }]));
 })
 
 
 test('relocated copy regressions reject source declarations and stated README repositories', async t => {
-  for (const extension of ['js', 'ts']) await t.test(extension, t => {
+  await checkCases(['js', 'ts'].map(extension => [extension, t => {
     const file = `src/base/modules/import-kit/tests/mutation.${extension}`
     const repository = `fixture-${randomBytes(8).toString('hex')}/source`
     const { run, report, references } = scanModuleCopy(t, ['modules/import-kit/schema/importers.schema.json'],
@@ -184,8 +200,8 @@ test('relocated copy regressions reject source declarations and stated README re
     assert.equal(run.status, 1)
     assert.equal(report.status, 'FAIL')
     assert.deepEqual(references.map(f => `${f.rule} ${f.path}`), [`hygiene.github-private ${file}`])
-  })
-  await t.test('README relocation: a root path names a repository only with GitHub context', t => {
+  }]));
+  await checkCases([['README relocation: a root path names a repository only with GitHub context', t => {
     const file = 'src/base/modules/sendgrid-email/README.md'
     const original = readFileSync(join(root, 'modules/sendgrid-email/README.md'), 'utf8')
     const states = { 'modules/sendgrid-email': 'missing' }
@@ -197,36 +213,25 @@ test('relocated copy regressions reject source declarations and stated README re
     assert.equal(stated.run.status, 1)
     assert.equal(stated.report.status, 'FAIL')
     assert.deepEqual(stated.references.map(f => `${f.rule} ${f.path}`), [`hygiene.github-missing ${file}`])
-  })
+  }]]);
 })
 
-test('module reference check accepts only the exact reviewed fictional identities', t => {
-  const file = 'src/base/modules/import-kit/future/source.json'
-  const { run, report, references } = scanModuleCopy(t, ['modules/import-kit/schema/importers.schema.json'], {
-    [file]: JSON.stringify(Object.keys(fictionalRepositories).map(repository => ({
-      sourceRepository: `https://github.com/${repository}.git`,
-    }))),
-  })
-  assert.deepEqual(references, [])
-  assert.equal(report.complete, true)
-  assert.equal(report.status, 'PASS')
-  assert.equal(run.status, 0)
-})
+
 
 test('fictional examples never exempt nearby names, real private repositories or explicit states', async t => {
   const file = 'src/base/modules/import-kit/future/source.json'
-  for (const [name, repository, state, rule, status, exit] of [
+  await checkCases([
     ['nearby name', 'example-owner/example-repo-nearby', undefined, 'scan.github-incomplete', 'INCOMPLETE', 2],
     ['real private repository', 'runeditrun/base', 'private', 'hygiene.github-private', 'FAIL', 1],
     ['fictional private override', 'example-owner/example-repo', 'private', 'hygiene.github-private', 'FAIL', 1],
     ['fictional missing override', 'example-owner/example-repo', 'missing', 'hygiene.github-missing', 'FAIL', 1],
     ['fictional unknown override', 'example-owner/example-repo', 'unknown', 'scan.github-incomplete', 'INCOMPLETE', 2],
-  ]) await t.test(name, t => {
+  ].map(([name, repository, state, rule, status, exit]) => [name, t => {
     const { run, report, references } = scanModuleCopy(t, ['modules/import-kit/schema/importers.schema.json'],
       { [file]: JSON.stringify({ sourceRepository: repository }) }, state ? { [repository]: state } : {})
     assert.deepEqual(references.map(f => `${f.rule} ${f.path}`), [`${rule} ${file}`])
     assert.equal(report.status, status)
     assert.equal(report.complete, status !== 'INCOMPLETE')
     assert.equal(run.status, exit)
-  })
+  }]));
 })

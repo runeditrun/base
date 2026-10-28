@@ -1,3 +1,4 @@
+import {checkCases} from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
@@ -7,12 +8,15 @@ import {dirname, join} from 'node:path';
 import {checkSchema} from './json-schema.mjs';
 import {parseSetupManifestBytes, validateSetupManifest} from './setup-validation.mjs';
 
+const manifestCases = [];
+const manifestCase = (name, check) => manifestCases.push([name, check]);
+
 const here = dirname(fileURLToPath(import.meta.url));
 const read = name => JSON.parse(readFileSync(join(here, name), 'utf8'));
 const schema = read('SETUP.schema.json');
 const example = read('SETUP.example.json');
 
-test('setup schema is enforced and the positive example covers every public kind and metadata family', () => {
+manifestCase('setup schema is enforced and the positive example covers every public kind and metadata family', () => {
   assert.doesNotThrow(() => checkSchema(schema));
   assert.deepEqual(validateSetupManifest(schema, example), []);
   assert.deepEqual(
@@ -63,14 +67,14 @@ const invalidCases = [
 ];
 
 for (const [name, mutate] of invalidCases) {
-  test(`rejects ${name}`, () => {
+  manifestCase(`rejects ${name}`, () => {
     const candidate = structuredClone(example);
     mutate(candidate);
     assert(validateSetupManifest(schema, candidate).length > 0);
   });
 }
 
-test('legacy setup-token may omit its token field or reference a generated owner-visible token', () => {
+manifestCase('legacy setup-token may omit its token field or reference a generated owner-visible token', () => {
   const withoutToken = structuredClone(example);
   withoutToken.steps[0] = {type:'owner-claim', mode:'setup-token', emailField:'OWNER_EMAIL'};
   assert.deepEqual(validateSetupManifest(schema, withoutToken), []);
@@ -81,13 +85,13 @@ test('legacy setup-token may omit its token field or reference a generated owner
   assert.deepEqual(validateSetupManifest(schema, withToken), []);
 });
 
-test('safe same-app signed paths retain dot-prefixed and tilde segments', () => {
+manifestCase('safe same-app signed paths retain dot-prefixed and tilde segments', () => {
   const candidate = structuredClone(example);
   candidate.steps[0].path = '/.well-known/~/claim';
   assert.deepEqual(validateSetupManifest(schema, candidate), []);
 });
 
-test('extension IDs remain edition-owned data and may be repeated', () => {
+manifestCase('extension IDs remain edition-owned data and may be repeated', () => {
   const candidate = structuredClone(example);
   candidate.steps.push({type: 'extension', id: 'email'});
   assert.deepEqual(validateSetupManifest(schema, candidate), []);
@@ -98,7 +102,7 @@ test('strict byte parser rejects duplicate JSON keys and invalid UTF-8', () => {
   assert.throws(() => parseSetupManifestBytes(Buffer.from([0xff, 0xfe])), /valid UTF-8/);
 });
 
-test('the checked negative example is rejected by the same setup validator', () => {
+manifestCase('the checked negative example is rejected by the same setup validator', () => {
   const negative = read('SETUP.invalid.example.json');
   assert(validateSetupManifest(schema, negative).some(error => error.includes('required generated hidden secret')));
 });
@@ -114,3 +118,5 @@ test('expected-invalid CLI mode rejects a missing negative example path', () => 
   assert.match(result.stderr, /FAIL schema\/missing\.invalid\.example\.json/);
   assert.match(result.stderr, /ENOENT/);
 });
+
+test('setup manifests accept supported inputs and refuse invalid configurations', () => checkCases(manifestCases));

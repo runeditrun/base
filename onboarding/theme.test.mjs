@@ -1,3 +1,4 @@
+import { checkCases } from './test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp, mkdir, writeFile, rm} from 'node:fs/promises';
@@ -20,7 +21,8 @@ async function seedRoot(t,files) {
 }
 const start=(t,root,extra={})=>startInstaller(root,{seed:{product:'Theme fixture',setup:{manifestFile:'rer-setup.json'},background:'background.svg',install:async()=>{},...extra},noPrefill:true}).then(server=>{t.after(()=>server.close());return server;});
 
-test('a seed theme dresses the installer from files the app serves, and an unthemed seed keeps the current page',async t=>{
+test("installer theme selection serves declared safe assets and refuses invalid grammar or contrast", () => checkCases([
+  ['a seed theme dresses the installer from files the app serves, and an unthemed seed keeps the current page', async t=>{
  const files={'public/rer-theme.css':theme,'public/fonts/brand.woff2':'font-bytes','public/brand/mark.svg':'<svg xmlns="http://www.w3.org/2000/svg"/>','public/private.woff2':'not declared'};
  const themed=await start(t,await seedRoot(t,files),{theme:'public/rer-theme.css'});
  const html=await (await fetch(themed.origin)).text();
@@ -36,9 +38,8 @@ test('a seed theme dresses the installer from files the app serves, and an unthe
  const plainHtml=await (await fetch(plain.origin)).text();
  assert.doesNotMatch(plainHtml,/rer-themed|rer-theme\.css|theme\.css/);
  for(const path of ['/rer-theme.css','/theme.css'])assert.equal((await fetch(plain.origin+path)).status,404,path);
-});
-
-test('a theme outside the grammar, naming files the app does not serve, or failing contrast is refused before the installer starts',async t=>{
+}],
+  ['a theme outside the grammar, naming files the app does not serve, or failing contrast is refused before the installer starts', async t=>{
  const cases=[
   [theme.replace('--rer-text: #12372e','--rer-text: #d7f25b'),/--rer-text #d7f25b on --rer-page #f3f3ee is 1\.\d+:1, below 4\.5:1/],
   [theme.replace('--rer-focus: #0d302c','--rer-focus: #f3f3ee'),/--rer-focus #f3f3ee on --rer-page #f3f3ee is 1\.00:1, below 3:1/],
@@ -52,4 +53,5 @@ test('a theme outside the grammar, naming files the app does not serve, or faili
   await assert.rejects(start(t,root,{theme:'public/rer-theme.css'}),message);
  }
  await assert.rejects(start(t,await seedRoot(t,{}),{theme:'../outside.css'}),/root-relative \.css path without \.\./);
-});
+}]
+]));
