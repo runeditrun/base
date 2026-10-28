@@ -1,10 +1,13 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { test } from 'node:test';
 import { runtime, SETUP, SECRET } from './runtime.mjs';
 const post = (input, cookie, extra = {}) => ({ method: 'POST', input, cookie, ...extra });
 
-test('HTTP mutations reject host/origin/method failures without data writes, and input failures stay redacted', async () => {
+test("auth HTTP issuance refuses untrusted or over-budget requests before writes and mail", async t => {
+  const foldedCases = [];
+foldedCases.push(['HTTP mutations reject host/origin/method failures without data writes, and input failures stay redacted', async (t) => {
   const r = await runtime();
   try {
     const setup = { token: SETUP, displayName: 'Owner' };
@@ -19,19 +22,18 @@ test('HTTP mutations reject host/origin/method failures without data writes, and
     assert.equal(oversized.status, 413);
     assert.equal((await r.call('/auth/bootstrap', post({ ...setup, displayName: '' }))).status, 400);
     const owner = await r.bootstrap();
-    for (const returnTo of ['https://evil.test', '//evil.test', '/%2fevil.test', '/%5cevil.test']) {
+    await runCases(t, Array.from(['https://evil.test', '//evil.test', '/%2fevil.test', '/%5cevil.test'], (returnTo, rowIndex) => [`${t.name}: returnTo row ${rowIndex + 1}`, async t => {
       await r.call('/auth/magic-link', post({ email: 'owner@example.com', returnTo }));
       const token = (await r.link()).searchParams.get('token');
       const res = await r.call('/auth/confirm', post({ token, returnTo: 'https://evil.test' }));
       assert.equal(res.status, 303); assert.equal(res.headers.get('location'), '/app');
-    }
+}]));
     assert.equal((await r.call('/auth/absent', { cookie: owner })).status, 404);
     const invalid = await r.call('/auth/magic-link', post({ email: 'bad\r\nbcc:other@example.com' }));
     assert.equal(invalid.status, 400); assert.deepEqual(await invalid.json(), { error: 'invalid_email' });
   } finally { await r.close(); }
-});
-
-test('invitation rate limits precede mail side effects and reinvitation invalidates older links', async () => {
+}]);
+foldedCases.push(['invitation rate limits precede mail side effects and reinvitation invalidates older links', async () => {
   const r = await runtime({ emailLimit: 2 }, { now: Date.now() });
   try {
     const owner = await r.bootstrap();
@@ -41,7 +43,11 @@ test('invitation rate limits precede mail side effects and reinvitation invalida
     assert.equal((await r.mails()).length, 2);
     assert.equal((await (await r.db).prepare('SELECT count(*) AS n FROM oa_tokens WHERE revoked_at IS NULL').first()).n, 1);
   } finally { await r.close(); }
+}]);
+  await runCases(t, foldedCases);
 });
+
+
 
 test('the development CLI sign-in proof never spends a person\'s sign-in budget, and only a local server honours it', async () => {
   const proof = createHmac('sha256', SECRET).update('local-cli\0sign-in').digest('hex');

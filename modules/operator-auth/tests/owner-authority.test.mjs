@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime } from '../identity/oidc/tests/fake-runtime.mjs';
@@ -47,8 +48,10 @@ async function prepare(r, setup, before) {
   return { operatorId: target.id, token, cookie };
 }
 
-test('all owner-authority routes demand fresh local proof and preserve non-owner status behavior', async () => {
-  for (const row of cases) {
+test("owner authority routes require fresh local proof through native SQL writes", async t => {
+  const foldedCases = [];
+foldedCases.push(['all owner-authority routes demand fresh local proof and preserve non-owner status behavior', async (t) => {
+  await runCases(t, Array.from(cases, (row, rowIndex) => [`${t.name}: row row ${rowIndex + 1}`, async t => {
     const cleanup = [];
     const r = await runtime({ after: fn => cleanup.push(fn) });
     try {
@@ -94,33 +97,34 @@ test('all owner-authority routes demand fresh local proof and preserve non-owner
       }
       console.log(JSON.stringify({ case: row.name, absent: '403 step_up_required', expired: '403 step_up_required', fresh: allowed.status }));
     } finally { for (const fn of cleanup.reverse()) await fn(); }
-  }
+}]));
 
   const cleanup = [];
   const r = await runtime({ after: fn => cleanup.push(fn) });
   try {
     await r.bootstrap();
     const actor = r.session(await r.login('auth'));
-    for (const role of ['member', 'admin']) {
+    await runCases(t, Array.from(['member', 'admin'], (role, rowIndex) => [`${t.name}: role row ${rowIndex + 1}`, async t => {
       const id = await r.operator(`${role}@example.com`, role);
-      for (const status of ['inactive', 'active']) {
+      await runCases(t, Array.from(['inactive', 'active'], (status, rowIndex) => [`${t.name}: status row ${rowIndex + 1}`, async t => {
         const response = await r.call('/auth/operator/status', post({ operatorId: id, status }, actor));
         assert.equal(response.status, 200);
         assert.deepEqual([(await response.json()).status], [status]);
-      }
-    }
+}]));
+}]));
     const owner = await (await r.call('/auth/session', { cookie: actor })).json();
     const before = await snapshot(r);
-    for (const [route, input] of [
+    await runCases(t, Array.from([
       ['/auth/operator/status', { status: 'active' }],
       ['/auth/operator/role', { role: 'owner' }],
-    ]) assert.equal((await r.call(route, post({ operatorId: owner.operator.id, ...input }, actor))).status, 200);
+    ], ([route, input], rowIndex) => [`${t.name}: [route, input] row ${rowIndex + 1}`, async t => {
+assert.equal((await r.call(route, post({ operatorId: owner.operator.id, ...input }, actor))).status, 200);
+}]));
     assert.deepEqual(await snapshot(r), before, 'unchanged owner role/status preserves authority and sessions without step-up');
   } finally { for (const fn of cleanup.reverse()) await fn(); }
 
-});
-
-test('local owner persona creation keeps its proof fence with product insert triggers', async () => {
+}]);
+foldedCases.push(['local owner persona creation keeps its proof fence with product insert triggers', async (t) => {
   const setup = 'fixture-owner-persona-setup-token';
   const dev = await devRuntime([await read('../accounts/schema/operator-auth.sql'), await read('./fixtures/trigger-writes.sql')], { SETUP_TOKEN: setup }, 'owner-persona-worker.mjs');
   try {
@@ -132,7 +136,7 @@ test('local owner persona creation keeps its proof fence with product insert tri
       assert.equal((await dev.call('/auth/step-up', { method: 'POST', cookie: actor, input: { action: 'owner:transfer' } })).status, 202);
       assert.equal((await dev.call('/auth/confirm', { method: 'POST', cookie: actor, input: { token: await dev.latestLink() } })).status, 303);
     };
-    for (const proof of ['absent', 'expired']) {
+    await runCases(t, Array.from(['absent', 'expired'], (proof, rowIndex) => [`${t.name}: proof row ${rowIndex + 1}`, async t => {
       if (proof === 'expired') {
         await prove();
         await dev.db.prepare('UPDATE oa_step_up_challenges SET consumed_at=consumed_at-? WHERE consumed_at IS NOT NULL').bind((STEP_UP_SECONDS + 60) * 1000).run();
@@ -143,7 +147,7 @@ test('local owner persona creation keeps its proof fence with product insert tri
       assert.deepEqual(await refused.json(), { error: 'step_up_required' });
       assert.equal(refused.headers.get('set-cookie'), null);
       assert.deepEqual(await snapshot(dev), before);
-    }
+}]));
     await prove();
     const created = await enter();
     assert.equal(created.status, 303);
@@ -161,4 +165,6 @@ test('local owner persona creation keeps its proof fence with product insert tri
     assert.ok(await dev.db.prepare("SELECT 1 FROM test_auth_writes WHERE event='ignored'").first(), 'the ignored insert still ran a trigger write');
     console.log(JSON.stringify({ case: 'create local owner persona', absent: '403 step_up_required', expired: '403 step_up_required', fresh: 303 }));
   } finally { await dev.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

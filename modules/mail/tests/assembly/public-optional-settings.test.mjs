@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMailSender, MailValidationError } from '../../index.mjs';
@@ -44,33 +45,33 @@ async function acceptedWire(input) {
   return JSON.parse(init.body);
 }
 
-test('public SendGrid omits absent settings and retains the caller durable ID', async () => {
-  for (const deliveryId of ['a', 'delivery/orbit/42', 'd'.repeat(512)]) {
+test("public mail assembly preserves explicit SendGrid settings and refuses unsupported inputs", async t => {
+  const foldedCases = [];
+foldedCases.push(['public SendGrid omits absent settings and retains the caller durable ID', async (t) => {
+  await runCases(t, Array.from(['a', 'delivery/orbit/42', 'd'.repeat(512)], (deliveryId, rowIndex) => [`${t.name}: deliveryId row ${rowIndex + 1}`, async t => {
     const wire = await acceptedWire({ ...message(), deliveryId });
     assert.equal(Object.hasOwn(wire, 'asm'), false);
     assert.deepEqual(wire.tracking_settings, disabledTracking);
     assert.deepEqual(wire.custom_args, { rer_delivery_id: deliveryId });
-  }
-});
-
-for (const asmGroupId of [1, 33984, Number.MAX_SAFE_INTEGER]) {
-  test(`public SendGrid preserves positive ASM group ${asmGroupId}`, async () => {
+}]));
+}]);
+await runCases(t, Array.from([1, 33984, Number.MAX_SAFE_INTEGER], (asmGroupId, rowIndex) => [`${t.name}: asmGroupId row ${rowIndex + 1}`, async t => {
+  foldedCases.push([`public SendGrid preserves positive ASM group ${asmGroupId}`, async () => {
     const wire = await acceptedWire({ ...message(), asmGroupId });
     assert.deepEqual(wire.asm, { group_id: asmGroupId });
     assert.deepEqual(wire.tracking_settings, disabledTracking);
     assert.deepEqual(wire.custom_args, { rer_delivery_id: message().deliveryId });
-  });
-}
-
-for (const subscriptionTracking of [false, true]) {
-  test(`public SendGrid preserves explicit subscription tracking ${subscriptionTracking}`, async () => {
+  }]);
+}]));
+await runCases(t, Array.from([false, true], (subscriptionTracking, rowIndex) => [`${t.name}: subscriptionTracking row ${rowIndex + 1}`, async t => {
+  foldedCases.push([`public SendGrid preserves explicit subscription tracking ${subscriptionTracking}`, async () => {
     const wire = await acceptedWire({ ...message(), subscriptionTracking });
     assert.deepEqual(wire.tracking_settings, {
       ...disabledTracking, subscription_tracking: { enable: subscriptionTracking },
     });
-  });
+  }]);
 
-  test(`public SendGrid keeps all optional settings through unsubscribe assembly (${subscriptionTracking})`, async () => {
+  foldedCases.push([`public SendGrid keeps all optional settings through unsubscribe assembly (${subscriptionTracking})`, async () => {
     const input = {
       ...message(), asmGroupId: 582, subscriptionTracking,
       customArgs: { rer_product: 'orbit', campaign: 'customer follow-up / café', empty: '' },
@@ -89,18 +90,16 @@ for (const subscriptionTracking of [false, true]) {
     assert.equal(wire.headers['List-Unsubscribe'], '<https://example.com/unsubscribe/42>');
     assert.equal(wire.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
     assert.deepEqual(input, before, 'submission must not consume caller settings');
-  });
-}
-
-test('public SendGrid preserves exact product arguments independently of ASM and tracking', async () => {
+  }]);
+}]));
+foldedCases.push(['public SendGrid preserves exact product arguments independently of ASM and tracking', async () => {
   const customArgs = { rer_product: 'ferry', command: 'mail/α-17', empty: '' };
   const wire = await acceptedWire({ ...message(), customArgs });
   assert.deepEqual(wire.custom_args, { ...customArgs, rer_delivery_id: message().deliveryId });
   assert.equal(Object.hasOwn(wire, 'asm'), false);
   assert.deepEqual(wire.tracking_settings, disabledTracking);
-});
-
-test('public SendGrid accepts exactly 10,000 UTF-8 custom argument bytes including durable ID', async () => {
+}]);
+foldedCases.push(['public SendGrid accepts exactly 10,000 UTF-8 custom argument bytes including durable ID', async () => {
   const input = message();
   const customArgs = { rer_product: 'orbit', marker: '' };
   const overhead = Buffer.byteLength(JSON.stringify({ ...customArgs, rer_delivery_id: input.deliveryId }));
@@ -109,16 +108,8 @@ test('public SendGrid accepts exactly 10,000 UTF-8 custom argument bytes includi
   assert.deepEqual(wire.custom_args, { ...customArgs, rer_delivery_id: input.deliveryId });
   assert.equal(Buffer.byteLength(JSON.stringify(wire.custom_args)), 10000);
   await rejectsWithoutEffects({ ...input, customArgs: { ...customArgs, marker: customArgs.marker + 'x' } }, 'custom_args_too_large');
-});
-
-async function rejectsWithoutEffects(input, code, configuration = config) {
-  const { sender, requests, captures } = captureSender(configuration);
-  await assert.rejects(sender.send(input), error => error instanceof MailValidationError && error.code === code);
-  assert.deepEqual(requests, [], 'invalid settings must not reach a provider');
-  assert.deepEqual(captures, [], 'invalid settings must not enter an outbox');
-}
-
-test('public SendGrid rejects invalid optional settings before any effect', async () => {
+}]);
+foldedCases.push(['public SendGrid rejects invalid optional settings before any effect', async () => {
   const invalid = [
     ...[0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '33984', null].map(asmGroupId => [{ asmGroupId }, 'invalid_asm_group']),
     ...['true', 0, 1, null].map(subscriptionTracking => [{ subscriptionTracking }, 'invalid_subscription_tracking']),
@@ -129,13 +120,29 @@ test('public SendGrid rejects invalid optional settings before any effect', asyn
       .map(key => [{ customArgs: { [key]: 'replacement' } }, 'invalid_custom_arg']),
   ];
   for (const [extra, code] of invalid) await rejectsWithoutEffects({ ...message(), ...extra }, code);
-});
-
-test('public remote providers reject unsupported SendGrid settings even when false or empty', async () => {
+}]);
+foldedCases.push(['public remote providers reject unsupported SendGrid settings even when false or empty', async () => {
   for (const provider of ['resend', 'cloudflare']) {
     const configuration = { ...config, provider, ...(provider === 'cloudflare' ? { accountId: 'a'.repeat(32) } : {}) };
     for (const extra of [{ asmGroupId: 1 }, { subscriptionTracking: false }, { subscriptionTracking: true }, { customArgs: {} }, { customArgs: { rer_product: 'orbit' } }]) {
       await rejectsWithoutEffects({ ...message(), ...extra }, 'unsupported_provider_setting', configuration);
     }
   }
+}]);
+  await runCases(t, foldedCases);
 });
+
+
+
+
+
+
+
+
+
+async function rejectsWithoutEffects(input, code, configuration = config) {
+  const { sender, requests, captures } = captureSender(configuration);
+  await assert.rejects(sender.send(input), error => error instanceof MailValidationError && error.code === code);
+  assert.deepEqual(requests, [], 'invalid settings must not reach a provider');
+  assert.deepEqual(captures, [], 'invalid settings must not enter an outbox');
+}

@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -34,10 +35,12 @@ async function relay(t, configuration) {
   };
 }
 
-test('public sender submits only the relay envelope and accepts 202 with or without HTML', async t => {
+test("relay submission makes one bounded authorized attempt with honest outcomes", async t => {
+  const foldedCases = [];
+foldedCases.push(['public sender submits only the relay envelope and accepts 202 with or without HTML', async t => {
   const configuration = config(), edge = await relay(t, configuration);
   const sender = createMailSender(configuration, { fetch: edge.fetch });
-  for (const html of [undefined, '<p>Your sign-in link</p>']) {
+  await runCases(t, Array.from([undefined, '<p>Your sign-in link</p>'], (html, rowIndex) => [`${t.name}: html row ${rowIndex + 1}`, async t => {
     const input = { ...message(), ...(html ? { html } : {}) };
     assert.deepEqual(await sender.send(input), { provider: 'rer', status: 'accepted', providerMessageId: null });
     const request = edge.requests.at(-1);
@@ -45,18 +48,21 @@ test('public sender submits only the relay envelope and accepts 202 with or with
     assert.equal(request.headers['content-type'], 'application/json');
     assert.ok(request.headers.authorization === `Bearer ${configuration.apiKey}`);
     assert.deepEqual(request.body, { to: 'reader@example.test', subject: input.subject, text: input.text, ...(html ? { html } : {}) });
-  }
+}]));
   assert.equal(edge.requests.length, 2);
-});
-
-test('relay errors preserve delivery policy without retrying or exposing the key', async t => {
+}]);
+foldedCases.push(['relay errors preserve delivery policy without retrying or exposing the key', async t => {
   const configuration = config(), edge = await relay(t, configuration);
   const logs = [];
-  for (const method of ['log', 'info', 'warn', 'error', 'debug']) t.mock.method(console, method, (...args) => logs.push(args));
+  for (const method of ['log', 'info', 'warn', 'error', 'debug']) {
+    const original = console[method];
+    console[method] = (...args) => logs.push(args);
+    t.after(() => { console[method] = original; });
+  }
   const sender = createMailSender(configuration, { fetch: edge.fetch });
   const outcomes = [[400, 'rejected'], [401, 'rejected'], [402, 'rejected'], [403, 'rejected'], [413, 'rejected'],
     [429, 'rate_limited'], [502, 'uncertain'], [503, 'uncertain'], [408, 'uncertain'], [200, 'uncertain'], [204, 'uncertain']];
-  for (const [status, expected] of outcomes) {
+  await runCases(t, Array.from(outcomes, ([status, expected], rowIndex) => [`${t.name}: [status, expected] row ${rowIndex + 1}`, async t => {
     edge.respond(status);
     const before = edge.requests.length;
     const result = await sender.send(message());
@@ -64,43 +70,47 @@ test('relay errors preserve delivery policy without retrying or exposing the key
     assert.equal(result.providerMessageId, null);
     assert.equal(edge.requests.length, before + 1);
     assert.ok(!JSON.stringify(result).includes(configuration.apiKey));
-  }
+}]));
   const result = await createMailSender(configuration, { fetch() { throw Error(configuration.apiKey); } }).send(message());
   assert.equal(result.status, 'uncertain');
   assert.ok(!JSON.stringify(result).includes(configuration.apiKey));
   assert.ok(!JSON.stringify(logs).includes(configuration.apiKey));
-});
-
-test('the public sender refuses a relay redirect without following it', async t => {
+}]);
+foldedCases.push(['the public sender refuses a relay redirect without following it', async t => {
   const configuration = config(), edge = await relay(t, configuration);
   const sender = createMailSender(configuration, { fetch: edge.fetch });
-  for (const status of [301, 302, 303, 307, 308]) {
+  await runCases(t, Array.from([301, 302, 303, 307, 308], (status, rowIndex) => [`${t.name}: status row ${rowIndex + 1}`, async t => {
     edge.respond(status);
     const before = edge.requests.length;
     const result = await sender.send(message());
     assert.equal(result.status, 'rejected');
     assert.equal(result.code, 'provider_redirected');
     assert.equal(edge.requests.length, before + 1);
-  }
+}]));
   assert.ok(edge.requests.every(request => request.path === '/api/managed-mail/send'));
-});
-
-test('unsupported relay messages and invalid credentials fail before network effects', async () => {
+}]);
+foldedCases.push(['unsupported relay messages and invalid credentials fail before network effects', async (t) => {
   let calls = 0;
   const dependencies = { fetch: async () => { calls++; return new Response(null, { status: 202 }); } };
   const configuration = config();
   const sender = createMailSender(configuration, dependencies);
-  for (const change of [
+  await runCases(t, Array.from([
     { to: ['first@example.test', 'second@example.test'] }, { subject: '' }, { subject: 'Sign in\nInjected' }, { subject: 'x'.repeat(201) },
     { text: undefined, html: '<p>HTML alone</p>' }, { text: 'x'.repeat(65_537) }, { html: 'x'.repeat(65_537) },
     { text: '界'.repeat(50_000) }, { cc: [] }, { bcc: [] }, { replyTo: 'reply@example.test' }, { headers: { 'Message-ID': '<sign-in@example.test>' } }, { attachments: [] },
     { customArgs: {} }, { subscriptionTracking: false },
-  ]) await assert.rejects(sender.send({ ...message(), ...change }), MailValidationError);
-  for (const change of [
+  ], (change, rowIndex) => [`${t.name}: change row ${rowIndex + 1}`, async t => {
+await assert.rejects(sender.send({ ...message(), ...change }), MailValidationError);
+}]));
+  await runCases(t, Array.from([
     { apiKey: undefined }, { apiKey: configuration.apiKey + '\n' }, { relayUrl: undefined },
     { relayUrl: 'http://managed.example.test/api/managed-mail/send' },
     { relayUrl: 'https://user:password@managed.example.test/send' },
-  ]) assert.throws(() => createMailSender({ ...configuration, ...change }, dependencies), error =>
+  ], (change, rowIndex) => [`${t.name}: change row ${rowIndex + 1}`, async t => {
+assert.throws(() => createMailSender({ ...configuration, ...change }, dependencies), error =>
     error instanceof MailValidationError && !error.message.includes(configuration.apiKey));
+}]));
   assert.equal(calls, 0);
+}]);
+  await runCases(t, foldedCases);
 });

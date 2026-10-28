@@ -1,3 +1,4 @@
+import { runCases, type Case } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSlackNotifier, slackEventTemplates } from '../../slack/index.ts';
@@ -6,8 +7,10 @@ import { botToken, channel, durableFixture, successBot, webhookUrl, wireFixture 
 const notice = { id: 'event-1', tenant: 'installation', destinationId: 'slack-channel-v1', event: 'incident.opened', data: { title: 'Local check', detail: 'Investigating.' } };
 const config = { incomingWebhook: async () => webhookUrl, bot: async () => ({ token: botToken, channel }), templates: slackEventTemplates };
 
-for (const mode of ['incoming-webhook', 'bot'] as const) {
-  test(`${mode}: durable enqueue, real ${mode === 'bot' ? 'verified TLS' : 'HTTP'} POST, restart and deduplication`, async t => {
+test("Slack notification delivery preserves safe payloads and durable conservative retry outcomes", async t => {
+  const foldedCases: Case[] = [];
+await runCases(t, Array.from(['incoming-webhook', 'bot'] as const, (mode, rowIndex) => [`${t.name}: mode row ${rowIndex + 1}`, async t => {
+  foldedCases.push([`${mode}: durable enqueue, real ${mode === 'bot' ? 'verified TLS' : 'HTTP'} POST, restart and deduplication`, async t => {
     const fixture = await wireFixture(t), db = durableFixture(t);
     let notifier = createSlackNotifier({ ...config, repository: db.repository(), transport: fixture.transport });
     const queued = await notifier.enqueue({ ...notice, mode });
@@ -29,8 +32,8 @@ for (const mode of ['incoming-webhook', 'bot'] as const) {
     const log = await notifier.delivery.log(notice.id); assert.equal(log.length, 1);
     assert.equal(log[0]!.outcome?.kind, 'accepted');
     for (const secret of [botToken, webhookUrl, 'localFixtureOnly']) { assert.equal(db.bytes().includes(secret), false); assert.equal(JSON.stringify(log).includes(secret), false); }
-  });
-  test(`${mode}: hostile user content reaches the provider only as escaped text`, async t => {
+  }]);
+  foldedCases.push([`${mode}: hostile user content reaches the provider only as escaped text`, async t => {
     const fixture = await wireFixture(t), db = durableFixture(t);
     const notifier = createSlackNotifier({ ...config, repository: db.repository(), transport: fixture.transport });
     const hostile = '<!channel> <!here> <!everyone> <@U123> <#C123> <!subteam^S123> <https://evil.example|click> &lt;!channel&gt;';
@@ -41,8 +44,8 @@ for (const mode of ['incoming-webhook', 'bot'] as const) {
     assert.equal(body, queued.body); assert.doesNotMatch(body, /[<>]/);
     const sent = JSON.parse(body);
     assert.equal(sent.blocks[1].text.text, '&lt;!channel&gt; &lt;!here&gt; &lt;!everyone&gt; &lt;@U123&gt; &lt;#C123&gt; &lt;!subteam^S123&gt; &lt;https://evil.example|click&gt; &amp;lt;!channel&amp;gt;');
-  });
-  test(`${mode}: rate-limit cooldown survives restart; attempts and retry-after are bounded`, async t => {
+  }]);
+  foldedCases.push([`${mode}: rate-limit cooldown survives restart; attempts and retry-after are bounded`, async t => {
     const fixture = await wireFixture(t), db = durableFixture(t); let now = 1000;
     const make = () => createSlackNotifier({ ...config, repository: db.repository(), transport: fixture.transport, now: () => now });
     let notifier = make(); await notifier.enqueue({ ...notice, mode }, { maxAttempts: 2, retryDelaysMs: [100] });
@@ -58,8 +61,8 @@ for (const mode of ['incoming-webhook', 'bot'] as const) {
     fixture.replies.push({ status: 429, body: '', headers: { 'Retry-After': '86401' } });
     assert.equal((await notifier.delivery.dispatch('excessive-delay'))?.state, 'rejected');
     assert.equal((await notifier.delivery.log('excessive-delay'))[0]!.outcome?.code, 'retry_delay_exceeded');
-  });
-  test(`${mode}: response lost after receipt remains uncertain across restart, never replayed`, async t => {
+  }]);
+  foldedCases.push([`${mode}: response lost after receipt remains uncertain across restart, never replayed`, async t => {
     const fixture = await wireFixture(t), db = durableFixture(t); let now = 1000;
     const make = () => createSlackNotifier({ ...config, repository: db.repository(), transport: fixture.transport, now: () => now });
     let notifier = make(); await notifier.enqueue({ ...notice, mode }); fixture.replies.push('disconnect');
@@ -69,14 +72,13 @@ for (const mode of ['incoming-webhook', 'bot'] as const) {
     assert.equal(fixture.received.length, 1); assert.equal((await notifier.delivery.log(notice.id))[0]!.outcome?.code, 'response_unknown');
     await notifier.delivery.resolveUncertain(notice.id, 'accepted', 'operator_confirmed');
     assert.equal((await notifier.delivery.get(notice.id))?.state, 'accepted');
-  });
-}
-
-test('both paths persist explicit rejection and uncertain server errors from real receivers', async t => {
+  }]);
+}]));
+foldedCases.push(['both paths persist explicit rejection and uncertain server errors from real receivers', async t => {
   const fixture = await wireFixture(t), db = durableFixture(t);
   const notifier = createSlackNotifier({ ...config, repository: db.repository(), transport: fixture.transport });
-  for (const mode of ['incoming-webhook', 'bot'] as const) {
-    for (const state of ['rejected', 'uncertain'] as const) {
+  await runCases(t, Array.from(['incoming-webhook', 'bot'] as const, (mode, rowIndex) => [`${t.name}: mode row ${rowIndex + 1}`, async t => {
+    await runCases(t, Array.from(['rejected', 'uncertain'] as const, (state, rowIndex) => [`${t.name}: state row ${rowIndex + 1}`, async t => {
       const id = `${mode}-${state}`;
       await notifier.enqueue({ ...notice, id, mode });
       fixture.replies.push(state === 'uncertain' ? { status: 500, body: 'provider unknown' }
@@ -84,11 +86,11 @@ test('both paths persist explicit rejection and uncertain server errors from rea
         : { status: 400, body: 'invalid_payload' });
       assert.equal((await notifier.delivery.dispatch(id))?.state, state);
       assert.equal((await notifier.delivery.log(id))[0]!.outcome?.kind, state);
-    }
-  }
+}]));
+}]));
   await notifier.delivery.dispatchDue(); assert.equal(fixture.received.length, 4);
-});
-test('actual SQLite failure propagates before sending; expired durable claim never replays', async t => {
+}]);
+foldedCases.push(['actual SQLite failure propagates before sending; expired durable claim never replays', async t => {
   const fixture = await wireFixture(t), db = durableFixture(t); let now = 1000;
   const notifier = createSlackNotifier({ ...config, repository: db.repository(), transport: fixture.transport, now: () => now });
   await notifier.enqueue({ ...notice, mode: 'bot' });
@@ -100,4 +102,6 @@ test('actual SQLite failure propagates before sending; expired durable claim nev
   db.execute('DROP TABLE integration_deliveries');
   await assert.rejects(restarted.enqueue({ ...notice, id: 'store-failed', mode: 'bot' }), /no such table/);
   assert.equal(fixture.received.length, 0);
+}]);
+  await runCases(t, foldedCases);
 });

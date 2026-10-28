@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime, post, cookie } from './cancellation-runtime.mjs';
@@ -24,7 +25,9 @@ async function release(r, barrier, pending) {
   if (pending) return pending;
 }
 
-for (const winner of ['cancellation', 'confirmation']) test(`invitation race: ${winner} commits before the authorized competing request`, async () => {
+test("cancellation and acceptance serialize against current invitation authority", async t => {
+  const foldedCases = [];
+for (const winner of ['cancellation', 'confirmation']) foldedCases.push([`invitation race: ${winner} commits before the authorized competing request`, async () => {
   const r = await runtime();
   let pending, barrier;
   try {
@@ -58,10 +61,9 @@ for (const winner of ['cancellation', 'confirmation']) test(`invitation race: ${
     assert.equal((await r.call(`/auth/confirm?token=${invitee.token}`)).status, 400);
     assert.equal((await r.call('/auth/confirm', confirmation)).status, 400);
   } finally { try { await release(r, barrier, pending); } finally { await r.close(); } }
-});
-
+}]);
 for (const change of ['session-revoked', 'session-expired', 'actor-demoted', 'actor-inactive', 'actor-restored', 'target-role-changed']) {
-  test(`cancellation rejects a stale authorized snapshot after ${change}`, async () => {
+  foldedCases.push([`cancellation rejects a stale authorized snapshot after ${change}`, async () => {
     const r = await runtime();
     let pending, barrier;
     try {
@@ -90,10 +92,9 @@ for (const change of ['session-revoked', 'session-expired', 'actor-demoted', 'ac
       // Cancellation authority changes alone must not revoke the invitation.
       assert.equal((await r.call(`/auth/confirm?token=${invitee.token}`)).status, change === 'target-role-changed' ? 400 : 200);
     } finally { try { await release(r, barrier, pending); } finally { await r.close(); } }
-  });
+  }]);
 }
-
-test('an activation held during cancellation cannot manufacture invitation acceptance', async () => {
+foldedCases.push(['an activation held during cancellation cannot manufacture invitation acceptance', async () => {
   const r = await runtime();
   let pending, barrier;
   try {
@@ -111,4 +112,6 @@ test('an activation held during cancellation cannot manufacture invitation accep
     assert.equal((await db.prepare('SELECT status FROM oa_operators WHERE id=?').bind(invitee.operator.id).first()).status, 'inactive');
     assert.equal((await db.prepare('SELECT count(*) AS n FROM oa_sessions WHERE operator_id=?').bind(invitee.operator.id).first()).n, 0);
   } finally { try { await release(r, barrier, pending); } finally { await r.close(); } }
+}]);
+  await runCases(t, foldedCases);
 });

@@ -1,3 +1,4 @@
+import { runCases } from '../../tests/cases.mjs';
 // The shared sign-in page accepts `login_hint` to prefill the email field, so a
 // claimed owner sent here by an Open app or Lobby link need not type it again.
 import assert from 'node:assert/strict';
@@ -22,9 +23,9 @@ test('sign-in prefills the email field from login_hint and never submits it', as
   assert.match(hinted, /<form method="post" action="\/auth\/magic-link">/, 'the visitor still submits the form themself');
   assert.doesNotMatch(hinted, /<script|autofocus|onload|http-equiv="refresh"/i);
 
-  for (const bad of ['not an email', 'a@b', '"><script>alert(1)</script>@x.example', 'x'.repeat(300) + '@example.com', '']) {
+  await runCases(t, Array.from(['not an email', 'a@b', '"><script>alert(1)</script>@x.example', 'x'.repeat(300) + '@example.com', ''], (bad, rowIndex) => [`${t.name}: bad row ${rowIndex + 1}`, async t => {
     const html = await page(bad);
     assert.doesNotMatch(field(html), /value=/, `ignored: ${bad.slice(0, 20)}`);
     assert.doesNotMatch(html, /<script/i);
-  }
+}]));
 });

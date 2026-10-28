@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -15,7 +16,7 @@ async function states(db, tenant = 'tenant', namespace = 'events') {
   return (await db.prepare('SELECT recipient, status, event_id FROM rer_mail_event_states WHERE tenant_id = ? AND event_namespace = ? ORDER BY recipient').bind(tenant, namespace).all()).results;
 }
 
-test('signed public intake uses real atomic D1 for races, isolation, full rollback and restart', { timeout: 60000 }, async () => {
+test('signed public intake uses real atomic D1 for races, isolation, full rollback and restart', { timeout: 60000 }, async (t) => {
   const path = await mkdtemp(join(tmpdir(), 'messaging-d1-'));
   let runtime;
   try {
@@ -59,10 +60,12 @@ test('signed public intake uses real atomic D1 for races, isolation, full rollba
     assert.deepEqual(stored.detail, { suppression: 'provider', code: 'list_block' });
     assert.deepEqual(stored.recipients, ['Reader@example.test']);
     // Authenticated tenant + namespace are composite identities, not global IDs.
-    for (const tenantId of ['tenant', 'other']) for (const eventNamespace of ['events', 'other']) {
+    await runCases(t, Array.from(['tenant', 'other'], (tenantId, rowIndex) => [`${t.name}: tenantId row ${rowIndex + 1}`, async t => {
+await runCases(t, Array.from(['events', 'other'], (eventNamespace, rowIndex) => [`${t.name}: eventNamespace row ${rowIndex + 1}`, async t => {
       const response = await ingest(runtime, token, { tenantId, eventNamespace });
       assert.equal(response.result[0].outcome, tenantId === 'tenant' && eventNamespace === 'events' ? 'duplicate' : 'stored');
-    }
+}]));
+}]));
     await runtime.dispose(); runtime = await createRuntime(path, source(), NOW); db = await runtime.getD1Database('DB');
     assert.equal((await ingest(runtime, token)).result[0].outcome, 'duplicate');
     // Local-part case is meaningful; two mailbox states must survive independently.
@@ -87,7 +90,7 @@ test('signed public intake uses real atomic D1 for races, isolation, full rollba
     // Verify all authentication and authorization BEFORE the first durable effect.
     const baseline = await counts(db);
     const otherKey = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey;
-    for (const bad of [token.slice(0, -4) + 'AAAA', JSON.stringify({ events: [event('unsigned')] }),
+    await runCases(t, Array.from([token.slice(0, -4) + 'AAAA', JSON.stringify({ events: [event('unsigned')] }),
       signedEvents([event('wrong-key')], { privateKey: otherKey }),
       signedEvents([event('wrong-iss')], { claims: { iss: 'https://other.example.test' } }),
       signedEvents([event('wrong-aud')], { claims: { aud: 'other-install' } }),
@@ -95,16 +98,16 @@ test('signed public intake uses real atomic D1 for races, isolation, full rollba
       signedEvents([event('future')], { claims: { iat: NOW / 1000 + 3600 } }),
       signedEvents([event('alg')], { header: { alg: 'HS256' } }),
       signedEvents([event('kid')], { header: { kid: 'untrusted' } }),
-      signedEvents([event('jku')], { header: { jku: 'https://evil.test/keys' } })]) {
+      signedEvents([event('jku')], { header: { jku: 'https://evil.test/keys' } })], (bad, rowIndex) => [`${t.name}: bad row ${rowIndex + 1}`, async t => {
       assert.equal((await ingest(runtime, bad)).code, 'event_signature_invalid');
-    }
+}]));
     const unauthorized = await ingest(runtime, signedEvents([event('before-unauthorized'), event('unauthorized', { deliveryId: 'unowned' })]));
     assert.equal(unauthorized.code, 'event_unauthorized');
-    for (const bad of [event('schema', { surprise: 'SENSITIVE' }), event('detail', { detail: { text: 'SENSITIVE' } }),
+    await runCases(t, Array.from([event('schema', { surprise: 'SENSITIVE' }), event('detail', { detail: { text: 'SENSITIVE' } }),
       event('detail-kind', { detail: { bounce: 'hard' } }), event('bad-address', { recipient: 'Reader <Reader@example.test>' }),
-      event('bad-date', { occurredAt: '2026-02-30T00:00:00Z' })]) {
+      event('bad-date', { occurredAt: '2026-02-30T00:00:00Z' })], (bad, rowIndex) => [`${t.name}: bad row ${rowIndex + 1}`, async t => {
       assert.equal((await ingest(runtime, signedEvents([event('before-invalid'), bad]))).status, 400);
-    }
+}]));
     assert.deepEqual(await counts(db), baseline);
   } finally { await runtime?.dispose(); await rm(path, { recursive: true, force: true }); }
 });

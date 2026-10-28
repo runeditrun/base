@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime, post, SETUP } from './regression-runtime.mjs';
@@ -33,10 +34,12 @@ function bodies(token, extra = '') {
   ];
 }
 
-test('setup rejects duplicate form/JSON credentials before owner claim, with a single escaped form field positive control', async () => {
+test('setup rejects duplicate form/JSON credentials before owner claim, with a single escaped form field positive control', async (t) => {
   const r = await runtime();
   try {
-    for (const input of bodies(SETUP, '&displayName=Owner')) await rejected(r, '/auth/bootstrap', input, SETUP);
+    await runCases(t, Array.from(bodies(SETUP, '&displayName=Owner'), (input, rowIndex) => [`${t.name}: input row ${rowIndex + 1}`, async t => {
+await rejected(r, '/auth/bootstrap', input, SETUP);
+}]));
     await rejected(r, `/auth/bootstrap?token=invalid`, post({ token: SETUP, displayName: 'Owner' }), SETUP);
     const valid = await r.call('/auth/bootstrap', form(`%74oken=${SETUP}&displayName=Owner`));
     assert.equal(valid.status, 303);
@@ -45,7 +48,9 @@ test('setup rejects duplicate form/JSON credentials before owner claim, with a s
   } finally { await r.close(); }
 });
 
-for (const kind of ['magic', 'invite']) test(`${kind} rejects query/form/JSON token ambiguity without preview, writes or credential leakage`, async () => {
+test("ambiguous confirmation credentials cannot preview, mutate or disclose tokens", async t => {
+  const foldedCases = [];
+for (const kind of ['magic', 'invite']) foldedCases.push([`${kind} rejects query/form/JSON token ambiguity without preview, writes or credential leakage`, async (t) => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -54,12 +59,16 @@ for (const kind of ['magic', 'invite']) test(`${kind} rejects query/form/JSON to
       : await r.call('/auth/invite', post({ email: 'staff@example.com', displayName: 'Staff', returnTo: '/app/queue' }, owner));
     assert.equal(issued.status, 202);
     const token = await r.link();
-    for (const key of ['token', '%74oken', 'to%6Ben']) {
-      for (const query of [`token=invalid&${key}=${token}`, `${key}=${token}&token=invalid`, `token=${token}&${key}=${token}`]) {
-        for (const method of ['GET', 'HEAD']) await rejected(r, `/auth/confirm?${query}`, { method }, token);
-      }
-    }
-    for (const input of bodies(token)) await rejected(r, '/auth/confirm', input, token);
+    await runCases(t, Array.from(['token', '%74oken', 'to%6Ben'], (key, rowIndex) => [`${t.name}: key row ${rowIndex + 1}`, async t => {
+      await runCases(t, Array.from([`token=invalid&${key}=${token}`, `${key}=${token}&token=invalid`, `token=${token}&${key}=${token}`], (query, rowIndex) => [`${t.name}: query row ${rowIndex + 1}`, async t => {
+        await runCases(t, Array.from(['GET', 'HEAD'], (method, rowIndex) => [`${t.name}: method row ${rowIndex + 1}`, async t => {
+await rejected(r, `/auth/confirm?${query}`, { method }, token);
+}]));
+}]));
+}]));
+    await runCases(t, Array.from(bodies(token), (input, rowIndex) => [`${t.name}: input row ${rowIndex + 1}`, async t => {
+await rejected(r, '/auth/confirm', input, token);
+}]));
     await rejected(r, '/auth/confirm?%74oken=invalid', post({ token }), token);
     await rejected(r, `/auth/confirm?token=${token}`, post({ token: 'invalid' }), token);
     await rejected(r, '/auth/confirm', json(`{"token":"${token}","metadata":{"x":1,"\\u0078":2}}`), token);
@@ -75,4 +84,6 @@ for (const kind of ['magic', 'invite']) test(`${kind} rejects query/form/JSON to
     assert.ok(accepted.headers.get('set-cookie'));
     assert.equal((await r.call('/auth/confirm', post({ token }))).status, 400);
   } finally { await r.close(); }
+}]);
+  await runCases(t, foldedCases);
 });
