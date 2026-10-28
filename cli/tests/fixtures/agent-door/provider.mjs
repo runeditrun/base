@@ -2,9 +2,9 @@ import receiver, { OPENAI_AUTHORIZATION } from './receiver.mjs';
 
 const refused = message => new Response(message, { status: 502 });
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.origin === 'https://receiver.example.invalid') return receiver.fetch(request);
+    if (url.origin === 'https://receiver.example.invalid') return receiver.fetch(request, env);
     if (url.origin !== 'https://api.openai.com' || url.pathname !== '/v1/responses' || url.search || request.method !== 'POST') return refused('Undeclared provider operation');
     if (request.headers.get('authorization') !== OPENAI_AUTHORIZATION || request.headers.get('content-type') !== 'application/json') return refused('Invalid provider authentication or media type');
     let input;

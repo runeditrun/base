@@ -1,3 +1,4 @@
+import { recordOnlyAuthority } from './conformance/authority.mjs'
 import { isClass } from './policy/catalogue.ts'
 import { schemaValid } from './json-schema.ts'
 import type { AgentDoorOptions, ToolDefinition } from './types.ts'
@@ -18,7 +19,8 @@ export function registry(options: AgentDoorOptions): ToolDefinition[] {
     if (!tool.scope || !tool.title || !tool.description || typeof tool.readOnly !== 'boolean' || !Array.isArray(tool.clauses) || typeof tool.classify !== 'function' || typeof tool.run !== 'function') throw new TypeError(`Invalid tool: ${tool.name}`)
     if ('cost' in tool) throw new TypeError(`Provider cost is not enforced: ${tool.name}`)
     if (!tool.readOnly && typeof tool.summary !== 'function') throw new TypeError(`Missing approval summary: ${tool.name}`)
-    if (tool.classes.some(cls => cls === 'access' || cls === 'security') && typeof tool.authority !== 'function') throw new TypeError(`Missing authority: ${tool.name}`)
+    if (tool.authority === 'none' && !recordOnlyAuthority(tool)) throw new TypeError(`Invalid no-subject authority: ${tool.name}`)
+    if (tool.classes.some(cls => cls === 'access' || cls === 'security') && tool.authority !== 'none' && typeof tool.authority !== 'function') throw new TypeError(`Missing authority: ${tool.name}`)
     const properties = { ...tool.inputSchema.properties }
     if ('idempotency_key' in properties || 'expected_revision' in properties) throw new TypeError(`Reserved argument: ${tool.name}`)
     const required = [...tool.inputSchema.required ?? []]
@@ -30,7 +32,7 @@ export function registry(options: AgentDoorOptions): ToolDefinition[] {
 export function describeTool(tool: ToolDefinition) {
   return { name: tool.name, title: tool.title, description: tool.description, inputSchema: tool.inputSchema, outputSchema: tool.outputSchema,
     annotations: { readOnlyHint: tool.readOnly, destructiveHint: tool.classes.includes('destructive'), openWorldHint: tool.classes.includes('external') },
-    _meta: { 'com.runeditrun/classes': tool.classes, 'com.runeditrun/clauses': tool.clauses, 'com.runeditrun/scope': tool.scope } }
+    _meta: { 'com.runeditrun/classes': tool.classes, 'com.runeditrun/clauses': tool.clauses, 'com.runeditrun/scope': tool.scope, ...(tool.authority === 'none' ? { 'com.runeditrun/authority': 'none', 'com.runeditrun/effect': tool.effect } : {}) } }
 }
 export function templateMatches(template: string, uri: string) {
   const pattern = template.split(/\{[^}]+\}/).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^/?#]+')

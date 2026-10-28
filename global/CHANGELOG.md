@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Verify labelled sponsor lists through native lifecycles, signed Business bindings and a cross-sponsor privacy/approval phase; single-sponsor journeys keep their existing phases and point counts.
+- Provision native per-install webhook keys into isolated verification receivers through a contained, read-only state accessor; signed inbound probes verify both accepted effects and wrong-signature refusals.
+- Add explicit `authority: 'none'` security tools for justified record changes, with closed schema validation, undeclared-argument refusal, normal policy/approval handling and audit classification.
+
 - Recheck current agent-door admission before returning idempotent outcomes; refusals retain their own audit without exposing cached content.
 
 - Agent-door verification follows signed and native owner lifecycles, supports isolated seed provider adapters, and accepts Base source archives for copy authoring.

@@ -23,6 +23,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
   try {
     const tool = resourceTool ?? rt.tools.find(tool => tool.name === name)
     if (!tool) { status = 400; return refuse('tool_not_found') }
+    if (tool.authority === 'none') row.authority = 'none'
     const raw = input && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : null
     const properties = tool.inputSchema.properties ?? {}
     const declared = Object.fromEntries(Object.entries(raw ?? {}).filter(([key]) => Object.hasOwn(properties, key)))
@@ -41,6 +42,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       return refuse(refusal.code, refusal.fields)
     }
     if (!tool.readOnly && !key) return refuse('idempotency_key_required')
+    if (tool.authority === 'none' && row.ignored_arguments.length) return refuse('undeclared_arguments')
     const requestDigest = await digest({ name, arguments: declared })
     // Locate a saved call, but do not disclose its outcome before current admission.
     let previous: { outcome: string | null; decision_id: string } | undefined
@@ -66,7 +68,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       const current = await tool.revision(args, ctx)
       if (expected !== current) return refuse('revision_conflict', { current_revision: current })
     }
-    const authority = await tool.authority?.(args, ctx)
+    const authority = typeof tool.authority === 'function' ? await tool.authority(args, ctx) : null
     if (selfEscalation(authority, principal)) {
       result.decision = { id: row.id, disposition: 'self_escalation', revision: state.revision, classes: [] }
       return refuse('self_escalation')

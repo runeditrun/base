@@ -11,12 +11,18 @@ export async function isolatedNetworkAdapter(root, entry, deny) {
  try {
   const wrangler = createRequire(join(root, 'package.json')).resolve('wrangler/package.json');
   const { Miniflare, convertV4MiniflareOptions = options => options } = await import(pathToFileURL(createRequire(wrangler).resolve('miniflare')));
-  mf = new Miniflare(convertV4MiniflareOptions({ host: '127.0.0.1', port: 0, cf: false, unsafeLocalExplorer: false,
+  const options = { host: '127.0.0.1', port: 0, cf: false, unsafeLocalExplorer: false,
    modules: source.modules, modulesRoot: source.root, compatibilityDate: '2026-09-01', compatibilityFlags: [],
    bindings: {}, outboundService: deny,
-  }));
-  const worker = await mf.getWorker();
-  return { fetch: request => worker.fetch(request), close: () => mf.dispose() };
+  };
+  mf = new Miniflare(convertV4MiniflareOptions(options));
+  let worker = await mf.getWorker();
+  return { fetch: async request => worker.fetch(request.url, { method: request.method, headers: Object.fromEntries(request.headers),
+    ...(!['GET', 'HEAD'].includes(request.method) ? { body: await request.arrayBuffer() } : {}) }),
+   provision: async secrets => {
+    await mf.setOptions(convertV4MiniflareOptions({ ...options, bindings: { secrets } }));
+    worker = await mf.getWorker();
+   }, close: () => mf.dispose() };
  } catch {
   if (mf) await mf.dispose();
   throw new NetworkAdapterError('Agent conformance network: the adapter could not start in isolated workerd. Check the seed\'s installed wrangler and use Worker-compatible ES modules with a default fetch export; Node APIs and runtime bindings are unavailable.');

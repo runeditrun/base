@@ -139,6 +139,11 @@ test('public-door replay rechecks current admission, records refusals and execut
    assert.equal(typeof row.sponsor.id, 'string'); assert.equal(typeof row.at, 'string')
   }
   await refuse('insufficient_scope', await r.token({ scope: 'records:read' }))
+  const approval = autonomousPolicy(); approval.rules = [{ id: 'all', class: '*', do: 'approval', approver: ['sponsor'], wait: 'PT1H' }]
+  await r.adopt(approval)
+  await refuse('approval_required')
+  await r.adopt(heldPolicy())
+  await refuse('review_required')
   const blocked = autonomousPolicy(); blocked.rules = [{ id: 'block', class: '*', do: 'blocked' }]
   await r.adopt(blocked)
   await refuse('policy_blocked')
