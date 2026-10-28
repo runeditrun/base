@@ -3,14 +3,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {raw, safe, requirePhysical, testSource, freedEntries} from './files.mjs';
 import {dependencies, resolve, external, bindings, lexicalExports} from './runtime-dependencies.mjs';
+import {relocateDependencies} from './module-edges.mjs';
 const code = name => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(name) && !testSource(name);
 const inside = (name, prefix) => prefix === '.' ? !name.startsWith('../') && !path.posix.isAbsolute(name) : name === prefix || name.startsWith(prefix + '/');
 const mapped = (source, copy) => copy.path + source.slice(copy.originPath.length);
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 
-export function completeModuleCopies(root, plans, {tree, read, revision, base, deliveries = [], ownerSources = new Map()}) {
+export function completeModuleCopies(root, plans, {tree, read, revision, base, deliveries = [], ownerSources = new Map(), relocations = new Map()}) {
   const index = new Set(raw(root, 'ls-files', '-z').toString('utf8').split('\0').filter(Boolean));
   const required = new Set();
+  const mappings = plans.filter(plan => !plan.retired).map(plan => plan.copy);
   const cache = new Map(), planned = new Map(), recorded = new Map(), queue = [], withheld = [];
   const disk = {has: name => {
     try { return fs.lstatSync(path.join(root, name)).isFile(); }
@@ -45,6 +47,13 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
       const from = file ? path.posix.dirname(copy.originPath) : copy.originPath;
       return inside(target, to) && path.posix.join(from, path.posix.relative(to, target)) === source;
     });
+  }
+  function recordedDestination(source) {
+    // Prefer the explicitly selected subtree over a broader, sparse runtime
+    // copy. Never choose between equally specific namespaces for the seed.
+    const candidates = mappings.filter(copy => inside(source, copy.originPath));
+    const specificity = Math.max(...candidates.map(copy => copy.originPath.length));
+    return [...new Set(candidates.filter(copy => copy.originPath.length === specificity).map(copy => mapped(source, copy)))];
   }
   function include(source, target) {
     required.add(target);
@@ -115,7 +124,23 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
       const source = planned.get(destination)?.source ?? (owner && owner.copy.originPath + destination.slice(owner.copy.path.length)) ?? dependency;
       return {...request, dependency: source, destination, satisfied: true};
     }
-    return {...request, manifests, dependency, destination: dependency && path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency))};
+    const expected = dependency && path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency));
+    // Relocate only new deliveries. Existing files and acknowledged adaptations
+    // retain their current imports and ownership, including old missing edges.
+    if (specifier.startsWith('.') && dependency && !recorded.has(target) && !witness(expected, dependency)) {
+      const destinations = recordedDestination(dependency);
+      if (destinations.length > 1) refuse(target, `ambiguous Base copy mappings for ${dependency}: ${destinations.join(', ')}`, '${EDITOR:-vi} base-copies.json');
+      if (destinations.length === 1) {
+        const destination = destinations[0];
+        // Preserve extensionless TS and emitted-JS spellings by moving the
+        // original request path by the same displacement as its resolved file.
+        const requested = path.posix.join(path.posix.dirname(source), request.kind === 'require' ? specifier : decodeURIComponent(specifier));
+        let relocation = path.posix.relative(path.posix.dirname(target), path.posix.join(path.posix.dirname(destination), path.posix.relative(path.posix.dirname(dependency), requested)));
+        if (!relocation.startsWith('.')) relocation = './' + relocation;
+        return {...request, manifests, dependency, destination, relocation};
+      }
+    }
+    return {...request, manifests, dependency, destination: expected};
   }
   const key = (target, request) => JSON.stringify([target, request.kind, request.types, request.specifier]);
   const bootstrap = source => /^(?:edition-authoring|(?:default-seed|export)\/scripts\/base-cli\/edition-authoring)\//.test(source);
@@ -213,6 +238,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
         }
       }
     }
+    if (!adapted && edges.some(edge => edge.relocation)) relocations.set(target, Buffer.from(relocateDependencies(bytes, edges)));
   }
   return withheld;
 }

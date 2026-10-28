@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `rer refresh-base` places newly delivered module imports against the most specific recorded vendor namespace, including files covered by a directory copy. Relocated files retain their Base baseline as acknowledged seed-owned adaptations; unmapped and ambiguous dependencies still refuse before writes. See `edition-authoring/ADOPTING.md`.
+
 ## 0.2.86
 
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.
