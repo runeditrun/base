@@ -73,7 +73,7 @@ export async function referenceBuildIdentity(root, env = process.env) {
 }
 
 const privatePart = /^(?:\.env(?:\..*)?|\.dev\.vars(?:\..*)?|\.git|\.wrangler|\.seed|\.rer|node_modules|exports|secrets?(?:\..*)?|credentials?(?:\..*)?|settings(?:\..*)?)$/i;
-const extensions = new Set(['.js', '.mjs', '.cjs', '.json', '.css', '.html', '.svg', '.png', '.ico', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.woff', '.woff2', '.ttf', '.otf', '.wasm', '.txt', '.sql', '.map', '.webmanifest', '.xml']);
+const extensions = new Set(['.js', '.mjs', '.cjs', '.json', '.css', '.html', '.svg', '.png', '.ico', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.woff', '.woff2', '.ttf', '.otf', '.wasm', '.txt', '.md', '.sql', '.map', '.webmanifest', '.xml']);
 function reviewPath(path, directory) {
  const parts = path.split('/');
  if (parts.some(part => !part || part === '.' || part === '..' || part.includes('\\') || privatePart.test(part))) fail('private or unsafe output path');
