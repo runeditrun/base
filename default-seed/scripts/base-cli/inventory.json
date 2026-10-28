@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.86-dev.g45f4aafd",
+  "cliVersion": "0.2.86-dev.g99feec96",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -863,7 +863,7 @@
     },
     "cli/deploy-variables.mjs": {
       "source": "cli/deploy-variables.mjs",
-      "sha256": "1eb0c8253782477f0985bd812bd342fa2f15ea4b5d1a72fbc526cd60629858e4"
+      "sha256": "fe742c95616ab4e6fc1521f7f60bf6a14526d51d0f674feb27d4604d5e0f4b55"
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
@@ -1099,11 +1099,11 @@
     },
     "cli/production-auth.mjs": {
       "source": "cli/production-auth.mjs",
-      "sha256": "1f33c14d2182e8770d841e91d4864692f2c765407688fbb74e54d75671196425"
+      "sha256": "51a694676582d14d0da53d64c10080b502c22676b9bfe3d8b723a5bcdaa351b9"
     },
     "cli/production-mail.mjs": {
       "source": "cli/production-mail.mjs",
-      "sha256": "81abf2837900e30f7b61be03a47e6334f1302ea11d999c6f617d4259c9106601"
+      "sha256": "3c5917f22dc6ccbb0feeac7540c9b9de2d78dc45ea978c4ce9c1a536ea875196"
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
@@ -2227,7 +2227,7 @@
     },
     "modules/delivery-producer/mail.mjs": {
       "source": "modules/delivery-producer/mail.mjs",
-      "sha256": "2323205c7cbc1aea81ec85509d597df2e486abfc9443981ceaee04950db913a4"
+      "sha256": "fbe18b3678e88db8f98d760d72d39f4a94552c4685e3b8ce27e15d761ed6a981"
     },
     "modules/delivery-producer/migrations.mjs": {
       "source": "modules/delivery-producer/migrations.mjs",

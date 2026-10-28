@@ -24,6 +24,25 @@ test('credentials-only deploy update uses declared live mail secrets with a vali
  await writeFile(join(f.root,'deploy.env'),`PRODUCT_MAIL_FROM=${productionSender}\nPRODUCT_MAIL_KEY=synthetic-mail-credential\n`,{mode:0o600});
  const first=await run();assert.equal(first.code,0,JSON.stringify(first.events));
  const writes=f.provider.state.writes.length;
+ // The mapped deploy input and public delivery declaration cannot name
+ // different senders; refuse before another provider read or write.
+ const calls=f.provider.state.calls.length;
+ const other=productionSender.replace('@','+other@');
+ await writeFile(join(f.root,'deploy.env'),`PRODUCT_MAIL_FROM=${other}\n`);
+ const conflict=await run();
+ assert.equal(conflict.code,4,JSON.stringify(conflict.events));
+ const conflictText=JSON.stringify(conflict.events);
+ for(const source of ['rer-packaging.json','PRODUCT_MAIL_FROM',productionSender])assert.ok(conflictText.includes(source),conflictText);
+ assert.ok(!conflictText.includes(other),'the environment-mapped value retains deploy secret redaction');
+ assert.equal(f.provider.state.calls.length,calls);
+ assert.equal(f.provider.state.writes.length,writes);
+ await writeFile(join(f.root,'deploy.env'),`PRODUCT_MAIL_FROM=${productionSender}\n`);
+ await writeFile(join(f.root,'wrangler.jsonc'),JSON.stringify({vars:{MAIL_FROM:other}}));
+ const sourceConflict=await run();
+ assert.equal(sourceConflict.code,4,JSON.stringify(sourceConflict.events));
+ assert.ok(JSON.stringify(sourceConflict.events).includes('wrangler.jsonc'));
+ assert.equal(f.provider.state.calls.length,calls);
+ await rm(join(f.root,'wrangler.jsonc'));
  await writeFile(join(f.root,'deploy.env'),'');
  const update=await run();
  console.error('credentials-only update:',JSON.stringify(update));

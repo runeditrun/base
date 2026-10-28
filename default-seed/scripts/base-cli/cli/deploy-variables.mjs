@@ -5,6 +5,8 @@ import { parseJsonc } from './jsonc.mjs';
 import { comments } from './business/parsers-syntax.mjs';
 import { tomlEntries } from './business/parsers-config.mjs';
 import { imageVariableSecrets } from '../modules/container/image-variables.mjs';
+import { publicMailSender, validateMailSenders } from '../modules/delivery-producer/mail.mjs';
+import { deliveryDeclarationSources } from './delivery-declarations.mjs';
 
 const id = 'deploy.vars-secrets';
 const lineAt = (source, offset) => source.slice(0, offset).split('\n').length;
@@ -16,9 +18,35 @@ async function sourceFile(root, path) {
  catch (error) { if (error.code === 'ENOENT') return null; throw error; }
 }
 
+async function variableEntries(root, path) {
+ const source = await sourceFile(root, path);
+ if (source === null) return [];
+ const entries = [];
+ let config;
+ try {
+  if (path.endsWith('.toml')) entries.push(...tomlEntries(comments(source).clean, { locations: true }));
+  else config = parseJsonc(source, (path, offset) => entries.push({ path, offset }));
+ } catch (error) { throw Error(`${path}: ${error.message}`); }
+ return entries.filter(entry => variablePath(entry.path)).map(entry => ({
+  binding: entry.path.at(-1),
+  value: config ? entry.path.reduce((value, key) => value?.[key], config) : entry.value,
+  source: `${path}:${lineAt(source, entry.offset)} (${entry.path.join('.')})`,
+  location: `${path}:${lineAt(source, entry.offset)} (${entry.path.slice(0, -1).join('.')})`,
+ }));
+}
+
+/** Source defaults participate in the same sender check as deploy inputs. */
+export async function sourceMailSenders(root, adapter) {
+ const senders = [];
+ for (const path of deployConfigPaths(adapter)) {
+  for (const entry of await variableEntries(root, path)) if (entry.binding === 'MAIL_FROM') senders.push(entry);
+ }
+ return senders;
+}
+
 // Reuse the image builder's JSONC reader and binding comparison. Source checks
-// deliberately reject even empty placeholders and legacy public-mail overlaps:
-// a declaration belongs in vars or secrets, before any build normalizes it.
+// reject secret placeholders before a build normalizes them. Managed MAIL_FROM
+// is a public input even when the deploy adapter supplies it through secrets.
 export async function deployVariableClause(root, adapter) {
  try {
   const declarationPath = adapter?.deploy?.declaration ?? 'deploy.json';
@@ -32,27 +60,30 @@ export async function deployVariableClause(root, adapter) {
   try { JSON.parse(declarationSource); } catch { throw Error(`${declarationPath}: invalid JSON declaration.`); }
   const secrets = declaration.secrets ?? [];
   if (!Array.isArray(secrets) || secrets.some(secret => typeof secret?.binding !== 'string')) throw Error(`${declarationPath}: secrets must be an array of binding declarations.`);
-  const overlaps = [];
-  for (const path of deployConfigPaths(adapter)) {
+  const senders = [{ source: `${declarationPath} vars.MAIL_FROM`, value: declaration.vars?.MAIL_FROM }];
+  let publicSender = false, privateSender = false;
+  for (const [path, select] of deliveryDeclarationSources) {
    const source = await sourceFile(root, path);
    if (source === null) continue;
-   const entries = [];
-   let config;
-   try {
-    if (path.endsWith('.toml')) entries.push(...tomlEntries(comments(source).clean, { locations: true }));
-    else config = parseJsonc(source, (path, offset) => entries.push({ path, offset }));
-   } catch (error) { throw Error(`${path}: ${error.message}`); }
-   for (const entry of entries.filter(entry => variablePath(entry.path))) {
-    const binding = entry.path.at(-1);
-    // TOML entries describe declared keys; JSONC values come from the very
-    // same reader the node image builder uses (including escaped key names).
-    const vars = config ? entry.path.slice(0, -1).reduce((value, key) => value?.[key], config) : { [binding]: entry.value };
-    const matched = new Set(imageVariableSecrets(vars ?? {}, secrets).map(secret => secret.binding));
+   const spec = select(JSON.parse(source));
+   if (!spec) continue;
+   publicSender ||= publicMailSender(spec);
+   privateSender ||= [...(spec.secretNames ?? []), ...(spec.optionalSecretNames ?? [])].includes('MAIL_FROM');
+   senders.push({ source: `${path} publicVariables.MAIL_FROM`, value: spec.publicVariables?.MAIL_FROM });
+  }
+  const overlaps = [];
+  for (const path of deployConfigPaths(adapter)) {
+   for (const entry of await variableEntries(root, path)) {
+    const { binding, value } = entry;
+    if (binding === 'MAIL_FROM') senders.push(entry);
+    const matched = new Set(imageVariableSecrets({ [binding]: value }, secrets).map(secret => secret.binding));
     if (!matched.has(binding)) continue;
+    if (binding === 'MAIL_FROM' && publicSender && !privateSender) continue;
     for (const [index, secret] of secrets.entries()) if (secret.binding === binding) overlaps.push(
-      `${binding}: ${path}:${lineAt(source, entry.offset)} (${entry.path.slice(0, -1).join('.')}) and ${declarationPath}:${secretLocations.get(index)} (secrets)`);
+      `${binding}: ${entry.location} and ${declarationPath}:${secretLocations.get(index)} (secrets)`);
    }
   }
+  validateMailSenders(senders);
   return overlaps.length ? { id, ok: false, message: overlaps.join('\n') + '\nremove it from wrangler vars; the deploy sets it as a secret' } : { id, ok: true };
  } catch (error) { return { id, ok: false, message: error.message }; }
 }
