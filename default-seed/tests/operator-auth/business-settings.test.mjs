@@ -8,6 +8,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 import { emittedRuntime, owner, root, setupToken } from './emitted-runtime.mjs'
 import { signSettings, testDocument, testTrust } from '../../../modules/business-settings/testing/index.mjs'
+import { createOperatorAuth } from '../../../modules/operator-auth/index.mjs'
 
 const digest = value => createHash('sha256').update(value).digest('hex')
 const cookieOf = response => { assert.equal(response.status, 303); return response.headers.get('set-cookie').split(';')[0] }
@@ -121,14 +122,27 @@ test('Business settings on the emitted Worker: signed door, runtime branding, ov
     const now = Math.floor(Date.now() / 1000)
     await post({ ...document, rev: 2, iat: now - 100, exp: now - 1 }, 403, 'expired document')
     await post({ ...document, rev: 2, unknown: 'refused' }, 403, 'unknown payload key')
+    for (const invalid of [
+      { owner_id: '' }, { owner_id: ' ' }, { owner_id: null }, { owner_id: 7 },
+      { team: [{ ...member, id: '' }] }, { team: [{ ...member, id: null }] },
+      { team: [{ ...member, id: 7 }] },
+      { owner_id: 'business-owner', team: [{ ...member, id: 'business-owner' }] },
+      { team: [{ ...member, id: 'duplicate' }, { ...member, email: 'another@example.test', id: 'duplicate' }] },
+    ]) await post({ ...document, rev: 2, ...invalid }, 403, 'invalid Business identity')
     const fullRow = () => runtime.db.prepare('SELECT * FROM bs_settings').first()
     const rowBefore = await fullRow()
     await post(document, 409, 'equal rev')
     await post({ ...document, rev: 0 }, 409, 'older revision zero')
     assert.deepEqual(await fullRow(), rowBefore)
     // Give the lower-revision case two valid positive revisions.
-    document = { ...document, rev: 2 }
+    document = { ...document, rev: 2, owner_id: 'business-owner', team: [{ ...member, id: 'business-sam' }] }
     await post(document, 200, 'next revision')
+    const businessIdentity = await runtime.db.prepare('SELECT operator_id,business_id,business_role FROM bs_team WHERE email=?').bind(member.email).first()
+    assert.equal(businessIdentity.business_id, 'business-sam'); assert.equal(businessIdentity.business_role, 'member')
+    assert.equal((await runtime.db.prepare('SELECT owner_id FROM bs_settings').first()).owner_id, document.owner_id)
+    await post({ ...document, rev: 3, owner_id: 'replacement-owner' }, 403, 'owner identity cannot be reassigned')
+    await post({ ...document, rev: 3, team: [{ ...member, id: 'replacement-person' }] }, 403, 'member identity cannot be reassigned')
+    assert.deepEqual(await runtime.db.prepare('SELECT operator_id,business_id,business_role FROM bs_team WHERE email=?').bind(member.email).first(), businessIdentity)
     const olderBefore = await fullRow()
     await post({ ...document, rev: 1 }, 409, 'older rev')
     assert.deepEqual(await fullRow(), olderBefore)
@@ -154,7 +168,11 @@ test('Business settings on the emitted Worker: signed door, runtime branding, ov
     assert.equal((await runtime.call('/api/work', { cookie: memberCookie })).status, 200)
     evidence.team.push({ action: 'accept invitation', session: 200 })
     document = { ...document, rev: 4, team: [{ ...member, role: 'admin' }] }
+    delete document.owner_id
     await post(document, 200, 'team role change')
+    assert.equal((await runtime.db.prepare('SELECT owner_id FROM bs_settings').first()).owner_id, 'business-owner')
+    assert.deepEqual(await runtime.db.prepare('SELECT operator_id,business_id,business_role FROM bs_team WHERE email=?').bind(member.email).first(),
+      { ...businessIdentity, business_role: 'admin' })
     const operators = await runtime.call('/auth/operators', { cookie: ownerCookie }).then(r => r.json())
     assert.equal(operators.find(o => o.email === member.email).role, 'admin')
     evidence.team.push({ action: 'role change', operator: operators.find(o => o.email === member.email) })
@@ -183,10 +201,21 @@ test('Business settings on the emitted Worker: signed door, runtime branding, ov
     assert.equal(runtime.mails.length, priorMails + 1)
     document = { ...document, rev: 10, team: [document.team[0]] }; await post(document, 200, 'cancel pending invitation')
     assert.ok(await runtime.db.prepare('SELECT 1 FROM oa_invitation_cancellations c JOIN oa_operators o ON o.id=c.operator_id WHERE o.email=?').bind(pending.email).first())
+    const native = createOperatorAuth({ db: runtime.db, clientIp: request => request.headers.get('cf-connecting-ip'), config: {
+      origin: runtime.origin, OWNER_EMAIL: owner, SESSION_SECRET: 'disposable-test-only-session-secret-00001',
+    } })
+    const remapped = createBusinessSettings({ db: runtime.db, trust, team: native.businessTeam,
+      business: { ...business, team: { roles: { admin: 'member', member: 'member' } } } })
+    document = { ...document, rev: 11, team: [{ ...member, id: 'business-sam', role: 'admin' }] }
+    const remappedResponse = await remapped.handle(new Request(runtime.origin + '/api/rer/business-settings', { method: 'POST',
+      headers: { 'content-type': 'application/json' }, body: JSON.stringify({ settings: await signSettings(document) }) }))
+    assert.equal(remappedResponse.status, 200)
+    assert.equal((await runtime.db.prepare('SELECT role FROM oa_operators WHERE id=?').bind(businessIdentity.operator_id).first()).role, 'member')
+    assert.equal((await runtime.db.prepare('SELECT business_role FROM bs_team WHERE business_id=?').bind('business-sam').first()).business_role, 'admin')
     const audit = await runtime.db.prepare("SELECT actor_id,action,value FROM oa_auth_audit WHERE json_extract(value,'$.via') LIKE 'via Business by %'").all()
     assert.ok(audit.results.length); assert.ok(audit.results.every(row => row.actor_id === ownerBefore.id))
     evidence.team.push({ action: 'resend and cancellation', additionalMail: 1, audit: audit.results })
-    document = { ...document, rev: 11, detached: true, logo: null }
+    document = { ...document, rev: 12, detached: true, logo: null }
     await post(document, 200, 'detach')
     const detached = await runtime.call('/api/rer/business-settings', { method: 'POST', input: {} })
     assert.equal(detached.status, 404); evidence.door.push({ request: 'after detached', status: detached.status })

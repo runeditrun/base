@@ -6,6 +6,7 @@ import { CommandKeyError, commandKey, commandKeyInput, readReceipt, runOnce, see
 import { themeFrame } from '../../../../../foundation/runtime/theme-frame'
 import { businessTimeZone as timeZone, identity } from '../../app/identity'
 import { theme } from '../../app/theme'
+import { personRecordEvent } from '../../../agent-door/person-events.server'
 import { createPerson } from './repository.server'
 
 // The reference server-rendered page for Base's two shared presentation rules:
@@ -51,9 +52,11 @@ export async function peoplePageResponse(request: Request, bindings: Bindings): 
   if (!form || !parsed.success) return page(bindings, '<p role="alert">Enter a name and an email address.</p>', 400)
   try {
     const key = commandKey(form)
-    await runOnce(bindings.DB, { actor, command: 'person.create', key }, async () => ({
-      result: { id: await createPerson(bindings.DB, actor, { ...parsed.data, details: {} }), name: parsed.data.name },
-    }))
+    await runOnce(bindings.DB, { actor, command: 'person.create', key }, async () => {
+      const id = await createPerson(bindings.DB, actor, { ...parsed.data, details: {} })
+      await personRecordEvent(bindings, session.operator, 'person.created', id)
+      return { result: { id, name: parsed.data.name } }
+    })
     return seeOther(`${PATH}?done=${key}`, headers)
   } catch (error) {
     if (error instanceof CommandKeyError) return page(bindings, `<p role="alert">${escape(error.message)}</p>`, error.status)

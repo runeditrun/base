@@ -26,7 +26,9 @@ the signed document path; `logo_ref` is not a setup Business-field hint.
 `createBusinessSettings({db, business, trust?, team?, mail?})` accepts the seed's D1
 binding, its manifest block, optional trust JSON/object, and optional team
 adapter. All reads use D1; constructing per request is supported. Apply
-`schema/0001_business_settings.sql` before invoking database methods.
+`schema/0001_business_settings.sql`, then `schema/0002_business_people.sql`
+before invoking database methods. Existing installations add only the second
+migration; preserve the previously applied schema.
 
 | Method | Result and behavior |
 | --- | --- |
@@ -82,11 +84,13 @@ Hosted requests must also arrive at the configured audience origin.
 The closed JWS header is `{alg:"ES256",typ:"rer-business-settings+jwt",kid}`.
 Its closed payload contains `v:1`, `iss`, `aud`, `sub`, `business`, `email`,
 `jti`, `iat`, `exp`, safe integer `rev`, `values`, `logo`, `team`, and
-optionally `detached:true`. The signed lifetime is at most 24 hours. Scalar
+optionally `owner_id` and `detached:true`. The signed lifetime is at most 24 hours. Scalar
 `values` holds only the four non-logo slots. `logo` is null or
 `{sha256,type,bytes}`. `team` is null or up to 500 unique normalized emails
-with `{email,name,role,invite}`; `role` is `admin` or `member`, and `invite` is a
-nonnegative integer used to request re-invitation.
+with `{id?,email,name,role,invite}`; `role` is `admin` or `member`, and `invite` is a
+nonnegative integer used to request re-invitation. `owner_id` and member `id`
+are optional nonblank Business person identifiers. Supplied member IDs must
+be unique and differ from `owner_id`. Documents without IDs remain valid.
 
 The ack is `{rev, applied, overrides, logo, team}`. `applied` and `overrides`
 contain field names, `logo` is the effective logo hash or null, and
@@ -103,6 +107,20 @@ The adapter prepares native writes, then sends invitations only after commit.
 `team:null` leaves membership unchanged; `team:[]` removes all Business-managed
 members. Existing accounts not owned by this integration are conflicts, and
 the owner is never changed or granted through the roster.
+
+`bs_settings.owner_id` stores the signed owner identifier. `bs_team` stores
+`business_id` and the signed `business_role` beside its native `operator_id`;
+the Business role remains `admin` or `member` even when native roles use other
+names. These values belong to the module, so custom adapters do not need to
+return them. The adapter still returns the complete managed ledger, including
+inactive native identities. A later document that omits IDs retains established
+bindings. An explicit ID follows its native operator when either the signed
+roster email or the native sign-in email changes. Replacing an established
+owner ID, reassigning a roster binding to another ID, or moving onto another
+retained binding's email is refused. Unused IDs can be added to legacy records.
+Business token sponsors must resolve these stored IDs to native operators;
+email matching is not a Business token authentication method. Check native
+account activity and the ledger state on each call.
 
 `stop()` and signed `detached:true` keep the last values, logo, overrides and
 members. They close the document door; rendering and existing team access

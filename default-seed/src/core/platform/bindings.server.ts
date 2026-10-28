@@ -29,6 +29,7 @@ export interface Bindings {
   /** The signed owner claim's issuer, installation and public keys (JSON {kid: JWK}); set by a hosted demo's front or RER Managed. */
   RER_OWNER_CLAIM_ISSUER?: string
   RER_OWNER_CLAIM_INSTALLATION_ID?: string
+  RER_OWNER_CLAIM_APP_ORIGIN?: string
   RER_OWNER_CLAIM_PUBLIC_KEYS?: string
   /** Public Business settings verification ring and installation binding. */
   RER_BUSINESS_TRUST?: string
