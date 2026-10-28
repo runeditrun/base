@@ -1,7 +1,7 @@
 import type { CallResult, DecisionMeta, Principal, Runtime, ToolContext } from './types.ts'
 import { audit, newAudit, recordDecision, outcomeRow, recoverAudit, usage, usageToday, type Evidence } from './audit.ts'
 import { policyRefusal, policyState, setupUrl } from './policy-store.ts'
-import { classify, context, digest, runTool, saveCall, selfEscalation, summary } from './execution.ts'
+import { classify, context, digest, runTool, saveCall, selfEscalation, summary, revoked } from './execution.ts'
 import { decide } from './policy/decide.ts'
 import { durationSeconds } from './policy/document.ts'
 import { validateSchema } from './json-schema.ts'
@@ -25,6 +25,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
   try {
     const tool = resourceTool ?? rt.tools.find(tool => tool.name === name)
     if (!tool) { status = 400; return refuse('tool_not_found') }
+    if (tool.authority === 'none') row.authority = 'none'
     const raw = input && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : null
     const properties = tool.inputSchema.properties ?? {}
     const declared = Object.fromEntries(Object.entries(raw ?? {}).filter(([key]) => Object.hasOwn(properties, key)))
@@ -35,7 +36,9 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     if (tool.scope && !principal.scopes.includes(tool.scope)) { status = 403; scope = tool.scope; return refuse('insufficient_scope') }
     const state = await policyState(rt)
     row.revision = state.revision
-    if (principal.consent && state.revoked.consents.includes(principal.consent)) return refuse('consent_revoked')
+    if (principal.consent && state.revoked.consents.includes(principal.consent)) { if (door === 'mcp') { status = 401; return refuse('unauthenticated') }; return refuse('consent_revoked') }
+    const agent = await rt.options.db.prepare('SELECT revoked,sponsor FROM agent_door_agents WHERE id=?').bind(principal.agent.id).first<{ revoked: number; sponsor: string }>()
+    if (revoked(state, principal) || agent?.revoked || agent && agent.sponsor !== principal.person.id) { status = 401; return refuse('unauthenticated') }
     const refusal = policyRefusal(rt, state, tool.classes)
     if (refusal) {
       const disposition = { agents_paused: 'paused', policy_unset: 'unset', policy_unavailable: 'unavailable' }[refusal.code] ?? 'none'
@@ -44,42 +47,32 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     }
     if (!tool.readOnly && !key) return refuse('idempotency_key_required')
     if (tool.widens === false && row.ignored_arguments.length) return refuse('invalid_arguments')
+    if (tool.authority === 'none' && row.ignored_arguments.length) return refuse('undeclared_arguments')
+    let previous: { outcome: string | null; decision_id: string } | undefined
     const requestDigest = await digest({ name, arguments: declared, ...(principal.clientId === undefined ? {} : { client_id: principal.clientId }) })
     if (tool.readOnly && requestState !== undefined) {
       if (typeof requestState !== 'string') return refuse('invalid_arguments')
       const pending = await rt.options.db.prepare("SELECT saved FROM agent_door_approvals WHERE json_extract(saved,'$.result.requestState')=?").bind(requestState).first<{ saved: string }>()
       const saved = pending ? JSON.parse(pending.saved) : null
       if (!saved || saved.principal.person.id !== principal.person.id || saved.principal.agent.id !== principal.agent.id || saved.tool !== name || saved.digest !== requestDigest) return refuse('invalid_arguments')
-      const { idempotency_key: _key, expected_revision: _expected, ...args } = declared
-      principal = await nativeProof(rt, tool, args, principal, proofReference)
-      await classify(tool, args, context(rt, principal, door, []))
-      result = await approvalReplay(rt, saved.result)
-      if (result.decision) result = { ...result, decision: { ...result.decision, id: row.id } }
-      row.replay_of = saved.decision_id; row.outcome = 'replayed'
-      return { result }
+      previous = { outcome: JSON.stringify(saved.result), decision_id: saved.decision_id }
     }
     if (key !== null) {
-      const previous = await rt.options.db.prepare('SELECT digest,outcome,decision_id FROM agent_door_calls WHERE agent=? AND key=?').bind(principal.agent.id, key).first<{ digest: string; outcome: string | null; decision_id: string }>()
-      if (previous) {
-        if (previous.digest !== requestDigest) return refuse('idempotency_conflict')
-        if (!previous.outcome) return refuse('call_in_progress')
-        const { idempotency_key: _key, expected_revision: _expected, ...args } = declared
-        principal = await nativeProof(rt, tool, args, principal, proofReference)
-        await recoverAudit(rt, previous.decision_id, JSON.parse(previous.outcome))
-        result = await approvalReplay(rt, JSON.parse(previous.outcome))
-        if (result.decision) result = { ...result, decision: { ...result.decision, id: row.id } }
-        row.replay_of = previous.decision_id; row.outcome = 'replayed'
-        return { result }
+      const saved = await rt.options.db.prepare('SELECT digest,outcome,decision_id FROM agent_door_calls WHERE agent=? AND key=?').bind(principal.agent.id, key).first<{ digest: string; outcome: string | null; decision_id: string }>()
+      if (saved) {
+        if (saved.digest !== requestDigest) return refuse('idempotency_conflict')
+        if (!saved.outcome) return refuse('call_in_progress')
+        previous = saved
       }
     }
     if (!raw || !validateSchema(tool.inputSchema, declared)) return refuse('invalid_arguments')
     const { idempotency_key: _key, expected_revision: expected, ...args } = declared
     const ctx = context(rt, principal, door, [])
-    if (tool.revision && expected !== undefined) {
+    if (!previous && tool.revision && expected !== undefined) {
       const current = await tool.revision(args, ctx)
       if (expected !== current) return refuse('revision_conflict', { current_revision: current })
     }
-    const authority = await tool.authority?.(args, ctx)
+    const authority = typeof tool.authority === 'function' ? await tool.authority(args, ctx) : null
     if (tool.widens === false && authority?.widens) return refuse('narrowing_contract_violation')
     if (selfEscalation(authority, principal)) {
       result.decision = { id: row.id, disposition: 'self_escalation', revision: state.revision, classes: [] }
@@ -97,6 +90,16 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     if (decision.result === 'unset') return refuse('policy_unset', { unanswered: decision.unset, setup_url: setupUrl(rt, state) })
     if (decision.result === 'blocked') return refuse('policy_blocked', { class: decision.deciding!.class, rule: decision.deciding!.rule, revision: state.revision })
     principal = await nativeProof(rt, tool, args, principal, proofReference)
+    if (previous?.outcome) {
+      const cached = await approvalReplay(rt, JSON.parse(previous.outcome))
+      // A newly required review or approval cannot be satisfied by an older receipt.
+      if (decision.result === 'approval' && (cached.decision?.disposition !== 'approval' || cached.decision.revision !== state.revision)) return refuse('approval_required')
+      if (decision.result === 'review' && cached.decision?.disposition !== 'review') return refuse('review_required')
+      await recoverAudit(rt, previous.decision_id, JSON.parse(previous.outcome))
+      result = { ...cached, decision: { ...meta, id: row.id } }
+      row.replay_of = previous.decision_id; row.outcome = 'replayed'
+      return { result }
+    }
     const savedSummary = await summary(tool, args, ctx)
     const summary_sha256 = await digest(savedSummary)
     recordDecision(row, meta)

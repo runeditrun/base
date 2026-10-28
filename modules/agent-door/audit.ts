@@ -5,6 +5,7 @@ import type { ClassAndFacts, DecisionMeta, Principal, Runtime } from './types.ts
 import { preparedBy } from './people.ts'
 
 export interface AuditRow {
+  authority?: 'none'
   sequence?: number; id: string; at: string; door: 'mcp' | 'embedded'; agent: Principal['agent']; sponsor: { id: string; name: string }; label: string
   consent: string | null; tool: string; resource: string | null; decision_id: string | null; classes: ClassAndFacts[]; revision: number | null; rules: Array<{ class: string; rule: string | null; do: string }>
   decision: string; outcome: 'running' | 'done' | 'refused' | 'pending' | 'failed' | 'replayed'; code: string | null
