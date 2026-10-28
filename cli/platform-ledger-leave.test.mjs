@@ -23,7 +23,7 @@ async function managedFixture(t) {
 async function managedSource(t) {
  const source=await managedFixture(t);
  await source.run(['export','--output','exports/empty.rer']);
- await source.data("INSERT INTO computed_entries(id,quantity,unit_price,label) VALUES('synthetic-base-1',3,125,'synthetic-base-2'); INSERT INTO synthetic_facts VALUES('synthetic-base-10','synthetic-base-11'); INSERT INTO synthetic_excluded_present VALUES('synthetic-base-12'); INSERT INTO synthetic_excluded_retired VALUES('synthetic-base-13')");
+ await source.data("INSERT INTO computed_entries(id,quantity,unit_price,label) VALUES('synthetic-base-1',3,125,'synthetic-base-2'); INSERT INTO synthetic_facts VALUES('synthetic-base-10','synthetic-base-11'); INSERT INTO synthetic_excluded_present VALUES('synthetic-base-12'); INSERT INTO synthetic_excluded_retired VALUES('synthetic-base-13'); INSERT INTO issues VALUES('issue-1','Retained issue'); INSERT INTO events VALUES('event-1','issue-1','Retained event')");
  const directory=join(source.root,'migrations/core');
  const rows=await Promise.all((await readdir(directory)).filter(name=>name.endsWith('.sql')).sort().map(async name=>`('delivered-${name}','${createHash('sha256').update(await readFile(join(directory,name))).digest('hex')}')`));
  await source.data(`CREATE TABLE rer_migrations (name TEXT PRIMARY KEY, sha256 TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
@@ -50,6 +50,11 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
  assert.equal(again.contentHash,restored.contentHash,'the native re-export carries the same data');
  const zipTarget=await managedFixture(t);
  await writeFile(join(zipTarget.root,'migrations/core/1000_retire_synthetic.sql'),'DROP TRIGGER synthetic_facts_legacy; DROP TABLE synthetic_excluded_retired;');
+ // Simulate the scratch copies an older native import left in the source.
+ await source.data("CREATE TABLE rer_portability_stage_old_0(id TEXT); INSERT INTO rer_portability_stage_old_0 VALUES('old scratch'); CREATE TABLE rer_portability_stage_old_0_meta(position INTEGER)");
+ await source.run(['export','--output','exports/with-leftovers.rer']);
+ const withLeftovers=archiveRecords(await readFile(join(source.root,'exports/with-leftovers.rer'),'utf8'));
+ assert.equal(withLeftovers[0].schema,records[0].schema,'old staging leftovers do not change product identity');
  const entries=await managedEntries(source),zip=managedZip(entries),input=join(zipTarget.root,'exports/managed.zip');
  const wrongKind=entries.map(([name,value])=>[name,name==='manifest.json'?JSON.stringify({...JSON.parse(value),kind:'synthetic-base-1'}):value]);
  const wrongVersion=entries.map(([name,value])=>[name,name==='manifest.json'?JSON.stringify({...JSON.parse(value),schema:2}):value]);
@@ -124,6 +129,7 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
  // Materialize the empty native destination so the unknown excluded table
  // refusal also proves its existing migration history remains byte-identical.
  await zipTarget.run(['export','--output','exports/empty.rer']);
+ await zipTarget.data("CREATE TABLE rer_portability_stage_destination_0(id TEXT); INSERT INTO rer_portability_stage_destination_0 VALUES('retain scratch')");
  const databaseBytes=async()=>{
   const directory=join(zipTarget.root,'.wrangler/state');
   const files=(await readdir(directory,{recursive:true})).filter(name=>/\.sqlite(?:-wal|-shm)?$/.test(name)).sort();
@@ -145,6 +151,11 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
  await writeFile(input,zip,{mode:0o600});
  const imported=(await zipTarget.run(['import','--input','exports/managed.zip','--yes','--non-interactive','--no-queue'])).at(-1);
  assert.equal(imported.ok,true);
+ assert.deepEqual((await zipTarget.data('SELECT * FROM issues'))[0].results,[{id:'issue-1',title:'Retained issue'}]);
+ assert.deepEqual((await zipTarget.data('SELECT * FROM events'))[0].results,[{id:'event-1',issue_id:'issue-1',body:'Retained event'}]);
+ assert.deepEqual((await zipTarget.data('SELECT * FROM rer_portability_stage_destination_0'))[0].results,[{id:'retain scratch'}],'destination leftovers stay outside restored product data');
+ assert.deepEqual((await zipTarget.data("SELECT name FROM sqlite_master WHERE name='rer_portability_stage_old_0'"))[0].results,[],'source scratch is never restored');
+ t.diagnostic('Managed ZIP: creation-ordered issues/events restore 0 -> 1 each; source and destination old stage tables excluded from product identity');
  const nameHash=names=>createHash('sha256').update(JSON.stringify(names.sort())).digest('hex');
  assert.ok(imported.managedSchema.accounted.some(group=>group.type==='table' && group.disposition==='retired' && group.migration==='1000_retire_synthetic.sql' && group.count===1 && group.namesSha256===nameHash(['synthetic_excluded_retired'])));
  const presentExclusions=records[0].excludedTables.filter(name=>!name.startsWith('sqlite_') && !name.startsWith('_cf_') && !['rer_migrations','synthetic_excluded_retired'].includes(name));

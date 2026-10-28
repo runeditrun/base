@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Older v2 backups without `schemaObjects` now restore without acknowledgment when their recorded migrations prove the complete destination schema and archived tables. Unverifiable backups retain the explicit recovery option. Managed data ZIP intake also accepts old native staging-table leftovers, and its fixture preserves parent-before-child creation order for foreign keys.
+
 ## 0.2.85
 
 - Two starters could both take over a stale local operation lock and both act as its owner. Takeover is now exclusive: the lock's inode stays pinned through takeover, and release checks the owner token.

@@ -71,8 +71,8 @@ test('CLI restore checks behavioral schema objects and authenticates older schem
    assert.match(result.stderr, /schema_mismatch/);
   }
  });
- await t.test('old archive without definitions refuses unverifiable objects with recovery guidance', async () => {
-  const legacy = structuredClone(saved); delete legacy[0].schemaObjects;
+ await t.test('unrecorded old archive without definitions refuses unverifiable objects with recovery guidance', async () => {
+  const legacy = structuredClone(saved); delete legacy[0].schemaObjects; delete legacy[0].migrations;
   await writeFile(join(f.root, 'exports/legacy.rer'), (await remakeArchive(legacy)).map(JSON.stringify).join('\n') + '\n', { mode: 0o600 });
   for (const changed of [sql, ...variants.slice(0, 3).map(([, changed]) => changed), tables]) {
    await f.run(['reset', '--yes']); await writeFile(migration, changed);

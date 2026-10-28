@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.gdb888446",
+  "cliVersion": "0.2.85",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -919,7 +919,7 @@
     },
     "cli/managed-data-schema.mjs": {
       "source": "cli/managed-data-schema.mjs",
-      "sha256": "db3cffdbe605fb8ca9833032f7ef645f0d2ae6a185bfd25ce8ddb86bbe585d9c"
+      "sha256": "13eb826c1007e3d95b01cd4862d3dc3ab08a0829c4eea5d78d86c3cb2ca09d16"
     },
     "cli/managed-data-zip.mjs": {
       "source": "cli/managed-data-zip.mjs",
@@ -4239,7 +4239,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "c0a41c6ebb25b2e40aad834151ed2aadea3e2860d63d0ae824dbea62371e901a"
+      "sha256": "79d30da05d70e0cef0082075f526eaa172308c51e577c53afa2c3e496b38781c"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
@@ -4251,7 +4251,7 @@
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
-      "sha256": "d3c5b9c126c16e9e002a59c811501f44ad221e19e867aaa3a081d4c13d3621e7"
+      "sha256": "075fc380051b52ff8498680b32b40278ad8ce9f542231ccb076fd56ea38d9c5c"
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
@@ -4323,7 +4323,7 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "991fc8e7537cf3344b313f7b3f0088d20e5d7f9b6c622c65315bc890225ec1b2"
+      "sha256": "6d80bdd78b2b04a1cbda1238e48268960f73abd8fac9495360e4c5cdfe2b3123"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
