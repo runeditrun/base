@@ -312,3 +312,58 @@ test('packed refresh delivers and adopts templates with their helpers atomically
  }
 
 });
+
+test('packed refresh fetches missing Base ancestry and refuses unreachable or offline history without writes', async t => {
+ for (const mode of ['online', 'unreachable', 'offline']) {
+  const {seed, source, revision, run, old, env} = await fixture(t);
+  write(source, 'singleton.mjs', 'export const singleton = "synthetic-base-1";\n');
+  const introduced = commit(source);
+  write(source, 'foundation/edition-migrations.json', JSON.stringify({schemaVersion: 1, migrations: [{
+   id: 'synthetic-base-1', introduced, origin: 'singleton.mjs', deliver: [], guide: 'guide.md', edit: 'Review synthetic Base data.',
+  }]}));
+  const next = commit(source);
+  const remote = source + '-remote.git', shallow = source + '-shallow.git';
+  git(source, 'clone', '--bare', '--', source, remote);
+  git(source, 'clone', '--bare', '--depth=1', '--', 'file://' + remote, shallow);
+  git(shallow, 'fetch', '--depth=1', '--no-tags', 'origin', revision, introduced);
+  assert.equal(git(shallow, 'rev-parse', '--is-shallow-repository'), 'true');
+  assert.equal(spawnSync('git', ['-C', shallow, 'merge-base', next, introduced]).status, 1);
+  fs.rmSync(source, {recursive: true});
+  const before = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  const singleton = fs.readFileSync(path.join(seed, 'one.mjs'));
+  if (mode === 'unreachable') fs.renameSync(remote, remote + '-unreachable');
+  // An offline attempt must not even try to contact the existing remote.
+  const trace = path.join(seed, 'git-trace.json');
+  env.GIT_TRACE2_EVENT = trace;
+  env.TMPDIR = path.dirname(seed);
+  const refreshed = run('refresh-base', '--ref', next, '--base', shallow, '--edition-migration', 'synthetic-base-1',
+   ...(mode === 'offline' ? ['--offline'] : []));
+  const traceText = fs.readFileSync(trace, 'utf8');
+  if (mode === 'online') {
+   assert.equal(refreshed.status, 0, refreshed.stdout + refreshed.stderr);
+   assert.equal(JSON.parse(refreshed.stdout.trim().split('\n').at(-1)).refreshed, next);
+   assert.equal(fs.readFileSync(path.join(seed, 'one.mjs'), 'utf8'), 'export const singleton = "synthetic-base-1";\n');
+   assert.ok(traceText.includes('"fetch","--no-tags","--no-recurse-submodules","--","file://' + remote + '","' + next + '","' + introduced + '"'));
+   assert.equal(old('verify-base', '--base', shallow).ok, true);
+   t.diagnostic('missing ancestry: exit 0; exact revisions fetched from local bare remote; copy refreshed');
+  } else {
+   assert.equal(refreshed.status, 4, refreshed.stdout + refreshed.stderr);
+   const error = JSON.parse(refreshed.stdout.trim().split('\n').find(line => JSON.parse(line).event === 'error')).message;
+   assert.ok(error.includes(next) && error.includes(introduced) && error.includes('file://' + remote), error);
+   assert.ok(error.includes('git init --bare') && error.includes('fetch --no-tags --no-recurse-submodules --'), error);
+   assert.ok(!error.includes('fetch full Base history'), error);
+   t.diagnostic(error);
+   assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), before);
+   assert.deepEqual(fs.readFileSync(path.join(seed, 'one.mjs')), singleton);
+   if (mode === 'offline') assert.ok(!traceText.includes('"fetch"') && !traceText.includes('upload-pack'), traceText);
+   else {
+    fs.renameSync(remote + '-unreachable', remote);
+    const command = error.match(/When online, run exactly:\n(.+)/)?.[1];
+    assert.ok(command, error);
+    const repaired = spawnSync('bash', ['-c', command], {cwd: seed, env, encoding: 'utf8'});
+    assert.equal(repaired.status, 0, repaired.stdout + repaired.stderr);
+   }
+   t.diagnostic(mode + ': exit 4; revisions, remote and executable repair named; record and copy unchanged');
+  }
+ }
+});
