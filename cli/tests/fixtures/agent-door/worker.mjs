@@ -188,17 +188,18 @@ export default {
     const path = new URL(request.url).pathname;
     if (path === '/health') return Response.json({ ok: true, deployment: { sourceSha: env.RER_DEPLOY_SOURCE, fingerprint: env.RER_DEPLOY_FINGERPRINT, versionId: env.RER_VERSION.id } });
     if (path === '/' && ['GET', 'HEAD'].includes(request.method)) return new Response(request.method === 'HEAD' ? null : '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Records</title></head><body><main><h1>Records</h1><p>Save internal records, request a provider review, and retain signed delivery receipts.</p><p><a href="/app">Open your records workspace</a></p></main></body></html>', { headers: { ...securityHeaders(), 'Content-Type': 'text/html; charset=utf-8' } });
-    const origin = env.RER_OWNER_CLAIM_APP_ORIGIN, nativeMode = env.OWNER_MODE === 'native';
-    if (!['signed', 'native', 'setup-token'].includes(env.OWNER_MODE)) return new Response('Invalid owner configuration', { status: 503 });
+    const origin = env.RER_OWNER_CLAIM_APP_ORIGIN, nativeMode = ['native', 'native-reviewer'].includes(env.OWNER_MODE);
+    if (!['signed', 'native', 'native-reviewer', 'setup-token'].includes(env.OWNER_MODE)) return new Response('Invalid owner configuration', { status: 503 });
     await env.DB.prepare('INSERT INTO fixture_installation(id,secret) VALUES(1,?) ON CONFLICT(id) DO NOTHING').bind(crypto.randomUUID() + crypto.randomUUID()).run();
     const config = { origin, OWNER_EMAIL: nativeMode ? env.SETUP_OPERATOR_EMAIL : env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, SETUP_TOKEN: env.SETUP_TOKEN,
       MAIL_FROM: 'synthetic-records@example.com', branding: { productName: 'Records' } };
     const clientIp = incoming => incoming.headers.get('CF-Connecting-IP') ?? '';
-    const teamAuth = createOperatorAuth({ db: env.DB, config, clientIp });
+    const sender = createMailSender({ provider: 'resend', mode: 'production', apiKey: env.MAIL_API_KEY });
+    const mailSender = { async send(message) { const result = await sender.send(message); await env.DB.prepare('INSERT INTO fixture_mail(email,body) VALUES(?,?)').bind(message.to[0], message.text).run(); return result; } } };
+    const teamAuth = createOperatorAuth({ db: env.DB, config, clientIp, mailSender });
     const settings = createBusinessSettings({ db: env.DB, trust: env.RER_BUSINESS_TRUST,
       business: { settings: 1, values: ['display_name'], team: { roles: { admin: 'admin', member: 'member' } } }, team: teamAuth.businessTeam });
-    const sender = createMailSender({ provider: 'resend', mode: 'production', apiKey: env.MAIL_API_KEY });
-    const auth = createOperatorAuth({ db: env.DB, config, clientIp, businessSettings: settings, mailSender: { async send(message) { const result = await sender.send(message); await env.DB.prepare('INSERT INTO fixture_mail(email,body) VALUES(?,?)').bind(message.to[0], message.text).run(); return result; } } });
+    const auth = createOperatorAuth({ db: env.DB, config, clientIp, mailSender, businessSettings: settings });
     const trust = { issuer: env.OWNER_MODE === 'signed' ? env.RER_MANAGEMENT_ORIGIN : env.RER_OWNER_CLAIM_ISSUER,
       installationId: env.OWNER_MODE === 'signed' ? env.RER_INSTALLATION_ID : env.RER_OWNER_CLAIM_INSTALLATION_ID,
       appOrigin: origin, publicKeys: JSON.parse(env.RER_OWNER_CLAIM_PUBLIC_KEYS) };
@@ -223,6 +224,21 @@ export default {
     if (path === '/auth/owner-claim' && env.OWNER_MODE === 'signed') return createOwnerClaimHandler({ db: env.DB, authConfig: config, clientIp, ...trust, expectedEmail: config.OWNER_EMAIL })(request);
     if (path === '/auth/bootstrap' && env.OWNER_MODE === 'signed') return new Response('Not found', { status: 404 });
     try {
+      if (path === '/app/review' && env.OWNER_MODE === 'native-reviewer') {
+        requirePost(request, config);
+        const session = await auth.getSession(request);
+        if (!session) return Response.json({ error: 'unauthenticated' }, { status: 401 });
+        const input = await readInput(request);
+        if (input.action === 'prepare' && session.operator.role === 'owner') {
+          const id = crypto.randomUUID();
+          await env.DB.prepare('INSERT INTO fixture_reviews(id,preparer_id) VALUES(?,?)').bind(id, session.operator.id).run();
+          return Response.json({ id });
+        }
+        const row = await env.DB.prepare('SELECT preparer_id,reviewer_id FROM fixture_reviews WHERE id=?').bind(input.id).first();
+        if (!row || !['owner', 'admin'].includes(session.operator.role) || row.preparer_id === session.operator.id) return Response.json({ error: 'independent_reviewer_required' }, { status: 403 });
+        const marked = await env.DB.prepare('UPDATE fixture_reviews SET reviewer_id=? WHERE id=? AND reviewer_id IS NULL AND preparer_id<>?').bind(session.operator.id, input.id, session.operator.id).run();
+        return Response.json({ reviewed: marked.meta.changes === 1 });
+      }
       if (path === '/app/native-proof') {
         requirePost(request, config);
         const session = await auth.getSession(request);

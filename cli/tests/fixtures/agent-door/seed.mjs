@@ -15,6 +15,7 @@ const productionSchemas = [
  'modules/agent-door/schema/agent-door.sql',
 ];
 const nativeSchema = `
+CREATE TABLE fixture_reviews (id TEXT PRIMARY KEY, preparer_id TEXT NOT NULL REFERENCES oa_operators(id), reviewer_id TEXT REFERENCES oa_operators(id));
 CREATE TABLE fixture_grants (id TEXT NOT NULL, scope TEXT NOT NULL, operator_id TEXT NOT NULL REFERENCES oa_operators(id), PRIMARY KEY(id,scope));
 CREATE TABLE fixture_proofs (id TEXT PRIMARY KEY, operator_id TEXT NOT NULL, agent TEXT NOT NULL, tool TEXT NOT NULL, record_id TEXT NOT NULL, expires INTEGER NOT NULL);
 CREATE TABLE fixture_mail (email TEXT NOT NULL, body TEXT NOT NULL);
@@ -43,10 +44,11 @@ export async function fixtureSeed(t, mode, { sponsors = false, security = false 
  await writeFile(join(root, 'credentials.mjs'),
   `export const deliverySecret = ${JSON.stringify(randomBytes(32).toString('hex'))};\n`
   + `export const openAiAuthorization = ${JSON.stringify('Bearer ' + randomBytes(32).toString('hex'))};\n`);
- for (const file of ['provider.mjs', 'receiver.mjs', 'initializer.mjs', 'proof.mjs', 'confirm-mail.mjs', 'journey.mjs', 'secret-source.mjs', 'second-sponsor.mjs', 'inbound-webhook.mjs']) await cp(join(import.meta.dirname, file), join(root, file));
+ for (const file of ['provider.mjs', 'receiver.mjs', 'initializer.mjs', 'proof.mjs', 'confirm-mail.mjs', 'journey.mjs', 'secret-source.mjs', 'second-sponsor.mjs', 'inbound-webhook.mjs', 'reviewer-owner.mjs', 'reviewer.mjs']) await cp(join(import.meta.dirname, file), join(root, file));
  const surface = JSON.parse(await readFile(join(import.meta.dirname, 'surface.json'), 'utf8'));
  surface.verification = { journey: 'journey.mjs', proof: { module: 'proof.mjs' }, network: { module: 'provider.mjs', secretSource: 'secret-source.mjs', origins: ['https://api.openai.com', 'https://receiver.example.invalid'] },
-  ...(mode === 'native' ? { owner: { email: 'native-owner@example.com', emailField: 'SETUP_OPERATOR_EMAIL', initializer: 'initializer.mjs' } } : {}),
+  ...(['native', 'native-reviewer'].includes(mode) ? { owner: { email: 'native-owner@example.com', emailField: 'SETUP_OPERATOR_EMAIL', initializer: mode === 'native-reviewer' ? 'reviewer-owner.mjs' : 'initializer.mjs' } } : {}),
+  ...(mode === 'native-reviewer' ? { reviewers: [{ label: 'quality', email: 'native-reviewer@example.invalid', initializer: 'reviewer.mjs' }] } : {}),
   ...(mode === 'signed' ? { owner: { bindings: { RER_MANAGEMENT_ORIGIN: 'issuer', RER_INSTALLATION_ID: 'installationId' } } } : {}),
  };
  if (sponsors) {
@@ -97,7 +99,7 @@ import { commandAdapter as declare } from ${JSON.stringify(source('cli/adapter.m
 export const commandAdapter = declare(localInstaller({}), { verify: [process.execPath, ['build-fixture.mjs']], publicPages: ['/'] });\n`);
  await writeFile(join(root, 'rer-setup.json'), JSON.stringify({ schema: 1, title: 'Fixture installation', fields: [
   { name: 'OWNER_EMAIL', kind: 'email', required: true }, { name: 'SETUP_TOKEN', kind: 'secret', required: true, generate: 'hex' },
- ], steps: mode === 'native' ? [{ type: 'extension', id: 'lamp-native-owner' }] : [{ type: 'owner-claim', mode, emailField: 'OWNER_EMAIL', tokenField: 'SETUP_TOKEN', path: mode === 'signed' ? '/auth/owner-claim' : '/auth/bootstrap' }] }));
+ ], steps: ['native', 'native-reviewer'].includes(mode) ? [{ type: 'extension', id: 'lamp-native-owner' }] : [{ type: 'owner-claim', mode, emailField: 'OWNER_EMAIL', tokenField: 'SETUP_TOKEN', path: mode === 'signed' ? '/auth/owner-claim' : '/auth/bootstrap' }] }));
  await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, vars: { OWNER_MODE: mode, ...(sponsors ? { SPONSOR_PROOF: true } : {}), ...(security ? { SECURITY_PROOF: true } : {}) }, secrets: [{ binding: 'SESSION_SECRET' }, { binding: 'MAIL_API_KEY' }] }));
  await writeFile(join(root, 'dist/server/wrangler.json'), JSON.stringify({ main: 'index.js', compatibility_date: '2026-09-01', d1_databases: [{ binding: 'DB', database_name: 'fixture', migrations_dir: 'migrations' }] }));
  const schemas = [...await Promise.all(productionSchemas.map(file => readFile(join(base, file), 'utf8'))), nativeSchema];
