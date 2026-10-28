@@ -13,8 +13,8 @@ export async function unsetPolicy(c, initial = false) {
   c.sponsor.id = sponsor.id;
  }
  for (const step of c.surface.journey) {
-  // Admission under an absent policy precedes argument use. No prior result
-  // exists in this phase; references are inert, invalid record identifiers.
+  // No prior result exists here; unresolved references cannot identify native
+  // records. Resolvable calls still retain their computed classification.
   const answer = await c.tool(step.tool, c.args(step, new Map(), { unresolved: true }));
   c.add(`BASE-AGENT-007.2.${initial ? 'initial' : 'removed'}.${step.id}`, errorCode(answer) === 'policy_unset', `${step.tool} must refuse with policy_unset before setup.`);
  }
@@ -42,7 +42,7 @@ export async function blockedPhases(c) {
     c.add(`BASE-AGENT-007.1.blocked-no-effect.${cls}.${step.id}`, isDeepStrictEqual(before, after), `${step.tool} changed native state while ${cls} was blocked.`);
     await c.adopt(autonomousPolicy());
    }
-   const completed = await c.tool(step.tool, args);
+   const completed = await c.tool(step.tool, args, await c.proof(step.tool, args));
    if (completed.result?.isError || completed.result?.structuredContent === undefined) throw new Error(`Could not prepare ${step.id} for the ${cls} blocked variant (${errorCode(completed) ?? completed.status})`);
    outputs.set(step.id, completed.result.structuredContent);
   }
@@ -61,4 +61,15 @@ export async function pausePhase(c) {
  c.add('BASE-AGENT-011.6.person', state.paused?.business === true, 'The signed-in person must still read paused state.');
  await c.adopt(autonomousPolicy());
  c.add('BASE-AGENT-011.6.resume', isDeepStrictEqual(before, await c.witness()), 'Pause calls changed native state, or resume did not restore access.');
+}
+
+export async function consentRevocationPhase(c) {
+ await c.adopt(autonomousPolicy());
+ const before = await c.witness();
+ await c.adopt(autonomousPolicy(), { revoked: { agents: [], consents: [c.consent] } });
+ const step = c.surface.journey[0];
+ const refused = await c.tool(step.tool, c.args(step, new Map(), { unresolved: true }));
+ c.add('BASE-AGENT-004.consent-revoked', refused.status === 401, 'A revoked originating consent must refuse the next authenticated call.');
+ await c.adopt(autonomousPolicy());
+ c.add('BASE-AGENT-004.consent-no-effect', isDeepStrictEqual(before, await c.witness()), 'A call under revoked consent changed native state.');
 }

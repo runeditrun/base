@@ -19,6 +19,7 @@
     },
     {
       "name": "base.access.role",
+      "sponsorEscalation": false,
       "scope": "access:write",
       "readOnly": false,
       "classes": [
@@ -143,14 +144,6 @@
       "args": {
         "name": "Synthetic Sponsor",
         "email": { "$sponsor": "email" },
-        "role": "admin"
-      }
-    },
-    {
-      "id": "widen-sponsor",
-      "tool": "base.access.role",
-      "args": {
-        "id": { "$sponsor": "id" },
         "role": "admin"
       }
     }

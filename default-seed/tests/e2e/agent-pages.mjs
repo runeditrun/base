@@ -112,10 +112,14 @@ export async function agentDoorPages(root) {
   ]);
   assert.deepEqual(approved.request().postDataJSON(),{revision:saved.revision,summary_sha256:saved.summary_sha256});
   await page.locator('[data-approval-state]').filter({hasText:'executed'}).waitFor();await captureState('executed');
-  successful(await c.tool('base.access.invite',inviteArgs));
+  const invited=successful(await c.tool('base.access.invite',inviteArgs));
+  const nativeInvitation=(await c.personJson('/auth/operators')).find(operator=>operator.id===invited.id);
+  assert.equal(nativeInvitation.email,inviteArgs.email);assert.equal(nativeInvitation.role,inviteArgs.role);
+  const approvedInvitation=(await c.personJson(`/agents/api/approvals/${id}`)).approval;
+  assert.equal(approvedInvitation.approvals[0].name,'Synthetic Owner');
   const events=successful(await c.tool('base.events.list',{limit:200})).events;
   const invitation=events.find(event=>event.type==='operator.invited');
-  assert.equal(invitation.approved_by[0].name,'Synthetic Owner');
+  assert.equal(invitation,undefined,'An unregistered operator resource must not expose its event.');
   await page.goto(hosted.origin+'/agents',{waitUntil:'networkidle'});
   await page.locator(`[data-review-id="${noteReviewId}"] [data-review-action="undo"]`).click();
   await page.locator(`[data-review-id="${noteReviewId}"]`).waitFor({state:'detached'});

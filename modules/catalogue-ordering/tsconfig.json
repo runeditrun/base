@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "lib": ["ES2022", "DOM"],
+    "module": "NodeNext", "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true, "noEmit": true,
+    "strict": true, "skipLibCheck": true, "erasableSyntaxOnly": true,
+    "noUnusedLocals": true, "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true, "types": ["node"],
+    "typeRoots": ["../../default-seed/node_modules/@types"], "allowJs": true
+  },
+  "include": ["*.ts", "conformance/*.mts", "tests/*.test.ts", "tests/*.mts" ]
+}
