@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.84-dev.gc5222b55",
+  "cliVersion": "0.2.84-dev.g8e298b14",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -213,7 +213,7 @@
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
-      "sha256": "15503277b5517faed1fe7d5e0215c1aa6f03ba3ca2dad3bd44af1cc5892aa823"
+      "sha256": "b889f655f579c5d857aa74b50e844aa3d2e78b4dcb75d45f02b183aa4105e132"
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
