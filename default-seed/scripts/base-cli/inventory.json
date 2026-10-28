@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.84-dev.gae98fa3c",
+  "cliVersion": "0.2.84",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4683,7 +4683,7 @@
     },
     "scripts/publish-check/public_hygiene.py": {
       "source": "scripts/publish-check/public_hygiene.py",
-      "sha256": "985cbf70e00667c744fce9b75496d8fda95d59f29f33e774332ad579d7826347"
+      "sha256": "ec271875706991fb2d4490e17d51311d22cd880396c705abefc6894c98de761b"
     },
     "scripts/publish-check/publication-config.json": {
       "source": "scripts/publish-check/publication-config.json",

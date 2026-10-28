@@ -21,6 +21,58 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
     def test_email_in_history(self):
         self.deleted('contact.txt', 'person' + '@' + 'gmail.com', 'hygiene.email')
 
+    def test_coauthor_provider_addresses_only_in_final_commit_trailers(self):
+        from test_source_metadata import public_scan
+        clean = self.git('rev-parse', 'HEAD')
+        subject = 'synthetic-base-1\n\n'
+
+        def trailer(address, name='OpenAI'):
+            return 'Co-Authored-By: ' + name + ' <' + address + '>\n'
+
+        provider = 'noreply' + '@' + 'openai.com'
+        personal = 'synthetic-base-2' + '@' + 'synthetic-base-3.net'
+        other = 'noreply' + '@' + 'synthetic-base-4.org'
+        lookalike = 'noreply' + '@' + 'openai.com.synthetic-base-5.net'
+        cases = [(name, 'commit', subject + trailer('noreply' + '@' + domain, name), True)
+                 for name, domain in (('OpenAI', 'openai.com'), ('Anthropic', 'anthropic.com'),
+                                      ('GitHub', 'github.com'))]
+        cases.extend((
+            ('personal trailer', 'commit', subject + trailer(personal), False),
+            ('personal body', 'commit', subject + personal + '\n\nsynthetic-base-6\n', False),
+            ('provider trailer in body', 'commit', subject + trailer(provider) + '\nsynthetic-base-6\n', False),
+            ('non-provider trailer', 'commit', subject + trailer(other), False),
+            ('lookalike trailer', 'commit', subject + trailer(lookalike), False),
+            ('other trailer key', 'commit', subject + trailer(provider).replace('Co-Authored-By:', 'Signed-Off-By:'), False),
+            ('file', 'file', subject + trailer(provider), False),
+            ('annotated tag', 'tag', subject + trailer(provider), False),
+        ))
+        for label, kind, message, accepted in cases:
+            with self.subTest(case=label):
+                self.git('reset', '-q', '--hard', clean)
+                if kind == 'commit':
+                    self.git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', message, '--allow-empty')
+                    self.assertEqual(self.git('log', '-1', '--format=%B'), message.strip())
+                elif kind == 'file':
+                    self.write('synthetic-base-7.txt', message)
+                    self.commit()
+                else:
+                    self.git('tag', '-a', 'synthetic-base-8', '-m', message)
+                inspected = self.git('rev-parse', 'synthetic-base-8' if kind == 'tag' else 'HEAD')
+                # Inspect the planted commit in newly-public history as well.
+                self.commit()
+                try:
+                    report = public_scan(self)
+                    self.assertEqual(report['status'], 'PASS' if accepted else 'FAIL')
+                    expected = set() if accepted else {('hygiene.email', '@commit-message' if kind == 'commit'
+                                                       else '@tag-message' if kind == 'tag' else 'synthetic-base-7.txt')}
+                    self.assertEqual({(f['rule'], f['path']) for f in report['findings']}, expected)
+                    if not accepted:
+                        self.assertTrue(any(inspected in f['commits'] and 'newly-public' in f['scopes']
+                                            for f in report['findings']))
+                finally:
+                    if kind == 'tag':
+                        self.git('tag', '-d', 'synthetic-base-8')
+
     def test_reserved_domains_are_not_personal_email(self):
         self.write('personas.txt', 'admin' + '@' + 'dev.localhost owner' + '@' + 'example.com')
         self.commit()
