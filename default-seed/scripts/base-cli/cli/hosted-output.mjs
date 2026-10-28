@@ -84,8 +84,10 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    await migrate(await mf.getD1Database(item.binding, 'app'), withRewrites(plan, await readMigrationRewrites(root), { partial: true }));
   }
  } catch (error) { await mf.dispose(); throw error; }
+ // Refusing an oversized body can close the connection before its next use.
+ // Keep each loopback exchange separate, including effectful POSTs; never retry.
  return { client, identity, origin: HOSTED_ORIGIN, close: () => mf.dispose(),
-  fetch: (path, { headers, ...init } = {}) => fetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }) };
+  fetch: (path, { headers, ...init } = {}) => fetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, connection: 'close', 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }) };
 }
 
 export async function checkHostedOutput(root, options) {

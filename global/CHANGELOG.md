@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Agent-door verification can map declared native environment binding names to its disposable issuer, installation, origin and owner credentials.
+- Agent-door verification can map declared native environment binding names to its disposable issuer, installation, origin and owner credentials. Hosted verification closes each loopback exchange so an oversized-body refusal cannot break the next request.
 - Durable agent-door invocations retain the originating consent through native tool context and audit, and refuse revoked consent at final execution admission before effects.
 
 - Agent-door verification follows signed and native owner lifecycles, supports isolated seed provider adapters, and accepts Base source archives for copy authoring.
