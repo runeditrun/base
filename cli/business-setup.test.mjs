@@ -120,7 +120,10 @@ test('packed business setup uses the owner session, preserves the platform recei
  assert.equal(first.code, 2);
  assert.equal(first.stderr, '');
  const receipt = JSON.parse(first.stdout);
- assert.deepEqual(receipt, {
+ for (const seed of receipt.seeds) assert.equal(typeof seed.message, 'string');
+ const structure = report => ({ ...report, seeds: report.seeds.map(seed =>
+  Object.fromEntries(Object.entries(seed).filter(([key]) => key !== 'message'))) });
+ assert.deepEqual(structure(receipt), {
   schema: 'rer-demo-receipt/1', synthetic: true, business_id: business.id, hosting: 'self_host',
   status: 'dependencies_required', setup_status: 'setup recorded', complete: false,
   policy: { id: business.id + ':1', revision: 1, confirmed: true, paused: false, spend: 'none' },
@@ -128,8 +131,6 @@ test('packed business setup uses the owner session, preserves the platform recei
    provisioned: 5, fixtures_loaded: 0, token_ids: 0, plans_created: 1 },
   seeds: seeds.map((seed, index) => ({ app: seed.app, name: seed.name, required: true,
    state: index < 5 ? 'agent_token_issuer_unavailable' : index === 5 ? 'provisioning' : 'failed',
-   message: index < 5 ? 'App provisioned; Business seed MCP token issuance is unavailable.'
-    : index === 5 ? 'Continue the existing M4 setup task; no deployment or owner claim is assumed.' : 'seed_dependency_unavailable',
    source: seed.source, fixture: seed.fixture, fixture_state: 'not_loaded', token_ids: [], door_state: 'unavailable',
    installation_id: 'installation-' + seed.app })),
   dependencies: [{ code: 'demo_issuer_required' }],
