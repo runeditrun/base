@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFile, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { portabilityFixture } from './fixtures/portability.mjs';
@@ -75,4 +75,57 @@ test('public import uses Platform file hashes without replaying them, admits dec
  assert.match(pending.stderr,/migration_ledger:unapplied/);
  assert.deepEqual((await target.data("SELECT name FROM sqlite_master WHERE name='pending_items'"))[0].results,[]);
  await rm(join(directory,'1000_pending.sql'));
+});
+
+test('public import restores into absent or engine-only D1 files and preserves occupied destination refusals', {timeout:10*60_000}, async t=>{
+ const f=await portabilityFixture(t);
+ const adapter=join(f.root,'scripts/installer/local.mjs');
+ await writeFile(adapter,(await readFile(adapter,'utf8')).replace('policy: portabilityPolicy',"policy: { ...portabilityPolicy, includeTables: ['computed_entries'] }"));
+ await f.run(['export','--output','exports/empty.rer']);
+ await f.data("INSERT INTO computed_entries(id,quantity,unit_price,label) VALUES('saved',3,125,'café ☕'),('return',-2,75,NULL)");
+ const query='SELECT *,hex(CAST(label AS BLOB)) AS label_bytes FROM computed_entries ORDER BY id';
+ const before=(await f.data(query))[0].results;
+ const saved=(await f.run(['export','--output','exports/saved.rer'])).at(-1);
+ const input=['import','--input','exports/saved.rer','--yes'];
+ const restored=async name=>{
+  const result=(await f.run(input)).at(-1);
+  assert.equal(result.contentHash,saved.contentHash);
+  assert.deepEqual((await f.data(query))[0].results,before,'stored bytes and generated cells restore exactly');
+  console.log(name+': exit=0; content hash and every visible cell/label byte match');
+ };
+ await f.run(['reset','--yes']);
+ await assert.rejects(stat(join(f.root,'.wrangler/state')),{code:'ENOENT'});
+ await restored('(a) no file');
+
+ for(const blank of [true,false]){
+  await f.run(['reset','--yes']);
+  await f.data('SELECT 1'); // Wrangler creates the real binding file without product schema.
+  const directory=join(f.root,'.wrangler/state/v3/d1/miniflare-D1DatabaseObject');
+  const files=(await readdir(directory)).filter(name=>name.endsWith('.sqlite') && name!=='metadata.sqlite');
+  assert.equal(files.length,1);
+  if(blank){
+   const path=join(directory,files[0]);
+   for(const suffix of ['-wal','-shm','-journal'])await rm(path+suffix,{force:true});
+   await writeFile(path,Buffer.alloc(0)); // An existing SQLite file with no tables at all.
+  }
+  await restored('(b) file with '+(blank?'no tables':'only Wrangler engine internals'));
+ }
+
+ const occupied=await f.run(input,4);
+ assert.equal(occupied.find(event=>event.event==='error').code,'restore_refused');
+ assert.match(occupied.find(event=>event.event==='error').message,/table computed_entries .*already holds rows/);
+ assert.deepEqual((await f.data(query))[0].results,before,'occupied refusal leaves the data untouched');
+ console.log('(c) occupied: exit=4; restore_refused; existing rows unchanged');
+ await f.run(['reset','--yes']);
+ await f.data('CREATE TABLE foreign_records(id TEXT); INSERT INTO foreign_records VALUES(\'keep\')');
+ const foreign=await f.run(input,4);
+ assert.match(foreign.find(event=>event.event==='error').message,/policy_table_missing:computed_entries/);
+ assert.deepEqual((await f.data('SELECT * FROM foreign_records'))[0].results,[{id:'keep'}]);
+ assert.deepEqual((await f.data("SELECT name FROM sqlite_master WHERE name='computed_entries'"))[0].results,[],'foreign schema refuses before migrations');
+ console.log('(c) foreign table: exit=4; policy_table_missing:computed_entries; no migrations or row changes');
+
+ await f.run(['reset','--yes']);
+ await f.run(['export','--output','exports/schema-empty.rer']);
+ assert.deepEqual((await f.data('SELECT * FROM computed_entries'))[0].results,[]);
+ await restored('(d) product schema with no rows');
 });
