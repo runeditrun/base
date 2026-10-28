@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Import door sources may declare `format: 'raw'` and a seed-owned `readRaw` reader for ZIP and other binary exports. Verified upload bytes, hash and size reach that reader before text decoding; exact custody, reviewed plans and the existing apply, reconciliation, catch-up and Undo lifecycle are shared with JSON/NDJSON sources.
+
 ## 0.2.85
 
 - Two starters could both take over a stale local operation lock and both act as its owner. Takeover is now exclusive: the lock's inode stays pinned through takeover, and release checks the owner token.

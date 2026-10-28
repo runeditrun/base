@@ -1,3 +1,4 @@
+import { readRawSource } from './raw.ts';
 import { randomUUID } from 'node:crypto';
 import { canonicalJson, sha256 } from '../provenance/identity.ts';
 import { readFileSource } from '../readers/file.ts';
@@ -173,8 +174,11 @@ async function readUpload(request: DoorRequest, upload: UploadRow, planId: strin
   const retained = await retainedSource(request,upload);
   if (retained) return {kitNamespace,retainedFrom:retained.planId,source:{...retained.source,records:retained.source.records.map(record=>({...record,namespace:kitNamespace}))}};
   // Credential values are removed per record, never imported, and never refuse a record.
-  const source = await readFileSource({namespace:kitNamespace,name:upload.name,bytes:await bundleBytes(request,upload),format:intake ? 'ndjson' : options.format,parse:options.parse,credentials:'remove'},
-    {...options.limits,maxBytes:Math.min(options.limits?.maxBytes ?? request.access.maxBytes,request.access.maxBytes),maxRecords:Math.min(options.limits?.maxRecords ?? request.access.maxRecords,request.access.maxRecords)});
+  const bytes = await bundleBytes(request,upload);
+  const limits = {...options.limits,maxBytes:Math.min(options.limits?.maxBytes ?? request.access.maxBytes,request.access.maxBytes),maxRecords:Math.min(options.limits?.maxRecords ?? request.access.maxRecords,request.access.maxRecords)};
+  const source = options.format === 'raw'
+    ? await readRawSource(options,upload,bytes,kitNamespace,limits)
+    : await readFileSource({namespace:kitNamespace,name:upload.name,bytes,format:intake ? 'ndjson' : options.format,parse:options.parse,credentials:'remove'},limits);
   if (intake) source.intake = intake;
   return {kitNamespace,source,retainedFrom:undefined};
 }
