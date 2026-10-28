@@ -1,3 +1,5 @@
+import { runRows } from '../rows.mjs'
+import { teamIdentityRows } from './business-team-identity.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
@@ -9,6 +11,9 @@ import { build } from 'esbuild'
 import { emittedRuntime, owner, root, setupToken } from './emitted-runtime.mjs'
 import { signSettings, testDocument, testTrust } from '../../../modules/business-settings/testing/index.mjs'
 
+const businessRows = []
+
+
 const digest = value => createHash('sha256').update(value).digest('hex')
 const cookieOf = response => { assert.equal(response.status, 303); return response.headers.get('set-cookie').split(';')[0] }
 const tokenOf = mail => new URL(mail.text.match(/https?:\/\/\S+/)[0]).searchParams.get('token')
@@ -16,7 +21,7 @@ const business = { settings: 1, values: ['display_name', 'owner_name', 'brand_co
 
 // One public-door core flow, shared with the emitted-Worker verification shard.
 // Only outbound mail is replaced, by emittedRuntime's network-edge sink.
-test('Business settings on the emitted Worker: signed door, runtime branding, overrides, native team and owner exit', async () => {
+businessRows.push(['Business settings on the emitted Worker: signed door, runtime branding, overrides, native team and owner exit', {}, async () => {
   const evidence = { door: [], html: {}, headers: {}, team: [], homepage: [] }
   const output = process.env.BUSINESS_SETTINGS_EVIDENCE_DIR
   const scratch = await mkdtemp(join(tmpdir(), 'business-settings-api-'))
@@ -206,4 +211,8 @@ test('Business settings on the emitted Worker: signed door, runtime branding, ov
     assert.doesNotMatch(sources, /business-test-only|signSettings|fixtureKeys|"d"\s*:/)
     if (output) await writeFile(join(output, 'core-flow.json'), JSON.stringify(evidence, null, 2) + '\n')
   } finally { await browser?.close(); await runtime?.close(); await rm(scratch, { recursive: true, force: true }) }
+}])
+
+test('Business settings journey: signed configuration, native team identity and owner exit', async t => {
+  await runRows(t, [...businessRows, ...teamIdentityRows])
 })

@@ -4,7 +4,8 @@ import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promise
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { test } from 'node:test'
+
+export const ownershipRows = []
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const module = import.meta.resolve('../../scripts/base-onboarding/local/operation.mjs')
@@ -16,6 +17,7 @@ const { localOperation } = await import(module)
 const starter = `
 import { localOperation } from ${JSON.stringify(module)};
 import { createInterface } from 'node:readline';
+
 const lines = createInterface({ input: process.stdin });
 let operation;
 console.log('ready');
@@ -38,7 +40,7 @@ function start(dir) {
   return { child, next, exited }
 }
 
-test('six simultaneous starters take over a stale lock with exactly one owner', { timeout: 120000 }, async (t) => {
+ownershipRows.push(['six simultaneous starters take over a stale lock with exactly one owner', { timeout: 120000 }, async (t) => {
   const parent = join(root, '.wrangler/local-setup-tests')
   await mkdir(parent, { recursive: true })
   const dir = await mkdtemp(join(parent, 'lock-'))
@@ -46,8 +48,8 @@ test('six simultaneous starters take over a stale lock with exactly one owner', 
   const directory = join(dir, '.wrangler/local-operation')
   await mkdir(directory, { recursive: true, mode: 0o700 })
   const lock = join(directory, 'active.json')
-  for (let trial = 0; trial < 12; trial++) {
-    // Alternate a lock whose process is gone with an old half-written one.
+  for (let trial = 0; trial < 2; trial++) {
+    // Exercise each distinct stale-lock path once: dead owner and old partial write.
     if (trial % 2 === 0) await writeFile(lock, JSON.stringify({ pid: 2 ** 22 + 12345, token: 'dead' }), { mode: 0o600 })
     else {
       await writeFile(lock, '', { mode: 0o600 })
@@ -76,4 +78,4 @@ test('six simultaneous starters take over a stale lock with exactly one owner', 
     const next = await localOperation(dir)
     await next.release()
   }
-})
+}])

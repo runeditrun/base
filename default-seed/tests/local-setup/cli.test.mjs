@@ -1,3 +1,7 @@
+import { nativeBindingRows } from './native-bindings.mjs'
+import { ownershipRows } from './operation-lock.mjs'
+import { setupRerunRows } from './setup-rerun.mjs'
+import { runRows } from '../rows.mjs'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -6,6 +10,14 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { localOperation } from '../../scripts/base-onboarding/local/operation.mjs'
+
+const buildRows = []
+
+const optionRows = []
+const lifecycleRows = []
+const unsafeFileRows = []
+const devRows = []
+const operationRows = []
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const execute = promisify(execFile)
@@ -27,6 +39,7 @@ async function fixture(t) {
   const mock = `#!/usr/bin/env node
 import { appendFileSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+
 const command = basename(process.argv[1]);
 if(command === 'git') { console.log(process.env.TEST_EMAIL ?? 'owner@example.test'); process.exit(0); }
 appendFileSync(join(process.cwd(), 'calls.jsonl'), JSON.stringify({ args:process.argv.slice(2), varsPresent:(()=>{try{readFileSync('.dev.vars');return true}catch{return false}})(), authEnv:process.env.SESSION_SECRET, loadDevVars:process.env.CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV, includeProcessEnv:process.env.CLOUDFLARE_INCLUDE_PROCESS_ENV })+'\\n');
@@ -60,7 +73,7 @@ async function log(dir) {
   return { text: await readFile(path, 'utf8'), path }
 }
 
-test('git email/default port, private fresh credentials, real command arguments and concise next step', async (t) => {
+lifecycleRows.push(['fresh setup and development keep credentials private through the command doors', {}, async (t) => {
   const { dir, run } = await fixture(t)
   const result = await run([], { SESSION_SECRET: ['parent', 'value', 'must', 'not', 'enter', 'build'].join('-') })
   assert.equal(result.code, 0, result.stderr)
@@ -87,9 +100,19 @@ test('git email/default port, private fresh credentials, real command arguments 
   assert.match(result.stdout, /Next: node scripts\/local-dev\.mjs\nOpen: http:\/\/127\.0\.0\.1:8787\/signin\n$/)
   assert.equal((result.stdout.match(/http:\/\//g) ?? []).length, 1)
   for (const secret of [vars.SESSION_SECRET, vars.INSTALLATION_KEY, vars.SETUP_TOKEN]) assert.ok(!`${result.stdout}${result.stderr}${logs.text}`.includes(secret))
-})
+  // Continue the fresh installation through its development entrypoint.
+  {
+    const result = await run([], { TEST_DEV_ECHO: '1', CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false', CLOUDFLARE_INCLUDE_PROCESS_ENV: 'true' }, 'local-dev')
+    assert.equal(result.code, 0, result.stderr)
+    const command = (await calls(dir)).at(-1)
+    assert.equal(command.loadDevVars, 'true')
+    assert.equal(command.includeProcessEnv, 'false')
+    for (const secret of [vars.SESSION_SECRET, vars.INSTALLATION_KEY, vars.SETUP_TOKEN]) assert.ok(!`${result.stdout}${result.stderr}`.includes(secret))
+    assert.match(result.stdout, /SESSION_SECRET=\[redacted\]/)
+  }
+}])
 
-test('no email and invalid arguments name flags and create no partial output', async (t) => {
+optionRows.push(['setup validation rejects malformed arguments and mailboxes without partial effects or credential changes', {}, async (t) => {
   const { dir, run } = await fixture(t)
   for (const [args, env, error] of [
     [[], { TEST_EMAIL: '' }, /--owner-email/],
@@ -109,60 +132,57 @@ test('no email and invalid arguments name flags and create no partial output', a
   await assert.rejects(stat(join(dir, '.dev.vars')), { code: 'ENOENT' })
   await assert.rejects(stat(join(dir, '.wrangler')), { code: 'ENOENT' })
   await assert.rejects(stat(join(dir, 'calls.jsonl')), { code: 'ENOENT' })
-})
-
-test('mail delivery rejects malformed owner addresses before any setup effects', async (t) => {
-  const { dir, run } = await fixture(t)
-  for (const email of [
-    '.owner@example.test',
-    'owner.@example.test',
-    'owner..name@example.test',
-    'owner@-example.test',
-    'owner@example-.test',
-    `${'a'.repeat(65)}@example.test`,
-    `owner@${'a'.repeat(64)}.test`,
-    'Owner <owner@example.test>',
-    '<owner@example.test>',
-  ]) {
-    for (const [args, env] of [
-      [['--owner-email', email], {}],
-      [[], { TEST_EMAIL: email }],
+  {
+    for (const email of [
+      '.owner@example.test',
+      'owner.@example.test',
+      'owner..name@example.test',
+      'owner@-example.test',
+      'owner@example-.test',
+      `${'a'.repeat(65)}@example.test`,
+      `owner@${'a'.repeat(64)}.test`,
+      'Owner <owner@example.test>',
+      '<owner@example.test>',
     ]) {
-      const result = await run(args, env)
-      assert.equal(result.code, 1)
-      assert.equal(result.stdout, '')
-      assert.equal(result.stderr, 'Local setup failed during validation: Invalid --owner-email; provide a plain email address.\n')
-      await assert.rejects(stat(join(dir, '.dev.vars')), { code: 'ENOENT' })
-      await assert.rejects(stat(join(dir, '.wrangler')), { code: 'ENOENT' })
-      await assert.rejects(stat(join(dir, 'calls.jsonl')), { code: 'ENOENT' })
-    }
+      for (const [args, env] of [
+        [['--owner-email', email], {}],
+        [[], { TEST_EMAIL: email }],
+      ]) {
+        const result = await run(args, env)
+        assert.equal(result.code, 1)
+        assert.equal(result.stdout, '')
+        assert.equal(result.stderr, 'Local setup failed during validation: Invalid --owner-email; provide a plain email address.\n')
+        await assert.rejects(stat(join(dir, '.dev.vars')), { code: 'ENOENT' })
+        await assert.rejects(stat(join(dir, '.wrangler')), { code: 'ENOENT' })
+        await assert.rejects(stat(join(dir, 'calls.jsonl')), { code: 'ENOENT' })
+      }
   }
-})
+  }
 
-test('malformed force input preserves existing credentials before any setup effects', async (t) => {
-  const { dir, run } = await fixture(t)
-  const path = join(dir, '.dev.vars')
-  const original = 'OWNER_EMAIL=owner@example.test\nSESSION_SECRET=existing-private-value\n'
-  await writeFile(path, original, { mode: 0o600 })
-  const result = await run(['--force', '--owner-email', 'owner..name@example.test'])
-  assert.equal(result.code, 1)
-  assert.equal(result.stdout, '')
-  assert.equal(result.stderr, 'Local setup failed during validation: Invalid --owner-email; provide a plain email address.\n')
-  assert.equal(await readFile(path, 'utf8'), original)
-  assert.equal((await stat(path)).mode & 0o777, 0o600)
-  await assert.rejects(stat(join(dir, '.wrangler')), { code: 'ENOENT' })
-  await assert.rejects(stat(join(dir, 'calls.jsonl')), { code: 'ENOENT' })
-})
+  {
+    const path = join(dir, '.dev.vars')
+    const original = 'OWNER_EMAIL=owner@example.test\nSESSION_SECRET=existing-private-value\n'
+    await writeFile(path, original, { mode: 0o600 })
+    const result = await run(['--force', '--owner-email', 'owner..name@example.test'])
+    assert.equal(result.code, 1)
+    assert.equal(result.stdout, '')
+    assert.equal(result.stderr, 'Local setup failed during validation: Invalid --owner-email; provide a plain email address.\n')
+    assert.equal(await readFile(path, 'utf8'), original)
+    assert.equal((await stat(path)).mode & 0o777, 0o600)
+    await assert.rejects(stat(join(dir, '.wrangler')), { code: 'ENOENT' })
+    await assert.rejects(stat(join(dir, 'calls.jsonl')), { code: 'ENOENT' })
+  }
+}])
 
-test('valid boundary mailbox preserves dotenv-safe punctuation and normalizes case', async (t) => {
+optionRows.push(['valid boundary mailbox preserves dotenv-safe punctuation and normalizes case', {}, async (t) => {
   const { dir, run } = await fixture(t)
   const email = `${'A'.repeat(57)}.!+_%Z-@Example.test`
   const result = await run(['--owner-email', email])
   assert.equal(result.code, 0, result.stderr)
   assert.equal(parse(await readFile(join(dir, '.dev.vars'), 'utf8')).OWNER_EMAIL, email.toLowerCase())
-})
+}])
 
-test('overrides, rerun and force rotate both credentials without build-time exposure', async (t) => {
+lifecycleRows.push(['overrides, rerun and force retain private backups, rotate credentials and refuse collisions', {}, async (t) => {
   const { dir, run } = await fixture(t)
   assert.equal((await run(['--owner-email', 'Other@Example.test', '--port', '08888'])).code, 0)
   const path = join(dir, '.dev.vars')
@@ -175,15 +195,24 @@ test('overrides, rerun and force rotate both credentials without build-time expo
   assert.equal(rerun.code, 0, rerun.stderr)
   assert.equal(await readFile(path, 'utf8'), original)
   assert.equal((await calls(dir)).length, 6)
+  await chmod(path, 0o640)
   const forced = await run(['--force'])
   assert.equal(forced.code, 0, forced.stderr)
   const next = parse(await readFile(path, 'utf8'))
   assert.notEqual(next.SESSION_SECRET, vars.SESSION_SECRET)
   assert.notEqual(next.SETUP_TOKEN, vars.SETUP_TOKEN)
   assert.ok((await calls(dir)).every((item) => !item.varsPresent))
-})
+  const backup = join(dir, '.dev.vars.previous')
+  assert.ok((await readFile(backup)).equals(Buffer.from(original)), 'backup bytes preserved')
+  assert.equal((await stat(backup)).mode & 0o777, 0o600)
+  assert.ok(forced.stdout.includes(backup))
+  const current = await readFile(path)
+  assert.equal((await run(['--force'])).code, 1)
+  assert.ok((await readFile(path)).equals(current))
+  assert.ok((await readFile(backup)).equals(Buffer.from(original)))
+}])
 
-test('build and migration failures retain private diagnostics and restore exact old file', async (t) => {
+lifecycleRows.push(['build and migration failures retain private diagnostics and restore exact old file', {}, async (t) => {
   for (const phase of ['build', 'migrations']) {
     const { dir, run } = await fixture(t)
     const path = join(dir, '.dev.vars')
@@ -202,9 +231,9 @@ test('build and migration failures retain private diagnostics and restore exact 
     assert.ok(!`${result.stdout}${result.stderr}${logs.text}`.includes('old-private-secret'))
     assert.equal((await calls(dir)).length, phase === 'build' ? 1 : 2)
   }
-})
+}])
 
-test('refuses secret-file and output symlinks even with force without touching targets', async (t) => {
+unsafeFileRows.push(['refuses secret-file and output symlinks even with force without touching targets', {}, async (t) => {
   for (const link of ['.dev.vars', '.wrangler', '.wrangler/local-setup', '.wrangler/reference']) {
     const { dir, run } = await fixture(t)
     const target = join(dir, 'unrelated')
@@ -219,22 +248,9 @@ test('refuses secret-file and output symlinks even with force without touching t
     else assert.deepEqual(await readdir(target), [])
     await assert.rejects(stat(join(dir, 'calls.jsonl')), { code: 'ENOENT' })
   }
-})
+}])
 
-test('the dev fixture loads private dotenv bindings, excludes inherited bindings and redacts output', async (t) => {
-  const { dir, run } = await fixture(t)
-  assert.equal((await run(['--port', '8889'])).code, 0)
-  const vars = parse(await readFile(join(dir, '.dev.vars'), 'utf8'))
-  const result = await run([], { TEST_DEV_ECHO: '1', CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false', CLOUDFLARE_INCLUDE_PROCESS_ENV: 'true' }, 'local-dev')
-  assert.equal(result.code, 0, result.stderr)
-  const command = (await calls(dir)).at(-1)
-  assert.equal(command.loadDevVars, 'true')
-  assert.equal(command.includeProcessEnv, 'false')
-  for (const secret of [vars.SESSION_SECRET, vars.INSTALLATION_KEY, vars.SETUP_TOKEN]) assert.ok(!`${result.stdout}${result.stderr}`.includes(secret))
-  assert.match(result.stdout, /SESSION_SECRET=\[redacted\]/)
-})
-
-test('HTTP default port is canonicalized for auth and still starts on port 80', async (t) => {
+optionRows.push(['HTTP default port is canonicalized for auth and still starts on port 80', {}, async (t) => {
   const { dir, run } = await fixture(t)
   const setup = await run(['--port', '80'])
   assert.equal(setup.code, 0, setup.stderr)
@@ -244,9 +260,9 @@ test('HTTP default port is canonicalized for auth and still starts on port 80', 
   assert.equal(dev.code, 0, dev.stderr)
   const args = (await calls(dir)).at(-1).args
   assert.equal(args[args.indexOf('--port') + 1], '80')
-})
+}])
 
-test('a hard-linked secret file cannot overwrite an unrelated file', async (t) => {
+unsafeFileRows.push(['a hard-linked secret file cannot overwrite an unrelated file', {}, async (t) => {
   const { dir, run } = await fixture(t)
   const original = join(dir, 'unrelated')
   await writeFile(original, 'original credentials')
@@ -256,9 +272,9 @@ test('a hard-linked secret file cannot overwrite an unrelated file', async (t) =
   assert.match(result.stderr, /hard link/)
   assert.equal(await readFile(original, 'utf8'), 'original credentials')
   await assert.rejects(stat(join(dir, 'calls.jsonl')), { code: 'ENOENT' })
-})
+}])
 
-test('missing pnpm reports the build phase and leaves no credentials', async (t) => {
+buildRows.push(['missing pnpm reports the build phase and leaves no credentials', {}, async (t) => {
   const { dir, run } = await fixture(t)
   await rm(join(dir, 'bin/pnpm'))
   const result = await run(['--owner-email', 'owner@example.test'], { PATH: join(dir, 'nowhere') })
@@ -267,10 +283,9 @@ test('missing pnpm reports the build phase and leaves no credentials', async (t)
   assert.match(result.stderr, /during build: Could not start pnpm/)
   assert.ok(!result.stdout.includes('Local setup ready'))
   await assert.rejects(stat(join(dir, '.dev.vars')), { code: 'ENOENT' })
-})
+}])
 
-
-test('setup rerun preserves every byte, removed setup token and nondefault owner/origin while applying migrations', async (t) => {
+lifecycleRows.push(['setup rerun preserves every byte, removed setup token and nondefault owner/origin while applying migrations', {}, async (t) => {
   const { dir, run } = await fixture(t)
   assert.equal((await run(['--owner-email', 'original@example.test', '--port', '8893'])).code, 0)
   const path = join(dir, '.dev.vars')
@@ -285,27 +300,9 @@ test('setup rerun preserves every byte, removed setup token and nondefault owner
   assert.doesNotMatch(result.stdout, /Use Set up the first owner/)
   assert.match(result.stdout, /Open: http:\/\/127\.0\.0\.1:8893\/signin/)
   assert.deepEqual((await calls(dir)).slice(-3).map(({args}) => args.includes('migrations') ? 'migrations' : args.includes('--json') ? 'ledger' : args[0]), ['build', 'migrations', 'ledger'])
-})
+}])
 
-test('force retains an exact private backup and refuses a subsequent backup collision', async (t) => {
-  const { dir, run } = await fixture(t)
-  assert.equal((await run()).code, 0)
-  const path = join(dir, '.dev.vars')
-  const original = await readFile(path)
-  await chmod(path, 0o640)
-  const forced = await run(['--force'])
-  assert.equal(forced.code, 0, forced.stderr)
-  const backup = join(dir, '.dev.vars.previous')
-  assert.ok((await readFile(backup)).equals(original), 'backup bytes preserved')
-  assert.equal((await stat(backup)).mode & 0o777, 0o600)
-  assert.ok(forced.stdout.includes(backup))
-  const next = await readFile(path)
-  assert.equal((await run(['--force'])).code, 1)
-  assert.ok((await readFile(path)).equals(next))
-  assert.ok((await readFile(backup)).equals(original))
-})
-
-test('ordinary build excludes local credentials and restores the exact file after success and failure', async (t) => {
+buildRows.push(['ordinary build excludes local credentials and restores the exact file after success and failure', {}, async (t) => {
   for (const failure of ['', 'vite']) {
     const { dir, run } = await fixture(t)
     const path = join(dir, '.dev.vars')
@@ -327,9 +324,9 @@ test('ordinary build excludes local credentials and restores the exact file afte
     assert.equal(command.includeProcessEnv, 'false')
     assert.doesNotMatch(result.stdout + result.stderr, /unit-private-|inherited-build-secret/)
   }
-})
+}])
 
-test('the dev fixture rejects missing or empty required credentials before spawning', async (t) => {
+devRows.push(['the dev fixture rejects missing or empty required credentials before spawning', {}, async (t) => {
   for (const key of ['OWNER_EMAIL', 'SESSION_SECRET']) {
     for (const value of [undefined, '', '   ']) {
       const { dir, run } = await fixture(t)
@@ -341,19 +338,18 @@ test('the dev fixture rejects missing or empty required credentials before spawn
       await assert.rejects(stat(join(dir, 'calls.jsonl')), { code: 'ENOENT' })
     }
   }
-})
+}])
 
-test('the dev fixture turns a busy port into one plain message instead of a stack dump', async (t) => {
+devRows.push(['the dev fixture turns a busy port into one plain message instead of a stack dump', {}, async (t) => {
   const { dir, run } = await fixture(t)
   await writeFile(join(dir, '.dev.vars'), 'OWNER_EMAIL=owner@example.test\nSESSION_SECRET=private-session\nAUTH_LOCAL=true\nAUTH_ORIGIN=http://127.0.0.1:8899\n')
   const result = await run([], { TEST_PORT_BUSY: '8899' }, 'local-dev')
   assert.equal(result.code, 1)
   assert.match(result.stderr, /Port 8899 is in use\. Stop the other local server, then run node scripts\/local-dev\.mjs again\./)
   assert.doesNotMatch(result.stderr, /EADDRINUSE|Address already in use|kj\/|node:events|at Server/)
-})
+}])
 
-
-test('overlapping setup and builds cannot restore credentials into an active build', async (t) => {
+operationRows.push(['overlapping setup and builds cannot restore credentials into an active build', {}, async (t) => {
   const { dir, run } = await fixture(t)
   const operation = await localOperation(dir)
   const lock = join(dir, '.wrangler/local-operation/active.json')
@@ -374,9 +370,9 @@ test('overlapping setup and builds cannot restore credentials into an active bui
   } finally { await operation.release() }
   const next = await localOperation(dir)
   await next.release()
-})
+}])
 
-test('a lock left by a killed setup or build is taken over, a live one is not', async (t) => {
+operationRows.push(['a lock left by a killed setup or build is taken over, a live one is not', {}, async (t) => {
   const { dir } = await fixture(t)
   const lock = join(dir, '.wrangler/local-operation/active.json')
   const first = await localOperation(dir)
@@ -393,4 +389,20 @@ test('a lock left by a killed setup or build is taken over, a live one is not', 
   assert.ok(replacement.equals(await readFile(lock)), 'the stale owner cannot release the replacement lock')
   await second.release()
   await assert.rejects(stat(lock), { code: 'ENOENT' })
+}])
+
+test("build keeps credentials private on success and failure", async t => {
+  await runRows(t, buildRows)
+})
+
+test("dev preflight refuses missing credentials and reports occupied ports", async t => {
+  await runRows(t, [...devRows, ...nativeBindingRows])
+})
+
+test("local operation ownership excludes overlap and recovers stale locks", async t => {
+  await runRows(t, [...operationRows, ...ownershipRows])
+})
+
+test("setup admission and credential lifecycle validate safe inputs before private publication", async t => {
+  await runRows(t, [...optionRows, ...lifecycleRows, ...unsafeFileRows, ...setupRerunRows])
 })

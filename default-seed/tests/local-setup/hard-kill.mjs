@@ -2,9 +2,10 @@ import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import { link, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { test } from 'node:test'
 import { localOperation } from '../../scripts/base-onboarding/local/operation.mjs'
 import { scriptFixture } from './script-fixture.mjs'
+
+export const recoveryRows = []
 
 const credentials = () => Buffer.from(`# private comment\nOWNER_EMAIL=owner@example.test\nAUTH_LOCAL=true\nAUTH_ORIGIN=http://127.0.0.1:8899\nSESSION_SECRET=${randomBytes(32).toString('hex')}\nSETUP_TOKEN=${randomBytes(32).toString('hex')}\nMAIL_PROVIDER=development\n`)
 
@@ -30,7 +31,7 @@ async function assertLockFree(dir) {
 
 for (const killed of ['local-build', 'local-setup']) {
   for (const next of ['local-build', 'local-setup', 'local-dev']) {
-    test(`after a SIGKILLed ${killed}, ${next} restores the exact original .dev.vars`, { timeout: 30000 }, async (t) => {
+    recoveryRows.push([`after a SIGKILLed ${killed}, ${next} restores the exact original .dev.vars`, { timeout: 30000 }, async (t) => {
       const { dir, run, hardKill, calls } = await scriptFixture(t)
       const path = join(dir, '.dev.vars')
       const original = credentials()
@@ -55,11 +56,11 @@ for (const killed of ['local-build', 'local-setup']) {
       else assert.equal(last.varsPresent, false, 'the following build still ran without .dev.vars')
       if (next === 'local-setup') assert.match(result.stdout, /Local setup ready/)
       await assertLockFree(dir)
-    })
+    }])
   }
 }
 
-test('several stranded originals stop build, setup and dev fixtures with their paths', { timeout: 30000 }, async (t) => {
+recoveryRows.push(['several stranded originals stop build, setup and dev fixtures with their paths', { timeout: 30000 }, async (t) => {
   const { dir, run, hardKill, calls } = await scriptFixture(t)
   await writeFile(join(dir, '.dev.vars'), credentials(), { mode: 0o600 })
   await hardKill('local-build')
@@ -79,9 +80,9 @@ test('several stranded originals stop build, setup and dev fixtures with their p
     assert.equal((await calls()).length, count, `${script} ran no command`)
     await assertLockFree(dir)
   }
-})
+}])
 
-test('the dev fixture waits for a running build instead of taking its hidden credentials', { timeout: 30000 }, async (t) => {
+recoveryRows.push(['the dev fixture waits for a running build instead of taking its hidden credentials', { timeout: 30000 }, async (t) => {
   const { dir, run, hang, calls } = await scriptFixture(t)
   const path = join(dir, '.dev.vars')
   const original = credentials()
@@ -104,9 +105,9 @@ test('the dev fixture waits for a running build instead of taking its hidden cre
   build.child.kill('SIGTERM')
   assert.equal((await build.exited).code, 1)
   assert.ok((await readFile(path)).equals(original), 'the running build restored its own file')
-})
+}])
 
-test('a restore interrupted before its private link was removed is completed', async (t) => {
+recoveryRows.push(['a restore interrupted before its private link was removed is completed', {}, async (t) => {
   const { dir, run } = await scriptFixture(t)
   const path = join(dir, '.dev.vars')
   const original = credentials()
@@ -119,9 +120,9 @@ test('a restore interrupted before its private link was removed is completed', a
   assert.ok((await readFile(path)).equals(original))
   assert.equal((await stat(path)).nlink, 1)
   assert.deepEqual(await stranded(dir), [])
-})
+}])
 
-test('an earlier stranded copy beside a current .dev.vars is named, not used', async (t) => {
+recoveryRows.push(['an earlier stranded copy beside a current .dev.vars is named, not used', {}, async (t) => {
   const { dir, run } = await scriptFixture(t)
   const path = join(dir, '.dev.vars')
   const current = credentials()
@@ -137,4 +138,4 @@ test('an earlier stranded copy beside a current .dev.vars is named, not used', a
     assert.ok((await readFile(path)).equals(current))
     assert.deepEqual(await stranded(dir), [copy])
   }
-})
+}])
