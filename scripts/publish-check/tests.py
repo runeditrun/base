@@ -267,6 +267,38 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
         self.write('public.md', '\n'.join('https://github.com/' + repository for repository in public))
         for name in ('vault', 'absent', 'saml'):
             self.write(f'{name}.md', f'https://github.com/acme-org/{name}-app')
+        # Repository context must belong to the reference, not to a heading,
+        # unrelated prose or the previous table cell. Local paths can have
+        # arbitrary names, while explicit declarations can name path-like repos.
+        self.write('assets/widget', 'Local source.\n')
+        self.write('NOTES.md', '# Repository\ninput/output contents stay local.\n'
+                   'The repository input/output contents are inspected.\n'
+                   '| Outcome | Proof |\n| --- | --- |\n'
+                   '| Checked the Git repository | `checks/collector.mjs:59` |\n'
+                   '| Inspected repository source | `assets/widget` |\n'
+                   'source commit/tree\n'
+                   'Repository review reads `release/receipt` independently.\n')
+        declarations = {
+            'field.md': 'Repository: `acme-org/absent-app`',
+            'table.md': '| Repository | `acme-org/absent-app` |',
+            'command.md': 'gh repo clone acme-org/absent-app',
+            'clone.md': 'Clone `acme-org/vault-app` first.',
+            'label.md': '**Upstream repository:** `acme-org/absent-app`',
+            'source-label.md': 'Source repository `acme-org/absent-app`',
+            'unmarked.md': 'Repository acme-org/absent-app',
+            'multiline.md': 'Repository:\n`acme-org/absent-app`',
+            'metadata.json': json.dumps({'repository': 'acme-org/vault-app'}),
+            'source.ts': "const repository: string = 'acme-org/absent-app';",
+            'workflow.yml': 'uses: acme-org/vault-app/action@main',
+            'file-repo.md': 'Repository: checks/collector.mjs',
+            'local-repo.md': 'Clone `assets/widget` first.',
+        }
+        truth.update({'checks/collector.mjs': 'missing', 'assets/widget': 'private'})
+        for path, content in declarations.items():
+            self.write(path, content)
+        retained = self.commit()
+        for path in (*declarations, 'vault.md', 'absent.md', 'saml.md'):
+            (self.repo / path).unlink()
         self.commit()
         with tempfile.TemporaryDirectory() as network:
             gh, log = os.path.join(network, 'gh'), os.path.join(network, 'calls.jsonl')
@@ -285,7 +317,13 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
         self.assertEqual(report['status'], 'FAIL')
         self.assertEqual({(f['path'], f['rule']) for f in report['findings']},
                          {('vault.md', 'hygiene.github-private'), ('absent.md', 'hygiene.github-missing'),
-                          ('saml.md', 'hygiene.github-private')})
+                          ('saml.md', 'hygiene.github-private')} | {
+                              (path, 'hygiene.github-private' if path in (
+                                  'clone.md', 'metadata.json', 'workflow.yml', 'local-repo.md')
+                               else 'hygiene.github-missing') for path in declarations})
+        self.assertTrue(report['complete'])
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(all(f['commits'] == [retained] for f in report['findings']))
         graphql = [call for call in calls if 'graphql' in call]
         self.assertLessEqual(len(graphql), -(-len(truth) // 100))
         # Only the repository GraphQL answered with doubt takes the REST lookup.
