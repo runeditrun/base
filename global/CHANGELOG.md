@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix two starters both taking over a stale local operation lock by keeping its inode pinned through exclusive takeover and checking the owner token before release.
+
 ## 0.2.84
 
 - The publication scan accepts the upstream copyright notice of a Base-listed third-party licence text only under an exact licence file name with the listed Git blob ID (initially the vendored yaml 2.9.1 `LICENSE`) and reports each in `thirdPartyNotices`; seed configuration cannot extend the list, and scans of the unpacked rer tarball and of refreshed seeds pass without review records.
