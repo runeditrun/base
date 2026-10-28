@@ -87,7 +87,14 @@ test('contract docs convert handwritten contracts and keep generated documents a
         const oldSource = await read(root, 'CONTRACT.md')
         const old = parseContract(oldSource)
         const oldCommit = git(root, 'rev-parse', 'HEAD')
-        succeeds(root, 'convert', '--old', 'HEAD')
+        const claimSource = await read(root, 'docs/CLAIMS.md')
+        const claimMap = { schema: 1, old: oldCommit, claims: [
+          ["Keep each entry's identity", 'E1'],
+          ['Draft entries stay private', 'PUBLISH-01'],
+          ['Archived entries remain readable', 'AUTH-HOST-01'],
+        ].map(([claim, id]) => ({ file: 'docs/CLAIMS.md', line: claimSource.split('\n').findIndex(line => line.includes(`| ${claim} |`)) + 1, claim, clauses: [id] })) }
+        await edit(root, 'claim-map.json', JSON.stringify(claimMap))
+        succeeds(root, 'convert', '--old', 'HEAD', '--claim-map', 'claim-map.json')
         succeeds(root, 'coverage', 'check', '--old', 'HEAD')
         succeeds(root, 'id-map', '--old', 'HEAD')
         const converted = parseContract(await read(root, 'CONTRACT.md'))
