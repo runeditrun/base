@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `rer refresh-base` accepts literal apostrophes in double-quoted workflow text while still refusing unclosed shell quotes before writing files.
+- Editions can declare reviewed test-reader dependencies in `verification.json` so contract, source-lock and evidence-only changes can select the Verify light tier; unknown readers still require full coverage.
+- `rer refresh-base` no longer prints the template-adoption notice when a preserved workflow already matches the incoming template, including acknowledged adaptations.
+
 ## 0.2.85
 
 - Two starters could both take over a stale local operation lock and both act as its owner. Takeover is now exclusive: the lock's inode stays pinned through takeover, and release checks the owner token.
