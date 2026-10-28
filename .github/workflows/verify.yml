@@ -57,6 +57,53 @@ jobs:
           matrix=$(node scripts/ci/verify.mjs --matrix)
           printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
 
+  template-cache:
+    name: Verify (delivered template cache lifecycle)
+    needs: plan
+    if: ${{ needs.plan.outputs.skip != 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CI: 'true'
+      WRANGLER_SEND_METRICS: 'false'
+      PLAYWRIGHT_SKIP_BROWSER_GC: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.20.0'
+      - run: npm install --global pnpm@10.12.4
+      - name: Export the delivered template and prepare its caches
+        id: fixture
+        run: node scripts/ci/template-cache.mjs prepare
+      - name: Cold frozen install, sudo dependencies and browser launch
+        run: node scripts/ci/template-cache.mjs cold
+      - name: Save the runner-user caches
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: ${{ steps.fixture.outputs.paths }}
+          key: delivered-template-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Remove the caches and installed dependencies
+        run: node scripts/ci/template-cache.mjs remove
+      - name: Restore the saved caches as the runner user
+        id: restored
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: ${{ steps.fixture.outputs.paths }}
+          key: delivered-template-${{ github.run_id }}-${{ github.run_attempt }}
+          fail-on-cache-miss: true
+      - name: Require a cache hit and repeat the delivered install and launch
+        env:
+          CACHE_HIT: ${{ steps.restored.outputs.cache-hit }}
+        run: |
+          test "$CACHE_HIT" = true
+          node scripts/ci/template-cache.mjs warm
+      - name: Remove the fixture
+        if: ${{ always() }}
+        run: node scripts/ci/template-cache.mjs cleanup
+
   companion-macos:
     needs: plan
     if: ${{ needs.plan.outputs.skip != 'true' }}

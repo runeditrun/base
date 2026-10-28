@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Refresh from a Base archive preserves unrecorded workflows without requesting unavailable Git history. Explicitly recorded templates still refresh; ownership, edits and ancestry-dependent migration refusals remain protected. See `ADOPTING.md`.
+- Deliver the full edition-authoring tool identity with yaml and Babel LICENSE/README files, so package-created locks pass the delivered template's check without relocking. Existing helper-collision protections still apply. See `ADOPTING.md`.
+- Refuse ambiguous undeclared `oc_` tables during installation transfers instead of silently excluding their rows; retain exact Base owner-claim exclusions and explicit include/exclude choices. See `ADOPTING.md`.
+- Create every accepted Managed-download table before executing interleaved inserts, retaining deferred foreign keys and the existing SQL/schema/ledger refusal boundaries. See `ADOPTING.md`.
+- Document the full 0.2.82 helper and case-spelling recovery sequence using the current installed package. Add a required hosted Ubuntu 24.04 Verify job for the delivered template's cold/save/remove/restore/warm cache lifecycle and real Chromium launches. See `ADOPTING.md`.
+
 ## 0.2.86
 
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.

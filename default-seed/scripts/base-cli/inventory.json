@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.86-dev.g45f4aafd",
+  "cliVersion": "0.2.86-dev.g92a54e7b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1011,7 +1011,7 @@
     },
     "cli/managed-data.mjs": {
       "source": "cli/managed-data.mjs",
-      "sha256": "7519f384e89e12e8e7d1f7abd78b066a67ba7c9e8e1640006dbabb02b58840a5"
+      "sha256": "ee1912149c68f67f97ecbf4c353651c462f1494eb47396018ad6865434e190f1"
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
@@ -1087,11 +1087,11 @@
     },
     "cli/portability-worker.mjs": {
       "source": "cli/portability-worker.mjs",
-      "sha256": "79fb774884c21ff9bce9aab3a5b6afc86a0c04bec41d93b6f0c0280da848a29a"
+      "sha256": "5a2d68e45a44a31064cafa832b854b0daee93c6efb80f6b99b614594d99db4ba"
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
-      "sha256": "cd21de50ee92b013a7c4dac89a1efb8ffed2ba3db3b882a2fb09d39e177aa5ab"
+      "sha256": "01a2802456dae1704c9596e3aba3b204f5006bfaecca2c2e4dc31bb9f6e714c9"
     },
     "cli/preview-cache.mjs": {
       "source": "cli/preview-cache.mjs",
@@ -1323,7 +1323,7 @@
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
-      "sha256": "0381ef09ba959116c86f64ce9bd7137a5aeff84defd3cf56315d719f6a512b40"
+      "sha256": "cd8ca780ed1f49977b183f025433227c12f844ff845b89a3a4a1d2d66f14e3e7"
     },
     "edition-authoring/lock.mjs": {
       "source": "edition-authoring/lock.mjs",
@@ -1335,7 +1335,7 @@
     },
     "edition-authoring/module-closure.mjs": {
       "source": "edition-authoring/module-closure.mjs",
-      "sha256": "95889883ce093f5c017cd1478107e5744fdef06ad80e36a4f8e6476d9449aff5"
+      "sha256": "13637301ef47b044af2a8af0c5cd09acb8cc6e0b877b3e2cf23319b1c60af495"
     },
     "edition-authoring/module-edges.mjs": {
       "source": "edition-authoring/module-edges.mjs",
@@ -1871,7 +1871,7 @@
     },
     "edition-authoring/workflow-copies.mjs": {
       "source": "edition-authoring/workflow-copies.mjs",
-      "sha256": "be15199b125ca10e19991469f65efe49e441d8e518df234b4f47ebb1d3727ec7"
+      "sha256": "ae3a1538706286741985004b44d681e1ee5a93e943e833ce4bfd8337030b354e"
     },
     "edition-authoring/workflow-scripts.mjs": {
       "source": "edition-authoring/workflow-scripts.mjs",
@@ -4499,7 +4499,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "d1dbd56b964cdfd1b1c7ea3245f895de166c8a3313d4f86d603002ac679a2fe3"
+      "sha256": "0aa2a155afc47714e2b81c8106ceacdc9a0aad19dbaa15f4cdee8d2f4dbb7f81"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
@@ -4515,7 +4515,7 @@
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
-      "sha256": "8f0c4e9797ed45eb4da7549aa57c021d57d019c28025510092340011564fbd0c"
+      "sha256": "2a4c9fa42d8793d8c2a24b1f2f5759738a7143b05514cebc5f7a041b13d737ce"
     },
     "modules/portability/cli-options.mjs": {
       "source": "modules/portability/cli-options.mjs",
