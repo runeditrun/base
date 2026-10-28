@@ -23,7 +23,7 @@ export async function mcp(rt: Runtime, request: Request): Promise<Response> {
   if (rpc instanceof Response) return rpc
   if (!methods.includes(rpc.method) && !rpc.method.startsWith('notifications/')) return rpcError(rpc.id, -32601, 'Method not found', 404)
   if (rpc.method === 'server/discover') return rpcResult(rpc, discovery(rt))
-  if (rpc.method === 'initialize') return rpcResult(rpc, { protocolVersion: '2025-11-25', capabilities, serverInfo: { name: rt.options.name, version: rt.options.version ?? '1' }, instructions: discovery(rt).instructions })
+  if (rpc.method === 'initialize') return rpcResult(rpc, { protocolVersion: request.headers.get('mcp-protocol-version') ?? rpc.params?.protocolVersion, capabilities, serverInfo: { name: rt.options.name, version: rt.options.version ?? '1' }, instructions: discovery(rt).instructions })
   const state = await policyState(rt), principal = await authenticate(rt.options, request, state.business)
   if (!principal || revoked(state, principal)) return rpcError(rpc.id, -32001, 'Unauthorized', 401, undefined, challenge(rt))
   const capacity = await admit(rt, principal)

@@ -1,17 +1,18 @@
 import { isClass } from './policy/catalogue.ts'
 import { schemaValid } from './json-schema.ts'
 import type { AgentDoorOptions, ToolDefinition } from './types.ts'
+import { validToolName } from './conformance/tool-name.mjs'
 
 export const defineTool = (tool: ToolDefinition): ToolDefinition => tool
 export function registry(options: AgentDoorOptions): ToolDefinition[] {
-  if (!/^[a-z][a-z0-9-]*$/.test(options.seed)) throw new TypeError('Invalid seed id')
+  if (!/^[a-z][a-z0-9-]*$/.test(options.seed) || !validToolName(`${options.seed}.events.list`, options.seed)) throw new TypeError('Invalid seed id')
   if (new URL(options.origin).origin !== options.origin) throw new TypeError('Agent origin must be canonical')
   for (const resource of options.resources ?? []) {
     if (!resource.classes?.length || new Set(resource.classes).size !== resource.classes.length || resource.classes.some(cls => !isClass(cls)) || typeof resource.classify !== 'function') throw new TypeError(`Invalid resource classes: ${resource.uriTemplate}`)
   }
   const names = new Set<string>([`${options.seed}.events.list`])
   return options.tools.map(tool => {
-    if (tool.name.length > 200 || !/^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/.test(tool.name) || !tool.name.startsWith(`${options.seed}.`) || names.has(tool.name)) throw new TypeError(`Invalid or duplicate tool name: ${tool.name}`)
+    if (!validToolName(tool.name, options.seed) || names.has(tool.name)) throw new TypeError(`Invalid or duplicate tool name: ${tool.name}`)
     names.add(tool.name)
     if (!tool.classes?.length || new Set(tool.classes).size !== tool.classes.length || tool.classes.some(cls => !isClass(cls))) throw new TypeError(`Invalid classes: ${tool.name}`)
     if (!tool.inputSchema || tool.inputSchema.type !== 'object' || !schemaValid(tool.inputSchema) || tool.outputSchema === undefined || !schemaValid(tool.outputSchema)) throw new TypeError(`Missing or invalid schema: ${tool.name}`)
@@ -23,7 +24,8 @@ export function registry(options: AgentDoorOptions): ToolDefinition[] {
     if ('idempotency_key' in properties || 'expected_revision' in properties) throw new TypeError(`Reserved argument: ${tool.name}`)
     const required = [...tool.inputSchema.required ?? []]
     if (!tool.readOnly) { properties.idempotency_key = { type: 'string', minLength: 1, maxLength: 200 }; required.push('idempotency_key') }
-    if (tool.revision) properties.expected_revision = { type: 'integer' }
+    if (tool.revisionType !== undefined && (!tool.revision || !['integer', 'number', 'string'].includes(tool.revisionType))) throw new TypeError(`Invalid revision type: ${tool.name}`)
+    if (tool.revision) properties.expected_revision = { type: tool.revisionType ?? 'integer' }
     return { ...tool, inputSchema: { ...tool.inputSchema, properties, required }, classes: [...tool.classes], clauses: [...tool.clauses] }
   }).sort((a, b) => a.name.localeCompare(b.name))
 }

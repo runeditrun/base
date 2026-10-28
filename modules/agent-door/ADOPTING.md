@@ -163,6 +163,86 @@ failed outcome evidence for at least 24 hours. This module currently retains it
 indefinitely; adoption must not introduce earlier cleanup. Report the exact
 edition behavior verified, separately from Base module or CLI results.
 
+## Verification owner lifecycle
+
+`rer verify` reads the same `rer-setup.json` owner-claim step as installation.
+For `mode: "signed"` it signs a fresh five-minute `rer-owner-claim+jwt` with
+the disposable installation's per-run key, matching its configured issuer,
+installation ID, origin and owner email. It posts that claim to the declared
+path through the production handler. Setup-token mode retains the native token
+POST. No production key is read, and signed admission still rejects raw tokens.
+
+Seeds with a native initializer or a different owner binding declare this in
+`agent-surface.json`:
+
+```json
+{
+  "verification": {
+    "owner": {
+      "email": "synthetic-owner@example.com",
+      "emailField": "SETUP_OPERATOR_EMAIL",
+      "tokenField": "H2H_SETUP_TOKEN",
+      "initializer": "tests/initialize-agent-owner.mjs"
+    }
+  }
+}
+```
+
+All four keys are optional. Email defaults to `synthetic-base-1@example.com`;
+the manifest's email and token fields are always bound too. The initializer is
+a contained seed module default-exporting an async function receiving
+`{request, origin, email, sub, displayName, token, claim, returnTo}`. `claim` is
+`{mode, path, token}` with the signed credential when signed mode is declared;
+`token` is the private per-run setup token. Use `request(absoluteURL, init)` to
+drive the seed's real project/password, owner and member-linking lifecycle.
+It permits only the fresh hosted origin. Return the native final 303 `Response`
+with its session cookies; then the runner posts the signed Business settings
+document and runs the journey. Never create an owner with direct SQL, substitute
+an auth adapter, or add a verification-only production route. Initializer code
+runs as trusted test tooling in Node; it must use the supplied request function
+and must not contact providers or read real credentials.
+
+## Verification provider edges
+
+`agent-surface.json.verification.network` declares an optional test-only edge:
+
+```json
+{
+  "module": "tests/provider-edge.mjs",
+  "origins": ["https://api.openai.com", "https://receiver.example.invalid"]
+}
+```
+
+The contained ES module default-exports `{async fetch(request) { ... }}`.
+It receives the full Web `Request`: method, exact URL, headers and raw body,
+and returns a Web `Response`, including JSON or a streaming body. Relative
+helper imports are supported. Run the seed's own signature/payload validation
+and return realistic provider receipts here; keep native preparation, permission
+checks, state commits and receipt validation in the application.
+The module runs in an isolated workerd with no application bindings, Node
+capabilities or network access. Its own `fetch` requests are denied, including
+requests to declared origins. Only declared exact origins reach the module;
+other outbound effects receive HTTP 502. Built-in Resend, SendGrid and Cloudflare
+mail adapters remain available by default. Never place production credentials
+in this declaration or ship the test adapter as application authority.
+
+## Base source from an archive
+
+A plain directory export can supply the source without a Base Git checkout:
+
+```sh
+node node_modules/@runeditrun/rer/edition-authoring/cli.mjs record-base src/base/modules/agent-door modules/agent-door --base-archive /absolute/base-export --ref FULL_BASE_COMMIT
+rer refresh-base --base-archive /absolute/base-export --ref FULL_BASE_COMMIT
+```
+
+Use the full 40-character commit SHA from the authenticated archive acquisition.
+The directory must preserve Base's paths and executable modes. It is the source
+at that declared SHA; the CLI cannot authenticate an archive's commit without
+Git history. Copy mapping and byte digests follow the same rules as a checkout.
+History-dependent refresh operations require the historical source evidence
+described in the [authoring guide](../../edition-authoring/README.md); they fail
+closed when that evidence is absent.
+
 ## Interim policy boundaries
 
 Do not register provider `cost`: construction refuses it until spend reservations
@@ -176,3 +256,103 @@ so promoting a seed admin does not confer Business approval authority.
 Business can revoke agents or consents in the signed envelope's optional
 `revoked` lists. Tokens require `consent`; affected pending approvals expire and
 execution rechecks revocation. Retain both these lists and historical attribution.
+
+## Event visibility and native revisions
+
+Retained event replay, listing and subscription delivery re-read each event's
+current native resource with `ResourceDefinition.read`. A sponsor, actor or
+Business role cannot override that reader's refusal or null result. Readers
+must authorize on every call, including after grants narrow. Unknown resources
+and refused reads produce no event, notification or new cursor. Base approval
+resources use their current approval reader rules.
+
+Tool names use `<seed>.<segment>(.<segment>)*`: each segment is lowercase
+`[a-z][a-z0-9_]*`. The existing seed-id grammar allows hyphens in the seed
+prefix. Names have at most 128 ASCII characters, within MCP's allowed character
+set. Duplicate, foreign-seed and malformed names fail the existing
+`BASE-AGENT-013.surface.<name>.name` declaration check and runtime registration.
+
+Native `revision(args,ctx)` returns an opaque string or number, or null when no
+record exists. Declare `revisionType: 'string'` for UUIDs or other string tokens,
+`'number'` for numeric tokens, or retain the default `'integer'`. The generated
+`expected_revision` input schema uses that type. Tokens are compared strictly
+and saved unchanged with pending approvals. A stale initial token returns
+`revision_conflict`; a token changed before approved execution also returns
+`revision_conflict` without running the tool. Native services
+still own atomic revision checks at their effect boundary.
+
+## MCP version compatibility
+
+The negotiated versions remain `2026-07-28` and `2025-11-25`. Both initialize
+and list the same registry; unsupported negotiation returns
+`UnsupportedProtocolVersion` (-32022). March `2025-03-26` is deliberately not
+advertised: its Streamable HTTP transport permits batched requests, which this
+door's single-message parser rejects, and its pre-June schema lacks structured
+results, output schemas, resource links and elicitation. March also predates the
+protocol-version HTTP header and modern method/name metadata. Supporting it
+would require a batch dispatcher and a separate legacy result/approval shape,
+not merely adding a version string. Seed contracts should use a supported
+version until that transport work is implemented.
+
+## Captured native email in verification
+
+The owner initializer and optional `verification.journey` test module receive
+`mail.read({limit, maxAgeMs, after})`. This reads only accepted Resend, SendGrid
+or Cloudflare sending submissions for this run's configured synthetic owner
+mailbox. Results contain `{id, at, subject, text, html}`; provider headers,
+credentials and other recipients are never returned. Defaults are ten messages
+and five minutes. Hard limits are twenty retained/read messages, 64 KiB per
+submission and five minutes of age. `after` is an optional millisecond timestamp.
+Capture exists only in verifier memory and is cleared when the run closes.
+There is no HTTP outbox, application binding or production reader.
+
+Drive the native email request through `request`, read the captured code or
+link, and submit it to the seed's real confirmation handler. Preserve native
+one-use, expiry, session and step-up checks. Never print the message or proof.
+Return the final native 303 response with its confirmed session cookie from the
+initializer. The reference verifier fixture uses the real operator-auth email
+lifecycle and production mail sender, with only the paid sending edge replaced.
+
+`verification.journey: "tests/native-agent-journey.mjs"` optionally names a
+contained module default-exporting an async function. It receives
+`{request, origin, email, cookie, mail, fixtures, tool}` after the standard
+policy/authentication phases and before the final audit. `tool(name,args)` uses
+the run's real agent credential and records calls for that audit; no signer or
+credential is passed to the module. The standard phases still run, and a failed
+native journey fails verification. Errors are redacted to a fixed diagnostic.
+Keep these modules in test tooling outside the production dependency graph.
+
+## Per-run provider fixture control
+
+The same initializer and native journey receive
+`fixtures.set(exactDeclaredOrigin, jsonValue)`. It permits at most 100 updates,
+16 KiB of JSON per value and only origins in `verification.network.origins`.
+Read challenges or other values through native HTTP or declared tools first,
+then set the isolated edge's response fixture. No production state accessor,
+route, credential or authorization bypass is supplied by the verifier.
+
+The network module's default `fetch(request, {fixture})` receives the most
+recent value for that request's declared origin, or null. The request retains
+its original method, URL, headers and body. A private loopback transport carries
+the fixture and strips its carrier headers before invoking the adapter; app
+headers cannot override it. Fixture controls are host functions, never served
+routes. Values are isolated to the run and cleared on close. Undeclared origins
+still receive 502, and the adapter's own outbound fetch remains denied. Keep
+native DNS/challenge, signature and receipt validation inside the application.
+
+## Copy source without Base's upstream tests
+
+Copy runtime source and declarations with the authoring export's `testSource`
+filter (`composition/git-source.mjs`), then `record-base` the files actually
+copied and `rer refresh-base` the exact selected revision. Do not bulk-copy the
+upstream `tests/`, fixtures or test typings into a seed's application source.
+Refresh preserves deliberately omitted upstream tests; the record's
+`notCopied` result makes those omissions inspectable. Existing intentional test
+copies remain their owner's choice and are not silently removed.
+
+The door's operator-people adapter also needs `modules/operator-auth`; Business
+settings needs `foundation/runtime`. Copy/record those dependencies at their
+corresponding relative paths or retain the seed's supported native adapters.
+The fresh-copy journey records and refreshes door, settings and prerequisites
+through the exported authoring CLI, then typechecks the entire copy under strict
+TypeScript without excluding any copied files.
