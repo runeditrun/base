@@ -684,8 +684,10 @@ The owner initializer receives `reviewers.initialize(label, {cookie})`. Pass its
 real native owner session. The declared reviewer initializer receives
 `{request, origin, label, email, owner: {email,cookie}, returnTo, mail}`. Use the
 same-origin `request` to invite the reviewer, consume their invitation through
-the native confirmation handler, and return its final 303 `Response` with the
-reviewer's session cookie. `initialize` returns `{email,cookie}` to the owner
+the native confirmation handler, and return its final 200 or 303 `Response` with the
+reviewer's session cookie. A native JSON 200 response is accepted alongside a
+303 redirect; other statuses, followed redirects, absent cookies and the owner's
+cookie refuse the lifecycle. The response body grants no authority. `initialize` returns `{email,cookie}` to the owner
 initializer, which then performs the native independent review. No agent token,
 signer, database writer or production test route is supplied. Native roles,
 independence, expiry, one-use proofs and step-up checks remain authoritative.
@@ -843,3 +845,23 @@ the standard level-four clause and Status table shape. Review the contract,
 `ACCEPTANCE.md` and `docs/CLAIMS.md` together, run touched seed checks, then run
 the edition's documented source-lock command **last**, followed by its source
 check. Locking and committing remain explicit edition-authoring steps.
+
+## Conformance probes with native revisions
+
+Injection checks re-read each read-only `$from` prerequisite before resolving the
+probe arguments. Reference native revision reads in `step.args` so every probe
+uses the current revision after the preceding write. Write prerequisites retain
+their original outputs and are never executed again to refresh a probe. The
+additional arguments must still leave computed classes, facts and disposition
+unchanged, and the probe must complete successfully.
+
+Native target checks follow the audit API's `{rows,cursor,differs_from_policy}`
+pagination using `after`, including pages containing no rows for this agent.
+Both pending and execution targets must match the independent fixture identity;
+a target beyond the first page receives the same check.
+
+Base source archives expose their one supplied revision when matching current
+workflow bytes during refresh. Unknown older workflow bytes remain seed-owned;
+the archive provides no historical versions or migration ancestry. Archive
+refresh still refuses legacy records lacking prior source membership and
+migrations whose applicability requires unavailable Git history.
