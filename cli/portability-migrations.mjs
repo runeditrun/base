@@ -62,27 +62,49 @@ export async function mapMigrationLedger({root,binding='DB',platformMigrations,e
  } catch(error) { throw constantRefusal(error); }
 }
 
+// Older runners leave Wrangler's bookkeeping beside their authoritative hashed
+// history. A tracked D1 ledger is another history and must agree with it.
+async function legacyPairPreflight(db) {
+ const columns=await all(db,'PRAGMA table_info(_rer_deploy_migrations)');
+ insist(['name','sha256','state'].every(name=>columns.some(column=>column.name===name)),'migration_ledger:incompatible',409);
+ const history=await all(db,'SELECT name,sha256,state FROM _rer_deploy_migrations ORDER BY name');
+ insist(history.every(row=>row.state==='applied'),'migration_ledger:uncertain',409);
+ insist(history.every(row=>typeof row.name==='string' && typeof row.sha256==='string' && /^[a-f0-9]{64}$/.test(row.sha256)) && new Set(history.map(row=>row.name)).size===history.length,'migration_ledger:incompatible',409);
+ const nativeColumns=(await all(db,'PRAGMA table_info(d1_migrations)')).map(column=>column.name);
+ const tracked=nativeColumns.includes('state') || nativeColumns.includes('sha256');
+ insist(['id','name','applied_at'].every(name=>nativeColumns.includes(name)) && (!tracked || nativeColumns.includes('state') && nativeColumns.includes('sha256')),'migration_ledger:incompatible',409);
+ const native=await all(db,`SELECT name${tracked?',sha256,state':''} FROM d1_migrations ORDER BY id`);
+ insist(native.every(row=>typeof row.name==='string') && new Set(native.map(row=>row.name)).size===native.length,'migration_ledger:incompatible',409);
+ if(tracked) {
+  insist(native.every(row=>row.state==='applied'),'migration_ledger:uncertain',409);
+  insist(native.every(row=>typeof row.sha256==='string' && /^[a-f0-9]{64}$/.test(row.sha256)),'migration_ledger:incompatible',409);
+  insist(native.length===history.length && native.every((row,index)=>row.name===history[index].name && row.sha256===history[index].sha256),'migration_ledger:multiple',409);
+ } else insist(native.every(row=>history.some(prior=>prior.name===row.name)),'migration_ledger:multiple',409);
+}
+
 // Adapter entry point, before *any* native Wrangler apply. The caller supplies
 // the real target binding and keeps its writers stopped through apply/transfer.
 // This only reads: it never repairs history or creates a second ledger.
 export async function nativeMigrationPreflight({root,db,binding='DB',platformMigrations}) {
  const declaration=platformMigrationDeclaration(platformMigrations);
  const tables=await all(db,`SELECT type,name FROM sqlite_master WHERE lower(name) IN (${ledgerNames.map(name=>`'${name}'`).join(',')})`);
- insist(tables.length<=1,'migration_ledger:multiple',409);
+ const legacyPair=tables.length===2 && ['_rer_deploy_migrations','d1_migrations'].every(name=>tables.some(row=>row.name===name));
+ insist(tables.length<=1 || legacyPair,'migration_ledger:multiple',409);
  insist(tables.every(row=>row.type==='table' && ledgerNames.includes(row.name)),'migration_ledger:incompatible',409);
- const table=tables[0]?.name;
+ const table=legacyPair?'_rer_deploy_migrations':tables[0]?.name;
  if(!table)return {nativeApply:true};
  // This runner's history cannot authorize Wrangler to apply the same files.
- insist(table!=='_rer_deploy_migrations','migration_ledger:runner',409);
+ insist(table!=='_rer_deploy_migrations' || legacyPair,'migration_ledger:runner',409);
  const files=await migrationInventory(root,binding,declaration);
  let nativeApply=false;
  try {
+  if(legacyPair)await legacyPairPreflight(db);
   const ledger=await destinationLedger(db),applied=matchMigrationLedger(ledger,files,declaration);
   // Wrangler skips only literal filenames, not transfer aliases or hashes.
   if(table==='d1_migrations')insist(ledger.every(row=>files.some(file=>file.name===row.name)),'migration_ledger:incompatible',409);
   nativeApply=table==='d1_migrations' && files.some(file=>!applied.includes(file.name));
   // The checkout file is named: it is the seed's own, never a ledger value.
-  if(table==='rer_migrations')for(const file of files)if(!applied.includes(file.name))throw Object.assign(new PortabilityError('migration_ledger:unapplied',409),{migration:file.name});
+  if(table!=='d1_migrations')for(const file of files)if(!applied.includes(file.name))throw Object.assign(new PortabilityError('migration_ledger:unapplied',409),{migration:file.name});
  } catch(error) { throw constantRefusal(error); }
  return {nativeApply};
 }
