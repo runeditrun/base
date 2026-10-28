@@ -20,7 +20,7 @@ export async function personDoor(rt: Runtime, request: Request): Promise<Respons
     let body: { paused?: unknown }
     try { body = await request.json() } catch { return error('invalid_arguments') }
     if (typeof body?.paused !== 'boolean') return error('invalid_arguments')
-    await rt.options.db.prepare('UPDATE agent_door_state SET local_paused=? WHERE id=1').bind(body.paused ? 1 : 0).run()
+    await rt.options.db.prepare('INSERT INTO agent_door_state(id,local_paused) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET local_paused=excluded.local_paused').bind(body.paused ? 1 : 0).run()
     const state = await policyState(rt)
     return json({ paused: { business: state.paused, local: state.localPaused } })
   }

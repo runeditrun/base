@@ -152,6 +152,9 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
  const local=await runtime({paired:false})
  try {
   assert.equal((await local.adopt()).status,404)
+  assert.equal((await local.person('/agents/api/pause',{paused:true})).body.paused.local,true)
+  assert.equal(code(await local.tool('records.list',{}, {token:'synthetic-base-local'})),'agents_paused')
+  await local.person('/agents/api/pause',{paused:false})
   assert.equal((await local.mcp('tools/list')).status,401)
   assert.equal((await local.person('/agents/api/policy',{document:autonomousPolicy()})).status,405)
   const incomplete=await local.fetch('/agents/api/policy',{method:'PUT',headers:{origin:local.c.origin,cookie:local.c.person.cookie,'content-type':'application/json'},body:JSON.stringify({document:{...autonomousPolicy(),rules:[],spend:undefined}})}); assert.equal(incomplete.status,409); assert.ok((await incomplete.json()).problems.some(p=>p.kind==='spend'))

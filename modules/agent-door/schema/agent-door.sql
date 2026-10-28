@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS agent_door_state (
   local_revision INTEGER NOT NULL DEFAULT 0, local_paused INTEGER NOT NULL DEFAULT 0,
   decision_lock TEXT, decision_until INTEGER
 );
-INSERT OR IGNORE INTO agent_door_state(id) VALUES(1);
 CREATE TABLE IF NOT EXISTS agent_door_agents (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, specialist TEXT, sponsor TEXT NOT NULL,
   sponsor_name TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0,

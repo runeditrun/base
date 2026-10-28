@@ -48,7 +48,7 @@ export async function adoptPolicy(rt: Runtime, request: Request): Promise<Respon
     const revision = typeof value.revision_signature === 'string' ? await verifyJws(value.revision_signature, 'rer-agent-policy-revision+jwt', trust.publicKeys) : null
     if (!revision || revision.business !== value.business || revision.revision !== value.revision || value.revision === null || revision.document_sha256 !== await document_sha256(validateDocument(value.document))) return error('policy_revision_invalid')
   } else if (value.revision_signature !== null) return error('policy_revision_invalid')
-  const result = await db.prepare(`UPDATE agent_door_state SET envelope=? WHERE id=1 AND (envelope IS NULL OR json_extract(envelope,'$.seq')<? OR (json_extract(envelope,'$.seq')=? AND json_extract(envelope,'$.iat')<?))`)
+  const result = await db.prepare(`INSERT INTO agent_door_state(id,envelope) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET envelope=excluded.envelope WHERE agent_door_state.envelope IS NULL OR json_extract(agent_door_state.envelope,'$.seq')<? OR (json_extract(agent_door_state.envelope,'$.seq')=? AND json_extract(agent_door_state.envelope,'$.iat')<?)`)
     .bind(JSON.stringify(value), value.seq, value.seq, value.iat).run()
   if (!result.meta.changes) return error('policy_stale', 409)
   return json({ adopted: { seq: value.seq, revision: value.revision }, door: { classes: declaredClasses(rt).map(cls => ({ class: cls, tools: rt.tools.filter(tool => tool.classes.includes(cls)).map(tool => tool.name).sort().slice(0, 20) })) } })
@@ -63,6 +63,6 @@ export async function localPolicy(rt: Runtime, request: Request): Promise<Respon
   catch (cause) { return error('policy_document_invalid', 400, { path: cause instanceof DocumentInvalid ? cause.path : '$' }) }
   const problems = completeness(document, declaredClasses(rt))
   if (problems.length) return error('policy_incomplete', 409, { problems })
-  const row = await rt.options.db.prepare('UPDATE agent_door_state SET local_document=?,local_revision=local_revision+1 WHERE id=1 RETURNING local_revision').bind(JSON.stringify(document)).first<{ local_revision: number }>()
+  const row = await rt.options.db.prepare('INSERT INTO agent_door_state(id,local_document,local_revision) VALUES(1,?,1) ON CONFLICT(id) DO UPDATE SET local_document=excluded.local_document,local_revision=agent_door_state.local_revision+1 RETURNING local_revision').bind(JSON.stringify(document)).first<{ local_revision: number }>()
   return json({ revision: row!.local_revision, complete: true })
 }

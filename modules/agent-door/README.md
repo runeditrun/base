@@ -10,7 +10,9 @@ embedded agents, and `emit(event)` for native person actions. `handle` returns
 `null` outside its routes; the edition keeps its existing router. Public exports
 also include `defineTool`, `ToolRefusal`, `operatorAuthPeople` and runtime types.
 Keep this code out of browser bundles. Apply `schema/agent-door.sql` through a
-new numbered edition migration before using the database-backed runtime.
+new numbered edition migration before using the database-backed runtime. The policy singleton is
+created only by an adopted policy or a person changing a setting, so a fresh
+or reset installation remains empty for archive restore.
 
 ## Routes
 
@@ -112,6 +114,8 @@ The tool error metadata has this shape:
 ```json
 {"_meta":{"com.runeditrun/error":{"code":"policy_unset"}}}
 ```
+
+Stable tool refusal codes are `policy_unset` (with `unanswered` and `setup_url`), `policy_unavailable`, `policy_blocked` (class, rule and revision), `approval_required` (legacy clients), `approval_rejected`, `approval_expired`, `approval_evidence_changed`, `self_escalation`, `agents_paused`, `idempotency_key_required`, `idempotency_conflict`, `revision_conflict` (with `current_revision`), `invalid_arguments` and `output_invalid`. Native `ToolRefusal` codes pass through unchanged. Local policy returns `policy_document_invalid` with `path`, `policy_incomplete` with `problems`, or `policy_managed_by_business`.
 
 Default MCP capacity is **600 requests per minute per agent** and
 **1,048,576 body bytes**, configurable through `limits`. These protect request
