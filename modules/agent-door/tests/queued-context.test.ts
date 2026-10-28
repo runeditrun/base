@@ -30,6 +30,15 @@ test('native queue retains admission identity through one effect and replay', as
   const rows = (await r.person('/agents/api/audit')).body.rows
   for (const row of rows) { assert.equal(row.operation_id, admission.operationId); assert.equal(row.idempotency_key, input.idempotency_key); assert.equal(row.consent, admission.consent) }
   assert.ok(rows.some((row: any) => row.tool === 'synthetic.queue.execute' && row.outcome === 'replayed'))
+  const first = job(), second = crypto.randomUUID()
+  assert.ok(result(await r.tool('queue.prepare', { ...first, additional: [second] }))?.operationId)
+  const one = await drain(r, first.id), two = await drain(r, second)
+  const effects = (await r.db.prepare('SELECT COUNT(*) AS n FROM test_effects WHERE id IN (?,?)').bind(first.id, second).first()).n
+  t.diagnostic(`G-op-fanout jobs=2 first=${one.outcome} second=${two.code ?? two.outcome} effects=${effects}; expected=2`)
+  assert.equal(one.outcome, 'done'); assert.equal(two.outcome, 'done'); assert.equal(effects, 2)
+  assert.equal((await drain(r, first.id)).result.id, first.id)
+  assert.equal((await drain(r, second)).result.id, second)
+  assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM test_effects WHERE id IN (?,?)').bind(first.id, second).first()).n, 2)
   t.diagnostic('a/b PASS: saved admission equals native effect identity; prepare replay and worker replay retain one effect.')
  } finally { await r.close() }
 })

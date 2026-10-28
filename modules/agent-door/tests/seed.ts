@@ -26,10 +26,10 @@ export default {
       scopes: ctx.scopes, person: { id: ctx.person.id }, agent: ctx.agent, clientId: ctx.clientId, approvers: ctx.approvers })
     const queueTools: ToolDefinition[] = [
       defineTool({ name: 'synthetic.queue.prepare', title: 'Queue native work', description: 'Prepare one native queued effect.', scope: 'records:write', readOnly: false,
-        inputSchema: object({ id: text }), outputSchema: object({ id: text, operationId: text }), classes: ['standard'], clauses: ['BASE-AGENT-002'], summary: args => ({ target: { id: String(args.id) } }),
+        inputSchema: object({ id: text, additional: { type: 'array', items: text } }, ['id']), outputSchema: object({ id: text, operationId: text }), classes: ['standard'], clauses: ['BASE-AGENT-002'], summary: args => ({ target: { id: String(args.id) } }),
         classify: () => [{ class: 'standard', facts: { measure: 1 } }],
         async run(args, ctx) {
-          await env.DB.prepare('INSERT INTO test_jobs(id,saved) VALUES(?,?)').bind(args.id, JSON.stringify(snapshot(ctx))).run()
+          for (const id of [args.id, ...(args.additional as string[] ?? [])]) await env.DB.prepare('INSERT INTO test_jobs(id,saved) VALUES(?,?)').bind(id, JSON.stringify(snapshot(ctx))).run()
           return { result: { id: args.id, operationId: ctx.operationId } }
         } }),
       defineTool({ name: 'synthetic.queue.execute', title: 'Execute queued work', description: 'Execute the native saved queue item.', scope: 'records:write', readOnly: false,
