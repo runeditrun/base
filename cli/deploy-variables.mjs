@@ -18,6 +18,32 @@ async function sourceFile(root, path) {
  catch (error) { if (error.code === 'ENOENT') return null; throw error; }
 }
 
+async function variableEntries(root, path) {
+ const source = await sourceFile(root, path);
+ if (source === null) return [];
+ const entries = [];
+ let config;
+ try {
+  if (path.endsWith('.toml')) entries.push(...tomlEntries(comments(source).clean, { locations: true }));
+  else config = parseJsonc(source, (path, offset) => entries.push({ path, offset }));
+ } catch (error) { throw Error(`${path}: ${error.message}`); }
+ return entries.filter(entry => variablePath(entry.path)).map(entry => ({
+  binding: entry.path.at(-1),
+  value: config ? entry.path.reduce((value, key) => value?.[key], config) : entry.value,
+  source: `${path}:${lineAt(source, entry.offset)} (${entry.path.join('.')})`,
+  location: `${path}:${lineAt(source, entry.offset)} (${entry.path.slice(0, -1).join('.')})`,
+ }));
+}
+
+/** Source defaults participate in the same sender check as deploy inputs. */
+export async function sourceMailSenders(root, adapter) {
+ const senders = [];
+ for (const path of deployConfigPaths(adapter)) {
+  for (const entry of await variableEntries(root, path)) if (entry.binding === 'MAIL_FROM') senders.push(entry);
+ }
+ return senders;
+}
+
 // Reuse the image builder's JSONC reader and binding comparison. Source checks
 // reject secret placeholders before a build normalizes them. Managed MAIL_FROM
 // is a public input even when the deploy adapter supplies it through secrets.
@@ -47,25 +73,14 @@ export async function deployVariableClause(root, adapter) {
   }
   const overlaps = [];
   for (const path of deployConfigPaths(adapter)) {
-   const source = await sourceFile(root, path);
-   if (source === null) continue;
-   const entries = [];
-   let config;
-   try {
-    if (path.endsWith('.toml')) entries.push(...tomlEntries(comments(source).clean, { locations: true }));
-    else config = parseJsonc(source, (path, offset) => entries.push({ path, offset }));
-   } catch (error) { throw Error(`${path}: ${error.message}`); }
-   for (const entry of entries.filter(entry => variablePath(entry.path))) {
-    const binding = entry.path.at(-1);
-    // TOML entries describe declared keys; JSONC values come from the very
-    // same reader the node image builder uses (including escaped key names).
-    const vars = config ? entry.path.slice(0, -1).reduce((value, key) => value?.[key], config) : { [binding]: entry.value };
-    if (binding === 'MAIL_FROM') senders.push({ source: `${path}:${lineAt(source, entry.offset)} (${entry.path.join('.')})`, value: vars?.[binding] });
-    const matched = new Set(imageVariableSecrets(vars ?? {}, secrets).map(secret => secret.binding));
+   for (const entry of await variableEntries(root, path)) {
+    const { binding, value } = entry;
+    if (binding === 'MAIL_FROM') senders.push(entry);
+    const matched = new Set(imageVariableSecrets({ [binding]: value }, secrets).map(secret => secret.binding));
     if (!matched.has(binding)) continue;
     if (binding === 'MAIL_FROM' && publicSender && !privateSender) continue;
     for (const [index, secret] of secrets.entries()) if (secret.binding === binding) overlaps.push(
-      `${binding}: ${path}:${lineAt(source, entry.offset)} (${entry.path.slice(0, -1).join('.')}) and ${declarationPath}:${secretLocations.get(index)} (secrets)`);
+      `${binding}: ${entry.location} and ${declarationPath}:${secretLocations.get(index)} (secrets)`);
    }
   }
   validateMailSenders(senders);

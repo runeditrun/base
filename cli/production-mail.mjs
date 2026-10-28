@@ -5,6 +5,7 @@ import { parseAddress } from '../modules/mail/src/core/validation.mjs';
 import { deliveryDeclarationSources } from './delivery-declarations.mjs';
 import { validateRerConfig } from '../modules/mail/src/adapters/rer/contract.mjs';
 import { validateMailSenders } from '../modules/delivery-producer/mail.mjs';
+import { sourceMailSenders } from './deploy-variables.mjs';
 
 const providers = ['resend', 'sendgrid', 'cloudflare', 'rer'];
 const nativeCredential = { sendgrid: 'SENDGRID_API_KEY', resend: 'RESEND_API_KEY' };
@@ -29,9 +30,10 @@ const placeholderSender = value => {
 // Packaging can declare inputs that a product's deploy adapter adds to the
 // root declaration later. Read that source contract, never arbitrary ambient
 // keys or the adapter's executable source, before any build or provider write.
-export async function productionMail(root, declaration, env, declarationPath = 'deploy.json') {
+export async function productionMail(root, declaration, env, declarationPath = 'deploy.json', adapter) {
  const bindings = { ...declaration.vars }, secrets = new Set(), publicInputs = new Set(), declaredProviders = new Set();
  const senders = [{ source: `${declarationPath} vars.MAIL_FROM`, value: declaration.vars?.MAIL_FROM }];
+ senders.push(...await sourceMailSenders(root, adapter));
  let senderFix = `Edit vars.MAIL_FROM in ${declarationPath}`;
  const environmentFix = name => `Set ${name} in your environment or owned 0600 --env-file`;
  for (const secret of declaration.secrets ?? []) {
