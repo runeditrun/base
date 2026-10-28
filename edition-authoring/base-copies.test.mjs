@@ -1,6 +1,7 @@
 import test from 'node:test';
 import {closureClasses} from './tests/closure-cases.mjs';
 import {archiveSourceCases} from './tests/archive-cases.mjs';
+import {importKitClosureCases} from './tests/import-kit-cases.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -317,6 +318,7 @@ test('refresh-base checks read-only destinations before updating any copy and pe
 });
 
 test('refresh-base completes required dependencies of a sparse historical module copy', () => {
+  importKitClosureCases({init, write, commit, run, ok, snapshotTree});
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-sparse-'));
   try {
     const base = path.join(temp, 'base'), seed = path.join(temp, 'seed');
