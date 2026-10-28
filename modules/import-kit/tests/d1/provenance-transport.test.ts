@@ -1,9 +1,11 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { provenanceTransportFixture } from './provenance-transport-fixture.ts';
 import { applyD1ImportBatches,createD1ImportJob,readD1ImportJob,readD1ImportUndoReport,undoD1Import } from '../../src/d1/index.ts';
 
-test('bounded source reuse stages every legal large provenance binding and preserves owner undo',async t=>{
+familyRows[0].push(['bounded source reuse stages every legal large provenance binding and preserves owner undo', async t=>{
   const r=await provenanceTransportFixture(t,2),m=r.meter;
   assert.equal((await m.request('apply-owner',()=>applyD1ImportBatches(r.job.id,r.context()))).state,'completed');
   assert.ok(m.requests.find(row=>row.label==='apply-owner')!.privateBatches>0);r.largeProvenance();r.clean();
@@ -21,9 +23,9 @@ test('bounded source reuse stages every legal large provenance binding and prese
   while(job.state!=='undone')job=await m.request('continue-owner-undo',()=>undoD1Import(r.job.id,r.context()));
   assert.equal((await m.request('repeat-owner-undo',()=>undoD1Import(r.job.id,r.context()))).state,'undone');
   assert.deepEqual(await r.targets.list(r.db(),'workspace'),r.before);r.clean();console.log(JSON.stringify({largeSourceReuse:m.summary()}));
-});
+}]);
 
-test('bounded preserved reversal stages multiple large before-images and retains a later edit after restart',async t=>{
+familyRows[0].push(['bounded preserved reversal stages multiple large before-images and retains a later edit after restart', async t=>{
   const r=await provenanceTransportFixture(t,4,true),m=r.meter;
   assert.equal((await m.request('apply-owner',()=>applyD1ImportBatches(r.job.id,r.context()))).state,'completed');r.largeProvenance();r.clean();
   assert.equal((await m.request('first-undo',()=>undoD1Import(r.job.id,{...r.context(1),maxBatches:1}))).state,'undoing');
@@ -38,4 +40,6 @@ test('bounded preserved reversal stages multiple large before-images and retains
   for(const row of r.before.filter(row=>row.targetId!=='2'))assert.deepEqual(await r.targets.read(r.db(),'workspace','record',row.targetId),row);
   assert.equal((await m.request('repeat-mixed-undo',()=>undoD1Import(r.job.id,r.context()))).state,'undone');
   assert.deepEqual(await m.request('repeat-report',()=>readD1ImportUndoReport(r.job.id,r.context())),report);r.clean();console.log(JSON.stringify({largePreservedReversal:m.summary()}));
-});
+}]);
+
+ test("d1 provenance transport preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

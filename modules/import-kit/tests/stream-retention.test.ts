@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildImportPlan } from '../src/plan/index.ts';
@@ -25,7 +27,7 @@ function fixture(rows: number, width: number, length: number) {
   return { plan, records, dictionary };
 }
 
-for (const length of [255, 256, 257]) test(`aggregate custody for ${length}-unit repeated Unicode stays bounded across every retained page`, t => {
+for (const length of [255, 256, 257]) familyRows[0].push([`aggregate custody for ${length}-unit repeated Unicode stays bounded across every retained page`, t => {
   const { plan, records } = fixture(100, 49, length);
   const pages = [...partitionPlan(plan)], retained = pages.map(page => compressedPlan(page, codec));
   const bytes = retained.reduce((sum, body) => sum + Buffer.byteLength(body), 0);
@@ -34,9 +36,9 @@ for (const length of [255, 256, 257]) test(`aggregate custody for ${length}-unit
   const restored = retained.flatMap(body => expandCompressedPlan(body, codec).entries);
   assert.deepEqual(restored.map(entry => entry.source), records);
   assert.deepEqual(restored, plan.entries);
-});
+}]);
 
-test('coalesced normalized pages keep complete ordered custody and mapper decisions while sharing repeated metadata', async () => {
+familyRows[0].push(['coalesced normalized pages keep complete ordered custody and mapper decisions while sharing repeated metadata', async () => {
   const { amplifiedPlan, mergePlanPages } = await import('../src/d1/stream-working-set.ts');
   const { erasePlanRecords } = await import('../src/d1/erased-plan.ts');
   const { retainPlan, loadPlans } = await import('../src/d1/plans.ts');
@@ -61,9 +63,9 @@ test('coalesced normalized pages keep complete ordered custody and mapper decisi
   assert.deepEqual(decoded.entries[100].effects, []);
   assert.deepEqual(decoded.entries.filter((_, i) => i !== 100), plan.entries.filter((_, i) => i !== 100));
   assert.ok(retained.statements.reduce((sum, statement) => sum + Buffer.byteLength(String(statement.params![0])), 0) < 256 * 1024, 'erasure must not expand all retained private metadata into SQL buffers');
-});
+}]);
 
-test('one local working-set measurement preserves exact sizes and is fresh after mutation',async()=>{
+familyRows[0].push(['one local working-set measurement preserves exact sizes and is fresh after mutation', async()=>{
   const {measurePlanWorkingSet}=await import('../src/d1/stream-working-set.ts');
   const {canonicalSize}=await import('../src/provenance/canonical-stream.ts');
   const {dictionaryWeight}=await import('../src/d1/stream-partition.ts');
@@ -73,4 +75,6 @@ test('one local working-set measurement preserves exact sizes and is fresh after
   const changed=measurePlanWorkingSet(plan);
   assert.deepEqual(changed,{bytes:dictionaryWeight(plan),expandedBytes:canonicalSize(plan),amplified:canonicalSize(plan)>4*dictionaryWeight(plan)});
   assert.notEqual(changed.expandedBytes,measure.expandedBytes);
-});
+}]);
+
+ test("stream retention preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

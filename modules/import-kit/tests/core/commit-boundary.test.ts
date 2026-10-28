@@ -1,3 +1,5 @@
+import { caseRow, caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyImportBatches, undoImport, rollbackImport, resumeImport, readImportJob, readImportOriginals } from '../../src/index.ts';
@@ -58,27 +60,33 @@ async function recover(fixture, action) {
   assert.deepEqual({ ...lease }, { lease_token: null, lease_expires: null });
 }
 
-for (const action of Object.keys(operations)) for (const phase of ['final', 'prefix']) for (const [fault, detail] of Object.entries(faults)) {
-  test(`${action} ${phase} rejects ${fault} changed by the last lease write and atomically preserves native state`, async t => {
-    const fixture = await prepare(t, action, phase), { ctx, db, job, event, condition } = fixture;
-    db.exec(`CREATE TRIGGER last_write_fault AFTER UPDATE OF ${event} ON ik_jobs WHEN ${condition} BEGIN ${detail.sql} END;`);
-    await assert.rejects(operations[action](job.id, ctx), detail.error);
-    unchangedBatch(fixture);
-    await recover(fixture, action);
-  });
-}
+familyRows[0].push(["last-write faults roll back native effects at every operation commit boundary", async t => {
+  for (const action of Object.keys(operations)) for (const phase of ['final', 'prefix']) for (const [fault, detail] of Object.entries(faults)) {
+    await caseRow(t, `${action} ${phase} rejects ${fault} changed by the last lease write and atomically preserves native state`, async t => {
+      const fixture = await prepare(t, action, phase), { ctx, db, job, event, condition } = fixture;
+      db.exec(`CREATE TRIGGER last_write_fault AFTER UPDATE OF ${event} ON ik_jobs WHEN ${condition} BEGIN ${detail.sql} END;`);
+      await assert.rejects(operations[action](job.id, ctx), detail.error);
+      unchangedBatch(fixture);
+      await recover(fixture, action);
+    });
+  }
+}]);
 
-for (const action of Object.keys(operations)) for (const phase of ['final', 'prefix']) {
-  test(`${action} ${phase} cannot commit when a real last-write SQLite function outlasts its 200ms lease`, async t => {
-    const fixture = await prepare(t, action, phase), { ctx, db, job, event, condition } = fixture;
-    ctx.leaseMs = 200;
-    (db as any).function('slow_final_write', () => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300); return 1; });
-    db.exec(`CREATE TRIGGER last_write_fault AFTER UPDATE OF ${event} ON ik_jobs WHEN ${condition} BEGIN SELECT slow_final_write(); END;`);
-    const start = Date.now();
-    await assert.rejects(operations[action](job.id, ctx), /IMPORT_LEASE_LOST/);
-    assert.ok(Date.now() - start >= 300);
-    unchangedBatch(fixture);
-    ctx.leaseMs = 30000;
-    await recover(fixture, action);
-  });
-}
+familyRows[0].push(["expired holders cannot commit native effects at any operation boundary", async t => {
+  for (const action of Object.keys(operations)) for (const phase of ['final', 'prefix']) {
+    await caseRow(t, `${action} ${phase} cannot commit when a real last-write SQLite function outlasts its 200ms lease`, async t => {
+      const fixture = await prepare(t, action, phase), { ctx, db, job, event, condition } = fixture;
+      ctx.leaseMs = 200;
+      (db as any).function('slow_final_write', () => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300); return 1; });
+      db.exec(`CREATE TRIGGER last_write_fault AFTER UPDATE OF ${event} ON ik_jobs WHEN ${condition} BEGIN SELECT slow_final_write(); END;`);
+      const start = Date.now();
+      await assert.rejects(operations[action](job.id, ctx), /IMPORT_LEASE_LOST/);
+      assert.ok(Date.now() - start >= 300);
+      unchangedBatch(fixture);
+      ctx.leaseMs = 30000;
+      await recover(fixture, action);
+    });
+  }
+}]);
+
+ test("core commit boundary preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

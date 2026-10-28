@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -47,5 +49,7 @@ async function crashProof(t, delayed = false) {
   assert.equal(db.prepare('SELECT count(*) n FROM ik_provenance WHERE reversed=1').get().n, 6);
   assert.equal(db.prepare('SELECT count(*) n FROM ik_stages').get().n, 0); assert.deepEqual(readImportOriginals(id, ctx), originals);
 }
-test('native SQLite WAL survives SIGKILL inside apply and undo, retaining complete attribution and exact originals', t => crashProof(t));
-test('native crash recovery preserves live-lease refusal despite scheduler delays longer than the lease', t => crashProof(t, true));
+familyRows[0].push(['native SQLite WAL survives SIGKILL inside apply and undo, retaining complete attribution and exact originals', t => crashProof(t)]);
+familyRows[0].push(['native crash recovery preserves live-lease refusal despite scheduler delays longer than the lease', t => crashProof(t, true)]);
+
+ test("core operation crash preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

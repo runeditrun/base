@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { nativeStagingFixture, nativePrivateTables } from './native-staging-fixture.ts';
@@ -5,14 +7,14 @@ import { readD1ImportStream, resumeD1ImportStream, undoD1ImportStream } from '..
 import { requestContext, remaining } from '../../src/d1/budget.ts';
 import { streamState, streamReturnQueries } from '../../src/d1/stream-state.ts';
 
-test('the pre-admitted stream tail covers all actual authority and snapshot statements',async t=>{
+familyRows[0].push(['the pre-admitted stream tail covers all actual authority and snapshot statements', async t=>{
   const r=await nativeStagingFixture(t),context=requestContext(r.context());
   const current=await streamState(r.job.id,context),reserved=streamReturnQueries(current,context),before=remaining(context);
   await readD1ImportStream(r.job.id,context);
   const actual=before-remaining(context);
   assert.ok(actual>=7);assert.ok(reserved>=actual);assert.ok(reserved<50);
-});
-for(const action of ['apply','undo'])test(`stream ${action} either pre-admits its complete return or leaves native publication unchanged`,async t=>{
+}]);
+for(const action of ['apply','undo'])familyRows[0].push([`stream ${action} either pre-admits its complete return or leaves native publication unchanged`, async t=>{
   const measure=await nativeStagingFixture(t),invoke=(id:string,context:any)=>action==='apply'?resumeD1ImportStream(id,context):undoD1ImportStream(id,context);
   if(action==='undo')await resumeD1ImportStream(measure.job.id,measure.context());
   const counted=requestContext(measure.context());await invoke(measure.job.id,counted);const used=1000-remaining(counted);
@@ -24,4 +26,6 @@ for(const action of ['apply','undo'])test(`stream ${action} either pre-admits it
   assert.deepEqual(r.native().prepare('SELECT * FROM native_records ORDER BY id').all(),before);
   assert.ok(remaining(context)>=0);
   for(const table of nativePrivateTables)assert.equal(r.native().prepare(`SELECT count(*) n FROM ${table}`).get()!.n,0,table);
-});
+}]);
+
+ test("d1 stream return budget preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

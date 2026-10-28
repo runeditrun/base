@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, source, mapping, targets } from './fixtures.ts';
@@ -20,7 +22,7 @@ function changedArtifacts(original: ImportStreamPlan, change: (artifacts: any[])
   return stream;
 }
 
-test('normalized publication validates original availability and artifact metadata before retaining any custody', async t => {
+familyRows[0].push(['normalized publication validates original availability and artifact metadata before retaining any custody', async t => {
   const r = await runtime(t), bundle = source(3);
   bundle.artifacts[0].original = { status: 'unavailable', reason: 'not-supplied' };
   const original = await planD1ImportStream(bundle, mapping, r.context());
@@ -37,9 +39,9 @@ test('normalized publication validates original availability and artifact metada
     await assert.rejects(createD1ImportStream(stream, { ...r.context(), reviewedFingerprint: stream.fingerprint }), /INVALID_|DUPLICATE_ARTIFACT/);
     for (const table of ['ik_jobs', 'ik_d1_streams', 'ik_d1_stream_pages', 'ik_d1_plan_index', 'ik_d1_plan_chunks', 'ik_original_sets', 'ik_originals', 'ik_provenance', 'contacts', 'evidence']) assert.equal((await r.db().prepare(`SELECT COUNT(*) n FROM ${table}`).first())!.n, 0);
   }
-});
+}]);
 
-for (const availability of ['missing', 'unavailable']) test(`normalized ${availability} originals retain exact receipts and cold resume`, async t => {
+for (const availability of ['missing', 'unavailable']) familyRows[0].push([`normalized ${availability} originals retain exact receipts and cold resume`, async t => {
   const r = await runtime(t), bundle = source(3);
   bundle.artifacts[0].original = { status: 'unavailable', reason: 'not-supplied' };
   const original = await planD1ImportStream(bundle, mapping, r.context());
@@ -51,9 +53,9 @@ for (const availability of ['missing', 'unavailable']) test(`normalized ${availa
   assert.equal(job.state, 'completed');
   assert.equal((await targets.list(r.db(), 'workspace')).length, 3);
   assert.deepEqual((await r.db().prepare('SELECT name,sha256,size,bytes FROM ik_originals WHERE job_id=?').bind(job.id).all()).results, [{ name: bundle.artifacts[0].name, sha256: bundle.artifacts[0].sha256, size: bundle.artifacts[0].size, bytes: null }]);
-});
+}]);
 
-test('normalized publication verifies all aggregate counts before retaining a parent', async t => {
+familyRows[0].push(['normalized publication verifies all aggregate counts before retaining a parent', async t => {
   const r = await runtime(t), bundle = source(3);
   bundle.artifacts[0].original = { status: 'unavailable', reason: 'not-supplied' };
   const original = await planD1ImportStream(bundle, mapping, r.context());
@@ -70,9 +72,9 @@ test('normalized publication verifies all aggregate counts before retaining a pa
   empty.fingerprint = planFingerprint(streamView(empty));
   await assert.rejects(createD1ImportStream(empty, { ...r.context(), reviewedFingerprint: empty.fingerprint }), /IMPORT_STREAM_LAYOUT_CHANGED/);
   assert.equal((await r.db().prepare('SELECT COUNT(*) n FROM ik_d1_streams').first())!.n, 0);
-});
+}]);
 
-test('normalized publication rejects newly attached original bytes before any custody is retained', async t => {
+familyRows[0].push(['normalized publication rejects newly attached original bytes before any custody is retained', async t => {
   const r = await runtime(t), bundle = source(1);
   bundle.artifacts[0].original = { status: 'unavailable', reason: 'not-supplied' };
   const stream = await planD1ImportStream(bundle, mapping, r.context());
@@ -83,4 +85,6 @@ test('normalized publication rejects newly attached original bytes before any cu
   stream.fingerprint = planFingerprint(streamView(stream));
   await assert.rejects(createD1ImportStream(stream, { ...r.context(), reviewedFingerprint: stream.fingerprint }), /IMPORT_STREAM_NORMALIZED_SOURCE_REQUIRED/);
   for (const table of ['ik_jobs', 'ik_d1_streams', 'ik_originals', 'ik_stages', 'ik_d1_original_chunks']) assert.equal((await r.db().prepare(`SELECT COUNT(*) n FROM ${table}`).first())!.n, 0);
-});
+}]);
+
+ test("d1 stream original validation preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

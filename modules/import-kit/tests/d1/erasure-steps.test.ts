@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -16,7 +18,7 @@ async function tables(r: any) {
   });
 }
 
-test('legacy >16 MiB import erasure resumes journaled requests, survives lost acknowledgements, restores and keeps peer undo', async t => {
+familyRows[0].push(['legacy >16 MiB import erasure resumes journaled requests, survives lost acknowledgements, restores and keeps peer undo', async t => {
   const r = await erasureStepFixture(t); r.native().exec('INSERT INTO privacy_epoch VALUES(0)');
   const source = sqliteSource(60); source.artifacts[0].original = { status: 'unavailable', reason: 'not-supplied' };
   for (const [i, row] of source.records.entries()) {
@@ -71,9 +73,9 @@ test('legacy >16 MiB import erasure resumes journaled requests, survives lost ac
   while (undone.state !== 'undone') undone = await resumeD1Import(job.id, restoredLegacy());
   assert.equal(count(restored, 'native_records'), 0); assert.equal(count(restored, 'native_parts'), 0);
   t.diagnostic(JSON.stringify({ retainedPlanBytes: bytes, requests, carriedRequests: carried, maximumErasureBatchBytes: maximum, archiveParts: records.filter(row => row.kind === 'part').length }));
-});
+}]);
 
-test('bounded retirement closes header custody and redacts shared fields while refusing unverified offsets', async t => {
+familyRows[0].push(['bounded retirement closes header custody and redacts shared fields while refusing unverified offsets', async t => {
   const r = await erasureStepFixture(t); r.native().exec('INSERT INTO privacy_epoch VALUES(0)');
   const source = sqliteSource(3); source.artifacts[0].original = { status: 'unavailable', reason: 'not-supplied' };
   for (const [i, row] of source.records.entries()) { row.payload = { rows: ['actor-marker', `peer-${i}`] }; row.payloadHash = sha256(canonicalJson(row.payload)); }
@@ -119,4 +121,6 @@ test('bounded retirement closes header custody and redacts shared fields while r
   const targetResult = await eraseD1ImportTargetStep('record', 'header-0', targetNative, r.context(), targetOptions);
   assert.equal(targetResult.phase, 'complete'); assert.equal(count(r, 'native_records'), 0);
   assert.equal((await eraseD1ImportTargetStep('record', 'header-0', targetNative, r.context(), targetOptions)).phase, 'complete');
-});
+}]);
+
+ test("d1 erasure steps preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

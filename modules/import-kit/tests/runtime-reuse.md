@@ -37,7 +37,7 @@ before/after measurement:
 - Ten discovered import files use the shared D1 fixture: `d1.test.ts`,
   `d1-preserved-provider.test.ts`, `d1-preserved-scale.test.ts`,
   `d1-read-only.test.ts`, `d1-original-name-custody.test.ts`,
-  `original-name-bytes.test.ts`, `plan-cap-d1.test.ts`,
+  `d1-original-name-custody.test.ts`, `plan-cap-d1.test.ts`,
   `d1-stream-custody.test.ts`, `reviewed-source-native.test.ts` and
   `stream-review-integrity.test.ts`. Each creates one initial
   runtime; every explicit `reopen()` adds a real runtime creation. Imported

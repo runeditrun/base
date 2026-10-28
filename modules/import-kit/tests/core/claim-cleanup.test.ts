@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyImportBatches, resumeImport, undoImport, readImportJob } from '../../src/index.ts';
@@ -9,7 +11,7 @@ const faults = {
   custody: { sql: "UPDATE ik_originals SET bytes=X'00' WHERE job_id=NEW.id;", error: /ORIGINAL/ },
 };
 
-for (const phase of ['acquire', 'stage']) for (const [fault, detail] of Object.entries(faults)) test(`${phase} claim validates ${fault} after all internal SQL writes`, async t => {
+for (const phase of ['acquire', 'stage']) for (const [fault, detail] of Object.entries(faults)) familyRows[0].push([`${phase} claim validates ${fault} after all internal SQL writes`, async t => {
   const { ctx } = nativeSetup(t), { job } = await nativeJob(ctx), db = ctx.storage.database;
   ctx.leaseMs = 200;
   const before = snapshot(ctx);
@@ -26,9 +28,9 @@ for (const phase of ['acquire', 'stage']) for (const [fault, detail] of Object.e
   if (lease.lease_token) await new Promise(resolve => setTimeout(resolve, Math.max(0, lease.lease_expires - Date.now() + 10)));
   ctx.leaseMs = 30000;
   assert.equal((await resumeImport(job.id, ctx)).state, 'completed');
-});
+}]);
 
-test('successful bounded release rejects a cleanup trigger without damaging the already committed prefix', async t => {
+familyRows[0].push(['successful bounded release rejects a cleanup trigger without damaging the already committed prefix', async t => {
   const { ctx } = nativeSetup(t), { job } = await nativeJob(ctx), db = ctx.storage.database;
   ctx.maxBatches = 1; ctx.leaseMs = 200;
   db.exec("CREATE TRIGGER cleanup_fault AFTER UPDATE OF lease_token ON ik_jobs WHEN NEW.lease_token IS NULL AND NEW.state='applying' BEGIN UPDATE ik_jobs SET fence=fence+1 WHERE id=NEW.id; END;");
@@ -41,9 +43,9 @@ test('successful bounded release rejects a cleanup trigger without damaging the 
   ctx.leaseMs = 30000;
   assert.equal((await resumeImport(job.id, ctx)).state, 'completed');
   assert.equal(readImportJob(job.id, ctx).fence, 2);
-});
+}]);
 
-test('failure cleanup cannot commit trigger corruption, and keeps the original native error visible', async t => {
+familyRows[0].push(['failure cleanup cannot commit trigger corruption, and keeps the original native error visible', async t => {
   const { ctx } = nativeSetup(t), { job } = await nativeJob(ctx), db = ctx.storage.database;
   ctx.maxBatches = 1; await applyImportBatches(job, ctx); delete ctx.maxBatches;
   const before = snapshot(ctx); ctx.leaseMs = 200;
@@ -69,9 +71,9 @@ test('failure cleanup cannot commit trigger corruption, and keeps the original n
   ctx.leaseMs = 30000;
   assert.equal((await resumeImport(job.id, ctx)).state, 'completed');
   await undoImport(job.id, ctx); assert.equal(nativeRows(ctx).length, 0);
-});
+}]);
 
-test('benign real SQLite audit triggers still run on acquisition, renewal and final release', async t => {
+familyRows[0].push(['benign real SQLite audit triggers still run on acquisition, renewal and final release', async t => {
   const { ctx } = nativeSetup(t), { job } = await nativeJob(ctx), db = ctx.storage.database;
   db.exec(`CREATE TABLE native_import_audit(state TEXT,lease_token TEXT);
     CREATE TRIGGER audit_lease AFTER UPDATE OF lease_expires ON ik_jobs BEGIN INSERT INTO native_import_audit VALUES(NEW.state,NEW.lease_token); END;`);
@@ -81,4 +83,6 @@ test('benign real SQLite audit triggers still run on acquisition, renewal and fi
   assert.ok(audit.some(row => row.state === 'completed' && row.lease_token === null));
   assert.ok(audit.some(row => row.state === 'undone' && row.lease_token === null));
   assert.equal(nativeRows(ctx).length, 0);
-});
+}]);
+
+ test("core claim cleanup preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

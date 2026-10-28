@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
@@ -5,7 +7,7 @@ import { sqlitePort, sqliteTargets } from './sqlite-runtime.ts';
 import { buildImportPlan } from '../../src/plan/index.ts';
 import { d1Schema, preservedUndoEvolution, initializeD1ImportStorage, readD1ImportJob, readD1ImportUndoReport, applyD1ImportBatches, undoD1Import, canonicalJson } from '../../src/d1/index.ts';
 
-test('evolution preserves existing strict jobs and is idempotent through setup', async t => {
+familyRows[0].push(['evolution preserves existing strict jobs and is idempotent through setup', async t => {
   const native = new DatabaseSync(':memory:'); t.after(() => native.close());
   const db = sqlitePort(native);
   native.exec(d1Schema.slice(0, -preservedUndoEvolution.length).join(';'));
@@ -20,16 +22,18 @@ test('evolution preserves existing strict jobs and is idempotent through setup',
   await assert.rejects(undoD1Import('legacy', { ...ctx, reversalPolicy: 'preserve-conflicts' }), /REVERSAL_POLICY_CONFLICT/);
   await applyD1ImportBatches('legacy', ctx);
   assert.equal((await undoD1Import('legacy', ctx)).state, 'undone');
-});
-test('partial evolution fails clearly instead of accepting missing integrity columns', async t => {
+}]);
+familyRows[0].push(['partial evolution fails clearly instead of accepting missing integrity columns', async t => {
   const native = new DatabaseSync(':memory:'); t.after(() => native.close());
   native.exec(d1Schema.slice(0, -preservedUndoEvolution.length).join(';'));
   native.exec(preservedUndoEvolution[0]);
   await assert.rejects(initializeD1ImportStorage(sqlitePort(native)), /IMPORT_SCHEMA_EVOLUTION_INCOMPLETE/);
-});
-test('setup rejects a partially removed creation-integrity evolution', async t => {
+}]);
+familyRows[0].push(['setup rejects a partially removed creation-integrity evolution', async t => {
   const native = new DatabaseSync(':memory:'); t.after(() => native.close());
   const db = sqlitePort(native); await initializeD1ImportStorage(db);
   native.exec('DROP TRIGGER ik_d1_creation_plan_capture');
   await assert.rejects(initializeD1ImportStorage(db), /IMPORT_SCHEMA_EVOLUTION_INCOMPLETE/);
-});
+}]);
+
+ test("d1 undo evolution preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

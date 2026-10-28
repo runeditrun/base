@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sqliteRuntime } from './sqlite-runtime.ts';
@@ -6,7 +8,7 @@ import { readAtomic, guard, sql } from '../../src/d1/database.ts';
 import { packGuards, requestContext } from '../../src/d1/budget.ts';
 import { observeReads, totalChanges } from './read-only-tools.ts';
 
-for (const [name, setup] of [['SQLite', sqliteRuntime], ['actual D1', runtime]] as const) test(`${name}: every packed scalar is checked, preserving SQL and parameter ordering`, async t => {
+for (const [name, setup] of [['SQLite', sqliteRuntime], ['actual D1', runtime]] as const) familyRows[0].push([`${name}: every packed scalar is checked, preserving SQL and parameter ordering`, async t => {
   const r = await setup(t), db = r.db();
   const observed = observeReads(db), ctx = { ...r.context(), storage: { ...r.context().storage, database: observed.database } };
   // Each uses a subquery, JSON path, quote and three binds, forcing a bind split
@@ -23,9 +25,9 @@ for (const [name, setup] of [['SQLite', sqliteRuntime], ['actual D1', runtime]] 
   const wide = Array.from({ length: 53 }, (_, i) => guard(sql(`1 /* distinct ${i} */`)));
   assert.equal(packGuards(wide, true).length, 2);
   await readAtomic(ctx, wide);
-});
+}]);
 
-test('SELECT fence rejects a whole over-budget batch before executing any group', async t => {
+familyRows[0].push(['SELECT fence rejects a whole over-budget batch before executing any group', async t => {
   const r = await sqliteRuntime(t), observed = observeReads(r.db());
   const ctx = requestContext({ ...r.context(), storage: { ...r.context().storage, database: observed.database } });
   await ctx.storage.database.batch(Array.from({ length: 999 }, () => ctx.storage.database.prepare('SELECT 1')));
@@ -36,15 +38,15 @@ test('SELECT fence rejects a whole over-budget batch before executing any group'
   await readAtomic(ctx, [guard(sql('1'))]);
   assert.equal(observed.executed.length, 1000);
   await assert.rejects(readAtomic(ctx, []), /IMPORT_D1_REQUEST_LIMIT/);
-});
+}]);
 
-test('SELECT guard SQL/provider errors remain errors with zero changes', async t => {
+familyRows[0].push(['SELECT guard SQL/provider errors remain errors with zero changes', async t => {
   const r = await sqliteRuntime(t), count = totalChanges(r.native());
   await assert.rejects(readAtomic(r.context(), [guard(sql('(SELECT private_value FROM absent_table)'))]), /no such table/);
   assert.equal(totalChanges(r.native()), count);
-});
+}]);
 
-test('incomplete, malformed and explicitly failed real batch replies reject before publication', async t => {
+familyRows[0].push(['incomplete, malformed and explicitly failed real batch replies reject before publication', async t => {
   const r = await sqliteRuntime(t), db = r.db(), count = totalChanges(r.native());
   // Deliberate broken transport replies around actual successful SQL, never
   // fabricated success values. Both valid driver shapes run in the tests above.
@@ -54,9 +56,9 @@ test('incomplete, malformed and explicitly failed real batch replies reject befo
     await assert.rejects(readAtomic(ctx, [guard(sql('1'))]), /IMPORT_ATOMIC_GUARD/);
   }
   assert.equal(totalChanges(r.native()), count);
-});
+}]);
 
-test('read packing retains parameter snapshots, byte ceilings and mutation ordering', () => {
+familyRows[0].push(['read packing retains parameter snapshots, byte ceilings and mutation ordering', () => {
   const predicate = sql('length(?)=?', '🌱'.repeat(200000), 200000), first = guard(predicate);
   predicate.sql = '0'; predicate.params![0] = 'changed';
   const second = guard(sql('length(?)=?', '漢'.repeat(266667), 266667));
@@ -70,4 +72,6 @@ test('read packing retains parameter snapshots, byte ceilings and mutation order
   assert.equal(writing.length, 3); assert.equal(writing[1], mutation);
   assert.ok(writing[0].sql.startsWith('INSERT INTO ik_d1_assertions'));
   assert.ok(writing[2].sql.startsWith('INSERT INTO ik_d1_assertions'));
-});
+}]);
+
+ test("d1 read guard packing preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

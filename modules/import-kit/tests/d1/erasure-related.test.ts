@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sqliteRuntime, sqliteTargets } from './sqlite-runtime.ts';
@@ -34,7 +36,7 @@ async function fixture(t: any) {
 // The product erases the person and redacts the kept record in the same batch.
 const native = () => [...sqliteTargets.remove('workspace', 'record', 'person'), ...sqliteTargets.write({ destination: 'workspace', targetKind: 'record', targetId: 'company', revision: 'redacted', value: { id: 'company', note: 'Account contact <erased>' } })];
 
-test('related erasure withdraws kept, rejected and original-only copies while severing undo from the kept record', async t => {
+familyRows[0].push(['related erasure withdraws kept, rejected and original-only copies while severing undo from the kept record', async t => {
   const { r, context, first, second } = await fixture(t);
   assert.ok(retainedText(r).includes(person), 'The fixture retains the person in plans and originals');
   // Target-only erasure leaves the kept record's source and the rejected row: the gap this option closes.
@@ -53,9 +55,9 @@ test('related erasure withdraws kept, rejected and original-only copies while se
   await undoD1Import(second.job.id, context());
   assert.equal(await sqliteTargets.read(r.db(), 'workspace', 'record', 'other'), undefined);
   assert.ok(!retainedText(r).includes(person));
-});
+}]);
 
-test('related erasure refuses a job created after its scan and changes nothing', async t => {
+familyRows[0].push(['related erasure refuses a job created after its scan and changes nothing', async t => {
   const { r, context } = await fixture(t);
   const late = await planD1Import(bundle('late.json', [{ id: 'late', note: person }]), mapping, context());
   let entered = false;
@@ -66,4 +68,6 @@ test('related erasure refuses a job created after its scan and changes nothing',
   assert.ok(await sqliteTargets.read(r.db(), 'workspace', 'record', 'person'), 'The person is not deleted by a refused erasure');
   assert.ok(retainedText(r).includes(person));
   await assert.rejects(eraseD1ImportTarget('record', 'person', native(), { ...context(), maxBatchBytes: 2 * 1024 * 1024 }, related), /IMPORT_RELATED_ERASURE_UNBOUNDED_ONLY/);
-});
+}]);
+
+ test("d1 erasure related preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

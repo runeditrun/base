@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -18,7 +20,7 @@ function bundle(recordBytes: number): SourceBundle {
 const mapping = {version: 'v1', map: (r: any) => ({effects: [{targetKind: 'record', targetId: r.sourceId, value: r.payload}]})};
 
 // One plan written in one transaction, and one large enough to be staged.
-for (const [name, size] of [['one transaction', 60_000], ['bounded staging', 600_000]] as const) test(`ordinary creation retains a normalized plan with the adapter's codec through ${name}`, async t => {
+for (const [name, size] of [['one transaction', 60_000], ['bounded staging', 600_000]] as const) familyRows[0].push([`ordinary creation retains a normalized plan with the adapter's codec through ${name}`, async t => {
   const r = await sqliteRuntime(t), codec: D1PlanCodec = {id: 'identity-v1', encode: plan => plan as any, decode: plan => plan as any};
   let staged = 0;
   const database = {prepare: (query: string) => r.db().prepare(query), batch: async (members: any[]) => { staged += members.filter(m => String(m.query).startsWith('INSERT INTO ik_d1_staging_chunks(')).length; return r.db().batch(members); }};
@@ -39,4 +41,6 @@ for (const [name, size] of [['one transaction', 60_000], ['bounded staging', 600
   while (current.state !== 'undone') current = await undoD1Import(job.id, context());
   assert.equal(native.prepare('SELECT count(*) n FROM native_records').get()!.n, 0);
   assert.deepEqual((await readD1ImportOriginals(job.id, context()))[0].original, original.original);
-});
+}]);
+
+ test("codec creation preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });
