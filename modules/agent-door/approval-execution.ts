@@ -9,13 +9,14 @@ import { decide } from './policy/decide.ts'
 import { canonical } from './policy/document.ts'
 import { policyRefusal, policyState } from './policy-store.ts'
 import { savedTool } from './resource-tool.ts'
+import { resolveTarget } from './target.ts'
 
 /** This person request executes once and has an audit separate from the held call. */
 export async function executeApproval(rt: Runtime, id: string, saved: SavedApproval, approvals: ApprovalMark[]) {
   const row = newAudit(rt, saved.principal, saved.tool, saved.door, null)
   row.decision_id = saved.decision_id
   row.idempotency_key = saved.key
-  if (saved.tool === 'resources/read') row.resource = String(saved.args.uri)
+  row.resource = saved.tool === 'resources/read' ? String(saved.args.uri) : saved.summary.target?.kind && saved.summary.target.id ? { kind: saved.summary.target.kind, id: saved.summary.target.id } : null
   let result = { ...saved.result }, locked = false, effects: Effect[] = [], evidence = saved.evidence
   const by = [...new Set(approvals.map(mark => mark.person))]
   const approvers: Array<{ id: string; name: string }> = []
@@ -34,6 +35,7 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
         if (!approvers.some(item => item.id === person.id)) approvers.push({ id: person.id, name: person.name })
       }
       const ctx = context(rt, principal, saved.door, [], approvers)
+      if (tool.target) row.resource = await resolveTarget(tool, saved.args, ctx)
       const authority = await tool.authority?.(saved.args, ctx)
       const currentRevision = tool.revision && saved.expected_revision !== undefined ? await tool.revision(saved.args, ctx) : undefined
       if (tool.widens === false && authority?.widens) result = { ...result, outcome: 'refused', code: 'narrowing_contract_violation' }
@@ -49,7 +51,7 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
         evidence = { document: state.document!, usage: sums, classes, result: fresh.result, rules: fresh.classes }
         result.decision = { id: saved.decision_id, disposition: fresh.result, revision: state.revision, classes: fresh.classes.map(item => ({ ...item, facts: classes.find(value => value.class === item.class)!.facts })) }
         recordDecision(row, result.decision)
-        if (!sameFacts(saved.classes, classes) || await digest(await summary(tool, saved.args, ctx)) !== saved.summary_sha256 || canonical(fresh.classes) !== canonical(saved.evidence.rules)) throw new Error('approval_evidence_changed')
+        if (!sameFacts(saved.classes, classes) || await digest(await summary(tool, saved.args, ctx, typeof row.resource === 'object' ? row.resource : null)) !== saved.summary_sha256 || canonical(fresh.classes) !== canonical(saved.evidence.rules)) throw new Error('approval_evidence_changed')
         row.approval = { id, by }
         if (!await startExecution(rt, row, principal, classes, state, evidence)) throw new Error(principal.consent && (await policyState(rt)).revoked.consents.includes(principal.consent) ? 'consent_revoked' : 'decision_busy')
         await releaseDecision(rt, row.id); locked = false

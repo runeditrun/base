@@ -1,4 +1,4 @@
-import type { ClassAndFacts, CallResult, Principal, Runtime, ToolContext, ToolDefinition, UndoContext, ApprovalDisplaySummary } from './types.ts'
+import type { ClassAndFacts, CallResult, Principal, Runtime, ToolContext, ToolDefinition, UndoContext, ApprovalDisplaySummary, NativeTarget } from './types.ts'
 import { validateSchema } from './json-schema.ts'
 import { ToolRefusal } from './errors.ts'
 import { canonical } from './policy/document.ts'
@@ -8,6 +8,7 @@ import { removeUsage } from './counting.ts'
 import { policyState } from './policy-store.ts'
 import { nativeProof } from './native-proof.ts'
 import { narrowPrincipal } from './principal.ts'
+import { resolveTarget } from './target.ts'
 
 export interface Effect { type: string; uri: string; data?: Record<string, unknown> }
 export function context(rt: Runtime, principal: Principal, door: ToolContext['door'], effects: Effect[], approvers: ToolContext['approvers'] = []): ToolContext {
@@ -57,14 +58,15 @@ export function undoContext(rt: Runtime, person: Principal['person'], door: Tool
   return { db: rt.options.db, person, agent: null, actor: { kind: 'person', person: { id: person.id, name: person.name }, label: person.name }, seed: rt.options.seed, origin: rt.options.origin, now: rt.now, door,
     emit(type, uri, data) { effects.push({ type, uri, data }) } }
 }
-export async function summary(tool: ToolDefinition, args: Record<string, unknown>, ctx: ToolContext): Promise<ApprovalDisplaySummary> {
-  if (tool.readOnly) return tool.name === 'resources/read' ? { uri: String(args.uri) } : { arguments: args }
+export async function summary(tool: ToolDefinition, args: Record<string, unknown>, ctx: ToolContext, resolved?: NativeTarget | null): Promise<ApprovalDisplaySummary> {
+  const target = resolved === undefined ? await resolveTarget(tool, args, ctx) : resolved
+  if (tool.readOnly) return { ...(tool.name === 'resources/read' ? { uri: String(args.uri) } : { arguments: args }), ...(target ? { target } : {}) }
   const value = await tool.summary!(args, ctx)
   const schema = { type: 'object', additionalProperties: false, properties: {
-    target: { type: 'object', additionalProperties: false, properties: { id: { type: 'string' }, name: { type: 'string' }, email: { type: 'string' } } },
+    target: { type: 'object', additionalProperties: false, properties: { kind: { type: 'string' }, id: { type: 'string' }, name: { type: 'string' }, email: { type: 'string' } } },
     recipients: { type: 'array', items: { type: 'string' } }, amount: { type: 'object', required: ['value','currency'], additionalProperties: false, properties: { value: { type: 'number' }, currency: { type: 'string' } } },
     payee: { type: 'string' }, role: { type: 'string' }, items: { type: 'array', items: { type: 'string' } },
   } }
   if (!validateSchema(schema, value)) throw new Error('summary_invalid')
-  return value
+  return target ? { ...value, target: { ...value.target, ...target } } : value
 }

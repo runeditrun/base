@@ -45,9 +45,22 @@ export default {
         async run(args, ctx) { await env.DB.prepare('INSERT INTO test_sent(id) VALUES(?)').bind(args.id).run(); ctx.emit('record.sent', `synthetic://record/${args.id}`); return { result: { id: args.id } } } }),
       defineTool({ name: 'synthetic.access.change', title: 'Change authority', description: 'Change authority of a named person.', scope: 'records:write', readOnly: false, summary: args => ({ target: { id: String(args.id) }, role: String(args.role ?? 'admin') }), inputSchema: object({ id: text, role: {type:'string',enum:['admin','member']} }, ['id']), outputSchema: idInput, classes: ['access'], clauses: ['BASE-AGENT-006'], authority: async args => ({ subject: args.id as string, widens: args.role !== 'member' }), classify: (args,ctx) => { if (args.role !== 'member' && String(args.id).toLowerCase() === ctx.person.email.toLowerCase()) throw new ToolRefusal('classifier_refused'); return [{ class: 'access', facts: { measure: 1, direction: args.role === 'member' ? 'narrows' : 'widens' } }] }, async run(args, ctx) { await env.DB.prepare("UPDATE oa_operators SET role=? WHERE id=? AND role<>'owner'").bind(args.role ?? 'admin',args.id).run(); ctx.emit('operator.role.changed', `synthetic://operator/${args.id}`); return { result: { id: args.id } } } }),
     ]
+    if (config.nativeTargets) for (const tool of tools) if (tool.inputSchema.properties?.id) Object.assign(tool, {
+      target: async (args: Record<string, unknown>) => {
+        const record = await read(String(args.id))
+        if (config.nativeTargets === 'invalid') return { kind: 'record' }
+        return record && record.exposure !== 'hidden' ? { kind: 'record', id: record.id } : null
+      },
+    })
+    if (config.recordSecurity) Object.assign(tools.find(tool => tool.name === 'synthetic.records.write')!, {
+      classes: ['security'], sponsorEscalation: false, authority: async () => null,
+      classify: () => [{ class: 'security', facts: { measure: 1, setting: 'record-visibility' } }],
+    })
+    if (config.selfWideningClaim) Object.assign(tools.find(tool => tool.name === 'synthetic.access.change')!, { sponsorEscalation: false })
+    const selectedTools = config.toolSubset ? tools.filter(tool => config.toolSubset.includes(tool.name)) : tools
     const door = createAgentDoor({ seed: config.seed, name: 'Synthetic Base', specialist: 'operations', origin: config.origin, db: env.DB, trust: JSON.parse(env.TRUST), now,
       currentScopes: async principal => { const grant = await env.DB.prepare('SELECT scopes FROM test_grants WHERE agent=?').bind(principal.agent.id).first<{ scopes: string }>(); return grant ? JSON.parse(grant.scopes) : principal.scopes },
-      tools: config.toolNames ? config.toolNames.map((name: string) => ({ ...tools[0], name })) : tools, limits: config.limits, people: operatorAuthPeople({ db: env.DB, allowList, session: request => auth.getSession(request) }),
+      tools: config.toolNames ? config.toolNames.map((name: string) => ({ ...tools[0], name })) : selectedTools, limits: config.limits, people: operatorAuthPeople({ db: env.DB, allowList, session: request => auth.getSession(request) }),
       localCredentials: async request => request.headers.get('authorization') === `Bearer ${env.LOCAL_TOKEN}` ? { sponsor: { id: (await env.DB.prepare('SELECT claim_id FROM oa_bootstrap WHERE singleton=1').first<{claim_id:string}>())!.claim_id }, agent: { id: 'synthetic-base-local', name: 'Synthetic Local' }, scopes: ['records:read','records:write','events:read'] } : null,
       resources: [{ uriTemplate: 'synthetic://record/{id}', name: 'Record', scope: config.resourceScope, classes: ['sensitive'], classify: () => [{ class: 'sensitive', facts: { measure: 1, kind: 'tax' } }], read: async (uri, ctx) => { await env.DB.prepare("INSERT INTO test_contexts(kind) VALUES('read')").run(); const row = await read(uri.split('/').pop()!); return row && row.exposure !== 'hidden' && (!row.exposure.startsWith('service:') || ctx.scopes.includes(row.exposure) && ctx.clientId === row.exposure) ? { json: row, untrusted: true } : null } }],
       onEvent: async event => { await env.DB.prepare('INSERT INTO test_callbacks(id,event) VALUES(?,?)').bind(event.id, JSON.stringify(event)).run() },

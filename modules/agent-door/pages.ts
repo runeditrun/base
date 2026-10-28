@@ -24,11 +24,12 @@ const empty = (text: string) => `<p class="muted">${escape(text)}</p>`
 
 function actionSummary(summary: ApprovalDisplaySummary | undefined): string {
   if (!summary) return '<p data-approval-summary>No action summary was recorded.</p>'
-  if ('arguments' in summary) return `<div data-approval-summary><pre>${pretty(summary.arguments)}</pre></div>`
-  if ('uri' in summary) return `<div data-approval-summary><dl><dt>Resource</dt><dd>${escape(summary.uri)}</dd></dl></div>`
+  const target = summary.target?.kind ? `<dl><dt>Target kind</dt><dd>${escape(summary.target.kind)}</dd><dt>Target ID</dt><dd>${escape(summary.target.id)}</dd></dl>` : ''
+  if ('arguments' in summary) return `<div data-approval-summary>${target}<pre>${pretty(summary.arguments)}</pre></div>`
+  if ('uri' in summary) return `<div data-approval-summary>${target}<dl><dt>Resource</dt><dd>${escape(summary.uri)}</dd></dl></div>`
   const fields: Array<[string, unknown]> = []
   if (summary.target) {
-    for (const [key, label] of [['name', 'Target name'], ['id', 'Target ID'], ['email', 'Target email']] as const) {
+    for (const [key, label] of [['kind', 'Target kind'], ['name', 'Target name'], ['id', 'Target ID'], ['email', 'Target email']] as const) {
       if (summary.target[key]) fields.push([label, summary.target[key]])
     }
   }

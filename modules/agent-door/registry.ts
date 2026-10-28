@@ -19,6 +19,8 @@ export function registry(options: AgentDoorOptions): ToolDefinition[] {
     if (!tool.inputSchema || tool.inputSchema.type !== 'object' || !schemaValid(tool.inputSchema) || tool.outputSchema === undefined || !schemaValid(tool.outputSchema)) throw new TypeError(`Missing or invalid schema: ${tool.name}`)
     if (!tool.scope || !tool.title || !tool.description || typeof tool.readOnly !== 'boolean' || !Array.isArray(tool.clauses) || typeof tool.classify !== 'function' || typeof tool.run !== 'function') throw new TypeError(`Invalid tool: ${tool.name}`)
     if ((tool.proof !== undefined || tool.proofKind !== undefined) && (tool.proof !== 'native' || typeof tool.proofKind !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/.test(tool.proofKind) || typeof options.nativeProof?.verify !== 'function' || typeof options.nativeProof?.handoff !== 'function')) throw new TypeError(`Missing native proof verifier or kind: ${tool.name}`)
+    if (tool.target !== undefined && typeof tool.target !== 'function') throw new TypeError(`Invalid target resolver: ${tool.name}`)
+    if (tool.sponsorEscalation !== undefined && (typeof tool.sponsorEscalation !== 'boolean' || !tool.classes.some(cls => cls === 'access' || cls === 'security'))) throw new TypeError(`Invalid sponsor escalation contract: ${tool.name}`)
     if ('cost' in tool) throw new TypeError(`Provider cost is not enforced: ${tool.name}`)
     if (!tool.readOnly && typeof tool.summary !== 'function') throw new TypeError(`Missing approval summary: ${tool.name}`)
     if (tool.classes.some(cls => cls === 'access' || cls === 'security') && typeof tool.authority !== 'function') throw new TypeError(`Missing authority: ${tool.name}`)
@@ -35,7 +37,7 @@ export function registry(options: AgentDoorOptions): ToolDefinition[] {
 export function describeTool(tool: ToolDefinition) {
   return { name: tool.name, title: tool.title, description: tool.description, inputSchema: tool.inputSchema, outputSchema: tool.outputSchema,
     annotations: { readOnlyHint: tool.readOnly, destructiveHint: tool.classes.includes('destructive'), openWorldHint: tool.classes.includes('external') },
-    _meta: { 'com.runeditrun/classes': tool.classes, 'com.runeditrun/clauses': tool.clauses, 'com.runeditrun/scope': tool.scope, ...(tool.proof ? { 'com.runeditrun/proof': tool.proof, 'com.runeditrun/proof-kind': tool.proofKind } : {}), ...(tool.widens === false ? { 'com.runeditrun/widens': false, 'com.runeditrun/narrowing': tool.narrowing } : {}) } }
+    _meta: { 'com.runeditrun/classes': tool.classes, 'com.runeditrun/clauses': tool.clauses, 'com.runeditrun/scope': tool.scope, ...(tool.sponsorEscalation === undefined ? {} : { 'com.runeditrun/sponsor-escalation': tool.sponsorEscalation }), ...(tool.target ? { 'com.runeditrun/target': true } : {}), ...(tool.proof ? { 'com.runeditrun/proof': tool.proof, 'com.runeditrun/proof-kind': tool.proofKind } : {}), ...(tool.widens === false ? { 'com.runeditrun/widens': false, 'com.runeditrun/narrowing': tool.narrowing } : {}) } }
 }
 export function templateMatches(template: string, uri: string) {
   const pattern = template.split(/\{[^}]+\}/).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^/?#]+')

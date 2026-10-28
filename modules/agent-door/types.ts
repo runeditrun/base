@@ -23,11 +23,12 @@ export interface ToolContext {
   now(): number; door: 'mcp' | 'embedded'; approvers: Array<{ id: string; name: string }>
   emit(type: string, uri: string, data?: Record<string, unknown>): void
 }
+export interface NativeTarget { kind: string; id: string }
 export interface ApprovalSummary {
-  target?: { id?: string; name?: string; email?: string }; recipients?: string[]
+  target?: { kind?: string; id?: string; name?: string; email?: string }; recipients?: string[]
   amount?: { value: number; currency: string }; payee?: string; role?: string; items?: string[]
 }
-export type ApprovalDisplaySummary = ApprovalSummary | { arguments: Record<string, unknown> } | { uri: string }
+export type ApprovalDisplaySummary = (ApprovalSummary | { arguments: Record<string, unknown> } | { uri: string }) & Pick<ApprovalSummary, 'target'>
 export interface UndoContext {
   db: D1Database; person: Person; agent: null; actor: { kind: 'person'; person: { id: string; name: string }; label: string }
   seed: string; origin: string; now(): number; door: 'mcp' | 'embedded'
@@ -40,9 +41,11 @@ export interface ToolDefinition {
   run(args: Record<string, unknown>, ctx: ToolContext): Promise<{ result: unknown; resources?: Array<{ uri: string; name: string }>; undo?: unknown }>
   revisionType?: 'integer' | 'number' | 'string'
   revision?(args: Record<string, unknown>, ctx: ToolContext): Promise<string | number | null>
+  target?(args: Record<string, unknown>, ctx: ToolContext): NativeTarget | null | Promise<NativeTarget | null>
   summary?(args: Record<string, unknown>, ctx: ToolContext): ApprovalSummary | Promise<ApprovalSummary>
   undo?(saved: unknown, ctx: UndoContext): Promise<void>
   authority?(args: Record<string, unknown>, ctx: ToolContext): Promise<{ subject: string; widens: boolean } | null>
+  sponsorEscalation?: boolean
   proof?: 'native'; proofKind?: string
   widens?: false; narrowing?: { effect: 'revoke' | 'narrow'; target: string }
   untrusted?: boolean

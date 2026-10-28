@@ -48,14 +48,14 @@ export function accessTools(bindings: Bindings): ToolDefinition[] {
     }),
     defineTool({
       name: 'base.access.role', title: 'Change a teammate role', description: 'Change a teammate between member and admin using native authorization. Delegations cannot change their sponsor or an owner.',
-      scope: 'access:write', readOnly: false, inputSchema: object({ id, role }), outputSchema: result, classes: ['access'], clauses,
+      scope: 'access:write', readOnly: false, sponsorEscalation: false, inputSchema: object({ id, role }), outputSchema: result, classes: ['access'], clauses,
       async classify(args, ctx) {
         const target = await roleTarget(args, ctx)
         if (target.role === args.role) throw new ToolRefusal('role_unchanged')
         return [{ class: 'access', facts: { measure: 1, direction: args.role === 'admin' ? 'widens' : 'narrows' } }]
       },
       async revision(args, ctx) { return (await readOperator(ctx.db, args.id as string))?.version ?? null },
-      async authority(args, ctx) { const target = await readOperator(ctx.db, args.id as string); return target ? { subject: target.id, widens: args.role === 'admin' && target.role !== 'admin' } : null },
+      async authority(args, ctx) { const target = await readOperator(ctx.db, args.id as string); return target ? { subject: target.id, widens: args.role === 'admin' && target.role === 'member' } : null },
       async summary(args, ctx) {
         const target = await roleTarget(args, ctx)
         return { target: { id: target.id, name: target.displayName, email: target.email }, role: args.role as string }
