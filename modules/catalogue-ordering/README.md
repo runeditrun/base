@@ -186,7 +186,7 @@ The public error codes are:
 | Codes | Meaning/action |
 |---|---|
 | `invalid_input`, `invalid_quantity`, `capacity` | Closed input shape, exact quantity/profile or bounded payload refused. Correct the request. |
-| `unavailable_offer`, `unpriced_offer`, `currency_mismatch` | Source identity/availability, missing price or incompatible monetary metadata. Resolve native facts before review. |
+| `unavailable_offer`, `unpriced_offer`, `currency_mismatch` | Source identity or availability, missing price or incompatible monetary metadata. Resolve native facts before review. |
 | `stale_review`, `revision_conflict` | Commercial/review/draft state changed. Reload and review the current revision. |
 | `authority_refused`, `not_found` | Current permission refused or requested local record absent. |
 | `idempotency_conflict` | Operation key already belongs to different content/actor. Never automatically change the key and resubmit. |

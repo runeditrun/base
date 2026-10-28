@@ -35,7 +35,7 @@ source. Production imports only `src/base/modules/catalogue-ordering/index.ts`;
 never import the fixture, Node helpers or test controls into a Worker. Copies may
 omit upstream tests, as described by [Copied Base source](../../edition-authoring/README.md#copied-base-source).
 Keep native adapters outside the copied directory. Commit `base-copies.json`,
-copied files and the seed's normal source lock/baselines together. Record the CLI
+copied files and the seed's normal source lock and baselines together. Record the CLI
 version, full runtime commit, copied origin/destination and schema provenance in
 the seed's adoption evidence. Run its declared lock/check commands; the installed
 authoring helper is `node node_modules/@runeditrun/rer/edition-authoring/cli.mjs`.
@@ -69,7 +69,7 @@ ownership and record its Base source commit separately. Never overwrite,
 renumber, delete or refresh applied SQL. Later changes get new migration numbers.
 If `verify-base` discovers the verbatim numbered SQL as `unrecordedCopies`, list
 that seed-owned immutable migration in `base-copies.json`'s `ignore` array and
-retain its source commit/digest in adoption evidence. The refreshable schema
+retain its source commit and digest in adoption evidence. The refreshable schema
 template under the module copy remains recorded normally.
 
 For an already populated seed:
