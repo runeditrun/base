@@ -9,7 +9,8 @@ export function authoringCommand(options) {
   return options.verb === 'adopt-edition' ? adoptEdition(options.cwd) : refreshCopies(options.cwd, copyOptions([
    ...(options.editionMigration ? options.editionMigration.split(',').flatMap(id => ['--edition-migration', id]) : []),
    options.ref, '--record', options.record ?? 'base-copies.json',
-   ...(options.base ? ['--base', resolve(options.cwd, options.base)] : []), ...(options.offline ? ['--offline'] : []),
+   ...(options.base ? ['--base', resolve(options.cwd, options.base)] : []),
+   ...(options.baseArchive ? ['--base-archive', resolve(options.cwd, options.baseArchive)] : []), ...(options.offline ? ['--offline'] : []),
   ], 1));
  } catch (error) { throw refuse(error.message); }
 }

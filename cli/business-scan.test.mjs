@@ -113,6 +113,8 @@ test('packed business scan discovers names across manifests, infrastructure, CI 
  absent(output, ['syntheticprivatekind', 'Synthetic::Private::Value', 'synthetic-private-registry.invalid']);
  const expected = [
   ['package.json', '@stripe/stripe-js'], ['composer.json', 'stripe/stripe-php'],
+  // A vendor known by its package and its key names (Algolia, from the M2 stage run).
+  ['package.json', 'algoliasearch', 'live-use'], ['.env.example', 'ALGOLIA_APP_ID', 'trace'], ['.env.example', 'ALGOLIA_ADMIN_KEY', 'trace'],
   ['requirements.txt', 'sendgrid'], ['pyproject.toml', 'boto3'], ['Gemfile', 'sidekiq'],
   ['go.mod', 'github.com/stripe/stripe-go/v81'], ['Cargo.toml', 'reqwest'],
   ['.env.example', 'SYNTHETIC_MAIL_TRANSPORT', 'trace'],

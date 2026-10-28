@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createPortability,readArchive,excludedTable } from '../index.mjs';
 import { migrate } from '../../container/migrations.mjs';
-import { runtime,seed,archive,collect,rows } from './helpers.mjs';
+import { runtime,seed,archive,collect,rows,restore } from './helpers.mjs';
 import { fixturePolicy } from './fixture-policy.mjs';
 test('snapshot stays consistent while writes land between create and advance',async t=>{
   const f=await runtime(t);await seed(f);const s=await f.connect(),id=await s.exports.create();
@@ -25,6 +25,22 @@ test('unlisted virtual tables fail by name; listed derived FTS tables are exclud
   await assert.rejects(f.connect(),/virtual_table:search/);
   const s=await createPortability({db:f.db,policy:{product:'fixture',derivedTables:['search']}});const a=await archive(s);
   assert.ok(a.manifest.excludedTables.includes('search'));assert.ok(!a.manifest.tables.some(x=>x.name.startsWith('search')));
+  const ddl=[
+    'CREATE TABLE messages(id INTEGER PRIMARY KEY,body TEXT NOT NULL)',
+    "CREATE VIRTUAL TABLE message_search USING fts5(body, /* restored content */ content = 'messages', content_rowid = 'id')",
+    "CREATE VIRTUAL TABLE contentless_search USING fts5(body, content='')",
+  ];
+  await f.db.batch(ddl.map(sql=>f.db.prepare(sql)));
+  await f.db.prepare("INSERT INTO messages VALUES(1,'restored lantern')").run();
+  const policy={product:'fixture',derivedTables:['search','message_search','contentless_search']};
+  const bundle=await archive(await createPortability({db:f.db,policy}));
+  const target=await runtime(t,{policy});
+  await target.db.batch(['CREATE VIRTUAL TABLE search USING fts5(text)',...ddl].map(sql=>target.db.prepare(sql)));
+  const result=await restore(await target.connect(),bundle);
+  assert.equal(result.status.phase,'complete');
+  assert.deepEqual((await target.db.prepare("SELECT rowid FROM message_search WHERE message_search MATCH 'lantern'").all()).results,[{rowid:1}]);
+  assert.deepEqual((await target.db.prepare("SELECT rowid FROM contentless_search WHERE contentless_search MATCH 'lantern'").all()).results,[]);
+  assert.deepEqual((await target.db.prepare("SELECT rowid FROM search WHERE search MATCH 'lantern'").all()).results,[]);
 });
 test('foreign keys into excluded tables fail by table name',async t=>{
   const f=await runtime(t);await f.db.prepare('CREATE TABLE dependent(id TEXT,parent TEXT REFERENCES private_notes(id))').run();await assert.rejects(f.connect(),/excluded_foreign_key:dependent:private_notes/);
