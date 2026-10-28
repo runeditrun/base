@@ -16,7 +16,7 @@ test('packed Business setup provisions through owner routes, repeats as a read a
  const bytes = await readFile(await buildPackage(base, join(directory, 'package')));
  const packed = join(directory, 'packed');
  await writePackage(readPackage(bytes, { integrity: integrity(bytes) }), packed);
- const session = crypto.randomUUID(), cookie = '__Host-rer_session=' + session;
+ const session = crypto.randomUUID().replaceAll('-', ''), cookie = '__Host-rer_session=' + session;
  const sessionFile = join(directory, 'owner.session');
  await writeFile(sessionFile, cookie + '\n', { mode: 0o600 });
  const remote = await setupServer(t, cookie);

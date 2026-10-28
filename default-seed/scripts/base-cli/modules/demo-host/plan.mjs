@@ -57,6 +57,7 @@ export function demoPlan({ project, environment, compatibilityDate, originVar, h
 
 /** The demo's record of what `rer deploy --demo` creates, kept on the provider so a
  * fresh checkout (a CI runner) can remove it: the deploy writes it as the Worker
- * version's message, and only a Worker serving it is taken for the demo's own. */
+ * version's message. A secret-only successor can prove continuity against that
+ * retained version without changing the provider during inventory. */
 export const demoRecord = ({ worker, hostname, hostnames = [hostname], container }) =>
   `rer-demo:${hash({ worker, hostname, container, ...(hostnames.length > 1 ? { hostnames } : {}) })}`;

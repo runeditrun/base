@@ -10,26 +10,9 @@ import { HOSTED_ORIGIN, serveHosted } from './hosted-output.mjs';
 import { createAgentConformanceNetwork } from './agent-network.mjs';
 import { contained } from './project.mjs';
 import { RerError } from './errors.mjs';
-
-const defaultEmail = 'synthetic-base-1@example.com';
-const ownerBindingValues = ['issuer', 'installationId', 'appOrigin', 'publicKeys', 'email', 'sub', 'token', 'sessionSecret'];
-
-async function verificationOwner(root, value = {}) {
- if (!value || typeof value !== 'object' || Array.isArray(value)
-  || Object.keys(value).some(key => !['email', 'emailField', 'tokenField', 'bindings', 'initializer'].includes(key))) throw new RerError('agent_owner_invalid', 'verification.owner must declare only email, emailField, tokenField, bindings and initializer.', 1);
- const email = value.email ?? defaultEmail;
- if (typeof email !== 'string' || email !== email.trim().toLowerCase() || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email)) throw new RerError('agent_owner_invalid', 'verification.owner.email must be a canonical owner email.', 1);
- for (const key of ['emailField', 'tokenField']) if (value[key] !== undefined && !/^[A-Z][A-Z0-9_]{0,63}$/.test(value[key])) throw new RerError('agent_owner_invalid', `verification.owner.${key} must name a production binding.`, 1);
- if (value.bindings !== undefined && (!value.bindings || typeof value.bindings !== 'object' || Array.isArray(value.bindings)
-  || Object.entries(value.bindings).some(([name, source]) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || !ownerBindingValues.includes(source)))) throw new RerError('agent_owner_invalid', `verification.owner.bindings must map native binding names to ${ownerBindingValues.join(', ')}.`, 1);
- let initialize;
- if (value.initializer !== undefined) {
-  await contained(root, value.initializer);
-  initialize = (await import(pathToFileURL(resolve(root, value.initializer)))).default;
-  if (typeof initialize !== 'function') throw new RerError('agent_owner_invalid', 'verification.owner.initializer must default-export an async owner initializer.', 1);
- }
- return { ...value, email, initialize };
-}
+import { verificationReviewers } from './agent-reviewers.mjs';
+import { verificationSponsors } from './agent-sponsors.mjs';
+import { verificationWebhooks } from './agent-webhooks.mjs';
 
 function finish(result, report) {
  for (const point of result.points) report(`${point.ok ? 'PASS' : 'FAIL'} ${point.id}${point.ok || !point.detail ? '' : `: ${point.detail}`}`);
@@ -55,9 +38,11 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   prove = (await import(pathToFileURL(resolve(root, verification.proof.module)))).default;
   if (typeof prove !== 'function') throw new RerError('agent_proof_invalid', 'verification.proof module must default-export a native proof test function.', 1);
  }
- const native = await verificationOwner(root, verification.owner), { email } = native;
+ const principals = await verificationSponsors(root, verification), native = principals[0], { email, sub } = native;
+ if (verification.reviewers !== undefined && !native.initialize) throw new RerError('agent_reviewer_invalid', 'verification.reviewers requires a native owner initializer to drive invitation and independent review.', 1);
+ const reviewers = await verificationReviewers(root, verification.reviewers, email);
  if (claim?.mode && !['signed', 'setup-token'].includes(claim.mode) && !native.initialize) throw new RerError('agent_owner_invalid', `Owner claim mode ${claim.mode} requires verification.owner.initializer using the seed's production lifecycle.`, 1);
- const token = randomBytes(32).toString('hex'), kid = randomUUID(), installationId = randomUUID(), sub = randomUUID();
+ const token = randomBytes(32).toString('hex'), kid = randomUUID(), installationId = randomUUID();
  const business = 'rer-agent-conformance';
  const issuer = `https://synthetic-base-1-${randomUUID()}.invalid`;
  const pair = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
@@ -68,7 +53,11 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  const network = await createAgentConformanceNetwork(root, verification.network, { email });
  let hosted;
  try {
- hosted = await serveHosted(root, { declaration, outboundService: network.fetch, bindings: {
+ hosted = await serveHosted(root, { declaration, outboundService: async request => {
+  const copy = reviewers.observes(request) ? request.clone() : null, response = await network.fetch(request);
+  if (copy) await reviewers.capture(copy, response.clone());
+  return response;
+ }, bindings: {
   RER_OWNER_CLAIM_ISSUER: issuer, RER_OWNER_CLAIM_INSTALLATION_ID: installationId,
   RER_OWNER_CLAIM_APP_ORIGIN: HOSTED_ORIGIN,
   RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(publicKeys),
@@ -94,13 +83,14 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   let bootstrap;
   try {
    bootstrap = native.initialize ? await native.initialize({ request, origin: hosted.origin, email, sub,
-    displayName: 'Synthetic Base 1', token, claim: { mode: claim?.mode ?? 'setup-token', path, token: claimToken }, returnTo: owner?.returnTo ?? '/', mail: network.mail, fixtures: network.fixtures,
+    reviewers: Object.freeze({ initialize: (label, session) => reviewers.initialize(label, session, { request, origin: hosted.origin, returnTo: owner?.returnTo ?? '/' }) }),
+    displayName: 'Synthetic Base 1', label: native.label, database: hosted.database, token, claim: { mode: claim?.mode ?? 'setup-token', path, token: claimToken }, returnTo: owner?.returnTo ?? '/', mail: network.mail, fixtures: network.fixtures,
    }) : await request(new URL(path, hosted.origin).href, { method: 'POST', redirect: 'manual',
     headers: { Origin: hosted.origin, 'Content-Type': 'application/json' },
     body: JSON.stringify({ token: claimToken, displayName: 'Synthetic Base 1', returnTo: owner?.returnTo ?? '/' }),
    });
   } catch {
-   return finish({ ok: false, points: [...validation.points, { id: 'BASE-AGENT-001.owner-bootstrap', ok: false, detail: 'Native owner bootstrap did not answer through the hosted installation origin within 30 seconds.' }] }, report);
+   return finish({ ok: false, points: [...validation.points, ...reviewers.points(), { id: 'BASE-AGENT-001.owner-bootstrap', ok: false, detail: 'Native owner bootstrap did not complete through the hosted installation origin.' }] }, report);
   }
   const cookie = bootstrap.headers.getSetCookie().map(value => value.split(';', 1)[0]).join('; ');
   await bootstrap.body?.cancel();
@@ -108,13 +98,33 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   const iat = seconds();
   const settings = await signJws(pair.privateKey, kid, 'rer-business-settings+jwt', {
    v: 1, iss: issuer, aud: hosted.origin, sub: installationId, business, email, owner_id: sub,
-   jti: randomUUID(), iat, exp: iat + 300, rev: 1, values: {}, logo: null, team: null,
+   jti: randomUUID(), iat, exp: iat + 300, rev: 1, values: {}, logo: null, team: principals.length > 1 ? principals.slice(1).map(person => ({ id: person.sub, email: person.email, name: person.label, role: person.role, invite: 1 })) : null,
   });
   const paired = await request(new URL('/api/rer/business-settings', hosted.origin).href, {
    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings }),
   });
   let ack; try { ack = await paired.json(); } catch {}
   if (!paired.ok || ack?.rev !== 1) return finish({ ok: false, points: [...validation.points, { id: 'BASE-AGENT-004.business-owner-binding', ok: false, detail: `Signed Business owner binding returned HTTP ${paired.status} without the expected acknowledgement.` }] }, report);
+  const sponsors = [{ email, cookie, sub, label: native.label }];
+  for (const principal of principals.slice(1)) {
+   const issued = seconds();
+   const signedClaim = await signJws(pair.privateKey, kid, 'rer-owner-claim+jwt', {
+    v: 1, iss: issuer, aud: hosted.origin, installationId, email: principal.email, jti: randomUUID(), iat: issued, exp: issued + 300,
+   });
+   let response;
+   try {
+    response = await principal.initialize({ request, origin: hosted.origin, email: principal.email, sub: principal.sub,
+     label: principal.label, displayName: principal.label, token, claim: { mode: 'signed', path, token: signedClaim },
+     owner: sponsors[0], database: hosted.database, mail: network.mail, fixtures: network.fixtures, returnTo: owner?.returnTo ?? '/',
+    });
+   } catch { throw new RerError('agent_sponsor_bootstrap', 'An additional sponsor could not complete its native lifecycle through the disposable installation.', 1); }
+   const session = response?.headers?.getSetCookie().map(value => value.split(';', 1)[0]).join('; ');
+   await response?.body?.cancel();
+   if (response?.status !== 303 || response.redirected || !session) throw new RerError('agent_sponsor_bootstrap', 'Each sponsor initializer must return its native final 303 session response.', 1);
+   sponsors.push({ email: principal.email, cookie: session, sub: principal.sub, label: principal.label });
+  }
+  const secrets = await network.provision(hosted);
+  const webhooks = await verificationWebhooks(root, verification.webhooks, secrets);
   let nativeJourney;
   if (verification.journey !== undefined) {
    await contained(root, verification.journey);
@@ -126,10 +136,11 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
    };
   }
   const result = await runAgentDoorConformance({ fetch: request, origin: hosted.origin, surface: declared.surface,
-   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: { email, cookie, sub }, business, prove, nativeJourney,
+   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors, webhooks, business, prove, nativeJourney,
   });
-  return finish(result, report);
- } finally { try { await hosted?.close(); } finally { await network.close(); } }
+  const points = [...result.points, ...reviewers.points()];
+  return finish({ ...result, points, ok: points.every(point => point.ok) }, report);
+ } finally { reviewers.close(); try { await hosted?.close(); } finally { await network.close(); } }
 }
 
 if (process.argv[1] && await realpath(new URL(import.meta.url)) === await realpath(process.argv[1])) {

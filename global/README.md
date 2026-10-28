@@ -442,14 +442,14 @@ platform script's JSON receipt, including each seed's actual state and only
 credential identifiers. Errors print a named `{code}` to stderr and exit 1.
 
 Run the same command to resume. Completed seeds keep their token, consent and
-policy identifiers and report `already provisioned`; a completed repeat is a
-read and sets `business_created` to false. Missing adoptions remain
-`not yet on the agent door`. The command uses the platform script's exit rule:
-exit 1 below `min(5, required_total)` required provisions, or for any failed,
-waiting-for-owner or provisioning row. It does not invent a `complete` field.
+policy identifiers and report equal receipts (`already provisioned`). The
+receipt includes each seed's state and a top-level `complete` flag. Exit 0
+requires `complete: true`: every required seed must be provisioned, token-issued,
+policy-confirmed, settings-delivered and have its door proofs recorded.
+Missing adoptions remain `not yet on the agent door` and exit nonzero.
 
 The route order, policy, synthetic company profile and receipt are mirrored from
-`runeditrun/platform` commit `c62af17e4d64105f84b71dd89ae012cb0ebccc4c`,
+`runeditrun/platform` commit `0261033177e8e05284c037369ee9c3a85922a8aa`,
 `scripts/business/demo.mjs` and `demo/company.json`. The platform owns the seed
 catalogue, fixture data and door proofs. This command does not pair the computer
 or use its stored device credential.

@@ -16,7 +16,7 @@ test('door clauses syncs canonical requirements without changing seed clauses or
  const root = join(directory, 'seed with spaces');
  cpSync(join(base, 'foundation/fixtures/contract-docs/standard'), root, { recursive: true });
  mkdirSync(join(root, 'src/base'), { recursive: true });
- for (const file of ['contract-docs.mjs', 'seed-contract.mjs']) cpSync(join(base, 'foundation/runtime', file), join(root, 'src/base', file));
+ for (const file of ['contract-docs.mjs', 'seed-contract.mjs', 'contract-prose.mjs', 'contract-prose-patterns.mjs']) cpSync(join(base, 'foundation/runtime', file), join(root, 'src/base', file));
  cpSync(join(base, 'default-seed/OPERATIONS.json'), join(root, 'OPERATIONS.json'));
  writeFileSync(join(root, 'AGENTS.md'), 'Lander-Regenerate: node src/base/contract-docs.mjs write\nLander-Regenerate: node scripts/edition-authoring/cli.mjs lock\n');
  const file = join(root, 'CONTRACT.md'), read = name => readFileSync(join(root, name), 'utf8');

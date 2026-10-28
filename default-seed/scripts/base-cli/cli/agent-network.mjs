@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { validateNetworkAdapter, NetworkAdapterError } from '../modules/agent-door/conformance/network-modules.mjs';
 import { isolatedNetworkAdapter } from '../modules/agent-door/conformance/network-runtime.mjs';
+import { verificationSecrets } from './agent-secrets.mjs';
 import { RerError } from './errors.mjs';
 import { createCapturedMail } from './agent-mail.mjs';
 import { createFixtureControl } from './agent-fixtures.mjs';
@@ -34,7 +35,7 @@ export async function createAgentConformanceNetwork(root, config, { email } = {}
  let declaration, adapter, fixtures;
  try {
   if (config !== undefined) {
-   declaration = validateNetworkAdapter(config);
+   declaration = validateNetworkAdapter(Object.fromEntries(Object.entries(config).filter(([key]) => key !== 'secretSource')));
    adapter = await isolatedNetworkAdapter(root, declaration.module, denied);
   }
   fixtures = createFixtureControl(declaration?.origins ?? new Set());
@@ -44,6 +45,12 @@ export async function createAgentConformanceNetwork(root, config, { email } = {}
   throw error;
  }
  return { mail: { read: options => mail.read(options) }, fixtures: { set: (origin, value) => fixtures.set(origin, value) },
+ provision: async hosted => {
+  if (config?.secretSource === undefined) return {};
+  const secrets = await verificationSecrets(root, config.secretSource, hosted.database);
+  await adapter.provision(secrets);
+  return secrets;
+ },
  close: async () => { mail.close(); fixtures.close(); await adapter?.close(); }, fetch: async request => {
   const capture = request.clone(), origin = new URL(request.url).origin;
   try {

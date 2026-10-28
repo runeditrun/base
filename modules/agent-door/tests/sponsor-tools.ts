@@ -51,13 +51,13 @@ export function sponsorTools(db: D1Database, auth: ReturnType<typeof createOpera
         return target ? { subject: target.id, widens: target.role === 'member' && args.role === 'admin' } : null
       },
       async classify(args, ctx) {
-        const target = await teammate(args, ctx)
-        if (target.role === args.role) throw new ToolRefusal('role_unchanged')
+        await teammate(args, ctx)
         return [{ class: 'access', facts: { measure: 1, direction: args.role === 'admin' ? 'widens' : 'narrows' } }]
       },
       async summary(args, ctx) { const target = await teammate(args, ctx); return { target: { id: target.id }, role: args.role as string } },
       async run(args, ctx) {
-        await teammate(args, ctx)
+        const current = await teammate(args, ctx)
+        if (current.role === args.role) throw new ToolRefusal('role_unchanged')
         try {
           await auth.delegatedAdministration({ personId: ctx.person.id, auditLabel: ctx.actor.label, agentId: ctx.agent.id }).setRole(args.id as string, args.role as 'admin' | 'member')
         } catch (cause) { if (cause instanceof AuthError) throw new ToolRefusal(cause.code); throw cause }

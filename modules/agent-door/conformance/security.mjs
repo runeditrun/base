@@ -12,7 +12,8 @@ export async function recordSecurityPhase(c) {
  await c.adopt(autonomousPolicy());
  const outputs = new Map();
  for (const step of c.surface.journey) {
-  const answer = await c.tool(step.tool, c.args(step, outputs));
+  const prepared = c.args(step, outputs);
+  const answer = await c.tool(step.tool, prepared, await c.proof(step.tool, prepared));
   if (answer.result?.isError || answer.result?.structuredContent === undefined) throw new Error('Could not prepare no-subject security journey.');
   outputs.set(step.id, answer.result.structuredContent);
   if (!tools.some(tool => tool.name === step.tool)) continue;
