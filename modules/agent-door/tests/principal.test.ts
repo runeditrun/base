@@ -40,10 +40,14 @@ test('principal journey: one sponsor retains distinct client fences through reso
       const view = (await r.person(`/agents/api/approvals/${id}`)).body.approval
       return (await r.person(`/agents/api/approvals/${id}/approve`, { revision: view.revision, summary_sha256: view.summary_sha256 })).body.approval
     }
+    const otherClient = await r.token({ client_id: 'service:b', act: { sub: 'agent-a', name: 'a' }, scope: 'records:read events:read service:b' })
     const pending = await read('a', tokens[0])
     check(pending.error.data.code, 'approval_required')
     check((await approve(pending)).state, 'executed')
+    check((await read('a', otherClient, pending.error.data.requestState)).error.data.code, 'invalid_arguments')
     check(JSON.parse((await read('a', tokens[0], pending.error.data.requestState)).result.contents[0].text).id, 'a')
+    await r.db.prepare('INSERT INTO test_grants VALUES(?,?)').bind('agent-a', JSON.stringify(['records:read', 'events:read'])).run()
+    check((await read('a', tokens[0], pending.error.data.requestState)).error.message, 'Resource unavailable')
     const narrowed = await read('b', tokens[1])
     await r.db.prepare('INSERT INTO test_grants VALUES(?,?)').bind('agent-b', JSON.stringify(['events:read'])).run()
     check((await approve(narrowed)).code, 'insufficient_scope')

@@ -43,7 +43,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     }
     if (!tool.readOnly && !key) return refuse('idempotency_key_required')
     if (tool.widens === false && row.ignored_arguments.length) return refuse('invalid_arguments')
-    const requestDigest = await digest({ name, arguments: declared })
+    const requestDigest = await digest({ name, arguments: declared, ...(principal.clientId === undefined ? {} : { client_id: principal.clientId }) })
     if (tool.readOnly && requestState !== undefined) {
       if (typeof requestState !== 'string') return refuse('invalid_arguments')
       const pending = await rt.options.db.prepare("SELECT saved FROM agent_door_approvals WHERE json_extract(saved,'$.result.requestState')=?").bind(requestState).first<{ saved: string }>()
@@ -51,6 +51,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       if (!saved || saved.principal.person.id !== principal.person.id || saved.principal.agent.id !== principal.agent.id || saved.tool !== name || saved.digest !== requestDigest) return refuse('invalid_arguments')
       const { idempotency_key: _key, expected_revision: _expected, ...args } = declared
       principal = await nativeProof(rt, tool, args, principal, proofReference)
+      await classify(tool, args, context(rt, principal, door, []))
       result = await approvalReplay(rt, saved.result)
       if (result.decision) result = { ...result, decision: { ...result.decision, id: row.id } }
       row.replay_of = saved.decision_id; row.outcome = 'replayed'

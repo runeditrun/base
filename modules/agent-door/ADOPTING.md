@@ -220,7 +220,9 @@ credential scopes before calls and again at approval execution and subscription
 delivery. It cannot widen the token or saved approval. Removing the tool's scope
 before approval execution returns `insufficient_scope`, runs no native action,
 and retains the execution audit linked to its original decision. Seeds without
-client grants can omit the hook. Keep grant checks in the native transaction too
+client grants can omit the hook. Approval retries and idempotency digests retain
+the originating client id; approved-read retries recheck native resource access
+before returning retained content. Keep grant checks in the native transaction too
 when the seed needs a fence against concurrent grant edits.
 
 Resource reads pass through
