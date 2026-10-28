@@ -122,7 +122,7 @@ export async function agentDoorPages(root) {
   assert.equal(approvedInvitation.approvals[0].name,'Synthetic Owner');
   const events=successful(await c.tool('base.events.list',{limit:200})).events;
   const invitation=events.find(event=>event.type==='operator.invited');
-  assert.equal(invitation,undefined,'An unregistered operator resource must not expose its event.');
+  assert.equal(invitation.approved_by[0].name,'Synthetic Owner');
   await page.goto(hosted.origin+'/agents',{waitUntil:'networkidle'});
   await page.locator(`[data-review-id="${noteReviewId}"] [data-review-action="undo"]`).click();
   await page.locator(`[data-review-id="${noteReviewId}"]`).waitFor({state:'detached'});

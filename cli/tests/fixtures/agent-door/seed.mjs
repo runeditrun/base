@@ -68,7 +68,7 @@ export async function fixtureSeed(t, mode, { sponsors = false, security = false 
    { name: 'fixture.access.role', scope: 'access:write', readOnly: false, classes: ['access'], clauses: ['BASE-AGENT-006'] },
   );
   surface.witness = { tool: 'fixture.workspace.snapshot', args: {} };
-  surface.escalations = [
+  surface.escalations = [...(surface.escalations ?? []),
    { id: 'invite-self', tool: 'fixture.access.invite', args: { email: { $sponsor: 'email' }, name: 'Sponsor', role: 'admin' } },
    { id: 'widen-self', tool: 'fixture.access.role', args: { id: { $sponsor: 'id' }, role: 'admin' } },
   ];

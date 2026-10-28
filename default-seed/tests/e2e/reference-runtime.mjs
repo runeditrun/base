@@ -91,7 +91,7 @@ async function browserNavigationCheck(baseUrl, cookie) {
     })
     page.on('pageerror', (error) => pageErrors.push(error.message))
     page.on('console', (message) => {
-      if (message.type() === 'error') consoleErrors.push(message.text())
+      if (message.type() === 'error') consoleErrors.push(message.text() + " " + message.location().url)
     })
     const [name, value] = cookie.split('=')
     await context.addCookies([{ name, value, url: baseUrl, httpOnly: true, sameSite: 'Lax' }])

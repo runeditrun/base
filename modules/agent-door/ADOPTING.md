@@ -788,7 +788,7 @@ The static surface validator checks every clause ID named by tools and
 There is no fixed shared set of `AGENT-*` or `SURFACE-*` IDs: those remain the
 seed's own specialist jobs and deltas. The sync never creates or changes them.
 
-A directory copy of `modules/agent-door` delivers `CLAUSES.md` automatically
+Copying this source directory delivers `CLAUSES.md` automatically
 through the existing `record-base` and `refresh-base` workflow above, including
 its digest in `base-copies.json`. If the edition instead records individual
 module files, copy and record this additional file from the same immutable
