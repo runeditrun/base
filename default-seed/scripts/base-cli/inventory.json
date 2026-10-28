@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.84-dev.g32393cc0",
+  "cliVersion": "0.2.84-dev.g46c284c1",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1771,11 +1771,11 @@
     },
     "modules/agent-door/conformance/crypto.mjs": {
       "source": "modules/agent-door/conformance/crypto.mjs",
-      "sha256": "a4dd1a807c8be854543f3b8b13a3c89c7d5f693727f155fe86786044f0247718"
+      "sha256": "5738105de8ac2821035b73824e5840fc90795e7510caac36ccb771f23ca1f6c9"
     },
     "modules/agent-door/conformance/discovery.mjs": {
       "source": "modules/agent-door/conformance/discovery.mjs",
-      "sha256": "4e334fa72a3da5c67e9cc482e0e88301ae5c1d23fb106351b1e98539267ce00f"
+      "sha256": "34d1c8ccca89fa7d160079e8603a0daa1e2540e69d5ff7d8f148c63d15c6ba21"
     },
     "modules/agent-door/conformance/index.mjs": {
       "source": "modules/agent-door/conformance/index.mjs",

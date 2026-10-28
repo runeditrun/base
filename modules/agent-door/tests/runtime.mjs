@@ -8,12 +8,12 @@ const { build } = require('esbuild');
 const { Miniflare, convertV4MiniflareOptions } = require('miniflare');
 const { unstable_splitSqlQuery: split } = require('wrangler');
 const output = await build({ entryPoints: [fileURLToPath(new URL('./seed.ts', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022' });
-export async function runtime({ paired = true, limits } = {}) {
+export async function runtime({ paired = true, limits, resourceScope = 'records:read' } = {}) {
  const origin = 'https://synthetic-base-1.invalid', issuer = 'https://synthetic-base-2.invalid', installationId = 'synthetic-base-1', kid = 'synthetic-base-1';
  const keys = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign','verify']);
  const publicKey = await webcrypto.subtle.exportKey('jwk', keys.publicKey);
  const signer = { issuer, installationId, kid, privateKey: keys.privateKey };
- const config = { origin, limits, OWNER_EMAIL: 'synthetic-base-1@example.com', SETUP_TOKEN: 'synthetic-base-1-setup-credential-32-bytes', SESSION_SECRET: 'synthetic-base-1-session-credential-32-bytes', MAIL_FROM: 'synthetic-base-1@example.com', ipLimit: 1000, emailLimit: 1000 };
+ const config = { origin, limits, resourceScope, OWNER_EMAIL: 'synthetic-base-1@example.com', SETUP_TOKEN: 'synthetic-base-1-setup-credential-32-bytes', SESSION_SECRET: 'synthetic-base-1-session-credential-32-bytes', MAIL_FROM: 'synthetic-base-1@example.com', ipLimit: 1000, emailLimit: 1000 };
  const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, script: output.outputFiles[0].text, compatibilityDate: '2026-09-01', d1Databases: { DB: 'synthetic-base-1' }, bindings: { CONFIG: JSON.stringify(config), TRUST: JSON.stringify(paired ? { issuer, installationId, appOrigin: origin, publicKeys: { [kid]: publicKey } } : null) } }));
  try {
   const db = await mf.getD1Database('DB');

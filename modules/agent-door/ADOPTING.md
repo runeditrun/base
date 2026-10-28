@@ -20,7 +20,7 @@ git -C /absolute/base-checkout archive FULL_BASE_COMMIT modules/agent-door | tar
 node node_modules/@runeditrun/rer/edition-authoring/cli.mjs record-base src/base/modules/agent-door modules/agent-door FULL_BASE_COMMIT --base /absolute/base-checkout
 ```
 
-This copies committed bytes from `modules/agent-door` into
+This copies committed bytes from `modules/agent-door/` into
 `src/base/modules/agent-door`. The record command writes its origin commit,
 file digests and modes into `base-copies.json`. Review any reported differences,
 omissions or edition-only files. Keep the record with the edition source.

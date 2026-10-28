@@ -45,7 +45,12 @@ defines these wire fields.
 Tools declare input and output schemas, scope, possible classes, contract clauses,
 server classification and their native action. Resource readers enforce current
 native visibility; unknown and invisible records share the unavailable result.
-External content can carry `com.runeditrun/untrusted` metadata. Embedded calls
+External content can carry untrusted result metadata:
+
+```json
+{"_meta":{"com.runeditrun/untrusted":true}}
+```
+ Embedded calls
 use the same execution pipeline and audit attribution.
 
 Business access tokens are ES256 `at+jwt` credentials verified against existing
@@ -98,9 +103,15 @@ Admission reservations prevent concurrent calls from exceeding daily policy sums
 | 403 for foreign Origin | Request cannot cross the application's Origin boundary. |
 | 413 | MCP body exceeds the configured byte capacity. |
 | 429 `rate_limited`, with `Retry-After` | Per-agent request capacity exceeded. |
-| Tool result `isError:true` | Stable business code in `com.runeditrun/error`; for example `policy_unset`, `policy_unavailable`, `agents_paused`, `policy_blocked`, `self_escalation`, `approval_rejected`, `approval_expired`, `idempotency_conflict` or `revision_conflict`. |
+| Tool result `isError:true` | Stable business code in the result error metadata; for example `policy_unset`, `policy_unavailable`, `agents_paused`, `policy_blocked`, `self_escalation`, `approval_rejected`, `approval_expired`, `idempotency_conflict` or `revision_conflict`. |
 
 The CLI conformance installation intercepts supported mail-provider requests only at the paid network edge; native invitation authorization and database effects still run. Other outbound effects are refused unless the adopter supplies its network adapter.
+
+The tool error metadata has this shape:
+
+```json
+{"_meta":{"com.runeditrun/error":{"code":"policy_unset"}}}
+```
 
 Default MCP capacity is **600 requests per minute per agent** and
 **1,048,576 body bytes**, configurable through `limits`. These protect request

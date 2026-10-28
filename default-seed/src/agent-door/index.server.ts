@@ -6,8 +6,8 @@ import { peopleTools, personResource } from './people-tools'
 
 function trust(bindings: Bindings): Trust | null {
   const issuer = bindings.RER_OWNER_CLAIM_ISSUER, installationId = bindings.RER_OWNER_CLAIM_INSTALLATION_ID
-  const appOrigin = bindings.RER_OWNER_CLAIM_APP_ORIGIN, publicKeys = bindings.RER_OWNER_CLAIM_PUBLIC_KEYS
-  if (![issuer, installationId, appOrigin, publicKeys].some(Boolean)) return null
+  const appOrigin = bindings.RER_OWNER_CLAIM_APP_ORIGIN ?? bindings.AUTH_ORIGIN, publicKeys = bindings.RER_OWNER_CLAIM_PUBLIC_KEYS
+  if (![issuer, installationId, bindings.RER_OWNER_CLAIM_APP_ORIGIN, publicKeys].some(Boolean)) return null
   if (!issuer || !installationId || !appOrigin || !publicKeys) throw new Error('Incomplete agent door trust configuration')
   return { issuer, installationId, appOrigin, publicKeys: JSON.parse(publicKeys) as Trust['publicKeys'] }
 }

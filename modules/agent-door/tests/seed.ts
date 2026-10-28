@@ -40,7 +40,7 @@ export default {
     const door = createAgentDoor({ seed: 'synthetic', name: 'Synthetic Base', specialist: 'operations', origin: config.origin, db: env.DB, trust: JSON.parse(env.TRUST), now,
       tools, limits: config.limits, people: operatorAuthPeople({ db: env.DB, session: request => auth.getSession(request) }),
       localCredentials: async request => request.headers.get('authorization') === 'Bearer synthetic-base-local' ? { sponsor: { email: config.OWNER_EMAIL }, agent: { id: 'synthetic-base-local', name: 'Synthetic Local' }, scopes: ['records:read','records:write','events:read'] } : null,
-      resources: [{ uriTemplate: 'synthetic://record/{id}', name: 'Record', scope: 'records:read', read: async uri => { const row = await read(uri.split('/').pop()!); return row && row.exposure !== 'hidden' ? { json: row, untrusted: true } : null } }],
+      resources: [{ uriTemplate: 'synthetic://record/{id}', name: 'Record', scope: config.resourceScope, read: async uri => { const row = await read(uri.split('/').pop()!); return row && row.exposure !== 'hidden' ? { json: row, untrusted: true } : null } }],
       onEvent: async event => { await env.DB.prepare('INSERT INTO test_callbacks(id,event) VALUES(?,?)').bind(event.id, JSON.stringify(event)).run() },
     })
     if (path === '/__embedded') return Response.json(await door.invoke('synthetic.records.list', {}, { person: (await doorPerson(auth, request))!, agent: { id: 'synthetic-base-embedded', name: 'Synthetic Embedded' } }))

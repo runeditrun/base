@@ -20,7 +20,7 @@ export async function accessToken(context, overrides = {}) {
  return signJws(context.signer.privateKey, context.signer.kid, 'at+jwt', {
   iss: context.signer.issuer, aud: `${context.origin}/mcp`, sub: context.person.email.toLowerCase(), email: context.person.email.toLowerCase(),
   act: { sub: context.agentId, name: 'Agent door conformance', specialist: context.surface.specialist }, client_id: 'rer-agent-conformance',
-  scope: [...new Set([...context.surface.tools.map(tool => tool.scope), 'events:read'])].join(' '), business: context.business,
+  scope: [...new Set([...context.surface.tools.map(tool => tool.scope), ...(context.resourceScopes ?? []), 'events:read'])].join(' '), business: context.business,
   jti: randomUUID(), iat, exp: iat + 300, ...overrides,
  });
 }

@@ -158,7 +158,7 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
   const saved=await local.fetch('/agents/api/policy',{method:'PUT',headers:{origin:local.c.origin,cookie:local.c.person.cookie,'content-type':'application/json'},body:JSON.stringify({document:autonomousPolicy()})}); assert.equal(saved.status,200)
   assert.equal((await local.mcp('tools/list',{}, {token:'synthetic-base-local'})).status,200)
  } finally { await local.close() }
- const fresh=await runtime()
+ const fresh=await runtime({resourceScope:'resources:read'})
  try {
   const surface={schema:'rer-agent-surface/1',seed:'synthetic',specialist:'operations',tools:[
    {name:'synthetic.records.list',scope:'records:read',readOnly:true,classes:['standard'],clauses:['BASE-AGENT-002']},

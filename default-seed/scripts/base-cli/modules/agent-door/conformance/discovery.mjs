@@ -15,6 +15,7 @@ export async function discoverDoor(c) {
  c.add('BASE-AGENT-001.3', unsupported.status === 400 && unsupported.message?.error?.code === -32022 && unsupported.message.error.data?.supported?.includes(VERSION), 'An unsupported version must return UnsupportedProtocolVersion.');
  const metadata = await c.request('/.well-known/oauth-protected-resource/mcp');
  let oauth; try { oauth = await metadata.json(); } catch {}
+ c.resourceScopes = Array.isArray(oauth?.scopes_supported) ? oauth.scopes_supported.filter(scope => typeof scope === 'string') : [];
  c.add('BASE-AGENT-004.1.metadata', metadata.ok && oauth?.resource === `${c.origin}/mcp` && oauth.authorization_servers?.includes(c.signer.issuer) && c.surface.tools.every(tool => oauth.scopes_supported?.includes(tool.scope)), 'Resource metadata must identify the canonical MCP resource, trusted issuer and all declared scopes.');
  const oversize = await c.request('/mcp', { method: 'POST', headers: { Authorization: `Bearer ${await accessToken(c)}`, Origin: c.origin, 'Content-Type': 'application/json', 'MCP-Protocol-Version': VERSION, 'Mcp-Method': 'tools/call', 'Mcp-Name': c.surface.witness.tool }, body: JSON.stringify({ jsonrpc: '2.0', id: 9999, method: 'tools/call', params: { name: c.surface.witness.tool, arguments: { oversized: 'x'.repeat(limits?.maxBodyBytes + 1 || 2 * 1024 * 1024) } } }) });
  c.add('BASE-AGENT-001.6', oversize.status === 413, `Oversized body returned ${oversize.status}.`);

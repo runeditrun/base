@@ -4,10 +4,10 @@ import { join } from 'node:path';
 import { randomUUID, webcrypto } from 'node:crypto';
 import { chromium } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { HOSTED_ORIGIN, serveHosted } from '../../../cli/hosted-output.mjs';
-import { agentConformanceNetwork } from '../../../cli/agent-network.mjs';
-import { createProtocol } from '../../../modules/agent-door/conformance/protocol.mjs';
-import { heldPolicy } from '../../../modules/agent-door/conformance/crypto.mjs';
+import { HOSTED_ORIGIN, serveHosted } from '../../scripts/base-cli/cli/hosted-output.mjs';
+import { agentConformanceNetwork } from '../../scripts/base-cli/cli/agent-network.mjs';
+import { createProtocol } from '../../scripts/base-cli/modules/agent-door/conformance/protocol.mjs';
+import { heldPolicy } from '../../scripts/base-cli/modules/agent-door/conformance/crypto.mjs';
 
 // Registered in the existing reference browser journey, using its production
 // build and real D1. Playwright's route is only the loopback network ingress.
