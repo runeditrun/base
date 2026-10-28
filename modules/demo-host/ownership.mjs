@@ -8,9 +8,9 @@ function identity(version) {
   if (typeof script?.etag !== 'string' || !script.etag || !resources.script_runtime?.compatibility_date
     || !Array.isArray(bindings) || !bindings.every(row => identifier(row?.name) && typeof row.type === 'string')
     || new Set(bindings.map(row => row.name)).size !== bindings.length) return null;
-  const { last_deployed_from: provenance, ...content } = script;
+  const content = { ...script };
   // The provider changes this from wrangler to api on a secret PUT.
-  void provenance;
+  delete content.last_deployed_from;
   return hash({ ...resources, script: content, bindings: [...bindings].sort((a, b) => a.name.localeCompare(b.name)) });
 }
 

@@ -49,6 +49,7 @@ export function demoAccount() {
       const [, name, rest = ''] = match, script = state.workers.get(name);
       if (!script) return missing();
       if (rest === '' && method === 'DELETE') { state.workers.delete(name); state.namespaces = state.namespaces.filter(row => row.script !== name); return ok(null); }
+      if (rest === '/secrets' && method === 'GET') return ok(script.versions[0].resources.bindings.filter(row => row.type === 'secret_text'));
       if (rest === '/secrets' && method === 'PUT') {
         const previous = script.versions[0], body = typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
         const version = { ...structuredClone(previous), id: randomUUID(), annotations: { 'workers/triggered_by': 'secret' } };
