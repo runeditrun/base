@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.87
+
+- Connect declared, contained agent verifier drivers to named native Worker RPC entrypoints, and run built queue consumers alongside producers. Public-door fixtures prove real queued effects, execution-time consent revocation and retained audits without a served test route.
+- Allow declared RPC provider verifiers in isolated Workers without application bindings or network access. Native signed delivery and approval still run; unsigned receipts and escaping modules fail.
+- Generate disposable native JSON/PEM owner bindings through contained test modules. A signed-claim fixture imports a fresh GitHub App RSA key and signs/verifies its JWT; invalid keys remain refused.
+- Run optional native journey beforeStep/afterStep hooks between mandatory autonomous and held steps, allowing real repository consent and queued-work preparation without skipping conformance.
+- Accept composite revoke/narrow targets consisting solely of required string identifiers. Match every witness key and retain grant-subset, neighboring-grant and widening-refusal checks.
+
 ## 0.2.86
 
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.

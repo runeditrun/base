@@ -10,6 +10,7 @@ import { readMigrationRewrites, withRewrites } from '../modules/deploy-kit/migra
 import { RerError } from './errors.mjs';
 import { hostedMailCredentials } from './hosted-mail.mjs';
 import { shared } from './shared.mjs';
+import { verificationRpc } from './agent-rpc.mjs';
 
 // Serve the production build the way rer deploy hosts it (assets behind the
 // Worker, deploy identity bound, a public https origin) on loopback, with no
@@ -44,7 +45,7 @@ const links = html => [...html.matchAll(/(?:src|href)=["'](\/[^"'#?\s]+)/g)].map
 
 /** The build served as rer deploy hosts it, with declared vars, origin and
  * stand-in deploy/Managed mail secrets. `fetch(path, init)` uses the deployed origin. */
-export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService } = {}) {
+export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService, rpc, workerEntrypoints = [] } = {}) {
  const { loopbackFetch } = await shared('loopback-fetch.mjs');
  const build = join(root, 'dist/server'), client = join(root, 'dist/client');
  let config;
@@ -56,13 +57,16 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
  const manifest = await optional(join(root, 'rer-setup.json'));
  const { Miniflare, convertV4MiniflareOptions = options => options } = await miniflareFor(root);
  const entry = join(build, config.main);
+ const rpcServices = await verificationRpc(root, rpc, config.services);
+ const nativeWorkers = Object.fromEntries(workerEntrypoints.map((entrypoint, index) => [entrypoint, `RER_NATIVE_${index}`]));
+ const nativeBindings = Object.fromEntries(Object.entries(nativeWorkers).map(([entrypoint, binding]) => [binding, { name: 'app', entrypoint }]));
  const modules = [entry, ...(await files(build)).map(path => join(build, path)).filter(path => path !== entry && moduleTypes[extname(path)])].map(path => ({ type: moduleTypes[extname(path)], path }));
  const identity = { sourceSha: createHash('sha1').update(randomBytes(16)).digest('hex'), fingerprint: createHash('sha256').update(randomBytes(16)).digest('hex'), versionId: crypto.randomUUID() };
  const secrets = Object.fromEntries((declaration.secrets ?? []).map(item => [item.binding, standIn(item, manifest.fields?.find(field => field.name === item.binding))]));
  for (const binding of await hostedMailCredentials(root)) {
   if (!Object.hasOwn(secrets, binding)) secrets[binding] = standIn({}, manifest.fields?.find(field => field.name === binding));
  }
- const mf = new Miniflare(convertV4MiniflareOptions({ host: '127.0.0.1', port: 0, cf: false, workers: [{ name: 'ingress', modules: true, script: ingress, serviceBindings: { APP: 'app' } }, {
+ const mf = new Miniflare(convertV4MiniflareOptions({ host: '127.0.0.1', port: 0, cf: false, workers: [{ name: 'ingress', modules: true, script: ingress, serviceBindings: { APP: 'app', ...nativeBindings } }, ...rpcServices.workers, {
   name: 'app', ...(outboundService ? { outboundService } : {}), modules, modulesRoot: build, compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
   bindings: { ...config.vars, ...declaration.vars, ...secrets, ...(declaration.originVar ? { [declaration.originVar]: HOSTED_ORIGIN } : {}),
    RER_DEPLOY_SOURCE: identity.sourceSha, RER_DEPLOY_FINGERPRINT: identity.fingerprint, RER_VERSION: { id: identity.versionId, tag: '', timestamp: new Date().toISOString() }, ...bindings },
@@ -70,6 +74,11 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   r2Buckets: Object.fromEntries((config.r2_buckets ?? []).map(item => [item.binding, item.bucket_name])),
   kvNamespaces: Object.fromEntries((config.kv_namespaces ?? []).map(item => [item.binding, item.id ?? item.binding])),
   queueProducers: Object.fromEntries((config.queues?.producers ?? []).map(item => [item.binding, item.queue])),
+  queueConsumers: Object.fromEntries((config.queues?.consumers ?? []).map(item => [item.queue, {
+   ...(item.max_batch_size !== undefined ? { maxBatchSize: item.max_batch_size } : {}), ...(item.max_batch_timeout !== undefined ? { maxBatchTimeout: item.max_batch_timeout } : {}),
+   ...(item.max_retries !== undefined ? { maxRetries: item.max_retries } : {}), ...(item.dead_letter_queue ? { deadLetterQueue: item.dead_letter_queue } : {}), ...(item.retry_delay !== undefined ? { retryDelay: item.retry_delay } : {}),
+  }])),
+  serviceBindings: rpcServices.serviceBindings,
   durableObjects: Object.fromEntries((config.durable_objects?.bindings ?? []).filter(item => !item.script_name).map(item => [item.name, { className: item.class_name, useSQLite: true }])),
   ...(config.assets ? { assets: { directory: client, binding: config.assets.binding ?? 'ASSETS', routerConfig: { has_user_worker: true, invoke_user_worker_ahead_of_assets: RUN_WORKER_FIRST } } } : {}),
  }] }));
@@ -87,6 +96,10 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   }
  } catch (error) { await mf.dispose(); throw error; }
  return { client, identity, origin: HOSTED_ORIGIN,
+  worker: async entrypoint => {
+   if (!Object.hasOwn(nativeWorkers, entrypoint)) throw new RerError('agent_invoke_invalid', 'Verification can invoke only its declared native Worker entrypoint.', 1);
+   return (await mf.getBindings('ingress'))[nativeWorkers[entrypoint]];
+  },
   database: async binding => {
    if (!(config.d1_databases ?? []).some(item => item.binding === binding)) throw new RerError('hosted_database_invalid', 'Verification can read only a declared disposable database binding.', 1);
    const db = await mf.getD1Database(binding, 'app');
