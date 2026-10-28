@@ -843,3 +843,8 @@ the standard level-four clause and Status table shape. Review the contract,
 `ACCEPTANCE.md` and `docs/CLAIMS.md` together, run touched seed checks, then run
 the edition's documented source-lock command **last**, followed by its source
 check. Locking and committing remain explicit edition-authoring steps.
+
+If the coverage source has no historical Homepage claims, refresh the recorded
+`foundation/runtime/contract-docs.mjs` copy before syncing. The generator accepts
+distinct current claims in that case; it still refuses duplicate current claims
+and requires every claim from a non-empty historical list to remain unchanged.
