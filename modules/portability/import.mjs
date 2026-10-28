@@ -32,7 +32,7 @@ export async function createImport(context,manifest,actor='direct',legacyRecover
   // definitions. Never infer that an old archive's absent inventory is empty.
   insist(manifest.schemaObjects!==undefined || legacyRecovery,'schema_mismatch:legacy_schema',409);
   const same=manifest.schema===cat.identity,history=()=>archivedHistory(original,ledgers);
-  const {replays,...bridge}=upgrade?{}:same?(await sameSchemaMigrations(db,manifest,cat,context.migrations,history)??{}):await additiveBridge(db,manifest,cat,context.migrations,history);
+  const {replays,...bridge}=upgrade?{}:same?(await sameSchemaMigrations(db,manifest,cat,context.migrations,history)??{}):await additiveBridge(db,manifest,cat,context.migrations,history,legacyRecovery);
   // Finalize checks object references on the staged rows; a later migration
   // replayed into a reference table would publish rows that check never saw.
   const referenced=replays?.find(r=>Object.values(config.buckets).some(spec=>spec.objectReferences?.table===r.table));

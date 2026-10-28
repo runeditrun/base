@@ -102,7 +102,19 @@ The runner validates the module/export before applying data migrations. The
 native transfer worker imports that same seed-owned entry point, preserving
 functions and module-local closures. Modules should have no top-level effects:
 preflight and transfer each load them in a separate process. Archive metadata
-never selects executable policy. Invalid paths, missing/invalid default exports,
+never selects executable policy. A module may also export
+`createPolicy({db, buckets})` to bind payload producers and consumers to the
+current transfer's database and buckets. Its default policy is validated during
+preflight; the factory's policy is validated when the bindings are available.
+Managed intake supplies its disposable source bindings to the same factory, so
+its payloads come from the ZIP's own staged data. Intake compares source schema
+objects with a fresh replay of the destination migrations. Portable tables must
+exist there; retired or replaced objects require a matching historical definition
+and the migration that removes it. The receipt groups those objects by type and
+migration, with counts and hashes of sorted names. Unknown objects refuse before
+native restore; the destination retains its own schema. Native runners can use
+`requireEmptyTables` before creating a restore job; finalization still enforces
+the atomic empty-table guards. Invalid paths, missing/invalid default exports,
 and declaring both `policy` and `policyModule` fail closed. Serializable object
 `policy` declarations remain supported; inline functions (including nested
 schema-upgrade and payload callbacks) are refused instead of being dropped by
@@ -367,9 +379,13 @@ source identity, job ids and boundaries do not affect equivalence.
 
 Schema identity covers table definitions (including constraints and generated
 expressions), explicit indexes (including uniqueness and partial predicates),
-views and triggers. Indexes and triggers on excluded tables are excluded with
-their tables, including platform bookkeeping tables. The complete additional
-definitions travel in `schemaObjects`. A single SQLite lexer reads the original
+views and triggers. Row exclusions do not omit indexes and triggers attached
+to excluded tables, including platform bookkeeping tables. Names with the literal
+internal prefixes `sqlite_` and `_cf_` remain exempt. The complete additional
+definitions travel in `schemaObjects`. Explicitly acknowledged v1 recovery uses
+the historical exclusion projection only when placing its old backup within
+native migration history; the live destination and ordinary v2 inventories
+still use the complete catalogue. A single SQLite lexer reads the original
 SQL before removing trivia. Identity records each token's class and canonical
 value, plus a deterministic spelling: a single space separates neighbours
 exactly when concatenating them would change their tokenization. The complete
@@ -1009,3 +1025,50 @@ Base's default-seed and composed foundation CLI adapters adopt direct local D1
 bindings with explicit identity/configuration exclusions. Their CLI journeys
 exercise archive/reset/restore/archive equivalence. Remote transfer and deployed
 product acceptance remain outside this local adoption.
+
+
+### Optional Managed data intake
+
+Platform's data download is a stored ZIP with kind `runeditrun-app-data` and
+schema 1. It is distinct from an installation archive. The reference adapter
+opts in with `localPortability({database, policy, buckets, managedData: true})`.
+Existing adapters retain their native archive and legacy JSON readers.
+
+Adapters with their own native archive format can keep their existing `import`
+method and add `managedDataImport` from an opted-in `localPortability`
+declaration. The CLI selects that method only for ZIP input; all other inputs
+continue through the adapter's original reader. This requires the seed's real
+native Workers database name, binding and portability policy.
+
+Adapters that already consume Base's native format can import `withManagedDataImport`
+from the package's portability entry point and call
+`withManagedDataImport(context, declaration, restoreNative)` before their native
+reader. The declaration supplies the real `binding`, `buckets`, `policy` or
+`policyModule`, and optional `platformMigrations`. The callback receives the
+context with a private native archive path for a Managed ZIP, or the original
+context for other inputs. Authentication, explicit confirmation, custody and
+empty-target checks remain the caller's responsibility. The callback must await
+its native restore before returning; staging is deleted on success or failure.
+This helper emits Base's native portability format; an adapter with a different
+format must provide a callback that adopts that native restore contract.
+
+The intake checks the complete ZIP and manifest, required members, checksums,
+bindings and Platform ledger before native restore. Source SQL runs in a private
+workerd D1 sandbox. The existing exporter preserves its erasure journal, excludes
+identity and secret data, maps migration identities using the same hash matching
+as native Platform-ledger archives, and emits a verified native archive. Native
+restore still checks emptiness, migration compatibility, erasure and row safety.
+No source SQL runs against the destination. The intake accounts every non-internal
+source table, index, trigger and view against native schema or a named retirement
+in destination migrations, including objects attached to excluded tables. Internal
+prefixes are compared literally. A scratch native import preflight checks the
+projected archive before native restore can open the destination.
+
+The current intake supports one database and declared buckets, local Workers
+transport, stored ZIP members, at most 10,000 entries and statements, a 128 MiB
+archive, 64 MiB members, 4 MiB metadata members and 16 MiB of SQL, with each SQL
+statement at most 100,000 bytes after binding string literals, with at most 100
+parameters of at most 2 MiB each. It refuses compressed or encrypted entries,
+unsafe paths, duplicate or unexpected members, missing ledgers, other versions,
+container transport, later-journal and legacy-recovery options. Refusals use
+constant `managed_data_*` reasons and do not print source values.
