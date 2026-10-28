@@ -10,6 +10,12 @@ readonly PLAYWRIGHT_VERSION=1.63.0
 readonly BIN_DIR=/usr/local/bin
 
 fail() { printf 'Bootstrap: %s\n' "$*" >&2; exit 1; }
+browser_needed=false
+case "${1:-}" in
+  '') [[ $# == 0 ]] || fail 'usage: bash scripts/agent-bootstrap.sh [--browser]' ;;
+  --browser) [[ $# == 1 ]] || fail 'usage: bash scripts/agent-bootstrap.sh [--browser]'; browser_needed=true ;;
+  *) fail 'usage: bash scripts/agent-bootstrap.sh [--browser]' ;;
+esac
 [[ $(uname -s) == Linux ]] || fail 'requires Linux (Ubuntu/Debian with apt-get).'
 command -v apt-get >/dev/null || fail 'requires apt-get for browser OS dependencies.'
 case ":${PATH}:" in
@@ -139,14 +145,8 @@ hash -r
 pnpm --config.only-built-dependencies=esbuild --config.only-built-dependencies=workerd \
   install --frozen-lockfile
 pnpm --dir modules/mail install --frozen-lockfile --ignore-workspace --ignore-scripts
-# Bound apt separately from the browser download, while retaining every OS
-# dependency and the real browser/workerd probes below. Pass APT_CONFIG through
-# privilege elevation so Playwright's own apt-get uses the same archive cache.
-apt_phase 'Chromium OS dependencies' pnpm --dir default-seed exec playwright install-deps chromium
-pnpm --dir default-seed exec playwright install chromium
-
-# Resolve the actual locked Wrangler runtime and launch the actual Chromium.
-# These checks fail if an optional native binary or an OS library is missing.
+# Resolve and execute the actual locked Wrangler runtime for every job,
+# including jobs that deliberately skip browser setup.
 node --input-type=module <<'NODE'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
@@ -157,19 +157,12 @@ const require = createRequire(realpathSync('default-seed/node_modules/wrangler/p
 const runtime = require.resolve('workerd/package.json')
 assert.equal(require(runtime).version, '1.20260907.1')
 execFileSync(resolve(dirname(runtime), 'bin/workerd'), ['--version'], { stdio: 'inherit' })
-const browserRequire = createRequire(resolve('default-seed/package.json'))
-assert.equal(browserRequire('@playwright/test/package.json').version, '1.63.0')
-const { chromium } = browserRequire('@playwright/test')
-const browser = await chromium.launch({ headless: true })
-try {
-  const page = await browser.newPage()
-  await page.goto('data:text/html,<title>Bootstrap browser probe</title>')
-  assert.equal(await page.title(), 'Bootstrap browser probe')
-  console.log(`Chromium ${browser.version()} launched successfully`)
-} finally {
-  await browser.close()
-}
+
 NODE
-printf 'Ready: %s; Node %s; pnpm %s; Playwright %s; workerd %s\n' \
-  "$(git --version)" "$NODE_VERSION" "$PNPM_VERSION" "$PLAYWRIGHT_VERSION" "$WORKERD_VERSION"
+if [[ $browser_needed == true ]]; then
+  node -e 'const assert = require("node:assert/strict"); assert.equal(require("./default-seed/node_modules/@playwright/test/package.json").version, process.argv[1])' "$PLAYWRIGHT_VERSION"
+  node scripts/ci/browser-probe.mjs default-seed --setup
+fi
+printf 'Ready: %s; Node %s; pnpm %s; workerd %s; browser=%s\n' \
+  "$(git --version)" "$NODE_VERSION" "$PNPM_VERSION" "$WORKERD_VERSION" "$browser_needed"
 printf 'Verify from the repository root: pnpm verify\n'
