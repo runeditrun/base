@@ -10,6 +10,7 @@ import { createAgentConformanceNetwork } from './agent-network.mjs';
 import { serveHosted, HOSTED_ORIGIN } from './hosted-output.mjs';
 import { deliveryRequest, verifyDeliveryReceipt } from './tests/fixtures/agent-door/receiver.mjs';
 import { validateAgentSurface } from '../modules/agent-door/conformance/surface.mjs';
+import { checkAgentDoor } from './agent-door.mjs';
 import { registry } from '../modules/agent-door/registry.ts';
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
@@ -88,4 +89,24 @@ test('no-subject schema validation rejects nested authority fields and open or o
   assert.equal(validateAgentSurface(invalid).ok, false);
   assert.throws(() => registry({ seed: 'fixture', origin: 'https://fixture.invalid', tools: [{ ...security, title: 'TLS', description: 'Record TLS', inputSchema: schema, outputSchema: {}, summary: () => ({}), classify: () => [], run: async () => ({ result: {} }) }] }), /no-subject/);
  }
+});
+
+
+test('an explicitly declared single sponsor preserves the native owner lifecycle and point count', { timeout: 120000 }, async t => {
+ const results = [];
+ for (const labelled of [false, true]) {
+  const root = await fixtureSeed(t, 'native');
+  if (labelled) {
+   const path = join(root, 'agent-surface.json'), surface = JSON.parse(await readFile(path, 'utf8'));
+   surface.verification.sponsors = [{ label: 'primary' }];
+   await writeFile(path, JSON.stringify(surface));
+  }
+  await buildFixture(root);
+  const result = await checkAgentDoor(root, { report: () => {} });
+  assert.equal(result.ok, true);
+  assert.equal(result.points.some(point => point.id.includes('cross-sponsor')), false);
+  results.push(result.points.length);
+ }
+ assert.equal(results[0], results[1]);
+ t.diagnostic(`Native owner: default ${results[0]}/${results[0]}, explicitly labelled single sponsor ${results[1]}/${results[1]}; original bootstrap inputs preserved.`);
 });

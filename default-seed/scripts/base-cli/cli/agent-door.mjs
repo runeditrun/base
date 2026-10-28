@@ -64,7 +64,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   let bootstrap;
   try {
    bootstrap = native.initialize ? await native.initialize({ request, origin: hosted.origin, email, sub,
-    displayName: native.label ?? 'Synthetic Base 1', label: native.label, database: hosted.database, token, claim: { mode: claim?.mode ?? 'setup-token', path, token: claimToken }, returnTo: owner?.returnTo ?? '/',
+    displayName: 'Synthetic Base 1', label: native.label, database: hosted.database, token, claim: { mode: claim?.mode ?? 'setup-token', path, token: claimToken }, returnTo: owner?.returnTo ?? '/',
    }) : await request(new URL(path, hosted.origin).href, { method: 'POST', redirect: 'manual',
     headers: { Origin: hosted.origin, 'Content-Type': 'application/json' },
     body: JSON.stringify({ token: claimToken, displayName: 'Synthetic Base 1', returnTo: owner?.returnTo ?? '/' }),
