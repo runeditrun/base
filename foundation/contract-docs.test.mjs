@@ -4,6 +4,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createHash } from 'node:crypto'
 import { parseContract } from './runtime/seed-contract.mjs'
 
 const fixtures = join(import.meta.dirname, 'fixtures/contract-docs')
@@ -11,7 +12,11 @@ const generatedFiles = ['CONTRACT.md', 'ACCEPTANCE.md', 'docs/CLAIMS.md']
 const read = (root, path) => readFile(join(root, path), 'utf8')
 const edit = (root, path, contents) => writeFile(join(root, path), contents)
 const snapshot = root => Promise.all(generatedFiles.map(path => read(root, path)))
-const git = (root, ...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
+const git = (root, ...args) => execFileSync('env', [
+  'GIT_AUTHOR_NAME=Run Edit Run fleet', 'GIT_AUTHOR_EMAIL=fleet@runeditrun.com',
+  'GIT_COMMITTER_NAME=Run Edit Run fleet', 'GIT_COMMITTER_EMAIL=fleet@runeditrun.com',
+  'git', ...args,
+], { cwd: root, encoding: 'utf8' }).trim()
 const cli = (root, ...args) => {
   const result = spawnSync(process.execPath, ['src/base/contract-docs.mjs', ...args], { cwd: root, encoding: 'utf8' })
   assert.ifError(result.error)
@@ -170,11 +175,121 @@ async function nonProductJourney() {
   }
 }
 
+async function sourceRowsJourney() {
+  // Seed-observed headers, including an escaped pipe in Balm's launch command.
+  for (const heading of ['Claim', 'Claims', 'Claim on the page', 'What the page claims', 'Claim text']) {
+    const root = await installation('legacy')
+    try {
+      await rm(join(root, 'docs/CLAIMS.md'))
+      const original = (await read(root, 'CONTRACT.md'))
+        .replace('| # | Claim | Clauses |', `| Claim # | ${heading} | Clause id(s) | Status |`)
+        .replace('| --- | --- | --- |', '| --- | --- | --- | --- |')
+        .replace("| 1 | Publish the studio's entries | PUBLISH-01 |", '| 1 | Publish entries \\| keep identity | PUBLISH-01 | partly |')
+        .replace('  Draft entries stay private.', '  Draft entries stay private.\n\n> Preserve the original decision.\n> Keep its attributed history.\n\n```text\n> literal code\n```')
+      await edit(root, 'CONTRACT.md', original)
+      git(root, 'add', '.')
+      git(root, 'commit', '-qm', 'Synthetic observed table and quoted prose')
+      succeeds(root, 'convert', '--old', 'HEAD')
+      succeeds(root, 'check')
+      succeeds(root, 'id-map', '--old', 'HEAD')
+      succeeds(root, 'coverage', 'check', '--old', 'HEAD')
+      const converted = await read(root, 'CONTRACT.md')
+      assert.ok(!converted.includes('\n> Preserve'), 'conversion retained blockquote markers')
+      assert.ok(converted.includes('\n> literal code\n'), 'conversion changed a literal code marker')
+      const provenance = JSON.parse(converted.match(/<!-- contract-claim-source\n([\s\S]*?)\n-->/)[1])
+      assert.equal(provenance.claims[0].status, 'partly')
+      assert.ok((await read(root, 'docs/CLAIMS.md')).includes('| partly | done |'))
+      const row = converted.split('\n').find(line => line.startsWith('| 1 |'))
+      for (const changed of [converted.replace(row + '\n', ''), converted.replace(row, row.replace('keep identity', 'lose identity'))]) {
+        await edit(root, 'CONTRACT.md', changed)
+        for (const args of [['check'], ['coverage', 'check', '--old', 'HEAD']]) refuses(root, 'Publish entries', ...args)
+      }
+      // Older converted contracts without provenance must also be checked
+      // against the immutable coverage source, even after regenerating views.
+      await edit(root, 'CONTRACT.md', converted.replace(/<!-- contract-claim-source\n[\s\S]*?\n-->/, '').replace(row + '\n', ''))
+      refuses(root, 'Publish entries', 'write')
+      await edit(root, 'CONTRACT.md', converted)
+      const coverage = await read(root, 'docs/contract/COVERAGE.json')
+      const map = JSON.parse(coverage)
+      for (const fragment of map.fragments) fragment.text = fragment.text.replace(/^>\s?/, '')
+      await edit(root, 'docs/contract/COVERAGE.json', JSON.stringify(map))
+      succeeds(root, 'coverage', 'check', '--old', 'HEAD')
+      const quoted = map.fragments.find(fragment => fragment.text === 'Preserve the original decision.')
+      quoted.text = 'Change the original decision.'
+      await edit(root, 'docs/contract/COVERAGE.json', JSON.stringify(map))
+      refuses(root, 'whole original text', 'coverage', 'check', '--old', 'HEAD')
+      await edit(root, 'docs/contract/COVERAGE.json', coverage)
+      await edit(root, 'CONTRACT.md', original.replace('| PUBLISH-01 | partly |', '| PUBLISH-01 | partly | extra |'))
+      git(root, 'add', '.')
+      git(root, 'commit', '-qm', 'Synthetic malformed homepage row')
+      refuses(root, 'malformed row', 'convert', '--old', 'HEAD')
+      await edit(root, 'CONTRACT.md', original.replace(`| ${heading} |`, '| Unrecognized promise column |'))
+      git(root, 'add', '.')
+      git(root, 'commit', '-qm', 'Synthetic unsupported heading')
+      refuses(root, 'unrecognized claim heading', 'convert', '--old', 'HEAD')
+    } finally { await rm(root, { recursive: true, force: true }) }
+  }
+}
+
+async function apiRecordJourney() {
+  const root = await installation('legacy'), base = await installation('legacy')
+  try {
+    const revision = git(base, 'rev-parse', 'HEAD'), tree = git(base, 'rev-parse', 'HEAD^{tree}')
+    const bytes = await readFile(join(base, 'README.md'))
+    const object = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex')
+    const response = {
+      [`commits/${revision}`]: { sha: revision, tree: { sha: tree } },
+      [`trees/${tree}?recursive=1`]: { sha: tree, truncated: false, tree: [{ path: 'README.md', type: 'blob', mode: '100644', sha: object }] },
+      [`blobs/${object}`]: { sha: object, encoding: 'base64', size: bytes.length, content: bytes.toString('base64') },
+    }
+    const tools = join(root, 'tools')
+    await mkdir(tools)
+    await writeFile(join(tools, 'responses.json'), JSON.stringify(response))
+    await writeFile(join(tools, 'gh'), `#!/usr/bin/env node
+const fs = require('fs');
+const values = JSON.parse(fs.readFileSync(__dirname + '/responses.json', 'utf8'));
+const endpoint = process.argv[3]?.split('/git/')[1];
+if (!values[endpoint]) process.exit(1);
+process.stdout.write(JSON.stringify(values[endpoint]));
+`, { mode: 0o755 })
+    const record = (...args) => spawnSync(process.execPath, [join(import.meta.dirname, '../edition-authoring/cli.mjs'), 'record-base', 'README.md', 'README.md', revision, ...args], {
+      cwd: root, encoding: 'utf8', env: { ...process.env, PATH: tools + ':' + process.env.PATH },
+    })
+    let result = record('--base', base)
+    assert.equal(result.status, 0, result.stderr)
+    const expected = await read(root, 'base-copies.json')
+    result = record('--from-api')
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(await read(root, 'base-copies.json'), expected, 'API and checkout records differ')
+    for (const broken of [
+      {},
+      { ...response, [`commits/${revision}`]: { sha: '0'.repeat(40), tree: { sha: tree } } },
+      { ...response, [`trees/${tree}?recursive=1`]: { ...response[`trees/${tree}?recursive=1`], truncated: true } },
+      { ...response, [`blobs/${object}`]: { ...response[`blobs/${object}`], content: Buffer.from('changed').toString('base64') } },
+    ]) {
+      await writeFile(join(tools, 'responses.json'), JSON.stringify(broken))
+      result = record('--from-api')
+      assert.notEqual(result.status, 0)
+      assert.equal(await read(root, 'base-copies.json'), expected, 'API refusal changed the record')
+    }
+    result = record('--from-api', '--offline')
+    assert.notEqual(result.status, 0)
+    result = record('--offline')
+    assert.notEqual(result.status, 0)
+    assert.equal(await read(root, 'base-copies.json'), expected)
+    result = record('--from-api', '--record', 'unavailable.json')
+    assert.notEqual(result.status, 0)
+    await assert.rejects(read(root, 'unavailable.json'), { code: 'ENOENT' })
+  } finally { await Promise.all([root, base].map(root => rm(root, { recursive: true, force: true }))) }
+}
+
 test('contract docs convert handwritten contracts and keep generated documents and migration maps accountable', async () => {
   const roots = await Promise.all(['standard', 'legacy'].map(installation))
   try {
     const results = await Promise.allSettled([
       nonProductJourney(),
+      sourceRowsJourney(),
+      apiRecordJourney(),
       (async () => {
         const root = roots[0]
         const original = parseContract(await read(root, 'CONTRACT.md'))

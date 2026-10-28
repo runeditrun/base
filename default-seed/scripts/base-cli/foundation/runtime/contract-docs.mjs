@@ -14,6 +14,7 @@ const json = value => JSON.stringify(value, null, 2) + '\n'
 const linesOf = text => text.replace(/\r\n?/g, '\n').split('\n')
 const cells = line => line.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, '').split(/(?<!\\)\|/).map(cell => cell.trim())
 const divider = line => /^\|?(\s*:?-{3,}:?\s*\|)+\s*:?-{0,}:?\s*$/.test(line.trim())
+const tableCell = text => text.replace(/(?<!\\)\|/g, '\\|')
 const idsIn = text => [...text.matchAll(new RegExp(`(?<![A-Za-z0-9.-])(${clauseIdSource})(?![A-Za-z0-9.-])`, 'g'))].map(match => match[1])
 const block = text => text.replace(/^\s*\n|\n\s*$/g, '').trim()
 function outline(text) {
@@ -137,30 +138,37 @@ function generatedFiles(text) {
     claims.push('A product claim is done when every clause behind it is done, missing when every one is missing, and partial otherwise. Explicit source-bound non-product facts are unassessed; their historical status is history, not current proof.')
     const hasSection = rows.some(row => row.header.some(cell => /^Section$/i.test(plainText(cell))))
     const hasNonProduct = provenance?.claims.some(row => row.nonProduct)
-    const header = ['#', ...(hasSection ? ['Section'] : []), 'Claim', 'Clauses', ...(hasNonProduct ? ['Basis', 'Historical status'] : []), 'Status']
+    const header = ['#', ...(hasSection ? ['Section'] : []), 'Claim', 'Clauses', ...(hasNonProduct ? ['Basis'] : []), ...(provenance ? ['Historical status'] : []), 'Status']
     const table = [`| ${header.join(' | ')} |`, `| ${header.map(() => '---').join(' | ')} |`], counts = { done: 0, partial: 0, missing: 0, unassessed: 0 }
     for (const [index, row] of rows.entries()) {
       const value = label => claimValue(row, label)
       const source = provenance?.claims[index]
       if (source?.nonProduct) {
         counts.unassessed++
-        table.push(`| ${[value('#'), ...(hasSection ? [value('Section')] : []), value('Claim'), '', `Non-product: ${source.nonProduct}`, source.status || 'Not recorded', 'unassessed'].join(' | ')} |`)
+        table.push(`| ${[value('#'), ...(hasSection ? [value('Section')] : []), value('Claim'), '', `Non-product: ${source.nonProduct}`, source.status || 'Not recorded', 'unassessed'].map(tableCell).join(' | ')} |`)
         continue
       }
       const ids = idsIn(value('Clauses?')), linked = ids.map(id => clauses.find(clause => clause.id === id))
       if (!ids.length || linked.some(clause => !clause)) throw Error(`CONTRACT.md:${row.line}: Homepage claim needs existing clause ids.`)
       const state = linked.every(clause => clause.status === 'done') ? 'done' : linked.every(clause => clause.status === 'missing') ? 'missing' : 'partial'
       counts[state]++
-      table.push(`| ${[value('#') || String(index + 1), ...(hasSection ? [value('Section')] : []), value('Claim'), linked.map(clause => `\`${clause.id}\` ${clause.status}`).join('; '), ...(hasNonProduct ? ['Product', source?.status || 'Not recorded'] : []), state].join(' | ')} |`)
+      table.push(`| ${[value('#') || String(index + 1), ...(hasSection ? [value('Section')] : []), value('Claim'), linked.map(clause => `\`${clause.id}\` ${clause.status}`).join('; '), ...(hasNonProduct ? ['Product'] : []), ...(provenance ? [source?.status || 'Not recorded'] : []), state].map(tableCell).join(' | ')} |`)
     }
     claims.push(table.join('\n'), `Claims: ${rows.length}; ${counts.done} done, ${counts.partial} partial, ${counts.missing} missing.${hasNonProduct ? ` Non-product: ${counts.unassessed} unassessed.` : ''}`)
-    if (hasNonProduct) claims.push(`Historical claim source: \`${provenance.old}\`. Exact source files, lines, text and historical statuses are retained in CONTRACT.md's contract-claim-source record.`)
+    if (provenance) claims.push(`Historical claim source: \`${provenance.old}\`. Exact source files, lines, text and historical statuses are retained in CONTRACT.md's contract-claim-source record.`)
   }
   return { 'CONTRACT.md': rewritten, 'ACCEPTANCE.md': acceptance.join('\n\n') + '\n', 'docs/CLAIMS.md': claims.join('\n\n') + '\n' }
 }
 function generate(check = false) {
   const text = read('CONTRACT.md')
   if (text === undefined) throw Error('CONTRACT.md does not exist.')
+  const coverage = read(covMapPath)
+  if (coverage !== undefined) {
+    let original
+    try { original = snapshot(JSON.parse(coverage).old?.commit) }
+    catch (error) { throw Error(`${covMapPath}: original SHA is unavailable: ${error.message}`) }
+    validateOriginalClaims(original)
+  }
   const files = generatedFiles(text), changed = Object.entries(files).filter(([name, contents]) => read(name) !== contents)
   const provenance = readClaimSource(text)
   if (provenance) for (const { name, original } of [{ name: 'docs/contract/ID-MAP.json', original: map => map.old }, { name: 'docs/contract/COVERAGE.json', original: map => map.old?.commit }]) {
@@ -251,10 +259,13 @@ function oldClauseBody(text, clause) {
   const lines = linesOf(text), start = clause.line - 1, first = lines[start]
   const bold = /^(-\s+)?\*\*[^*]+\*\*\s*/.exec(first)
   const body = [bold ? first.slice(bold[0].length) : '']
+  let fence
   for (let index = start + 1; index < lines.length; index++) {
     const line = lines[index]
-    if (/^#{1,6}\s/.test(line) || new RegExp(`^(?:-\\s+)?\\*\\*${clauseIdSource}\\s+[—–-]\\s+`).test(line)) break
-    if (bold?.[1] && line.trim() && !/^[ \t]/.test(line)) break
+    const insideFence = Boolean(fence), state = covFence(line, fence)
+    fence = state.current
+    if (!insideFence && !state.marker && (/^#{1,6}\s/.test(line) || new RegExp(`^(?:-\\s+)?\\*\\*${clauseIdSource}\\s+[—–-]\\s+`).test(line))) break
+    if (bold?.[1] && line.trim() && !/^[ \t>]/.test(line) && !insideFence && !state.marker) break
     body.push(bold?.[1] ? line.replace(/^ {1,2}/, '') : line)
   }
   return block(body.join('\n'))
@@ -273,6 +284,9 @@ function acceptanceEntries(text, ids) {
   return result
 }
 function requirementAndAcceptance(body, oldAcceptance) {
+  // Blockquote syntax is presentation, not part of a retained obligation.
+  body = withoutQuoteMarkers(body)
+  oldAcceptance = oldAcceptance === undefined ? undefined : withoutQuoteMarkers(oldAcceptance)
   const history = [], status = /\*{1,2}Status:\*{1,2}\s*(?:done|partial|missing)\b/i.exec(body)
   if (status) { history.push(body.slice(status.index)); body = body.slice(0, status.index).trim() }
   const markerPattern = /(?:\*{1,2}Acceptance(?: evidence)?[:.]\*{1,2}|\*\*Acceptance\*\*[:.]?)/i
@@ -293,7 +307,16 @@ function requirementAndAcceptance(body, oldAcceptance) {
   }
   return { text: result.join('\n\n'), history }
 }
-const claimValue = (row, label) => row.cells[row.header.findIndex(cell => new RegExp(`^${label}$`, 'i').test(plainText(cell).replace('(s)', 's')))] ?? ''
+// Only spellings observed in the launch seeds' immutable homepage tables.
+const claimHeaders = new Set(['claim', 'claims', 'claim on the page', 'what the page claims', 'claim text'])
+function claimHeader(cell) {
+  const value = plainText(cell).toLowerCase()
+  if (claimHeaders.has(value)) return 'Claim'
+  if (['clause', 'clauses', 'clause(s)', 'clause id(s)'].includes(value)) return 'Clauses'
+  if (value === 'claim #') return '#'
+  return plainText(cell)
+}
+const claimValue = (row, label) => row.cells[row.header.findIndex(cell => new RegExp(`^${label}$`, 'i').test(claimHeader(cell)))] ?? ''
 const claimRows = text => homepageClaims(text).flatMap(table => table.rows.map(row => ({ ...row, header: table.header })))
 function originalClaims(old) {
   const candidates = Object.entries(old.files).filter(([name, text]) => name === 'CONTRACT.md' || /(?:^|\/)CLAIMS\.md$/.test(name) && !text.startsWith('<!-- Generated from CONTRACT.md by contract-docs.')).map(([name, text]) => ({ name, tables: homepageClaims(text) }))
@@ -339,7 +362,8 @@ function validateClaimSource(text, rows = claimRows(text), old) {
   let original
   try { original = old ?? snapshot(record.old) } catch (error) { throw Error(`CONTRACT.md: contract-claim-source old ${record.old}: ${error.message}`) }
   const selected = originalClaims(original), ids = new Set(parseContract(original.files['CONTRACT.md']).clauses.map(clause => clause.id))
-  if (record.claims.length !== selected.rows.length || rows.length !== selected.rows.length) throw Error('CONTRACT.md: contract-claim-source must retain every original claim once.')
+  validateOriginalClaims(original, rows)
+  if (record.claims.length !== selected.rows.length) throw Error('CONTRACT.md: contract-claim-source must retain every original claim once.')
   for (const [index, source] of record.claims.entries()) {
     const expected = sourceClaim(selected.file, selected.rows[index], index), label = `CONTRACT.md: contract-claim-source claim ${index + 1}`
     if (!source || Object.entries(expected).some(([key, value]) => source[key] !== value)) throw Error(`${label}: source SHA/file/line/number/text/historical status must match the immutable original.`)
@@ -349,9 +373,20 @@ function validateClaimSource(text, rows = claimRows(text), old) {
     if (source.nonProduct !== undefined) {
       nonProductBasis(source, source.nonProduct, ids, label)
       if (basis !== `Non-product: ${source.nonProduct}` || claimValue(row, 'Clauses?')) throw Error(`${label}: explicit non-product basis and empty Clauses cell required.`)
-    } else if (basis !== 'Product') throw Error(`${label}: product claim cannot acquire a non-product exemption.`)
+    } else if (basis && basis !== 'Product') throw Error(`${label}: product claim cannot acquire a non-product exemption.`)
   }
   return record
+}
+function validateOriginalClaims(old, rows = claimRows(read('CONTRACT.md'))) {
+  const selected = originalClaims(old), remaining = [...rows], problems = []
+  for (const [index, row] of selected.rows.entries()) {
+    const source = sourceClaim(selected.file, row, index)
+    const found = remaining.findIndex(current => claimValue(current, '#') === source.number && claimValue(current, 'Claim') === source.claim)
+    if (found < 0) problems.push(`${source.file}:${source.line}: missing original Homepage claim ${source.number}: ${source.claim}; current claim number/text must match the original.`)
+    else remaining.splice(found, 1)
+  }
+  if (remaining.length) problems.push('CONTRACT.md: unexpected or duplicate Homepage claims.')
+  if (problems.length) throw Error('CONTRACT.md: must retain every original claim once.\n' + problems.join('\n'))
 }
 function contractClaims(old, ids, claimMapPath) {
   const { file, rows } = originalClaims(old), value = claimValue
@@ -395,11 +430,11 @@ function contractClaims(old, ids, claimMapPath) {
     const linked = idsIn(references)
     if (!nonProduct && (!linked.length || linked.some(id => !ids.has(id))))
       problems.push(`${file}:${row.line}: Homepage claim ${JSON.stringify(value(row, 'Claim'))} needs existing product clause ids (found ${JSON.stringify(references)}). Supply --claim-map <file> with schema 1, old ${old.commit}, and claims entries {file, line, claim, clauses}; map only to the actual obligations, never invent a link.`)
-    table.push(`| ${[value(row, '#') || String(index + 1), ...(hasSection ? [value(row, 'Section')] : []), value(row, 'Claim'), references, ...(hasNonProduct ? [nonProduct ? `Non-product: ${nonProduct}` : 'Product'] : [])].join(' | ')} |`)
+    table.push(`| ${[value(row, '#') || String(index + 1), ...(hasSection ? [value(row, 'Section')] : []), value(row, 'Claim'), references, ...(hasNonProduct ? [nonProduct ? `Non-product: ${nonProduct}` : 'Product'] : [])].map(tableCell).join(' | ')} |`)
   }
   if (problems.length) throw Error(problems.join('\n'))
   if (hasNonProduct) table.unshift('Explicit non-product facts have current derived status unassessed. The source record retains historical statuses as history, not current proof.', '')
-  if (hasNonProduct) table.push('', '<!-- contract-claim-source', json({ schema: 1, old: old.commit, claims: rows.map((row, index) => ({ ...sourceClaim(file, row, index), ...(mapped.get(row.line)?.nonProduct ? { nonProduct: mapped.get(row.line).nonProduct } : {}) })) }).trimEnd(), '-->')
+  table.push('', '<!-- contract-claim-source', json({ schema: 1, old: old.commit, claims: rows.map((row, index) => ({ ...sourceClaim(file, row, index), ...(mapped.get(row.line)?.nonProduct ? { nonProduct: mapped.get(row.line).nonProduct } : {}) })) }).replaceAll('|', '\\u007c').trimEnd(), '-->')
   return table.join('\n')
 }
 function convert(old, acceptanceOld, claimMapPath) {
@@ -485,7 +520,7 @@ const covHeading = /^(#{1,6})\s+(.+?)\s*#*\s*$/;
 const covDefinition = new RegExp(`^(?:#{1,6}\\s+|(?:[-*+]\\s+)?\\*\\*)(${clauseIdSource})\\s+[—–-]\\s+`);
 const covSplit = text => text.replace(/\r\n?/g, '\n').split('\n');
 const covGenerated = text => /^\uFEFF?<!-- Generated from CONTRACT\.md by contract-docs\./.test(covSplit(text)[0]);
-const covNormalize = text => typeof text === 'string' ? text.replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+)/, '').replace(/[`*_]/g, '').replace(/\s+/gu, '') : '';
+const covNormalize = text => typeof text === 'string' ? withoutQuoteMarkers(text).replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+)/, '').replace(/[`*_]/g, '').replace(/\s+/gu, '') : '';
 const covKey = entry => JSON.stringify([entry.file, entry.line, entry.cell ?? '']);
 const covLabel = entry => `${entry.file}:${entry.line}${entry.cell ? ` (${entry.cell})` : ''}`;
 
@@ -524,6 +559,15 @@ function covFence(line, current) {
   if (marker[0] === current[0] && marker.length >= current.length) return { current: undefined, marker: true };
   return { current, marker: false };
 }
+function withoutQuoteMarkers(text) {
+  let fence;
+  return linesOf(text).map(line => {
+    const state = covFence(line, fence);
+    const value = state.marker || fence ? line : line.replace(/^[ \t]*(?:>[ \t]?)+/, '');
+    fence = state.current;
+    return value;
+  }).join('\n');
+}
 
 // A claims heading owns its descendants until a sibling or ancestor ends it.
 // A more specific claims heading, such as Opt-out claims, owns its own tables.
@@ -546,12 +590,17 @@ function homepageClaims(text) {
     if (!owner || !/\bhomepage\s+claims\b/i.test(owner.text) || /\bopt[ -]?out\b/i.test(owner.text)) continue;
     if (!value.includes('|') || !covDivider(lines[i + 1]?.text ?? '')) continue;
     const header = covCells(value);
-    if (!header.some(cell => /^claims?$/i.test(plainText(cell)))) continue;
+    if (!header.some(cell => claimHeader(cell) === 'Claim')) {
+      // Handwritten claims files also contain clause-status appendices under
+      // their document title. Those are not homepage claim tables.
+      if (/^Clause$/i.test(plainText(header[0])) && header.some(cell => /^Status$/i.test(plainText(cell)))) continue;
+      throw Error(`Homepage claims:${i + 1}: unrecognized claim heading: ${value}`);
+    }
     const rows = [];
     let next = i + 2;
     while (next < lines.length && lines[next].text.trim() && lines[next].text.includes('|') && !covHeading.test(lines[next].text)) {
       const row = lines[next];
-      if (covDivider(row.text) || covCells(row.text).length !== header.length) break;
+      if (covDivider(row.text) || covCells(row.text).length !== header.length) throw Error(`Homepage claims:${next + 1}: malformed row: ${row.raw}`);
       rows.push({ line: next + 1, cells: covCells(row.text), raw: row.raw });
       next++;
     }
@@ -745,6 +794,7 @@ function covDestination(destination, fragment, source, context, problems, label)
   }
 }
 function coverageCheck(old) {
+  validateOriginalClaims(old);
   validateClaimSource(read('CONTRACT.md'), undefined, old);
   const map = covReadMap(), problems = [], entries = covScope(old), expected = new Map(entries.map(entry => [covKey(entry), entry])), groups = new Map();
   if (map.schema !== 1) problems.push('Coverage schema must be 1.');
