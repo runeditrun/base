@@ -1,5 +1,6 @@
 import test from 'node:test';
 import {closureClasses} from './tests/closure-cases.mjs';
+import {archiveSourceCases} from './tests/archive-cases.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -99,6 +100,7 @@ test('record-base pins Base bytes and verify-base passes only for exact recorded
     ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
     assert.equal(ok(seed, 'verify-base', '--offline').ok, true);
     assert.notEqual(run(seed, 'verify-base').status, 0);
+    archiveSourceCases(temp, run, snapshotTree);
   } finally { fs.rmSync(temp, {recursive: true, force: true}); }
 });
 
