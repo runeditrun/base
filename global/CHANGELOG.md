@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `rer import` now restores into an existing local D1 file with no product schema, including a file created by Wrangler after reset. Migrations run before restore as they do when no file exists; occupied destinations and unknown foreign tables remain refused.
+
 ## 0.2.85
 
 - Two starters could both take over a stale local operation lock and both act as its owner. Takeover is now exclusive: the lock's inode stays pinned through takeover, and release checks the owner token.
