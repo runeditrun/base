@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.86
 
 - Local `rer export` and `rer import` accept the historical `_rer_deploy_migrations` plus `d1_migrations` pair: the deploy ledger remains authoritative and Wrangler is skipped. Incomplete, pending or conflicting histories still refuse before transfer.
 - **Known adapter change in 0.2.85:** the worker's `migration-preflight` receipt changed from `{platformLedger}` to `{nativeApply}`, and `platformMigrationPreflight` was renamed to `nativeMigrationPreflight`. Seeds wrapping the worker or importing the internal adapter must update; the supported adapter entry is `@runeditrun/rer/portability-migrations`, and native migrations run only when `nativeApply` is true.
@@ -31,6 +31,11 @@
 - Older v2 backups without `schemaObjects` now restore without acknowledgment when their recorded migrations prove the complete destination schema and archived tables. Unverifiable backups retain the explicit recovery option. Managed data ZIP intake also accepts old native staging-table leftovers, and its fixture preserves parent-before-child creation order for foreign keys.
 - `rer import` now restores into an existing local D1 file with no product schema, including a file created by Wrangler after reset. Migrations run before restore as they do when no file exists; occupied destinations and unknown foreign tables remain refused.
 - `rer refresh-base` refused sparse historical module copies when required dependency additions also resolved their old missing imports. Refresh now delivers and records those planned dependencies without a manual copy-record edit; ordinary unresolved imports without a planned dependency remain preserved.
+
+### Known issues
+
+- The two refresh recovery guidance issues documented in 0.2.82 still apply, with the same manual recoveries.
+- The delivered Verify template's runner-temporary pnpm store, Chromium and apt cache lifecycle is not yet exercised end to end on a GitHub Ubuntu 24.04 runner; Base Verify covers only Base's own bootstrap.
 
 ## 0.2.85
 
