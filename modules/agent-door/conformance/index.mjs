@@ -24,8 +24,8 @@ export async function runAgentDoorConformance({ fetch, invoke, origin, surface, 
  await c.phase('BASE-AGENT-001.transport', () => discoverDoor(c));
  await c.phase('BASE-AGENT-007.phase0', () => unsetPolicy(c, true));
  await c.phase('BASE-AGENT-007.phase1', () => removalPhase(c));
- await c.phase('BASE-AGENT-013.phase2', async () => { await c.adopt(autonomousPolicy()); await listedDoor(c); await runJourney(c, 'autonomous', { injections: true, replay: true }); });
- await c.phase('BASE-AGENT-013.phase3', async () => { await c.adopt(heldPolicy()); await runJourney(c, 'held', { held: true }); });
+ await c.phase('BASE-AGENT-013.phase2', async () => { await c.adopt(autonomousPolicy()); await c.prepare('autonomous'); await listedDoor(c); await runJourney(c, 'autonomous', { injections: true, replay: true }); });
+ await c.phase('BASE-AGENT-013.phase3', async () => { await c.prepare('held'); await c.adopt(heldPolicy()); await runJourney(c, 'held', { held: true }); });
  await c.phase('BASE-AGENT-007.phase4', () => blockedPhases(c));
  await c.phase('BASE-AGENT-011.phase5', () => pausePhase(c));
  await c.phase('BASE-AGENT-004.phase6', () => negativePhase(c));

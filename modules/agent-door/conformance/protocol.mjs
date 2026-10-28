@@ -27,6 +27,7 @@ export function resolveArgs(value, outputs, { unresolved = false, sponsor, fixtu
   if ('$from' in value || '$fixture' in value) {
    const key = value.$fixture ?? value.$from, values = '$fixture' in value ? new Map(Object.entries(fixtures)) : outputs;
    if (!values.has(key)) {
+    if ('$fixture' in value && unresolved) return `unresolved-fixture-${key}`;
     if ('$fixture' in value) throw new Error('A required native phase fixture is unavailable');
     if (unresolved) return `unresolved-${value.$from}`;
     throw new Error(`Reference ${value.$from} has no structuredContent in this phase`);

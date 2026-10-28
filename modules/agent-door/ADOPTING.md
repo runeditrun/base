@@ -545,6 +545,15 @@ fixture module and fail when their value or client is absent. Audit verification
 checks each client's own agent, sponsor, client ID and null Business consent;
 Business credential and consent negatives still use the Business credential.
 
+The initial unanswered-policy round can return only clients: its refusal probes
+use unresolved arguments just as they do for `$from` references. Successful
+journeys require the real prepared values. Later preparation runs with the
+autonomous policy in force, before adopting the policy under test, so native
+REST mutations can enter the real agent door to establish receipt custody.
+Their audit rows remain available and their client identity is checked. Only
+rows created inside preparation are separated from the journey's exact audit
+count; every tested call still requires its own matching audit row.
+
 Preparation runs before `initial`, `removed`, `autonomous`, `held`, each
 `blocked:<class>`, `paused`, `negative` and `consent` round, before no-effect
 witnesses are taken. Optional replay, invocation, webhook and record-security
