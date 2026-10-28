@@ -84,7 +84,15 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    await migrate(await mf.getD1Database(item.binding, 'app'), withRewrites(plan, await readMigrationRewrites(root), { partial: true }));
   }
  } catch (error) { await mf.dispose(); throw error; }
- return { client, identity, origin: HOSTED_ORIGIN, close: () => mf.dispose(),
+ return { client, identity, origin: HOSTED_ORIGIN,
+  database: async binding => {
+   if (!(config.d1_databases ?? []).some(item => item.binding === binding)) throw new RerError('hosted_database_invalid', 'Verification can read only a declared disposable database binding.', 1);
+   const db = await mf.getD1Database(binding, 'app');
+   return { prepare(sql) {
+    if (typeof sql !== 'string' || !/^\s*SELECT\b/i.test(sql) || sql.includes(';')) throw new RerError('hosted_database_invalid', 'Verification state access is read-only SELECT.', 1);
+    return db.prepare(sql);
+   } };
+  }, close: () => mf.dispose(),
   fetch: (path, { headers, ...init } = {}) => fetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }) };
 }
 

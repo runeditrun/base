@@ -41,7 +41,8 @@ export interface ToolDefinition {
   revision?(args: Record<string, unknown>, ctx: ToolContext): Promise<number | null>
   summary?(args: Record<string, unknown>, ctx: ToolContext): ApprovalSummary | Promise<ApprovalSummary>
   undo?(saved: unknown, ctx: UndoContext): Promise<void>
-  authority?(args: Record<string, unknown>, ctx: ToolContext): Promise<{ subject: string; widens: boolean } | null>
+  authority?: 'none' | ((args: Record<string, unknown>, ctx: ToolContext) => Promise<{ subject: string; widens: boolean } | null>)
+  effect?: { kind: 'record'; justification: string }
   untrusted?: boolean
 }
 export interface ResourceDefinition {

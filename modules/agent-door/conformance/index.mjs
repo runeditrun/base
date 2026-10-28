@@ -6,12 +6,16 @@ import { discoverDoor, listedDoor } from './discovery.mjs';
 import { runJourney } from './journey.mjs';
 import { unsetPolicy, removalPhase, blockedPhases, pausePhase } from './policy-phases.mjs';
 import { negativePhase } from './negative.mjs';
+import { replayAdmissionPhase } from './replay.mjs';
+import { webhookPhase } from './webhooks.mjs';
+import { recordSecurityPhase } from './security.mjs';
+import { crossSponsorPhase } from './sponsors.mjs';
 import { auditPhase } from './audit.mjs';
 
 export { validateAgentSurface } from './surface.mjs';
 
 /** Run against a fresh, real installation using its HTTP and person doors. */
-export async function runAgentDoorConformance({ fetch, origin, surface, signer, person, business = 'rer-agent-conformance', consent = randomUUID(), now }) {
+export async function runAgentDoorConformance({ fetch, origin, surface, signer, person, sponsors = [person], webhooks, business = 'rer-agent-conformance', consent = randomUUID(), now }) {
  const validation = validateAgentSurface(surface), points = [...validation.points];
  if (!validation.ok) return { ok: false, points };
  if (typeof fetch !== 'function' || !signer?.privateKey || !signer.issuer || !signer.installationId || !signer.kid || !person?.email || !person.cookie || typeof person.sub !== 'string' || !person.sub.trim() || typeof consent !== 'string' || !consent.trim() || new URL(origin).origin !== origin) throw new TypeError('Conformance requires fetch, canonical origin, signer, consent and signed-in person {email,cookie,sub}');
@@ -24,6 +28,10 @@ export async function runAgentDoorConformance({ fetch, origin, surface, signer, 
  await c.phase('BASE-AGENT-007.phase4', () => blockedPhases(c));
  await c.phase('BASE-AGENT-011.phase5', () => pausePhase(c));
  await c.phase('BASE-AGENT-004.phase6', () => negativePhase(c));
+ if (surface.tools.some(tool => tool.authority === 'none')) await c.phase('BASE-AGENT-005.no-subject', () => recordSecurityPhase(c));
+ if (surface.verification?.replayAdmission) await c.phase('BASE-AGENT-012.replay', () => replayAdmissionPhase(c, surface.verification.replayAdmission));
+ if (webhooks) await c.phase('BASE-AGENT-006.webhook', () => webhookPhase(c, webhooks));
  await c.phase('BASE-AGENT-009.phase7', () => auditPhase(c));
+ if (sponsors.length > 1) await c.phase('BASE-AGENT-004.cross-sponsor', () => crossSponsorPhase(c, sponsors));
  return { ok: points.every(point => point.ok), points };
 }

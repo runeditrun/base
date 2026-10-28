@@ -1,4 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { validateNetworkAdapter, NetworkAdapterError } from '../modules/agent-door/conformance/network-modules.mjs';
+import { isolatedNetworkAdapter } from '../modules/agent-door/conformance/network-runtime.mjs';
+import { verificationSecrets } from './agent-secrets.mjs';
+import { RerError } from './errors.mjs';
+
+const denied = () => new Response('Conformance has no network adapter for this external effect.', { status: 502 });
 
 // Conformance is a disposable installation. Replace only the paid mail network
 // edge; native invitation preparation, authorization and D1 commits still run.
@@ -17,5 +23,32 @@ export async function agentConformanceNetwork(request) {
   const body = await request.json();
   return Response.json({ success: true, errors: [], result: { message_id: randomUUID(), accepted: body.to, rejected: [] } });
  }
- return new Response('Conformance has no network adapter for this external effect.', { status: 502 });
+ return denied();
+}
+
+/** Extend the paid network edge for declared origins, without running seed
+ * modules in this process or giving them any route to the real network. */
+export async function createAgentConformanceNetwork(root, config) {
+ if (config === undefined) return { fetch: agentConformanceNetwork, provision: async () => ({}), close: async () => {} };
+ let declaration, adapter;
+ try {
+  const network = config && typeof config === 'object' && !Array.isArray(config)
+   ? Object.fromEntries(Object.entries(config).filter(([key]) => key !== 'secretSource')) : config;
+  declaration = validateNetworkAdapter(network);
+  adapter = await isolatedNetworkAdapter(root, declaration.module, denied);
+ } catch (error) {
+  if (error instanceof NetworkAdapterError) throw new RerError('agent_network_invalid', error.message, 1);
+  throw error;
+ }
+ return { close: adapter.close,
+  provision: async hosted => {
+   if (config.secretSource === undefined) return {};
+   const secrets = await verificationSecrets(root, config.secretSource, hosted.database);
+   await adapter.provision(secrets);
+   return secrets;
+  }, fetch: async request => {
+  if (!declaration.origins.has(new URL(request.url).origin)) return agentConformanceNetwork(request);
+  try { return await adapter.fetch(request); }
+  catch { throw new RerError('agent_network_failed', 'The isolated conformance network adapter failed to handle a provider request. Its default fetch export must return a Response.', 1); }
+ } };
 }
