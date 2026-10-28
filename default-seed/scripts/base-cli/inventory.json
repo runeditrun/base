@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.84-dev.ga6ad2d72",
+  "cliVersion": "0.2.84-dev.g6d3ada4d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -37,7 +37,7 @@
     },
     "app-fetch.mjs": {
       "source": "onboarding/app-fetch.mjs",
-      "sha256": "0dc8b6a1a646806736db177327f518845d6cdf0c1b7918b602cfe9868c40b0a0"
+      "sha256": "47f86161306d6156376fea5f99077aa91e090676933b824c1c059a2e1230569a"
     },
     "app-processes.mjs": {
       "source": "onboarding/app-processes.mjs",
@@ -162,6 +162,10 @@
     "local/state.mjs": {
       "source": "onboarding/local/state.mjs",
       "sha256": "67c9e1f7352fd1f46575e8ce54b2d3d540dc045a22574a4d1c6c01c47a731a12"
+    },
+    "loopback-fetch.mjs": {
+      "source": "onboarding/loopback-fetch.mjs",
+      "sha256": "f2df7a7402351dd13c41c5f162f851ced33bb14a2f71673a74747ad3e75f5e8a"
     },
     "metadata.mjs": {
       "source": "onboarding/metadata.mjs",

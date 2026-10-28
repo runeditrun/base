@@ -20,6 +20,7 @@
 - Carry the paired Business name and display settings into local first-party apps at connect, setup and dev; refresh live apps while Business runs and remove the local carry on disconnect.
 - Include the GitHub CLI exit status and bounded, redacted stderr in unavailable release verification receipts; retain authentication guidance when stderr is empty.
 - Allow seed source folders named exports in development while keeping generated top-level export output and installation archives private.
+- Prevent "fetch failed" and UND_ERR_SOCKET on local worker requests by closing each loopback harness connection after its response instead of reusing idle sockets. Readiness, owner claims and seed runtime journeys share this transport without retries.
 
 ## 0.2.84
 

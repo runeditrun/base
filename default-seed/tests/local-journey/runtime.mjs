@@ -1,4 +1,5 @@
 import '../../scripts/base-cli/modules/container/adapters/d1-workerd-preload.mjs';
+import { loopbackFetch as fetch } from '../../scripts/base-onboarding/loopback-fetch.mjs'
 import assert from 'node:assert/strict'
 import { copyProject } from './copy.mjs'
 import { mkdir, mkdtemp, open, readFile, rm, statfs, writeFile } from 'node:fs/promises'

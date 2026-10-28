@@ -1,3 +1,4 @@
+import { loopbackFetch as fetch } from '../../scripts/base-onboarding/loopback-fetch.mjs'
 import assert from 'node:assert/strict'
 import { checkDoor } from './import-door-conformance.mjs'
 
