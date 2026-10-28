@@ -36,6 +36,13 @@ test('credentials-only deploy update uses declared live mail secrets with a vali
  assert.ok(!conflictText.includes(other),'the environment-mapped value retains deploy secret redaction');
  assert.equal(f.provider.state.calls.length,calls);
  assert.equal(f.provider.state.writes.length,writes);
+ await writeFile(join(f.root,'deploy.env'),`PRODUCT_MAIL_FROM=${productionSender}\n`);
+ await writeFile(join(f.root,'wrangler.jsonc'),JSON.stringify({vars:{MAIL_FROM:other}}));
+ const sourceConflict=await run();
+ assert.equal(sourceConflict.code,4,JSON.stringify(sourceConflict.events));
+ assert.ok(JSON.stringify(sourceConflict.events).includes('wrangler.jsonc'));
+ assert.equal(f.provider.state.calls.length,calls);
+ await rm(join(f.root,'wrangler.jsonc'));
  await writeFile(join(f.root,'deploy.env'),'');
  const update=await run();
  console.error('credentials-only update:',JSON.stringify(update));
