@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.86-dev.gcfa1157a",
+  "cliVersion": "0.2.86-dev.g7ce44fa5",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1863,7 +1863,7 @@
     },
     "modules/agent-door/conformance/audit.mjs": {
       "source": "modules/agent-door/conformance/audit.mjs",
-      "sha256": "efb081da23741eef1ba02ebf04807415bd5ea5a5528e8ae33b8588ce5cc3ad26"
+      "sha256": "ad29c205d44034275685197bf55eb0b4c92fbeae5546f6c1cee7e05170471b1e"
     },
     "modules/agent-door/conformance/crypto.mjs": {
       "source": "modules/agent-door/conformance/crypto.mjs",
@@ -1871,7 +1871,7 @@
     },
     "modules/agent-door/conformance/discovery.mjs": {
       "source": "modules/agent-door/conformance/discovery.mjs",
-      "sha256": "2a4aafd7c4bd5abffba6248c9436ca4fb9d7debfb5f023921b3f5cd27e2c91f4"
+      "sha256": "b70a03b393fb978d1e1a359e57d0f747f1fa7c0436d72e3361eeeedb96ca8084"
     },
     "modules/agent-door/conformance/index.mjs": {
       "source": "modules/agent-door/conformance/index.mjs",
@@ -1919,7 +1919,7 @@
     },
     "modules/agent-door/conformance/surface.mjs": {
       "source": "modules/agent-door/conformance/surface.mjs",
-      "sha256": "7afb0ceaddbc141d3ccc3c783c4645ebde6ba75c367aaea7de729dd171fe7d7f"
+      "sha256": "e0296430e01214f881a4a2177fe968b9262d17470640e90efe520e8a272b5a37"
     },
     "modules/agent-door/conformance/tool-name.d.mts": {
       "source": "modules/agent-door/conformance/tool-name.d.mts",

@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { runtime } from './runtime.mjs'
 import { autonomousPolicy, heldPolicy } from '../conformance/crypto.mjs'
+import { createProtocol } from '../conformance/protocol.mjs'
+import { runJourney } from '../conformance/journey.mjs'
 import { runAgentDoorConformance, validateAgentSurface } from '../conformance/index.mjs'
 
 const code = (answer: any) => answer.result?._meta?.['com.runeditrun/error']?.code ?? answer.error?.data?.code
@@ -57,7 +59,13 @@ test('native target resolver reaches audit, approval summary and execution witho
   await r.db.prepare("UPDATE test_records SET exposure='hidden' WHERE id=?").bind(resource.id).run()
   const refused = await r.person(`/agents/api/approvals/${secondId}/approve`, { revision: secondView.revision, summary_sha256: secondView.summary_sha256 })
   assert.equal(refused.body.approval.code, 'approval_evidence_changed')
-  t.diagnostic('target negative: caller attribution ignored; changed native target refused approval_evidence_changed')
+  const invalid = await fixture({ nativeTargets: 'invalid' })
+  try {
+   await invalid.adopt()
+   assert.equal(code(await invalid.tool('records.write', input())), 'target_invalid')
+   assert.deepEqual((await invalid.tool('records.list', {})).result.structuredContent.records, [])
+  } finally { await invalid.close() }
+  t.diagnostic('target negatives: caller attribution ignored; malformed resolver target_invalid; changed target approval_evidence_changed')
  } finally { await r.close() }
 })
 
@@ -96,13 +104,19 @@ test('security surfaces without sponsor widening retain full policy and approval
   const falseClaim = structuredClone(declaration)
   ;(falseClaim.tools[1] as any).sponsorEscalation = 'no'
   assert.equal(validateAgentSurface(falseClaim).ok, false)
-  const native = await runtime()
+  const native = await runtime({ selfWideningClaim: true })
   try {
    await native.adopt()
    const actor = await native.mcp('tools/list')
    assert.equal(actor.status, 200)
    const sponsor = (await native.person('/agents/api/agents')).body.agents.find((a: any) => a.id === native.c.agentId).sponsor.id
    assert.equal(code(await native.tool('access.change', { id: sponsor, idempotency_key: crypto.randomUUID() })), 'self_escalation')
+   const declaration = { ...surface(), tools: [{ name: 'synthetic.access.change', scope: 'records:write', readOnly: false, classes: ['access'], sponsorEscalation: false }], journey: [{ id: 'false-claim', tool: 'synthetic.access.change', args: { id: sponsor }, expect: [{ class: 'access' }] }] }
+   const c = createProtocol({ ...native.c, fetch: native.fetch, points: [], listed: new Map(), surface: declaration })
+   c.listed = new Map((await c.mcp('tools/list')).result.tools.map((tool: any) => [tool.name, tool]))
+   await runJourney(c, 'false-claim')
+   assert.ok(c.points.some((point: any) => !point.ok && point.detail.includes('self_escalation')))
+
   } finally { await native.close() }
   t.diagnostic('per-surface negatives: undeclared widening coverage and malformed contract fail; actual self-widening still self_escalation')
  } finally { await r.close() }

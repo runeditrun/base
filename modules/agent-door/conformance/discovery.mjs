@@ -31,6 +31,7 @@ export async function listedDoor(c) {
  c.add('BASE-AGENT-001.4', isDeepStrictEqual(first.result, second.result) && typeof first.result?.ttlMs === 'number' && first.result.ttlMs >= 0 && first.result.cacheScope === 'private', 'Repeated tools/list results must have deterministic order, ttlMs and private cache scope.');
  for (const declared of c.surface.tools) {
   const tool = c.listed.get(declared.name);
+  if (declared.sponsorEscalation !== undefined) c.add(`BASE-AGENT-005.sponsor-escalation.${declared.name}`, tool?._meta?.['com.runeditrun/sponsor-escalation'] === declared.sponsorEscalation, `${declared.name} must expose its per-surface sponsor escalation contract.`);
   if (declared.proof) c.add(`BASE-AGENT-004.proof.${declared.name}.declaration`, tool?._meta?.['com.runeditrun/proof'] === declared.proof && tool?._meta?.['com.runeditrun/proof-kind'] === declared.proofKind, `${declared.name} must expose its native proof requirement.`);
   if (declared.widens === false) {
    const { idempotency_key: _key, expected_revision: _revision, ...properties } = tool?.inputSchema?.properties ?? {};

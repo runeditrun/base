@@ -110,7 +110,7 @@ person id, email or agent id; the door normalises these and refuses self-widenin
 before classification and again at approval execution. Return null only when
 no standing authority is changed. Other people's changes still follow policy.
 Declare `escalations: [{ id, tool, args }]` in `agent-surface.json`, covering each
-access or security tool that can widen authority. Use `{ "$sponsor": "id" }` or
+access or security tool whose `authority()` can widen its sponsor. Use `{ "$sponsor": "id" }` or
 `{ "$sponsor": "email" }` as argument values; the conformance journey resolves
 these and requires `self_escalation` with an unchanged native witness. Retain a
 journey call proving an ordinary narrowing change too.
@@ -502,3 +502,71 @@ corresponding relative paths or retain the seed's supported native adapters.
 The fresh-copy journey records and refreshes door, settings and prerequisites
 through the exported authoring CLI, then typechecks the entire copy under strict
 TypeScript without excluding any copied files.
+
+
+## Resolve native targets for audit and approval
+
+A tool acting on a native record can declare a read-only
+`target(args, ctx)` resolver alongside its native classification and summary:
+
+```ts
+target: async (args, ctx) => {
+  const record = await nativeReadableRecord(args.id, ctx)
+  return record ? { kind: 'invoice', id: record.id } : null
+}
+```
+
+The resolver receives declared arguments without the reserved replay/revision
+fields and the authenticated ToolContext. Return the actual native kind and id,
+applying the seed's visibility and redaction policy before returning them. Return
+null when no target can be attributed. Never return credentials, raw content or
+caller-provided attribution. This is attribution only: keep native authorization
+and transaction fences inside the tool's native services.
+
+The audit row's `resource` is this exact `{kind, id}` for a tool, a URI string
+for `resources/read`, or null without a resolved target. The door adds the same
+kind/id to `summary.target`, whose hash binds an approval to that target. The
+person's approval and review pages show its kind and id. Execution resolves it
+again; changed summary evidence refuses with `approval_evidence_changed`.
+The runtime rejects malformed resolver results with `target_invalid`. Calls
+without the hook retain their current behavior. Verify the expected native
+identity in the seed's native conformance journey through `/agents/api/audit`
+and `/agents/api/approvals/:id`, including a changed-target negative.
+
+## Resource refusal machine codes
+
+A refused `resources/read` returns its stable refusal in JSON-RPC
+`error.data.code`, matching the tool pipeline's code. Missing and native-hidden
+records both return `resource_unavailable`, including unknown resource templates;
+neither returns content or reveals which condition applied. Scope, policy,
+pause and approval refusals keep their existing named codes and challenges.
+
+## Declare sponsor escalation per tool surface
+
+Access/security classification does not itself mean a tool can widen its
+sponsor. A native record security editor can return null from `authority()`;
+an admin-only team editor can widen other people's grants while its sponsor
+already has full authority. Such a tool declares `sponsorEscalation: false`
+in both its runtime definition and Agent surface tool. Discovery checks those
+declarations agree and reports a named sponsor-escalation point. It still runs
+all ordinary autonomous, held/approval, blocked, unset and pause journey phases.
+
+Omitting the field (or declaring true) preserves the required sponsor-escalation
+fixture. A widening fixture must describe an actual native increase: owner to
+admin is a reduction, and an unchanged role does not widen authority. The
+reference role editor declares false and retains its native refusal for owner
+and sponsor changes. The stronger `widens: false` narrowing-only contract and
+its grant-subset witness remain separate. Declaring false never bypasses the
+runtime `self_escalation` guard, including on delayed approval execution.
+
+## Retain metadata on early policy refusals
+
+After authentication and scope admission, schema-valid paused, unset and
+unavailable-policy calls resolve their target and classify native facts for
+audit without running an action, authority change, summary or effect. Their
+original refusal remains authoritative; each available class records that
+disposition with `rule: null`, since no policy rule admitted the action.
+Invalid arguments are never passed to metadata hooks on these paths. When a
+native reader cannot resolve the target or classification, the audit marks
+`metadata_unavailable` with `target` or `classes`; it does not fabricate facts
+or replace the policy refusal. Keep both hooks read-only.

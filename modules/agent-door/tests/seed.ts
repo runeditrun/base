@@ -48,6 +48,7 @@ export default {
     if (config.nativeTargets) for (const tool of tools) if (tool.inputSchema.properties?.id) Object.assign(tool, {
       target: async (args: Record<string, unknown>) => {
         const record = await read(String(args.id))
+        if (config.nativeTargets === 'invalid') return { kind: 'record' }
         return record && record.exposure !== 'hidden' ? { kind: 'record', id: record.id } : null
       },
     })
@@ -55,6 +56,7 @@ export default {
       classes: ['security'], sponsorEscalation: false, authority: async () => null,
       classify: () => [{ class: 'security', facts: { measure: 1, setting: 'record-visibility' } }],
     })
+    if (config.selfWideningClaim) Object.assign(tools.find(tool => tool.name === 'synthetic.access.change')!, { sponsorEscalation: false })
     const selectedTools = config.toolSubset ? tools.filter(tool => config.toolSubset.includes(tool.name)) : tools
     const door = createAgentDoor({ seed: config.seed, name: 'Synthetic Base', specialist: 'operations', origin: config.origin, db: env.DB, trust: JSON.parse(env.TRUST), now,
       currentScopes: async principal => { const grant = await env.DB.prepare('SELECT scopes FROM test_grants WHERE agent=?').bind(principal.agent.id).first<{ scopes: string }>(); return grant ? JSON.parse(grant.scopes) : principal.scopes },

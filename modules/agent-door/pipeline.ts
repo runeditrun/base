@@ -14,6 +14,7 @@ import { preparedBy } from './people.ts'
 import type { ToolDefinition } from './types.ts'
 import { nativeProof } from './native-proof.ts'
 import { narrowPrincipal } from './principal.ts'
+import { resolveTarget } from './target.ts'
 
 export interface PipelineAnswer { result: CallResult; status?: number; scope?: string }
 export async function callTool(rt: Runtime, name: string, input: unknown, principal: Principal, door: ToolContext['door'], trace?: unknown, resourceTool?: ToolDefinition, requestState?: unknown, proofReference?: unknown): Promise<PipelineAnswer> {
@@ -24,7 +25,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
   const refuse = (code: string, fields?: Record<string, unknown>) => { result = { ...result, outcome: 'refused', code, fields }; return { result, status, scope } }
   try {
     const tool = resourceTool ?? rt.tools.find(tool => tool.name === name)
-    if (!tool) { status = 400; return refuse('tool_not_found') }
+    if (!tool) { status = 400; return refuse(name === 'resources/read' ? 'resource_unavailable' : 'tool_not_found') }
     const raw = input && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : null
     const properties = tool.inputSchema.properties ?? {}
     const declared = Object.fromEntries(Object.entries(raw ?? {}).filter(([key]) => Object.hasOwn(properties, key)))
@@ -39,7 +40,15 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     const refusal = policyRefusal(rt, state, tool.classes)
     if (refusal) {
       const disposition = { agents_paused: 'paused', policy_unset: 'unset', policy_unavailable: 'unavailable' }[refusal.code] ?? 'none'
-      result.decision = { id: row.id, disposition, revision: state.revision, classes: [] }
+      const classes: DecisionMeta['classes'] = []
+      if (raw && validateSchema(tool.inputSchema, declared)) {
+        const { idempotency_key: _key, expected_revision: _expected, ...args } = declared
+        const ctx = context(rt, principal, door, [])
+        // Metadata must never override an existing refusal or run an effect.
+        try { if (tool.target) row.resource = await resolveTarget(tool, args, ctx) } catch { (row.metadata_unavailable ??= []).push('target') }
+        try { classes.push(...(await classify(tool, args, ctx)).map(item => ({ ...item, rule: null, do: disposition }))) } catch { (row.metadata_unavailable ??= []).push('classes') }
+      }
+      result.decision = { id: row.id, disposition, revision: state.revision, classes }
       return refuse(refusal.code, refusal.fields)
     }
     if (!tool.readOnly && !key) return refuse('idempotency_key_required')
@@ -51,6 +60,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       const saved = pending ? JSON.parse(pending.saved) : null
       if (!saved || saved.principal.person.id !== principal.person.id || saved.principal.agent.id !== principal.agent.id || saved.tool !== name || saved.digest !== requestDigest) return refuse('invalid_arguments')
       const { idempotency_key: _key, expected_revision: _expected, ...args } = declared
+      if (tool.target) row.resource = await resolveTarget(tool, args, context(rt, principal, door, []))
       principal = await nativeProof(rt, tool, args, principal, proofReference)
       await classify(tool, args, context(rt, principal, door, []))
       result = await approvalReplay(rt, saved.result)
@@ -64,6 +74,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
         if (previous.digest !== requestDigest) return refuse('idempotency_conflict')
         if (!previous.outcome) return refuse('call_in_progress')
         const { idempotency_key: _key, expected_revision: _expected, ...args } = declared
+        if (tool.target) row.resource = await resolveTarget(tool, args, context(rt, principal, door, []))
         principal = await nativeProof(rt, tool, args, principal, proofReference)
         await recoverAudit(rt, previous.decision_id, JSON.parse(previous.outcome))
         result = await approvalReplay(rt, JSON.parse(previous.outcome))
@@ -75,6 +86,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     if (!raw || !validateSchema(tool.inputSchema, declared)) return refuse('invalid_arguments')
     const { idempotency_key: _key, expected_revision: expected, ...args } = declared
     const ctx = context(rt, principal, door, [])
+    if (tool.target) row.resource = await resolveTarget(tool, args, ctx)
     if (tool.revision && expected !== undefined) {
       const current = await tool.revision(args, ctx)
       if (expected !== current) return refuse('revision_conflict', { current_revision: current })
@@ -97,7 +109,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     if (decision.result === 'unset') return refuse('policy_unset', { unanswered: decision.unset, setup_url: setupUrl(rt, state) })
     if (decision.result === 'blocked') return refuse('policy_blocked', { class: decision.deciding!.class, rule: decision.deciding!.rule, revision: state.revision })
     principal = await nativeProof(rt, tool, args, principal, proofReference)
-    const savedSummary = await summary(tool, args, ctx)
+    const savedSummary = await summary(tool, args, ctx, typeof row.resource === 'object' ? row.resource : null)
     const summary_sha256 = await digest(savedSummary)
     recordDecision(row, meta)
     const claim = key === null ? undefined : { key, digest: requestDigest }

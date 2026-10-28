@@ -31,6 +31,7 @@ export function validateAgentSurface(surface, { contract } = {}) {
   add(`${label}.clauses`, clauses.length > 0 && clauses.every(text), `${label} must name its contract clauses.`);
   if (contract !== undefined) for (const clause of clauses) add(`${label}.clause.${clause}`, hasClause(contract, clause), `${label} names clause ${clause}, absent from CONTRACT.md.`);
   if (tool?.proof !== undefined || tool?.proofKind !== undefined) add(`${label}.proof`, tool.proof === 'native' && typeof tool.proofKind === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(tool.proofKind), `${label} must declare proof native and its named proofKind.`);
+  if (tool?.sponsorEscalation !== undefined) escalation(`${label}.sponsor-escalation`, typeof tool.sponsorEscalation === 'boolean' && tool.classes?.some(cls => ['access', 'security'].includes(cls)), `${label} sponsorEscalation must be a boolean on an access/security tool.`);
   if (tool?.widens !== undefined || tool?.narrowing !== undefined) escalation(`${label}.narrowing-contract`, tool.widens === false && tool.readOnly === false && tool.classes?.some(cls => ['access', 'security'].includes(cls)) && narrowingContract(tool), `${label} narrowing requires revoke/narrow and a closed target-only string schema.`);
   tools.set(name, tool); coverage.set(name, new Set());
  }
@@ -72,7 +73,7 @@ export function validateAgentSurface(surface, { contract } = {}) {
   checkReferences(witness?.args, `narrowing.${i}.witness`, steps, escalation);
   narrowingTools.add(fixture?.tool);
  }
- for (const [name, tool] of tools) if (Array.isArray(tool?.classes) && tool.classes.some(cls => ['access', 'security'].includes(cls))) escalation(`${name}.coverage`, tool.widens === false ? narrowingTools.has(name) : escalationTools.has(name), `${name} has no ${tool.widens === false ? 'narrowing check' : 'sponsor escalation fixture'}.`);
+ for (const [name, tool] of tools) if (Array.isArray(tool?.classes) && tool.classes.some(cls => ['access', 'security'].includes(cls))) escalation(`${name}.coverage`, tool.widens === false ? narrowingTools.has(name) : tool.sponsorEscalation === false || escalationTools.has(name), `${name} has no ${tool.widens === false ? 'narrowing check' : 'sponsor escalation fixture'}.`);
  for (const [name, tool] of tools) for (const cls of Array.isArray(tool?.classes) ? tool.classes : []) add(`${name}.coverage.${cls}`, coverage.get(name).has(cls), `${name} has no journey fixture for declared class ${cls}.`);
  add('events', tools.has(`${surface.seed}.events.list`), `Declare built-in ${surface.seed}.events.list in the Agent surface.`);
  add('witness', object(surface.witness) && tools.get(surface.witness.tool)?.readOnly === true && object(surface.witness.args), 'witness must name a declared readOnly tool and arguments.');
