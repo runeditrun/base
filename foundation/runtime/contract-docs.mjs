@@ -280,21 +280,49 @@ function requirementAndAcceptance(body, oldAcceptance) {
   }
   return { text: result.join('\n\n'), history }
 }
-function contractClaims(old) {
+function contractClaims(old, ids, claimMapPath) {
   const candidates = Object.entries(old.files).filter(([name, text]) => name === 'CONTRACT.md' || /(?:^|\/)CLAIMS\.md$/.test(name) && !text.startsWith('<!-- Generated from CONTRACT.md by contract-docs.')).map(([name, text]) => ({ name, tables: homepageClaims(text) }))
   const winner = candidates.sort((a, b) => b.tables.reduce((n, table) => n + table.rows.length, 0) - a.tables.reduce((n, table) => n + table.rows.length, 0))[0]
-  if (!winner?.tables.some(table => table.rows.length)) return 'No homepage claims are mapped yet.'
-  const rows = winner.tables.flatMap(table => table.rows.map(row => ({ ...row, header: table.header })))
+  const rows = winner?.tables.flatMap(table => table.rows.map(row => ({ ...row, header: table.header }))) ?? []
+  const value = (row, label) => row.cells[row.header.findIndex(cell => new RegExp(`^${label}$`, 'i').test(plainText(cell).replace('(s)', 's')))] ?? ''
+  const mapped = new Map()
+  if (claimMapPath !== undefined) {
+    const source = read(claimMapPath)
+    if (source === undefined) throw Error(`${claimMapPath}: claim map does not exist.`)
+    let map
+    try { map = JSON.parse(source) } catch (error) { throw Error(`${claimMapPath}: invalid claim map JSON: ${error.message}`) }
+    if (map?.schema !== 1 || map.old !== old.commit || !Array.isArray(map.claims))
+      throw Error(`${claimMapPath}: claim map needs schema 1, old ${old.commit}, and a claims list.`)
+    for (const entry of map.claims) {
+      if (!entry || entry.file !== winner?.name || !Number.isInteger(entry.line) || entry.line < 1)
+        throw Error(`${claimMapPath}: each claim mapping needs file ${winner?.name ?? 'CONTRACT.md'} and its original positive line number.`)
+      const row = rows.find(row => row.line === entry.line)
+      const label = `${claimMapPath}: ${entry.file}:${entry.line}`
+      if (!row) throw Error(`${label}: not a selected original homepage claim row.`)
+      if (mapped.has(entry.line)) throw Error(`${label}: duplicate claim mapping; supply one clauses list per row.`)
+      if (entry.claim !== value(row, 'Claim')) throw Error(`${label}: claim must exactly match ${JSON.stringify(value(row, 'Claim'))}.`)
+      if (!Array.isArray(entry.clauses) || !entry.clauses.length || new Set(entry.clauses).size !== entry.clauses.length)
+        throw Error(`${label}: clauses must be a non-empty list of distinct existing product clause ids.`)
+      for (const id of entry.clauses) if (typeof id !== 'string' || !idPattern.test(id) || !ids.has(id))
+        throw Error(`${label}: unknown product clause ${JSON.stringify(id)}; use an id defined in the original contract.`)
+      mapped.set(entry.line, entry.clauses)
+    }
+  }
+  if (!rows.length) return 'No homepage claims are mapped yet.'
   const hasSection = rows.some(row => row.header.some(label => /^section$/i.test(plainText(label))))
   const header = ['#', ...(hasSection ? ['Section'] : []), 'Claim', 'Clauses']
-  const table = [`| ${header.join(' | ')} |`, `| ${header.map(() => '---').join(' | ')} |`]
+  const table = [`| ${header.join(' | ')} |`, `| ${header.map(() => '---').join(' | ')} |`], problems = []
   for (const [index, row] of rows.entries()) {
-    const value = label => row.cells[row.header.findIndex(cell => new RegExp(`^${label}$`, 'i').test(plainText(cell).replace('(s)', 's')))] ?? ''
-    table.push(`| ${[value('#') || String(index + 1), ...(hasSection ? [value('Section')] : []), value('Claim'), value('Clauses?')].join(' | ')} |`)
+    const references = mapped.has(row.line) ? mapped.get(row.line).join(', ') : value(row, 'Clauses?')
+    const linked = idsIn(references)
+    if (!linked.length || linked.some(id => !ids.has(id)))
+      problems.push(`${winner.name}:${row.line}: Homepage claim ${JSON.stringify(value(row, 'Claim'))} needs existing product clause ids (found ${JSON.stringify(references)}). Supply --claim-map <file> with schema 1, old ${old.commit}, and claims entries {file, line, claim, clauses}; map only to the actual obligations, never invent a link.`)
+    table.push(`| ${[value(row, '#') || String(index + 1), ...(hasSection ? [value(row, 'Section')] : []), value(row, 'Claim'), references].join(' | ')} |`)
   }
+  if (problems.length) throw Error(problems.join('\n'))
   return table.join('\n')
 }
-function convert(old, acceptanceOld) {
+function convert(old, acceptanceOld, claimMapPath) {
   const text = old.files['CONTRACT.md'], parsed = parseContract(text), lines = linesOf(text), seed = seedName(text), ids = new Set(parsed.clauses.map(clause => clause.id))
   const acceptanceSource = acceptanceOld?.files['ACCEPTANCE.md'] ?? old.files['ACCEPTANCE.md']
   const acceptances = acceptanceEntries(acceptanceSource, ids)
@@ -341,7 +369,7 @@ function convert(old, acceptanceOld) {
       }
     }
   }
-  output.push('## Field proof register', 'No field proof is recorded yet.', '## Boundaries', section(text, 'Boundaries') || section(text, 'Honest boundaries') || section(text, 'Honest boundaries and delivery responsibilities') || 'No additional boundaries are recorded.', '## Homepage claims', contractClaims(old))
+  output.push('## Field proof register', 'No field proof is recorded yet.', '## Boundaries', section(text, 'Boundaries') || section(text, 'Honest boundaries') || section(text, 'Honest boundaries and delivery responsibilities') || 'No additional boundaries are recorded.', '## Homepage claims', contractClaims(old, ids, claimMapPath))
   const retired = outline(text).filter(entry => entry.level === 2 && /^Retired\b/i.test(entry.title))
   if (retired.length) {
     const contents = retired.map(entry => block(lines.slice(entry.start + 1, entry.end).join('\n'))).join('\n\n')
@@ -736,9 +764,10 @@ function coverageRebase(from, onto) {
 
 function main(args) {
   const [command, ...rest] = args
-  const option = name => {
+  const option = (name, description = 'Git reference') => {
     const index = rest.indexOf(name)
-    if (index < 0 || !rest[index + 1] || rest[index + 1].startsWith('--')) throw Error(`Provide ${name} and its Git reference.`)
+    if (index < 0 || !rest[index + 1] || rest[index + 1].startsWith('--')) throw Error(`Provide ${name} and its ${description}.`)
+    if (rest.lastIndexOf(name) !== index) throw Error(`Provide ${name} only once.`)
     return rest[index + 1]
   }
   if (command === 'write' && !rest.length) generate()
@@ -747,7 +776,7 @@ function main(args) {
   else if (command === 'coverage' && rest[0] === 'init') coverageInit(snapshot(option('--old')))
   else if (command === 'coverage' && rest[0] === 'check') coverageCheck(snapshot(option('--old')))
   else if (command === 'coverage' && rest[0] === 'rebase') coverageRebase(snapshot(option('--from')), snapshot(option('--onto')))
-  else if (command === 'convert') convert(snapshot(option('--old')), rest.includes('--old-acceptance') ? snapshot(option('--old-acceptance')) : undefined)
-  else throw Error('Usage: contract-docs.mjs write|check|id-map --old <ref>|coverage init|check --old <ref>|coverage rebase --from <ref> --onto <ref>|convert --old <ref> [--old-acceptance <ref>]')
+  else if (command === 'convert') convert(snapshot(option('--old')), rest.includes('--old-acceptance') ? snapshot(option('--old-acceptance')) : undefined, rest.includes('--claim-map') ? option('--claim-map', 'JSON file path') : undefined)
+  else throw Error('Usage: contract-docs.mjs write|check|id-map --old <ref>|coverage init|check --old <ref>|coverage rebase --from <ref> --onto <ref>|convert --old <ref> [--old-acceptance <ref>] [--claim-map <file>]')
 }
 try { main(process.argv.slice(2)) } catch (error) { console.error(error.message); process.exitCode = 1 }
