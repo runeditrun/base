@@ -237,11 +237,12 @@ provider operation.
 | Compatible `d1_migrations`, every recorded name exactly equal to its checkout filename | `{nativeApply:true}`; Wrangler may apply its pending files. Plain Wrangler names remain supported; tracked history must also match hashes and applied states. |
 | Native alias-only or hash-only relocation, or an unmapped native data-only row | `migration_ledger:incompatible`; restore the matching checkout or reconcile through the owning runner before native apply. |
 | Sole, fully applied matching `rer_migrations` | `{nativeApply:false}`; preserve Platform's ledger and skip Wrangler. |
-| Any pending checkout file with Platform history | `migration_ledger:unapplied`, naming the file (`error.migration`); apply it through the owning runner first. |
-| Multiple ledgers, even empty | `migration_ledger:multiple`; reconcile history through its owning runner. |
+| Fully applied matching `_rer_deploy_migrations` plus plain Wrangler `d1_migrations` bookkeeping | `{nativeApply:false}`; preserve the deploy history and skip Wrangler. Bookkeeping names must belong to that history. A tracked D1 ledger must match the deploy history's names, hashes and order. |
+| Any pending checkout file with Platform history or the legacy pair | `migration_ledger:unapplied`, naming the file (`error.migration`); apply it through the owning runner first. |
+| Other multiple ledgers, or disagreeing tracked native histories | `migration_ledger:multiple`; reconcile history through its owning runner. |
 | Legacy `_rer_deploy_migrations` alone | `migration_ledger:runner`; use its owning runner, which can adopt the history. |
 | Invalid ledger shape, row or binding | `migration_ledger:incompatible` or `migration_ledger:binding`. |
-| Partial Platform batch or non-applied tracked row | `migration_ledger:uncertain`; resolve the incomplete operation first. |
+| Partial Platform batch or non-applied tracked or legacy row | `migration_ledger:uncertain`; resolve the incomplete operation first. |
 | Unknown hash/name, ambiguous hash/alias or conflicting name/hash | `migration_ledger:unknown`, `:ambiguous` or `:conflict`; use the matching checkout and declaration. |
 
 Refusals throw `PortabilityError` with status 409 and a constant `code`;

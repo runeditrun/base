@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Local `rer export` and `rer import` accept the historical `_rer_deploy_migrations` plus `d1_migrations` pair: the deploy ledger remains authoritative and Wrangler is skipped. Incomplete, pending or conflicting histories still refuse before transfer.
+- **Known adapter change in 0.2.85:** the worker's `migration-preflight` receipt changed from `{platformLedger}` to `{nativeApply}`, and `platformMigrationPreflight` was renamed to `nativeMigrationPreflight`. Seeds wrapping the worker or importing the internal adapter must update; the supported adapter entry is `@runeditrun/rer/portability-migrations`, and native migrations run only when `nativeApply` is true.
+
 - Bind agent sponsors to durable Business person ids from signed settings, enforce native admission including the allow-list, and honour signed agent and consent revocation. Resources now use the policy and audit pipeline. Approvals show saved summaries, bind decisions to their hash, execute with named approvers and leave a separate execution audit; Undo is the reviewer's act. Running audits commit before effects and recover from recorded outcomes. Standalone spend caps and unscoped Business daily limits are refused until their enforcement exists. The reference journey exercises self-escalation fixtures and real settings pairing.
 
 - Add the server-side agent-door source entry `modules/agent-door/index.ts`, native-action adoption guidance, signed policy adoption on existing owner-claim trust, MCP and person routes, approvals, reviews, audit and retained events. Document request capacities and indefinitely retained idempotency outcomes; distinguish implemented conformance point registrations from edition-specific coverage. Policy behavior derives from platform commit `72aa71c03d943b53ed43dc73cac17d412c00d8fb`, `src/business/agent-policy/{catalogue,document,decide}.ts`; runtime copy pins and CLI versions remain independent.
