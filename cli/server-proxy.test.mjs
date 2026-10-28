@@ -1,3 +1,4 @@
+import { nativeOwnerEntry } from './native-owner-entry.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -33,8 +34,15 @@ test('public proxy reuses connections, recovers a stale read once, and never rep
  });
  runtime.on('connection',socket=>{accepts++;sockets.add(socket);socket.on('close',()=>sockets.delete(socket));});
  await new Promise(resolve=>runtime.listen(0,'127.0.0.1',resolve));
- const proxy=await trafficProxy({host:'127.0.0.1',port:0,target:runtime.address().port,activity:{begin(){begins++;return()=>{finishes++;};}}});
+ let entry;
+ const proxy=await trafficProxy({host:'127.0.0.1',port:0,target:runtime.address().port,ownerEntry:(req,res)=>entry?.handle(req,res),activity:{begin(){begins++;return()=>{finishes++;};}}});
  t.after(async()=>{await proxy.close();runtime.closeAllConnections();await new Promise(resolve=>runtime.close(resolve));});
+ const origin=`http://127.0.0.1:${proxy.port}`;let now=Date.now();
+ entry=nativeOwnerEntry({origin,state:'.',store:{addSecrets(){}},clock:()=>now});
+ const key=new URLSearchParams(new URL(entry.issue()).hash.slice(1)).get('rer-dev');
+ now+=15*60*1000;
+ assert.equal((await request(proxy.port,'/__dev/key',{method:'POST',body:JSON.stringify({key}),headers:{origin,'content-type':'application/json'}})).status,403,'native owner entry expires at 15 minutes before any grant is minted');
+ await entry.close();entry=undefined;
  const first=await request(proxy.port,'/headers',{headers:{host:'demo.localhost',origin:'http://demo.localhost',cookie:'session=synthetic-proxy-1'}});
  assert.equal(first.body,'ok');assert.deepEqual(first.headers['set-cookie'],['a=1','b=2']);
  assert.equal(seen[0].headers.host,'demo.localhost');assert.equal(seen[0].headers.origin,'http://demo.localhost');assert.equal(seen[0].headers.cookie,'session=synthetic-proxy-1');

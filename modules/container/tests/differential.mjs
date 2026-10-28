@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Miniflare,convertV4MiniflareOptions } from 'miniflare';
+import { Miniflare,convertV4MiniflareOptions } from '../adapters/d1-workerd.mjs';
 import { D1 } from '../adapters/d1.mjs';
 import { mkdtemp,rm } from 'node:fs/promises';
 import { join } from 'node:path';

@@ -88,7 +88,7 @@ sensitive paths receive opaque SHA-256 handles.
 In actual commit messages only, `hygiene.email` accepts the address in a complete,
 case-insensitive `Co-Authored-By: Name <address>` line in the final trailer
 paragraph when its local part is
-`noreply` at the `anthropic.com` or `github.com` domain, or a numeric ID plus `+`
+`noreply` at the `anthropic.com`, `openai.com` or `github.com` domain, or a numeric ID plus `+`
 plus a GitHub username at `users.noreply.github.com`. The name and all other
 addresses remain inspected. This does not apply to ordinary body addresses,
 other trailers, annotated tags or files, and does not affect secret or other

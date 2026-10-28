@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import { createReadStream } from 'node:fs'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { DatabaseSync } from 'node:sqlite'
+import { DatabaseSync as TraceDatabaseSync } from 'node:sqlite'
+import { DatabaseSync } from '../../scripts/base-cli/modules/container/adapters/d1-sqlite.mjs'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
@@ -48,7 +49,7 @@ async function leftovers(root, values = planted) {
   }
   const traceDirectory = join(root, '.wrangler/state/v3/observability/miniflare-wobs-trace-store')
   for (const file of (await readdir(traceDirectory)).filter(name => name.endsWith('.sqlite'))) {
-    const db = new DatabaseSync(join(traceDirectory, file), { readOnly: true })
+    const db = new TraceDatabaseSync(join(traceDirectory, file), { readOnly: true })
     try {
       for (const { name } of db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all()) {
         for (const row of db.prepare(`SELECT * FROM "${name}"`).all()) found.push(...hits(JSON.stringify(row, (_, v) => v instanceof Uint8Array ? new TextDecoder().decode(v) : v)).map(value => `trace:${name}:${value}`))

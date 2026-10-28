@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { Miniflare } from 'miniflare';
+import { Miniflare } from '../../../container/adapters/d1-workerd.mjs';
 import { request as httpRequest } from 'node:http';
 
 const root = new URL('../../', import.meta.url);

@@ -37,14 +37,19 @@ test('normalizing every cell of a 100-column table stays within the binding limi
 });
 
 test('wide tables with long column names stay within the D1 SQL statement limit',async t=>{
-  const names=Array.from({length:99},(_,i)=>'c'+i+'_'+'x'.repeat(550));
+  // The former row guard measured 99967 and 100066 statement bytes here.
+  for(const length of [334,335,550]) {
+  const names=Array.from({length:99},(_,i)=>'c'+i+'_'+'x'.repeat(length));
   const ddl=['CREATE TABLE wide(id INTEGER PRIMARY KEY,'+names.map(name=>'"'+name+'" TEXT').join(',')+')'];
   assert.ok(Buffer.byteLength(ddl[0])<100000);
   const policy={product:'fixture',partBytes:256*1024},source=await database(t,ddl,policy),target=await database(t,ddl,policy);
   await source.db.prepare('INSERT INTO wide VALUES('+Array(100).fill('?').join(',')+')').bind(1,...names.map((_,i)=>'value '+i)).run();
+  await source.db.prepare('INSERT INTO wide VALUES('+Array(100).fill('?').join(',')+')').bind(2,...names.map((_,i)=>i%2?null:'é'.repeat(60))).run();
   const before=await bundle(source.service),id=await stage(target.service,before);
   await target.service.imports.finalize(id,{archiveHash:before.closing.archiveHash});const after=await bundle(target.service);
   assert.deepEqual(rows(after),rows(before));assert.equal(after.closing.contentHash,before.closing.contentHash);
+  t.diagnostic('Long-name export and restore PASS at '+length+' padding characters');
+  }
 });
 
 test('an encoded projection beyond D1 SQL limits refuses export up front by table name',async t=>{

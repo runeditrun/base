@@ -44,11 +44,14 @@ export function serializablePolicy(input) {
  return result;
 }
 
-export async function loadPolicy(root, policy, policyModule) {
+export async function loadPolicy(root, policy, policyModule, bindings) {
  if (policyModule === undefined) return serializablePolicy(policy);
  if (policy !== undefined) throw new PortabilityError('ambiguous_policy', 409);
  try {
-  const { default: input } = await import(await policyModuleURL(root, policyModule));
+  const module = await import(await policyModuleURL(root, policyModule));
+  validatePolicy(module.default);
+  if (module.createPolicy !== undefined && typeof module.createPolicy !== 'function') throw new Error();
+  const input = bindings && module.createPolicy ? await module.createPolicy(bindings) : module.default;
   validatePolicy(input);
   return input;
  } catch { throw new PortabilityError('invalid_policy_module', 409); }

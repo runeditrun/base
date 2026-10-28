@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { database, bundle, stage } from './regression-helpers.mjs';
 import { createPortability } from '../index.mjs';
+import { requireEmptyTables } from '../restore-empty.mjs';
 import { migrationReplay } from '../migration-history.mjs';
 import { migrationStatements } from '../migration-sql.mjs';
 
@@ -40,7 +41,7 @@ async function installed(t, migrations, wrap = db => db, rules = policy) {
   const target = await database(t, [ledger], policy);
   await apply(target.db, migrations);
   const replay = async () => migrationReplay(migrations.map(m => ({ name: m.name, statements: migrationStatements(m.sql, split) })), rules);
-  return { ...target, service: await createPortability({ db: wrap(target.db), buckets: { FILES: target.bucket }, policy: rules, migrations: replay }) };
+  return { ...target, migrations: replay, service: await createPortability({ db: wrap(target.db), buckets: { FILES: target.bucket }, policy: rules, migrations: replay }) };
 }
 async function source(t, first = rooms, extra = [], rules = policy) {
   const installation = await installed(t, [first], undefined, rules);
@@ -84,6 +85,28 @@ test('an archive predating a journal backfill restores to the live upgrade, and 
   // Triggers are back after the replay: a new member logs a join after the baselines.
   await target.db.prepare("INSERT INTO members VALUES('r2','u3')").run();
   assert.deepEqual((await membership(target.db)).at(-1), { seq: 4, room: 'r2', user: 'u3', action: 'join' });
+
+  // A later migration numbers archived members, then derives and updates a
+  // second new table from those reconstructed rows, in the same transaction.
+  const numbered = { name: '0002_numbered.sql', sql: `CREATE TABLE member_numbers(room TEXT,user TEXT,number INTEGER);
+INSERT INTO member_numbers SELECT room,user,row_number() OVER (PARTITION BY room ORDER BY user) FROM members;
+CREATE TABLE member_totals(room TEXT PRIMARY KEY,next INTEGER);
+INSERT INTO member_totals SELECT id,1 FROM rooms;
+UPDATE member_totals SET next=coalesce((SELECT max(number) FROM member_numbers n WHERE n.room=member_totals.room),0)+1;` };
+  const original = await source(t);
+  await apply(original.db, [numbered]);
+  const queries = ['SELECT * FROM member_numbers ORDER BY room,number', 'SELECT * FROM member_totals ORDER BY room'];
+  const expected = await Promise.all(queries.map(sql => select(original.db, sql)));
+  const destination = await installed(t, [rooms, numbered], failingOnce);
+  const pending = await stage(destination.service, original.archive);
+  await assert.rejects(finalize(destination.service, original.archive, pending));
+  assert.deepEqual(await Promise.all(queries.map(sql => select(destination.db, sql))), [[], []]);
+  assert.equal((await finalize(destination.service, original.archive, pending)).phase, 'complete');
+  assert.deepEqual(await Promise.all(queries.map(sql => select(destination.db, sql))), expected);
+  assert.deepEqual(await archived(destination.db), await archived(original.db));
+  const before = await select(destination.db, 'SELECT * FROM rer_portability_jobs');
+  await assert.rejects(requireEmptyTables({db:destination.db,policy,migrations:destination.migrations}), /target_not_empty:/);
+  assert.deepEqual(await select(destination.db, 'SELECT * FROM rer_portability_jobs'), before);
 });
 
 test('a carried journal replays INSERT or REPLACE over its archived rows exactly like a live upgrade', async t => {

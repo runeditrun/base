@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../container/adapters/d1-sqlite.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { hash } from '../validation.mjs';
 export function providerFixture({handlers = ['fetch','scheduled']} = {}) {

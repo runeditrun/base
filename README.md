@@ -174,15 +174,17 @@ The public runner also exposes these operations:
 | Reset local state | `rer reset --yes --non-interactive` |
 | Back up this installation | `rer export --output exports/installation.rer` |
 | Restore this installation into an empty destination | `rer import --input exports/installation.rer --yes --non-interactive` |
-| Validate a deploy and target secrets | `rer deploy --dry-run` |
+| Build and validate a local deploy plan | `rer deploy --dry-run` |
 | Inspect supported commands and effects | `rer describe` |
 
 Review the inventory before `rer reset --yes`. The archive commands above are
 how to back up and restore this installation, separate from bringing records
 in through the reviewed import door. Preserve a backup before a reset if domain
 data should be restored; archive restore requires an empty destination and has
-no door plan or Undo. An application dry run reads target secret bindings with
-Cloudflare credentials and makes no provider writes. See
+no door plan or Undo. An application dry run builds and validates locally and prints target names,
+bindings and migration names. It needs no Cloudflare credentials, makes no
+Cloudflare requests and changes nothing remotely. A real deploy checks target
+secrets, permissions and remote readiness. See
 [run it on your computer](export/RUN-LOCALLY.md) for transfer and recovery
 steps, bounded local ports, queued-work progress and the runnable queue-status
 command. Bounded waits immediately explain the reason and numeric one-based

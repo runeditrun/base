@@ -97,6 +97,11 @@ async function writeReceipt(path, receipt) {
 export async function siteDeploy({ api, plan, files, receiptPath, readiness = {} }) {
   assert(typeof receiptPath === 'string' && receiptPath.length, 'missing-receipt-path');
   assert(plan?.module === SITE_MODULE && Array.isArray(files) && files.some(file => file.path === 'index.html'), 'invalid-site-assets');
+  const provider = api;
+  api = {...api,
+    zoneRequest:(path,options = {}) => provider.zoneRequest(path,{step:'checking site zone',...options}),
+    request:(path,options = {}) => provider.request(path,{step:path.includes('/domains') ? 'checking site custom domains' : 'checking site Worker',...options}),
+  };
   const runtime = siteRuntime(plan.runtime);
   const fingerprint = siteFingerprint(plan, files);
   const zones = await api.zoneRequest(`/zones?name=${plan.domain}&account.id=${api.accountId}`);
@@ -111,7 +116,7 @@ export async function siteDeploy({ api, plan, files, receiptPath, readiness = {}
     if (row && (!previous || row.service !== plan.worker)) throw refuse('resource-name-collision', 'domain', hostname);
   }
 
-  const jwt = await uploadAssets(api, plan.worker, files);
+  const jwt = await uploadAssets(api, plan.worker, files, {label:'site assets'});
   const body = new FormData();
   body.set('metadata', new Blob([JSON.stringify({ main_module: SITE_MODULE, compatibility_date: plan.compatibilityDate, bindings: siteRuntimeBindings(runtime),
     assets: { jwt, config: { ...plan.assetsConfig, run_worker_first: true } }, annotations: { 'workers/message': `rer-site:${fingerprint}` } })], { type: 'application/json' }));
@@ -119,7 +124,7 @@ export async function siteDeploy({ api, plan, files, receiptPath, readiness = {}
   const window = readiness.window ?? readinessWindow(readiness);
   window.start();
   api = readinessAPI(api, window, 'site-upload-timeout');
-  const upload = await api.request(`/workers/scripts/${plan.worker}`, { method: 'PUT', body });
+  const upload = await api.request(`/workers/scripts/${plan.worker}`, { method: 'PUT', body, step:'uploading site Worker with redirect' });
   const versionId = uploadVersionId(upload);
   assert(versionId, 'invalid-upload-version');
   const readback = () => waitForSiteUpload({ api, worker: plan.worker, versionId, fingerprint, previous, window, runtime, module: SITE_MODULE });
@@ -127,7 +132,7 @@ export async function siteDeploy({ api, plan, files, receiptPath, readiness = {}
   await workerOrigin(api, plan.worker, { enable: true, workersDev: false });
   for (const hostname of plan.hostnames) {
     if (attached.some(row => row?.hostname === hostname)) continue;
-    const row = await api.request('/workers/domains', { method: 'PUT', body: { environment: 'production', hostname, service: plan.worker, zone_id: zone.id } });
+    const row = await api.request('/workers/domains', { method: 'PUT', step:`attaching custom domain ${hostname}`, body: { environment: 'production', hostname, service: plan.worker, zone_id: zone.id } });
     assert(row?.hostname === hostname && row.service === plan.worker && typeof row.id === 'string', 'invalid-domain-attach');
   }
   // Readback: the kit's Worker live and both domains on it.

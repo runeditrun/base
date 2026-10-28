@@ -131,8 +131,8 @@ const stepRecord = name => ({
 });
 export const installState = stepRecord('install'), setupState = stepRecord('setup');
 
-// The ports other checkouts were set up on by this launcher. A stopped
-// checkout keeps its saved origin, so a fresh launch must not take its port.
+// Saved setup ports are held only while their launch worker or server lives.
+// A stopped checkout keeps its settings without reserving a port indefinitely.
 export async function savedPorts(checkout, env = process.env) {
  const launches = join(serversDirectory(env), 'launches'), own = launchPath(checkout, env);
  let entries = [];
@@ -140,8 +140,8 @@ export async function savedPorts(checkout, env = process.env) {
  const ports = [];
  for (const entry of entries) {
   if (!entry.isDirectory() || join(launches, entry.name) === own) continue;
-  const port = (await setupState.read(join(launches, entry.name)))?.port;
-  if (Number.isInteger(port)) ports.push(port);
+  const directory = join(launches, entry.name), port = (await setupState.read(directory))?.port;
+  if (Number.isInteger(port) && (await liveWorker(directory) || await live(await serverRecord.read(directory)))) ports.push(port);
  }
  return ports;
 }

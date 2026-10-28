@@ -230,6 +230,9 @@ test('contract docs convert handwritten contracts and keep generated documents a
         const coverageText = await read(root, coveragePath)
         const coverage = JSON.parse(coverageText)
         assert.equal(coverage.old.commit, oldCommit)
+        const statusTableLines = oldSource.split('\n').flatMap((line, index) => /^\| (Clauses|Published|Target and push further|All|Clause) \|/.test(line) ? [index + 1] : [])
+        assert.ok(statusTableLines.length >= 5, 'the legacy fixture lost its Status tables')
+        assert.ok(!coverage.fragments.some(fragment => fragment.file === 'CONTRACT.md' && statusTableLines.includes(fragment.line)), 'Status table headers and summary rows are carried by the ID map and status, not coverage')
         const optOutLine = claimsSource.split('\n').findIndex(line => line.includes('Do not sell entries')) + 1
         const optOut = coverage.fragments.filter(fragment => fragment.file === 'docs/CLAIMS.md' && fragment.line === optOutLine)
         assert.ok(optOut.length, 'the opt-out table row was not covered')
