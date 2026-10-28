@@ -22,6 +22,7 @@
 - Version 2 backups without a schema object inventory could not be restored. Explicit `--acknowledge-unverified-schema-objects` recovers them into an empty installation with destination migration replay and every existing restore fence; completed receipts record the acknowledged schema uncertainty, and current archives restore without acknowledgment.
 - A fresh owner could not sign in to a local `rer preview`, and `rer demo` offered only its persona. Preview now prints a single-use native owner entry and demo adds one beside its persona, through the existing fragment gate and native owner grant; links expire within 15 minutes and are never saved.
 - First runs needed a shell PATH detour, led with machine lines and an unlabelled site URL, showed a fixed owner address without explanation, and timed every phase from the launch. The installer now prints a quoted absolute launch command, ready output leads with one plain app link and labels the site, the owner form explains the local account, and each launch phase is timed separately; machine ready output is unchanged.
+- The shared hosting guide listed its options in a different order from the Run chooser. It now follows the chooser: the one-line local run first, then Assisted, then Managed for a listing that offers it, then the do-it-yourself Cloudflare steps, with plan copy, sign-up state and links taken from the chooser.
 
 ## 0.2.84
 

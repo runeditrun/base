@@ -631,8 +631,11 @@ needed. The rendered page's appearance and copy stay seed-owned.
 `hosting` is the public context derived from the seed's deploy, setup and mail
 declarations, or `null` when those declarations do not support the shared
 walkthrough. When hosting context is provided, include `/docs/hosting` through
-Base's shared hosting page. It explains deployment using the actual declared
-resources and inputs; it does not store deployment credentials.
+Base's shared hosting page. It follows the chooser's order: the one line, then
+Assisted, then Managed when `paths.product` is a listing and `managed.open` is
+not `false`, then the do-it-yourself walkthrough, which explains deployment
+using the actual declared resources and inputs; it does not store deployment
+credentials.
 
 Base's shared `/run` chooser reads `RunData.paths`: `product` is the app listing
 id or `null` while the seed has no listing; optional `requirementsExtra` adds
