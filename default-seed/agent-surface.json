@@ -130,7 +130,8 @@
     }
   ],
   "resources": [
-    "base://person/{id}"
+    "base://person/{id}",
+    "base://operator/{id}"
   ],
   "witness": {
     "tool": "base.workspace.snapshot",
