@@ -1,3 +1,4 @@
+import { namedSteps, caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -49,32 +50,38 @@ function refused(url, headers={}) {
  });
 }
 
-test('container upgrades preserve app sends, text/binary echo, protocol, cookies and close in both directions', {timeout:30000}, async t => {
- const {host,url} = await (await fixture(t))('alice');
- const ws = connect(t,url,'alice'), greeting = once(ws,'message'), upgraded = once(ws,'upgrade');
- await once(ws,'open');
- assert.equal(ws.protocol,'echo'); assert.deepEqual((await upgraded)[0].headers['set-cookie'],['visited=1; HttpOnly']);
- assert.equal((await greeting)[0].toString(),'visitor:alice');
- let message=once(ws,'message');ws.send('hello');assert.equal((await message)[0].toString(),'hello');
- message=once(ws,'message');ws.send(Buffer.from([0,255,1]));const [bytes,binary]=await message;assert.equal(binary,true, 'received bytes: '+bytes.toString('hex'));assert.deepEqual(bytes,Buffer.from([0,255,1]));
- let closed=once(ws,'close');ws.send('close');assert.deepEqual(await closed,[4001,Buffer.from('Access changed')]);
- const clientClose=connect(t,url,'alice');await once(clientClose,'open');closed=once(clientClose,'close');clientClose.close(1000,'Done');assert.deepEqual(await closed,[1000,Buffer.from('Done')]);
- const shutdown=connect(t,url,'alice');await once(shutdown,'open');closed=once(shutdown,'close');await host.close();await closed;
-});
+test("container WebSocket upgrades preserve the app protocol, authentication and isolated visitor streams", async t => {
+  await caseRows(t, [["container WebSocket upgrades preserve the app protocol, authentication and isolated visitor streams", async t => {
+  const step = namedSteps(t);
+  await step('container upgrades preserve app sends, text/binary echo, protocol, cookies and close in both directions', {timeout:30000}, async t => {
+   const {host,url} = await (await fixture(t))('alice');
+   const ws = connect(t,url,'alice'), greeting = once(ws,'message'), upgraded = once(ws,'upgrade');
+   await once(ws,'open');
+   assert.equal(ws.protocol,'echo'); assert.deepEqual((await upgraded)[0].headers['set-cookie'],['visited=1; HttpOnly']);
+   assert.equal((await greeting)[0].toString(),'visitor:alice');
+   let message=once(ws,'message');ws.send('hello');assert.equal((await message)[0].toString(),'hello');
+   message=once(ws,'message');ws.send(Buffer.from([0,255,1]));const [bytes,binary]=await message;assert.equal(binary,true, 'received bytes: '+bytes.toString('hex'));assert.deepEqual(bytes,Buffer.from([0,255,1]));
+   let closed=once(ws,'close');ws.send('close');assert.deepEqual(await closed,[4001,Buffer.from('Access changed')]);
+   const clientClose=connect(t,url,'alice');await once(clientClose,'open');closed=once(clientClose,'close');clientClose.close(1000,'Done');assert.deepEqual(await closed,[1000,Buffer.from('Done')]);
+   const shutdown=connect(t,url,'alice');await once(shutdown,'open');closed=once(shutdown,'close');await host.close();await closed;
+  });
 
-test('container upgrade refusals retain HTTP status and use HTTP ingress/auth checks', {timeout:30000}, async t => {
- const {url} = await (await fixture(t))('alice');
- let result=await refused(url+'/refuse',{cookie:'session=alice',upgrade:'WebSocket'});assert.equal(result.status,403);assert.equal(result.body,'Origin denied');
- result=await refused(url);assert.equal(result.status,401);assert.ok(result.headers['set-cookie']);
- result=await refused(url,{upgrade:'h2c'});assert.equal(result.status,400);
- result=await refused(url,{cookie:'session=alice',origin:'https://evil.example.com'});assert.equal(result.status,403);
-});
+  await step('container upgrade refusals retain HTTP status and use HTTP ingress/auth checks', {timeout:30000}, async t => {
+   const {url} = await (await fixture(t))('alice');
+   let result=await refused(url+'/refuse',{cookie:'session=alice',upgrade:'WebSocket'});assert.equal(result.status,403);assert.equal(result.body,'Origin denied');
+   result=await refused(url);assert.equal(result.status,401);assert.ok(result.headers['set-cookie']);
+   result=await refused(url,{upgrade:'h2c'});assert.equal(result.status,400);
+   result=await refused(url,{cookie:'session=alice',origin:'https://evil.example.com'});assert.equal(result.status,403);
+  });
 
-test('a socket authenticated for one visitor cannot enter another container', {timeout:30000}, async t => {
- const start=await fixture(t), alice=await start('alice'), bob=await start('bob');
- assert.equal((await refused(bob.url,{cookie:'session=alice'})).status,401);
- assert.equal((await refused(alice.url,{cookie:'session=bob'})).status,401);
- const a=connect(t,alice.url,'alice'), b=connect(t,bob.url,'bob'), am=once(a,'message'),bm=once(b,'message');
- await Promise.all([once(a,'open'),once(b,'open')]);assert.equal((await am)[0].toString(),'visitor:alice');assert.equal((await bm)[0].toString(),'visitor:bob');
- const echoed=once(a,'message');a.send('alice-only');assert.equal((await echoed)[0].toString(),'alice-only');
-});
+  await step('a socket authenticated for one visitor cannot enter another container', {timeout:30000}, async t => {
+   const start=await fixture(t), alice=await start('alice'), bob=await start('bob');
+   assert.equal((await refused(bob.url,{cookie:'session=alice'})).status,401);
+   assert.equal((await refused(alice.url,{cookie:'session=bob'})).status,401);
+   const a=connect(t,alice.url,'alice'), b=connect(t,bob.url,'bob'), am=once(a,'message'),bm=once(b,'message');
+   await Promise.all([once(a,'open'),once(b,'open')]);assert.equal((await am)[0].toString(),'visitor:alice');assert.equal((await bm)[0].toString(),'visitor:bob');
+   const echoed=once(a,'message');a.send('alice-only');assert.equal((await echoed)[0].toString(),'alice-only');
+  });
+
+  }]]);
+})

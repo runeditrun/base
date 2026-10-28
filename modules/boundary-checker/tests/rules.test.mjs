@@ -1,3 +1,4 @@
+import { caseRows } from '../../review-harness/tests/fold-steps.mjs';
 import { symlink } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { test } from 'node:test'
@@ -38,7 +39,8 @@ test('clean tree covers all eight extensions, alias, indexes, re-exports, type a
   assert.deepEqual(findings(result), [])
 })
 for (const [rule, fixture, rules, expected] of cases) {
-  test(`${rule} exact findings`, async t => {
+  test(`${rule} reports exact findings and can be turned off`, async t => {
+    await caseRows(t, [[`${rule} exact findings`, async t => {
     const root = await project(t, fixture)
     const result = await checkBoundaries({ root, config: { ...config, rules } })
     assert.deepEqual(findings(result), expected)
@@ -47,12 +49,12 @@ for (const [rule, fixture, rules, expected] of cases) {
       assert.deepEqual(Object.keys(item), ['rule', 'file', 'line', 'column', 'specifier', 'target', 'message'])
       assert.ok(!item.file.includes('\\'))
     }
-  })
-  test(`${rule} can be turned off`, async t => {
+    }], [`${rule} can be turned off`, async t => {
     const root = await project(t, fixture)
     for (const disabled of [false, { ...rules[rule], enabled: false }]) {
       assert.deepEqual(findings(await checkBoundaries({ root, config: { ...config, rules: { ...rules, [rule]: disabled } } })), [])
     }
+    }]])
   })
 }
 
