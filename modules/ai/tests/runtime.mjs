@@ -2,7 +2,7 @@ import { readdir, readFile, mkdtemp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Miniflare } from 'miniflare';
+import { Miniflare } from '../../container/adapters/d1-workerd.mjs';
 
 export const DEV_KEY = 'only-a-public-ai-test-key-not-a-real-checkout-key-0000000000';
 const root = new URL('../../../', import.meta.url);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions } from '../adapters/d1-workerd.mjs';
 import { ensurePortabilitySchema } from '../portability-schema.mjs';
 import { migrate } from '../migrations.mjs';
 const plan = (name, statements) => ({name,statements,sql:statements.join(';'),sha256:createHash('sha256').update(statements.join(';')).digest('hex')});

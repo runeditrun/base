@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
+import { DatabaseSync } from '../../scripts/base-cli/modules/container/adapters/d1-sqlite.mjs'
 
 // The people page through the built Worker: a create form posted twice (a
 // refresh, Back, a double click) creates one person, and its activity reads as

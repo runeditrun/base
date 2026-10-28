@@ -1,3 +1,4 @@
+import { installD1Preflight } from '../../scripts/base-cli/modules/container/adapters/d1-workerd-setup.mjs';
 import { createRequire } from 'node:module'
 import { readFile, readdir, mkdtemp, rm, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -6,7 +7,8 @@ import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const require = createRequire(await realpath(join(root, 'node_modules/wrangler/package.json')))
-const { Miniflare, convertV4MiniflareOptions } = require('miniflare')
+const { Miniflare, convertV4MiniflareOptions, D1_PLUGIN } = require('miniflare');
+installD1Preflight(D1_PLUGIN)
 const { build } = require('esbuild')
 const { unstable_splitSqlQuery: splitSql } = require('wrangler')
 const output = await build({ entryPoints: [fileURLToPath(new URL('./worker.mjs', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', external: ['cloudflare:workers', 'node:*'] })

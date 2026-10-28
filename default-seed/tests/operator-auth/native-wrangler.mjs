@@ -1,3 +1,4 @@
+import { loopbackFetch as fetch } from '../../scripts/base-onboarding/loopback-fetch.mjs'
 import { completeFirstRun } from './first-run.mjs'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'

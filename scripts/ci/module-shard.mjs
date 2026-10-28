@@ -4,7 +4,8 @@ import { glob, readFile, stat } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 
-export const MODULE_SHARDS = 6;
+export const MODULE_SHARDS = 2;
+const browserFiles = ['modules/demo/tests/label.test.ts', 'modules/demo/tests/navigation.test.ts'];
 
 async function expandD1Wrapper(wrapper) {
   const source = await readFile(wrapper, 'utf8'), files = [];
@@ -34,9 +35,8 @@ export async function moduleTestFiles() {
 }
 
 export async function verifyModuleShard(shard) {
-  assert.match(shard ?? '', /^[1-6]$/, `MODULE_SHARD must be one of the ${MODULE_SHARDS} matrix shards`);
-  const files = await moduleTestFiles();
-  assert.ok(files.length >= MODULE_SHARDS, 'Each module shard must have test files');
+  assert.match(shard ?? '', /^[1-2]$/, `MODULE_SHARD must be one of the ${MODULE_SHARDS} matrix shards`);
+  const files = (await moduleShardPlan())[shard];
   const started = performance.now();
   console.log(`VERIFY_STAGE start verify:modules shard=${shard}/${MODULE_SHARDS}`);
   const child = spawn(process.execPath, [
@@ -44,7 +44,7 @@ export async function verifyModuleShard(shard) {
     // The original wrapper initializes the public D1 entry in engine.test.ts
     // before its internal utility suites. Keep that context in each worker.
     '--import', './modules/import-kit/src/d1/index.ts',
-    '--max-old-space-size=4096', '--test', '--test-concurrency=2', `--test-shard=${shard}/${MODULE_SHARDS}`, ...files,
+    '--max-old-space-size=4096', '--test', '--test-concurrency=2', ...files,
   ], { stdio: 'inherit' });
   const onTerm = () => child.kill('SIGTERM'), onInt = () => child.kill('SIGINT');
   process.on('SIGTERM', onTerm); process.on('SIGINT', onInt);
@@ -58,4 +58,16 @@ export async function verifyModuleShard(shard) {
   } finally {
     process.off('SIGTERM', onTerm); process.off('SIGINT', onInt);
   }
+}
+
+export async function moduleShardPlan() {
+  const files = await moduleTestFiles();
+  assert.ok(files.length >= MODULE_SHARDS, 'Each module shard must have test files');
+  for (const file of browserFiles) assert.ok(files.includes(file), `Missing module browser suite: ${file}`);
+  const regular = files.filter(file => !browserFiles.includes(file));
+  const groups = Object.fromEntries([1, 2].map(shard => [String(shard), [
+    ...(shard === 1 ? browserFiles : []), ...regular.filter((_, index) => index % MODULE_SHARDS === shard - 1),
+  ]]));
+  assert.deepEqual(Object.values(groups).flat().sort(), files, 'Module CI must cover every push file exactly once');
+  return groups;
 }

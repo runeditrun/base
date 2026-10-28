@@ -141,6 +141,68 @@ test('search deploy waits for the uploaded runtime instead of checking an older 
 // so a token without Single Redirect permission (every ruleset path 403) works.
 test('site deploy uploads the generated site Worker, attaches the apex and www, and deploys again from a fresh checkout without new resources', async t => {
   const { siteProvider } = await import('./site-provider.mjs');
+  // Exercise the public site deploy door with real local HTTP transport failures.
+  for (const stage of ['session','batch','Worker','domain','content']) for (const failure of ['timeout','403','503','reset','large403','body403','503-deadline','body-timeout']) await t.test(`${stage}: ${failure}`, async t => {
+    const { createServer } = await import('node:http');
+    const { once } = await import('node:events');
+    const { deployDiagnostic, providerFailure } = await import('../diagnostics.mjs');
+    const fake = siteProvider({domain:'synthetic-base-1.test'}), input = await site(t);
+    t.after(() => fake.close());
+    if (stage === 'content') {
+      await writeFile(join(input.folder,'docs-search-vectors.json'),JSON.stringify({corpusHash:hash('search corpus')}));
+      input.files = await collectFiles(input.folder);
+    }
+    const plan = sitePlan({...app,declaration:{version:1,domain:'synthetic-base-1.test'},assets:input.folder,...(stage === 'content' ? {runtime:searchRuntime()} : {})});
+    let calls = 0, uploadToken, batches = 0;
+    const server = createServer((request,response) => {
+      calls++; request.resume();
+      if (failure === 'timeout') return;
+      if (failure === 'body-timeout') {response.writeHead(200);response.write('synthetic-base-2');return;}
+      if (failure === 'reset') { request.socket.destroy(); return; }
+      response.writeHead(failure === 'large403' || failure === 'body403' ? 403 : failure === '503-deadline' ? 503 : Number(failure));
+      if (failure === 'body403') { response.write('synthetic-base-2'); setTimeout(() => response.destroy(),10); return; }
+      response.end(JSON.stringify({success:false,errors:[{message:`synthetic-base-2 ${fake.token} ${fake.accountId} ${uploadToken ?? ''} https://synthetic-base-3.test/path?signature=synthetic-base-4 `+'é'.repeat(failure === 'large403' ? 3*1024*1024 : 3000)}]}));
+    });
+    server.listen(0,'127.0.0.1'); await once(server,'listening');
+    t.after(() => {server.closeAllConnections(); return new Promise(resolve => server.close(resolve));});
+    const api = cloudflare({accountId:fake.accountId,token:fake.token,timeoutMs:failure === 'timeout' || failure === 'body-timeout' || failure === '503-deadline' ? 50 : 1000,fetch:async (url,init) => {
+      const path = new URL(url).pathname;
+      const selected = stage === 'content' ? path.endsWith('/content/v2') : stage === 'session' ? path.endsWith('/assets-upload-session') : stage === 'batch' ? path.endsWith('/workers/assets/upload') && ++batches > 1 : stage === 'Worker' ? init.method === 'PUT' && path.endsWith(`/${plan.worker}`) : init.method === 'PUT' && path.endsWith('/workers/domains') && JSON.parse(init.body).hostname.startsWith('www.');
+      if (selected) { uploadToken = init.headers.Authorization.slice('Bearer '.length); return fetch(`http://127.0.0.1:${server.address().port}/`,init); }
+      const response = await fake.fetch(url,init);
+      if (stage === 'batch' && path.endsWith('/assets-upload-session')) {
+        const body = await response.json();
+        const [first,...rest] = body.result.buckets[0]; body.result.buckets = [[first],rest];
+        return Response.json(body);
+      }
+      return response;
+    }});
+    let caught;
+    await assert.rejects(siteDeploy({api,plan,files:input.files,receiptPath:input.receiptPath}), error => {caught = error; return true;});
+    const diagnostic = deployDiagnostic(caught,String), message = providerFailure(caught,String), detail = diagnostic.providerRequest;
+    const step = stage === 'content' ? 'reading Worker content' : stage === 'session' ? 'creating site assets upload session' : stage === 'batch' ? 'uploading site assets, batch 2 of 2' : stage === 'Worker' ? 'uploading site Worker with redirect' : 'attaching custom domain www.synthetic-base-1.test';
+    assert.equal(diagnostic.step,step); assert.ok(message.includes(step),message);
+    const endpoint = stage === 'content' ? '/workers/scripts/[worker]/content/v2' : stage === 'domain' ? '/workers/domains' : stage === 'batch' ? '/workers/assets/upload' : stage === 'session' ? `/workers/scripts/${plan.worker}/assets-upload-session` : `/workers/scripts/${plan.worker}`;
+    assert.equal(detail.endpoint,`/client/v4/accounts/[REDACTED]${endpoint}`);
+    assert.equal(detail.method,stage === 'content' ? 'GET' : ['session','batch'].includes(stage) ? 'POST' : 'PUT');
+    assert.ok(message.includes(detail.endpoint)); assert.match(message,/elapsed \d+ ms/);
+    assert.ok(Number.isFinite(detail.elapsedMs) && detail.elapsedMs >= 0);
+    if (failure === 'timeout' || failure === 'body-timeout') {
+      if (failure === 'body-timeout') {assert.equal(detail.status,200);assert.match(message,/HTTP 200; timeout/);}
+      assert.equal(detail.cause,'timeout');assert.equal(detail.timeoutMs,50);assert.match(message,/timeout after 0.05 s \(limit 50 ms\)/);}
+    else if (failure === 'reset') {assert.equal(detail.cause,'connection reset',detail.body);assert.match(message,/connection reset/);}
+    else {
+      const status = failure.endsWith('403') ? 403 : failure === '503-deadline' ? 503 : Number(failure);
+      assert.equal(detail.status,status); assert.equal(caught.message,`provider-http-${status}`); assert.match(message,new RegExp(`HTTP ${status}`));
+      assert.ok(!message.includes('transport failed'));
+      if (failure !== '503-deadline' || !['session','batch'].includes(stage)) assert.match(detail.body,/synthetic-base-2/);
+      assert.ok(Buffer.byteLength(detail.body)<=2048);
+    }
+    for (const secret of [fake.accountId,fake.token,uploadToken,'signature=synthetic-base-4']) if (secret) assert.ok(!JSON.stringify([message,diagnostic]).includes(secret));
+    assert.ok(calls >= 1); await assert.rejects(readFile(input.receiptPath),{code:'ENOENT'});
+    console.log(`${stage} ${failure}: ${message.slice(0,360)}`);
+  });
+
   const provider = siteProvider({ domain: 'run-cradle.com' }), { root, files, folder, receiptPath } = await site(t);
   t.after(() => provider.close());
   const api = cloudflare({ accountId: provider.accountId, token: provider.token, fetch: async (input,init) => {

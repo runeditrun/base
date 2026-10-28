@@ -115,7 +115,7 @@ export function checkArchivedLedgers(manifest,ledgers) {
 }
 
 /** The applied migrations an archive's own ledger records, [{name,sha256?}]; undefined when it carries no ledger. */
-export function archivedHistory(manifest,ledgers) {
+export function archivedHistory(manifest,ledgers,{allowOlderShape=false}={}) {
   const tables=archivedLedgerTables(manifest);
   // A Platform-origin export records its ledger in the manifest, never as a table.
   if(manifest.migrationLedger)insist(!tables.length,'schema_mismatch:migration_history');
@@ -123,7 +123,8 @@ export function archivedHistory(manifest,ledgers) {
   insist(tables.length===1 && ledgers?.[tables[0].name],'schema_mismatch:migration_history');
   const [table]=tables,rows=ledgers[table.name],columns=table.columns.map(c=>c.name);
   if(identifier(table.name)==='rer_migrations') {
-    insist(shape(table.columns)===platformShape,'schema_mismatch:migration_history');
+    const older=canonicalJson([{name:'name',type:'TEXT',notnull:0,pk:1},{name:'applied_at',type:'TEXT',notnull:1,pk:0}]);
+    insist(shape(table.columns)===platformShape || (allowOlderShape && shape(table.columns)===older),'schema_mismatch:migration_history');
     insist(!rows.some(row=>partial(row.name)),'schema_mismatch:uncertain_migrations');
   }else{
     insist(columns.includes('name') && columns.includes('state')===columns.includes('sha256'),'schema_mismatch:migration_history');

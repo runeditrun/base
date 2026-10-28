@@ -1,4 +1,4 @@
-import { Miniflare,convertV4MiniflareOptions } from 'miniflare';
+import { Miniflare,convertV4MiniflareOptions } from '../../container/adapters/d1-workerd.mjs';
 import { readFile,mkdtemp,rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

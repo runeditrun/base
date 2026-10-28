@@ -50,6 +50,36 @@ the signed-in app shell and preserve approved public pages and product marks.
 The recipe documents source-copy dependencies, mail display-name integration
 and the assembled-seed checks; it does not promise a package export.
 
+## Local Business carry
+
+The installed rer carries the paired Business into each first-party checkout at
+`.rer/local/business.json`. The folder is 0700 and the file is 0600. Writes use a
+temporary file and atomic rename. A refresh with unchanged values leaves the file
+byte-identical, including `refreshed_at`, which records when the carried values
+last changed.
+
+```json
+{"version":1,"origin":"https://billing-qualification.runeditrun.com","business_id":"<id>","business_url":"https://billing-qualification.runeditrun.com/business/<id>","name":"Example Business Co","legal_name":null,"accent":"#264f45","logo_url":null,"refreshed_at":"<ISO time>"}
+```
+
+`origin` is the paired state origin. `business_id` must match that state's
+Business id; `business_url` is the origin plus `/business/` plus the id encoded
+with `encodeURIComponent`. `name` has 1 to 200 characters. `legal_name` is a
+string or null. `accent` is the profile's `brand_color` as lower case `#rrggbb`,
+or null; `logo_url` is HTTPS or null. A missing Business block or a mismatched
+id writes nothing. An unavailable or refusing platform preserves the file;
+launch continues. Connect and re-connect refresh live first-party checkouts;
+setup and dev refresh their checkout before its pinned rer runs. Business run
+refreshes live checkouts at start, including `--once`, and at most once a minute.
+Disconnect removes carries from recorded and live checkouts.
+
+These values are prefills and display only, never authority. Never overwrite a
+value the owner saved. A legal-name prefill uses `legal_name ?? name`.
+Seeds read and validate this JSON only under `vite dev`, as one plain binding
+`RER_BUSINESS` holding the validated JSON. Exclude it from build output and never
+read or bind it when `RER_DEMO=1`. Seeds restart their dev server when the carry
+file is added, changed or removed.
+
 ## Browser-free agent check
 
 After the pinned `pnpm install --frozen-lockfile`, run `pnpm run verify:agent`.
@@ -79,13 +109,61 @@ Run from the project root, or use `--cwd PATH`. Every new verb accepts `--help`,
 | `build` | `--site`, `--no-queue` | With `--site`, the static run site (see Installed homepage and run site) written to the declared folder, checked and named in the output; a seed without a declared run site refuses with exit 4 before any effect. Otherwise: real production Worker/assets built with private local settings excluded, then restored exactly. A `devIdentity` seed's build fails with exit 4, naming the file, when its output contains the dev layer's marker. |
 | `verify` | `--no-queue` | The seed's complete verification command runs; it never calls its own public `verify` alias recursively. Then its production build is served on loopback as `rer deploy` hosts it (see Hosted assets and deploy identity); verify fails, listing each path, when a built file does not answer 200 or `/health` lacks the deploy identity. Then Chromium loads each public page of that served build and verify fails, naming the page, case, section and evidence, when page sections do not hydrate as separate units (see Hydration units). |
 | `reset` | `--yes` | Explicitly confirmed local data, owner, generated settings and installer state removed; no remote effect. |
-| `deploy` | `--environment NAME`, `--owner-name NAME`, `--dry-run`, `--site`, `--no-queue` | With `--site`, the run site on its Base-generated site Worker (assets, plus the www-to-apex 301) with its custom domains (see Installed homepage and run site); with `--dry-run` it builds the site and prints the plan with zero provider requests. Otherwise: Base deploy-kit owner-account deployment plus health (the deploy identity, then one built file must answer 200); dry run validates/builds locally and reads target secret bindings using Cloudflare credentials, with zero provider writes. It uses deploy’s required-secret resolver and reports every missing secret with the same nonzero exit and error in human and JSON modes; missing credentials or an unreadable target secret list also fail. Default environment is `production`. Both refuse with exit 4, before building, a deploy binding, secret or secret source named `RER_DEV_KEY` or any key the adapter declares in `localOnlyKeys`; deploy-kit's owner plan refuses the same. A deploy that is not a dry run also refuses with exit 4, before building, tracked files with uncommitted changes, naming them. |
+| `deploy` | `--environment NAME`, `--owner-name NAME`, `--dry-run`, `--site`, `--no-queue` | With `--site`, the run site on its Base-generated site Worker (assets, plus the www-to-apex 301) with its custom domains (see Installed homepage and run site); with `--dry-run` it builds the site and prints the plan with zero provider requests. Otherwise: Base deploy-kit owner-account deployment plus health (the deploy identity, then one built file must answer 200); dry run builds and validates locally and prints target names, binding names and migration names. No credentials are needed, no Cloudflare requests occur and nothing changes remotely. Target secrets, permissions and remote readiness remain unchecked until a real deploy. Default environment is `production`. Both refuse with exit 4, before building, a deploy binding, secret or secret source named `RER_DEV_KEY` or any key the adapter declares in `localOnlyKeys`; deploy-kit's owner plan refuses the same. A deploy that is not a dry run also refuses with exit 4, before building, tracked files with uncommitted changes, naming them. |
 | `export` | `--target local\|remote`, `--output FILE`, `--origin URL`, `--session-file FILE`, `--no-queue` | Complete supported installation data of the local copy written to a new owner-only archive, with integrity receipt and explicit exclusions; the closing line says which copy it exported. Default target is local; local output is required. A declared `portability.hostedExport` runs the seed's own hosted-export argv for `--target remote` (see the hook below). Otherwise `--origin` or `--target remote` names the hosted install: unless the adapter declares remote portability, export refuses (exit 2) before any effect, saves nothing, and names the `npx wrangler d1 export DATABASE --remote --output exports/DATABASE.sql` command for each database the checkout deployed. A declared `prepareData` hook runs first and the path is checked against the app's served folders after it, so a checkout that never built still completes when its Vite configuration needs a file `prepareData` generates. |
-| `import` | `--target local\|remote`, `--input FILE`, `--journal FILE`, `--origin URL`, `--session-file FILE`, `--yes`, `--legacy-v1`, `--acknowledge-unverified-metadata`, `--output FILE`, `--no-queue` | Archive validated and atomically restored into an empty destination under the product's restore policy; input and confirmation are required. Normal import requires v2; `--journal` (local only) names a later archive of the same installation, whose erasure journal also fences the restore. Backup-only local Workers v1 recovery requires both legacy flags and a new v2 output; it refuses `--journal` rather than ignoring it. See modules/portability/README.md#backup-only-v1-recovery. A declared `prepareData` hook runs first, so a copy that never ran setup or build can import. |
+| `import` | `--target local\|remote`, `--input FILE`, `--journal FILE`, `--origin URL`, `--session-file FILE`, `--yes`, `--legacy-v1`, `--acknowledge-unverified-metadata`, `--acknowledge-unverified-schema-objects`, `--output FILE`, `--no-queue` | Archive validated and atomically restored into an empty destination under the product's restore policy; input and confirmation are required. Normal import requires v2; `--journal` (local only) names a later archive of the same installation, whose erasure journal also fences the restore. Backup-only local Workers v1 recovery requires both legacy flags and a new v2 output; it refuses `--journal` rather than ignoring it. See modules/portability/README.md#backup-only-v1-recovery. A v2 archive without `schemaObjects` requires explicit `--acknowledge-unverified-schema-objects`, an empty destination and compatible destination migration history. Structure comes only from destination migrations; the normal confirmation, authentication and erasure fences remain. The receipt records `schemaUnverified` with archive identity and acknowledgment time. A fresh export from current rer is preferred; current archives restore without acknowledgment. A declared `prepareData` hook runs first, so a copy that never ran setup or build can import. |
 | `doctor` | none | Read-only tool/version, local configuration and state-placement diagnostics, naming missing inputs and their documented sources, plus `warnings` for leftover Node quarantine copies, mismatched Node/pnpm/workerd pins across running checkouts and a checkout on another volume (warnings never change the exit code). No provider request. |
 | `describe` | none | Describes commands, flags, aliases, effects, pins and state without installing or executing project commands. |
 | `check` | `--profile first-party` | Read-only structural contract/operations validation, including required hooks, flags, aliases and pins. No credentials needed for a fresh clone. |
 | `release` | existing `--repo`, `--project`, `--repository`, `--output`, `--ref`, `--public-base`, `--dry-run`, `--local-verify`, `--verify-workflow NAME_OR_FILE`, `--tag [vVERSION]`, `--clean-history`, `--onto`, `--env-file`, `--no-queue` | Existing Base release behavior, receipts, validation, gates, local tags and exit codes preserved. |
+
+### Registration budget
+
+A checkout opts into effect-free registration counting with `test-budget.json`:
+
+```json
+{
+  "version": 1,
+  "cap": 200,
+  "platforms": ["linux", "darwin", "win32"]
+}
+```
+
+The cap is the maximum count across the declared supported platforms. Each
+platform is evaluated statically, including conditional registrations based on
+`process.platform` or the platform function from the Node OS module. Skipped,
+only and todo registrations still count. Unknown fields, invalid declarations
+and count exemptions fail `rer check`; an absent declaration leaves existing
+checkouts unaffected and does not require a parser.
+
+The reader resolves the checkout's installed TypeScript parser only for an
+applicable budget. It reads syntax without importing project modules, running
+test bodies, invoking commands or creating local state. Missing dependencies
+produce an explicit prerequisite error.
+
+`rer check --json` includes `testBudget` with `total`, `cap`, `files` (each
+with `file` and `count`), `configurations` and `diagnostics`. Contributions and
+the total describe the supported configuration with the greatest count; each
+configuration also reports its own contributions. Unresolved analysis reports
+`total: null` and file-and-line diagnostics instead of an invented total. Human
+refusals name the excess and contributing files.
+
+Every behavior registration counts once, including registering `contract`
+wrappers, aliases, nested subtests and statically imported suites. Finite array
+and integer loops and finite `.each` tables expand per generated case; a data
+table inside one behavior adds no registrations. Wrappers contribute at their
+invocation site; importing a wrapper twice adds nothing by itself. Suite groups
+do not add behaviors. Assert scripts named by verification commands count once,
+even when repeated across package scripts and the verification manifest.
+
+Discovery considers owned source regardless of filename. Installed dependencies,
+normal build outputs and copies recorded by the portable CLI inventory or the
+Base copy record are excluded; explicitly adapted Base files remain owned.
+The reader handles literal values, static property access, local functions and
+relative imports. It is bounded rather than a general JavaScript interpreter:
+dynamic registration tables, opaque registration factories, unsupported control
+flow and recursion require a static declaration in source and otherwise fail
+with a diagnostic. It never accepts a claimed count in place of registrations.
 
 `signin` is rer's own verb, not a seed operation: no seed declares it and `check` does not ask for it. `rer signin [--environment NAME] [--env-file FILE]` gives the hosted owner a one-time sign-in link without mail when the seed uses operator-auth's `accounts/schema/owner-signin.sql` migration. It uses only the Cloudflare credentials that deployed that environment, writes a single-use grant for the recorded owner into the deployment's auth D1, and prints the link once to the terminal (never to a log or receipt). The link expires within 15 minutes and its use is recorded in the owner's audit log. Those seeds document `rer signin` in their README as the way into a hosted install whose mail is not working yet; after it, the owner corrects a wrong email in settings (`POST /auth/email`). A seed with native sign-in can declare its browser page with the `commandAdapter` option `signInPath: '/login'` (a same-origin path, not a magic-link API endpoint). When the owner sign-in table is absent, `rer signin` explains that the seed uses its own sign-in flow and points to that page on the recorded environment's origin, or to `/setup` for owner recovery when no page is declared. It exits 4 and issues no link.
 
@@ -503,7 +581,7 @@ including its message. SC-01/SC-02 and the `export` package alias stay unchanged
 
 Answer `/health` with `deploymentHealth(env)` from `foundation/runtime/deployment-health.ts` (`src/base/deployment-health.ts`): `{ok: true, deployment: {sourceSha, fingerprint, versionId}}` from the `RER_DEPLOY_SOURCE`, `RER_DEPLOY_FINGERPRINT` and `RER_VERSION` bindings the deploy kit sets. Spread it into a body that carries other fields (`{status: 'ok', ...deploymentHealth(env)}`) and run any readiness check first. Declare `RER_DEPLOY_SOURCE?: string`, `RER_DEPLOY_FINGERPRINT?: string` and `RER_VERSION?: { id: string }` in the bindings type too. `rer deploy` compares these three values with what it just deployed and exits 1 when they differ.
 
-The owner deployment declaration may set top-level `"productDirectory": ".rer/deploy/product"` for a product staged by the build or deploy hook. It must name a normalized checkout-relative subdirectory: no absolute path, backslash, empty, `.` or `..` segment. The directory must exist after the build or hook, with no symlink on its path. rer reads this field and passes `--product` only to the kit's packaging commands (`dry-run`, `deploy` and `health`), including its extra dry run after a custom hook. A hook that invokes the kit itself still supplies `--product` on its own invocation; the wrapper reads the declaration for its own steps. Omitting the field keeps packaging at the checkout root. State, root ownership, secret changes and removal keep their existing locations and behavior; dry run still requires credentials for target secret reads.
+The owner deployment declaration may set top-level `"productDirectory": ".rer/deploy/product"` for a product staged by the build or deploy hook. It must name a normalized checkout-relative subdirectory: no absolute path, backslash, empty, `.` or `..` segment. The directory must exist after the build or hook, with no symlink on its path. rer reads this field and passes `--product` only to the kit's packaging commands (`local-plan`, `deploy` and `health`). A public dry run runs the build lifecycle instead of the custom upload hook. A hook that invokes the kit itself still supplies `--product` on its own invocation; the wrapper reads the declaration for its own steps. Omitting the field keeps packaging at the checkout root. State, root ownership, secret changes and removal keep their existing locations and behavior; dry run needs no credentials and never reads target secrets.
 
 For an optional canonical public origin, declare `"publicOriginSetting": "PUBLIC_ORIGIN"` beside `originVar` (`AUTH_ORIGIN` or `APP_ORIGIN`) in `deploy.json`. `rer deploy` reads `PUBLIC_ORIGIN` from the adapter's saved settings; the process environment overrides saved settings and `--env-file` wins over both. The value must be `https://host[:port]`, with no credentials, path (including a trailing `/`), query, fragment, whitespace or backslashes; it is normalized to `URL.origin`. When omitted, the origin remains workers.dev. This changes only `originVar`: readiness, health checks, the deployment target, recorded resource names and IDs, and the owner claim retain the kit's workers.dev origin and identity.
 
@@ -601,8 +679,11 @@ needed. The rendered page's appearance and copy stay seed-owned.
 `hosting` is the public context derived from the seed's deploy, setup and mail
 declarations, or `null` when those declarations do not support the shared
 walkthrough. When hosting context is provided, include `/docs/hosting` through
-Base's shared hosting page. It explains deployment using the actual declared
-resources and inputs; it does not store deployment credentials.
+Base's shared hosting page. It follows the chooser's order: the one line, then
+Assisted, then Managed when `paths.product` is a listing and `managed.open` is
+not `false`, then the do-it-yourself walkthrough, which explains deployment
+using the actual declared resources and inputs; it does not store deployment
+credentials.
 
 Base's shared `/run` chooser reads `RunData.paths`: `product` is the app listing
 id or `null` while the seed has no listing; optional `requirementsExtra` adds

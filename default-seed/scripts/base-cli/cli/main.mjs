@@ -53,7 +53,7 @@ export async function main(argv = process.argv.slice(2)) {
    const result = await check(project, options.profile);
    (await import('./placeholder-mark.mjs')).warnPlaceholderMarks(out, options, result.placeholderMarks);
    if (!options.json) for (const clause of result.clauses.filter(c => !c.ok)) out.human(`${clause.id}: ${clause.message}`);
-   out.result(result.ok, result.ok ? 0 : 1, { clauses: result.clauses }); return result.ok ? 0 : 1;
+   out.result(result.ok, result.ok ? 0 : 1, { clauses: result.clauses, ...(result.testBudget ? { testBudget: result.testBudget } : {}) }); return result.ok ? 0 : 1;
   }
   if (options.verb === 'doctor') {
    const result = await (await import('./lifecycle.mjs')).runCommand(project, options, out);
@@ -84,7 +84,7 @@ export async function main(argv = process.argv.slice(2)) {
   out.result(true, 0, result); return 0;
  } catch (error) {
   const failure = error instanceof RerError ? error : unexpectedFailure(error);
-  out.error(failure); out.result(false, failure.exitCode, { ...failure.exportDetails, ...(failure.childExitCode === undefined ? {} : { childExitCode: failure.childExitCode, signal: failure.signal }) }); return failure.exitCode;
+  out.error(failure); out.result(false, failure.exitCode, { ...failure.exportDetails, ...(failure.siteDeploy ? {siteDeploy:failure.siteDeploy} : {}), ...(failure.d1Import ? {d1Import:failure.d1Import} : {}), ...(failure.childExitCode === undefined ? {} : { childExitCode: failure.childExitCode, signal: failure.signal }) }); return failure.exitCode;
  }
 }
 

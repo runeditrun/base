@@ -12,7 +12,7 @@ export const commandAdapter = createCommandAdapter(lifecycle, {
  dev: developmentTarget, preview: previewTarget, verify: ['pnpm', ['run', 'verify:app']], deploy: ownerDeploy('deploy.json', lifecycle),
  // Portable-hosting moves use the shared archive policy and its default identity exclusions.
  // The destination claims a fresh owner and re-links authentication explicitly.
- portability: localPortability({ database: 'default-seed-reference', buckets: { FILES: 'FILES' }, policy: portabilityPolicy, transient: ['JOBS delivery attempts (durable jobs are included)', 'local runtime caches and logs'] }),
+ portability: localPortability({ database: 'default-seed-reference', managedData: true, buckets: { FILES: 'FILES' }, policy: portabilityPolicy, transient: ['JOBS delivery attempts (durable jobs are included)', 'local runtime caches and logs'] }),
 
  setup: { manifestFile: 'rer-setup.json' }, browserModule: 'scripts/installer/ui/seed.mjs',
  // The hydration check starts from the React pages: `/` is the server-rendered Lobby.

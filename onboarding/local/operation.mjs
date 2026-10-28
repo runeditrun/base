@@ -47,7 +47,12 @@ export async function localOperation(root, inheritedToken) {
   try { await file.writeFile(JSON.stringify({ ...self, token })) } finally { await file.close() }
   const acquired = await identity(path)
   return { token, release: async () => {
-    if (await identity(path) === acquired) await unlink(path).catch(missing)
+    let owner
+    try { owner = JSON.parse(await readFile(path, 'utf8')) } catch (error) {
+      if (error.code === 'ENOENT') return
+      throw error
+    }
+    if (owner.token === token && await identity(path) === acquired) await unlink(path).catch(missing)
   } }
 }
 
@@ -70,30 +75,36 @@ export async function ownerAlive(owner) {
 // just created. Every starter that judged the same stale file competes for one
 // exclusive guard named after that file's identity; only the guard holder may
 // remove it, and only while the path still names that exact file. A new lock
-// has a new identity, so it can never be removed as stale.
+// has a new identity. Keep the judged descriptor open through the takeover:
+// otherwise its deleted inode can be reused by a new lock while a delayed
+// contender still holds the old identity. Filesystem timestamps do not make
+// inode reuse an exclusive ownership primitive.
 async function takeOver(path) {
-  const judged = await staleIdentity(path)
-  if (judged === undefined) return false
-  if (judged === null) return true // Already gone: retry the exclusive create.
-  const guardPath = `${path}.takeover-${judged}`
-  let guard
-  for (let attempt = 0; !guard; attempt++) {
-    try { guard = await open(guardPath, 'wx', 0o600) } catch (error) {
-      if (error.code !== 'EEXIST') throw error
-      // Another starter is taking over; it, or a faster starter, owns the lock.
-      // A guard whose owner was killed is removed once, after its grace.
-      if (attempt > 0 || !await removeAbandonedGuard(guardPath, path)) return false
-    }
-  }
+  const stale = await staleIdentity(path)
+  if (stale === undefined) return false
+  if (stale === null) return true // Already gone: retry the exclusive create.
+  const { handle, id: judged } = stale
   try {
-    await guard.writeFile(JSON.stringify(await currentProcess()))
-    const current = await identity(path)
-    if (current === judged) await unlink(path).catch(missing)
-    return true
-  } finally {
-    await guard.close()
-    await unlink(guardPath).catch(missing)
-  }
+    const guardPath = `${path}.takeover-${judged}`
+    let guard
+    for (let attempt = 0; !guard; attempt++) {
+      try { guard = await open(guardPath, 'wx', 0o600) } catch (error) {
+        if (error.code !== 'EEXIST') throw error
+        // Another starter is taking over; it, or a faster starter, owns the lock.
+        // A guard whose owner was killed is removed once, after its grace.
+        if (attempt > 0 || !await removeAbandonedGuard(guardPath, path)) return false
+      }
+    }
+    try {
+      await guard.writeFile(JSON.stringify(await currentProcess()))
+      const current = await identity(path)
+      if (current === judged) await unlink(path).catch(missing)
+      return true
+    } finally {
+      await guard.close()
+      await unlink(guardPath).catch(missing)
+    }
+  } finally { await handle.close() }
 }
 
 // Returns the identity of a stale lock, null when the lock is already gone, or
@@ -105,15 +116,22 @@ async function staleIdentity(path) {
     if (error.code === 'ENOENT') return null
     throw error
   }
+  let retained = false
   try {
     const status = await handle.stat({ bigint: true })
     const id = key(status)
     try {
       const owner = JSON.parse(await handle.readFile('utf8'))
-      if (Number.isSafeInteger(owner.pid) && owner.pid > 0) return await ownerAlive(owner) ? undefined : id
+      if (Number.isSafeInteger(owner.pid) && owner.pid > 0) {
+        if (await ownerAlive(owner)) return undefined
+        retained = true
+        return { handle, id }
+      }
     } catch { /* Half-written or unreadable: judged by age below. */ }
-    return Date.now() - Number(status.mtimeMs) > graceMs ? id : undefined
-  } finally { await handle.close() }
+    if (Date.now() - Number(status.mtimeMs) <= graceMs) return undefined
+    retained = true
+    return { handle, id }
+  } finally { if (!retained) await handle.close() }
 }
 
 // A takeover guard left by a killed starter would otherwise block every later
@@ -162,7 +180,7 @@ async function identity(path) {
   }
 }
 
-// Inode numbers can be reused after deletion; the change time cannot repeat.
+// Compare metadata while the judged inode remains pinned by its descriptor.
 const key = (status) => `${status.dev}-${status.ino}-${status.ctimeNs}`
 // A rename changes ctime, so a moved file is matched by its unchanged fields.
 const movedKey = (status) => `${status.dev}-${status.ino}-${status.birthtimeNs}-${status.mtimeNs}`

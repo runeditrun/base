@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions } from '../../container/adapters/d1-workerd.mjs';
 import { createPortability, canonicalJson, sha256 } from '../../portability/index.mjs';
 import { createErasure, defineErasure } from '../index.mjs';
 import { initializeD1ImportStorage, planD1Import, createD1ImportJob, resumeD1Import, eraseD1ImportTarget, sha256 as kitSha, canonicalJson as kitJson } from '../../import-kit/src/d1/index.ts';

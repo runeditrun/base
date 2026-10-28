@@ -44,7 +44,7 @@ async function persistent(files) {
 
 // Empty when `rer` already runs this launcher in this terminal and new ones.
 // Otherwise the advice ends with the exact line to run.
-export async function pathAdvice(paths, env = process.env) {
+export async function pathAdvice(paths, env = process.env, { includeShellStep = true } = {}) {
  const entries = [...new Set((env.PATH ?? '').split(delimiter).filter(Boolean).map(entry => resolve(entry)))];
  const bin = resolve(paths.bin), lines = [];
  let firstCommand;
@@ -58,10 +58,11 @@ export async function pathAdvice(paths, env = process.env) {
    lines.push(`Left existing rer at ${candidate} unchanged.`);
   } catch (error) { if (!['ENOENT', 'EACCES', 'ENOTDIR'].includes(error.code)) throw error; }
  }
+ if (!includeShellStep) return lines.join('\n');
  const startup = await shellStartup(paths.home, env);
  const first = entries.includes(bin) && firstCommand === paths.launcher;
  if (first && await persistent(startup.files)) return lines.join('\n');
  const why = first ? 'New terminals will not find rer yet.' : firstCommand ? `Another rer (${firstCommand}) comes first on your PATH.` : 'rer is not on your PATH yet.';
- lines.push(`${why} Run this line; it puts ~/.local/bin first on PATH in this terminal and in new ones:`, `  ${startup.line}`);
+ lines.push(`Optional: make rer available in future terminals. ${why} Running the following line adds ~/.local/bin to your shell's startup file and this terminal. rer changes no shell file itself:`, `  ${startup.line}`);
  return lines.join('\n');
 }

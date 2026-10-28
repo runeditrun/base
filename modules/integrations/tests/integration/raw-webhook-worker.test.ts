@@ -1,3 +1,4 @@
+import { installD1Preflight } from '../../../container/adapters/d1-workerd-setup.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -5,7 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { key, tenant, destinationId, signedWebhook, byteMutations, receiverWorkerModules } from './raw-webhook-fixture.ts';
 
-const { Miniflare } = await import(process.env.INTEGRATIONS_MINIFLARE_MODULE ?? 'miniflare');
+const miniflare = await import(process.env.INTEGRATIONS_MINIFLARE_MODULE ?? 'miniflare');
+installD1Preflight(miniflare.D1_PLUGIN);
+const { Miniflare } = miniflare;
 
 test('documented Fetch receiver runs in workerd with raw-byte authentication and durable D1 replay protection', async t => {
   const now = Math.floor(Date.now() / 1000) * 1000;
