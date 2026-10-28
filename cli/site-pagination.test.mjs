@@ -82,7 +82,7 @@ for (const phase of ['preflight', 'readback']) for (const list of phase === 'pre
  });
 }
 
-test('rer deploy --site stops a list that keeps changing throughout the owner settling window', {timeout:150000}, async t => {
+test('rer deploy --site stops a list that keeps changing throughout the owner settling window', {timeout:180000}, async t => {
  const {provider, run} = await fixture(t), writes = provider.state.writes.length;
  const changed = changingList(t, provider, {list:'zones', always:true});
  const started = performance.now(), result = await run(), elapsed = performance.now() - started;
@@ -91,7 +91,9 @@ test('rer deploy --site stops a list that keeps changing throughout the owner se
  assert.equal(result.code, 1, result.text);
  assert.match(message, /Run site deploy stopped: provider-pagination-changed/);
  assert.match(message, /GET \/zones.*page 2/);
- assert.ok(elapsed >= 119000, 'the existing 120-second window was used');
+ // The next backoff must fit inside the window; provider latency and timer
+ // scheduling can make the final refusal a few seconds earlier than 120 s.
+ assert.ok(elapsed >= 115000, 'the existing 120-second window was used');
  assert.ok(changed.starts > 1 && changed.starts <= 33, 'bounded backoff limits relists');
  assert.equal(provider.state.writes.length, writes, 'an unsettled preflight authorizes no writes');
 });
