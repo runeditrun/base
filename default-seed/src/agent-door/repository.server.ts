@@ -1,4 +1,5 @@
 import { ToolRefusal, type Person } from '../../../modules/agent-door/index.ts'
+import { newUlid } from '../core/platform/identifiers.server'
 
 export function requirePeopleAccess(person: Person) {
   if (!person.active || !['owner', 'admin'].includes(person.role)) throw new ToolRefusal('operator_role_required')
@@ -15,6 +16,21 @@ export async function readPerson(db: D1Database, id: string) {
   const notes = (await db.prepare('SELECT id,body,created_at FROM person_notes WHERE person_id=? ORDER BY id').bind(id).all()).results
   const files = (await db.prepare('SELECT id,name,content_type,size,created_at FROM person_files WHERE person_id=? ORDER BY id').bind(id).all()).results
   return { ...row, details: JSON.parse(row.details) as Record<string, unknown>, notes, files }
+}
+
+/** Reverse only the exact note that was saved, with native person attribution. */
+export async function undoPersonNote(db: D1Database, actor: string, note: { id: string; personId: string; body: string }) {
+  try {
+    await db.batch([
+      db.prepare("SELECT CASE WHEN EXISTS(SELECT 1 FROM person_notes WHERE id=? AND person_id=? AND body=?) THEN 1 ELSE json_extract('[]', '$[undo_evidence_changed') END").bind(note.id, note.personId, note.body),
+      db.prepare('DELETE FROM person_notes WHERE id=? AND person_id=? AND body=?').bind(note.id, note.personId, note.body),
+      db.prepare("INSERT INTO audit_events(id,actor,action,entity_type,entity_id,details,created_at) VALUES(?,?,'note.removed','note',?,?,?)")
+        .bind(newUlid(), actor, note.id, JSON.stringify({ personId: note.personId }), new Date().toISOString()),
+    ])
+  } catch (cause) {
+    if (String(cause).includes('undo_evidence_changed')) throw new ToolRefusal('undo_evidence_changed')
+    throw cause
+  }
 }
 
 export interface OperatorRow { id: string; email: string; displayName: string; role: 'owner' | 'admin' | 'member'; status: 'active' | 'invited' | 'inactive'; version: number }

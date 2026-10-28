@@ -85,20 +85,20 @@ export async function authenticate(
         !Number.isFinite(now) || typeof claims.iat !== 'number' || !Number.isFinite(claims.iat) ||
         typeof claims.exp !== 'number' || !Number.isFinite(claims.exp) || claims.iat > now + 30 ||
         claims.exp <= now || claims.exp <= claims.iat || claims.exp - claims.iat > 900) return null
-      const person = await options.people.sponsor({ sub: claims.sub, email: claims.email })
+      if (!nonempty(claims.consent)) return null
+      const person = await options.people.sponsor({ sub: claims.sub })
       if (!person?.active) return null
       return {
         person,
         agent: { id: claims.act.sub, name: claims.act.name, specialist: claims.act.specialist as string | null | undefined },
-        scopes: claims.scope === '' ? [] : claims.scope.split(' '),
+        scopes: claims.scope === '' ? [] : claims.scope.split(' '), consent: claims.consent,
       }
     }
     const local = await options.localCredentials?.(request)
-    if (!local || !nonempty(local.sponsor.email) || !nonempty(local.agent.id) || !nonempty(local.agent.name) ||
-      (local.sponsor.sub !== undefined && !nonempty(local.sponsor.sub)) ||
+    if (!local || !nonempty(local.sponsor.id) || !nonempty(local.agent.id) || !nonempty(local.agent.name) ||
       (local.agent.specialist !== undefined && local.agent.specialist !== null && !nonempty(local.agent.specialist)) ||
       !Array.isArray(local.scopes) || !local.scopes.every(nonempty)) return null
-    const person = await options.people.sponsor({ sub: local.sponsor.sub ?? null, email: local.sponsor.email.toLowerCase() })
+    const person = await options.people.person(local.sponsor.id)
     if (!person?.active) return null
     return { person, agent: local.agent, scopes: local.scopes }
   } catch {

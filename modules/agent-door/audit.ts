@@ -6,15 +6,15 @@ import { preparedBy } from './people.ts'
 
 export interface AuditRow {
   sequence?: number; id: string; at: string; door: 'mcp' | 'embedded'; agent: Principal['agent']; sponsor: { id: string; name: string }; label: string
-  tool: string; classes: ClassAndFacts[]; revision: number | null; rules: Array<{ class: string; rule: string | null; do: string }>
-  decision: string; outcome: 'done' | 'refused' | 'pending' | 'failed' | 'replayed'; code: string | null
+  tool: string; resource: string | null; decision_id: string | null; classes: ClassAndFacts[]; revision: number | null; rules: Array<{ class: string; rule: string | null; do: string }>
+  decision: string; outcome: 'running' | 'done' | 'refused' | 'pending' | 'failed' | 'replayed'; code: string | null
   approval: { id: string; by: string[] } | null; review: { id: string; by: string | null } | null
   idempotency_key: string | null; trace: string | null; ignored_arguments: string[]; replay_of: string | null
 }
 export interface Evidence { document: PolicyDocument; usage: Record<string, number>; classes: ClassAndFacts[]; result: string; rules: unknown }
 export function newAudit(rt: Runtime, principal: Principal, tool: string, door: AuditRow['door'], trace: unknown): AuditRow {
   return { id: crypto.randomUUID(), at: new Date(rt.now()).toISOString(), door, agent: { ...principal.agent, specialist: principal.agent.specialist ?? null }, sponsor: { id: principal.person.id, name: principal.person.name }, label: preparedBy(principal).label,
-    tool, classes: [], revision: null, rules: [], decision: 'none', outcome: 'refused', code: null, approval: null, review: null, idempotency_key: null,
+    tool, resource: null, decision_id: null, classes: [], revision: null, rules: [], decision: 'none', outcome: 'refused', code: null, approval: null, review: null, idempotency_key: null,
     trace: typeof trace === 'string' ? trace.slice(0, 512) : null, ignored_arguments: [], replay_of: null }
 }
 export function recordDecision(row: AuditRow, decision: DecisionMeta) {
@@ -22,15 +22,34 @@ export function recordDecision(row: AuditRow, decision: DecisionMeta) {
   row.classes = decision.classes.map(item => ({ class: item.class as ClassId, facts: item.facts as ClassAndFacts['facts'] }))
   row.rules = decision.classes.map(({ class: cls, rule, do: action }) => ({ class: cls, rule, do: action }))
 }
+export function auditInsert(rt: Runtime, row: AuditRow, evidence?: Evidence, guard?: string) {
+  return rt.options.db.prepare(`INSERT INTO agent_door_audit(id,at,agent,classes,row,evidence) SELECT ?,?,?,?,?,?${guard ? ' WHERE EXISTS(SELECT 1 FROM agent_door_usage WHERE decision_id=?)' : ''}`)
+    .bind(row.id, row.at, row.agent.id, JSON.stringify(row.classes.map(item => item.class)), JSON.stringify(row), evidence ? JSON.stringify(evidence) : null, ...(guard ? [guard] : []))
+}
 export async function audit(rt: Runtime, row: AuditRow, evidence?: Evidence) {
-  await rt.options.db.prepare('INSERT INTO agent_door_audit(id,at,agent,classes,row,evidence) VALUES(?,?,?,?,?,?)')
+  await rt.options.db.prepare(`INSERT INTO agent_door_audit(id,at,agent,classes,row,evidence) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET classes=excluded.classes,row=excluded.row,evidence=excluded.evidence`)
     .bind(row.id, row.at, row.agent.id, JSON.stringify(row.classes.map(item => item.class)), JSON.stringify(row), evidence ? JSON.stringify(evidence) : null).run()
+}
+export function outcomeRow(row: AuditRow, result: import('./types.ts').CallResult) {
+  if (result.decision) recordDecision(row, result.decision)
+  if (row.outcome !== 'replayed' && row.outcome !== 'failed') row.outcome = result.code === 'output_invalid' || result.code === 'execution_failed' ? 'failed' : result.outcome
+  row.code = result.code ?? null
+  row.approval = result.approval ? { id: result.approval.id, by: (result.receipt?.approved_by as string[]) ?? [] } : null
+  row.review = result.review ? { id: result.review.id, by: null } : null
+}
+export async function recoverAudit(rt: Runtime, id: string, result: import('./types.ts').CallResult) {
+  const record = await rt.options.db.prepare('SELECT row,evidence FROM agent_door_audit WHERE id=?').bind(id).first<{ row: string; evidence: string | null }>()
+  if (!record) throw new Error('audit_missing')
+  const row: AuditRow = JSON.parse(record.row)
+  if (row.outcome !== 'running') return
+  outcomeRow(row, result)
+  await audit(rt, row, record.evidence ? JSON.parse(record.evidence) : undefined)
 }
 export async function usage(rt: Runtime, document: PolicyDocument, principal: Principal) {
   const day = Math.floor(rt.now() / 86400000) * 86400000
   const rows = (await rt.options.db.prepare('SELECT seed,specialist,agent,classes FROM agent_door_usage WHERE at>=? AND at<?').bind(day, day + 86400000).all<{ seed: string; specialist: string | null; agent: string; classes: string }>()).results
   const sums: Record<string, number> = {}
-  for (const rule of document.rules) for (const tool of rt.tools) for (const cls of tool.classes) {
+  for (const rule of document.rules) for (const cls of [...new Set([...rt.tools.flatMap(tool => tool.classes), ...rt.options.resources?.flatMap(resource => resource.classes) ?? []])]) {
     const key = `${rule.id}:${cls}`
     if (key in sums) continue
     sums[key] = rows.reduce((sum, row) => sum + (JSON.parse(row.classes) as ClassAndFacts[]).filter(item => item.class === cls && scopeMatches(rule, row, item.facts)

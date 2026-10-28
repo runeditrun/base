@@ -10,15 +10,19 @@ export interface Trust {
   v: 1; issuer: string; audience: string; subject: string; email?: string;
   keys: Record<string, JsonWebKey>;
 }
-export interface Member { email: string; name: string; role: 'admin' | 'member'; invite: number }
+export type BusinessRole = 'admin' | 'member';
+export interface Member { id?: string; email: string; name: string; role: BusinessRole; invite: number }
 export interface Logo { sha256: string; type: string; bytes: number }
 export interface SettingsDocument {
   v: 1; iss: string; aud: string; sub: string; business: string; email: string;
   jti: string; iat: number; exp: number; rev: number; values: Values;
-  logo: Logo | null; team: Member[] | null; detached?: true;
+  logo: Logo | null; team: Member[] | null; owner_id?: string; detached?: true;
 }
 export interface TeamState { email: string; state: 'invited' | 'active' | 'inactive' | 'conflict' }
-export interface ManagedMember extends TeamState { operatorId: string | null; invite: number }
+export interface ManagedMember extends TeamState {
+  operatorId: string | null; invite: number;
+  businessId?: string | null; businessRole?: BusinessRole | null;
+}
 export interface Guard { sql: string; args: unknown[] }
 export interface TeamAdapter {
   ownerEmail?(): Promise<string | null>;

@@ -15,6 +15,8 @@ export function validateAgentSurface(surface, { contract } = {}) {
  add('resources', Array.isArray(surface.resources), 'Agent surface must declare resources.');
  for (const uri of Array.isArray(surface.resources) ? surface.resources : []) add(`resource.${String(uri)}`, text(uri), 'Resource template must be a URI string.');
  add('journey', Array.isArray(surface.journey) && surface.journey.length > 0, 'Agent surface must declare its journey.');
+ const escalation = (id, ok, detail) => points.push({ id: `BASE-AGENT-005.surface.${id}`, ok: Boolean(ok), ...(!ok ? { detail } : {}) });
+ escalation('escalations', surface.escalations === undefined || Array.isArray(surface.escalations), 'Agent surface must declare its escalations.');
  const tools = new Map(), steps = new Set(), coverage = new Map();
  for (const [i, tool] of (Array.isArray(surface.tools) ? surface.tools : []).entries()) {
   const name = tool?.name, label = text(name) ? name : `tools[${i}]`;
@@ -33,20 +35,35 @@ export function validateAgentSurface(surface, { contract } = {}) {
  }
  const references = (value, visit) => {
   if (Array.isArray(value)) value.forEach(item => references(item, visit));
-  else if (object(value)) { if ('$from' in value) visit(value); else Object.values(value).forEach(item => references(item, visit)); }
+  else if (object(value)) { if ('$from' in value || '$sponsor' in value) visit(value); else Object.values(value).forEach(item => references(item, visit)); }
  };
+ const checkReferences = (value, label, available, addPoint = add) => references(value, ref => {
+  if ('$sponsor' in ref) addPoint(`${label}.sponsor`, Object.keys(ref).length === 1 && ['id', 'email'].includes(ref.$sponsor), `${label} must reference the sponsor as {$sponsor:'id'} or {$sponsor:'email'}.`);
+  else addPoint(`${label}.ref.${ref.$from}`, available.has(ref.$from) && typeof ref.pointer === 'string' && (ref.pointer === '' || ref.pointer.startsWith('/')), `${label} references ${ref.$from} before its structuredContent is available, or has an invalid JSON pointer.`);
+ });
  for (const [i, step] of (Array.isArray(surface.journey) ? surface.journey : []).entries()) {
   const id = text(step?.id) ? step.id : `journey[${i}]`, tool = tools.get(step?.tool);
   add(`journey.${id}`, object(step) && text(step.id) && !steps.has(step.id) && Boolean(tool) && object(step.args) && Array.isArray(step.expect) && step.expect.length > 0, `Invalid or duplicate journey step ${id}, tool ${JSON.stringify(step?.tool)}.`);
   const expect = Array.isArray(step?.expect) ? step.expect : [];
   add(`journey.${id}.classes`, new Set(expect.map(item => item?.class)).size === expect.length && expect.every(item => object(item) && Array.isArray(tool?.classes) && tool.classes.includes(item.class) && (item.facts === undefined || object(item.facts))), `${id} expects duplicate, undeclared or malformed classes.`);
   for (const item of expect) coverage.get(step?.tool)?.add(item?.class);
-  references(step?.args, ref => add(`journey.${id}.ref.${ref.$from}`, steps.has(ref.$from) && typeof ref.pointer === 'string' && (ref.pointer === '' || ref.pointer.startsWith('/')), `${id} references ${ref.$from} before its structuredContent is available, or has an invalid JSON pointer.`));
+  checkReferences(step?.args, `journey.${id}`, steps);
   if (step?.inject !== undefined) add(`journey.${id}.inject`, object(step.inject), `${id}.inject must be an object of additional arguments.`);
+  checkReferences(step?.inject, `journey.${id}.inject`, steps);
   steps.add(step?.id);
  }
+ const escalationIds = new Set(), escalationTools = new Set();
+ for (const [i, step] of (Array.isArray(surface.escalations) ? surface.escalations : []).entries()) {
+  const id = text(step?.id) ? step.id : `escalations[${i}]`, tool = tools.get(step?.tool);
+  escalation(id, object(step) && text(step.id) && !escalationIds.has(step.id) && Boolean(tool) && object(step.args), `Invalid or duplicate escalation ${id}, tool ${JSON.stringify(step?.tool)}.`);
+  escalation(`${id}.authority`, Array.isArray(tool?.classes) && tool.classes.some(cls => ['access', 'security'].includes(cls)), `${id} must exercise an access or security tool.`);
+  checkReferences(step?.args, `escalations.${id}`, steps, escalation);
+  escalationIds.add(step?.id); escalationTools.add(step?.tool);
+ }
+ for (const [name, tool] of tools) if (Array.isArray(tool?.classes) && tool.classes.some(cls => ['access', 'security'].includes(cls))) escalation(`${name}.coverage`, escalationTools.has(name), `${name} has no sponsor escalation fixture.`);
  for (const [name, tool] of tools) for (const cls of Array.isArray(tool?.classes) ? tool.classes : []) add(`${name}.coverage.${cls}`, coverage.get(name).has(cls), `${name} has no journey fixture for declared class ${cls}.`);
  add('events', tools.has(`${surface.seed}.events.list`), `Declare built-in ${surface.seed}.events.list in the Agent surface.`);
  add('witness', object(surface.witness) && tools.get(surface.witness.tool)?.readOnly === true && object(surface.witness.args), 'witness must name a declared readOnly tool and arguments.');
+ checkReferences(surface.witness?.args, 'witness', new Set());
  return { ok: points.every(point => point.ok), points };
 }

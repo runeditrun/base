@@ -6,6 +6,9 @@ export const defineTool = (tool: ToolDefinition): ToolDefinition => tool
 export function registry(options: AgentDoorOptions): ToolDefinition[] {
   if (!/^[a-z][a-z0-9-]*$/.test(options.seed)) throw new TypeError('Invalid seed id')
   if (new URL(options.origin).origin !== options.origin) throw new TypeError('Agent origin must be canonical')
+  for (const resource of options.resources ?? []) {
+    if (!resource.classes?.length || new Set(resource.classes).size !== resource.classes.length || resource.classes.some(cls => !isClass(cls)) || typeof resource.classify !== 'function') throw new TypeError(`Invalid resource classes: ${resource.uriTemplate}`)
+  }
   const names = new Set<string>([`${options.seed}.events.list`])
   return options.tools.map(tool => {
     if (tool.name.length > 200 || !/^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/.test(tool.name) || !tool.name.startsWith(`${options.seed}.`) || names.has(tool.name)) throw new TypeError(`Invalid or duplicate tool name: ${tool.name}`)
@@ -13,6 +16,9 @@ export function registry(options: AgentDoorOptions): ToolDefinition[] {
     if (!tool.classes?.length || new Set(tool.classes).size !== tool.classes.length || tool.classes.some(cls => !isClass(cls))) throw new TypeError(`Invalid classes: ${tool.name}`)
     if (!tool.inputSchema || tool.inputSchema.type !== 'object' || !schemaValid(tool.inputSchema) || tool.outputSchema === undefined || !schemaValid(tool.outputSchema)) throw new TypeError(`Missing or invalid schema: ${tool.name}`)
     if (!tool.scope || !tool.title || !tool.description || typeof tool.readOnly !== 'boolean' || !Array.isArray(tool.clauses) || typeof tool.classify !== 'function' || typeof tool.run !== 'function') throw new TypeError(`Invalid tool: ${tool.name}`)
+    if ('cost' in tool) throw new TypeError(`Provider cost is not enforced: ${tool.name}`)
+    if (!tool.readOnly && typeof tool.summary !== 'function') throw new TypeError(`Missing approval summary: ${tool.name}`)
+    if (tool.classes.some(cls => cls === 'access' || cls === 'security') && typeof tool.authority !== 'function') throw new TypeError(`Missing authority: ${tool.name}`)
     const properties = { ...tool.inputSchema.properties }
     if ('idempotency_key' in properties || 'expected_revision' in properties) throw new TypeError(`Reserved argument: ${tool.name}`)
     const required = [...tool.inputSchema.required ?? []]

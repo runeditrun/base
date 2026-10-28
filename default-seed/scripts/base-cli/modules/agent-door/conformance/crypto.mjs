@@ -18,19 +18,19 @@ export function seconds(now) {
 export async function accessToken(context, overrides = {}) {
  const iat = seconds(context.now);
  return signJws(context.signer.privateKey, context.signer.kid, 'at+jwt', {
-  iss: context.signer.issuer, aud: `${context.origin}/mcp`, sub: context.person.email.toLowerCase(), email: context.person.email.toLowerCase(),
+  iss: context.signer.issuer, aud: `${context.origin}/mcp`, sub: context.person.sub, email: context.person.email.toLowerCase(),
   act: { sub: context.agentId, name: 'Agent door conformance', specialist: context.surface.specialist }, client_id: 'rer-agent-conformance',
   scope: [...new Set([...context.surface.tools.map(tool => tool.scope), ...(context.resourceScopes ?? []), 'events:read'])].join(' '), business: context.business,
-  jti: randomUUID(), iat, exp: iat + 300, ...overrides,
+  consent: context.consent, jti: randomUUID(), iat, exp: iat + 300, ...overrides,
  });
 }
 export const autonomousPolicy = () => ({ schema: 'rer-agent-policy/1', catalogue: CATALOGUE, rules: [{ id: 'all', class: '*', do: 'autonomous' }], spend: { none: true } });
 export const heldPolicy = () => ({ schema: 'rer-agent-policy/1', catalogue: CATALOGUE, rules: [{ id: 'all', class: '*', do: 'approval', approver: ['sponsor'], wait: 'PT1H' }, { id: 'standard', class: 'standard', do: 'review' }], reviewers: ['sponsor'], spend: { none: true } });
-export async function policyEnvelope(context, document, { paused = false, revision = context.revision + 1, seq = context.seq + 1, ...overrides } = {}) {
+export async function policyEnvelope(context, document, { paused = false, revoked, revision = context.revision + 1, seq = context.seq + 1, ...overrides } = {}) {
  const iat = seconds(context.now);
  const revision_signature = document === null ? null : await signJws(context.signer.privateKey, context.signer.kid, 'rer-agent-policy-revision+jwt', {
   business: context.business, revision, document_sha256: createHash('sha256').update(canonical(document)).digest('hex'),
  });
- const payload = { v: 1, iss: context.signer.issuer, aud: context.origin, sub: context.signer.installationId, business: context.business, seq, revision, paused, catalogue: CATALOGUE, document, revision_signature, iat, exp: iat + 300, ...overrides };
+ const payload = { v: 1, iss: context.signer.issuer, aud: context.origin, sub: context.signer.installationId, business: context.business, seq, revision, paused, catalogue: CATALOGUE, document, revision_signature, iat, exp: iat + 300, ...(revoked === undefined ? {} : { revoked }), ...overrides };
  return { payload, policy: await signJws(context.signer.privateKey, context.signer.kid, 'rer-agent-policy+jwt', payload) };
 }

@@ -1,6 +1,6 @@
 import type { AgentEvent, EventActor, Person, Runtime, ToolDefinition } from './types.ts'
 import { templateMatches } from './registry.ts'
-import { businessRole, matchesRef } from './people.ts'
+import { businessRole, matchingRefs } from './people.ts'
 
 export async function appendEvents(rt: Runtime, drafts: Array<{ type: string; uri: string; actor: EventActor; data?: Record<string, unknown> }>) {
   const events: AgentEvent[] = drafts.map(event => ({ ...event.data, id: crypto.randomUUID(), type: event.type, uri: event.uri, actor: event.actor, at: new Date(rt.now()).toISOString() }))
@@ -14,7 +14,7 @@ export async function eventVisible(rt: Runtime, person: Person, event: AgentEven
     const row = await rt.options.db.prepare('SELECT saved FROM agent_door_approvals WHERE id=?').bind(event.uri.split('/').pop()).first<{ saved: string }>()
     if (!row) return false
     const saved = JSON.parse(row.saved)
-    return person.id === saved.principal.person.id || saved.approvers.some((ref: string) => matchesRef(rt.options.people, person, saved.principal.person.id, ref))
+    return person.id === saved.principal.person.id || (await matchingRefs(rt, person, saved.principal.person.id, saved.approvers)).length > 0
   }
   if (event.actor.kind === 'agent' && event.actor.for.id === person.id) return true
   if (event.actor.kind === 'person' && event.actor.person.id === person.id) return true

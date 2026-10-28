@@ -31,13 +31,18 @@ export function accessTools(bindings: Bindings): ToolDefinition[] {
         requirePeopleAccess(ctx.person)
         return [{ class: 'external', facts: { measure: 1, counterparty: 'new' } }, { class: 'access', facts: { measure: 1, direction: 'widens' } }]
       },
-      async authority(args, ctx) { return { subject: (await operatorByEmail(ctx.db, args.email as string))?.id ?? args.email as string, widens: true } },
+      authority(args) { return Promise.resolve({ subject: args.email as string, widens: true }) },
+      summary(args, ctx) {
+        requirePeopleAccess(ctx.person)
+        const email = (args.email as string).trim().toLowerCase()
+        return { target: { name: (args.name as string).trim(), email }, recipients: [email], role: args.role as string }
+      },
       async run(args, ctx) {
         requirePeopleAccess(ctx.person)
         await native(bindings, ctx).invite({ email: args.email as string, displayName: (args.name as string).trim(), role: args.role as 'admin' | 'member', returnTo: '/app' })
         const target = await operatorByEmail(ctx.db, args.email as string)
         if (!target) throw new Error('Native invitation did not produce an operator')
-        ctx.emit('operator.invited', operatorUri(target.id), { id: target.id, role: target.role })
+        ctx.emit('operator.invited', operatorUri(target.id), { id: target.id, role: target.role, approved_by: ctx.approvers })
         return { result: { id: target.id, role: target.role, status: target.status, version: target.version } }
       },
     }),
@@ -51,10 +56,14 @@ export function accessTools(bindings: Bindings): ToolDefinition[] {
       },
       async revision(args, ctx) { return (await readOperator(ctx.db, args.id as string))?.version ?? null },
       async authority(args, ctx) { const target = await readOperator(ctx.db, args.id as string); return target ? { subject: target.id, widens: args.role === 'admin' && target.role !== 'admin' } : null },
+      async summary(args, ctx) {
+        const target = await roleTarget(args, ctx)
+        return { target: { id: target.id, name: target.displayName, email: target.email }, role: args.role as string }
+      },
       async run(args, ctx) {
         await roleTarget(args, ctx)
         const target = await native(bindings, ctx).setRole(args.id as string, args.role as 'admin' | 'member')
-        ctx.emit('operator.role.changed', operatorUri(target.id), { id: target.id, role: target.role, version: target.version })
+        ctx.emit('operator.role.changed', operatorUri(target.id), { id: target.id, role: target.role, version: target.version, approved_by: ctx.approvers })
         return { result: { id: target.id, role: target.role, status: target.status, version: target.version } }
       },
     }),

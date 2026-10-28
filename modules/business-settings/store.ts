@@ -1,12 +1,12 @@
 import type { Ack, Database, BusinessManifest, Field, ManagedMember, SettingsDocument, Snapshot } from './types.ts';
 
-export interface SettingsRow { rev: number; document: string | null; applied_at: string | null; stopped: number; token: string }
-export const initialSettings = (): SettingsRow => ({ rev: 0, document: null, applied_at: null, stopped: 0, token: '' });
+export interface SettingsRow { rev: number; document: string | null; applied_at: string | null; stopped: number; token: string; owner_id: string | null }
+export const initialSettings = (): SettingsRow => ({ rev: 0, document: null, applied_at: null, stopped: 0, token: '', owner_id: null });
 export function settingsRow(db: Database): Promise<SettingsRow | null> {
-  return db.prepare('SELECT rev,document,applied_at,stopped,token FROM bs_settings WHERE singleton=1').first<SettingsRow>();
+  return db.prepare('SELECT rev,document,applied_at,stopped,token,owner_id FROM bs_settings WHERE singleton=1').first<SettingsRow>();
 }
 export async function managed(db: Database): Promise<ManagedMember[]> {
-  return (await db.prepare('SELECT email,operator_id AS operatorId,invite,state FROM bs_team ORDER BY email').all<ManagedMember>()).results;
+  return (await db.prepare('SELECT email,operator_id AS operatorId,invite,state,business_id AS businessId,business_role AS businessRole FROM bs_team ORDER BY email').all<ManagedMember>()).results;
 }
 export async function snapshot(db: Database): Promise<Snapshot> {
   const [stored, overrides, team, logo] = await Promise.all([

@@ -11,6 +11,7 @@ export function closed(value: unknown, required: string[], optional: string[] = 
 const text = (value: unknown, max: number): value is string => typeof value === 'string' && value.length > 0 && value.length <= max && value === value.trim() && !/[\x00-\x1f\x7f-\x9f]/.test(value);
 const email = (value: unknown): value is string => text(value, 254) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value === value.toLowerCase();
 const integer = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+const identity = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 export function validateValues(value: unknown): SettingsDocument['values'] {
   const values = closed(value, [], ['display_name', 'owner_name', 'brand_color', 'timezone']);
   for (const [key, item] of Object.entries(values)) {
@@ -40,9 +41,10 @@ export function trust(input: string | Trust): Trust {
   } catch { throw new SettingsError('invalid_trust', 503); }
 }
 export function payload(value: unknown, config: Trust, ownerEmail: string | null): SettingsDocument {
-  const p = closed(value, ['v', 'iss', 'aud', 'sub', 'business', 'email', 'jti', 'iat', 'exp', 'rev', 'values', 'logo', 'team'], ['detached']);
+  const p = closed(value, ['v', 'iss', 'aud', 'sub', 'business', 'email', 'jti', 'iat', 'exp', 'rev', 'values', 'logo', 'team'], ['owner_id', 'detached']);
   const now = Math.floor(Date.now() / 1000);
   if (p.v !== 1 || p.iss !== config.issuer || p.aud !== config.audience || p.sub !== config.subject || !email(p.email) || p.email !== (config.email ?? ownerEmail) || (ownerEmail && p.email !== ownerEmail) || !text(p.business, 256) || !text(p.jti, 256) || !integer(p.iat) || !integer(p.exp) || p.iat > now + 30 || p.exp <= now || p.exp <= p.iat || p.exp - p.iat > 86400 || typeof p.rev !== 'number' || !Number.isSafeInteger(p.rev) || (p.detached !== undefined && p.detached !== true)) fail();
+  if (Object.hasOwn(p, 'owner_id') && !identity(p.owner_id)) fail();
   validateValues(p.values);
   if (p.logo !== null) {
     const logo = closed(p.logo, ['sha256', 'type', 'bytes']);
@@ -50,10 +52,14 @@ export function payload(value: unknown, config: Trust, ownerEmail: string | null
   }
   if (p.team !== null) {
     if (!Array.isArray(p.team) || p.team.length > 500) fail();
-    const emails = new Set();
+    const emails = new Set(), ids = new Set();
     for (const item of p.team) {
-      const member = closed(item, ['email', 'name', 'role', 'invite']);
+      const member = closed(item, ['email', 'name', 'role', 'invite'], ['id']);
       if (!email(member.email) || !text(member.name, 120) || !['admin', 'member'].includes(member.role as string) || !integer(member.invite) || emails.has(member.email)) fail();
+      if (Object.hasOwn(member, 'id')) {
+        if (!identity(member.id) || ids.has(member.id) || member.id === p.owner_id) fail();
+        ids.add(member.id);
+      }
       emails.add(member.email);
     }
   }

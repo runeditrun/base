@@ -49,12 +49,12 @@ test('policy adoption closes the door until answered and preserves the last vali
   await r.adopt(); await r.setNow(r.c.now+301000); await correlation('policy_unavailable'); assert.equal(code(await r.tool('records.list', {})), 'policy_unavailable')
   await r.adopt(); assert.equal((await r.tool('records.list', {})).result.isError, false)
   await r.setNow(r.c.now + 86400000)
-  await r.adopt({ ...autonomousPolicy(), rules: [{ id:'base',class:'standard',do:'blocked' }, { id:'daily',class:'standard',do:'autonomous',max_per_day:2 }] })
+  await r.adopt({ ...autonomousPolicy(), rules: [{ id:'base',class:'standard',do:'blocked' }, { id:'daily',class:'standard',do:'autonomous',seed:'synthetic',max_per_day:2 }] })
   assert.equal((await r.tool('records.write',args('synthetic-base-day-1'))).result.isError,false)
   assert.equal((await r.tool('records.write',args('synthetic-base-day-2'))).result.isError,false)
   assert.equal(code(await r.tool('records.write',args('synthetic-base-day-3'))),'policy_blocked')
   assert.equal((await r.person('/agents/api/audit')).body.differs_from_policy,0)
-  const { db, ...options } = { db:r.db, seed:'synthetic',name:'Synthetic',specialist:'operations',origin:r.c.origin,trust:null,people:{sponsor:async()=>null,session:async()=>null}, tools:[] }; void db
+  const { db, ...options } = { db:r.db, seed:'synthetic',name:'Synthetic',specialist:'operations',origin:r.c.origin,trust:null,people:{sponsor:async()=>null,person:async()=>null,session:async()=>null}, tools:[] }; void db
   const sample = { name:'synthetic.records.list', title:'Read',description:'Read',scope:'records:read',readOnly:true,inputSchema:{type:'object'},outputSchema:{type:'object'},classes:['standard'],clauses:[],classify:()=>[],run:async()=>({result:{}}) }
   for (const tools of [[{...sample,classes:['uncatalogued']}],[{...sample,name:'foreign.records.list'}],[sample,sample],[{...sample,outputSchema:undefined}]]) assert.throws(()=>createAgentDoor({...options,db:r.db,tools} as any))
  } finally { await r.close() }
@@ -79,11 +79,12 @@ test('autonomous and review actions retain one outcome, native refusals, undo, a
   assert.equal(decision(reviewed).disposition,'review'); assert.equal((await r.person(`/agents/api/reviews/${id}/flag`,{note:'Synthetic observation'})).status,200)
   assert.equal((await r.person(`/agents/api/reviews/${id}/reviewed`,{})).body.review.state,'reviewed')
   assert.equal((await r.person(`/agents/api/reviews/${id}/undo`,{})).body.review.state,'undone')
+  await r.adopt()
   const read = await r.mcp('resources/read',{uri:'synthetic://record/synthetic-base-1'}); assert.equal(read.result.contents[0]._meta['com.runeditrun/untrusted'],true)
   await r.db.prepare("INSERT INTO test_records VALUES('synthetic-base-hidden','synthetic-base-hidden',1,'hidden')").run()
   const hidden = await r.mcp('resources/read',{uri:'synthetic://record/synthetic-base-hidden'}), missing = await r.mcp('resources/read',{uri:'synthetic://record/synthetic-base-missing'}); assert.deepEqual(hidden.error,missing.error)
   const audit = (await r.person('/agents/api/audit')).body
-  assert.equal(audit.differs_from_policy,0); assert.equal(audit.rows.length,10)
+  assert.equal(audit.differs_from_policy,0); assert.equal(audit.rows.length,13)
   assert.deepEqual(audit.rows[0].ignored_arguments,['classes','confirmExternal','internal']); assert.equal(audit.rows[1].outcome,'replayed'); assert.equal(audit.rows[1].replay_of,audit.rows[0].id)
   assert.ok(audit.rows.every((row:any)=>row.label==='Agent door conformance for Synthetic Person'))
   await r.adopt(); const events = (await r.tool('events.list',{limit:200})).result.structuredContent.events
@@ -103,18 +104,20 @@ test('approval waits, names its person, executes once, rejects, expires and dete
   assert.equal(call.result.resultType,'input_required'); assert.ok(call.result.inputRequests.approval); assert.deepEqual(await rows(r),before)
   assert.equal((await r.tool('records.erase',input)).result.requestState,call.result.requestState)
   assert.equal(code(await r.tool('records.erase',input,{version:'2025-11-25'})),'approval_required')
-  assert.equal((await r.person(`/agents/api/approvals/${id}/approve`,{revision:r.c.revision}, {authorization:`Bearer ${await r.token()}`})).status,403)
-  assert.equal((await r.person(`/agents/api/approvals/${id}/approve`,{revision:r.c.revision})).status,200); assert.deepEqual(await rows(r),[])
+  assert.equal((await r.person(`/agents/api/approvals/${id}/approve`,{revision:r.c.revision,summary_sha256:(await r.person(`/agents/api/approvals/${id}`)).body.approval.summary_sha256}, {authorization:`Bearer ${await r.token()}`})).status,403)
+  assert.equal((await r.person(`/agents/api/approvals/${id}/approve`,{revision:r.c.revision,summary_sha256:(await r.person(`/agents/api/approvals/${id}`)).body.approval.summary_sha256})).status,200); assert.deepEqual(await rows(r),[])
   const completed=await r.tool('records.erase',input), receipt=completed.result._meta['com.runeditrun/receipt']; assert.equal(receipt.approval_id,id); assert.ok(receipt.approved_by.length)
-  await r.person(`/agents/api/approvals/${id}/approve`,{revision:r.c.revision}); assert.deepEqual((await r.tool('records.erase',input)).result.structuredContent,completed.result.structuredContent)
+  await r.person(`/agents/api/approvals/${id}/approve`,{revision:r.c.revision,summary_sha256:(await r.person(`/agents/api/approvals/${id}`)).body.approval.summary_sha256}); assert.deepEqual((await r.tool('records.erase',input)).result.structuredContent,completed.result.structuredContent)
   const rejectedArgs={id:'synthetic-base-2',idempotency_key:crypto.randomUUID()}, rejected=await r.tool('records.erase',rejectedArgs)
-  await r.person(`/agents/api/approvals/${pending(rejected).id}/reject`,{revision:r.c.revision}); assert.equal(code(await r.tool('records.erase',rejectedArgs)),'approval_rejected')
+  await r.person(`/agents/api/approvals/${pending(rejected).id}/reject`,{revision:r.c.revision,summary_sha256:(await r.person(`/agents/api/approvals/${pending(rejected).id}`)).body.approval.summary_sha256}); assert.equal(code(await r.tool('records.erase',rejectedArgs)),'approval_rejected')
   const expArgs={id:'synthetic-base-3',idempotency_key:crypto.randomUUID()}, exp=await r.tool('records.erase',expArgs)
   await r.setNow(r.c.now+3601000); await r.adopt(heldPolicy(),{revision:r.c.revision})
-  assert.equal((await r.person(`/agents/api/approvals/${pending(exp).id}/approve`,{revision:r.c.revision})).body.error,'approval_expired'); assert.equal(code(await r.tool('records.erase',expArgs)),'approval_expired')
+  assert.equal((await r.person(`/agents/api/approvals/${pending(exp).id}/approve`,{revision:r.c.revision,summary_sha256:(await r.person(`/agents/api/approvals/${pending(exp).id}`)).body.approval.summary_sha256})).body.code,'approval_expired'); assert.equal(code(await r.tool('records.erase',expArgs)),'approval_expired')
   const changedArgs={id:'synthetic-base-4',idempotency_key:crypto.randomUUID()}, changed=await r.tool('records.erase',changedArgs)
   await r.db.prepare("INSERT INTO test_records VALUES('synthetic-base-4','synthetic-base-4',1,'internal')").run()
-  await r.person(`/agents/api/approvals/${pending(changed).id}/approve`,{revision:r.c.revision}); assert.equal(code(await r.tool('records.erase',changedArgs)),'approval_evidence_changed')
+  await r.person(`/agents/api/approvals/${pending(changed).id}/approve`,{revision:r.c.revision,summary_sha256:(await r.person(`/agents/api/approvals/${pending(changed).id}`)).body.approval.summary_sha256}); assert.equal(code(await r.tool('records.erase',changedArgs)),'approval_evidence_changed')
+  const changedExecution=(await r.person('/agents/api/audit')).body.rows.find((row:any)=>row.decision_id===decision(changed).id)
+  assert.equal(changedExecution.classes[0].facts.measure,1)
   await r.adopt({...autonomousPolicy(),rules:[{id:'block',class:'*',do:'blocked'}]})
   assert.equal(code(await r.tool('records.erase',{id:'synthetic-base-4',idempotency_key:crypto.randomUUID()})),'policy_blocked'); assert.equal((await rows(r)).length,1)
   const person=(await r.db.prepare('SELECT id FROM oa_operators').first()).id
@@ -155,8 +158,9 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
  const admission = await runtime()
  try {
   await admission.adopt()
-  await admission.db.prepare("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('synthetic-base-admin','synthetic-base-admin@example.com','Synthetic Admin','admin','active',0)").run()
-  const token = await admission.token({ email: 'synthetic-base-admin@example.com' })
+  assert.equal((await admission.settings({team:[{id:'synthetic-base-member',email:'synthetic-base-admin@example.com',name:'Synthetic Admin',role:'admin',invite:0}]})).status,200)
+  await admission.db.prepare("UPDATE oa_operators SET status='active' WHERE id=(SELECT operator_id FROM bs_team WHERE business_id='synthetic-base-member')").run()
+  const token = await admission.token({ sub:'synthetic-base-member',email: 'synthetic-base-admin@example.com' })
   const call = (name: string, arguments_: any) => admission.tool(name, arguments_, { token })
   assert.equal((await call('records.write',args())).result.isError, false)
   assert.equal((await call('records.list',{})).result.isError, false)
@@ -190,7 +194,7 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
  } finally { await local.close() }
  const fresh=await runtime({resourceScope:'resources:read'})
  try {
-  const surface={schema:'rer-agent-surface/1',seed:'synthetic',specialist:'operations',tools:[
+  const surface={escalations:[{id:'self',tool:'synthetic.access.change',args:{id:{$sponsor:'id'}}}],schema:'rer-agent-surface/1',seed:'synthetic',specialist:'operations',tools:[
    {name:'synthetic.records.list',scope:'records:read',readOnly:true,classes:['standard'],clauses:['BASE-AGENT-002']},
    {name:'synthetic.records.write',scope:'records:write',readOnly:false,classes:['standard'],clauses:['BASE-AGENT-002']},
    {name:'synthetic.records.erase',scope:'records:write',readOnly:false,classes:['destructive'],clauses:['BASE-AGENT-006']},

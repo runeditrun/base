@@ -6,4 +6,4 @@ export class ToolRefusal extends Error {
   }
 }
 export const json = (value: unknown, status = 200, headers: HeadersInit = {}) => Response.json(value, { status, headers: { 'cache-control': 'no-store', ...headers } })
-export const error = (code: string, status = 400, fields: Record<string, unknown> = {}) => json({ error: code, ...fields }, status)
+export const error = (code: string, status = 400, fields: Record<string, unknown> = {}) => json({ code, ...fields }, status)

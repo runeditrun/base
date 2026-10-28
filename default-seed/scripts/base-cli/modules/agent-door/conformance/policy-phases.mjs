@@ -5,6 +5,13 @@ import { errorCode } from './protocol.mjs';
 export async function unsetPolicy(c, initial = false) {
  const listed = await c.mcp('tools/list');
  c.add(`BASE-AGENT-007.2.${initial ? 'initial' : 'removed'}.list`, isDeepStrictEqual(listed.result?.tools, []), 'An unanswered door must list no tools.');
+ if (initial) {
+  const inventory = await c.personJson('/agents/api/agents');
+  const sponsor = inventory.agents?.find(agent => agent.id === c.agentId)?.sponsor;
+  c.add('BASE-AGENT-004.6.sponsor', typeof sponsor?.id === 'string' && sponsor.id.length > 0, 'The native person agents inventory must identify the authenticated agent sponsor.');
+  if (!sponsor?.id) throw new Error('Cannot resolve native sponsor ID from the person agents door');
+  c.sponsor.id = sponsor.id;
+ }
  for (const step of c.surface.journey) {
   // Admission under an absent policy precedes argument use. No prior result
   // exists in this phase; references are inert, invalid record identifiers.

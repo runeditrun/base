@@ -26,7 +26,7 @@ or reset installation remains empty for archive restore.
 | `POST /agents/api/agents/:id/revoke` | Owner revocation of a recorded agent. |
 | `GET` / `PUT /agents/api/policy` | Standalone owner policy read and complete-document confirmation; PUT body `{"document":{...}}`. Paired policy is managed by Business. |
 | `POST /agents/api/pause` | Owner local Pause; body `{"paused":true}` or `false`. |
-| `GET /agents/api/approvals[/:id]`, `POST /agents/api/approvals/:id/approve` or `/reject` | Pending reads and named-person decisions; POST body includes the exact saved `revision`. |
+| `GET /agents/api/approvals[/:id]`, `POST /agents/api/approvals/:id/approve` or `/reject` | Pending reads and named-person decisions; POST body includes the exact saved `revision` and `summary_sha256`. |
 | `GET /agents/api/reviews`, `POST /agents/api/reviews/:id/reviewed`, `/flag` or `/undo` | Review list, person marks and native reversal where supported. |
 
 Person API mutations require the application Origin and native person session;
@@ -45,8 +45,14 @@ served. [MCP transport](https://modelcontextprotocol.io/specification/2026-07-28
 defines these wire fields.
 
 Tools declare input and output schemas, scope, possible classes, contract clauses,
-server classification and their native action. Resource readers enforce current
+server classification and their native action. Every mutating tool also declares a
+server-computed `summary`; access and security tools require `authority`. Tools
+with a `cost` member are rejected until provider spend is enforced. Resource
+readers declare catalogue `classes` and classify the record they read; their
+reads pass through policy, review, approval and audit. They enforce current
 native visibility; unknown and invisible records share the unavailable result.
+The reference raw people read tools conservatively carry `sensitive` because
+they expose native detail fields; its workspace witness returns fingerprints.
 External content can carry untrusted result metadata:
 
 ```json
@@ -57,11 +63,18 @@ use the same execution pipeline and audit attribution.
 
 Business access tokens are ES256 `at+jwt` credentials verified against existing
 owner-claim trust, with the canonical MCP audience, sponsor, agent, scopes and
-at most 15 minutes' lifetime. Resolve the sponsor's current account on each
-request. Local credentials require an explicit edition adapter; a rejected
+at most 15 minutes' lifetime and a required `consent` id. Resolve `sub` only
+through the durable Business-person mapping, never the token's email. Business
+must send settings `owner_id` and team `id` values equal to token `sub` before
+minting access tokens. `operatorAuthPeople` uses the module-owned settings
+mapping and re-reads each native operator with the same admission predicate as
+native sessions, including `AUTH_ALLOW_LIST`. Later reads use `people.person(id)`;
+changes of email cannot transfer an agent or pending approval. Local credentials require an explicit edition adapter; a rejected
 recognizable Business credential cannot fall through to it. Local credential
-issuance and Business consent revocation propagation remain adopter and platform
-work.
+issuance remains adopter work. A signed envelope may include
+`revoked: { agents: string[], consents: string[] }`; these refuse the next call
+and expire affected pending approvals. Business delivery of those lists remains
+platform work.
 
 The policy catalogue, validator and decision function derive from platform
 commit `72aa71c03d943b53ed43dc73cac17d412c00d8fb`, paths
@@ -75,7 +88,12 @@ Signed policy adoption verifies the existing owner-claim issuer, app audience,
 installation subject, ring and revision signature. A greater sequence replaces
 the envelope; equal sequence with later issue time refreshes it. The closed
 answer is `{"adopted":{"seq":n,"revision":r},"door":{"classes":[{"class":"standard","tools":["seed.area.verb"]}]}}`,
-where `revision` can be null. Invalid input leaves the last valid state intact.
+where `revision` can be null. Resources also contribute declared classes. A
+Business rule with `max_per_day` must name a `seed`; unscoped daily limits are
+refused as `policy_document_invalid` with the rule's `.seed` path, because this
+installation cannot reserve company-wide usage. A named `person:` ref must
+resolve to an active mapped Business person at adoption. Paired approver and
+reviewer refs use Business member ids and roles, independent of native roles. Invalid input leaves the last valid state intact.
 Expired adopted policy refuses agent work; unpairing uses the retained local
 document, or leaves policy unset. Adoption delivery and the paired computer's
 self-host transport are outside this module.
@@ -86,12 +104,22 @@ when the client advertises URL elicitation, an `inputRequests` map whose
 Retry the original call with a new JSON-RPC ID and unchanged state; URL or form
 `accept` is not a person's approval. The legacy path returns
 `approval_required` with the pending URL instead. Actual named-person approval
-is checked through the person door.
+is checked through the person door. The saved summary and its canonical JSON
+SHA-256 identify exactly what the person decides. Missing or stale hashes get
+`approval_summary_mismatch`. The final approval state is `executed` or `refused`
+(with its code), alongside `pending`, `rejected` and `expired`; completion has its
+own audit row linked by `decision_id`. Approved runs expose `ctx.approvers`.
+Undo is a reviewer act with `UndoContext.agent: null` and a person actor.
 
 Mutating tools require `idempotency_key`; `expected_revision` is optional for
 tools with native revision lookup. Same agent and key and arguments return the
 recorded outcome; changed arguments conflict. Recorded outcomes are retained
-indefinitely. Native actions still own their transaction guards and recovery.
+indefinitely. A `running` audit row, usage reservation and idempotency claim commit in one
+D1 batch before execution. The recorded outcome precedes finalising that row.
+A replay completes a non-final audit from the durable outcome; without an outcome
+it returns `call_in_progress` and runs nothing. Every attempt captures its key,
+traceparent and ignored argument names before early policy refusals. Native
+actions still own their transaction guards and recovery.
 Admission reservations prevent concurrent calls from exceeding daily policy sums; an admission lease cannot execute after it loses its fence. `decision_busy` and `call_in_progress` refuse overlapping admissions without an effect. An unexpected execution failure keeps the key claimed because the native action may have committed; the edition must reconcile that action before recovery. The module does not supply a generic long-job executor.
 
 ## Errors and capacity
@@ -115,7 +143,15 @@ The tool error metadata has this shape:
 {"_meta":{"com.runeditrun/error":{"code":"policy_unset"}}}
 ```
 
-Stable tool refusal codes are `policy_unset` (with `unanswered` and `setup_url`), `policy_unavailable`, `policy_blocked` (class, rule and revision), `approval_required` (legacy clients), `approval_rejected`, `approval_expired`, `approval_evidence_changed`, `self_escalation`, `agents_paused`, `idempotency_key_required`, `idempotency_conflict`, `revision_conflict` (with `current_revision`), `invalid_arguments` and `output_invalid`. Native `ToolRefusal` codes pass through unchanged. Local policy returns `policy_document_invalid` with `path`, `policy_incomplete` with `problems`, or `policy_managed_by_business`.
+Stable tool refusal codes are `policy_unset` (with `unanswered` and `setup_url`), `policy_unavailable`, `policy_blocked` (class, rule and revision), `approval_required` (legacy clients), `approval_rejected`, `approval_expired`, `approval_evidence_changed`, `self_escalation`, `agents_paused`, `idempotency_key_required`, `idempotency_conflict`, `revision_conflict` (with `current_revision`), `invalid_arguments` and `output_invalid`. Native `ToolRefusal` codes pass through unchanged. Person, local policy and adoption JSON refusals use `{ "code": "..." }`.
+Local policy returns `policy_document_invalid` with `path`, `policy_incomplete` with `problems`, or `policy_managed_by_business`.
+
+Provider spend caps are **not enforced**. Standalone saves containing
+`spend.caps` return 409 `spend_caps_not_enforced`; `{ none: true }` works.
+Business documents retain their contract and can carry caps, but state reports
+`policy.spend_caps: "not_enforced"` and the Agents page displays that gap.
+The state is `"none"` for an explicit no-cap answer and null without a spend answer.
+Estimates, reservations and `budget_exhausted` remain follow-up work.
 
 Default MCP capacity is **600 requests per minute per agent** and
 **1,048,576 body bytes**, configurable through `limits`. These protect request
@@ -138,7 +174,7 @@ Module tests under `tests/`, this reusable journey and an edition's integrated
 browser and native journey are separate evidence.
 
 Remaining work includes full clause and tier and role and UI parity, grant narrowing,
-Business consent revocation, provider-spend caps and byte budgets, long jobs,
+Business revocation delivery, provider-spend caps and byte budgets, long jobs,
 outside-mail attribution, standalone credential issuance,
 self-host delivery, stranger-specialist completion, generated agent docs, and
 adoption of this shared policy source by the platform. Editions must report

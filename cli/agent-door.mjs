@@ -3,6 +3,7 @@ import { readFile, realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { runAgentDoorConformance } from '../modules/agent-door/conformance/index.mjs';
 import { validateAgentSurface } from '../modules/agent-door/conformance/surface.mjs';
+import { seconds, signJws } from '../modules/agent-door/conformance/crypto.mjs';
 import { readAgentSurface } from './agent-surface.mjs';
 import { HOSTED_ORIGIN, serveHosted } from './hosted-output.mjs';
 import { agentConformanceNetwork } from './agent-network.mjs';
@@ -26,14 +27,17 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  if (!validation.ok) return finish(validation, report);
  const manifest = setupManifest ?? JSON.parse(await readFile(join(root, 'rer-setup.json'), 'utf8'));
  const claim = manifest.steps?.find(step => step.type === 'owner-claim');
- const token = randomBytes(32).toString('hex'), kid = randomUUID(), installationId = randomUUID();
+ const token = randomBytes(32).toString('hex'), kid = randomUUID(), installationId = randomUUID(), sub = randomUUID();
+ const business = 'rer-agent-conformance';
  const issuer = `https://synthetic-base-1-${randomUUID()}.invalid`;
  const pair = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
  const { kty, crv, x, y } = await webcrypto.subtle.exportKey('jwk', pair.publicKey);
+ const publicKeys = { [kid]: { kty, crv, x, y, kid, alg: 'ES256', use: 'sig' } };
  const hosted = await serveHosted(root, { declaration, outboundService: agentConformanceNetwork, bindings: {
   RER_OWNER_CLAIM_ISSUER: issuer, RER_OWNER_CLAIM_INSTALLATION_ID: installationId,
   RER_OWNER_CLAIM_APP_ORIGIN: HOSTED_ORIGIN,
-  RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify({ [kid]: { kty, crv, x, y, kid, alg: 'ES256', use: 'sig' } }),
+  RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(publicKeys),
+  RER_BUSINESS_TRUST: JSON.stringify({ v: 1, issuer, audience: HOSTED_ORIGIN, subject: installationId, email, keys: publicKeys }),
   OWNER_EMAIL: email, SETUP_TOKEN: token,
   ...(claim?.emailField ? { [claim.emailField]: email } : {}),
   ...(claim?.tokenField ? { [claim.tokenField]: token } : {}),
@@ -58,8 +62,18 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   const cookie = bootstrap.headers.getSetCookie().map(value => value.split(';', 1)[0]).join('; ');
   await bootstrap.body?.cancel();
   if (bootstrap.status !== 303 || bootstrap.redirected || !cookie) return finish({ ok: false, points: [...validation.points, { id: 'BASE-AGENT-001.owner-bootstrap', ok: false, detail: `Native owner bootstrap returned HTTP ${bootstrap.status}${!cookie ? ' without a session cookie' : ''}.` }] }, report);
+  const iat = seconds();
+  const settings = await signJws(pair.privateKey, kid, 'rer-business-settings+jwt', {
+   v: 1, iss: issuer, aud: hosted.origin, sub: installationId, business, email, owner_id: sub,
+   jti: randomUUID(), iat, exp: iat + 300, rev: 1, values: {}, logo: null, team: null,
+  });
+  const paired = await request(new URL('/api/rer/business-settings', hosted.origin).href, {
+   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings }),
+  });
+  let ack; try { ack = await paired.json(); } catch {}
+  if (!paired.ok || ack?.rev !== 1) return finish({ ok: false, points: [...validation.points, { id: 'BASE-AGENT-004.business-owner-binding', ok: false, detail: `Signed Business owner binding returned HTTP ${paired.status} without the expected acknowledgement.` }] }, report);
   const result = await runAgentDoorConformance({ fetch: request, origin: hosted.origin, surface: declared.surface,
-   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: { email, cookie },
+   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: { email, cookie, sub }, business,
   });
   return finish(result, report);
  } finally { await hosted.close(); }

@@ -62,8 +62,19 @@ person session and Origin and CSRF controls. The [route and capacity reference](
 lists the owned paths and defaults; these are request capacities, not company
 policy limits.
 
-Use `operatorAuthPeople({db, session})` to connect live operator accounts. Pass
-the edition's native session reader as `session`. Sponsorship is resolved from
+Use `operatorAuthPeople({db, session, allowList})` to connect live operator accounts. Pass
+the edition's native session reader as `session` and the same parsed
+`AUTH_ALLOW_LIST` native session admission uses. Copy the additive
+`modules/business-settings/schema/0002_business_people.sql` into a new migration
+as well as adopting the Business settings module. Business sends `owner_id` and
+team `id` before minting access tokens, using the same Business person id as
+`sub`. `people.sponsor({sub})` resolves only through that durable mapping; token
+email never selects a local account. Implement `people.person(id)` to re-read
+native ids for approval execution, Undo, embedded agents and subscriptions.
+Expose `businessMember(person)` from the same mapping for paired policy refs:
+Business owner is owner, Business team admin is editor, member has no policy
+role. The native role may differ. Local credentials return `sponsor: { id }`,
+read by `people.person`, rather than an address. Sponsorship is resolved from
 current native people on each request; an unknown or inactive sponsor cannot
 act. A saved token never replaces this account check. Keep native permissions,
 resource ownership and business invariants inside each tool's native service.
@@ -85,6 +96,25 @@ Declare each tool's input and output JSON Schemas, scope, policy classes and
 contract clauses. Classify the exact proposed effects before execution, using
 native facts and units. Add only the native actions the edition supports and
 retain native validation, access checks, transaction boundaries and audit.
+Mutating tools require a server-computed `summary(args,ctx)` describing target,
+recipients, amount, payee, role or item names. Read summaries retain declared
+arguments or the resource URI. Approval views expose `summary` and
+`summary_sha256`; approval and rejection send both that hash and `revision`.
+Approved native actions receive `ctx.approvers`, while the agent remains the
+preparer. Native reversal receives `UndoContext`: the reviewer is `person`,
+`agent` is null, and `actor.kind` is person.
+
+Tools declaring access or security require `authority(args,ctx)`, returning the
+authority subject and whether the proposed change widens it. Name the native
+person id, email or agent id; the door normalises these and refuses self-widening
+before classification and again at approval execution. Return null only when
+no standing authority is changed. Other people's changes still follow policy.
+Declare `escalations: [{ id, tool, args }]` in `agent-surface.json`, covering each
+access or security tool. Use `{ "$sponsor": "id" }` or
+`{ "$sponsor": "email" }` as argument values; the conformance journey resolves
+these and requires `self_escalation` with an unchanged native witness. Retain a
+journey call proving an ordinary narrowing change too.
+
 Return resource references for outcomes the user can inspect. Supply undo only
 when the native action has a real reversal; review and approval do not invent one.
 
@@ -98,7 +128,9 @@ edition with a different domain. Use `door.invoke` for embedded agents and
 `door.emit` after native person changes so both enter the same event vocabulary.
 
 Expose resources through explicit readers and treat imported or external
-content as untrusted. A resource read must enforce the current person's native
+content as untrusted. Every resource declares non-empty catalogue `classes`
+and `classify(record,ctx)`, based on the record itself. Resource reads pass through
+the same policy, approval, review and audit path as tools. A resource read must enforce the current person's native
 access. Mark device, screen, connector, import-door and installation operations
 as outside the tool registry when they require another supported door.
 
@@ -111,13 +143,15 @@ ESM against the pinned CLI; it must not depend on TypeScript loading or the
 application's bundler.
 
 `conformance/index.mjs` exports `runAgentDoorConformance`. Connect its fetch,
-canonical origin, Agent surface, test-only signer and signed-in test person to
+canonical origin, Agent surface, test-only signer and `{email,cookie,sub}` to
 a disposable real installation with the edition's actual D1 schema and native
 actions. Never include test signer material or fixture authority in production.
 The harness's stable point prefixes describe its implemented checks; they do
 not mean every baseline clause has been exercised. Module tests under `tests/`
 are separate from this installation journey and the edition's browser and UI parity
-work. Retain explicit gaps for Business consent propagation, spend and byte budgets,
+work. `rer verify` pairs its per-run ring through `RER_BUSINESS_TRUST`, posts a
+real signed settings document with the owner's Business `owner_id`, then mints
+journey tokens carrying that subject and `consent`. No setup-mode bypass exists. Retain explicit gaps for Business consent propagation, spend and byte budgets,
 long jobs, grant narrowing, outside mail, standalone policy forms and token
 issuance, self-host delivery and stranger-specialist completion. Platform adoption
 of the shared policy source is also separate from copying it into an edition.
@@ -128,3 +162,17 @@ resources, audit, subscriptions and retained outcomes. Keep successful and
 failed outcome evidence for at least 24 hours. This module currently retains it
 indefinitely; adoption must not introduce earlier cleanup. Report the exact
 edition behavior verified, separately from Base module or CLI results.
+
+## Interim policy boundaries
+
+Do not register provider `cost`: construction refuses it until spend reservations
+are enforced. Standalone `spend.caps` cannot be saved. A paired Business document
+can contain caps but state and the page plainly report that they are not enforced.
+Only seed-scoped `max_per_day` rules can be adopted from Business; company-wide
+reservation requires a future Business door. Business `person:` references must
+map to active local people at adoption. Business role references use the mapping,
+so promoting a seed admin does not confer Business approval authority.
+
+Business can revoke agents or consents in the signed envelope's optional
+`revoked` lists. Tokens require `consent`; affected pending approvals expire and
+execution rechecks revocation. Retain both these lists and historical attribution.

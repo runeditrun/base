@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.gea73c7da",
+  "cliVersion": "0.2.85-dev.g0cad22d3",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -387,7 +387,7 @@
     },
     "cli/agent-door.mjs": {
       "source": "cli/agent-door.mjs",
-      "sha256": "2277a0d82e57be19689dfa59da42860c48553ae04879132c3a05d4d1b465dbcf"
+      "sha256": "aa581d202181f87f1d776217b698ec52c56cd2bfe47b6b88cd3df5264aa7973d"
     },
     "cli/agent-network.mjs": {
       "source": "cli/agent-network.mjs",
@@ -1819,11 +1819,11 @@
     },
     "modules/agent-door/conformance/audit.mjs": {
       "source": "modules/agent-door/conformance/audit.mjs",
-      "sha256": "f2fcb4c19ef02cad1f84626d42f7bc19d3bd667afcbab58d04a0247753429435"
+      "sha256": "d33ca5825155b5e49051771ec7766f43d69c6c906a49e13083edc386861ba5f3"
     },
     "modules/agent-door/conformance/crypto.mjs": {
       "source": "modules/agent-door/conformance/crypto.mjs",
-      "sha256": "5738105de8ac2821035b73824e5840fc90795e7510caac36ccb771f23ca1f6c9"
+      "sha256": "4a073f879668dd3ee3e31bb74d8cbdf48c5fdd7e7a7303b7bab2b998258d341e"
     },
     "modules/agent-door/conformance/discovery.mjs": {
       "source": "modules/agent-door/conformance/discovery.mjs",
@@ -1831,11 +1831,11 @@
     },
     "modules/agent-door/conformance/index.mjs": {
       "source": "modules/agent-door/conformance/index.mjs",
-      "sha256": "7023fcb38b62d79c0ddc9ee4f9c4e6bc3014b67ff887ee7173e7df9c30adf4c0"
+      "sha256": "f09ffcea0c9e3d2213fa5aa204255a99fba50de6abde1623e5bbcda295944296"
     },
     "modules/agent-door/conformance/journey.mjs": {
       "source": "modules/agent-door/conformance/journey.mjs",
-      "sha256": "59c89b6c8560e4e3c65bf26c0a9168970a431578de174854e1295ebbfbde15c3"
+      "sha256": "8702611a1c5ab03a3ac73bf1add691c90e688041942c6d75cebb1fc0bd3bfc54"
     },
     "modules/agent-door/conformance/negative.mjs": {
       "source": "modules/agent-door/conformance/negative.mjs",
@@ -1843,11 +1843,11 @@
     },
     "modules/agent-door/conformance/policy-phases.mjs": {
       "source": "modules/agent-door/conformance/policy-phases.mjs",
-      "sha256": "61f4f342524bc282b3458c553a7a29bac620a53199ff42c774cd9813763d9c38"
+      "sha256": "ef1f261fd2bcbdde841eb4fd7323dcc2b0436f49a2bf2a961c798ebebd2c45e7"
     },
     "modules/agent-door/conformance/protocol.mjs": {
       "source": "modules/agent-door/conformance/protocol.mjs",
-      "sha256": "cb8631611e8344e605a2fc948c06265ee81e44f2ae37eb41e46fcce3edda568a"
+      "sha256": "3d56ba08bc0e3af37b134f766621ab184e978879740b8afa3e408ba37a275664"
     },
     "modules/agent-door/conformance/schema.mjs": {
       "source": "modules/agent-door/conformance/schema.mjs",
@@ -1855,7 +1855,7 @@
     },
     "modules/agent-door/conformance/surface.mjs": {
       "source": "modules/agent-door/conformance/surface.mjs",
-      "sha256": "84addba3b3c331fd44a383957791fcd783f00fe820e9041b51c34f80ea2f61f5"
+      "sha256": "e17d57994f839decacbb9d8e749e7d2aef53e3fe57a138c8bb11b8d8dec52d19"
     },
     "modules/ai/LICENSE": {
       "source": "modules/ai/LICENSE",
