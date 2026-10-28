@@ -8,6 +8,7 @@ import { managedEntries, managedZip, managedTriggerSQL, managedPolicyModule } fr
 import { splitStatements } from '../modules/portability/sql-text.mjs';
 import { managedDataLimits } from './managed-data-zip.mjs';
 import { archiveRecords, remakeArchive } from './fixtures/archive-records.mjs';
+import { managedDerivedJourney } from './fixtures/managed-derived.mjs';
 
 async function managedFixture(t) {
  const fixture=await portabilityFixture(t);
@@ -193,7 +194,7 @@ test('a Managed installation leaves for native: its Platform-ledger export maps 
 
 });
 
-test('a Platform history that is not this checkout\'s refuses with its migration named and the fix',{timeout:15*60_000},async t=>{
+test('Platform history refusals, legacy readers and Managed derived indexes use public restore doors',{timeout:15*60_000},async t=>{
  const {source,directory}=await managedSource(t),target=await managedFixture(t);
  await source.run(['export','--output','exports/managed.rer']);
  const records=archiveRecords(await readFile(join(source.root,'exports/managed.rer'),'utf8'));
@@ -218,4 +219,5 @@ commandAdapter.portability.import = async ({ path }) => {
  await writeFile(join(target.root,'exports/legacy.json'),JSON.stringify({kind:'synthetic-base-14'}),{mode:0o600});
  assert.equal((await target.run(['import','--input','exports/legacy.json','--yes'])).at(-1).legacyJSON,'synthetic-base-14');
  t.diagnostic('Legacy JSON reader: public rer import exit=0');
+ await managedDerivedJourney(t);
 });

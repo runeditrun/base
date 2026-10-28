@@ -46,12 +46,13 @@ export function managedZip(entries) {
 
 // Synthetic data from the existing runnable reference fixture. Schema and rows
 // are read through its database command, in the same SQL shape as the producer.
-export async function managedEntries(source) {
+export async function managedEntries(source, { omitTables = [] } = {}) {
  const query = async sql => (await localD1(source.root, sql))[0].results;
  const schema = await query("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE sql IS NOT NULL AND substr(lower(name), 1, 7) <> 'sqlite_' AND substr(lower(name), 1, 4) <> '_cf_' ORDER BY rowid");
  let sql = 'PRAGMA defer_foreign_keys=ON;\n';
- for (const table of schema.filter(row => row.type === 'table')) {
-  sql += table.sql + ';\n';
+ const tables = schema.filter(row => row.type === 'table' && !omitTables.includes(row.name));
+ for (const table of tables) sql += table.sql + ';\n';
+ for (const table of tables) {
   const columns = (await query(`PRAGMA table_xinfo(${quote(table.name)})`)).filter(column => !column.hidden);
   const rows = await query(`SELECT ${columns.map((column, i) => `quote(${quote(column.name)}) AS ${quote('c' + i)}`).join(',')} FROM ${quote(table.name)} ORDER BY rowid`);
   for (const row of rows) sql += `INSERT INTO ${quote(table.name)} VALUES(${columns.map((_, i) => row['c' + i]).join(',')});\n`;

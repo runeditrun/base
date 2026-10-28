@@ -18,6 +18,7 @@ import { replayStatements } from './backfills.mjs';
 import { checkArchivedLedgers, archivedHistory } from './ledgers.mjs';
 import { legacyEmptyGuards, legacyAuditStatements, requireLegacyEmpty } from './legacy-safety.mjs';
 import { checkReferences } from './references.mjs';
+import { rebuildDerivedStatements } from './derived.mjs';
 // ledgers: the rows of each migration ledger table the archive carries, as the
 // caller read them from it ({table:rows}); uploadPart binds them to its parts.
 export async function createImport(context,manifest,actor='direct',legacyRecovery,ledgers,acknowledgeUnverifiedSchemaObjects=false) {
@@ -221,6 +222,7 @@ async function finalizeLeasedImport(context,id,{contentHash,archiveHash,laterJou
       insist(hash.digest()===object.sha256,'object_write_checksum');
     }
     for(const payload of manifest.payloads)await config.extraPayloads[payload.name].consume(binaryStream(context,id,payload,binaryIndexes),payload);
+    const derived=await rebuildDerivedStatements(db,config);
     row.phase='complete';row.metadata.contentHash=digest;
     if(row.metadata.schemaUnverified)row.metadata.schemaUnverified.archiveHash=archiveHash;
     await db.batch([db.prepare('PRAGMA defer_foreign_keys=ON'),...emptyGuards(context,row,seeded),...seeded.map(t=>guard(db,...seededCondition(t))),...dependentGuards,...legacyEmptyGuards(db,row),
@@ -229,7 +231,7 @@ async function finalizeLeasedImport(context,id,{contentHash,archiveHash,laterJou
       ...row.metadata.triggers.map(t=>db.prepare(`DROP TRIGGER ${quote(t.name)}`)),
       ...replaced.map(t=>db.prepare(`DELETE FROM ${quote(t)}`)),
       ...row.metadata.targets.flatMap(t=>restoreCopy(db,t,row.metadata.copies[t.name])),save(db,row),...replayStatements(db,row),
-      ...row.metadata.triggers.map(t=>db.prepare(t.sql)),...mergeJournal(db,manifest,checked),...legacyAuditStatements(db,row),
+      ...row.metadata.triggers.map(t=>db.prepare(t.sql)),...derived,...mergeJournal(db,manifest,checked),...legacyAuditStatements(db,row),
       // Publication and removal of this import's scratch commit together. A lost
       // acknowledgement still finds a complete job with no staging left behind.
       ...dropCopyStatements(db,row),
