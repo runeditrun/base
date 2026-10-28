@@ -134,6 +134,40 @@ the same policy, approval, review and audit path as tools. A resource read must 
 access. Mark device, screen, connector, import-door and installation operations
 as outside the tool registry when they require another supported door.
 
+## Durable invocation consent
+
+Persist the originating `ctx.consent` alongside the native sponsor id, agent
+attribution, tool, arguments and idempotency key when preparing scheduled or
+durable work. The trusted worker later calls the public door with that saved
+identity:
+
+```ts
+const result = await door.invoke(job.tool, job.args, {
+  person: { id: job.sponsorId }, agent: job.agent, consent: job.consent,
+})
+```
+
+`invoke` re-reads the native person; saved role or email is unnecessary. Consent
+is optional for work that originated independently of Business consent. Work
+prepared under a consent must retain that exact id rather than omit or replace
+it at execution. The door puts it on the Principal and `ToolContext`, re-reads
+current signed revocations at worker admission and fences execution reservation
+against revocation. A revoked consent returns
+`{outcome: 'refused', code: 'consent_revoked'}` without calling the native effect.
+Both successful and refused invocation audit rows include `consent`, agent,
+sponsor, tool, time, policy revision and outcome. The edition owns its scheduler
+and native transaction boundaries; retain that result with the job.
+
+The shared `runAgentDoorConformance` journey accepts an optional
+`invoke(name,args,who)` callback wired to that same trusted worker door. `who`
+carries `{person: {id}, agent, consent}`. The module's journey uses it to run
+serialized job input, prove a native effect and consent-attributed audit, then
+revoke the consent before admitting saved work and prove `consent_revoked`,
+a complete refusal audit and an unchanged native witness. Supply this callback
+in the edition's integrated module journey; no production test route is needed.
+The HTTP-only CLI journey checks signed consent revocation and audit attribution
+separately, without claiming to run the edition's scheduler.
+
 ## Keep runtime and CLI evidence separate
 
 The copied module is application runtime source pinned by `base-copies.json`.
@@ -162,6 +196,101 @@ resources, audit, subscriptions and retained outcomes. Keep successful and
 failed outcome evidence for at least 24 hours. This module currently retains it
 indefinitely; adoption must not introduce earlier cleanup. Report the exact
 edition behavior verified, separately from Base module or CLI results.
+
+## Verification owner lifecycle
+
+`rer verify` reads the same `rer-setup.json` owner-claim step as installation.
+For `mode: "signed"` it signs a fresh five-minute `rer-owner-claim+jwt` with
+the disposable installation's per-run key, matching its configured issuer,
+installation ID, origin and owner email. It posts that claim to the declared
+path through the production handler. Setup-token mode retains the native token
+POST. No production key is read, and signed admission still rejects raw tokens.
+
+Seeds with a native initializer or a different owner binding declare this in
+`agent-surface.json`:
+
+```json
+{
+  "verification": {
+    "owner": {
+      "email": "synthetic-owner@example.com",
+      "emailField": "SETUP_OPERATOR_EMAIL",
+      "tokenField": "H2H_SETUP_TOKEN",
+      "bindings": {
+        "RER_MANAGEMENT_ORIGIN": "issuer",
+        "RER_INSTALLATION_ID": "installationId"
+      },
+      "initializer": "tests/initialize-agent-owner.mjs"
+    }
+  }
+}
+```
+
+All keys are optional. Email defaults to `synthetic-base-1@example.com`;
+the manifest's email and token fields are always bound too. The initializer is
+a contained seed module default-exporting an async function receiving
+`{request, origin, email, sub, displayName, token, claim, returnTo}`. `claim` is
+`{mode, path, token}` with the signed credential when signed mode is declared;
+`token` is the private per-run setup token. Use `request(absoluteURL, init)` to
+drive the seed's real project/password, owner and member-linking lifecycle.
+It permits only the fresh hosted origin. Return the native final 303 `Response`
+with its session cookies; then the runner posts the signed Business settings
+document and runs the journey. Never create an owner with direct SQL, substitute
+an auth adapter, or add a verification-only production route. Initializer code
+runs as trusted test tooling in Node; it must use the supplied request function
+and must not contact providers or read real credentials.
+
+`bindings` maps native environment binding names to the verifier's per-run
+values: `issuer` (the issuer origin), `installationId`, `appOrigin`, `publicKeys`
+(the JSON public key ring), `email`, `sub` (the owner's Business person id),
+`token` (the setup token), or `sessionSecret` (a fresh session signing secret).
+Only named native bindings are added, for that disposable runtime only; existing
+Base verifier bindings and manifest email/token fields remain available. Nothing
+is written to the seed's environment files. Tokens and sessions are never printed.
+These aliases configure the seed's existing admission and do not bypass signed
+claim verification. For a signed seed needing just its native issuer and
+installation names, declare the two `bindings` above without an initializer.
+
+## Verification provider edges
+
+`agent-surface.json.verification.network` declares an optional test-only edge:
+
+```json
+{
+  "module": "tests/provider-edge.mjs",
+  "origins": ["https://api.openai.com", "https://receiver.example.invalid"]
+}
+```
+
+The contained ES module default-exports `{async fetch(request) { ... }}`.
+It receives the full Web `Request`: method, exact URL, headers and raw body,
+and returns a Web `Response`, including JSON or a streaming body. Relative
+helper imports are supported. Run the seed's own signature/payload validation
+and return realistic provider receipts here; keep native preparation, permission
+checks, state commits and receipt validation in the application.
+The module runs in an isolated workerd with no application bindings, Node
+capabilities or network access. Its own `fetch` requests are denied, including
+requests to declared origins. Only declared exact origins reach the module;
+other outbound effects receive HTTP 502. Built-in Resend, SendGrid and Cloudflare
+mail adapters remain available by default. Never place production credentials
+in this declaration or ship the test adapter as application authority.
+
+## Base source from an archive
+
+A plain directory export can supply the source without a Base Git checkout:
+
+```sh
+node node_modules/@runeditrun/rer/edition-authoring/cli.mjs record-base src/base/modules/agent-door modules/agent-door --base-archive /absolute/base-export --ref FULL_BASE_COMMIT
+rer refresh-base --base-archive /absolute/base-export --ref FULL_BASE_COMMIT
+```
+
+Use the full 40-character commit SHA from the authenticated archive acquisition.
+The directory must preserve Base's paths and executable modes. It is the source
+at that declared SHA; the CLI cannot authenticate an archive's commit without
+Git history. Copy mapping and byte digests follow the same rules as a checkout.
+History-dependent refresh operations require the historical source evidence
+described in the [authoring guide](../../edition-authoring/README.md); they fail
+closed when that evidence is absent.
 
 ## Interim policy boundaries
 

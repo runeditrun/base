@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { classIds } from './protocol.mjs';
 import { AGENT_CLASSES } from './surface.mjs';
 
-async function auditRows(c) {
+export async function auditRows(c) {
  const rows = []; let cursor = null, differs = 0;
  for (let page = 0; page < 100; page++) {
   const result = await c.personJson(`/agents/api/audit?agent=${encodeURIComponent(c.agentId)}${cursor ? `&after=${encodeURIComponent(cursor)}` : ''}`);
@@ -19,7 +19,7 @@ export async function auditPhase(c) {
  c.add('BASE-AGENT-009.1.unique', new Set(rows.map(row => row.id)).size === rows.length, 'Every tool call, resource read and approval execution must have its own audit ID.');
  for (const [index, call] of expected.entries()) {
   const row = rows[index], decision = call.decision;
-  c.add(`BASE-AGENT-009.1.call.${index}`, Boolean(row) && row.tool === call.name && row.agent?.id === c.agentId && row.agent?.specialist === c.surface.specialist && row.sponsor?.id === c.sponsor.id && typeof row.label === 'string' && row.label.includes(' for ') && Number.isFinite(Date.parse(row.at)) && row.door === 'mcp', `${call.name} lacks its complete ordered audit row.`);
+  c.add(`BASE-AGENT-009.1.call.${index}`, Boolean(row) && row.tool === call.name && row.consent === c.consent && row.agent?.id === c.agentId && row.agent?.specialist === c.surface.specialist && row.sponsor?.id === c.sponsor.id && typeof row.label === 'string' && row.label.includes(' for ') && Number.isFinite(Date.parse(row.at)) && row.door === (call.kind === 'embedded' ? 'embedded' : 'mcp'), `${call.name} lacks its complete ordered audit row.`);
   if (!row) continue;
   c.add(`BASE-AGENT-009.1.resource.${index}`, row.resource === (call.kind === 'resources/read' ? call.args.uri : null), `${call.name} audit resource must identify exactly the requested URI, or be null for a tool.`);
   c.add(`BASE-AGENT-009.2.link.${index}`, call.kind === 'approval/execute' ? row.id !== decision?.id && row.decision_id === decision?.id : row.decision_id === null, `${call.name} must ${call.kind === 'approval/execute' ? 'link its own execution row to the pending decision' : 'have its own call row without an approval execution link'}.`);

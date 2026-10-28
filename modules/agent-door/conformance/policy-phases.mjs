@@ -62,3 +62,14 @@ export async function pausePhase(c) {
  await c.adopt(autonomousPolicy());
  c.add('BASE-AGENT-011.6.resume', isDeepStrictEqual(before, await c.witness()), 'Pause calls changed native state, or resume did not restore access.');
 }
+
+export async function consentRevocationPhase(c) {
+ await c.adopt(autonomousPolicy());
+ const before = await c.witness();
+ await c.adopt(autonomousPolicy(), { revoked: { agents: [], consents: [c.consent] } });
+ const step = c.surface.journey[0];
+ const refused = await c.tool(step.tool, c.args(step, new Map(), { unresolved: true }));
+ c.add('BASE-AGENT-004.consent-revoked', refused.status === 401, 'A revoked originating consent must refuse the next authenticated call.');
+ await c.adopt(autonomousPolicy());
+ c.add('BASE-AGENT-004.consent-no-effect', isDeepStrictEqual(before, await c.witness()), 'A call under revoked consent changed native state.');
+}
