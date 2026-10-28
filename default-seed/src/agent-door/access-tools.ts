@@ -55,7 +55,7 @@ export function accessTools(bindings: Bindings): ToolDefinition[] {
         return [{ class: 'access', facts: { measure: 1, direction: args.role === 'admin' ? 'widens' : 'narrows' } }]
       },
       async revision(args, ctx) { return (await readOperator(ctx.db, args.id as string))?.version ?? null },
-      async authority(args, ctx) { const target = await readOperator(ctx.db, args.id as string); return target ? { subject: target.id, widens: args.role === 'admin' && target.role !== 'admin' } : null },
+      async authority(args, ctx) { const target = await readOperator(ctx.db, args.id as string); return target ? { subject: target.id, widens: args.role === 'admin' && target.role === 'member' } : null },
       async summary(args, ctx) {
         const target = await roleTarget(args, ctx)
         return { target: { id: target.id, name: target.displayName, email: target.email }, role: args.role as string }

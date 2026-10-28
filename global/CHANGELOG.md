@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Resolve seed-declared native targets into audit and hashed approval summaries; retain resolvable pause/unset classification; return resource refusal machine codes in JSON-RPC data; require sponsor-escalation fixtures only for applicable native surfaces.
+
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.
 
 - Recheck native resource visibility before retained event replay and subscription delivery; accept single-segment and underscore tool names within MCP's 128-character limit; preserve opaque string or numeric revision tokens through approvals. Negotiate every advertised MCP version explicitly and document the unsupported March 2025 transport.
