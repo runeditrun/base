@@ -36,7 +36,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     if (tool.scope && !principal.scopes.includes(tool.scope)) { status = 403; scope = tool.scope; return refuse('insufficient_scope') }
     const state = await policyState(rt)
     row.revision = state.revision
-    if (principal.consent && state.revoked.consents.includes(principal.consent)) return refuse('consent_revoked')
+    if (principal.consent && state.revoked.consents.includes(principal.consent)) { status = 401; return refuse('consent_revoked') }
     const agent = await rt.options.db.prepare('SELECT revoked,sponsor FROM agent_door_agents WHERE id=?').bind(principal.agent.id).first<{ revoked: number; sponsor: string }>()
     if (revoked(state, principal) || agent?.revoked || agent && agent.sponsor !== principal.person.id) { status = 401; return refuse('unauthenticated') }
     const refusal = policyRefusal(rt, state, tool.classes)
