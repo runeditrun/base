@@ -41,6 +41,29 @@ async function cli(home, args, { terminal = false, input = '', columns = 120, on
   child.stdin.end(input);
  });
 }
+test('Business entry points expose setup before advanced commands and preserve the selected pairing destination', async t => {
+ const home = join(directory, 'handoff-home');
+ const outputs = await Promise.all([['business'], ['business', '--help']].map(args => cli(home, args)));
+ for (const result of outputs) {
+  assert.equal(result.code, 0);
+  const [lead, ...secondary] = result.stdout.trim().split(/\n\s*\n/);
+  assert.equal(lead.match(/\brer business connect\b/g)?.length, 1, 'one setup action leads help');
+  assert.ok(!/^\s*token(?:\s|$)/m.test(lead), 'advanced commands stay out of the lead');
+  assert.ok(secondary.some(section => /^\S[^\n]*\n/.test(section) && /^ +token(?:\s|$)/m.test(section)),
+   'the token command remains in a separate, headed section after setup');
+ }
+ const remote = await fixtureServer(t);
+ for (const terminal of [false, true]) {
+  const result = await cli(home, ['business', 'connect', '--origin', remote.origin], { terminal });
+  assert.equal(result.code, 1, 'the no-code handoff does not redeem or alter pairing');
+  const text = result.stdout + result.stderr;
+  const urls = text.match(/https?:\/\/[^\s;]+/g);
+  assert.deepEqual(urls, [remote.origin + '/business'], 'one browser link, for the selected app');
+  assert.ok(!text.includes('app.runeditrun.com'), 'an explicitly selected app is preserved');
+  assert.equal(remote.state.requests.length, 0);
+ }
+});
+
 // The fixture answers polls every second instead of the platform's five.
 async function fixtureServer(t) {
  const remote = await server(t);
@@ -415,6 +438,35 @@ test('browser opt-ins apply without terminal prompts, and disconnect revokes bef
   assert.equal(remote.state.revoked, true);
   assert.deepEqual(JSON.parse(await readFile(join(home, '.claude/settings.json'), 'utf8')), prior);
   assert.deepEqual(await readdir(home), baseline, 'service files, parents, keychain items, state and permission additions are removed');
+ }
+});
+
+test('paired guidance names one applying command and run and next apply later browser choices without reconnecting', async t => {
+ const remote = await fixtureServer(t);
+ for (const terminal of [false, true]) {
+  for (const command of ['next', 'run']) {
+   const home = join(directory, `later-choices-${command}-${terminal}`);
+   remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
+   const paired = await connect(home, remote, { terminal });
+   assert.match(paired.stdout, /\bbusiness next\b/);
+   // An already-paired invocation emits just the successful connection guidance,
+   // without the earlier instruction for resuming a pending approval.
+   const connected = await cli(home, ['business', 'connect'], { terminal });
+   assert.equal(connected.code, 0, connected.stderr);
+   assert.deepEqual([...new Set(Array.from(connected.stdout.matchAll(/\bbusiness (\w+)\b/g), match => match[1]))], ['next']);
+   assert.doesNotMatch(connected.stdout + connected.stderr, /\bconnect\b/);
+   assert.ok(!(await readdir(home)).includes('.claude'));
+   remote.state.optIns = { installPermissions: true, awakeConsent: true, installService: true };
+   const applied = await cli(home, ['business', command, ...(command === 'run' ? ['--once'] : [])], { terminal });
+   assert.equal(applied.code, 0, applied.stderr);
+   assert.equal(JSON.parse(await readFile(join(home, '.rer/business/state.json'), 'utf8')).awakeConsent, true);
+   assert.ok((await readdir(join(home, '.claude'))).includes('settings.json'));
+   const status = await cli(home, ['business', 'status', '--json']);
+   assert.equal(JSON.parse(status.stdout).service, 'running');
+   assert.equal(remote.state.requests.filter(entry => entry.body.code).length, 1, 'applying choices never redeems another code');
+   assert.equal((await cli(home, ['business', 'disconnect'])).code, 0);
+   remote.state.requests.length = 0;
+  }
  }
 });
 

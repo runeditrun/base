@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.84-dev.g2d782393",
+  "cliVersion": "0.2.84-dev.gb435e90b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -419,7 +419,7 @@
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "791897875d8d1c5b8159cd35e33ee556e45d8674bea3e7643ae7c7b79b3fffcf"
+      "sha256": "3c7b6b9b1c5f44463a8a77c5657de39073c5d11aa05523c9c43749c8c8b44c79"
     },
     "cli/business/config-policy.mjs": {
       "source": "cli/business/config-policy.mjs",
@@ -427,7 +427,7 @@
     },
     "cli/business/connect.mjs": {
       "source": "cli/business/connect.mjs",
-      "sha256": "9577b46cdf50a9415a58e791920b029193e019ff3e74c7eef60791fb17239e3f"
+      "sha256": "c465492e86abb1350029abf58f9492769761528bf9a94013a6127aaab9b103f1"
     },
     "cli/business/detector.mjs": {
       "source": "cli/business/detector.mjs",
@@ -467,7 +467,7 @@
     },
     "cli/business/opt-ins.mjs": {
       "source": "cli/business/opt-ins.mjs",
-      "sha256": "c967f339730c8c9bb1d9b1a59ab7fb6d66486b73488596bd557ddc647b42f3b8"
+      "sha256": "e798d69b9c8c4049ed1ed2e3a55af90ce34fde131252ee900201c5f3ecc8cab8"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
@@ -515,7 +515,7 @@
     },
     "cli/business/questions.mjs": {
       "source": "cli/business/questions.mjs",
-      "sha256": "ff5e8055e3a2fc09c338539572528b615a182b0f0ab42564e3aec2251793484e"
+      "sha256": "669191ac6dd7dcd4b075de64cdea4e32d23bc69d392cee6546bc9ada446fb99c"
     },
     "cli/business/repository.mjs": {
       "source": "cli/business/repository.mjs",
@@ -539,7 +539,7 @@
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
-      "sha256": "aba5214e581d25e50bc25b6b6588ef4f6a575873c86e877e449ada53d69a892b"
+      "sha256": "dcf5e259567fb9310aa9e1a3bfa1c1c54dc865e3e5899dfcca68bb25e683a012"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",
@@ -811,7 +811,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "5716c02b9bc620b15190bf79b3d961d59a34f8521007cfd9b18fa1e507d0d2fd"
+      "sha256": "3af3c189c71b2688e48ab9c8e844d53ef4352e9b721fb5cfa7560e3aa396aa75"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -923,7 +923,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "1df392c39d8ea80b8e035c76359006610d38be9d89261875ee5db49f5e7a54b7"
+      "sha256": "3b3498eff6a1423ff45d3a29b4a62640257f788c6aa9b214f0c213f78c0b1aea"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -1017,9 +1017,17 @@
       "source": "cli/project.mjs",
       "sha256": "bbe4232614d2b9033932ecad4d758521c64975dc697a93fed2cfa34b511c0f91"
     },
+    "cli/ready-summary.mjs": {
+      "source": "cli/ready-summary.mjs",
+      "sha256": "654b7c1ff472ca9cb79551cee9b07cd3cec2e6d97952019eab2dd9dccaef3056"
+    },
     "cli/release.mjs": {
       "source": "cli/release.mjs",
       "sha256": "a6a76c05fe5d0bb3e1c203aa293e514d9bc47e19bfea4a1c5819dec8a6e3ad3f"
+    },
+    "cli/run-transfers.mjs": {
+      "source": "cli/run-transfers.mjs",
+      "sha256": "e03e7012353ffe2ea81c86d98ff3c033f9bcda4b429c43ec305972a6e61d6a48"
     },
     "cli/runtime-front-door.mjs": {
       "source": "cli/runtime-front-door.mjs",
@@ -1772,6 +1780,14 @@
     "foundation/runtime/contract-docs.mjs": {
       "source": "foundation/runtime/contract-docs.mjs",
       "sha256": "9c1d8f38c42cd18539792f71bda94cbcd6ebe30e25c884eb6af51de1dccabdfd"
+    },
+    "foundation/runtime/run-data.d.mts": {
+      "source": "foundation/runtime/run-data.d.mts",
+      "sha256": "8b8f8e6b6030abe061027eef4b1b1560fdc77f54b25c82048839887da4fe56c1"
+    },
+    "foundation/runtime/run-data.mjs": {
+      "source": "foundation/runtime/run-data.mjs",
+      "sha256": "e27f7c181fe17f54771893a0988098f49395511a8264b4fd3b848ecda1f5c1c9"
     },
     "foundation/runtime/seed-contract.mjs": {
       "source": "foundation/runtime/seed-contract.mjs",

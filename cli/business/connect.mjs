@@ -35,7 +35,7 @@ export async function connect({ code, origin } = {}) {
  }
  if (pending && Date.parse(pending.expires_at) <= Date.now()) { await clearPending(); pending = null; }
  if (pending && (pending.origin !== origin || code && pending.code !== code)) throw Error(`Business is already waiting for approval of another code${pending.origin === origin ? '' : ` at ${pending.origin}`}. Run ${rerCommand()} business connect to resume it, or ${rerCommand()} business disconnect to drop it before using another code.`);
- if (!pending && !code) throw Error(`Business needs a pairing code. Open ${origin}/business, then run ${rerCommand()} business connect --code CODE --origin ${origin}.`);
+ if (!pending && !code) throw Error(`Set up your business: Business shares your business name, logo and brand colour with apps that support it. Open ${origin}/business; sign up free there if you have no account. Choose what to share there. Back in this terminal, run this same command again with --code followed by the code you copied from that page.`);
  // Refuse before redeeming the one-use code or collecting an approval when this
  // session cannot keep the pairing or store the device credential.
  await checkStateWritable();

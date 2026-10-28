@@ -29,8 +29,8 @@ else its vendored scripts/rer.mjs.
                        them off PATH): where a project's docs say pnpm run X, run rer run X.
   rer list [DIR]       The checkouts in DIR (default: here), newest first, with whether rer dev can
                        launch them, whether they are set up, and their running URL. --json for data.
-  rer business ...     Pair a Business device, store local vendor keys, inspect tasks and disconnect.
-                       rer business --help lists the commands and current protocol limitations.
+  rer business ...     Set up your business once and share its name, logo and brand colour
+                       with apps that support Business. Start with rer business connect.
   rer companion ...    Pair this computer with a Run Edit Run app and run its change requests here
                        with your own Codex or Claude. rer companion --help lists the commands.
   rer door ...         The opt-in front door: every checkout at http://NAME.localhost:PORT, started
@@ -38,6 +38,7 @@ else its vendored scripts/rer.mjs.
   rer cli status       This rer: version, contents digest, install channel, launcher and other rer
                        commands on PATH. --json for data.
   rer cli install      Install this package for the current user (~/.local/bin/rer).
+  rer cli path         Optional: make rer available in future terminals; shows the shell step.
   rer cli uninstall    Remove the launcher and the install root; ~/.rer is untouched.
   rer update           Move to the latest published rer (--version X for an exact one), the way it
                        was installed: npx and install.sh installs switch atomically, npm installs run npm.

@@ -15,6 +15,8 @@
 - Keep trigger definitions literal during Managed data intake; bind string cells only in top-level INSERT statements so trigger bodies containing VALUES and semicolons import successfully. Reconcile retired schema objects against destination migrations, retain database-bound policy payloads, and replay dependent new-table backfills during native restore. Refuse occupied destinations before creating a restore job and skip already-applied native migrations.
 - Make the separate install and start recipe use the installed launcher without a PATH prerequisite. Explain frozen lockfile refusals with one cause and a runnable repair command; retain pnpm codes and captured output in JSON.
 - Explain refused dependency downloads, invalid ports and checkout archive paths with a plain cause and a runnable next command. Keep technical diagnostics in the unchanged JSON output and omit error classes and stacks from human failure summaries.
+- After Business pairing, name `business next` as the next step; both `next` and `run` apply the owner's latest computer choices without reconnecting.
+- Lead Business setup and local launch with one plain next step, defer optional shell setup until ready, and show a shared cold-run budget plus measured archive downloads and disk use.
 
 ## 0.2.84
 
