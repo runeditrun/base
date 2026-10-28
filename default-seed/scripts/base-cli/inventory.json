@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g0cad22d3",
+  "cliVersion": "0.2.85-dev.g45f4aafd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -495,7 +495,7 @@
     },
     "cli/business/parsers-config.mjs": {
       "source": "cli/business/parsers-config.mjs",
-      "sha256": "6158ff18391f7d83535555ad4005be51e5670ced14d3381eadf0c494300375b0"
+      "sha256": "01d1de8bdd6770cac13c7fc7e5baa56277f1d73ce17b7f94deffec263ec7512f"
     },
     "cli/business/parsers-infrastructure.mjs": {
       "source": "cli/business/parsers-infrastructure.mjs",
@@ -511,7 +511,7 @@
     },
     "cli/business/parsers-syntax.mjs": {
       "source": "cli/business/parsers-syntax.mjs",
-      "sha256": "95d55be9540762a8fae71b0794b3ab005016e5de6efaa0216e8e2a4b2b7faadb"
+      "sha256": "9a2959631b7d9e001b9e6017042fac4544d587ac1efa876cfc8fd683488dfea5"
     },
     "cli/business/parsers-terraform.mjs": {
       "source": "cli/business/parsers-terraform.mjs",
@@ -735,7 +735,7 @@
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
-      "sha256": "d9bddc99e9efdffa92ba7e213a07f3a70891fd288d0767e6ca071d59078d171d"
+      "sha256": "97c52f10e8ee67148255cdde56ae63a81b3784420eb42faaa04a127d63a8dc43"
     },
     "cli/deploy-hook-record.mjs": {
       "source": "cli/deploy-hook-record.mjs",
@@ -796,6 +796,10 @@
     "cli/deploy-source.mjs": {
       "source": "cli/deploy-source.mjs",
       "sha256": "ee3bbaa6411528fe683c32fed1edb7c92176e14d00312794450149b7626ff1c2"
+    },
+    "cli/deploy-variables.mjs": {
+      "source": "cli/deploy-variables.mjs",
+      "sha256": "1e84fc8b37a06c917f20174c876283ce7634d6c90a59896ee0a4970bd98ba316"
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
@@ -895,11 +899,11 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "c57265e87e3b03e2a332155cbd00d2da526f810a01d8c2fbdc521959789dff18"
+      "sha256": "abdcb91dce67d68296e9ac6f12e058879dc3f9303cb984e608dbfad2372496e7"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
-      "sha256": "1aa887996cc0108d805a837b4b2520c1989a68d99aa1e928fed8020f78a61830"
+      "sha256": "0032cbd15daff764f0735fa5055ef7b00c5c55a2db4bae71cc3c48feff700b6c"
     },
     "cli/ledger-refusal.mjs": {
       "source": "cli/ledger-refusal.mjs",
@@ -1999,7 +2003,7 @@
     },
     "modules/container/image-variables.mjs": {
       "source": "modules/container/image-variables.mjs",
-      "sha256": "53555267577c6642ff0f93f68e63b00bde9e9a811674a0d96e876d6c9763871f"
+      "sha256": "ad2374544550fcd6c1b3e02e801dffcda6f471b8cd76e4300059ce151612e2b4"
     },
     "modules/container/import-graph.mjs": {
       "source": "modules/container/import-graph.mjs",

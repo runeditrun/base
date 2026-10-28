@@ -47,7 +47,7 @@ function remainingQuote(source, initial = '') {
 }
 
 function statements(source) {
- const result = []; let current = '', quote = '', depth = 0, triple = false;
+ const result = []; let current = '', quote = '', depth = 0, triple = false, start = 0;
  for (let i = 0; i < source.length; i++) {
   const char = source[i]; current += char;
   if (quote) {
@@ -59,14 +59,14 @@ function statements(source) {
    if (source.slice(i, i + 3) === char.repeat(3)) { triple = true; current += source.slice(i + 1, i + 3); i += 2; }
   } else if (char === '[' || char === '{') depth++;
   else if (char === ']' || char === '}') depth--;
-  else if (char === '\n' && depth === 0) { result.push(current.trim()); current = ''; }
+  else if (char === '\n' && depth === 0) { result.push({text:current.trim(), offset:start + current.search(/\S/)}); current = ''; start = i + 1; }
  }
- if (current.trim()) result.push(current.trim()); return result;
+ if (current.trim()) result.push({text:current.trim(), offset:start + current.search(/\S/)}); return result;
 }
 
-export function tomlEntries(source) {
+export function tomlEntries(source, { locations = false } = {}) {
  const entries = []; let table = [];
- for (const statement of statements(source)) {
+ for (const {text:statement, offset} of statements(source)) {
   const header = /^(\[\[?)([\s\S]*?)(\]\]?)$/.exec(statement);
   if (header && header[1].length === header[3].length) {
    table = keyParts(header[2], true) ?? [];
@@ -79,7 +79,8 @@ export function tomlEntries(source) {
   const parts = splitOutside(statement, '='); if (parts.length < 2) continue;
   const keys = keyParts(parts.shift(), true); if (!keys) continue;
   const path = [...table, ...keys], raw = parts.join('=').trim();
-  entries.push({ path, value: literal(raw) }); flowEntries(raw, path, '=', entries);
+  entries.push({ path, value: literal(raw), ...(locations ? {offset} : {}) });
+  flowEntries(raw, path, '=', entries, 0, locations ? offset + statement.indexOf('=') + 1 + parts.join('=').search(/\S/) : undefined);
  }
  return entries;
 }
