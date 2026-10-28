@@ -387,7 +387,7 @@
     },
     "cli/agent-door.mjs": {
       "source": "cli/agent-door.mjs",
-      "sha256": "3990b48b1731fa39f1ed6143188532de058716146a4838946265a31c3f2d10a3"
+      "sha256": "675189582aaf06a92a7eb6b8b5c624f23842e237be5fd8b23a19787cbc9a519c"
     },
     "cli/agent-network.mjs": {
       "source": "cli/agent-network.mjs",
@@ -875,7 +875,7 @@
     },
     "cli/hosted-output.mjs": {
       "source": "cli/hosted-output.mjs",
-      "sha256": "723d49a064eb73d99f16b38a9ec929836061582e6c4e2174ad9c1f6cd025b00a"
+      "sha256": "cd9c7c8d17c2127eb66ed3349fe51efb7a1e503533acfa8cd766f714f25e928d"
     },
     "cli/human-error.mjs": {
       "source": "cli/human-error.mjs",
@@ -1855,7 +1855,7 @@
     },
     "modules/agent-door/conformance/audit.mjs": {
       "source": "modules/agent-door/conformance/audit.mjs",
-      "sha256": "d33ca5825155b5e49051771ec7766f43d69c6c906a49e13083edc386861ba5f3"
+      "sha256": "4cc5ae6347660cc479b740c6d80100352159b2fd9e45513e95a83b344d8ce765"
     },
     "modules/agent-door/conformance/crypto.mjs": {
       "source": "modules/agent-door/conformance/crypto.mjs",
@@ -1867,7 +1867,11 @@
     },
     "modules/agent-door/conformance/index.mjs": {
       "source": "modules/agent-door/conformance/index.mjs",
-      "sha256": "f09ffcea0c9e3d2213fa5aa204255a99fba50de6abde1623e5bbcda295944296"
+      "sha256": "7807f0a17e8fdd5c5aeb0fbf898324fc04f6a6509867f0ed9ef8431f3506159e"
+    },
+    "modules/agent-door/conformance/invocation.mjs": {
+      "source": "modules/agent-door/conformance/invocation.mjs",
+      "sha256": "a6d29cc5957b3abaaf3d1d2a117e7f9772451daed2e29c4e89f676c9319b8e74"
     },
     "modules/agent-door/conformance/journey.mjs": {
       "source": "modules/agent-door/conformance/journey.mjs",
@@ -1887,7 +1891,7 @@
     },
     "modules/agent-door/conformance/policy-phases.mjs": {
       "source": "modules/agent-door/conformance/policy-phases.mjs",
-      "sha256": "ef1f261fd2bcbdde841eb4fd7323dcc2b0436f49a2bf2a961c798ebebd2c45e7"
+      "sha256": "6d8e0e9894af3d2c461348fb4eeb9d2ee7a2bdb7eec59508b0c63e4b171945f1"
     },
     "modules/agent-door/conformance/protocol.mjs": {
       "source": "modules/agent-door/conformance/protocol.mjs",

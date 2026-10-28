@@ -9,7 +9,7 @@ import { policyState } from './policy-store.ts'
 
 export interface Effect { type: string; uri: string; data?: Record<string, unknown> }
 export function context(rt: Runtime, principal: Principal, door: ToolContext['door'], effects: Effect[], approvers: ToolContext['approvers'] = []): ToolContext {
-  return { db: rt.options.db, person: principal.person, agent: principal.agent, actor: preparedBy(principal), seed: rt.options.seed, origin: rt.options.origin, now: rt.now, door, approvers,
+  return { db: rt.options.db, person: principal.person, agent: principal.agent, consent: principal.consent, actor: preparedBy(principal), seed: rt.options.seed, origin: rt.options.origin, now: rt.now, door, approvers,
     emit(type, uri, data) { effects.push({ type, uri, data }) } }
 }
 export async function classify(tool: ToolDefinition, args: Record<string, unknown>, ctx: ToolContext): Promise<ClassAndFacts[]> {

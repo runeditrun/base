@@ -43,6 +43,7 @@ export async function fixtureSeed(t, mode) {
  const surface = JSON.parse(await readFile(join(import.meta.dirname, 'surface.json'), 'utf8'));
  surface.verification = { network: { module: 'provider.mjs', origins: ['https://api.openai.com', 'https://receiver.example.invalid'] },
   ...(mode === 'native' ? { owner: { email: 'native-owner@example.com', emailField: 'SETUP_OPERATOR_EMAIL', initializer: 'initializer.mjs' } } : {}),
+  ...(mode === 'signed' ? { owner: { bindings: { RER_MANAGEMENT_ORIGIN: 'issuer', RER_INSTALLATION_ID: 'installationId' } } } : {}),
  };
  await writeFile(join(root, 'agent-surface.json'), JSON.stringify(surface));
  const reference = JSON.parse(await readFile(join(base, 'default-seed/package.json'), 'utf8'));

@@ -28,7 +28,7 @@ export default {
         revision: async args => (await read(args.id as string))?.version ?? null,
         async run(args, ctx) {
           if (args.value === 'synthetic-base-refused') throw new ToolRefusal('native_refused')
-          await env.DB.prepare('INSERT INTO test_contexts(kind,person,agent,actor,approvers,audit) VALUES(?,?,?,?,?,?)').bind('run',ctx.person.id,ctx.agent.id,JSON.stringify(ctx.actor),JSON.stringify(ctx.approvers),JSON.stringify((await env.DB.prepare("SELECT row FROM agent_door_audit WHERE json_extract(row,'$.outcome')='running' ORDER BY sequence DESC LIMIT 1").first()) ?? null)).run()
+          await env.DB.prepare('INSERT INTO test_contexts(kind,person,agent,actor,approvers,audit,consent) VALUES(?,?,?,?,?,?,?)').bind('run',ctx.person.id,ctx.agent.id,JSON.stringify(ctx.actor),JSON.stringify(ctx.approvers),JSON.stringify((await env.DB.prepare("SELECT row FROM agent_door_audit WHERE json_extract(row,'$.outcome')='running' ORDER BY sequence DESC LIMIT 1").first()) ?? null),ctx.consent ?? null).run()
           const before = await read(args.id as string)
           await env.DB.prepare("INSERT INTO test_records(id,value,version,exposure) VALUES(?,?,1,'internal') ON CONFLICT(id) DO UPDATE SET value=excluded.value,version=version+1").bind(args.id, args.value).run()
           const row = (await read(args.id as string))!; ctx.emit('record.saved', `synthetic://record/${row.id}`)
@@ -49,7 +49,12 @@ export default {
       resources: [{ uriTemplate: 'synthetic://record/{id}', name: 'Record', scope: config.resourceScope, classes: ['sensitive'], classify: () => [{ class: 'sensitive', facts: { measure: 1, kind: 'tax' } }], read: async uri => { const row = await read(uri.split('/').pop()!); return row && row.exposure !== 'hidden' ? { json: row, untrusted: true } : null } }],
       onEvent: async event => { await env.DB.prepare('INSERT INTO test_callbacks(id,event) VALUES(?,?)').bind(event.id, JSON.stringify(event)).run() },
     })
-    if (path === '/__embedded') return Response.json(await door.invoke('synthetic.records.list', {}, { person: (await doorPerson(auth, request))!, agent: { id: 'synthetic-base-embedded', name: 'Synthetic Embedded' } }))
+    if (path === '/__embedded') {
+      const person = await doorPerson(auth, request)
+      if (!person) return new Response(null, { status: 401 })
+      const input = request.method === 'POST' ? await request.json() as { name?: string; agent?: { id: string; name: string; specialist?: string }; consent?: string; args?: Record<string, unknown> } : null
+      return Response.json(await door.invoke(input?.name ?? (input?.args ? 'synthetic.records.write' : 'synthetic.records.list'), input?.args ?? {}, { person, agent: input?.agent ?? { id: 'synthetic-base-embedded', name: 'Synthetic Embedded' }, consent: input?.consent }))
+    }
     if (path === '/__emit') { const person = await doorPerson(auth, request); if (!person) return new Response(null, { status: 401 }); await door.emit({ type: 'record.person', uri: 'synthetic://record/synthetic-base-1', person }); return Response.json({ ok: true }) }
     return await door.handle(request) ?? await settings.handle(request) ?? await createAuthHandler(auth)(request) ?? new Response(null, { status: 404 })
   },

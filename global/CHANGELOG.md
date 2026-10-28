@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Agent-door verification can map native environment binding names to its disposable issuer, installation and owner/session values. Durable invocations retain their originating consent and refuse revoked consent at worker admission, with consent attribution in the audit.
+
 ## 0.2.86
 
 - Agent-door verification fixtures generate disposable setup, session, local bearer, delivery and provider credentials at runtime while retaining signed receipts and isolated provider checks.

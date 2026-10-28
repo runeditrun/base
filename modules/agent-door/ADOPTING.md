@@ -134,6 +134,40 @@ the same policy, approval, review and audit path as tools. A resource read must 
 access. Mark device, screen, connector, import-door and installation operations
 as outside the tool registry when they require another supported door.
 
+## Durable invocation consent
+
+Persist the originating `ctx.consent` alongside the native sponsor id, agent
+attribution, tool, arguments and idempotency key when preparing scheduled or
+durable work. The trusted worker later calls the public door with that saved
+identity:
+
+```ts
+const result = await door.invoke(job.tool, job.args, {
+  person: { id: job.sponsorId }, agent: job.agent, consent: job.consent,
+})
+```
+
+`invoke` re-reads the native person; saved role or email is unnecessary. Consent
+is optional for work that originated independently of Business consent. Work
+prepared under a consent must retain that exact id rather than omit or replace
+it at execution. The door puts it on the Principal and `ToolContext`, re-reads
+current signed revocations at worker admission and fences execution reservation
+against revocation. A revoked consent returns
+`{outcome: 'refused', code: 'consent_revoked'}` without calling the native effect.
+Both successful and refused invocation audit rows include `consent`, agent,
+sponsor, tool, time, policy revision and outcome. The edition owns its scheduler
+and native transaction boundaries; retain that result with the job.
+
+The shared `runAgentDoorConformance` journey accepts an optional
+`invoke(name,args,who)` callback wired to that same trusted worker door. `who`
+carries `{person: {id}, agent, consent}`. The module's journey uses it to run
+serialized job input, prove a native effect and consent-attributed audit, then
+revoke the consent before admitting saved work and prove `consent_revoked`,
+a complete refusal audit and an unchanged native witness. Supply this callback
+in the edition's integrated module journey; no production test route is needed.
+The HTTP-only CLI journey checks signed consent revocation and audit attribution
+separately, without claiming to run the edition's scheduler.
+
 ## Keep runtime and CLI evidence separate
 
 The copied module is application runtime source pinned by `base-copies.json`.
@@ -182,13 +216,17 @@ Seeds with a native initializer or a different owner binding declare this in
       "email": "synthetic-owner@example.com",
       "emailField": "SETUP_OPERATOR_EMAIL",
       "tokenField": "H2H_SETUP_TOKEN",
+      "bindings": {
+        "RER_MANAGEMENT_ORIGIN": "issuer",
+        "RER_INSTALLATION_ID": "installationId"
+      },
       "initializer": "tests/initialize-agent-owner.mjs"
     }
   }
 }
 ```
 
-All four keys are optional. Email defaults to `synthetic-base-1@example.com`;
+All keys are optional. Email defaults to `synthetic-base-1@example.com`;
 the manifest's email and token fields are always bound too. The initializer is
 a contained seed module default-exporting an async function receiving
 `{request, origin, email, sub, displayName, token, claim, returnTo}`. `claim` is
@@ -201,6 +239,17 @@ document and runs the journey. Never create an owner with direct SQL, substitute
 an auth adapter, or add a verification-only production route. Initializer code
 runs as trusted test tooling in Node; it must use the supplied request function
 and must not contact providers or read real credentials.
+
+`bindings` maps native environment binding names to the verifier's per-run
+values: `issuer` (the issuer origin), `installationId`, `appOrigin`, `publicKeys`
+(the JSON public key ring), `email`, `sub` (the owner's Business person id),
+`token` (the setup token), or `sessionSecret` (a fresh session signing secret).
+Only named native bindings are added, for that disposable runtime only; existing
+Base verifier bindings and manifest email/token fields remain available. Nothing
+is written to the seed's environment files. Tokens and sessions are never printed.
+These aliases configure the seed's existing admission and do not bypass signed
+claim verification. For a signed seed needing just its native issuer and
+installation names, declare the two `bindings` above without an initializer.
 
 ## Verification provider edges
 

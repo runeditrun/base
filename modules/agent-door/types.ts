@@ -19,7 +19,7 @@ export interface PreparedBy { agent: { id: string; name: string }; for: { id: st
 export type EventActor = ({ kind: 'agent' } & PreparedBy) | { kind: 'person'; person: { id: string; name: string } } | { kind: 'business' }
 export interface AgentEvent { id: string; type: string; uri: string; actor: EventActor; at: string; [key: string]: unknown }
 export interface ToolContext {
-  db: D1Database; person: Person; agent: Agent; actor: PreparedBy; seed: string; origin: string
+  db: D1Database; person: Person; agent: Agent; consent?: string; actor: PreparedBy; seed: string; origin: string
   now(): number; door: 'mcp' | 'embedded'; approvers: Array<{ id: string; name: string }>
   emit(type: string, uri: string, data?: Record<string, unknown>): void
 }
@@ -67,7 +67,7 @@ export interface CallResult {
 }
 export interface AgentDoor {
   handle(request: Request): Promise<Response | null>
-  invoke(name: string, args: Record<string, unknown>, who: { person: Person; agent: Agent }): Promise<CallResult>
+  invoke(name: string, args: Record<string, unknown>, who: { person: Pick<Person, 'id'>; agent: Agent; consent?: string }): Promise<CallResult>
   emit(event: { type: string; uri: string; person: Person; data?: Record<string, unknown> }): Promise<void>
 }
 export interface PolicyState {
