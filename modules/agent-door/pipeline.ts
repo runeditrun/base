@@ -32,6 +32,10 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     if (tool.scope && !principal.scopes.includes(tool.scope)) { status = 403; scope = tool.scope; return refuse('insufficient_scope') }
     const state = await policyState(rt)
     row.revision = state.revision
+    if (principal.consent && state.revoked.consents.includes(principal.consent)) {
+      result.decision = { id: row.id, disposition: 'consent_revoked', revision: state.revision, classes: [] }
+      return refuse('consent_revoked')
+    }
     const refusal = policyRefusal(rt, state, tool.classes)
     if (refusal) {
       const disposition = { agents_paused: 'paused', policy_unset: 'unset', policy_unavailable: 'unavailable' }[refusal.code] ?? 'none'

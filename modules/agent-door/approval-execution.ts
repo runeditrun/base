@@ -22,7 +22,8 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
   try {
     const principal = await livePrincipal(rt, saved.principal), state = await policyState(rt), tool = savedTool(rt, saved.tool, saved.args)
     const refusal = policyRefusal(rt, state, tool?.classes)
-    if (!principal || !tool) result = { ...result, outcome: 'refused', code: 'sponsor_unavailable' }
+    if (saved.principal.consent && state.revoked.consents.includes(saved.principal.consent)) result = { ...result, outcome: 'refused', code: 'consent_revoked' }
+    else if (!principal || !tool) result = { ...result, outcome: 'refused', code: 'sponsor_unavailable' }
     else if (refusal) result = { ...result, outcome: 'refused', ...refusal }
     else if (state.revision !== saved.revision) result = { ...result, outcome: 'refused', code: 'approval_evidence_changed' }
     else {

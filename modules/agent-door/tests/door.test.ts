@@ -5,6 +5,7 @@ import { runtime } from './runtime.mjs'
 import { createAgentDoor } from '../index.ts'
 import { autonomousPolicy, heldPolicy, policyEnvelope } from '../conformance/crypto.mjs'
 import { runAgentDoorConformance } from '../conformance/index.mjs'
+import { durableAdapter } from './durable-adapter.mjs'
 import { decide } from '../policy/decide.ts'
 
 const decision = (answer: any) => answer.result?._meta?.['com.runeditrun/decision']
@@ -126,7 +127,7 @@ test('approval waits, names its person, executes once, rejects, expires and dete
  } finally { await r.close() }
 })
 
-test('credentials, pause, embedded calls, subscriptions and the generic conformance journey share the live door', async () => {
+test('credentials, pause, embedded calls, subscriptions and the generic conformance journey share the live door', async t => {
  const r = await runtime()
  try {
   await r.adopt()
@@ -207,7 +208,9 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
     {id:'access',tool:'synthetic.access.change',args:{id:'synthetic-base-other'},expect:[{class:'access'}]},
     {id:'erase',tool:'synthetic.records.erase',args:{id:'synthetic-base-1'},expect:[{class:'destructive'}]},
     {id:'events',tool:'synthetic.events.list',args:{},expect:[{class:'standard'}]}]}
-  const result=await runAgentDoorConformance({fetch:fresh.fetch,origin:fresh.c.origin,surface,signer:fresh.c.signer,person:fresh.c.person,now:()=>fresh.c.now})
+  const result=await runAgentDoorConformance({fetch:fresh.fetch,origin:fresh.c.origin,surface,signer:fresh.c.signer,person:fresh.c.person,now:()=>fresh.c.now,durable:durableAdapter({origin:fresh.c.origin,cookie:fresh.c.person.cookie})})
   assert.deepEqual(result.points.filter((p:any)=>!p.ok),[])
+  const durable = result.points.filter((point:any) => point.id.includes('.durable.'))
+  t.diagnostic(`Module journey: ${result.points.filter((point:any) => point.ok).length}/${result.points.length}; durable consent: ${durable.filter((point:any) => point.ok).length}/${durable.length}.`)
  } finally { await fresh.close() }
 })

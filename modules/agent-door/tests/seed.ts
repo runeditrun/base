@@ -2,6 +2,7 @@ import { createAgentDoor, defineTool, operatorAuthPeople, ToolRefusal } from '..
 import type { ToolDefinition } from '../index.ts'
 import { createBusinessSettings } from '../../business-settings/index.ts'
 import { createOperatorAuth, createAuthHandler } from '../../operator-auth/index.mjs'
+import { queueRecord, queuedRecord } from './durable.ts'
 
 const object = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({ type: 'object' as const, properties, required, additionalProperties: false })
 const text = { type: 'string', minLength: 1 }, idInput = object({ id: text })
@@ -24,10 +25,11 @@ export default {
     const tools: ToolDefinition[] = [
       defineTool({ name: 'synthetic.records.list', title: 'Read records', description: 'Read native records.', scope: 'records:read', readOnly: true, inputSchema: object({}), outputSchema: object({ records: { type: 'array', items: { type: 'object' } }, sent: { type: 'array', items: { type: 'object' } } }), classes: ['standard'], clauses: ['BASE-AGENT-002'], classify: () => [{ class: 'standard', facts: { measure: 1 } }],
         async run() { return { result: { records: (await env.DB.prepare('SELECT * FROM test_records ORDER BY id').all()).results, sent: (await env.DB.prepare('SELECT * FROM test_sent ORDER BY rowid').all()).results } } } }),
-      defineTool({ name: 'synthetic.records.write', title: 'Write record', description: 'Save native internal work.', scope: 'records:write', readOnly: false, summary: args => ({ target: { id: String(args.id) } }), inputSchema: object({ id: text, value: text }), outputSchema: output, classes: ['standard'], clauses: ['BASE-AGENT-002'], classify: () => [{ class: 'standard', facts: { measure: 1 } }],
+      defineTool({ name: 'synthetic.records.write', title: 'Write record', description: 'Save native internal work.', scope: 'records:write', readOnly: false, summary: args => ({ target: { id: String(args.id) } }), inputSchema: object({ id: text, value: text, defer: { type: 'boolean' } }, ['id','value']), outputSchema: output, classes: ['standard'], clauses: ['BASE-AGENT-002'], classify: () => [{ class: 'standard', facts: { measure: 1 } }],
         revision: async args => (await read(args.id as string))?.version ?? null,
         async run(args, ctx) {
           if (args.value === 'synthetic-base-refused') throw new ToolRefusal('native_refused')
+          if (args.defer) return queueRecord(args, ctx)
           await env.DB.prepare('INSERT INTO test_contexts(kind,person,agent,actor,approvers,audit) VALUES(?,?,?,?,?,?)').bind('run',ctx.person.id,ctx.agent.id,JSON.stringify(ctx.actor),JSON.stringify(ctx.approvers),JSON.stringify((await env.DB.prepare("SELECT row FROM agent_door_audit WHERE json_extract(row,'$.outcome')='running' ORDER BY sequence DESC LIMIT 1").first()) ?? null)).run()
           const before = await read(args.id as string)
           await env.DB.prepare("INSERT INTO test_records(id,value,version,exposure) VALUES(?,?,1,'internal') ON CONFLICT(id) DO UPDATE SET value=excluded.value,version=version+1").bind(args.id, args.value).run()
@@ -49,6 +51,10 @@ export default {
       resources: [{ uriTemplate: 'synthetic://record/{id}', name: 'Record', scope: config.resourceScope, classes: ['sensitive'], classify: () => [{ class: 'sensitive', facts: { measure: 1, kind: 'tax' } }], read: async uri => { const row = await read(uri.split('/').pop()!); return row && row.exposure !== 'hidden' ? { json: row, untrusted: true } : null } }],
       onEvent: async event => { await env.DB.prepare('INSERT INTO test_callbacks(id,event) VALUES(?,?)').bind(event.id, JSON.stringify(event)).run() },
     })
+    if (path.startsWith('/__jobs/')) {
+      if (request.method !== 'POST' || request.headers.get('origin') !== config.origin || !await doorPerson(auth, request)) return new Response(null, { status: 403 })
+      return queuedRecord(path, door, env.DB)
+    }
     if (path === '/__embedded') return Response.json(await door.invoke('synthetic.records.list', {}, { person: (await doorPerson(auth, request))!, agent: { id: 'synthetic-base-embedded', name: 'Synthetic Embedded' } }))
     if (path === '/__emit') { const person = await doorPerson(auth, request); if (!person) return new Response(null, { status: 401 }); await door.emit({ type: 'record.person', uri: 'synthetic://record/synthetic-base-1', person }); return Response.json({ ok: true }) }
     return await door.handle(request) ?? await settings.handle(request) ?? await createAuthHandler(auth)(request) ?? new Response(null, { status: 404 })

@@ -7,11 +7,12 @@ import { runJourney } from './journey.mjs';
 import { unsetPolicy, removalPhase, blockedPhases, pausePhase } from './policy-phases.mjs';
 import { negativePhase } from './negative.mjs';
 import { auditPhase } from './audit.mjs';
+import { durablePhase } from './durable.mjs';
 
 export { validateAgentSurface } from './surface.mjs';
 
 /** Run against a fresh, real installation using its HTTP and person doors. */
-export async function runAgentDoorConformance({ fetch, origin, surface, signer, person, business = 'rer-agent-conformance', consent = randomUUID(), now }) {
+export async function runAgentDoorConformance({ fetch, origin, surface, signer, person, business = 'rer-agent-conformance', consent = randomUUID(), now, durable }) {
  const validation = validateAgentSurface(surface), points = [...validation.points];
  if (!validation.ok) return { ok: false, points };
  if (typeof fetch !== 'function' || !signer?.privateKey || !signer.issuer || !signer.installationId || !signer.kid || !person?.email || !person.cookie || typeof person.sub !== 'string' || !person.sub.trim() || typeof consent !== 'string' || !consent.trim() || new URL(origin).origin !== origin) throw new TypeError('Conformance requires fetch, canonical origin, signer, consent and signed-in person {email,cookie,sub}');
@@ -25,5 +26,6 @@ export async function runAgentDoorConformance({ fetch, origin, surface, signer, 
  await c.phase('BASE-AGENT-011.phase5', () => pausePhase(c));
  await c.phase('BASE-AGENT-004.phase6', () => negativePhase(c));
  await c.phase('BASE-AGENT-009.phase7', () => auditPhase(c));
+ if (durable !== undefined) await c.phase('BASE-AGENT-004.durable', () => durablePhase(c, durable));
  return { ok: points.every(point => point.ok), points };
 }
