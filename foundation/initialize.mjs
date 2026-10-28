@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { commit, select, sha256, tree } from '../composition/git-source.mjs'
 import { sourceRoots } from '../cli/export.mjs'
 import { stampedVersion } from '../cli/version.mjs'
+import { renderVerifySchedule, scheduleTransformation } from './verify-schedule.mjs'
 
 export async function initialize({ baseRepo, ref, output, family, edition, repository, siteDomain = `run-${edition}.example` }) {
   for (const id of [family, edition]) if (!/^[a-z][a-z0-9-]*$/.test(id) || id === 'base') throw new Error('Invalid family/edition id')
@@ -18,10 +19,10 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
   await mkdir(target) // Never overwrite an owner checkout.
   const provenance = {}
   const modules = [...new Set(sourceRoots.filter(source => source.startsWith('modules/')).map(source => source.split('/')[1]))]
-  async function put(path, bytes, origin) {
+  async function put(path, bytes, origin, transformation) {
     await mkdir(dirname(resolve(target, path)), { recursive: true })
     await writeFile(resolve(target, path), bytes)
-    provenance[path] = { sha256: sha256(bytes), ...(origin ? { source: origin } : { generated: true }) }
+    provenance[path] = { sha256: sha256(bytes), ...(origin ? { source: origin } : { generated: true }), ...(transformation ? { transformation } : {}) }
   }
   const json = (path, data) => put(path, JSON.stringify(data, null, 2) + '\n')
   try {
@@ -30,7 +31,9 @@ export async function initialize({ baseRepo, ref, output, family, edition, repos
     for (const file of files) await put(`editions/${edition}/${file.relative}`, startDocs.has(file.relative) ? file.bytes.toString().replaceAll('run-foundation', `run-${edition}`) : file.bytes, file.path)
     const workflows = ['verify.yml', 'verify-nightly.yml'].map(name => select(baseRepo, revision, `export/${name}`)[0])
     for (const workflow of workflows) {
-      await put(`editions/${edition}/.github/workflows/${workflow.path.slice('export/'.length)}`, workflow.bytes, workflow.path)
+      const scheduled = workflow.path === 'export/verify-nightly.yml'
+      const bytes = scheduled ? renderVerifySchedule(workflow.bytes.toString(), edition) : workflow.bytes
+      await put(`editions/${edition}/.github/workflows/${workflow.path.slice('export/'.length)}`, bytes, workflow.path, scheduled ? scheduleTransformation : undefined)
     }
     // Older pinned workflows install inline. A workflow using the helper must
     // supply it from that same revision; select still rejects a missing helper.

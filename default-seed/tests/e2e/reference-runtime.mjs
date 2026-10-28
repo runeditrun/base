@@ -1,3 +1,4 @@
+import { loopbackFetch as fetch } from '../../scripts/base-onboarding/loopback-fetch.mjs'
 import { completeFirstRun } from '../operator-auth/first-run.mjs'
 import { queuedEntrypoint } from '../../../onboarding/queued-entry.mjs';
 const queuedExit=await queuedEntrypoint(import.meta.url,'verify:browser');

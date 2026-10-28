@@ -1,3 +1,4 @@
+import { installD1Preflight } from '../../scripts/base-cli/modules/container/adapters/d1-workerd-setup.mjs';
 import { createRequire } from 'node:module'
 import { mkdtemp, readdir, readFile, rm, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -13,7 +14,8 @@ const { fromCrossJSON } = startRequire('seroval')
 const { defaultSerovalPlugins } = startRequire('@tanstack/router-core')
 export const decodeStart = (body) => fromCrossJSON(JSON.parse(body), { plugins: defaultSerovalPlugins })
 const require = createRequire(await realpath(join(root, 'node_modules/wrangler/package.json')))
-const { Miniflare, convertV4MiniflareOptions } = require('miniflare')
+const { Miniflare, convertV4MiniflareOptions, D1_PLUGIN } = require('miniflare');
+installD1Preflight(D1_PLUGIN)
 export const { unstable_splitSqlQuery: splitSql } = require('wrangler')
 export const owner = 'owner@example.test'
 export const setupToken = 'disposable-test-only-owner-setup-token-00001'

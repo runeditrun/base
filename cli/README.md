@@ -65,6 +65,17 @@ owner/sign-in hooks. The reference hook declaration is
 internal build/dev/verify targets and deployment policy. The CLI owns flags,
 pins, containment, cancellation, capture, output and sequencing.
 
+Shared local dev and preview runtimes bind an OS-assigned socket before reporting
+its port over their private parent channel. The CLI confirms that the runtime
+owns that socket, then updates the traffic proxy and scheduled-trigger target.
+Custom runtime targets retain the assigned internal port contract: bind it
+strictly. A healthy application on a different owned port causes an immediate
+port-mismatch refusal. Application health has a hard 60-second limit, including
+setup; an individual probe gets at most five seconds by default. Concurrent
+starts waiting on an existing server have one five-minute elapsed deadline,
+including control requests and polling. Loopback HTTP requests use an elapsed
+deadline, so a response that keeps sending bytes cannot extend readiness.
+
 `rer dev` runs the local migration hook before starting the app and checking its
 owner prerequisites. The shared operator hook reads every SQL file in the seed's
 canonical `migrations/core` inventory, including changes pulled since the last
@@ -396,7 +407,7 @@ declaration refuses completion. A kit or custom-hook deploy, except `--dry-run`,
 first refuses uncommitted tracked source, naming the files, before any build or
 upload.
 
-The owner deployment declaration may set top-level `"productDirectory": ".rer/deploy/product"` for a product staged by the build or deploy hook. It must name a normalized checkout-relative subdirectory: no absolute path, backslash, empty, `.` or `..` segment. The directory must exist after the build or hook, with no symlink on its path. rer reads this field and passes `--product` only to the kit's packaging commands (`dry-run`, `deploy` and `health`), including its extra dry run after a custom hook. A hook that invokes the kit itself still supplies `--product` on its own invocation; the wrapper reads the declaration for its own steps. Omitting the field keeps packaging at the checkout root. State, root ownership, secret changes and removal keep their existing locations and behavior; dry run still requires credentials for target secret reads.
+The owner deployment declaration may set top-level `"productDirectory": ".rer/deploy/product"` for a product staged by the build or deploy hook. It must name a normalized checkout-relative subdirectory: no absolute path, backslash, empty, `.` or `..` segment. The directory must exist after the build or hook, with no symlink on its path. rer reads this field and passes `--product` only to the kit's packaging commands (`local-plan`, `deploy` and `health`). A public dry run runs the build lifecycle instead of the custom upload hook. A hook that invokes the kit itself still supplies `--product` on its own invocation; the wrapper reads the declaration for its own steps. Omitting the field keeps packaging at the checkout root. State, root ownership, secret changes and removal keep their existing locations and behavior; dry run needs no credentials and never reads target secrets.
 
 For a hosted owner claim, deploy reuses the name saved by `rer setup` in the
 checkout's `.seed/installer/setup-answers.json`, under the adapter's
@@ -522,3 +533,8 @@ sealing-capable Base version after restoring D1; rolling code back cannot decryp
 the rows. The CLI has no old-Base capability receipt or code rollback command,
 so it cannot preflight an out-of-band provider rollback. Current Base rejects a
 sealed key passed to its plaintext signing path with `installation_key_sealed_rollback`.
+
+On loopback, `rer preview` prints `RER_OPEN` for native owner entry.
+`rer demo` keeps its persona link and also prints `RER_OWNER_OPEN` for a native
+owner session in its isolated demo data. These native entry links work once,
+expire within 15 minutes and are never saved. Restarting retires them.

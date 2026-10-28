@@ -158,9 +158,13 @@ async function descendants(pid,context){
  const owned=new Set([pid]);for(let changed=true;changed;){changed=false;for(const [child,parent]of rows)if(owned.has(parent)&&!owned.has(child)){owned.add(child);changed=true;}}
  return owned;
 }
+// The process's own listeners first, then its descendants', each in port order:
+// a runtime's own application listener comes before the helper sockets its
+// children open (Miniflare's workerd also answers the application's health).
 export async function listenerPorts(pid,context=inspectionContext()){
- const owned=await descendants(pid,context);
- return [...new Set((await listeners([...owned],context)).filter(row=>owned.has(row.pid)).flatMap(row=>row.names.map(portOf)).filter(port=>Number.isInteger(port)&&port>0&&port<=65535))].sort((a,b)=>a-b);
+ const owned=await descendants(pid,context),rows=(await listeners([...owned],context)).filter(row=>owned.has(row.pid));
+ const ports=group=>group.flatMap(row=>row.names.map(portOf)).filter(port=>Number.isInteger(port)&&port>0&&port<=65535).sort((a,b)=>a-b);
+ return [...new Set([...ports(rows.filter(row=>row.pid===pid)),...ports(rows.filter(row=>row.pid!==pid))])];
 }
 // An exact health address can use positive own-tree evidence. localhost can
 // reach either loopback family, so it also needs a completed inspection with

@@ -34,7 +34,7 @@ async function runLifecycle(project, options, out, deployRedaction) {
  if(project.profile==='first-party'&&options.verb==='outbox')throw refuse('Captured mail has been retired. Run rer dev and open its RER_OPEN link.');
  if(project.profile==='first-party'&&['dev','preview'].includes(options.verb))return (await import('./managed-server.mjs')).managedServer(project,options,out);
  const cancellation = new AbortController(), signal = cancellation.signal;
- let termination, operation, store, temporary, proxy, failed = false;
+ let termination, operation, store, temporary, proxy, failed = false, installingFrozen = false;
  const handlers = new Map(['SIGINT', 'SIGTERM'].map(name => [name, () => { if (!termination) { termination = name; cancellation.abort(name); } }]));
  for (const [name, handler] of handlers) process.on(name, handler);
  try {
@@ -75,7 +75,7 @@ async function runLifecycle(project, options, out, deployRedaction) {
   const capture = ['.seed', 'installer', ...(process.env.RER_LOCAL_OPERATION || process.env.RER_ONBOARDING_PROCESS_OWNER ? [`commands-${process.pid}`] : [])];
   const directory = project.profile === 'first-party' && options.verb !== 'doctor' ? await privateDirectory(project.root, capture) : (temporary = await mkdtemp(join(tmpdir(), 'rer-command-')));
   const state = { logs: [] };
-  store = await createCommands(directory, state, { terminal: text => out.progress(text), onWaiting: options.json ? details => out.event('waiting', details) : undefined, queue: ['install','setup','build','verify','deploy','export','import'].includes(options.verb)?{verb:options.verb,originalCI:process.env.CI==='true'}:undefined });
+  store = await createCommands(directory, state, { terminal: text => { if (!installingFrozen || options.json) out.progress(text); }, onWaiting: options.json ? details => out.event('waiting', details) : undefined, queue: ['install','setup','build','verify','deploy','export','import'].includes(options.verb)?{verb:options.verb,originalCI:process.env.CI==='true'}:undefined });
   store.state = state;
   if (deployRedaction) store.addSecrets?.(Object.values(process.env).filter(value => value && deployRedaction.redact(value) !== value));
   store.setupManifest = project.setupManifest;
@@ -93,12 +93,15 @@ async function runLifecycle(project, options, out, deployRedaction) {
   if (options.verb === 'install') {
    try {
     const { dependencyEnvironment } = await shared('dependency-environment.mjs');
+    if (!options.json) out.progress('Installing frozen dependencies\n');
+    installingFrozen = true;
     await store.run('Installing frozen dependencies', 'pnpm', ['install', '--frozen-lockfile'], { cwd: project.root, signal, env: { ...dependencyEnvironment(), CI: 'true' }, display: 'pnpm install --frozen-lockfile' });
+    installingFrozen = false;
     // The test browser downloads on first need (verify), not here. Package
     // scripts run with the pinned pnpm through rer run, which keeps pnpm off PATH.
     if (!options.json) store.report('Run this project\'s package scripts with rer run SCRIPT (it uses the pnpm this project pins).');
     return {};
-   } catch (error) { if (signal.aborted) throw error; throw await installStepError(error, store, project.root); }
+   } catch (error) { if (signal.aborted) throw error; throw await installStepError(error, store, project.root); } finally { installingFrozen = false; }
   }
   if (options.verb === 'verify') {
    const target = adapter.verify;
@@ -128,7 +131,7 @@ async function runLifecycle(project, options, out, deployRedaction) {
   const privateSettings = [...adapter.settings, '.rer/local/models.json', ...(project.privateInputs??[])];
   const run = () => adapter.run(project.root, input ?? { [emailKey]: options.ownerEmail ?? selected?.vars[emailKey] }, store,
    child => { app = child; }, signal,
-   { verb: options.verb, ownerKey: emailKey, selectedOrigin: selected?.url, runtimePort: proxy?.runtimePort, operationToken: operation?.token, dev: adapter.dev, privateSettings, devKey: devKey ?? undefined });
+   { verb: options.verb, ownerKey: emailKey, selectedOrigin: selected?.url, runtimePort: proxy?.runtimePort, setRuntimePort: port=>proxy.setRuntimePort(port), operationToken: operation?.token, dev: adapter.dev, privateSettings, devKey: devKey ?? undefined });
   // A production build never sees the checkout's local settings, whatever the seed's build runs.
   if (options.verb === 'build') await withoutLocalSettings(project.root, { settings: privateSettings, operationToken: operation?.token }, run);
   else await run();
@@ -151,7 +154,7 @@ async function runLifecycle(project, options, out, deployRedaction) {
    const deployNeeds = await hostedNeeds(project);
    if (options.json) out.event('setup-ready', { url, setupUrl: url+'/setup', ...(deployNeeds.length ? { neededForDeploy: deployNeeds } : {}) });
    else {
-    out.human(`RER_SETUP_READY ${url}`); out.human(`Next: rer dev opens ${url} signed in as the owner; first-run setup finishes at ${url}/setup.`);
+    out.human(`RER_SETUP_READY ${url}`); out.human(`Next: rer dev opens ${url} signed in as the owner; first-run setup finishes at ${url}/setup. rer preview prints a one-time native owner link on loopback; rer demo also prints a separate native owner entry.`);
     if (deployNeeds.length) out.human(['To host it on your own Cloudflare account later, rer deploy needs:', ...deployNeeds.map(item => `  - ${item}`), 'Set them in your environment or a private (mode 0600) file passed with --env-file, then check with rer deploy --dry-run.'].join('\n'));
    }
   } else if (options.verb !== 'build') throw refuse('The requested first-party capability is unavailable.');
@@ -191,6 +194,21 @@ async function installStepError(error, store, root) {
  if (approvedFailure(error)?.code === 'machine_busy') return error;
  const { checkoutPath, stepDiagnostic, stepFailureText } = await shared('step-failure.mjs');
  const step = approvedFailure(error)?.step ?? stepDiagnostic({ name: store.state.step, output: store.state.logs, log: store.redact(checkoutPath(root, store.logPath)) });
+ // pnpm's stable machine codes select public wording; its raw diagnostic is
+ // retained in the structured step and private capture, never in this sentence.
+ const text = step.output.join('\n');
+ const refusal = [
+  ['ERR_PNPM_OUTDATED_LOCKFILE', 'pnpm-lock.yaml does not match package.json'],
+  ['ERR_PNPM_NO_LOCKFILE', 'pnpm-lock.yaml is missing'],
+  ['ERR_PNPM_LOCKFILE_BREAKING_CHANGE', 'pnpm-lock.yaml was written by an incompatible pnpm version'],
+ ].find(([code]) => text.includes(code)) ?? (text.includes('Headless installation requires a pnpm-lock.yaml file') ? ['ERR_PNPM_NO_LOCKFILE', 'pnpm-lock.yaml is missing'] : undefined);
+ if (refusal) {
+  const { toolCommand } = await shared('tool-command.mjs');
+  const { shellQuote } = await import('./node-runtime-cache.mjs');
+  const [program, args] = toolCommand('pnpm', ['install', '--no-frozen-lockfile']);
+  const next = [program, ...args].map(value => /^[A-Za-z0-9_.-]+$/.test(value) ? value : shellQuote(value)).join(' ');
+  return new RerError(refusal[0], `${refusal[1]}, so the install was stopped; run ${next} to update it, then retry.\n${stepFailureText(step)}`, 1, { step, childExitCode: step.exitCode, signal: step.signal });
+ }
  // Only a RerError's message or a symbolic error code is safe to show; a native message can hold private data.
  const cause = error instanceof RerError ? `\n${error.message}` : /^[A-Z][A-Z0-9_]{1,63}$/.test(error?.code ?? '') ? `\nCause: ${error.code}` : '';
  return new RerError(error instanceof RerError ? error.code : 'install_step_failed', `${stepFailureText(step)}${cause}`, error instanceof RerError ? error.exitCode : 1, { step, ...(Number.isInteger(step.exitCode) ? { childExitCode: step.exitCode, signal: step.signal } : {}) });

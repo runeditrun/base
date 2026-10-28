@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ownerDeploy } from './deploy.mjs';
 
-test('owner deploy dry run validates the kit artifact and declaration with only provider reads',async t=>{
+test('owner deploy dry run validates the kit artifact and declaration without provider requests',async t=>{
  // Kit artifact data only; real application acceptance is in reference-journey.
  const root=await realpath(await mkdtemp(join(tmpdir(),'rer-deploy-kit-')));t.after(()=>rm(root,{recursive:true,force:true}));
  for(const path of ['dist/server','dist/client','migrations/core'])await mkdir(join(root,path),{recursive:true});
@@ -21,8 +21,8 @@ test('owner deploy dry run validates the kit artifact and declaration with only 
  const {localOperation}=await import('../onboarding/local/operation.mjs');const lock=await localOperation(root);t.after(()=>lock.release());
  const deploy=ownerDeploy('deploy.json',{run:async(...args)=>{builds++;assert.equal(args.at(-1).verb,'build');assert.equal(args.at(-1).operationToken,lock.token);}});
  const args={root,options:{dryRun:true},store,signal:new AbortController().signal,operationToken:lock.token};
- assert.deepEqual(await deploy(args),{dryRun:true,deployed:false});assert.equal(builds,1);assert.equal(provider.state.writes.length,0);
- assert.ok(provider.state.calls.length>0);assert.ok(provider.state.calls.every(call=>call.method==='GET'));
+ const dry=await deploy(args);assert.equal(dry.dryRun,true);assert.equal(dry.deployed,false);assert.equal(dry.plan.d1[0].binding,'DB');assert.equal(builds,1);assert.equal(provider.state.writes.length,0);
+ assert.equal(provider.state.calls.length,0);
  const requests=provider.state.calls.length;
  await writeFile(join(root,'deploy.json'),JSON.stringify({...declaration,d1:[]}));
  await assert.rejects(deploy(args),/undeclared-migration-binding/);assert.equal(provider.state.calls.length,requests);
@@ -102,5 +102,42 @@ test('owner deploy reports the failed provider step and completed creates withou
    assert.equal(provider.state.buckets.length,step==='create R2'?0:1);
    assert.equal(provider.state.settings,null,'the failed attempt did not publish a Worker');
   }finally{transport.mock.restore();provider.close();}
+ }
+});
+
+test('site deploy preserves its redacted provider failure in human and JSON output', async t => {
+ const {siteCommand} = await import('./site.mjs');
+ const {siteProvider} = await import('../modules/deploy-kit/tests/site-provider.mjs');
+ const {symlink} = await import('node:fs/promises');
+ const {output} = await import('./output.mjs');
+ const root = await realpath(await mkdtemp(join(tmpdir(),'rer-site-diagnostic-')));
+ t.after(() => rm(root,{recursive:true,force:true}));
+ await symlink(new URL('../default-seed/node_modules',import.meta.url).pathname,join(root,'node_modules'),'dir');
+ await writeFile(join(root,'package.json'),'{}'); await writeFile(join(root,'site.mjs'),'export default {}');
+ await writeFile(join(root,'deploy.json'),JSON.stringify({version:1,project:['synthetic-base-1','synthetic-base-2'].join('/'),compatibilityDate:'2026-09-08'}));
+ await writeFile(join(root,'deploy-site.json'),JSON.stringify({version:1,domain:'synthetic-base-3.test'}));
+ const provider = siteProvider({domain:'synthetic-base-3.test'}); t.after(() => provider.close());
+ const names = ['CLOUDFLARE_ACCOUNT_ID','CLOUDFLARE_API_TOKEN'], prior = names.map(name => process.env[name]);
+ t.after(() => names.forEach((name,i) => {if(prior[i] === undefined) delete process.env[name]; else process.env[name] = prior[i];}));
+ names.forEach((name,i) => {process.env[name] = i ? provider.token : provider.accountId;});
+ t.mock.method(globalThis,'fetch',async (url,init) => new URL(url).pathname.endsWith('/assets-upload-session')
+  ? new Response(`synthetic-base-4 ${provider.token} ${provider.accountId} https://synthetic-base-5.test/?signature=synthetic-base-6`,{status:403}) : provider.fetch(url,init));
+ const store = {report:() => {},run:async (label,command,args) => {
+  await writeFile(join(args[3],'index.html'),'<!doctype html><h1>Example</h1>');
+  await writeFile(join(args[3],'run.html'),'<!doctype html><h1>Run</h1>');
+ }};
+ let caught;
+ await assert.rejects(siteCommand({root,adapter:{site:{entry:'site.mjs',output:['dist','site'].join('/'),declaration:'deploy-site.json'}}},{verb:'deploy',json:true},store,undefined,{human:() => {}}),error => {caught = error;return true;});
+ assert.equal(caught.code,'deploy_refused'); assert.match(caught.message,/creating site assets upload session/);
+ assert.match(caught.message,/POST \/client\/v4\/accounts\/\[REDACTED\].*HTTP 403/);
+ assert.equal(caught.siteDeploy.providerRequest.status,403);
+ for (const json of [false,true]) {
+  let written = '';
+  const stdout = t.mock.method(process.stdout,'write',text => {written += text;return true;});
+  const stderr = t.mock.method(process.stderr,'write',text => {written += text;return true;});
+  try {output({verb:'deploy',json}).error(caught);} finally {stdout.mock.restore();stderr.mock.restore();}
+  assert.ok(written.includes('synthetic-base-4'));
+  for (const secret of [provider.accountId,provider.token,'signature=synthetic-base-6']) assert.ok(!written.includes(secret));
+  if (json) assert.deepEqual(JSON.parse(written).siteDeploy,caught.siteDeploy); else assert.equal(written,caught.message+'\n');
  }
 });

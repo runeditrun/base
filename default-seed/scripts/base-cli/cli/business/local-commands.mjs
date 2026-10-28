@@ -7,6 +7,7 @@ import { removePermissions } from './permissions.mjs';
 import { Api, pause } from './api.mjs';
 import { loadProgress } from './progress.mjs';
 import { VENDORS } from './vendors/index.mjs';
+import { removeCarries } from './carry.mjs';
 import { rerCommand } from './invocation.mjs';
 
 export async function paired() {
@@ -78,6 +79,7 @@ export async function disconnect() {
   for (const handle of state.vendorHandles ?? []) await store.delete(handle);
   if (state.origin) await store.delete(credentialHandle(state.origin));
  }
+ await removeCarries();
  await removeStateDirectory();
  process.stdout.write(revocation === 'revoked'
   ? 'Business disconnected. Device revoked; local service, credentials and added permissions removed.\n'

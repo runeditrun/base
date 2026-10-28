@@ -1,3 +1,4 @@
+import { humanError } from './human-error.mjs';
 import { handleBrokenPipes } from './stdio.mjs';
 import { exportSummary } from './export-summary.mjs';
 import { importSafetySummary } from './import-summary.mjs';
@@ -24,8 +25,8 @@ export function output(options) {
    else if (!['describe', 'check', 'dev', 'preview', 'setup'].includes(options.verb) || !ok) this.human(`${options.verb}: ${ok ? 'complete' : 'failed'} (exit ${exitCode})`);
   },
   error(error) {
-   if (structuredResult) this.event('error', { code: error.code, message: error.message, exitCode: error.exitCode, ...(error.availableDeployments ? { environment: error.environment, availableDeployments: error.availableDeployments } : {}), ...(error.step ? { step: error.step } : {}) });
-   else write(2, error.message + '\n');
+   if (structuredResult) this.event('error', { code: error.code, message: error.message, exitCode: error.exitCode, ...(!options.json && error.humanMessage ? { humanMessage: error.humanMessage } : {}), ...(error.availableDeployments ? { environment: error.environment, availableDeployments: error.availableDeployments } : {}), ...(error.siteDeploy ? {siteDeploy:error.siteDeploy} : {}), ...(error.step ? { step: error.step } : {}), ...(error.d1Import ? {d1Import:error.d1Import} : {}) });
+   else write(2, humanError(error) + '\n');
   },
  };
 }

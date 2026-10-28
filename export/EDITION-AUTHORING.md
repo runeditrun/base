@@ -52,7 +52,16 @@ Git repository and reads committed blobs. The default publisher identity
 `runeditrun/base` resolves to `https://github.com/runeditrun/base.git`. A legacy
 record repository or an edition's Base source URL is still honored. No source
 scripts run, and the temporary clone is removed. `--base` is relative to the
-seed root; it must contain both the recorded and target commits.
+seed root; it must contain both the recorded and target commits. If a history
+comparison cannot be established locally, online refresh fetches just the two
+immutable comparison tips from that checkout's origin (or the declared Base
+remote) into a temporary bare repository. This avoids shallow boundaries without
+requiring a full Base clone or changing the supplied checkout. The fetch requests
+no tags or other branches and has a 60-second transport deadline. Its temporary
+repository is removed after comparison. A failed acquisition refuses before
+refresh writes, naming both revisions, the remote and a complete one-line repair
+command. Offline refresh never fetches; incomplete ancestry gets the same repair
+guidance for use when online.
 
 For offline use, supply `--offline --base CHECKOUT`. Without a checkout refresh
 refuses plainly; it cannot refresh from hashes alone. Offline Git reads use an isolated

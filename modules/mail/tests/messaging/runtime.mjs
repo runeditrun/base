@@ -1,6 +1,9 @@
+import { installD1Preflight } from '../../../container/adapters/d1-workerd-setup.mjs';
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-const { Miniflare } = await import(process.env.MAIL_MINIFLARE_MODULE || 'miniflare');
+const miniflare = await import(process.env.MAIL_MINIFLARE_MODULE || 'miniflare');
+installD1Preflight(miniflare.D1_PLUGIN);
+const { Miniflare } = miniflare;
 const root = new URL('../../', import.meta.url);
 export async function createRuntime(path, source, now) {
   const modules = {};

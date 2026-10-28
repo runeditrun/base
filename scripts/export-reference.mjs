@@ -3,6 +3,7 @@ import { resolve, relative, dirname, basename } from 'node:path';
 import { exportCLI } from '../cli/export.mjs';
 import { createHash } from 'node:crypto';
 import { testSource } from '../composition/git-source.mjs';
+import { renderVerifySchedule, scheduleTransformation } from '../foundation/verify-schedule.mjs';
 import { exportBusinessSettings } from '../export/business-settings.mjs';
 
 export async function exportReference(base, target) {
@@ -24,13 +25,22 @@ export async function exportReference(base, target) {
  await exportCLI(base, target);
  for (const name of ['RUN-LOCALLY.md','SEED-COMMAND-CONTRACT.md','HOMEPAGE-VARIANTS.md','VERIFY-WORKFLOW.md','DEMO.md']) await cp(resolve(base,'export',name), resolve(target,name));
  await mkdir(resolve(target, '.github/workflows'), { recursive: true });
- for (const name of ['verify.yml', 'verify-nightly.yml']) await cp(resolve(base, 'export', name), resolve(target, '.github/workflows', name));
+ const workflowSources = {};
+ const seed = JSON.parse(await readFile(resolve(reference, 'OPERATIONS.json'), 'utf8')).project.split('/').at(-1);
+ for (const name of ['verify.yml', 'verify-nightly.yml']) {
+  const source = `export/${name}`, path = `.github/workflows/${name}`;
+  const original = await readFile(resolve(base, source), 'utf8');
+  const bytes = name === 'verify-nightly.yml' ? renderVerifySchedule(original, seed) : original;
+  await writeFile(resolve(target, path), bytes);
+  workflowSources[path] = { source, sha256: createHash('sha256').update(bytes).digest('hex'), ...(name === 'verify-nightly.yml' ? { transformation: scheduleTransformation } : {}) };
+ }
+ for (const name of ['verify-ci.mjs', 'verify-evidence.mjs', 'verify-plan.mjs', 'verify-light.mjs']) await cp(resolve(base, 'export', name), resolve(target, 'scripts', name));
  await cp(resolve(base,'LICENSE'), resolve(target,'LICENSE'));
  const idp = 'modules/operator-auth/identity/oidc/tests/idp.mjs', idpTarget = 'tests/operator-auth/idp.mjs';
  const maps = { ...business.maps, [resolve(base, 'modules/agent-door')]: resolve(target, 'src/modules/agent-door'), [resolve(base, 'modules/dependencies')]: resolve(target, 'src/modules/dependencies'), [resolve(base, 'modules/owner-claim')]: resolve(target, 'src/modules/owner-claim'), [resolve(base, 'modules/demo')]: resolve(target, 'src/modules/demo'), [resolve(base, idp)]: resolve(target, idpTarget), [resolve(base, 'onboarding')]: resolve(target, 'scripts/base-onboarding'), [resolve(base, 'modules/mail')]: resolve(target, 'src/modules/mail'), [resolve(base, 'modules/ai')]: resolve(target, 'src/modules/ai'), [resolve(base, 'modules/operator-auth')]: resolve(target, 'src/modules/operator-auth'), [resolve(base, 'foundation/runtime')]: resolve(target, 'src/base'), [resolve(base, 'modules/portability')]: resolve(target, 'src/modules/portability'), [resolve(base, 'modules/erasure')]: resolve(target, 'src/modules/erasure'), [resolve(base, 'modules/import-kit')]: resolve(target, 'src/modules/import-kit') };
  const helper = 'scripts/install-chromium-deps.py', helperSource = 'export/install-chromium-deps.py';
  await cp(resolve(base, helperSource), resolve(target, helper));
- const sources = { ...business.sources, [helper]: { source: helperSource, sha256: createHash('sha256').update(await readFile(resolve(target, helper))).digest('hex') } };
+ const sources = { ...business.sources, ...workflowSources, [helper]: { source: helperSource, sha256: createHash('sha256').update(await readFile(resolve(target, helper))).digest('hex') } };
  function relocate(bytes, original, file) {
   return bytes.replace(/(['"])(\.\.[^'"\n]+)\1/g, (literal, quote, specifier) => {
    const absolute = resolve(dirname(original), specifier);
@@ -49,7 +59,7 @@ export async function exportReference(base, target) {
     const original = resolve(reference, name); let bytes = await readFile(file, 'utf8');
     bytes = relocate(bytes, original, file);
     await writeFile(file, bytes);
-    sources[name] = { source: 'default-seed/' + name, sha256: createHash('sha256').update(bytes).digest('hex'), transformation: 'Contained runtime import relocation' };
+    sources[name] = { source: /^scripts\/verify-(?:ci|evidence|plan|light)\.mjs$/.test(name) ? 'export/' + basename(name) : 'default-seed/' + name, sha256: createHash('sha256').update(bytes).digest('hex'), transformation: 'Contained runtime import relocation' };
    }
   }
  }

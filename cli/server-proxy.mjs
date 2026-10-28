@@ -23,12 +23,13 @@ import { UpstreamAgent } from './upstream-agent.mjs';
 // A Host that is neither loopback, a `*.localhost` name nor the configured
 // origin's (origin) gets a plain 421 here: the application would refuse it
 // anyway, and an auth check that throws on it must not answer with a crash page.
-export async function trafficProxy({host,port,target,activity,door,devKey,origin}) {
+export async function trafficProxy({host,port,target,activity,door,devKey,origin,ownerEntry}) {
  const probe=randomUUID(),sockets=new Set(),keyed=keyHolder(devKey),configured=origin?new URL(origin).host:null;
  const agent=new UpstreamAgent();let closing=false;
- const server=http.createServer((req,res)=>{
+ const server=http.createServer(async (req,res)=>{
   if(door&&!doorAdmits(req,door)){req.resume();res.writeHead(403,{'content-type':'text/plain; charset=utf-8'});res.end('This checkout answers only through its front door.');return;}
   if(!hostAdmits(req,configured)){req.resume();res.writeHead(421,{'content-type':'text/plain; charset=utf-8'});res.end('This local server answers only its own host.');return;}
+  try { if(await ownerEntry?.(req,res))return; } catch {req.resume();notFound(res);return;}
   if(!publicPath(req.url)||fsPath(req.url)&&!keyed(req)){req.resume();notFound(res);return;}
   const internal=req.headers['x-rer-probe']===probe;delete req.headers['x-rer-probe'];
   const endActivity=internal?()=>{}:activity.begin();let finished=false;
@@ -102,7 +103,7 @@ export async function trafficProxy({host,port,target,activity,door,devKey,origin
   upstream.on('error',()=>socket.destroy());socket.on('error',()=>upstream.destroy());socket.on('close',()=>upstream.destroy());upstream.on('close',()=>socket.destroy());
  });
  try{await listen(server,host,port);}catch(error){agent.destroy();throw error;}
- return {probe,port:server.address().port,async close(){closing=true;agent.destroy();for(const socket of sockets)socket.destroy();await new Promise(resolve=>server.close(resolve));}};
+ return {probe,port:server.address().port,setTarget(port){target=port;},async close(){closing=true;agent.destroy();for(const socket of sockets)socket.destroy();await new Promise(resolve=>server.close(resolve));}};
 }
 function doorAdmits(req,door){
  const host=String(req.headers.host??'').toLowerCase(),given=Buffer.from(String(req.headers[door.header]??'')),secret=Buffer.from(door.secret);
