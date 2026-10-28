@@ -89,9 +89,10 @@ catch (error) {
  // A populated destination names its table or bucket: schema names, never row data.
  const occupied = error instanceof PortabilityError && /^(target|bucket)_not_empty:/.test(error.code) ? error.code.slice(error.code.indexOf(':') + 1) : undefined;
  // Safety diagnostics contain only policy schema names, never source values.
+ const identityTable = error instanceof PortabilityError && error.code.startsWith('identity_table_undeclared:') ? error.code.slice('identity_table_undeclared:'.length) : undefined;
  const safety = error instanceof PortabilityError && error.code.startsWith('import_row_') ? error.code.slice(error.code.indexOf(':')+1) : undefined;
  // Anything that is not a portability refusal names its class and code, never its message: that can hold row data.
  const native = error instanceof PortabilityError || error.message === 'archive_json' ? undefined : nativeFailure(error);
  process.exitCode = exitCode;
- await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, ...(reExport ? { reExport: true } : {}), ...(migration ? { migration } : {}), ...(unapplied ? { unapplied } : {}), ...(occupied ? { occupied } : {}), ...(safety ? { safety } : {}), ...(native ? { native } : {}), exitCode });
+ await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, ...(reExport ? { reExport: true } : {}), ...(migration ? { migration } : {}), ...(unapplied ? { unapplied } : {}), ...(occupied ? { occupied } : {}), ...(identityTable ? { identityTable } : {}), ...(safety ? { safety } : {}), ...(native ? { native } : {}), exitCode });
 }

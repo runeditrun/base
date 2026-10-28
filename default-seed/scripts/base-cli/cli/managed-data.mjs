@@ -26,7 +26,7 @@ export async function withManagedDataImport(context, declaration, restore) {
  catch (error) {
   if (!(error instanceof PortabilityError)) throw error;
   const reason = error.code.startsWith('managed_data_') ? error.code : error.code.split(':').slice(0, 2).join(':');
-  throw new RerError(reason, `Managed data restore refused (${reason}). The destination has not accepted this archive.`, 4);
+  throw new RerError(reason, `Managed data restore refused (${reason}). The destination has not accepted this archive.${reason.startsWith('identity_table_undeclared:') ? ' Declare this table in includeTables to transfer its rows or excludeTables to omit them.' : ''}`, 4);
  }
 }
 async function intake(context, declaration, restore) {
@@ -55,7 +55,7 @@ async function intake(context, declaration, restore) {
    check(Buffer.byteLength(sql) <= 16 * 1024 * 1024, 'oversized');
    const statements = splitStatements(sql);
    check(statements.length <= 10000, 'oversized');
-   const prepared = [];
+   const prepared = [[], [], []];
    for (const statement of statements) {
     context.signal?.throwIfAborted();
     const tokens = sqliteTokens(statement), head = tokens.slice(0, 3).map(token => token.text.toLowerCase());
@@ -75,9 +75,13 @@ async function intake(context, declaration, restore) {
     }
     sql += statement.slice(offset);
     check(Buffer.byteLength(sql) <= 100000, 'oversized');
-    prepared.push(params.length ? db.prepare(sql).bind(...params) : db.prepare(sql));
+    // A child INSERT may precede its parent's definition in the producer's
+    // dump. Validate everything first, then create all tables in the same
+    // deferred-FK batch. Keep the remaining order, especially trigger creation.
+    const phase = head[0] === 'pragma' ? 0 : head[0] === 'create' && head[1] === 'table' ? 1 : 2;
+    prepared[phase].push(params.length ? db.prepare(sql).bind(...params) : db.prepare(sql));
    }
-   await db.batch(prepared);
+   await db.batch(prepared.flat());
   } catch (error) {
    if (error instanceof PortabilityError || context.signal?.aborted) throw error;
    check(false, 'sql_refused');

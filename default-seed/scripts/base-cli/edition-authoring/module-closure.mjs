@@ -1,7 +1,7 @@
 // All recorded code uses the same source graph and seed ownership boundary.
 import fs from 'node:fs';
 import path from 'node:path';
-import {raw, safe, requirePhysical, testSource, freedEntries} from './files.mjs';
+import {raw, safe, requirePhysical, testSource, freedEntries, toolFile} from './files.mjs';
 import {dependencies, resolve, external, bindings, lexicalExports} from './runtime-dependencies.mjs';
 const code = name => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(name) && !testSource(name);
 const inside = (name, prefix) => prefix === '.' ? !name.startsWith('../') && !path.posix.isAbsolute(name) : name === prefix || name.startsWith(prefix + '/');
@@ -177,6 +177,14 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     const imports = bindings(bytes), oldBindings = bindings(before);
     const typeImports = bindings(bytes, true), oldTypes = bindings(before, true);
     const edges = requests(bytes, source, target).map(request => edge(source, target, request));
+    // lock.mjs reads the whole tool dynamically to identify it. Deliver that
+    // same file set, including parser notices and modules outside its imports.
+    if (/^(?:edition-authoring|(?:default-seed|export)\/scripts\/base-cli\/edition-authoring)\/lock\.mjs$/.test(source)) {
+      const from = source.slice(0, -'lock.mjs'.length), to = target.slice(0, -'lock.mjs'.length);
+      for (const dependency of tree.keys()) if (dependency.startsWith(from) && toolFile(dependency.slice(from.length))) {
+        edges.push({dependency, destination: to + dependency.slice(from.length)});
+      }
+    }
     for (const {manifests = []} of [...edges]) for (const dependency of manifests) {
       edges.push({dependency, destination: path.posix.join(path.posix.dirname(target), path.posix.relative(path.posix.dirname(source), dependency))});
     }
