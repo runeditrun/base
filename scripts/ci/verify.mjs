@@ -12,14 +12,14 @@ import { referenceShardPlan, verifyReferenceShard } from './reference-shard.mjs'
 const stage = name => ({ stage: `verify:${name}` });
 const partition = (name, shard) => ({ stage: `verify:${name}`, shard });
 export const groups = {
-  '1': [partition('modules', 1), stage('editor')],
-  '2': [partition('modules', 2), stage('foundation')],
-  '3': [partition('cli', 1), stage('deployment'), stage('container')],
-  '4': [partition('cli', 2), stage('portability')],
-  '5': [stage('reference'), stage('operator-auth'), stage('onboarding-browser')],
-  '6': [partition('cli', 3), stage('release'), stage('rer')],
-  '7': [partition('modules', 3), stage('publish-check'), stage('onboarding'), stage('review-harness')],
-  '8': [partition('cli', 4), ...['composition', 'edition-authoring', 'authoring', 'delivery-producer', 'schema', 'operations', 'job-queue', 'owner-claim', 'boundary-checker', 'launcher', 'mail-relay'].map(stage)],
+  '1': [partition('modules', 1), stage('deployment'), stage('launcher'), stage('onboarding-browser')],
+  '2': [partition('modules', 2), stage('release'), stage('publish-check'), stage('onboarding'), stage('review-harness'), stage('job-queue'), stage('operations'), stage('schema'), stage('mail-relay')],
+  '3': [partition('cli', 1)],
+  '4': [partition('cli', 2), stage('owner-claim')],
+  '5': [stage('reference'), stage('boundary-checker'), stage('edition-authoring')],
+  '6': [partition('cli', 3), stage('authoring'), stage('rer')],
+  '7': [partition('modules', 3)],
+  '8': [partition('cli', 4), stage('editor'), stage('operator-auth'), stage('delivery-producer'), stage('foundation'), stage('portability'), stage('container'), stage('composition')],
 };
 
 export async function ciPlan({ journeys = false } = {}) {
@@ -34,9 +34,9 @@ export async function ciPlan({ journeys = false } = {}) {
     else assert.equal(owners[0].shard, undefined, `Unexpected partition: ${name}`);
   }
   await Promise.all([moduleShardPlan(), cliShardPlan(), referenceShardPlan()]);
-  // Only the native editor consumer requires hosted disk reclamation. Both
-  // module browser files stay in partition 1; partition 2 needs only workerd.
-  const include = Object.keys(groups).map(group => ({ group, browser: group !== '2', native: groups[group].some(task => task.stage === 'verify:editor') }));
+  // Native disk setup follows the editor. A job containing only a module
+  // partition without the two fixed browser files needs workerd alone.
+  const include = Object.keys(groups).map(group => ({ group, browser: groups[group].some(task => task.stage !== 'verify:modules' || task.shard === 1), native: groups[group].some(task => task.stage === 'verify:editor') }));
   if (journeys) include.push({ group: 'journeys', browser: true, native: false });
   return { include };
 }

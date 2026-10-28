@@ -337,7 +337,7 @@ jobs:
           path: ${{ runner.temp }}/rer-test-evidence
           if-no-files-found: ignore
       - name: Fetch pinned active HappyToHelp source without credentials
-        if: ${{ !cancelled() && matrix.group == '8' }}
+        if: ${{ !cancelled() && matrix.group == '5' }}
         env:
           GIT_CONFIG_NOSYSTEM: '1'
           GIT_CONFIG_GLOBAL: /dev/null
@@ -348,15 +348,15 @@ jobs:
           git -c credential.helper= -C "$RUNNER_TEMP/public-happytohelp" fetch --depth=1 https://github.com/just-every/happytohelp.git 60e9a84688ea41575d56a8f692bbb8173366c7c5
           git -c credential.helper= -C "$RUNNER_TEMP/public-happytohelp" checkout --detach FETCH_HEAD
       - name: Select the active edition's pinned runtime after Base stages finish
-        if: ${{ !cancelled() && matrix.group == '8' }}
+        if: ${{ !cancelled() && matrix.group == '5' }}
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '26.8.1'
       - name: Packed launcher acquisition, browser onboarding and offline resume for active HappyToHelp
-        if: ${{ !cancelled() && matrix.group == '8' }}
+        if: ${{ !cancelled() && matrix.group == '5' }}
         run: node scripts/ci/launcher-acceptance.mjs
       - name: Remove active-edition acceptance checkouts
-        if: ${{ always() && matrix.group == '8' }}
+        if: ${{ always() && matrix.group == '5' }}
         run: |
           rm -rf -- "$RUNNER_TEMP/public-happytohelp" "$RUNNER_TEMP/base-launcher-evidence"
           rm -f -- "$RUNNER_TEMP/launcher-release-manifest.json"
