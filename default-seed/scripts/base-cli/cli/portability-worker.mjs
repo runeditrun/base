@@ -1,3 +1,4 @@
+import { installD1Preflight } from '../modules/container/adapters/d1-workerd-setup.mjs';
 import { portabilityPlan, ensurePortabilitySchema } from '../modules/container/portability-schema.mjs';
 import { exportArchive, importArchive, fileRecords } from '../modules/portability/files.mjs';
 import { readLegacyArchive } from '../modules/portability/format.mjs';
@@ -38,7 +39,9 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
  policy = await loadPolicy(root, policy, policyModule);
  const declaration=platformMigrationDeclaration(platformMigrations);
  if (direction === 'policy-preflight') return { checkedPolicy: true };
- const { getPlatformProxy, unstable_splitSqlQuery } = createRequire(join(root, 'package.json'))('wrangler');
+ const require = createRequire(join(root, 'package.json'));
+ const { getPlatformProxy, unstable_splitSqlQuery } = require('wrangler');
+ installD1Preflight(createRequire(require.resolve('wrangler/package.json'))('miniflare').D1_PLUGIN);
 
  // Unlike Wrangler's --persist-to base, the API takes the versioned directory.
  const configPath = await dataConfiguration(root);

@@ -1,3 +1,4 @@
+import '../modules/container/adapters/d1-workerd-preload.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

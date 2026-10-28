@@ -1,3 +1,4 @@
+import '../../scripts/base-cli/modules/container/adapters/d1-workerd-preload.mjs';
 import assert from 'node:assert/strict'
 import { copyProject } from './copy.mjs'
 import { mkdir, mkdtemp, open, readFile, rm, statfs, writeFile } from 'node:fs/promises'
@@ -64,7 +65,7 @@ export async function freshLocalProject(owner) {
   }
   const env = {
     ...servingEnvironment,
-    ...Object.fromEntries(['HTTP_PROXY','HTTPS_PROXY','NO_PROXY','NODE_EXTRA_CA_CERTS','SSL_CERT_FILE'].filter(name=>process.env[name]).map(name=>[name,process.env[name]])),
+    ...Object.fromEntries(['HTTP_PROXY','HTTPS_PROXY','NO_PROXY','NODE_EXTRA_CA_CERTS','SSL_CERT_FILE','NODE_OPTIONS','NODE_USE_ENV_PROXY'].filter(name=>process.env[name]).map(name=>[name,process.env[name]])),
     PATH: process.env.PATH, HOME: process.env.HOME, CI: 'true',
     RER_JOBS_DIR: join(directory, 'jobs'), RER_JOBS_LOAD_THRESHOLD: '100000', RER_JOBS_MIN_FREE_MEMORY_BYTES: '0',
     RER_SERVERS_DIR: join(directory, 'servers'),

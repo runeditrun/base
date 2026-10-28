@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../container/adapters/d1-sqlite.mjs';
 import { providerFixture } from './provider-fixture.mjs';
 
 /** Fake Cloudflare account for owner-account mode tests. It reuses the existing

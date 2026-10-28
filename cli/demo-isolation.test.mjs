@@ -1,10 +1,11 @@
+import '../modules/container/adapters/d1-workerd-preload.mjs';
 import { retainStartupFailure } from './fixtures/command-diagnostic.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { access, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../modules/container/adapters/d1-sqlite.mjs';
 import { fixture, pause } from './fixtures/reference.mjs';
 
 const events = child => child.stdoutText.trim().split('\n').filter(Boolean).map(JSON.parse);

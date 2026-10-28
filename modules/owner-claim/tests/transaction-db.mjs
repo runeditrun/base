@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../container/adapters/d1-sqlite.mjs';
 import { readFileSync } from 'node:fs';
 
 // Test-only D1 API adapter: execute the production SQL and transaction boundaries

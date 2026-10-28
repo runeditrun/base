@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { cp, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, sep } from 'node:path';
-import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions } from '../../../container/adapters/d1-workerd.mjs';
 import { initializeD1ImportStorage } from '../../src/d1/index.ts';
 import type { D1Database, D1ImportContext } from '../../src/d1/index.ts';
 import { targets } from './fixtures.ts';
