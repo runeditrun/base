@@ -84,8 +84,10 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    await migrate(await mf.getD1Database(item.binding, 'app'), withRewrites(plan, await readMigrationRewrites(root), { partial: true }));
   }
  } catch (error) { await mf.dispose(); throw error; }
+ // Close each exchange, as loopback harnesses do: a refused oversized upload can
+ // leave a pooled socket that the server has already closed. Never retry.
  return { client, identity, origin: HOSTED_ORIGIN, close: () => mf.dispose(),
-  fetch: (path, { headers, ...init } = {}) => fetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }),
+  fetch: (path, { headers, ...init } = {}) => fetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, connection: 'close', 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }),
   // One cron firing of the app's scheduled handler, as rer deploy's trigger runs it.
   async scheduled() {
    const result = await (await mf.getWorker('app')).scheduled({ cron: config.triggers?.crons?.[0] ?? '* * * * *', scheduledTime: new Date() });
