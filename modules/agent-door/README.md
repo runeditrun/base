@@ -143,7 +143,7 @@ The tool error metadata has this shape:
 {"_meta":{"com.runeditrun/error":{"code":"policy_unset"}}}
 ```
 
-Stable tool refusal codes are `policy_unset` (with `unanswered` and `setup_url`), `policy_unavailable`, `policy_blocked` (class, rule and revision), `approval_required` (legacy clients), `approval_rejected`, `approval_expired`, `approval_evidence_changed`, `self_escalation`, `agents_paused`, `idempotency_key_required`, `idempotency_conflict`, `revision_conflict` (with `current_revision`), `invalid_arguments` and `output_invalid`. Native `ToolRefusal` codes pass through unchanged. Person, local policy and adoption JSON refusals use `{ "code": "..." }`.
+Stable tool refusal codes are `policy_unset` (with `unanswered` and `setup_url`), `policy_unavailable`, `policy_blocked` (class, rule and revision), `approval_required` (legacy clients), `approval_rejected`, `approval_expired`, `approval_evidence_changed`, `self_escalation`, `agents_paused`, `idempotency_key_required`, `idempotency_conflict`, `revision_conflict` (with `current_revision`), `invalid_arguments`, `native_proof_required` (kind and human handoff), `invalid_authority` and `output_invalid`. Native `ToolRefusal` codes pass through unchanged. Person, local policy and adoption JSON refusals use `{ "code": "..." }`.
 Local policy returns `policy_document_invalid` with `path`, `policy_incomplete` with `problems`, or `policy_managed_by_business`.
 
 Provider spend caps are **not enforced**. Standalone saves containing
@@ -173,7 +173,7 @@ They are not evidence that every clause or every adopting edition has passed.
 Module tests under `tests/`, this reusable journey and an edition's integrated
 browser and native journey are separate evidence.
 
-Remaining work includes full clause and tier and role and UI parity, grant narrowing,
+Remaining work includes full clause and tier and role and UI parity,
 Business revocation delivery, provider-spend caps and byte budgets, long jobs,
 outside-mail attribution, standalone credential issuance,
 self-host delivery, stranger-specialist completion, generated agent docs, and

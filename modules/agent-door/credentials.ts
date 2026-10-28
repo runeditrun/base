@@ -91,7 +91,7 @@ export async function authenticate(
       return {
         person,
         agent: { id: claims.act.sub, name: claims.act.name, specialist: claims.act.specialist as string | null | undefined },
-        scopes: claims.scope === '' ? [] : claims.scope.split(' '), consent: claims.consent,
+        clientId: claims.client_id, scopes: claims.scope === '' ? [] : claims.scope.split(' '), consent: claims.consent,
       }
     }
     const local = await options.localCredentials?.(request)
@@ -100,7 +100,7 @@ export async function authenticate(
       !Array.isArray(local.scopes) || !local.scopes.every(nonempty)) return null
     const person = await options.people.person(local.sponsor.id)
     if (!person?.active) return null
-    return { person, agent: local.agent, scopes: local.scopes }
+    return { person, agent: local.agent, clientId: local.clientId, scopes: local.scopes }
   } catch {
     return null
   }

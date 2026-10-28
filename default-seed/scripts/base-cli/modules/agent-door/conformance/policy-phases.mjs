@@ -1,3 +1,4 @@
+import { proofOptions } from './authority-phases.mjs';
 import { isDeepStrictEqual } from 'node:util';
 import { autonomousPolicy } from './crypto.mjs';
 import { errorCode } from './protocol.mjs';
@@ -42,7 +43,7 @@ export async function blockedPhases(c) {
     c.add(`BASE-AGENT-007.1.blocked-no-effect.${cls}.${step.id}`, isDeepStrictEqual(before, after), `${step.tool} changed native state while ${cls} was blocked.`);
     await c.adopt(autonomousPolicy());
    }
-   const completed = await c.tool(step.tool, args);
+   const completed = await c.tool(step.tool, args, await proofOptions(c, step, args));
    if (completed.result?.isError || completed.result?.structuredContent === undefined) throw new Error(`Could not prepare ${step.id} for the ${cls} blocked variant (${errorCode(completed) ?? completed.status})`);
    outputs.set(step.id, completed.result.structuredContent);
   }

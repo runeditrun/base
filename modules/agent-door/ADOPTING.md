@@ -134,6 +134,88 @@ the same policy, approval, review and audit path as tools. A resource read must 
 access. Mark device, screen, connector, import-door and installation operations
 as outside the tool registry when they require another supported door.
 
+## Preserve the authenticated principal
+
+Tool contexts and resource readers/classifiers receive `person`, `agent`,
+`clientId` (the authenticated Business `client_id`, or the local adapter's id),
+and `scopes`. Enforce native resource fences with this context, including in
+read tools. Resource-backed events and subscription notifications check that
+same reader before any sponsor or Business-role shortcut. Register readers for
+all event URIs that require a resource fence. Approval events belong to the
+originating agent/client and must still pass the current scope/resource check.
+
+Call embedded agents with `door.invoke(name,args,{person,agent,scopes,clientId})`.
+Scopes are required and are retained exactly; the door never expands them to
+its registry. Supply `grantedScopes(principal)` when native client grants can
+change. It must read the current grant by stable agent/client id; the door
+intersects its answer with authenticated/saved scopes, so the hook cannot add
+authority. Without the hook, authenticated scopes remain authoritative.
+Approval execution restores the original principal, intersects its current
+grant, then checks the required tool/resource scope. Any removed saved scope
+refuses with `insufficient_scope`, no effect and a linked execution audit.
+The grant is checked again immediately before native execution. Native actions
+still own atomic transaction fences for concurrent grant changes.
+
+## Declare fixed narrowing operations
+
+Access/security tools that can widen keep their existing `authority` and sponsor
+escalation fixtures. For a fixed native revoke or reduction, declare:
+
+```ts
+widens: false,
+narrowing: { effect: 'revoke', reason: 'closed-target-input' },
+inputSchema: { type: 'object', properties: { client_id: { type: 'string' } },
+  required: ['client_id'], additionalProperties: false }
+```
+
+The checked reason accepts only required string target ids (`id`, `target_id`,
+`client_id`, `endpoint_id`, `monitor_id`, `runner_id`). It refuses nested payloads,
+references, unions, open schemas and person/role/scope/grant-adding fields. Use
+separate native fixed tools when arbitrary inputs could widen authority. The
+runtime rejects undeclared arguments for these tools, instead of discarding
+them, and refuses contradictory widening authority/classification.
+
+Add `narrowings: [{id,tool,args,subject,witness:{tool,args},smuggle:{role:'admin'}}]`
+to the surface. `args` must match a declared journey call. The read-only witness
+returns `{subject,grants:string[]}` from native authority for that target. During
+the autonomous journey, conformance refuses the smuggled widening argument
+without effects and requires the successful call's grant set to be a strict
+subset of its previous set. Output names every tool using this check. The
+reference `base.access.demote` uses the native role service; invitation and
+variable role tools retain their self-escalation fixtures.
+
+## Hand off native human proof
+
+A tool may declare `proof: 'native', proofKind: 'step_up'`. Register its seed-owned
+`nativeProofs.step_up` with `handoff(context)` and async
+`verify(reference,context)`. Context includes the original principal, tool, kind
+and exact declared arguments. The verifier decides whether the human's native
+proof is recent, correctly bound and still valid; Base receives only an opaque
+reference, never passwords, session cookies, two-factor codes or credentials.
+The handoff is a same-origin human URL and must contain no secret.
+
+An agent without valid proof receives `native_proof_required` with `kind` and
+`handoff`, no effect and a complete audit row. Send the opaque reference in MCP
+`params._meta['com.runeditrun/native-proof']` or embedded `who.proofReference`.
+Proof supplements policy and person approval; it never replaces either. Saved
+approvals retain the reference and reverify it immediately before execution,
+so an expired/revoked proof cannot run an approved action. Reference ids must
+be non-secret, bounded identifiers safe to retain in the private approval store.
+
+Declare `verification.proof: 'tests/native-proof.mjs'` in the Agent surface.
+Like the owner initializer, this contained test-only ES module default-exports
+an async function receiving `{request,origin,person,tool,kind,arguments}` and
+returns a reference obtained through the seed's real native proof lifecycle.
+Its `request` can reach only the disposable installation. It cannot inject a
+production bypass or substitute a Business approval for authentication.
+Conformance asserts missing/bogus challenges, unchanged native state and their
+audit rows, then executes with the valid native reference under both autonomous
+and approval policy. Other tools retain unconditional autonomous-success checks.
+The maintained reference protects erasure with `recent_sign_in`: its seed-owned
+verifier checks an active, version-matched native session created within ten
+minutes. This example is not two-factor proof; a seed needing two-factor step-up
+must implement that native verifier and test driver.
+
 ## Keep runtime and CLI evidence separate
 
 The copied module is application runtime source pinned by `base-copies.json`.
@@ -152,7 +234,7 @@ are separate from this installation journey and the edition's browser and UI par
 work. `rer verify` pairs its per-run ring through `RER_BUSINESS_TRUST`, posts a
 real signed settings document with the owner's Business `owner_id`, then mints
 journey tokens carrying that subject and `consent`. No setup-mode bypass exists. Retain explicit gaps for Business consent propagation, spend and byte budgets,
-long jobs, grant narrowing, outside mail, standalone policy forms and token
+long jobs, outside mail, standalone policy forms and token
 issuance, self-host delivery and stranger-specialist completion. Platform adoption
 of the shared policy source is also separate from copying it into an edition.
 
@@ -162,6 +244,86 @@ resources, audit, subscriptions and retained outcomes. Keep successful and
 failed outcome evidence for at least 24 hours. This module currently retains it
 indefinitely; adoption must not introduce earlier cleanup. Report the exact
 edition behavior verified, separately from Base module or CLI results.
+
+## Verification owner lifecycle
+
+`rer verify` reads the same `rer-setup.json` owner-claim step as installation.
+For `mode: "signed"` it signs a fresh five-minute `rer-owner-claim+jwt` with
+the disposable installation's per-run key, matching its configured issuer,
+installation ID, origin and owner email. It posts that claim to the declared
+path through the production handler. Setup-token mode retains the native token
+POST. No production key is read, and signed admission still rejects raw tokens.
+
+Seeds with a native initializer or a different owner binding declare this in
+`agent-surface.json`:
+
+```json
+{
+  "verification": {
+    "owner": {
+      "email": "synthetic-owner@example.com",
+      "emailField": "SETUP_OPERATOR_EMAIL",
+      "tokenField": "H2H_SETUP_TOKEN",
+      "initializer": "tests/initialize-agent-owner.mjs"
+    }
+  }
+}
+```
+
+All four keys are optional. Email defaults to `synthetic-base-1@example.com`;
+the manifest's email and token fields are always bound too. The initializer is
+a contained seed module default-exporting an async function receiving
+`{request, origin, email, sub, displayName, token, claim, returnTo}`. `claim` is
+`{mode, path, token}` with the signed credential when signed mode is declared;
+`token` is the private per-run setup token. Use `request(absoluteURL, init)` to
+drive the seed's real project/password, owner and member-linking lifecycle.
+It permits only the fresh hosted origin. Return the native final 303 `Response`
+with its session cookies; then the runner posts the signed Business settings
+document and runs the journey. Never create an owner with direct SQL, substitute
+an auth adapter, or add a verification-only production route. Initializer code
+runs as trusted test tooling in Node; it must use the supplied request function
+and must not contact providers or read real credentials.
+
+## Verification provider edges
+
+`agent-surface.json.verification.network` declares an optional test-only edge:
+
+```json
+{
+  "module": "tests/provider-edge.mjs",
+  "origins": ["https://api.openai.com", "https://receiver.example.invalid"]
+}
+```
+
+The contained ES module default-exports `{async fetch(request) { ... }}`.
+It receives the full Web `Request`: method, exact URL, headers and raw body,
+and returns a Web `Response`, including JSON or a streaming body. Relative
+helper imports are supported. Run the seed's own signature/payload validation
+and return realistic provider receipts here; keep native preparation, permission
+checks, state commits and receipt validation in the application.
+The module runs in an isolated workerd with no application bindings, Node
+capabilities or network access. Its own `fetch` requests are denied, including
+requests to declared origins. Only declared exact origins reach the module;
+other outbound effects receive HTTP 502. Built-in Resend, SendGrid and Cloudflare
+mail adapters remain available by default. Never place production credentials
+in this declaration or ship the test adapter as application authority.
+
+## Base source from an archive
+
+A plain directory export can supply the source without a Base Git checkout:
+
+```sh
+node node_modules/@runeditrun/rer/edition-authoring/cli.mjs record-base src/base/modules/agent-door modules/agent-door --base-archive /absolute/base-export --ref FULL_BASE_COMMIT
+rer refresh-base --base-archive /absolute/base-export --ref FULL_BASE_COMMIT
+```
+
+Use the full 40-character commit SHA from the authenticated archive acquisition.
+The directory must preserve Base's paths and executable modes. It is the source
+at that declared SHA; the CLI cannot authenticate an archive's commit without
+Git history. Copy mapping and byte digests follow the same rules as a checkout.
+History-dependent refresh operations require the historical source evidence
+described in the [authoring guide](../../edition-authoring/README.md); they fail
+closed when that evidence is absent.
 
 ## Interim policy boundaries
 

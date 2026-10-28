@@ -24,6 +24,19 @@ async function roleTarget(args: Record<string, unknown>, ctx: ToolContext) {
 export function accessTools(bindings: Bindings): ToolDefinition[] {
   return [
     defineTool({
+      name: 'base.access.grants', title: 'Read teammate grants', description: 'Read the native role grant set for a teammate.',
+      scope: 'access:read', readOnly: true, inputSchema: object({ id }),
+      outputSchema: object({ subject: id, grants: { type: 'array', items: { type: 'string' } } }), classes: ['standard'], clauses,
+      classify: () => [{ class: 'standard', facts: { measure: 1 } }],
+      async run(args, ctx) {
+        requirePeopleAccess(ctx.person)
+        const target = await readOperator(ctx.db, args.id as string)
+        if (!target) throw new ToolRefusal('operator_not_found')
+        const grants = target.status === 'inactive' ? [] : target.role === 'owner' ? ['member', 'admin', 'owner'] : target.role === 'admin' ? ['member', 'admin'] : ['member']
+        return { result: { subject: target.id, grants } }
+      },
+    }),
+    defineTool({
       name: 'base.access.invite', title: 'Invite a teammate', description: 'Send a native operator invitation and grant its pending access. The recipient is a new external counterparty.',
       scope: 'access:write', readOnly: false, inputSchema: object({ name: text(120), email, role }), outputSchema: result,
       classes: ['external', 'access'], clauses,
@@ -64,6 +77,20 @@ export function accessTools(bindings: Bindings): ToolDefinition[] {
         await roleTarget(args, ctx)
         const target = await native(bindings, ctx).setRole(args.id as string, args.role as 'admin' | 'member')
         ctx.emit('operator.role.changed', operatorUri(target.id), { id: target.id, role: target.role, version: target.version, approved_by: ctx.approvers })
+        return { result: { id: target.id, role: target.role, status: target.status, version: target.version } }
+      },
+    }),
+    defineTool({
+      name: 'base.access.demote', title: 'Remove teammate administration', description: 'Reduce a teammate to member through native role authorization.',
+      scope: 'access:write', readOnly: false, widens: false, narrowing: { effect: 'narrow', reason: 'closed-target-input' },
+      inputSchema: object({ id }), outputSchema: result, classes: ['access'], clauses,
+      async authority(args) { return { subject: args.id as string, widens: false } },
+      async classify(args, ctx) { await roleTarget(args, ctx); return [{ class: 'access', facts: { measure: 1, direction: 'narrows' } }] },
+      async summary(args, ctx) { const target = await roleTarget(args, ctx); return { target: { id: target.id }, role: 'member' } },
+      async run(args, ctx) {
+        await roleTarget(args, ctx)
+        const target = await native(bindings, ctx).setRole(args.id as string, 'member')
+        ctx.emit('operator.role.changed', operatorUri(target.id), { id: target.id, role: target.role })
         return { result: { id: target.id, role: target.role, status: target.status, version: target.version } }
       },
     }),

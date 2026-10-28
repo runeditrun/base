@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { classIds, subset, errorCode, APPROVAL } from './protocol.mjs';
+import { proofOptions, checkProofChallenge, narrowingBefore, narrowingAfter } from './authority-phases.mjs';
 import { schemaErrors } from './schema.mjs';
 
 export function checkClasses(c, step, answer, phase) {
@@ -37,7 +38,11 @@ export async function runJourney(c, phase, { held = false, injections = false, r
   for (const step of c.surface.journey) {
    const args = c.args(step, outputs), needsApproval = held && step.expect.some(item => item.class !== 'standard');
    const before = needsApproval ? await c.witness() : undefined;
-   let answer = await c.tool(step.tool, args);
+   const narrow = !held && (c.surface.narrowings ?? []).find(item => item.tool === step.tool && JSON.stringify(item.args) === JSON.stringify(step.args));
+   const grants = narrow ? await narrowingBefore(c, narrow, args, outputs) : null;
+   if (!held && c.surface.tools.find(tool => tool.name === step.tool)?.proof) await checkProofChallenge(c, step, args);
+   const proof = await proofOptions(c, step, args);
+   let answer = await c.tool(step.tool, args, proof);
    checkClasses(c, step, answer, phase);
    const expectedDisposition = held ? needsApproval ? 'approval' : 'review' : 'autonomous';
    c.add(`BASE-AGENT-007.1.${phase}.${step.id}`, answer.decision?.disposition === expectedDisposition && answer.decision.revision === c.revision && answer.decision.classes.every(item => item.do === (held ? item.class === 'standard' ? 'review' : 'approval' : 'autonomous')), `${step.tool} must receive ${expectedDisposition} under revision ${c.revision}.`);
@@ -49,23 +54,24 @@ export async function runJourney(c, phase, { held = false, injections = false, r
     if (!approval?.id) continue;
     const approved = await c.decideApproval(answer);
     c.add(`BASE-AGENT-008.5.approver.${step.id}`, approved.ok, `Signed-in sponsor approval returned HTTP ${approved.status}.`);
-    answer = await c.tool(step.tool, args, { requestState: answer.result.requestState });
+    answer = await c.tool(step.tool, args, { ...proof, requestState: answer.result.requestState });
     checkClasses(c, step, answer, `${phase}.approved`);
     c.add(`BASE-AGENT-007.5.receipt.${step.id}`, !answer.result?.isError && answer.result?.resultType !== 'input_required' && Boolean(answer.result?._meta?.['com.runeditrun/receipt']) && answer.decision?.disposition === 'approval', 'The approved retry must complete with an approval receipt.');
    }
    c.add(`BASE-AGENT-013.4.${phase}.${step.id}`, answer.status === 200 && answer.result && !answer.result.isError && answer.result.resultType !== 'input_required', `${step.tool} did not complete (${errorCode(answer) ?? answer.status}).`);
    if (answer.result?.isError || answer.result?.structuredContent === undefined) continue;
+   if (narrow) await narrowingAfter(c, narrow, grants, outputs);
    outputs.set(step.id, answer.result.structuredContent);
    checkOutput(c, step, answer, phase);
    await checkResources(c, step, answer, phase, held);
    if (injections && step.inject) {
     const injected = { ...args, ...c.resolve(step.inject, outputs), ...(!c.surface.tools.find(tool => tool.name === step.tool)?.readOnly ? { idempotency_key: randomUUID() } : {}) };
-    const checked = await c.tool(step.tool, injected);
+    const checked = await c.tool(step.tool, injected, proof);
     c.add(`BASE-AGENT-005.5.${phase}.${step.id}`, isDeepStrictEqual(checked.decision?.classes, answer.decision?.classes) && checked.decision?.disposition === answer.decision?.disposition && !checked.result?.isError, `${step.tool} changed class, facts or decision for additional arguments.`);
    }
    if (replay && !replayed && !c.surface.tools.find(tool => tool.name === step.tool)?.readOnly) {
     replayed = true;
-    const beforeReplay = await c.witness(), repeated = await c.tool(step.tool, args), afterReplay = await c.witness();
+    const beforeReplay = await c.witness(), repeated = await c.tool(step.tool, args, proof), afterReplay = await c.witness();
     c.add(`BASE-AGENT-012.1.${phase}`, !repeated.result?.isError && isDeepStrictEqual(answer.result.structuredContent, repeated.result?.structuredContent) && isDeepStrictEqual(beforeReplay, afterReplay), `${step.tool} replay changed native state or returned a different result.`);
 
    }

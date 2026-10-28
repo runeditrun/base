@@ -102,7 +102,7 @@ export function createProtocol(context) {
   });
   return answer;
  };
- context.tool = (name, args, options) => context.mcp('tools/call', { name, arguments: args, ...(options?.requestState === undefined ? {} : { requestState: options.requestState }) }, options);
+ context.tool = (name, args, options) => context.mcp('tools/call', { name, arguments: args, ...(options?.requestState === undefined ? {} : { requestState: options.requestState }), ...(options?.proofReference === undefined ? {} : { _meta: { 'com.runeditrun/native-proof': options.proofReference } }) }, options);
  context.resolve = (value, outputs = new Map(), options = {}) => resolveArgs(value, outputs, { ...options, sponsor: context.sponsor });
  context.args = (step, outputs, options) => {
   const args = context.resolve(step.args, outputs, options);

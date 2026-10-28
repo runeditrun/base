@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { accessToken } from './crypto.mjs';
+import { narrowingContract } from './narrowing-contract.mjs';
 import { VERSION } from './protocol.mjs';
 
 export async function discoverDoor(c) {
@@ -30,6 +31,8 @@ export async function listedDoor(c) {
  c.add('BASE-AGENT-001.4', isDeepStrictEqual(first.result, second.result) && typeof first.result?.ttlMs === 'number' && first.result.ttlMs >= 0 && first.result.cacheScope === 'private', 'Repeated tools/list results must have deterministic order, ttlMs and private cache scope.');
  for (const declared of c.surface.tools) {
   const tool = c.listed.get(declared.name);
+  if (declared.widens === false) c.add(`BASE-AGENT-005.${declared.name}.runtime-contract`, narrowingContract(declared, tool?.inputSchema) && tool?._meta?.['com.runeditrun/widens'] === false && isDeepStrictEqual(tool?._meta?.['com.runeditrun/narrowing'], declared.narrowing), 'The runtime must publish the checked narrowing contract and closed target-only schema.');
+  if (declared.proof) c.add(`BASE-AGENT-004.${declared.name}.proof-contract`, isDeepStrictEqual(tool?._meta?.['com.runeditrun/proof'], { proof: declared.proof, kind: declared.proofKind }), 'The runtime must publish its native proof kind.');
   c.add(`BASE-AGENT-002.2.schema.${declared.name}`, tool?.inputSchema?.type === 'object' && tool.outputSchema !== undefined, `${declared.name} must carry input and output schemas.`);
   c.add(`BASE-AGENT-002.3.${declared.name}`, tool?.annotations?.readOnlyHint === declared.readOnly && tool?.annotations?.destructiveHint === declared.classes.includes('destructive') && tool?.annotations?.openWorldHint === declared.classes.includes('external'), `${declared.name} annotations differ from its declared behavior.`);
   c.add(`BASE-AGENT-006.1.${declared.name}`, isDeepStrictEqual([...(tool?._meta?.['com.runeditrun/classes'] ?? [])].sort(), [...declared.classes].sort()) && tool?._meta?.['com.runeditrun/scope'] === declared.scope && isDeepStrictEqual([...(tool?._meta?.['com.runeditrun/clauses'] ?? [])].sort(), [...declared.clauses].sort()), `${declared.name} classes, scope or clauses differ from the Agent surface.`);

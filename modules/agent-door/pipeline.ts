@@ -12,9 +12,11 @@ import { appendEvents } from './events.ts'
 import { acquireDecision, releaseDecision, startExecution, startPending } from './counting.ts'
 import { preparedBy } from './people.ts'
 import type { ToolDefinition } from './types.ts'
+import { narrowPrincipal } from './principal.ts'
+import { requireNativeProof } from './native-proof.ts'
 
 export interface PipelineAnswer { result: CallResult; status?: number; scope?: string }
-export async function callTool(rt: Runtime, name: string, input: unknown, principal: Principal, door: ToolContext['door'], trace?: unknown, resourceTool?: ToolDefinition, requestState?: unknown): Promise<PipelineAnswer> {
+export async function callTool(rt: Runtime, name: string, input: unknown, principal: Principal, door: ToolContext['door'], trace?: unknown, resourceTool?: ToolDefinition, requestState?: unknown, proofReference?: unknown): Promise<PipelineAnswer> {
   const row = newAudit(rt, principal, name, door, trace)
   if (name === 'resources/read') row.resource = String((input as { uri: string }).uri)
   let evidence: Evidence | undefined, owned = false, effected = false, locked = false
@@ -29,6 +31,8 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     row.ignored_arguments = Object.keys(raw ?? {}).filter(key => !Object.hasOwn(properties, key)).sort()
     const key = !tool.readOnly && typeof raw?.idempotency_key === 'string' && raw.idempotency_key.length > 0 && raw.idempotency_key.length <= 200 ? raw.idempotency_key : null
     row.idempotency_key = key
+    principal = await narrowPrincipal(rt, principal)
+    row.scopes = [...principal.scopes]
     if (tool.scope && !principal.scopes.includes(tool.scope)) { status = 403; scope = tool.scope; return refuse('insufficient_scope') }
     const state = await policyState(rt)
     row.revision = state.revision
@@ -39,6 +43,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       return refuse(refusal.code, refusal.fields)
     }
     if (!tool.readOnly && !key) return refuse('idempotency_key_required')
+    if (tool.widens === false && row.ignored_arguments.length) return refuse('invalid_arguments', { undeclared_arguments: row.ignored_arguments })
     const requestDigest = await digest({ name, arguments: declared })
     if (tool.readOnly && requestState !== undefined) {
       if (typeof requestState !== 'string') return refuse('invalid_arguments')
@@ -70,6 +75,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       if (expected !== current) return refuse('revision_conflict', { current_revision: current })
     }
     const authority = await tool.authority?.(args, ctx)
+    if (tool.widens === false && authority?.widens) return refuse('invalid_authority')
     if (selfEscalation(authority, principal)) {
       result.decision = { id: row.id, disposition: 'self_escalation', revision: state.revision, classes: [] }
       return refuse('self_escalation')
@@ -85,6 +91,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     evidence = { document: state.document!, usage: sums, classes, result: decision.result, rules: decision.classes }
     if (decision.result === 'unset') return refuse('policy_unset', { unanswered: decision.unset, setup_url: setupUrl(rt, state) })
     if (decision.result === 'blocked') return refuse('policy_blocked', { class: decision.deciding!.class, rule: decision.deciding!.rule, revision: state.revision })
+    await requireNativeProof(rt, tool, args, principal, proofReference)
     const savedSummary = await summary(tool, args, ctx)
     const summary_sha256 = await digest(savedSummary)
     recordDecision(row, meta)
@@ -92,7 +99,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     if (decision.result === 'approval') {
       await startPending(rt, row, principal, evidence, claim); owned = key !== null
       result = await openApproval(rt, { decision_id: row.id, revision: state.revision, tool: name, args, digest: requestDigest, key,
-        classes, principal, summary: savedSummary, summary_sha256, approvers: decision.approvers!, expires_at: new Date(rt.now() + durationSeconds(decision.wait)! * 1000).toISOString(), door, evidence,
+        classes, principal, proofReference: typeof proofReference === 'string' ? proofReference : undefined, summary: savedSummary, summary_sha256, approvers: decision.approvers!, expires_at: new Date(rt.now() + durationSeconds(decision.wait)! * 1000).toISOString(), door, evidence,
         result, ...(expected === undefined ? {} : { expected_revision: expected as number }) })
       effected = true
       await saveCall(rt, principal, key, result)
@@ -104,7 +111,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       owned = key !== null
       await releaseDecision(rt, row.id); locked = false
       effected = true
-      const run = await runTool(rt, tool, args, principal, result, door)
+      const run = await runTool(rt, tool, args, principal, result, door, [], row.id, proofReference)
       result = run.result
       if (result.outcome === 'done' && decision.result === 'review') result.review = await openReview(rt, name, principal, row.id, evidence, run.undo, door, savedSummary)
       if (result.code && result.code !== 'output_invalid') effected = false

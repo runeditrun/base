@@ -1,5 +1,6 @@
 import test from 'node:test';
 import {closureClasses} from './tests/closure-cases.mjs';
+import {archiveSourceCases} from './tests/archive-cases.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -99,6 +100,7 @@ test('record-base pins Base bytes and verify-base passes only for exact recorded
     ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
     assert.equal(ok(seed, 'verify-base', '--offline').ok, true);
     assert.notEqual(run(seed, 'verify-base').status, 0);
+    archiveSourceCases(temp, run, snapshotTree);
   } finally { fs.rmSync(temp, {recursive: true, force: true}); }
 });
 
@@ -169,6 +171,10 @@ test('verify-base checks recorded hashes and paths against Base at the recorded 
     write(seed, 'vendor/sample/index.mjs', 'locally rewritten\n');
     record.copies[0].files['vendor/sample/index.mjs'] = sha('locally rewritten\n');
     record.copies[0].files['vendor/sample/invented.mjs'] = sha('invented\n');
+    // Forge the new membership metadata too, so offline consistency passes
+    // and the real source comparison still has to detect the invented file.
+    record.copies[0].originFiles.push('modules/sample/invented.mjs');
+    record.copies[0].originFiles.sort();
     write(seed, 'vendor/sample/invented.mjs', 'invented\n');
     fs.writeFileSync(recordPath, JSON.stringify(record));
     assert.equal(ok(seed, 'verify-base', '--offline').ok, true);

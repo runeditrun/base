@@ -16,17 +16,17 @@ export async function subscriptions(rt: Runtime, request: Request, rpc: Rpc, pri
     if (typeof uri !== 'string' || uris.includes(uri)) continue
     const resource = rt.options.resources?.find(resource => templateMatches(resource.uriTemplate, uri))
     if (resource && (!resource.scope || principal.scopes.includes(resource.scope))) {
-      try { if (await resource.read(uri, { person: principal.person, db: rt.options.db })) uris.push(uri) } catch { /* Visibility refusals do not reveal existence. */ }
+      try { if (await resource.read(uri, { ...principal, db: rt.options.db })) uris.push(uri) } catch { /* Visibility refusals do not reveal existence. */ }
     }
   }
   const filter = { ...(requested?.toolsListChanged === true ? { toolsListChanged: true } : {}), ...(uris.length ? { resourceSubscriptions: uris } : {}) }
   const meta = { 'io.modelcontextprotocol/subscriptionId': rpc.id }
   const position = (await rt.options.db.prepare('SELECT COALESCE(MAX(sequence),0) AS seq FROM agent_door_events').first<{ seq: number }>())!.seq
-  const listed = async () => {
+  const listed = async (current: Principal) => {
     const state = await policyState(rt)
-    return rt.tools.filter(tool => tool.classes.every(cls => answered(state.document, cls))).map(tool => tool.name).join(',')
+    return rt.tools.filter(tool => current.scopes.includes(tool.scope) && tool.classes.every(cls => answered(state.document, cls))).map(tool => tool.name).join(',')
   }
-  let cursor = position, lastTools = await listed(), stopped = false, timer: ReturnType<typeof setTimeout> | undefined
+  let cursor = position, lastTools = await listed(principal), stopped = false, timer: ReturnType<typeof setTimeout> | undefined
   const started = rt.now(), encoder = new TextEncoder()
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -52,10 +52,10 @@ export async function subscriptions(rt: Runtime, request: Request, rpc: Rpc, pri
           for (const row of rows) {
             cursor = row.sequence
             const event: AgentEvent = JSON.parse(row.event)
-            if (uris.includes(event.uri) && await eventVisible(rt, person.person, event)) notify('notifications/resources/updated', { uri: event.uri })
+            if (uris.includes(event.uri) && await eventVisible(rt, person, event)) notify('notifications/resources/updated', { uri: event.uri })
           }
           if (filter.toolsListChanged) {
-            const next = await listed()
+            const next = await listed(person)
             if (next !== lastTools) { lastTools = next; notify('notifications/tools/list_changed', {}) }
           }
           if (!stopped) timer = setTimeout(() => { void tick() }, 1000)
