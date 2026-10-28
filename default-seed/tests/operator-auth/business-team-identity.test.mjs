@@ -14,12 +14,12 @@ const cookieOf = response => {
 test('Business removal and re-addition follow operator IDs after native email changes', async () => {
   const runtime = await emittedRuntime({ bindings: { RER_BUSINESS_TRUST: JSON.stringify(testTrust({ email: undefined })) } })
   let rev = 0, ownerEmail = owner
-  const member = { email: 'sam@example.test', name: 'Sam Chen', role: 'member', invite: 0 }
+  const member = { id: 'business-sam', email: 'sam@example.test', name: 'Sam Chen', role: 'member', invite: 0 }
   const operator = id => runtime.db.prepare('SELECT * FROM oa_operators WHERE id=?').bind(id).first()
   const ledger = email => runtime.db.prepare('SELECT * FROM bs_team WHERE email=?').bind(email).first()
   async function post(team) {
     const response = await runtime.call('/api/rer/business-settings', { method: 'POST', input: {
-      settings: await signSettings(testDocument({ rev: ++rev, email: ownerEmail, team })),
+      settings: await signSettings(testDocument({ rev: ++rev, owner_id: 'business-owner', email: ownerEmail, team })),
     } })
     assert.equal(response.status, 200)
     return response.json()
@@ -43,6 +43,7 @@ test('Business removal and re-addition follow operator IDs after native email ch
     assert.equal((await operator(identity.id)).status, 'inactive')
     const managed = await ledger(entry.email)
     assert.equal(managed.operator_id, identity.id)
+    assert.equal(managed.business_id, entry.id)
     assert.equal(managed.state, 'inactive')
     assert.equal((await runtime.call('/api/work', { cookie: identity.cookie })).status, 401)
     await post([])
@@ -66,7 +67,17 @@ test('Business removal and re-addition follow operator IDs after native email ch
     await remove(member, renamed)
     assert.deepEqual(await operator(human.id), human)
 
-    const ownerKey = { ...member, email: 'former-member@example.test' }
+    const rosterRename = { ...member, email: 'business-updated@example.test', role: 'admin' }
+    const restored = await post([rosterRename])
+    assert.equal(restored.team.find(row => row.email === rosterRename.email).state, 'active')
+    assert.equal(await ledger(member.email), null)
+    assert.equal((await ledger(rosterRename.email)).operator_id, renamed.id)
+    assert.equal((await ledger(rosterRename.email)).business_id, member.id)
+    assert.equal((await ledger(rosterRename.email)).business_role, 'admin')
+    assert.deepEqual(await operator(human.id), human)
+    await remove(rosterRename, renamed)
+
+    const ownerKey = { ...member, id: 'business-former-member', email: 'former-member@example.test' }
     const second = await joinAndRename(ownerKey, 'another-renamed@example.test')
     await changeEmail(ownerCookie, ownerKey.email)
     ownerEmail = ownerKey.email

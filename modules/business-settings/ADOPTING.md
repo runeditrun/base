@@ -21,12 +21,17 @@ history. The updated source supplies `auth.businessTeam` and the Business
 branding/stop integration. Native-account compositions need their own team
 adapter; passing `businessSettings` alone does not provide one.
 
-Copy `./modules/business-settings/schema/0001_business_settings.sql` into the
-seed's normal migration directory under its next unused migration number.
+Copy `./modules/business-settings/schema/0001_business_settings.sql` and
+`./modules/business-settings/schema/0002_business_people.sql` into the
+seed's normal migration directory under consecutive unused migration numbers.
 The maintained reference uses `./default-seed/migrations/core/0033_business_settings.sql`.
 Do not replace an applied migration or assume 0033 is free in another seed.
+An installation that already applied the first schema adds only the second.
 Apply it through the seed's existing local/deployment migration lifecycle,
-on the same D1 binding as the native accounts. It creates settings storage and `bs_overrides`, `bs_logo`, `bs_team`, `bs_audit`, `bs_assert`.
+on the same D1 binding as the native accounts. The first creates settings storage and
+`bs_overrides`, `bs_logo`, `bs_team`, `bs_audit`, `bs_assert`. The second adds
+`bs_settings.owner_id`, `bs_team.business_id` and `bs_team.business_role`,
+including a unique index for non-null Business teammate IDs.
 Apply it before starting the runtime. The first document or owner stop creates
 the singleton row; a fresh installation stays empty for archive restore.
 
@@ -152,8 +157,9 @@ account model, implement this server-only interface on the same D1 database:
 ```ts
 ownerEmail?(): Promise<string | null>
 prepare(input: {
-  members: { email: string; name: string; role: 'admin' | 'member'; invite: number }[]
+  members: { id?: string; email: string; name: string; role: 'admin' | 'member'; invite: number }[]
   managed: { email: string; operatorId: string | null; invite: number;
+    businessId?: string | null; businessRole?: 'admin' | 'member' | null;
     state: 'invited' | 'active' | 'inactive' | 'conflict' }[]
   ownerEmail: string
   roles: { admin: string; member: string }
@@ -171,6 +177,14 @@ a conflict. `ownerEmail` is the verified actor. `roles` is the seed's mapping.
 Return native prepared statements and the complete next managed ledger;
 the module writes `bs_team` itself. Preparation may read and build statements,
 but must not mutate accounts or send mail outside the module's transaction.
+The module derives `business_id` and `business_role` from the verified roster
+and previous bindings, independently of the adapter's returned row metadata.
+Do not infer the Business role from a mapped native role. Before preparation,
+an existing member `id` projects its managed row onto the current signed email;
+the row's native `operatorId` stays unchanged. Always use that operator ID for
+an established binding, even when its native email has changed. Retain IDs and
+inactive rows in the complete ledger. Legacy documents can omit IDs; adding an
+ID to an unlinked legacy row establishes its durable Business identity.
 
 The module first places its settings compare-and-swap in the batch, then
 its logo writes, adapter statements, managed-ledger/audit writes and a final assertion.
@@ -208,6 +222,10 @@ Verify a signed higher revision changes rendered slots, while wrong trust,
 expired documents and replay cannot change stored values or native accounts.
 Exercise logo replacement/removal, overrides/reset, conflicting native users,
 invite acceptance, role change, removal/session invalidation and re-invitation.
+Verify optional Business person IDs, rejected duplicate/owner IDs, legacy
+documents without IDs, and unchanged native operator bindings after native
+and signed-roster email changes. Include a native role mapping that differs
+from the signed Business role and check the stored `business_role` directly.
 Check mail sender display names, real timezone formatting and public/private
 loader boundaries. Compare the approved homepage at desktop and mobile sizes
 before and after a Business colour change; its rendering must stay identical.

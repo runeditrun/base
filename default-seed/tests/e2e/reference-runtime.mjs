@@ -13,6 +13,7 @@ import { chromium } from '@playwright/test'
 import { spawnOwnedProcess, stopOwnedProcess } from '../owned-process.mjs'
 import { advertisedOrigin, listenerConfig } from '../worker-listener.mjs'
 import { readableActivity, refreshSafeCreate } from './people-page.mjs'
+import { agentDoorPages } from './agent-pages.mjs'
 import { freshSeedImportDoor } from './import-door.mjs'
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
@@ -273,6 +274,7 @@ async function main() {
     const refreshSafe = await refreshSafeCreate({ baseUrl, cookie, persistPath })
     const activity = await readableActivity({ baseUrl, cookie, persistPath, execute })
     const browser = await browserNavigationCheck(baseUrl, cookie)
+    const agentPages = await agentDoorPages(root)
     console.log(JSON.stringify({
       status: 'passed',
       staticReference: true,
@@ -284,6 +286,7 @@ async function main() {
       refreshSafe,
       activity,
       browser,
+      agentPages,
     }))
   } finally {
     await stopOwnedProcess(worker)
