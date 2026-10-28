@@ -54,10 +54,109 @@ async function generatedJourney(root) {
   assert.equal(await read(root, 'ACCEPTANCE.md'), acceptance)
 }
 
+async function nonProductJourney() {
+  // Small public-command reproductions of the two immutable source forms:
+  // Coaster's OWN alias and Nectar's explicit em-dash exemptions. These facts
+  // have no product duty; a real product promise remains beside them.
+  const sources = [
+    [
+      [6, '"100% free, open source alternative to Expensify, SAP Concur and Emburse"', 'OWN', 'license/public-repository ownership'],
+      [51, '"100% free and open source. MIT licensed."', 'OWN', 'license/public-repository ownership'],
+    ],
+    [
+      [6, '"100% free, open source alternative to Stripe Billing, Chargebee and Recurly"', '—', 'license/public-repository ownership'],
+      [71, 'Terminal: `npx -y @runeditrun/rer dev just-every/run-nectar` starts Nectar', '—', 'launcher identity'],
+      [73, '"100% free and open source. MIT licensed."', '—', 'license/public-repository ownership'],
+      [76, '"Try the demo" opens the hosted demo', '—', 'hosted-demo action'],
+    ],
+  ]
+  for (const facts of sources) {
+    const root = await installation('legacy')
+    try {
+      await rm(join(root, 'docs/CLAIMS.md'))
+      const initial = await read(root, 'CONTRACT.md')
+      const table = [
+        '| # | Section | Claim | Clause(s) | Status |', '| --- | --- | --- | --- | --- |',
+        '| 1 | Hero | Publish the studio\'s entries | PUBLISH-01 | done |',
+        ...facts.map(([number, claim, reference]) => `| ${number} | Closing | ${claim} | ${reference} | done |`),
+        '| 2 | Catalogue | Publish entries as open source | — | partial |',
+      ].join('\n')
+      await edit(root, 'CONTRACT.md', initial.replace(/\| # \| Claim \| Clauses \|[\s\S]*?(?=\n## Status)/, table + '\n'))
+      git(root, 'add', '.')
+      git(root, '-c', 'user.name=Synthetic author', '-c', 'user.email=synthetic@example.invalid', 'commit', '-qm', 'Synthetic non-product source forms')
+      const old = git(root, 'rev-parse', 'HEAD'), originalText = await read(root, 'CONTRACT.md'), original = parseContract(originalText)
+      const claims = facts.map(([, claim, , nonProduct]) => ({ file: 'CONTRACT.md', line: originalText.split('\n').findIndex(line => line.includes(`| ${claim} |`)) + 1, claim, nonProduct }))
+      const productAlias = { file: 'CONTRACT.md', line: originalText.split('\n').findIndex(line => line.startsWith('| 2 | Catalogue |')) + 1, claim: 'Publish entries as open source', clauses: ['PUBLISH-01'] }
+      claims.push(productAlias)
+      const map = { schema: 1, old, claims }
+      refuses(root, 'Homepage claim', 'convert', '--old', old)
+      for (const [change, explanation] of [
+        [{ old: '0'.repeat(40) }, 'old'],
+        [{ claims: [{ ...claims[0], claim: 'Changed source text' }, ...claims.slice(1)] }, 'claim'],
+        [{ claims: claims.slice(1) }, 'Homepage claim'],
+        [{ claims: [{ ...claims[0], nonProduct: 'arbitrary exemption' }, ...claims.slice(1)] }, 'non-product basis'],
+        [{ claims: [{ ...claims[0], clauses: ['PUBLISH-01'] }, ...claims.slice(1)] }, 'cannot also supply clauses'],
+        [{ claims: [...claims.slice(0, -1), { ...productAlias, clauses: undefined, nonProduct: 'license/public-repository ownership' }] }, 'product promises need real clauses'],
+        [{ claims: [...claims, { file: 'CONTRACT.md', line: originalText.split('\n').findIndex(line => line.includes('| 1 | Hero |')) + 1, claim: "Publish the studio's entries", nonProduct: 'license/public-repository ownership' }] }, 'product promises need real clauses'],
+      ]) {
+        await edit(root, 'claim-map.json', JSON.stringify({ ...map, ...change }))
+        refuses(root, explanation, 'convert', '--old', old, '--claim-map', 'claim-map.json')
+        assert.equal(await read(root, 'CONTRACT.md'), originalText, 'refusal changed the immutable-source working copy')
+      }
+      await edit(root, 'claim-map.json', JSON.stringify(map))
+      succeeds(root, 'convert', '--old', old, '--claim-map', 'claim-map.json')
+      succeeds(root, 'check')
+      succeeds(root, 'id-map', '--old', old)
+      succeeds(root, 'coverage', 'check', '--old', old)
+      const converted = await read(root, 'CONTRACT.md'), after = parseContract(converted)
+      for (const key of ['counts', 'commit', 'date']) assert.deepEqual(after[key], original[key])
+      assert.deepEqual(after.clauses.map(({ id, kind, status, evidence, gap }) => ({ id, kind, status, evidence, gap })), original.clauses.map(({ id, kind, status, evidence, gap }) => ({ id, kind, status, evidence, gap })))
+      const view = await read(root, 'docs/CLAIMS.md')
+      for (const [number, claim, , basis] of facts) {
+        assert.ok(view.includes(`| ${number} | Closing | ${claim} |  | Non-product: ${basis} | done | unassessed |`))
+        const record = JSON.parse(converted.match(/<!-- contract-claim-source\n([\s\S]*?)\n-->/)[1])
+        const source = record.claims.find(row => row.number === String(number))
+        assert.equal(record.old, old)
+        assert.equal(source.text, originalText.split('\n')[source.line - 1])
+        assert.equal(source.status, 'done')
+        assert.equal(source.claim, claim)
+      }
+      assert.ok(view.includes(`Claims: ${facts.length + 2}; 2 done, 0 partial, 0 missing. Non-product: ${facts.length} unassessed.`))
+      const mutateRecord = change => converted.replace(/(<!-- contract-claim-source\n)([\s\S]*?)(\n-->)/, (_, start, body, end) => {
+        const record = JSON.parse(body); change(record); return start + JSON.stringify(record, null, 2) + end
+      })
+      const first = facts[0], row = converted.split('\n').find(line => line.startsWith(`| ${first[0]} | Closing |`))
+      for (const [text, explanation] of [
+        [converted.replace(row + '\n', ''), 'retain every original claim'],
+        [converted.replace(row, row.replace(first[1], 'Changed claim meaning')), 'current claim number/text'],
+        [mutateRecord(record => { record.old = '0'.repeat(40) }), 'old'],
+        [mutateRecord(record => { record.claims[1].claim = 'Forged historical claim' }), 'immutable original'],
+        [mutateRecord(record => { record.claims[1].status = 'missing' }), 'immutable original'],
+        [mutateRecord(record => { record.claims[1].line++ }), 'immutable original'],
+        [converted.replace('| PUBLISH-01 | Product |', '|  | Product |'), 'existing clause ids'],
+        [converted.replace('| PUBLISH-01 | Product |', '| ABSENT-001 | Product |'), 'existing clause ids'],
+        [converted.replace('| PUBLISH-01 | Product |', '|  | Non-product: license/public-repository ownership |'), 'product claim cannot acquire'],
+        [mutateRecord(record => { record.claims[0].nonProduct = 'license/public-repository ownership' }).replace('| PUBLISH-01 | Product |', '|  | Non-product: license/public-repository ownership |'), 'product promises need real clauses'],
+        [converted.replace(/<!-- contract-claim-source\n[\s\S]*?\n-->/, ''), 'require a contract-claim-source'],
+      ]) {
+        await edit(root, 'CONTRACT.md', text)
+        refuses(root, explanation, 'write')
+      }
+      await edit(root, 'CONTRACT.md', converted)
+      await generatedJourney(root)
+      succeeds(root, 'coverage', 'check', '--old', old)
+      const coveragePath = 'docs/contract/COVERAGE.json', coverageText = await read(root, coveragePath)
+      await edit(root, coveragePath, coverageText.replace(old, '0'.repeat(40)))
+      refuses(root, 'original SHA', 'check')
+    } finally { await rm(root, { recursive: true, force: true }) }
+  }
+}
+
 test('contract docs convert handwritten contracts and keep generated documents and migration maps accountable', async () => {
   const roots = await Promise.all(['standard', 'legacy'].map(installation))
   try {
     const results = await Promise.allSettled([
+      nonProductJourney(),
       (async () => {
         const root = roots[0]
         const original = parseContract(await read(root, 'CONTRACT.md'))
@@ -87,7 +186,36 @@ test('contract docs convert handwritten contracts and keep generated documents a
         const oldSource = await read(root, 'CONTRACT.md')
         const old = parseContract(oldSource)
         const oldCommit = git(root, 'rev-parse', 'HEAD')
-        succeeds(root, 'convert', '--old', 'HEAD')
+        const claimsSource = await read(root, 'docs/CLAIMS.md')
+        const claims = [
+          ["Keep each entry's identity", 'E1'],
+          ['Draft entries stay private', 'PUBLISH-01'],
+          ['Archived entries remain readable', 'AUTH-HOST-01'],
+        ].map(([claim, id]) => ({ file: 'docs/CLAIMS.md', line: claimsSource.split('\n').findIndex(line => line.includes(`| ${claim} |`)) + 1, claim, clauses: [id] }))
+        const claimMap = { schema: 1, old: oldCommit, claims }
+        const before = await snapshot(root)
+        refuses(root, 'Homepage claim', 'convert', '--old', oldCommit)
+        assert.deepEqual(await snapshot(root), before, 'refusal changed the original documents')
+        // Editing the working copy cannot repair the immutable --old input.
+        await edit(root, 'docs/CLAIMS.md', claimsSource.replace('OWN-01', 'E1').replace('Honest boundaries', 'PUBLISH-01').replace('—', 'AUTH-HOST-01'))
+        refuses(root, 'Homepage claim', 'convert', '--old', oldCommit)
+        await edit(root, 'docs/CLAIMS.md', claimsSource)
+        for (const [change, explanation] of [
+          [{ claims: claims.slice(0, -1) }, 'Archived entries remain readable'],
+          [{ old: '0'.repeat(40) }, 'old'],
+          [{ claims: [...claims, claims[0]] }, 'duplicate'],
+          [{ claims: [{ ...claims[0], claim: 'A different claim' }, ...claims.slice(1)] }, 'claim'],
+          [{ claims: [{ ...claims[0], clauses: ['ABSENT-01'] }, ...claims.slice(1)] }, 'ABSENT-01'],
+          [{ claims: [{ ...claims[0], clauses: [] }, ...claims.slice(1)] }, 'clauses'],
+          [{ claims: [{ ...claims[0], line: 999 }, ...claims.slice(1)] }, '999'],
+        ]) {
+          await edit(root, 'claim-map.json', JSON.stringify({ ...claimMap, ...change }))
+          refuses(root, explanation, 'convert', '--old', oldCommit, '--claim-map', 'claim-map.json')
+          assert.deepEqual(await snapshot(root), before, 'invalid mapping changed the original documents')
+          assert.equal(git(root, 'status', '--porcelain'), '?? claim-map.json', 'refusal wrote conversion records')
+        }
+        await edit(root, 'claim-map.json', JSON.stringify(claimMap))
+        succeeds(root, 'convert', '--old', oldCommit, '--claim-map', 'claim-map.json')
         succeeds(root, 'coverage', 'check', '--old', 'HEAD')
         succeeds(root, 'id-map', '--old', 'HEAD')
         const converted = parseContract(await read(root, 'CONTRACT.md'))
@@ -105,7 +233,6 @@ test('contract docs convert handwritten contracts and keep generated documents a
         const statusTableLines = oldSource.split('\n').flatMap((line, index) => /^\| (Clauses|Published|Target and push further|All|Clause) \|/.test(line) ? [index + 1] : [])
         assert.ok(statusTableLines.length >= 5, 'the legacy fixture lost its Status tables')
         assert.ok(!coverage.fragments.some(fragment => fragment.file === 'CONTRACT.md' && statusTableLines.includes(fragment.line)), 'Status table headers and summary rows are carried by the ID map and status, not coverage')
-        const claimsSource = await readFile(join(fixtures, 'legacy/docs/CLAIMS.md'), 'utf8')
         const optOutLine = claimsSource.split('\n').findIndex(line => line.includes('Do not sell entries')) + 1
         const optOut = coverage.fragments.filter(fragment => fragment.file === 'docs/CLAIMS.md' && fragment.line === optOutLine)
         assert.ok(optOut.length, 'the opt-out table row was not covered')
@@ -114,6 +241,18 @@ test('contract docs convert handwritten contracts and keep generated documents a
         const homepage = convertedText.split('## Homepage claims')[1].split('\n## ')[0]
         assert.ok(homepage.includes('Keep each entry\'s identity'), 'the larger handwritten homepage claims table was lost')
         assert.ok(!homepage.includes('Do not sell entries'), 'the opt-out row became a homepage claim')
+        for (const claim of ["Publish the studio's entries", ...claims.map(row => row.claim)]) {
+          for (const document of [homepage, await read(root, 'docs/CLAIMS.md')])
+            assert.equal(document.split(`| ${claim} |`).length - 1, 1, `claim text/count changed: ${claim}`)
+        }
+        assert.ok((await read(root, 'docs/CLAIMS.md')).includes('Claims: 4; 2 done, 1 partial, 1 missing.'))
+        for (const row of claims) {
+          const originalRow = claimsSource.split('\n')[row.line - 1]
+          assert.ok(coverage.fragments.some(fragment => fragment.file === row.file && fragment.line === row.line && fragment.text === originalRow), 'coverage lost the original claim or references')
+        }
+        assert.ok(convertedText.includes('Draft entries stay private.'))
+        assert.ok(convertedText.includes('The editor saves the description and keeps the entry\'s owner.'))
+        assert.ok(convertedText.includes('Archive collections for a long retention period. Archived entries remain readable.'))
         const verification = await read(root, 'docs/verify.md')
         assert.ok(verification.includes('The observer records any confusing empty states in the installation notes.'))
         const history = await read(root, 'CHANGELOG.md')
