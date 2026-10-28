@@ -10,6 +10,7 @@ import { HOSTED_ORIGIN, serveHosted } from './hosted-output.mjs';
 import { createAgentConformanceNetwork } from './agent-network.mjs';
 import { contained } from './project.mjs';
 import { RerError } from './errors.mjs';
+import { verificationReviewers } from './agent-reviewers.mjs';
 import { verificationSponsors } from './agent-sponsors.mjs';
 import { verificationWebhooks } from './agent-webhooks.mjs';
 
@@ -38,6 +39,8 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   if (typeof prove !== 'function') throw new RerError('agent_proof_invalid', 'verification.proof module must default-export a native proof test function.', 1);
  }
  const principals = await verificationSponsors(root, verification), native = principals[0], { email, sub } = native;
+ if (verification.reviewers !== undefined && !native.initialize) throw new RerError('agent_reviewer_invalid', 'verification.reviewers requires a native owner initializer to drive invitation and independent review.', 1);
+ const reviewers = await verificationReviewers(root, verification.reviewers, email);
  if (claim?.mode && !['signed', 'setup-token'].includes(claim.mode) && !native.initialize) throw new RerError('agent_owner_invalid', `Owner claim mode ${claim.mode} requires verification.owner.initializer using the seed's production lifecycle.`, 1);
  const token = randomBytes(32).toString('hex'), kid = randomUUID(), installationId = randomUUID();
  const business = 'rer-agent-conformance';
@@ -50,7 +53,11 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  const network = await createAgentConformanceNetwork(root, verification.network, { email });
  let hosted;
  try {
- hosted = await serveHosted(root, { declaration, outboundService: network.fetch, bindings: {
+ hosted = await serveHosted(root, { declaration, outboundService: async request => {
+  const copy = reviewers.observes(request) ? request.clone() : null, response = await network.fetch(request);
+  if (copy) await reviewers.capture(copy, response.clone());
+  return response;
+ }, bindings: {
   RER_OWNER_CLAIM_ISSUER: issuer, RER_OWNER_CLAIM_INSTALLATION_ID: installationId,
   RER_OWNER_CLAIM_APP_ORIGIN: HOSTED_ORIGIN,
   RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(publicKeys),
@@ -76,13 +83,14 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   let bootstrap;
   try {
    bootstrap = native.initialize ? await native.initialize({ request, origin: hosted.origin, email, sub,
+    reviewers: Object.freeze({ initialize: (label, session) => reviewers.initialize(label, session, { request, origin: hosted.origin, returnTo: owner?.returnTo ?? '/' }) }),
     displayName: 'Synthetic Base 1', label: native.label, database: hosted.database, token, claim: { mode: claim?.mode ?? 'setup-token', path, token: claimToken }, returnTo: owner?.returnTo ?? '/', mail: network.mail, fixtures: network.fixtures,
    }) : await request(new URL(path, hosted.origin).href, { method: 'POST', redirect: 'manual',
     headers: { Origin: hosted.origin, 'Content-Type': 'application/json' },
     body: JSON.stringify({ token: claimToken, displayName: 'Synthetic Base 1', returnTo: owner?.returnTo ?? '/' }),
    });
   } catch {
-   return finish({ ok: false, points: [...validation.points, { id: 'BASE-AGENT-001.owner-bootstrap', ok: false, detail: 'Native owner bootstrap did not answer through the hosted installation origin within 30 seconds.' }] }, report);
+   return finish({ ok: false, points: [...validation.points, ...reviewers.points(), { id: 'BASE-AGENT-001.owner-bootstrap', ok: false, detail: 'Native owner bootstrap did not complete through the hosted installation origin.' }] }, report);
   }
   const cookie = bootstrap.headers.getSetCookie().map(value => value.split(';', 1)[0]).join('; ');
   await bootstrap.body?.cancel();
@@ -130,8 +138,9 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   const result = await runAgentDoorConformance({ fetch: request, origin: hosted.origin, surface: declared.surface,
    signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors, webhooks, business, prove, nativeJourney,
   });
-  return finish(result, report);
- } finally { try { await hosted?.close(); } finally { await network.close(); } }
+  const points = [...result.points, ...reviewers.points()];
+  return finish({ ...result, points, ok: points.every(point => point.ok) }, report);
+ } finally { reviewers.close(); try { await hosted?.close(); } finally { await network.close(); } }
 }
 
 if (process.argv[1] && await realpath(new URL(import.meta.url)) === await realpath(process.argv[1])) {
