@@ -1,17 +1,18 @@
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {validateSetupManifest} from './setup-validation.mjs';
 
-test('extension-only setup needs no invented owner input and still needs a step', async () => {
+test("extension-only setup supports safe local defaults without inventing owner inputs or secret literals", t => caseRows(t, [
+  ['extension-only setup needs no invented owner input and still needs a step', async () => {
  const schema = JSON.parse(await readFile(new URL('./SETUP.schema.json', import.meta.url)));
  const manifest = {schema:1,title:'Branding',groups:[],fields:[{name:'APP_NAME',label:'Name',kind:'text',required:true}],steps:[{type:'extension',id:'branding'}]};
  assert.deepEqual(validateSetupManifest(schema, manifest), []);
  assert.ok(validateSetupManifest(schema, {...manifest,steps:[]}).length);
  assert.ok(validateSetupManifest(schema, {...manifest,fields:[...manifest.fields,{name:'OWNER_EMAIL',label:'Owner',kind:'email',prefill:'account-email'}]}).length);
-});
-
-test('a local default is a public literal, a generated entered secret or the local origin, and never a secret literal', async () => {
+}],
+  ['a local default is a public literal, a generated entered secret or the local origin, and never a secret literal', async () => {
  const schema = JSON.parse(await readFile(new URL('./SETUP.schema.json', import.meta.url)));
  const fields = [
   {name:'WORKSPACE_NAME',label:'Workspace',kind:'text',required:true,localDefault:'Local workspace'},
@@ -28,4 +29,5 @@ test('a local default is a public literal, a generated entered secret or the loc
   {name:'HOME_URL',label:'Home',kind:'url',localDefault:'not a url'},
   {name:'MODE',label:'Mode',kind:'text',localDefault:{from:'elsewhere'}},
  ]) assert.ok(validateSetupManifest(schema, manifest(field)).length, `refused: ${JSON.stringify(field.localDefault)} on ${field.kind}`);
-});
+}]
+]));
