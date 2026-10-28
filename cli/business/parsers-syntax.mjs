@@ -72,15 +72,19 @@ export function keyParts(source, dotted = false) {
  return result.length && result.every(part => part !== undefined) ? result : undefined;
 }
 
-export function flowEntries(source, path, delimiter, entries, depth = 0) {
+export function flowEntries(source, path, delimiter, entries, depth = 0, offset) {
  if (depth > 48) return;
  const value = source.trim();
+ if (offset !== undefined) offset += source.search(/\S/);
  if (value.startsWith('{') && value.endsWith('}')) {
+  let cursor = 1;
   for (const pair of splitOutside(value.slice(1, -1), ',')) {
    const parts = splitOutside(pair, delimiter); if (parts.length < 2) continue;
    const keys = keyParts(parts.shift(), delimiter === '='); if (!keys) continue;
-   const child = [...path, ...keys], raw = parts.join(delimiter).trim();
-   entries.push({ path: child, value: literal(raw) }); flowEntries(raw, child, delimiter, entries, depth + 1);
+   const child = [...path, ...keys], raw = parts.join(delimiter);
+   entries.push({ path: child, value: literal(raw), ...(offset === undefined ? {} : {offset:offset + cursor + pair.search(/\S/)}) });
+   flowEntries(raw, child, delimiter, entries, depth + 1, offset === undefined ? undefined : offset + cursor + pair.indexOf(delimiter) + 1);
+   cursor += pair.length + 1;
   }
  } else if (value.startsWith('[') && value.endsWith(']')) {
   for (const item of splitOutside(value.slice(1, -1), ',')) {

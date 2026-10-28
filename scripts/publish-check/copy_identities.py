@@ -34,7 +34,9 @@ def copy_pointers(document, read_regular):
             value = read_regular(name)
             if (value is None or value[1] != modes[name]
                     or hashlib.sha256(value[0]).hexdigest() != digest):
-                break
+                # An adapted or mismatched file does not invalidate its siblings'
+                # proofs. Its own digest and content remain ordinary scan inputs.
+                continue
             pending.add(('copies', index, 'files', name))
         else:
             allowed.update(pending)

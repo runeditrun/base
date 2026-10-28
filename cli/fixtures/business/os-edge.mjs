@@ -32,6 +32,13 @@ else if (binary.endsWith('launchctl') || binary === 'systemctl') {
   if (action === 'set' && await exists(join(root, 'fail-credential-store'))) { process.exit(1); }
   // As macOS Keychain answers a write from inside an agent sandbox; reads still work.
   if (action === 'set' && await exists(join(root, 'sandboxed-credential-store'))) { process.stderr.write('security: SecKeychainItemCreateFromContent (<default>): UNIX[Operation not permitted]\n'); process.exit(1); }
+  // A removal inside a Codex workspace-write sandbox (codex-cli 0.163, network on)
+  // prints success, exits 161 and leaves the item in place. A Linux sandbox
+  // without the session bus cannot reach Secret Service at all.
+  if (action === 'delete' && await exists(join(root, 'sandboxed-credential-store'))) {
+   if (binary.endsWith('security')) { process.stdout.write('password has been deleted.\n'); process.exit(161); }
+   process.stderr.write('secret-tool: Cannot autolaunch D-Bus without X11 $DISPLAY\n'); process.exit(1);
+  }
   if (action === 'set') values[handle] = value; else delete values[handle];
   if (Object.keys(values).length) await writeFile(path, JSON.stringify(values), { mode: 0o600 }); else await unlink(path).catch(() => {});
  }

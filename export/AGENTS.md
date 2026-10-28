@@ -134,6 +134,8 @@ different responsibilities; do not invent accepted fields in either.
 
 ## Work from the product
 
+A handler, registry or route table indexed by a request-derived name must use an own-property guard (`Object.hasOwn`) or a null-prototype/Map registry; inherited names (`constructor`, `__proto__`, `toString`) must answer 404/unknown.
+
 Decide the intended journeys and interface first, then build the domain and
 modules needed to deliver that complete product. Preserve recorded requirements,
 including requirements intended for another edition. A family-wide incumbent
