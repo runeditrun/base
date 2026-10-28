@@ -97,10 +97,11 @@ export async function authenticate(
     const local = await options.localCredentials?.(request)
     if (!local || !nonempty(local.sponsor.id) || !nonempty(local.agent.id) || !nonempty(local.agent.name) ||
       (local.agent.specialist !== undefined && local.agent.specialist !== null && !nonempty(local.agent.specialist)) ||
+      (local.clientId !== undefined && !nonempty(local.clientId)) ||
       !Array.isArray(local.scopes) || !local.scopes.every(nonempty)) return null
     const person = await options.people.person(local.sponsor.id)
     if (!person?.active) return null
-    return { person, agent: local.agent, scopes: local.scopes }
+    return { person, agent: local.agent, scopes: local.scopes, clientId: local.clientId }
   } catch {
     return null
   }

@@ -53,7 +53,9 @@ test('principal journey: one sponsor retains distinct client fences through reso
     await r.adopt(autonomousPolicy())
     check((await r.person('/__embedded', { scopes: [], name: 'synthetic.records.list' })).body.code, 'insufficient_scope')
     check((await r.person('/__embedded', { scopes: ['records:read'] })).body.outcome, 'done')
+    await r.db.prepare('INSERT INTO test_grants VALUES(?,?)').bind(r.c.agentId, JSON.stringify(['records:read', 'events:read'])).run()
     check((await r.tool('records.list', {}, { token: await r.token({ scope: 'events:read' }) })).status, 403)
+    check((await r.person('/agents/api/audit')).body.rows.findLast((row: any) => row.door === 'embedded' && row.code === 'insufficient_scope').tool, 'synthetic.records.list')
     assert.ok(decision(await r.tool('events.list', {})))
     t.diagnostic(`Gap P public-door journey: ${points}/${points} points passed.`)
   } finally { await r.close() }

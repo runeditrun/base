@@ -45,6 +45,13 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  const manifest = setupManifest ?? JSON.parse(await readFile(join(root, 'rer-setup.json'), 'utf8'));
  const claim = manifest.steps?.find(step => step.type === 'owner-claim');
  const verification = declared.surface.verification ?? {};
+ let prove;
+ if (verification.proof !== undefined) {
+  if (typeof verification.proof?.module !== 'string' || Object.keys(verification.proof).join(',') !== 'module') throw new RerError('agent_proof_invalid', 'verification.proof must name a contained test module.', 1);
+  await contained(root, verification.proof.module);
+  prove = (await import(pathToFileURL(resolve(root, verification.proof.module)))).default;
+  if (typeof prove !== 'function') throw new RerError('agent_proof_invalid', 'verification.proof module must default-export a native proof test function.', 1);
+ }
  const native = await verificationOwner(root, verification.owner), { email } = native;
  if (claim?.mode && !['signed', 'setup-token'].includes(claim.mode) && !native.initialize) throw new RerError('agent_owner_invalid', `Owner claim mode ${claim.mode} requires verification.owner.initializer using the seed's production lifecycle.`, 1);
  const token = randomBytes(32).toString('hex'), kid = randomUUID(), installationId = randomUUID(), sub = randomUUID();
@@ -103,7 +110,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   let ack; try { ack = await paired.json(); } catch {}
   if (!paired.ok || ack?.rev !== 1) return finish({ ok: false, points: [...validation.points, { id: 'BASE-AGENT-004.business-owner-binding', ok: false, detail: `Signed Business owner binding returned HTTP ${paired.status} without the expected acknowledgement.` }] }, report);
   const result = await runAgentDoorConformance({ fetch: request, origin: hosted.origin, surface: declared.surface,
-   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: { email, cookie, sub }, business,
+   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: { email, cookie, sub }, business, prove,
   });
   return finish(result, report);
  } finally { try { await hosted?.close(); } finally { await network.close(); } }

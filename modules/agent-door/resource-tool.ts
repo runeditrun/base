@@ -17,8 +17,8 @@ export function resourceTool(rt: Runtime, uri: string): ToolDefinition | undefin
       if (!record) throw new ToolRefusal('resource_unavailable')
       return resource.classify(record, { person: ctx.person, agent: ctx.agent, scopes: ctx.scopes, clientId: ctx.clientId, db: ctx.db })
     },
-    async run() {
-      if (!record) throw new ToolRefusal('resource_unavailable')
+    async run(_args, ctx) {
+      if (!record || !await resource.read(uri, { person: ctx.person, agent: ctx.agent, scopes: ctx.scopes, clientId: ctx.clientId, db: ctx.db })) throw new ToolRefusal('resource_unavailable')
       return { result: { contents: [{ uri, mimeType: resource.mimeType ?? 'application/json', text: record.text ?? JSON.stringify(record.json),
         ...(record.untrusted ? { _meta: { 'com.runeditrun/untrusted': true } } : {}) }] } }
     },

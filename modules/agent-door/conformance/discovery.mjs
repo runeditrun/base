@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { accessToken } from './crypto.mjs';
+import { narrowingContract } from './narrowing.mjs';
 import { VERSION } from './protocol.mjs';
 
 export async function discoverDoor(c) {
@@ -30,6 +31,12 @@ export async function listedDoor(c) {
  c.add('BASE-AGENT-001.4', isDeepStrictEqual(first.result, second.result) && typeof first.result?.ttlMs === 'number' && first.result.ttlMs >= 0 && first.result.cacheScope === 'private', 'Repeated tools/list results must have deterministic order, ttlMs and private cache scope.');
  for (const declared of c.surface.tools) {
   const tool = c.listed.get(declared.name);
+  if (declared.proof) c.add(`BASE-AGENT-004.proof.${declared.name}.declaration`, tool?._meta?.['com.runeditrun/proof'] === declared.proof && tool?._meta?.['com.runeditrun/proof-kind'] === declared.proofKind, `${declared.name} must expose its native proof requirement.`);
+  if (declared.widens === false) {
+   const { idempotency_key: _key, expected_revision: _revision, ...properties } = tool?.inputSchema?.properties ?? {};
+   const schema = { ...tool?.inputSchema, properties, required: tool?.inputSchema?.required?.filter(key => !['idempotency_key', 'expected_revision'].includes(key)) };
+   c.add(`BASE-AGENT-005.narrowing.${declared.name}.schema`, narrowingContract({ ...declared, inputSchema: schema }) && tool?._meta?.['com.runeditrun/widens'] === false && isDeepStrictEqual(tool?._meta?.['com.runeditrun/narrowing'], declared.narrowing) && isDeepStrictEqual(schema, declared.inputSchema), `${declared.name} narrowing check requires the runtime's exact closed target-only schema and effect.`);
+  }
   c.add(`BASE-AGENT-002.2.schema.${declared.name}`, tool?.inputSchema?.type === 'object' && tool.outputSchema !== undefined, `${declared.name} must carry input and output schemas.`);
   c.add(`BASE-AGENT-002.3.${declared.name}`, tool?.annotations?.readOnlyHint === declared.readOnly && tool?.annotations?.destructiveHint === declared.classes.includes('destructive') && tool?.annotations?.openWorldHint === declared.classes.includes('external'), `${declared.name} annotations differ from its declared behavior.`);
   c.add(`BASE-AGENT-006.1.${declared.name}`, isDeepStrictEqual([...(tool?._meta?.['com.runeditrun/classes'] ?? [])].sort(), [...declared.classes].sort()) && tool?._meta?.['com.runeditrun/scope'] === declared.scope && isDeepStrictEqual([...(tool?._meta?.['com.runeditrun/clauses'] ?? [])].sort(), [...declared.clauses].sort()), `${declared.name} classes, scope or clauses differ from the Agent surface.`);

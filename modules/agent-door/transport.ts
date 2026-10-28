@@ -34,7 +34,7 @@ export async function mcp(rt: Runtime, request: Request): Promise<Response> {
   if (rpc.id === undefined) return new Response(null, { status: 202 })
   const params = rpc.params ?? {}, meta = metaOf(rpc)
   if (rpc.method === 'tools/call') {
-    const answer = await callTool(rt, String(params.name ?? ''), params.arguments, principal, 'mcp', meta.traceparent, undefined, params.requestState)
+    const answer = await callTool(rt, String(params.name ?? ''), params.arguments, principal, 'mcp', meta.traceparent, undefined, params.requestState, meta['com.runeditrun/native-proof'])
     if (answer.status === 500) return rpcError(rpc.id, -32603, 'Tool execution failed', 500, { code: answer.result.code })
     if (answer.result.code === 'tool_not_found') return rpcError(rpc.id, -32602, 'Unknown tool', 400)
     if (answer.status === 403) return rpcError(rpc.id, -32000, 'Insufficient scope', 403, { code: 'insufficient_scope' }, challenge(rt, answer.scope))

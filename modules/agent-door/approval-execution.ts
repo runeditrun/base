@@ -34,7 +34,8 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
       }
       const ctx = context(rt, principal, saved.door, [], approvers)
       const authority = await tool.authority?.(saved.args, ctx)
-      if (selfEscalation(authority, principal)) result = { ...result, outcome: 'refused', code: 'self_escalation' }
+      if (tool.widens === false && authority?.widens) result = { ...result, outcome: 'refused', code: 'narrowing_contract_violation' }
+      else if (selfEscalation(authority, principal)) result = { ...result, outcome: 'refused', code: 'self_escalation' }
       else if (tool.revision && saved.expected_revision !== undefined && await tool.revision(saved.args, ctx) !== saved.expected_revision) result = { ...result, outcome: 'refused', code: 'approval_evidence_changed' }
       else {
         const classes = await classify(tool, saved.args, ctx)

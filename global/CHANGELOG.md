@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Agent-door access/security tools can declare a machine-checked revoke/narrow contract and prove a native grant subset plus undeclared-argument refusal. Native-proof tools challenge with a human handoff, use the seed verifier before execution and remain subject to company policy and approval; conformance checks challenges, bogus references, audits and valid native proof.
+
 - Carry agent/client scopes into resource authorization, delayed approvals and event/subscription filtering. Embedded callers supply explicit scopes; native current-grant hooks may only narrow their original authority.
 
 - Agent-door verification follows signed and native owner lifecycles, supports isolated seed provider adapters, and accepts Base source archives for copy authoring.

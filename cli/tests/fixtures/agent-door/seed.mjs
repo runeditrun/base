@@ -14,6 +14,8 @@ const productionSchemas = [
  'modules/agent-door/schema/agent-door.sql',
 ];
 const nativeSchema = `
+CREATE TABLE fixture_grants (id TEXT NOT NULL, scope TEXT NOT NULL, operator_id TEXT NOT NULL REFERENCES oa_operators(id), PRIMARY KEY(id,scope));
+CREATE TABLE fixture_proofs (id TEXT PRIMARY KEY, operator_id TEXT NOT NULL, agent TEXT NOT NULL, tool TEXT NOT NULL, record_id TEXT NOT NULL, expires INTEGER NOT NULL);
 CREATE TABLE fixture_members (operator_id TEXT PRIMARY KEY REFERENCES oa_operators(id), email TEXT NOT NULL UNIQUE, joined_at INTEGER NOT NULL);
 CREATE TABLE fixture_records (id TEXT PRIMARY KEY, value TEXT NOT NULL, version INTEGER NOT NULL CHECK(version>0), operator_id TEXT NOT NULL REFERENCES oa_operators(id));
 CREATE TABLE fixture_receipts (id TEXT PRIMARY KEY, record_id TEXT NOT NULL REFERENCES fixture_records(id), kind TEXT NOT NULL, status INTEGER NOT NULL, body TEXT NOT NULL, operator_id TEXT NOT NULL REFERENCES oa_operators(id), created_at INTEGER NOT NULL);
@@ -30,9 +32,9 @@ export async function fixtureSeed(t, mode) {
  await mkdir(join(root, 'dist/server/migrations'), { recursive: true });
  await mkdir(join(root, 'dist/client'), { recursive: true });
  await symlink(join(base, 'default-seed/node_modules'), join(root, 'node_modules'));
- for (const file of ['provider.mjs', 'receiver.mjs', 'initializer.mjs']) await cp(join(import.meta.dirname, file), join(root, file));
+ for (const file of ['provider.mjs', 'receiver.mjs', 'initializer.mjs', 'proof.mjs']) await cp(join(import.meta.dirname, file), join(root, file));
  const surface = JSON.parse(await readFile(join(import.meta.dirname, 'surface.json'), 'utf8'));
- surface.verification = { network: { module: 'provider.mjs', origins: ['https://api.openai.com', 'https://receiver.example.invalid'] },
+ surface.verification = { proof: { module: 'proof.mjs' }, network: { module: 'provider.mjs', origins: ['https://api.openai.com', 'https://receiver.example.invalid'] },
   ...(mode === 'native' ? { owner: { email: 'native-owner@example.com', emailField: 'SETUP_OPERATOR_EMAIL', initializer: 'initializer.mjs' } } : {}),
  };
  await writeFile(join(root, 'agent-surface.json'), JSON.stringify(surface));
