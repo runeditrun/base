@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "typeRoots": ["../../../default-seed/node_modules/@types"]
+  },
+  "include": ["*.test.ts", "*.d.mts"]
+}
