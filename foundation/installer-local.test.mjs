@@ -1,3 +1,4 @@
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import {exportCLI} from '../cli/export.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,7 +43,8 @@ async function fixture(build, healthStatus = 200, healthBody = { status: 'ok' },
  } };
 }
 
-test('foundation failed attempt awaits delayed application termination and final pipe output', async () => {
+test("foundation local start retains cleanup custody and diagnostics through healthy, exited and failed startup", t => caseRows(t, [
+  ['foundation failed attempt awaits delayed application termination and final pipe output', async () => {
  const f = await fixture(`console.log('build completed');`, 503, undefined, `
   const http=require('node:http');
   process.on('SIGTERM',()=>setTimeout(()=>{
@@ -69,13 +71,11 @@ test('foundation failed attempt awaits delayed application termination and final
   assert.match(f.store.state.error, /Last health: HTTP 503/);
   assert.match(f.store.state.logs.join('\n'), /application cleanup completed/);
  } finally { await f.close(); }
-});
-
-for (const [exit, code, signal, diagnostic] of [
+}],
+  ...[
  ['process.exit(7)', 7, null, /exit 7/],
  ["process.kill(process.pid,'SIGTERM')", null, 'SIGTERM', /signal SIGTERM/],
-]) {
-test(`foundation application ${signal ?? `exit ${code}`} completes failure without signalling its retired PID`, async () => {
+].map(([exit, code, signal, diagnostic]) => [`foundation application ${signal ?? `exit ${code}`} completes failure without signalling its retired PID`, async () => {
  const f = await fixture(`console.log('build completed');`, undefined, undefined, `console.error('application final failure detail');${exit};`);
  let child, closed = false;
  const stop = f.store.stop.bind(f.store);
@@ -100,11 +100,8 @@ test(`foundation application ${signal ?? `exit ${code}`} completes failure witho
   assert.match(f.store.state.error, diagnostic);
   assert.match(f.store.state.error, /application final failure detail/);
  } finally { await f.close(); }
-});
-}
-const input = { APP_NAME: 'Local fixture', PRIMARY_COLOR: '#356c60' };
-
-test('foundation failing build retains actual final output in approved diagnostics', async () => {
+}]),
+  ['foundation failing build retains actual final output in approved diagnostics', async () => {
  const f = await fixture(`for(let i=0;i<80;i++)console.log('build progress '+i);console.error('final compiler detail: missing exported symbol');console.error('final build line: source compilation failed');process.exit(7);`);
  try {
   await f.install(f.root, input, f.store, () => assert.fail('failed build cannot start app'));
@@ -114,9 +111,8 @@ test('foundation failing build retains actual final output in approved diagnosti
   assert.match(f.store.state.error, /final build line: source compilation failed/);
   assert.match(await readFile(f.store.logPath, 'utf8'), /final build line: source compilation failed/);
  } finally { await f.close(); }
-});
-
-test('foundation local start completes after transient unhealthy responses', async () => {
+}],
+  ['foundation local start completes after transient unhealthy responses', async () => {
  const f = await fixture(`console.log('build completed');`, undefined, undefined, `
   const http=require('node:http');let checks=0;
   const port=Number(process.argv[process.argv.indexOf('--port')+1]);
@@ -136,13 +132,11 @@ test('foundation local start completes after transient unhealthy responses', asy
   assert.equal(retried, true, 'installation retries a not-ready health transport');
   assert.equal((await fetch(f.store.state.appUrl + '/health')).status, 200);
  } finally { await f.close(); }
-});
-
-for (const [status, body, diagnostic] of [
+}],
+  ...[
  [503, { status: 'private response body must stay private' }, /Last health: HTTP 503/],
  [200, { status: 'private response body must stay private' }, /Last health: HTTP 200; health status not ok/],
-]) {
- test(`foundation readiness deadline records actual HTTP ${status} health status`, async () => {
+].map(([status, body, diagnostic]) => [`foundation readiness deadline records actual HTTP ${status} health status`, async () => {
   const f = await fixture(`console.log('build completed');`, status, body);
   const waitForReady = f.store.waitForReady.bind(f.store);
   f.store.waitForReady = (label, child, health, options) => waitForReady(label, child, health, { ...options, timeoutMs: 1000, intervalMs: 20, softAfterMs: 30 });
@@ -153,5 +147,8 @@ for (const [status, body, diagnostic] of [
    assert.match(f.store.state.error, diagnostic);
    assert.doesNotMatch(f.store.state.error, /private response body/);
   } finally { await f.close(); }
- });
-}
+ }])
+]));
+
+
+const input = { APP_NAME: 'Local fixture', PRIMARY_COLOR: '#356c60' };

@@ -1,3 +1,4 @@
+import { caseRows } from './test-fixture.mjs';
 import {writeTestManifest, manifestContract} from './test-manifest-support.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,16 +34,16 @@ test('HTTP capture retains cleared vault secrets, nested direct credentials, and
  for(const secret of [...emit,'ADAPTER_GENERATED_SECRET'])assert.ok(!output.includes(secret));assert.match(client.server.state.error,/Probe: exit 7/);
 });
 
-test('owner Stop cancels captured running command and supports explicit retry',async t=>{
+test("HTTP stop custody cancels owned command groups, retains final output and permits explicit retry", t => caseRows(t, [
+  ['owner Stop cancels captured running command and supports explicit retry', async t=>{
  let attempts=0;
  const client=await setup(t,async(_root,_input,store)=>{if(++attempts===1)await store.run('Long operation',process.execPath,['-e','setInterval(()=>{},1000)']);else await store.phase('complete');});
  assert.equal((await client.call('/api/start',{})).status,202);
  assert.equal((await client.call('/api/stop',{}, {Origin:'https://attacker.invalid'})).status,403);
  assert.equal((await client.call('/api/stop',{})).status,202);await client.phase('failed');assert.match(client.server.state.error,/cancelled/);
  assert.equal((await client.call('/api/start',{})).status,202);await client.phase('complete');assert.equal(client.server.state.error,undefined);
-});
-
-test('Stop terminates the owned command group including its child while retaining final output',async t=>{
+}],
+  ['Stop terminates the owned command group including its child while retaining final output', async t=>{
  const client=await setup(t,async(_root,_input,store)=>{
   const script=`const {spawn}=require('node:child_process');
    const descendant=spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{console.log('DESCENDANT_STOPPED');process.exit(0)});console.log('DESCENDANT_READY');setInterval(()=>{},1000)"],{stdio:['ignore','inherit','inherit']});
@@ -56,9 +57,13 @@ test('Stop terminates the owned command group including its child while retainin
  const start=Date.now();assert.equal((await client.call('/api/stop',{})).status,202);await client.phase('failed');
  assert.ok(Date.now()-start<1500,'descendant needed emergency parent cleanup instead of group termination');
  assert.match(client.server.state.logs.join('\n'),/DESCENDANT_STOPPED/);
-});
+}]
+]));
 
-for(const reason of ['readiness','core failure'])test(`failed ${reason} cleans an exited command group before retry and keeps the log writable`,{skip:process.platform==='win32'},async t=>{
+
+
+test("failed command group cleanup closes descendants and leaves the retry log writable", {skip:process.platform==='win32'}, t => caseRows(t, [
+  ...['readiness','core failure'].map(reason => [`failed ${reason} cleans an exited command group before retry and keeps the log writable`, async t=>{
  let attempts=0,child,closed=false,descendant;
  const client=await setup(t,async(_root,_input,store,onApp)=>{
   if(++attempts>1){await store.run('Retry command',process.execPath,['-e',"console.log('RETRY_LOG_OUTPUT')"]);await store.phase('complete');return;}
@@ -78,9 +83,11 @@ for(const reason of ['readiness','core failure'])test(`failed ${reason} cleans a
   assert.equal((await client.call('/api/start',{})).status,202);await client.phase('complete');
   const disk=await readFile(join(client.root,'.seed/installer/install.log'),'utf8');assert.match(disk,/LEADER_FINAL_OUTPUT/);assert.match(disk,/FAILED_ATTEMPT_DESCENDANT_STOPPED/);assert.match(disk,/RETRY_LOG_OUTPUT/);
  } finally {if(child&&!closed){try{process.kill(-child.pid,'SIGKILL');}catch{}}}
-});
+}])
+]));
 
-for(const reason of ['readiness exit','core failure','hard deadline','owner stop'])test(`${reason} cleans a group that ignores SIGTERM before permitting retry`,{skip:process.platform==='win32'},async t=>{
+test("uncooperative command group cleanup escalates before permitting retry", {skip:process.platform==='win32'}, t => caseRows(t, [
+  ...['readiness exit','core failure','hard deadline','owner stop'].map(reason => [`${reason} cleans a group that ignores SIGTERM before permitting retry`, async t=>{
  let attempts=0,child,closed=false;
  const client=await setup(t,async(_root,_input,store,onApp)=>{
   if(++attempts>1){await store.run('Retry after escalation',process.execPath,['-e',"console.log('ESCALATION_RETRY_OUTPUT')"]);await store.phase('complete');return;}
@@ -107,4 +114,5 @@ for(const reason of ['readiness exit','core failure','hard deadline','owner stop
   assert.equal((await client.call('/api/start',{})).status,202);await client.phase('complete');
   assert.match(await readFile(join(client.root,'.seed/installer/install.log'),'utf8'),/ESCALATION_RETRY_OUTPUT/);
  } finally {if(child&&!closed){try{process.kill(-child.pid,'SIGKILL');}catch{}}}
-});
+}])
+]));

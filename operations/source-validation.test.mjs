@@ -1,3 +1,4 @@
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -27,7 +28,8 @@ const unsafeSources = () => {
   ];
 };
 
-test('source guidance rejects embedded assignments and provider tokens with generic errors', () => {
+test("environment source guidance rejects credential values through native and copied inspectors", t => caseRows(t, [
+  ['source guidance rejects embedded assignments and provider tokens with generic errors', () => {
   for (const source of unsafeSources()) {
     // Compare only generic errors: a failed assertion must never print a value.
     let error;
@@ -38,32 +40,8 @@ test('source guidance rejects embedded assignments and provider tokens with gene
   for (const source of ['OPERATIONS.md', 'docs/OPERATIONS.md#mail', 'Team vault: production mail item', 'Ask the owner for the production mail key']) {
     validateEnvironmentSources({ environmentSources: { INPUT: source } }, new Set(['INPUT']));
   }
-});
-
-async function copiedInspector(t, version) {
-  const root = await mkdtemp(join(tmpdir(), 'operations-source-'));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await mkdir(join(root, 'scripts'));
-  for (const name of ['operations.mjs', 'project-operations.mjs']) {
-    await copyFile(new URL(name, import.meta.url), join(root, 'scripts', name));
-  }
-  await writeFile(join(root, 'verify.mjs'), 'throw new Error("Inspection must never execute commands");');
-  const descriptor = version === 1
-    ? { version, edition: 'source-validation', requiredEnvironment: ['INPUT'], acceptance: { document: 'ACCEPTANCE.md' }, commands: Object.fromEntries(['setup', 'deploy', 'verify'].map(name => [name, { argv: ['pnpm', 'run', name], effects: 'Local verification' }])) }
-    : { version, project: 'source-validation', runtime: { requirements: [] }, requiredEnvironment: ['INPUT'], commands: { verify: { argv: ['node', 'verify.mjs'], inputs: ['verify.mjs'], effects: 'Local verification' } } };
-  if (version === 1) {
-    await writeFile(join(root, 'OPERATIONS.md'), 'Operations');
-    await writeFile(join(root, 'ACCEPTANCE.md'), 'Acceptance');
-    await writeFile(join(root, 'scripts/operations-config.mjs'), 'export function validateConfiguration() {}');
-    await writeFile(join(root, 'package.json'), JSON.stringify({ scripts: Object.fromEntries(['setup', 'deploy', 'verify'].map(name => [name, 'node verify.mjs'])) }));
-  }
-  const save = source => writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ ...descriptor, environmentSources: { INPUT: source } }));
-  const run = command => spawnSync(process.execPath, ['scripts/operations.mjs', command], { cwd: root, env: { PATH: process.env.PATH }, encoding: 'utf8', timeout: 5000 });
-  return { root, save, run };
-}
-
-for (const version of [1, 2]) {
-  test(`v${version} copied inspector rejects unsafe sources before describe or check output`, async t => {
+}],
+  ...[1, 2].map(version => [`v${version} copied inspector rejects unsafe sources before describe or check output`, async t => {
     const { root, save, run } = await copiedInspector(t, version);
     for (const source of unsafeSources()) {
       await save(source);
@@ -111,5 +89,27 @@ for (const version of [1, 2]) {
       assert.equal(lines.length, 1);
       assert.equal(lines[0] === JSON.stringify({ ok: false, error: 'Invalid command or unreadable operations files. Usage: node scripts/operations.mjs describe|check' }), true);
     }
-  });
+  }])
+]));
+
+async function copiedInspector(t, version) {
+  const root = await mkdtemp(join(tmpdir(), 'operations-source-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, 'scripts'));
+  for (const name of ['operations.mjs', 'project-operations.mjs']) {
+    await copyFile(new URL(name, import.meta.url), join(root, 'scripts', name));
+  }
+  await writeFile(join(root, 'verify.mjs'), 'throw new Error("Inspection must never execute commands");');
+  const descriptor = version === 1
+    ? { version, edition: 'source-validation', requiredEnvironment: ['INPUT'], acceptance: { document: 'ACCEPTANCE.md' }, commands: Object.fromEntries(['setup', 'deploy', 'verify'].map(name => [name, { argv: ['pnpm', 'run', name], effects: 'Local verification' }])) }
+    : { version, project: 'source-validation', runtime: { requirements: [] }, requiredEnvironment: ['INPUT'], commands: { verify: { argv: ['node', 'verify.mjs'], inputs: ['verify.mjs'], effects: 'Local verification' } } };
+  if (version === 1) {
+    await writeFile(join(root, 'OPERATIONS.md'), 'Operations');
+    await writeFile(join(root, 'ACCEPTANCE.md'), 'Acceptance');
+    await writeFile(join(root, 'scripts/operations-config.mjs'), 'export function validateConfiguration() {}');
+    await writeFile(join(root, 'package.json'), JSON.stringify({ scripts: Object.fromEntries(['setup', 'deploy', 'verify'].map(name => [name, 'node verify.mjs'])) }));
+  }
+  const save = source => writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ ...descriptor, environmentSources: { INPUT: source } }));
+  const run = command => spawnSync(process.execPath, ['scripts/operations.mjs', command], { cwd: root, env: { PATH: process.env.PATH }, encoding: 'utf8', timeout: 5000 });
+  return { root, save, run };
 }
