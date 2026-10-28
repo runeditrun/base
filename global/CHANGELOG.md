@@ -2,6 +2,8 @@
 
 ## 0.2.86
 
+- Agent-door verification fixtures generate disposable setup, session, local bearer, delivery and provider credentials at runtime while retaining signed receipts and isolated provider checks.
+
 - Local `rer export` and `rer import` accept the historical `_rer_deploy_migrations` plus `d1_migrations` pair: the deploy ledger remains authoritative and Wrangler is skipped. Incomplete, pending or conflicting histories still refuse before transfer.
 - **Known adapter change in 0.2.85:** the worker's `migration-preflight` receipt changed from `{platformLedger}` to `{nativeApply}`, and `platformMigrationPreflight` was renamed to `nativeMigrationPreflight`. Seeds wrapping the worker or importing the internal adapter must update; the supported adapter entry is `@runeditrun/rer/portability-migrations`, and native migrations run only when `nativeApply` is true.
 - `rer deploy --dry-run` now accepts valid senders on reserved fixture domains and no longer requires an owner name to print its local plan. Real deploys keep placeholder-sender refusals and managed adapters check the owner email before asking for a missing name; deploy help documents that order.
