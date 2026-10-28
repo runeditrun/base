@@ -113,11 +113,13 @@ test('public check enforces registration budgets without executing tests or crea
  await symlink(join(base, 'default-seed/node_modules/typescript'), join(root, 'node_modules/typescript'));
  await mkdir(join(root, 'tests'));
  await save('tests/wrappers.mjs', `import {test as register} from 'node:test';
- export function contract(name, body) { register(name, body); }
+ export function contract(...args) { register(...args); }
  export function importedSuite({test: registerBehavior}) { for (const value of [1, 2]) registerBehavior(String(value), () => {}); }
  `);
+ await save('tests/barrel.mjs', `export * from './wrappers.mjs';`);
  await save('tests/edition-owned.ts', `import {test as spec, it, describe} from 'node:test';
- import {contract, importedSuite} from './wrappers.mjs';
+ import {contract, importedSuite} from './barrel.mjs';
+ import os from 'node:os';
  import {importedSuite as sameSuite} from './wrappers.mjs';
  import {writeFileSync} from 'node:fs';
  writeFileSync('synthetic-base-1', 'must never execute');
@@ -128,9 +130,9 @@ test('public check enforces registration budgets without executing tests or crea
  spec.skip('skipped still counts', () => {});
  spec('nested CLI cases', async t => { for (const value of [1, 2]) await t.test(String(value), () => {}); });
  it('alias', () => {});
- for (const name of ['synthetic-base-2', 'synthetic-base-3']) contract(name, () => {});
+ for (const name of ['synthetic-base-2', 'synthetic-base-3']) contract(name, async t => { await t.test('forwarded callback', () => {}); });
  importedSuite({test: spec});
- describe('suite is not a behavior', () => { if (process.platform === 'linux') spec('linux', () => {}); else for (const value of [1, 2]) spec(String(value), () => {}); });
+ describe('suite is not a behavior', () => { if (os.platform() === 'linux') spec('linux', () => {}); else for (const value of [1, 2]) spec(String(value), () => {}); });
  `);
  await save('tests/assert-script.mjs', `import assert from 'node:assert/strict'; assert.ok(false); throw Error('must never execute');`);
  await save('tests/assert-wrapper.mjs', `import './assert-script.mjs';`);
@@ -144,16 +146,16 @@ test('public check enforces registration budgets without executing tests or crea
  const before = (await readdir(root, { recursive: true })).sort();
  const accepted = check();
  assert.equal(accepted.status, 0, JSON.stringify(accepted.report.testBudget));
- assert.equal(accepted.report.testBudget.total, 18);
- assert.deepEqual(accepted.report.testBudget.configurations.map(config => [config.platform, config.total]), [['linux', 17], ['darwin', 18], ['win32', 18]]);
- assert.deepEqual(accepted.report.testBudget.files, [{ file: 'tests/assert-script.mjs', count: 1 }, { file: 'tests/edition-owned.ts', count: 17 }]);
+ assert.equal(accepted.report.testBudget.total, 20);
+ assert.deepEqual(accepted.report.testBudget.configurations.map(config => [config.platform, config.total]), [['linux', 19], ['darwin', 20], ['win32', 20]]);
+ assert.deepEqual(accepted.report.testBudget.files, [{ file: 'tests/assert-script.mjs', count: 1 }, { file: 'tests/edition-owned.ts', count: 19 }]);
  assert.deepEqual((await readdir(root, { recursive: true })).sort(), before, 'checking creates no files or state');
  copyRecord.copies[0].adapted = { 'tests/shared-copy.mjs': '0'.repeat(40) };
  await save('base-copies.json', JSON.stringify(copyRecord));
- assert.equal(check().report.testBudget.total, 19, 'an adapted copy remains edition-owned behavior');
+ assert.equal(check().report.testBudget.total, 21, 'an adapted copy remains edition-owned behavior');
  delete copyRecord.copies[0].adapted;
  await save('base-copies.json', JSON.stringify(copyRecord));
- await declare(17);
+ await declare(19);
  const over = check();
  assert.equal(over.status, 1);
  assert.match(over.report.clauses.find(clause => clause.id === 'TEST.budget').message, /exceeded by 1/);

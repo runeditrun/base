@@ -20,10 +20,10 @@ export function registrationReader(ts, { root, platform, excluded, limit }) {
  };
  const tick = node => { if (++steps > 250000) { diagnostic(node, 'Registration analysis exceeds the bounded reader limit.'); throw Error('Registration analysis exceeds the bounded reader limit.'); } };
  const builtin = specifier => {
-  if (['node:test', 'test'].includes(specifier)) return { default: registrar, test: registrar, it: registrar, describe: suite, suite };
+  if (specifier === 'node:test') return { default: registrar, test: registrar, it: registrar, describe: suite, suite };
   if (['@playwright/test', 'vitest', '@jest/globals'].includes(specifier)) return { default: registrar, test: registrar, it: registrar, describe: suite };
   if (/^(?:node:)?assert(?:\/strict)?$/.test(specifier)) return { default: assertion, strict: assertion, ok: assertion, equal: assertion, deepEqual: assertion };
-  if (['node:os', 'os'].includes(specifier)) return { platform: { kind: 'platform' } };
+  if (['node:os', 'os'].includes(specifier)) { const os = { platform: { kind: 'platform' } }; return { ...os, default: os }; }
   return undefined;
  };
  const isFunction = value => value?.kind === 'function';
@@ -50,8 +50,9 @@ export function registrationReader(ts, { root, platform, excluded, limit }) {
  function property(value, key) {
   if (value === dynamicRegistration || (value === registrar && key === unknown)) return dynamicRegistration;
   if (value === unknown || key === unknown || value == null) return unknown;
-  if (value === registrar && ['skip', 'only', 'todo', 'concurrent', 'serial', 'failing'].includes(key)) return registrar;
+  if (value === registrar && ['test', 'it', 'skip', 'only', 'todo', 'concurrent', 'serial', 'failing'].includes(key)) return registrar;
   if ((value === registrar || value === suite) && key === 'each') return { kind: 'each', base: value };
+  if (value === registrar && ['describe', 'suite'].includes(key)) return suite;
   if (value === registrar) return dynamicRegistration;
   if (value === assertion) return assertion;
   if (value?.kind === 'namespace') return value.module.exports.get(key) ?? unknown;
@@ -198,6 +199,11 @@ export function registrationReader(ts, { root, platform, excluded, limit }) {
     if (statement.moduleSpecifier) target = await load(resolve(dirname(file), statement.moduleSpecifier.text));
     for (const element of statement.exportClause.elements) module.exports.set(element.name.text, target?.exports.get(element.propertyName?.text ?? element.name.text) ?? module.env.get(element.propertyName?.text ?? element.name.text) ?? unknown);
    }
+   if (ts.isExportDeclaration(statement) && statement.moduleSpecifier && (!statement.exportClause || ts.isNamespaceExport(statement.exportClause))) {
+    const target = await load(resolve(dirname(file), statement.moduleSpecifier.text));
+    if (target && !statement.exportClause) { for (const [key, value] of target.exports) if (key !== 'default') module.exports.set(key, value); }
+    else if (target && statement.exportClause) module.exports.set(statement.exportClause.name.text, { kind: 'namespace', module: target });
+   }
    if (ts.isExportAssignment(statement)) module.exports.set('default', valueOf(statement.expression, module.env));
   }
   return module;
@@ -245,10 +251,21 @@ export function registrationReader(ts, { root, platform, excluded, limit }) {
   return found;
  }
  function add(owner) { contributions.set(owner, (contributions.get(owner) ?? 0) + 1); }
+ function argumentsOf(nodes, env) {
+  const args = [];
+  for (const node of nodes) {
+   if (ts.isSpreadElement(node)) {
+    const values = valueOf(node.expression, env);
+    if (!Array.isArray(values)) return;
+    args.push(...values);
+   } else args.push(valueOf(node, env));
+  }
+  return args;
+ }
  async function invoke(fn, args, owner, site) {
   if (active.has(fn.node)) { diagnostic(site, 'Recursive registration wrapper is unresolved.'); return unknown; }
   const env = new Map(fn.env);
-  fn.node.parameters.forEach((parameter, index) => bind(parameter.name, args[index] === undefined && parameter.initializer ? valueOf(parameter.initializer, env) : args[index] ?? unknown, env));
+  fn.node.parameters.forEach((parameter, index) => bind(parameter.name, parameter.dotDotDotToken ? args.slice(index) : args[index] === undefined && parameter.initializer ? valueOf(parameter.initializer, env) : args[index] ?? unknown, env));
   active.add(fn.node);
   try {
    if (ts.isBlock(fn.node.body)) return await statements(fn.node.body.statements, env, owner);
@@ -267,7 +284,9 @@ export function registrationReader(ts, { root, platform, excluded, limit }) {
     if (!Array.isArray(cases)) { diagnostic(node, 'Unresolved dynamic .each registration cases.'); return unknown; }
     if (cases.length > limit) { diagnostic(node, 'Registration cases exceed the bounded reader limit.'); return unknown; }
     const base = callable?.kind === 'cases' ? callable.base : callable;
-    const callback = [...node.arguments].reverse().map(argument => valueOf(argument, env)).find(isFunction);
+    const args = argumentsOf(node.arguments, env);
+    if (!args) { diagnostic(node, 'Unresolved dynamic registration arguments.'); return unknown; }
+    const callback = [...args].reverse().find(isFunction);
     for (const row of cases) {
      if (base === registrar) add(owner);
      if (callback) {
@@ -278,7 +297,11 @@ export function registrationReader(ts, { root, platform, excluded, limit }) {
     }
     return unknown;
    }
-   if (isFunction(callable) && canRegister(node, env)) return invoke(callable, node.arguments.map(argument => valueOf(argument, env)), owner, node);
+   if (isFunction(callable) && canRegister(node, env)) {
+    const args = argumentsOf(node.arguments, env);
+    if (!args) { diagnostic(node, 'Unresolved dynamic registration wrapper arguments.'); return unknown; }
+    return invoke(callable, args, owner, node);
+   }
    if (callable?.kind === 'array-method' && callable.method === 'forEach') {
     const callback = valueOf(node.arguments[0], env);
     if (isFunction(callback)) for (const [index, item] of callable.value.entries()) if (canRegister(callback.node.body, new Map([...callback.env, ...env]))) await invoke(callback, [item, index], owner, node);
