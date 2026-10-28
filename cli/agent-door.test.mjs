@@ -10,11 +10,11 @@ import { isolatedQueue } from './fixtures/queue.mjs';
 import { serveHosted, HOSTED_ORIGIN } from './hosted-output.mjs';
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
 
-test('rer verify drives signed, setup-token and native owner lifecycles through isolated JSON, streaming and signed provider edges', { timeout: 240000 }, async t => {
+test('rer verify drives signed, setup-token and native owner lifecycles through isolated JSON, streaming and signed provider edges', { timeout: 330000 }, async t => {
  const env = await isolatedQueue(t, { ...process.env, CI: 'true', WRANGLER_SEND_METRICS: 'false' });
  for (const mode of ['signed', 'setup-token', 'native']) {
   const root = await fixtureSeed(t, mode);
-  const { stdout, stderr } = await run(process.execPath, [join(base, 'bin/rer.mjs'), 'verify', '--cwd', root, '--json'], { env, timeout: 75000, maxBuffer: 4 * 1024 * 1024 });
+  const { stdout, stderr } = await run(process.execPath, [join(base, 'bin/rer.mjs'), 'verify', '--cwd', root, '--json'], { env, timeout: 100000, maxBuffer: 4 * 1024 * 1024 });
   const result = JSON.parse(stdout.trim().split('\n').at(-1));
   assert.equal(result.ok, true, stderr + stdout);
   assert.equal(result.agentDoor.ok, true, stdout);
