@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
@@ -149,7 +150,9 @@ DROP TABLE entries_copy;` };
 const entryRows = db => db.prepare('SELECT rowid,code,kind FROM entries ORDER BY rowid').all().map(row => ({ ...row }));
 const entryDefinition = db => db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='entries'").get().sql;
 
-test('trigger-only migrations admit archives that predate them and restore every row exactly', async () => {
+test("restore admits compatible triggers and rebuilds while refusing archived-row rewrites", async t => {
+  const foldedCases = [];
+foldedCases.push(['trigger-only migrations admit archives that predate them and restore every row exactly', async () => {
   // An archive without recorded migrations (placed by its schema prefix).
   const source = database([reads], { ledger: false });
   source.exec("INSERT INTO message_history VALUES('m1','c1'),('m2','c2'); INSERT INTO reads VALUES('c1','u1',10),('c2','u1',20); INSERT INTO thread_reads VALUES('m1','u2')");
@@ -173,9 +176,8 @@ test('trigger-only migrations admit archives that predate them and restore every
   assert.deepEqual(guarded.status.bridged.replayed, [{ migration: guardedInsert.name, statement: 2, table: 'accepted', rows: 1 }]);
   guarded.target.exec("UPDATE data_state SET value='blocked' WHERE id='mode'");
   assert.throws(() => guarded.target.exec("INSERT INTO accepted VALUES('denied')"), /STATE_NOT_READY/);
-});
-
-test('later migrations that rewrite archived rows, directly, through a trigger or past an unbounded trigger, stay refused', async () => {
+}]);
+foldedCases.push(['later migrations that rewrite archived rows, directly, through a trigger or past an unbounded trigger, stay refused', async (t) => {
   const bundle = await archive(await service(custodySource([custody]), [custody]));
   const refusals = [
     { name: '0002_backfill.sql', sql: 'UPDATE custody_states SET revision=revision+1;' },
@@ -186,11 +188,11 @@ INSERT INTO audit VALUES('a1');` },
     // A trigger glued to the statement after it, as a splitter that missed its END would hand it over.
     { name: '0002_glued.sql', statements: ["CREATE TRIGGER audit_touch AFTER DELETE ON jobs BEGIN SELECT 1; END; UPDATE custody_states SET revision=0"] },
   ];
-  for (const later of refusals) {
+  await runCases(t, Array.from(refusals, (later, rowIndex) => [`${t.name}: later row ${rowIndex + 1}`, async t => {
     const migrations = [custody, later], target = database(migrations);
     await assert.rejects((await service(target, migrations)).imports.create(bundle.manifest), new RegExp('schema_mismatch:migration_data:' + later.name));
     assert.deepEqual(rows(target, ['jobs', 'custody_states', 'sources']), { jobs: [], custody_states: [], sources: [] });
-  }
+}]));
 
   // The same UPDATE admitted for a row-less archive cannot skip an archived row.
   const filled = stateSource({ queued: true }), filledBundle = await archive(await service(filled, [state]));
@@ -201,19 +203,97 @@ INSERT INTO audit VALUES('a1');` },
   const entriesSource = database([entries]);
   entriesSource.exec("INSERT INTO entries(rowid,code,kind) VALUES(-7,'alpha','old'),(21,'beta','kept'); INSERT INTO companion VALUES('carried')");
   const entriesBundle = await archive(await service(entriesSource, [entries]));
-  for (const later of [
+  await runCases(t, Array.from([
     rebuildEntries('0002_missing_column.sql', 'CREATE TABLE entries(code TEXT NOT NULL)', 'code'),
     rebuildEntries('0002_changed_column.sql', entriesDefinition.replace('code TEXT', 'code INTEGER')),
     rebuildEntries('0002_rejected_check.sql', entriesDefinition.replace("'old','kept'", "'old','new'")),
-  ]) {
+  ], (later, rowIndex) => [`${t.name}: later row ${rowIndex + 1}`, async t => {
     const migrations = [entries, later], destination = database(migrations), definition = entryDefinition(destination);
     // Before rebuild admission this fails at placement; once admitted, the
     // incompatible column or CHECK must still refuse the whole public restore.
     await assert.rejects(restore(await service(destination, migrations), entriesBundle), /schema_mismatch:(?:migration_data|columns|definition):|CHECK constraint/);
     assert.deepEqual(rows(destination, ['companion', 'entries']), { companion: [], entries: [] }, later.name);
     assert.equal(entryDefinition(destination), definition);
-  }
+}]));
+}]);
+foldedCases.push(['an archive predating a guard and a view restores past triggers holding CASE ... END; archived rewrites and unreadable chunks stay refused', async t => {
+  const source = database([knowledge, search]);
+  source.exec("INSERT INTO pages VALUES('p1','w1','page'),('r1','w1','record'); INSERT INTO page_blocks VALUES('b1','p1','Hello'),('b2','r1','Fields')");
+  const exported = await archive(await service(source, [knowledge, search], searchPolicy));
+  const bundle = await legacyAssertions(exported, source);
+  assert.deepEqual(bundle.manifest.migrations, [knowledge.name, search.name]);
+  const migrations = [knowledge, search, door], target = database(migrations), before = triggers(target);
+  const restored = await restore(await service(target, migrations, searchPolicy), bundle);
+  assert.equal(restored.phase, 'complete');
+  assert.deepEqual(restored.skippedTables, ['ik_d1_assertions']);
+  assert.ok(!exported.manifest.tables.some(table => table.name === 'ik_d1_assertions'));
+  assert.ok(!exported.parts.some(part => part.items.some(item => item.table === 'ik_d1_assertions')));
+  assert.deepEqual(rows(target, ['ik_d1_assertions']), { ik_d1_assertions: [] });
+  assert.deepEqual(rows(target, ['pages', 'page_blocks', 'door_plans']), { ...rows(source, ['pages', 'page_blocks']), door_plans: [] });
+  assert.deepEqual(triggers(target), before);
+  target.exec("UPDATE page_blocks SET body='Edited' WHERE id='b2'");
+  assert.deepEqual(rows(target, ['search_dirty']), { search_dirty: [{ key: 'record:r1', workspace_id: 'w1' }] });
+
+  const corrupt = await legacyAssertions(exported, source, [1]);
+  const destination = database(migrations);
+  await assert.rejects(restore(await service(destination, migrations, searchPolicy), corrupt), /invalid_bookkeeping_rows:ik_d1_assertions/);
+  assert.deepEqual(rows(destination, ['pages', 'page_blocks', 'ik_d1_assertions']), { pages: [], page_blocks: [], ik_d1_assertions: [] });
+
+  const refusals = [
+    [{ name: '0003_door.sql', sql: `${door.sql}\nUPDATE pages SET page_kind='page' WHERE page_kind='record';` }, /schema_mismatch:migration_data:0003_door\.sql/],
+    // SQLite runs a statement ending in an open block comment; Base cannot read where it ends.
+    [{ name: '0003_open.sql', statements: ['CREATE INDEX pages_kind ON pages(page_kind); /* left open'] }, /generated_sql/],
+  ];
+  await runCases(t, Array.from(refusals, ([later, refusal], rowIndex) => [`${t.name}: [later, refusal] row ${rowIndex + 1}`, async t => {
+    const list = [knowledge, search, later], destination = database(list);
+    await assert.rejects((await service(destination, list, searchPolicy)).imports.create(bundle.manifest), refusal, later.name);
+    assert.deepEqual(rows(destination, ['pages', 'page_blocks']), { pages: [], page_blocks: [] });
+}]));
+
+  // An UPDATE of a carried table with no rows cannot alter the archive, even
+  // when its expression reads another carried table that does have rows.
+  const stateDb = stateSource();
+  await runCases(t, [['a row-less target may read carried rows', async () => {
+    await roundTrip([state, emptyUpdate], stateDb, ['data_state', 'queued']);
+  }]]);
+
+  // The view itself has no archived rows. Resolve its carried base table and
+  // replay the INSERT after restoring it, rather than silently leaving it empty.
+  await runCases(t, [['a replay resolves every view dependency', async () => {
+    const throughView = await roundTrip([state, viewInsert], stateDb, ['data_state', 'queued']);
+    assert.deepEqual(rows(throughView.target, ['snapshots']), { snapshots: rows(stateDb, ['data_state']).data_state });
+
+  // A view's complete dependency set matters: this one also reads a table
+  // absent from the archive, so it cannot be replayed from carried rows alone.
+    const viewTarget = database([state, externalViewInsert]);
+    await assert.rejects((await service(viewTarget, [state, externalViewInsert])).imports.create(throughView.bundle.manifest), /schema_mismatch:migration_data:0002_external_view\.sql/);
+    assert.deepEqual(rows(viewTarget, ['data_state', 'queued', 'local_state', 'snapshots']), { data_state: [], queued: [], local_state: [], snapshots: [] });
+  }]]);
+}]);
+foldedCases.push(['a five-statement CHECK widening rebuild preserves the destination definition and every archived rowid', async (t) => {
+  const logged = { name: '0003_entry_log.sql', sql: `CREATE TABLE entry_log(code TEXT NOT NULL,kind TEXT NOT NULL);
+INSERT INTO entry_log(code,kind) SELECT code,kind FROM entries;
+CREATE TRIGGER entry_logged AFTER INSERT ON entries BEGIN INSERT INTO entry_log VALUES(NEW.code,NEW.kind); END;` };
+  await runCases(t, Array.from([[false, '*'], [false, 'code,kind'], [false, 'rowid AS original_rowid,*'], [true, 'rowid AS original_rowid,*'], [false, 'rowid AS original_rowid,code,kind'], [true, 'rowid AS original_rowid,code,kind']], ([populated, copy], rowIndex) => [`${t.name}: [populated, copy] row ${rowIndex + 1}`, async t => {
+    const wider = rebuildEntries('0002_wider_check.sql', undefined, undefined, copy);
+    const source = database([entries]);
+    if (populated) source.exec("INSERT INTO entries(rowid,code,kind) VALUES(-11,'alpha','old'),(4,'beta','kept'),(29,'gamma','old'); INSERT INTO companion VALUES('carried')");
+    const bundle = await archive(await service(source, [entries]));
+    const migrations = [entries, wider, logged], target = database(migrations), definition = entryDefinition(target);
+    assert.equal((await restore(await service(target, migrations), bundle)).phase, 'complete');
+    assert.equal(entryDefinition(target), definition);
+    assert.deepEqual(entryRows(target), entryRows(source));
+    assert.deepEqual(rows(target, ['companion']), rows(source, ['companion']));
+    assert.deepEqual(rows(target, ['entry_log']).entry_log, rows(source, ['entries']).entries);
+    assert.equal(target.prepare("SELECT name FROM sqlite_master WHERE name='entries_copy'").get(), undefined);
+    target.exec("INSERT INTO entries(code,kind) VALUES('after','new')");
+    assert.throws(() => target.exec("INSERT INTO entries(code,kind) VALUES('invalid','unknown')"), /CHECK constraint/);
+}]));
+}]);
+  await runCases(t, foldedCases);
 });
+
+
 
 // Like a search capacity migration: triggers feeding an excluded queue whose
 // bodies start `SELECT CASE ... END||p.id`. Wrangler's splitter misses their
@@ -249,79 +329,3 @@ async function legacyAssertions(exported, source, values = []) {
   for (const part of parts) { integrity.add(part); for (const item of part.items) content.add(item); }
   return { manifest, parts, closing: { kind: 'closing', partCount: parts.length, contentHash: content.digest(), archiveHash: integrity.digest() } };
 }
-
-test('an archive predating a guard and a view restores past triggers holding CASE ... END; archived rewrites and unreadable chunks stay refused', async t => {
-  const source = database([knowledge, search]);
-  source.exec("INSERT INTO pages VALUES('p1','w1','page'),('r1','w1','record'); INSERT INTO page_blocks VALUES('b1','p1','Hello'),('b2','r1','Fields')");
-  const exported = await archive(await service(source, [knowledge, search], searchPolicy));
-  const bundle = await legacyAssertions(exported, source);
-  assert.deepEqual(bundle.manifest.migrations, [knowledge.name, search.name]);
-  const migrations = [knowledge, search, door], target = database(migrations), before = triggers(target);
-  const restored = await restore(await service(target, migrations, searchPolicy), bundle);
-  assert.equal(restored.phase, 'complete');
-  assert.deepEqual(restored.skippedTables, ['ik_d1_assertions']);
-  assert.ok(!exported.manifest.tables.some(table => table.name === 'ik_d1_assertions'));
-  assert.ok(!exported.parts.some(part => part.items.some(item => item.table === 'ik_d1_assertions')));
-  assert.deepEqual(rows(target, ['ik_d1_assertions']), { ik_d1_assertions: [] });
-  assert.deepEqual(rows(target, ['pages', 'page_blocks', 'door_plans']), { ...rows(source, ['pages', 'page_blocks']), door_plans: [] });
-  assert.deepEqual(triggers(target), before);
-  target.exec("UPDATE page_blocks SET body='Edited' WHERE id='b2'");
-  assert.deepEqual(rows(target, ['search_dirty']), { search_dirty: [{ key: 'record:r1', workspace_id: 'w1' }] });
-
-  const corrupt = await legacyAssertions(exported, source, [1]);
-  const destination = database(migrations);
-  await assert.rejects(restore(await service(destination, migrations, searchPolicy), corrupt), /invalid_bookkeeping_rows:ik_d1_assertions/);
-  assert.deepEqual(rows(destination, ['pages', 'page_blocks', 'ik_d1_assertions']), { pages: [], page_blocks: [], ik_d1_assertions: [] });
-
-  const refusals = [
-    [{ name: '0003_door.sql', sql: `${door.sql}\nUPDATE pages SET page_kind='page' WHERE page_kind='record';` }, /schema_mismatch:migration_data:0003_door\.sql/],
-    // SQLite runs a statement ending in an open block comment; Base cannot read where it ends.
-    [{ name: '0003_open.sql', statements: ['CREATE INDEX pages_kind ON pages(page_kind); /* left open'] }, /generated_sql/],
-  ];
-  for (const [later, refusal] of refusals) {
-    const list = [knowledge, search, later], destination = database(list);
-    await assert.rejects((await service(destination, list, searchPolicy)).imports.create(bundle.manifest), refusal, later.name);
-    assert.deepEqual(rows(destination, ['pages', 'page_blocks']), { pages: [], page_blocks: [] });
-  }
-
-  // An UPDATE of a carried table with no rows cannot alter the archive, even
-  // when its expression reads another carried table that does have rows.
-  const stateDb = stateSource();
-  await t.test('a row-less target may read carried rows', async () => {
-    await roundTrip([state, emptyUpdate], stateDb, ['data_state', 'queued']);
-  });
-
-  // The view itself has no archived rows. Resolve its carried base table and
-  // replay the INSERT after restoring it, rather than silently leaving it empty.
-  await t.test('a replay resolves every view dependency', async () => {
-    const throughView = await roundTrip([state, viewInsert], stateDb, ['data_state', 'queued']);
-    assert.deepEqual(rows(throughView.target, ['snapshots']), { snapshots: rows(stateDb, ['data_state']).data_state });
-
-  // A view's complete dependency set matters: this one also reads a table
-  // absent from the archive, so it cannot be replayed from carried rows alone.
-    const viewTarget = database([state, externalViewInsert]);
-    await assert.rejects((await service(viewTarget, [state, externalViewInsert])).imports.create(throughView.bundle.manifest), /schema_mismatch:migration_data:0002_external_view\.sql/);
-    assert.deepEqual(rows(viewTarget, ['data_state', 'queued', 'local_state', 'snapshots']), { data_state: [], queued: [], local_state: [], snapshots: [] });
-  });
-});
-
-test('a five-statement CHECK widening rebuild preserves the destination definition and every archived rowid', async () => {
-  const logged = { name: '0003_entry_log.sql', sql: `CREATE TABLE entry_log(code TEXT NOT NULL,kind TEXT NOT NULL);
-INSERT INTO entry_log(code,kind) SELECT code,kind FROM entries;
-CREATE TRIGGER entry_logged AFTER INSERT ON entries BEGIN INSERT INTO entry_log VALUES(NEW.code,NEW.kind); END;` };
-  for (const [populated, copy] of [[false, '*'], [false, 'code,kind'], [false, 'rowid AS original_rowid,*'], [true, 'rowid AS original_rowid,*'], [false, 'rowid AS original_rowid,code,kind'], [true, 'rowid AS original_rowid,code,kind']]) {
-    const wider = rebuildEntries('0002_wider_check.sql', undefined, undefined, copy);
-    const source = database([entries]);
-    if (populated) source.exec("INSERT INTO entries(rowid,code,kind) VALUES(-11,'alpha','old'),(4,'beta','kept'),(29,'gamma','old'); INSERT INTO companion VALUES('carried')");
-    const bundle = await archive(await service(source, [entries]));
-    const migrations = [entries, wider, logged], target = database(migrations), definition = entryDefinition(target);
-    assert.equal((await restore(await service(target, migrations), bundle)).phase, 'complete');
-    assert.equal(entryDefinition(target), definition);
-    assert.deepEqual(entryRows(target), entryRows(source));
-    assert.deepEqual(rows(target, ['companion']), rows(source, ['companion']));
-    assert.deepEqual(rows(target, ['entry_log']).entry_log, rows(source, ['entries']).entries);
-    assert.equal(target.prepare("SELECT name FROM sqlite_master WHERE name='entries_copy'").get(), undefined);
-    target.exec("INSERT INTO entries(code,kind) VALUES('after','new')");
-    assert.throws(() => target.exec("INSERT INTO entries(code,kind) VALUES('invalid','unknown')"), /CHECK constraint/);
-  }
-});

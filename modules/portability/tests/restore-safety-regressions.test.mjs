@@ -1,9 +1,13 @@
+import { runCases } from './cases.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { database,bundle,stage } from './regression-helpers.mjs';
 import { createPortability } from '../index.mjs';
 
-for(const action of ['CASCADE','SET NULL','SET DEFAULT'])test('replacement refuses excluded destination dependents with '+action,async t=>{
+test("restore replacement preserves every excluded foreign-key dependent", async t => {
+  const foldedCases = [];
+await runCases(t, Array.from(['CASCADE','SET NULL','SET DEFAULT'], (action, rowIndex) => [`${t.name}: action row ${rowIndex + 1}`, async t => {
+foldedCases.push(['replacement refuses excluded destination dependents with '+action, async t=>{
   const ddl=['CREATE TABLE tenants(id TEXT PRIMARY KEY,name TEXT)',
     `CREATE TABLE oa_sessions(id TEXT PRIMARY KEY,tenant TEXT REFERENCES tenants(id) ON DELETE ${action})`];
   const policy={product:'fixture',replaceableTables:['tenants']};
@@ -16,9 +20,9 @@ for(const action of ['CASCADE','SET NULL','SET DEFAULT'])test('replacement refus
   assert.deepEqual((await target.db.prepare('SELECT * FROM oa_sessions').all()).results,[{id:'destination-session',tenant:'t'}]);
   assert.equal((await target.db.prepare('SELECT name FROM tenants').first()).name,'bootstrap');
   assert.equal((await target.service.imports.status(id)).phase,'staging');
-});
-
-test('excluded dependents added during staged validation are protected by the commit guard',async t=>{
+}]);
+}]));
+foldedCases.push(['excluded dependents added during staged validation are protected by the commit guard', async t=>{
   const ddl=['CREATE TABLE tenants(id TEXT PRIMARY KEY,name TEXT)',
     'CREATE TABLE oa_sessions(id TEXT PRIMARY KEY,tenant TEXT REFERENCES tenants(id) ON DELETE CASCADE)'];
   const policy={product:'fixture',replaceableTables:['tenants']},source=await database(t,ddl,policy),target=await database(t,ddl,policy);
@@ -32,9 +36,8 @@ test('excluded dependents added during staged validation are protected by the co
   assert.deepEqual((await target.db.prepare('SELECT * FROM oa_sessions').all()).results,[{id:'late-session',tenant:'t'}]);
   assert.equal((await target.db.prepare('SELECT name FROM tenants').first()).name,'bootstrap');
   assert.equal((await service.imports.status(id)).phase,'staging');
-});
-
-test('replacement still succeeds when excluded FK dependents are empty',async t=>{
+}]);
+foldedCases.push(['replacement still succeeds when excluded FK dependents are empty', async t=>{
   const ddl=['CREATE TABLE tenants(id TEXT PRIMARY KEY,name TEXT)',
     'CREATE TABLE oa_sessions(id TEXT PRIMARY KEY,tenant TEXT REFERENCES tenants(id) ON DELETE CASCADE)'];
   const policy={product:'fixture',replaceableTables:['tenants']},source=await database(t,ddl,policy),target=await database(t,ddl,policy);
@@ -42,9 +45,8 @@ test('replacement still succeeds when excluded FK dependents are empty',async t=
   const archive=await bundle(source.service),id=await stage(target.service,archive);
   assert.equal((await target.service.imports.finalize(id,{archiveHash:archive.closing.archiveHash})).phase,'complete');
   assert.equal((await target.db.prepare('SELECT name FROM tenants').first()).name,'restored');
-});
-
-test('transitive cascades cannot remove excluded auth rows through replaceable children',async t=>{
+}]);
+foldedCases.push(['transitive cascades cannot remove excluded auth rows through replaceable children', async t=>{
   const ddl=['CREATE TABLE tenants(id TEXT PRIMARY KEY)',
     'CREATE TABLE links(id TEXT PRIMARY KEY,tenant TEXT REFERENCES tenants(id) ON DELETE CASCADE)',
     'CREATE TABLE oa_sessions(id TEXT PRIMARY KEY,link TEXT REFERENCES links(id) ON DELETE CASCADE)'];
@@ -54,9 +56,8 @@ test('transitive cascades cannot remove excluded auth rows through replaceable c
   const archive=await bundle(source.service),id=await stage(target.service,archive);
   await assert.rejects(target.service.imports.finalize(id,{archiveHash:archive.closing.archiveHash}),/excluded_destination_dependents:oa_sessions:links/);
   assert.deepEqual((await target.db.prepare('SELECT * FROM oa_sessions').all()).results,[{id:'session',link:'l'}]);
-});
-
-test('compatible NO ACTION auth dependents survive replacing their parent',async t=>{
+}]);
+foldedCases.push(['compatible NO ACTION auth dependents survive replacing their parent', async t=>{
   const ddl=['CREATE TABLE tenants(id TEXT PRIMARY KEY,name TEXT)',
     'CREATE TABLE oa_sessions(id TEXT PRIMARY KEY,tenant TEXT REFERENCES tenants(id) ON DELETE NO ACTION)'];
   const policy={product:'fixture',replaceableTables:['tenants']},source=await database(t,ddl,policy),target=await database(t,ddl,policy);
@@ -66,4 +67,6 @@ test('compatible NO ACTION auth dependents survive replacing their parent',async
   assert.equal((await target.service.imports.finalize(id,{archiveHash:archive.closing.archiveHash})).phase,'complete');
   assert.deepEqual((await target.db.prepare('SELECT * FROM oa_sessions').all()).results,[{id:'session',tenant:'t'}]);
   assert.equal((await target.db.prepare('SELECT name FROM tenants').first()).name,'restored');
+}]);
+  await runCases(t, foldedCases);
 });

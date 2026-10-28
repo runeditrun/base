@@ -1,3 +1,4 @@
+import { runCases } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NodePinnedTransport } from '../../core/node-transport.ts';
@@ -8,7 +9,11 @@ import { database } from './support.ts';
 
 test('real TLS terminal response failures cannot resolve success or authorize an automatic resend', async t => {
   let calls = 0;
-  const receiver = await tlsReceiver((req, res) => {
+  let receiver: Awaited<ReturnType<typeof tlsReceiver>>;
+  // Each row closes its receiver even when a response expectation fails.
+  async function receive(run: () => Promise<void>) {
+    calls = 0;
+    receiver = await tlsReceiver((req, res) => {
     calls++; req.resume();
     if (req.url === '/oversized') { res.writeHead(200, { 'content-length': 2048 }); res.end(Buffer.alloc(2048, 'x')); }
     else if (req.url === '/exact') { res.writeHead(200, { 'content-length': 1024 }); res.end(Buffer.alloc(1024, 'x')); }
@@ -16,23 +21,41 @@ test('real TLS terminal response failures cannot resolve success or authorize an
     else if (req.url === '/stalled') { res.writeHead(200); res.write('waiting'); }
     else { res.writeHead(200); res.write(Buffer.alloc(600, 'x')); res.end(Buffer.alloc(600, 'y')); }
   });
-  try {
-    await t.test('oversized final TLS chunk rejects immediately instead of resolving an empty 200 body', async () => {
+    try {
+      await run();
+    } finally {
+      try {
+        // Observe socket cleanup before disposing this row's receiver.
+        await new Promise(resolve => setTimeout(resolve, 50));
+        assert.equal(receiver.sockets.size, 0);
+      } finally { await receiver.close(); }
+    }
+  }
+  await runCases(t, [
+['oversized final TLS chunk rejects immediately instead of resolving an empty 200 body', async () => { await receive(async () => {
       const transport = new NodePinnedTransport({ maxResponseBytes: 1024 });
       await assert.rejects(transport.send({ url: `${receiver.url}/oversized`, headers: {}, body: '{}' }), /Response limit exceeded/);
-    });
-    await t.test('exact response limit succeeds without truncation', async () => {
+
+}); }],
+['exact response limit succeeds without truncation', async () => { await receive(async () => {
       const transport = new NodePinnedTransport({ maxResponseBytes: 1024 });
       const response = await transport.send({ url: `${receiver.url}/exact`, headers: {}, body: '{}' });
       assert.equal(response.status, 200); assert.equal(response.body, 'x'.repeat(1024));
-    });
-    await t.test('chunked overflow, partial response and absolute timeout all reject', async () => {
-      const transport = new NodePinnedTransport({ maxResponseBytes: 1024, timeoutMs: 300 });
-      await assert.rejects(transport.send({ url: `${receiver.url}/chunked`, headers: {}, body: '{}' }), /Response limit exceeded/);
-      await assert.rejects(transport.send({ url: `${receiver.url}/truncated`, headers: {}, body: '{}' }), /aborted|incomplete|closed/);
-      await assert.rejects(transport.send({ url: `${receiver.url}/stalled`, headers: {}, body: '{}' }), /Transport timeout/);
-    });
-    await t.test('overflow persists uncertain without classification and remains unsent after restart', async () => {
+
+}); }],
+['chunked overflow rejects', async () => { await receive(async () => {
+const transport = new NodePinnedTransport({ maxResponseBytes: 1024, timeoutMs: 300 });
+await assert.rejects(transport.send({ url: `${receiver.url}/chunked`, headers: {}, body: '{}' }), /Response limit exceeded/);
+}); }],
+['partial response rejects', async () => { await receive(async () => {
+const transport = new NodePinnedTransport({ maxResponseBytes: 1024, timeoutMs: 300 });
+await assert.rejects(transport.send({ url: `${receiver.url}/truncated`, headers: {}, body: '{}' }), /aborted|incomplete|closed/);
+}); }],
+['absolute timeout rejects', async () => { await receive(async () => {
+const transport = new NodePinnedTransport({ maxResponseBytes: 1024, timeoutMs: 300 });
+await assert.rejects(transport.send({ url: `${receiver.url}/stalled`, headers: {}, body: '{}' }), /Transport timeout/);
+}); }],
+['overflow persists uncertain without classification and remains unsent after restart', async () => { await receive(async () => {
       const store = await database(); let classifications = 0;
       const protocol: DeliveryProtocol = {
         id: 'tls-test', async prepare(envelope) { return { url: `${receiver.url}/oversized`, headers: {}, body: envelope.body }; },
@@ -49,9 +72,7 @@ test('real TLS terminal response failures cannot resolve success or authorize an
         await service.dispatch('limit-event'); assert.deepEqual(await service.dispatchDue(), []);
         assert.equal(calls, before + 1); assert.equal((await service.log('limit-event')).length, 1);
       } finally { await store.close(); }
-    });
-    // All request sockets must close from success/failure handling, before fixture cleanup.
-    await new Promise(resolve => setTimeout(resolve, 50));
-    assert.equal(receiver.sockets.size, 0);
-  } finally { await receiver.close(); }
+
+}); }]
+  ]);
 });

@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 // The original server seams kept for existing callers: admitVerifiedIdentity
 // and createIdentityAdmission, now admitting through the accounts adapter.
 import test from 'node:test';
@@ -34,16 +35,19 @@ test('associations are immutable issuer-scoped configuration, and identity field
   await assert.rejects(admit(request(), { issuer: issuers[1], subject: 'configured' }));
   await assert.rejects(admit(request(), { issuer, subject: 'injected', email: 'owner@example.com', emailVerified: true }));
   await assert.rejects(auth.admitVerifiedIdentity(request(), { issuer, subject: 'injected', email: 'owner@example.com', emailVerified: true, associatedEmail: 'owner@example.com' }));
-  for (const input of [{ issuer: 'https://unconfigured.example' }, { issuer, subjectEmails: [] }, { issuer, subjectEmails: { '': 'owner@example.com' } }, { issuer, subjectEmails: { configured: 'invalid' } }]) {
+  await runCases(t, Array.from([{ issuer: 'https://unconfigured.example' }, { issuer, subjectEmails: [] }, { issuer, subjectEmails: { '': 'owner@example.com' } }, { issuer, subjectEmails: { configured: 'invalid' } }], (input, rowIndex) => [`${t.name}: input row ${rowIndex + 1}`, async t => {
     assert.throws(() => auth.createIdentityAdmission(input), e => e.code === 'invalid_configuration');
-  }
+}]));
   assert.deepEqual(bindings().map(b => b.subject), ['configured', 'owner-subject']);
 });
 
 test('trusted maps never move a bound principal; token roles grant nothing; status, role versions and the allow-list still govern', async t => {
+const [issuer] = issuers;
+const staff = { issuer, subject: 'staff-subject', email: 'unverified@example.com', emailVerified: false, role: 'owner' };
+await runCases(t, [
+['bound principal authority lifecycle', async t => {
+
   const { auth, request, bindings, sqlite } = await core(t);
-  const [issuer] = issuers;
-  const staff = { issuer, subject: 'staff-subject', email: 'unverified@example.com', emailVerified: false, role: 'owner' };
   const admitted = await auth.createIdentityAdmission({ issuer, subjectEmails: { 'staff-subject': 'member@example.com' } })(request(), staff);
   assert.equal(admitted.operator.role, 'member', 'a token role never grants authority');
   const moved = auth.createIdentityAdmission({ issuer, subjectEmails: { 'staff-subject': 'owner@example.com' } });
@@ -51,7 +55,12 @@ test('trusted maps never move a bound principal; token roles grant nothing; stat
   assert.deepEqual(bindings(), [{ issuer, subject: 'staff-subject', operatorId: 'member' }]);
   sqlite.prepare("UPDATE oa_operators SET status='inactive' WHERE id='member'").run();
   await assert.rejects(auth.createIdentityAdmission({ issuer, subjectEmails: { 'staff-subject': 'member@example.com' } })(request(), staff));
+}],
+['current allow list excludes principal', async t => {
+
   const excluded = await core(t, { allowList: ['owner@example.com'] });
   await assert.rejects(excluded.auth.createIdentityAdmission({ issuer, subjectEmails: { 'staff-subject': 'member@example.com' } })(excluded.request(), staff));
   assert.deepEqual(excluded.bindings(), []);
+}]
+]);
 });

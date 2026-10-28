@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mailDoctor } from '../../src/doctor/index.mjs';
@@ -35,7 +36,9 @@ function dependencies({ status = 'accepted', mutate = email => email, listOnly =
   };
 }
 
-test('live sender and independent inbox readback correlate fresh message body and identity', async () => {
+test("mail receipt proof binds fresh exact sender, recipient, body and receiving identity", async t => {
+  const foldedCases = [];
+foldedCases.push(['live sender and independent inbox readback correlate fresh message body and identity', async () => {
   const fixture = dependencies();
   const result = await mailDoctor({ ...options(), timeoutMs: 2000 }, fixture.deps);
   const [send, receive] = result.items.slice(4);
@@ -45,43 +48,38 @@ test('live sender and independent inbox readback correlate fresh message body an
   assert.match(receive.evidence.bodySha256, /^[a-f0-9]{64}$/);
   assert.deepEqual(fixture.counts(), { sends: 1, reads: 2 });
   assert.doesNotMatch(JSON.stringify(result), /test_sender_key|test_readback_key|must-not-export|inbox@|Sender </);
-});
-
-test('acceptance alone cannot pass receipt; unrelated messages time out without hydration', async () => {
+}]);
+foldedCases.push(['acceptance alone cannot pass receipt; unrelated messages time out without hydration', async () => {
   const fixture = dependencies({ mutate: email => ({ ...email, subject: 'another run' }), listOnly: true });
   const result = await mailDoctor(options(), fixture.deps);
   assert.equal(result.items[4].status, 'pass');
   assert.equal(result.items[5].status, 'pending');
   assert.equal(result.items[5].evidence.state, 'timeout');
   assert.deepEqual(fixture.counts(), { sends: 1, reads: 1 });
-});
-
-test('rejected and rate limited submissions never poll the inbox or resend', async () => {
-  for (const status of ['rejected', 'rate_limited']) {
+}]);
+foldedCases.push(['rejected and rate limited submissions never poll the inbox or resend', async (t) => {
+  await runCases(t, Array.from(['rejected', 'rate_limited'], (status, rowIndex) => [`${t.name}: status row ${rowIndex + 1}`, async t => {
     const fixture = dependencies({ status });
     const result = await mailDoctor(options(), fixture.deps);
     assert.equal(result.items[4].status, 'fail'); assert.equal(result.items[5].status, 'not_checked');
     assert.deepEqual(fixture.counts(), { sends: 1, reads: 0 });
-  }
-});
-
-test('uncertain submission may be reconciled by actual readback but remains uncertain', async () => {
+}]));
+}]);
+foldedCases.push(['uncertain submission may be reconciled by actual readback but remains uncertain', async () => {
   const fixture = dependencies({ status: 'uncertain' });
   const result = await mailDoctor(options(), fixture.deps);
   assert.equal(result.items[4].status, 'pending'); assert.equal(result.items[5].status, 'pass');
   assert.equal(fixture.counts().sends, 1);
-});
-
-test('stale, wrong sender and wrong recipient do not correlate', async () => {
-  for (const alteration of [{ created_at: '2000-01-01T00:00:00Z' }, { from: 'other@mail.example.com' }, { to: ['wrong@receive.example.com'] }]) {
+}]);
+foldedCases.push(['stale, wrong sender and wrong recipient do not correlate', async (t) => {
+  await runCases(t, Array.from([{ created_at: '2000-01-01T00:00:00Z' }, { from: 'other@mail.example.com' }, { to: ['wrong@receive.example.com'] }], (alteration, rowIndex) => [`${t.name}: alteration row ${rowIndex + 1}`, async t => {
     const fixture = dependencies({ mutate: email => ({ ...email, ...alteration }), listOnly: true });
     const result = await mailDoctor(options(), fixture.deps);
     assert.equal(result.items[5].evidence.state, 'timeout');
-  }
-});
-
-test('wrong body and hydrated identity conflict cannot become received proof', async () => {
-  for (const alteration of [{ text: 'other body' }, { id: '87654321-4321-4321-8123-123456789abc' }]) {
+}]));
+}]);
+foldedCases.push(['wrong body and hydrated identity conflict cannot become received proof', async (t) => {
+  await runCases(t, Array.from([{ text: 'other body' }, { id: '87654321-4321-4321-8123-123456789abc' }], (alteration, rowIndex) => [`${t.name}: alteration row ${rowIndex + 1}`, async t => {
     const fixture = dependencies();
     const fetcher = fixture.deps.fetch;
     fixture.deps.fetch = async (url, init) => {
@@ -90,33 +88,30 @@ test('wrong body and hydrated identity conflict cannot become received proof', a
     };
     const result = await mailDoctor(options(), fixture.deps);
     assert.equal(result.items[5].status, 'fail');
-  }
-});
-
-test('live options fail before any effect when provider, mailbox, domain or budget is invalid', async () => {
-  for (const mutate of [
+}]));
+}]);
+foldedCases.push(['live options fail before any effect when provider, mailbox, domain or budget is invalid', async (t) => {
+  await runCases(t, Array.from([
     value => delete value.receive,
     value => { value.receive.apiKey = ''; },
     value => { value.send.config.provider = 'development'; value.send.config.mode = 'development'; },
     value => { value.send.from = 'sender@other.example.com'; },
     value => { value.timeoutMs = Infinity; },
     value => { value.pollIntervalMs = 0; },
-  ]) {
+  ], (mutate, rowIndex) => [`${t.name}: mutate row ${rowIndex + 1}`, async t => {
     const value = options(); mutate(value);
     await assert.rejects(mailDoctor(value, { fetch() { assert.fail('network effect'); }, sender: { send() { assert.fail('send effect'); } } }));
-  }
-});
-
-test('mailbox transport errors, redirects and oversized bodies fail with redacted evidence', async () => {
-  for (const fetcher of [async () => { throw new Error('test_readback_key private'); }, async () => new Response(null, { status: 302 }), async () => new Response('x'.repeat(262145))]) {
+}]));
+}]);
+foldedCases.push(['mailbox transport errors, redirects and oversized bodies fail with redacted evidence', async (t) => {
+  await runCases(t, Array.from([async () => { throw new Error('test_readback_key private'); }, async () => new Response(null, { status: 302 }), async () => new Response('x'.repeat(262145))], (fetcher, rowIndex) => [`${t.name}: fetcher row ${rowIndex + 1}`, async t => {
     const fixture = dependencies(); fixture.deps.fetch = fetcher;
     const result = await mailDoctor(options(), fixture.deps);
     assert.equal(result.items[5].evidence.state, 'error');
     assert.doesNotMatch(JSON.stringify(result), /test_readback_key|private/);
-  }
-});
-
-test('provider data cannot select an arbitrary receiving endpoint', async () => {
+}]));
+}]);
+foldedCases.push(['provider data cannot select an arbitrary receiving endpoint', async () => {
   const fixture = dependencies();
   let calls = 0;
   fixture.deps.fetch = async url => {
@@ -125,9 +120,8 @@ test('provider data cannot select an arbitrary receiving endpoint', async () => 
   };
   const result = await mailDoctor(options(), fixture.deps);
   assert.equal(result.items[5].status, 'fail'); assert.equal(calls, 1);
-});
-
-test('receive scan caps pages and time even when mailbox has more messages', async t => {
+}]);
+foldedCases.push(['receive scan caps pages and time even when mailbox has more messages', async t => {
   t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 1700000000000 });
   let calls = 0;
   let pollingWait;
@@ -152,9 +146,17 @@ test('receive scan caps pages and time even when mailbox has more messages', asy
   const result = await pending;
   assert.equal(calls, 3); assert.equal(result.evidence.state, 'timeout');
   assert.equal(result.evidence.polls, 1); assert.equal(result.evidence.requests, 3);
-});
+}]);
+foldedCases.push(['bounded operation times out even if an injected transport ignores abort', async t => {
 
-test('bounded operation times out even if an injected transport ignores abort', async () => {
+  await runCases(t, [
+['ignored abort still times out', async t => {
   await assert.rejects(bounded(() => new Promise(() => {}), 20));
+}],
+['oversized JSON refuses', async t => {
   await assert.rejects(readJson(new Response('x'.repeat(20)), 10));
+}]
+  ]);
+}]);
+  await runCases(t, foldedCases);
 });

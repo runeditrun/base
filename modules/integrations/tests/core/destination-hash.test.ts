@@ -1,3 +1,4 @@
+import { runCases, type Case } from '../cases.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
@@ -15,7 +16,9 @@ function protocol(resolve = () => endpoint): DeliveryProtocol {
     classify() { return { kind: 'accepted', code: 'acknowledged' }; } };
 }
 
-test('default destination hash preserves every queued field and exact outbound request', async () => {
+test("durable destination hashing binds preparation to the current claimed immutable delivery", async t => {
+  const foldedCases: Case[] = [];
+foldedCases.push(['default destination hash preserves every queued field and exact outbound request', async () => {
   const store = await database(); let sent: WireRequest | undefined;
   try {
     const service = new DeliveryService({ repository: store.repo(), protocols: [protocol()], now: () => now,
@@ -27,9 +30,9 @@ test('default destination hash preserves every queued field and exact outbound r
     assert.ok((await service.dispatch(envelope.id))?.state === 'accepted');
     assert.ok(JSON.stringify(sent) === JSON.stringify(await protocol().prepare(envelope, now)), 'default wire is byte-identical');
   } finally { await store.close(); }
-});
-
-for (const prefix of ['', 'hmac-v1:']) test(`configured keyed destination digest persists across restart${prefix ? ' with a version' : ''}`, async () => {
+}]);
+await runCases(t, Array.from(['', 'hmac-v1:'], (prefix, rowIndex) => [`${t.name}: prefix row ${rowIndex + 1}`, async t => {
+foldedCases.push([`configured keyed destination digest persists across restart${prefix ? ' with a version' : ''}`, async () => {
   const store = await database(), key = randomBytes(48); let sends = 0, hashes = 0;
   const hashDestination = async (url: string) => { hashes++; return prefix + await hmac(key, digest(url)); };
   const transport = { async send(wire: WireRequest) {
@@ -50,9 +53,9 @@ for (const prefix of ['', 'hmac-v1:']) test(`configured keyed destination digest
     assert.ok(hashes === 2 && sends === 1, 'enqueue and dispatch both use the supplied hasher');
     assert.ok((await service.get(envelope.id))?.attempts === 1);
   } finally { await store.close(); }
-});
-
-test('keyed destination drift rejects during preflight without transport', async () => {
+}]);
+}]));
+foldedCases.push(['keyed destination drift rejects during preflight without transport', async () => {
   const store = await database(), key = randomBytes(32); let url = endpoint, sends = 0;
   try {
     const service = new DeliveryService({ repository: store.repo(), protocols: [protocol(() => url)], now: () => now,
@@ -63,14 +66,11 @@ test('keyed destination drift rejects during preflight without transport', async
     assert.ok(sends === 0 && (await service.get(envelope.id))?.attempts === 1);
     assert.ok((await service.log(envelope.id))[0]?.outcome?.code === 'preflight_failed');
   } finally { await store.close(); }
-});
-
-const invalid = [null, undefined, 42, {}, 'a'.repeat(63), 'a'.repeat(65), 'A'.repeat(64), 'g'.repeat(64), 'a'.repeat(64) + '\n',
-  ':', 'Hmac-v1:', '1hmac:', 'a'.repeat(17) + ':', 'hmac_v1:', 'hmac:v1:'].map(value => typeof value === 'string' && value.endsWith(':') ? value + 'a'.repeat(64) : value);
-for (const phase of ['enqueue', 'dispatch'] as const) test(`invalid destination digests cannot ${phase === 'enqueue' ? 'insert a delivery' : 'start transport'}`, async () => {
+}]);
+for (const phase of ['enqueue', 'dispatch'] as const) foldedCases.push([`invalid destination digests cannot ${phase === 'enqueue' ? 'insert a delivery' : 'start transport'}`, async (t) => {
   const store = await database(); let sends = 0;
   try {
-    for (const [index, value] of invalid.entries()) {
+    await runCases(t, Array.from(invalid.entries(), ([index, value], rowIndex) => [`${t.name}: [index, value] row ${rowIndex + 1}`, async t => {
       let valid = phase === 'dispatch';
       const service = new DeliveryService({ repository: store.repo(), protocols: [protocol()], now: () => now,
         hashDestination: async () => (valid ? digest(endpoint) : value) as string,
@@ -85,12 +85,12 @@ for (const phase of ['enqueue', 'dispatch'] as const) test(`invalid destination 
         assert.ok((await service.dispatch(input.id))?.state === 'rejected', 'invalid hash rejects preflight');
         assert.ok((await service.log(input.id))[0]?.outcome?.code === 'preflight_failed');
       }
-    }
+}]));
     assert.ok(sends === 0, 'invalid hash cannot start transport');
   } finally { await store.close(); }
-});
-
-for (const reconcile of [false, true]) test(`asynchronous hashing preserves the durable claim check${reconcile ? ' after reconciliation' : ''}`, async () => {
+}]);
+await runCases(t, Array.from([false, true], (reconcile, rowIndex) => [`${t.name}: reconcile row ${rowIndex + 1}`, async t => {
+foldedCases.push([`asynchronous hashing preserves the durable claim check${reconcile ? ' after reconciliation' : ''}`, async () => {
   const store = await database(); let clock = now, calls = 0, sends = 0;
   try {
     const service = new DeliveryService({ repository: store.repo(), protocols: [protocol()], now: () => clock,
@@ -103,4 +103,14 @@ for (const reconcile of [false, true]) test(`asynchronous hashing preserves the 
     assert.ok(sends === 0, 'expired hashing cannot send');
     assert.ok((await service.log(envelope.id))[0]?.outcome?.code === 'claim_expired');
   } finally { await store.close(); }
+}]);
+}]));
+  await runCases(t, foldedCases);
 });
+
+
+
+
+
+const invalid = [null, undefined, 42, {}, 'a'.repeat(63), 'a'.repeat(65), 'A'.repeat(64), 'g'.repeat(64), 'a'.repeat(64) + '\n',
+  ':', 'Hmac-v1:', '1hmac:', 'a'.repeat(17) + ':', 'hmac_v1:', 'hmac:v1:'].map(value => typeof value === 'string' && value.endsWith(':') ? value + 'a'.repeat(64) : value);
