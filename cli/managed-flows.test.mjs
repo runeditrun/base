@@ -157,6 +157,15 @@ test('rer dev shares one canonical checkout, returns its URL, and stops after id
  assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,privateMode);
  assert.deepEqual((await f.data('SELECT value FROM managed_saved'))[0].results,[{value:'owner content'}],'failed startup retains canonical data and releases its state lock');
 
+ const route = join(f.root, 'src/routes/reference.tsx'), routeBytes = await readFile(route, 'utf8');
+ const sourceDirectory = join(f.root, 'src/synthetic-base-1/exports');
+ await mkdir(sourceDirectory, {recursive: true});
+ await mkdir(join(f.root, 'exports'), {recursive: true});
+ await writeFile(join(sourceDirectory, 'doors.ts'), "export const doors = 'synthetic-base-1';\n");
+ await writeFile(join(f.root, 'exports/synthetic-base-2.txt'), 'synthetic-base-2');
+ await writeFile(join(f.root, 'src/synthetic-base-3.rer'), 'synthetic-base-3');
+ await writeFile(route, "import { doors } from '../synthetic-base-1/exports/doors';\n" + routeBytes.replace('<h1>Reference snapshot</h1>', '<h1>Reference snapshot</h1><p>{doors}</p>'));
+
  const dev = await ready(f.launch(['--import', join(import.meta.dirname,'fixtures/slow-state-inspection.mjs'), 'scripts/rer.mjs', 'dev', '--port', String(port), '--json']));
  const original = await processTree(dev.pid);
  const alias = f.root + '-alias'; await symlink(f.root, alias);
@@ -170,6 +179,24 @@ test('rer dev shares one canonical checkout, returns its URL, and stops after id
  const runtime = tree => tree.filter(row => row.executable === 'workerd').map(row => [row.pid,row.start]);
  assert.deepEqual(runtime(await processTree(dev.pid)), runtime(original), 'reuse keeps the actual runtime lifetime');
  assert.equal((await fetch(url + '/@vite/client')).status, 200, 'dev retains real Vite');
+ const module = await fetch(url + '/src/synthetic-base-1/exports/doors.ts');
+ assert.equal(module.status, 200, 'a source folder named exports remains loadable');
+ assert.match(await module.text(), /synthetic-base-1/);
+ const document = await fetch(url + '/reference');
+ assert.equal(document.status, 200, 'the app imports the source module through real Vite');
+ assert.match(await document.text(), /synthetic-base-1/);
+ assert.ok(!(dev.stdoutText + dev.stderrText).includes('Failed to load url /src/synthetic-base-1/exports/doors.ts'));
+ for (const [path, value] of [['exports/synthetic-base-2.txt', 'synthetic-base-2'], ['src/synthetic-base-3.rer', 'synthetic-base-3']]) {
+  for (const request of ['/' + path, '/@fs' + join(f.root, path)]) {
+   const denied = await fetch(url + request);
+   assert.notEqual(denied.status, 200, 'export output and installation archives remain refused');
+   assert.ok(!(await denied.text()).includes(value), 'refused file bytes stay private');
+  }
+ }
+ await writeFile(route, routeBytes);
+ await rm(join(f.root, 'src/synthetic-base-1'), {recursive: true});
+ await rm(join(f.root, 'exports'), {recursive: true});
+ await rm(join(f.root, 'src/synthetic-base-3.rer'));
  await f.run(['dev', '--stop', '--json']);
  await stopped(dev, original);
 

@@ -19,6 +19,7 @@
 - Lead Business setup and local launch with one plain next step, defer optional shell setup until ready, and show a shared cold-run budget plus measured archive downloads and disk use.
 - Carry the paired Business name and display settings into local first-party apps at connect, setup and dev; refresh live apps while Business runs and remove the local carry on disconnect.
 - Include the GitHub CLI exit status and bounded, redacted stderr in unavailable release verification receipts; retain authentication guidance when stderr is empty.
+- Allow seed source folders named exports in development while keeping generated top-level export output and installation archives private.
 
 ## 0.2.84
 
