@@ -45,6 +45,19 @@ files. Editing the working contract or claims file does not change that input.
 Conversion uses the largest original homepage claims source; errors name its
 file, original line and exact claim. Valid product links need no mapping.
 
+The observed claim columns are `Claim`, `Claims`, `Claim on the page`,
+`What the page claims` and `Claim text`; clause columns accept `Clause`,
+`Clauses`, `Clause(s)` and `Clause id(s)`. Other homepage table headings
+refuse conversion. Clause-status appendices are separate from claim tables.
+Every converted row retains its exact source text and historical status in
+`contract-claim-source`; generated claims show history separately from current
+derived status. Both `check` and `coverage check` name missing or changed
+original claims, including older conversions with a coverage record.
+
+Coverage ignores leading Markdown blockquote prefixes when comparing source
+fragments. Conversion removes those prefixes from clause prose while retaining
+the words. A changed or dropped sentence still fails reconstruction.
+
 For historical aliases, boundary labels or empty cells with a real product
 obligation, pass a reviewed JSON claim map. Its `old` must be the full original
 SHA. Each entry identifies
@@ -241,6 +254,19 @@ For each new copied file, record the destination, Base origin and full commit:
 node scripts/edition-authoring/cli.mjs record-base src/base/contract-docs.mjs foundation/runtime/contract-docs.mjs FULL_40_HEX_COMMIT --base /absolute/base-checkout
 node scripts/edition-authoring/cli.mjs verify-base --base /absolute/base-checkout
 ```
+
+Without a Base checkout, use GitHub's immutable commit/tree/blob API through
+an authenticated `gh`:
+
+```sh
+node scripts/edition-authoring/cli.mjs record-base src/base/contract-docs.mjs foundation/runtime/contract-docs.mjs FULL_40_HEX_COMMIT --from-api
+```
+
+`--from-api` writes the same digest/mode record as `--base` for that commit.
+It checks the full commit, rejects truncated trees, verifies blob identities
+and refuses unavailable commits before any record write. It cannot be combined
+with `--base` or `--offline`. Offline recording requires `--base` and reads
+only that checkout's existing objects.
 
 `record-base <path> <origin-path> <revision>` takes no repository positional
 argument; `--record <file>` selects a record instead of `base-copies.json`.
