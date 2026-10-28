@@ -85,6 +85,28 @@ test('a package-pinned seed adopts authoring and refreshes through the packed pu
 });
 
 test('packed authoring preserves source and provenance on invalid adoption and refresh refusal', async t => {
+ {
+  const {seed, source, old, run} = await fixture(t);
+  const importer = 'src/modules/portability/http-errors.mjs', owned = 'src/modules/portability/import-lease.mjs';
+  write(source, 'modules/portability/http-errors.mjs', 'export const status = true;\n');
+  write(source, 'modules/portability/import-lease.mjs', 'export const importRunningMetadata = () => ({});\n');
+  write(seed, importer, 'export const status = true;\n');
+  write(seed, owned, 'export const seedOwned = true;\n');
+  old('record-base', importer, 'modules/portability/http-errors.mjs', commit(source), '--base', source);
+  commit(seed);
+  write(source, 'modules/portability/http-errors.mjs', "import {importRunningMetadata} from './import-lease.mjs';\nexport const status = importRunningMetadata;\n");
+  const record = fs.readFileSync(path.join(seed, 'base-copies.json'));
+  const refused = run('refresh-base', '--ref', commit(source), '--base', source, '--offline');
+  assert.equal(refused.status, 4, refused.stdout + refused.stderr);
+  const error = refused.stdout.trim().split('\n').map(line => JSON.parse(line)).find(event => event.event === 'error');
+  assert.ok(error.message.includes(owned) && error.message.includes('importRunningMetadata'), error.message);
+  assert.match(error.message, /git -C .* show .* > .*import-lease\.mjs\.base/);
+  assert.doesNotMatch(refused.stdout + refused.stderr, /\n\s+at |SyntaxError:/);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
+  assert.equal(fs.readFileSync(path.join(seed, owned), 'utf8'), 'export const seedOwned = true;\n');
+  assert.equal(fs.readFileSync(path.join(seed, importer), 'utf8'), 'export const status = true;\n');
+  t.diagnostic(`missing seed-owned export: exit ${refused.status}; ${error.message}`);
+ }
  const {seed, source, revision, run, result, old} = await fixture(t);
  const recordPath = path.join(seed, 'base-copies.json'), record = fs.readFileSync(recordPath), singleton = fs.readFileSync(path.join(seed, 'one.mjs'));
  for (const verb of ['adopt-edition', 'refresh-base']) assert.equal(run(verb, '--help').status, 0);

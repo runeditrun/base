@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Automatic `rer dev` port selection reclaims saved ports from stopped checkouts. Live launch workers, live servers, active claims and bound sockets still exclude their ports, and an exhausted search still names its range and candidate count.
+
 ## 0.2.84
 
 - The publication scan accepts the upstream copyright notice of a Base-listed third-party licence text only under an exact licence file name with the listed Git blob ID (initially the vendored yaml 2.9.1 `LICENSE`) and reports each in `thirdPartyNotices`; seed configuration cannot extend the list, and scans of the unpacked rer tarball and of refreshed seeds pass without review records.
