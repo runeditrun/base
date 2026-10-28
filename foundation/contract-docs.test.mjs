@@ -83,7 +83,7 @@ async function nonProductJourney() {
       ].join('\n')
       await edit(root, 'CONTRACT.md', initial.replace(/\| # \| Claim \| Clauses \|[\s\S]*?(?=\n## Status)/, table + '\n'))
       git(root, 'add', '.')
-      git(root, 'commit', '-qm', 'Synthetic non-product source forms')
+      git(root, '-c', 'user.name=Synthetic author', '-c', 'user.email=synthetic@example.invalid', 'commit', '-qm', 'Synthetic non-product source forms')
       const old = git(root, 'rev-parse', 'HEAD'), originalText = await read(root, 'CONTRACT.md'), original = parseContract(originalText)
       const claims = facts.map(([, claim, , nonProduct]) => ({ file: 'CONTRACT.md', line: originalText.split('\n').findIndex(line => line.includes(`| ${claim} |`)) + 1, claim, nonProduct }))
       const productAlias = { file: 'CONTRACT.md', line: originalText.split('\n').findIndex(line => line.startsWith('| 2 | Catalogue |')) + 1, claim: 'Publish entries as open source', clauses: ['PUBLISH-01'] }
