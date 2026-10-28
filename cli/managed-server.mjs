@@ -28,7 +28,7 @@ export async function ready(out,url,dev,json=false,siteUrl,demo,root,ownerOpenUr
   for (const line of readySummary({ url, ...dev, siteUrl })) out.human(line);
   for (const line of await launchSummary(root)) out.human(line);
   out.human('Details for tools and troubleshooting:');
- }
+ } else out.human(`Your app is ready, open it: ${dev?.openUrl ?? url}`);
  out.human(`RER_READY ${url}`);
  if(dev){
   if(dev.signedInAs)out.human(`RER_SIGNED_IN ${dev.signedInAs}`);
@@ -37,7 +37,7 @@ export async function ready(out,url,dev,json=false,siteUrl,demo,root,ownerOpenUr
   if (!root && !dev.native) out.human("Open that link on this computer. Its fragment holds this checkout's dev key, which the page keeps only as a cookie; never share the link.");
  }
  if(ownerOpenUrl){out.human(`RER_OWNER_OPEN ${ownerOpenUrl}`);out.human('Native owner entry: open on this computer once within 15 minutes. The link is not saved.');}
- if(siteUrl)out.human(`RER_SITE ${siteUrl}`);
+ if(siteUrl){if(!root)out.human(`Site: ${siteUrl}`);out.human(`RER_SITE ${siteUrl}`);}
  if(demo){out.human(`RER_DEMO_ENDS_ON_STOP ${demo.state}`);out.human(`This demo runs on its own data in that folder, which is deleted when it stops: rer demo --stop, Ctrl-C, or at its end (${demo.ends.slice(11,16)}). Public reads and checks run for real. This checkout's own data is untouched.`);}
 }
 export async function managedServer(project,options,out,{clock={}}={}){

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.84-dev.gbf60a3c3",
+  "cliVersion": "0.2.84-dev.g68f22c41",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -931,7 +931,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "7d993b7387a26d87ad59a3652a64461c654c3dc1e2d5be838d49d89fba6aa218"
+      "sha256": "45722f6ff5d2048b59de0f60ce42883ac49c1151de55ab5c4aa12455e44b705b"
     },
     "cli/native-owner-entry.mjs": {
       "source": "cli/native-owner-entry.mjs",

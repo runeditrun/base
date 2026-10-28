@@ -41,9 +41,10 @@ async function writeLauncher(paths) {
 }
 
 // The absolute launcher works immediately, without editing shell files.
+const shellQuote = value => "'" + value.replaceAll("'", "'\"'\"'") + "'";
 async function closing(paths) {
  const notices = await pathAdvice(paths, process.env, { includeShellStep: false });
- return (notices ? notices + '\n' : '') + (process.env.RER_INSTALL_NO_NEXT ? '' : `Next, start an app: ${paths.launcher} dev <owner>/<repo>\n`);
+ return (notices ? notices + '\n' : '') + (process.env.RER_INSTALL_NO_NEXT ? '' : `Next, start an app: ${shellQuote(paths.launcher)} dev <owner>/<repo>\n`);
 }
 
 export async function install({ quiet = false } = {}) {

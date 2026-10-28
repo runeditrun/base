@@ -24,6 +24,7 @@
 - Make application deploy dry runs build and validate the local plan without Cloudflare credentials or requests. Print target, binding and migration names and reserve remote readiness checks for a real deploy.
 - Add explicit `--acknowledge-unverified-schema-objects` recovery for version 2 backups without a schema object inventory. Destination migration replay, an empty target and all existing restore fences remain required; completed receipts record the acknowledged schema uncertainty. Current archives restore without acknowledgment.
 - Local preview now prints a single-use native owner entry. Demo keeps its persona and adds a separate native owner entry, using the existing fragment gate and native owner grant. Links expire within 15 minutes and are never saved.
+- Print an absolute installer launch command, lead ready output with a plain app link and label the site, explain local owner accounts, and time each launch phase separately. Machine ready output stays unchanged.
 
 ## 0.2.84
 

@@ -2,6 +2,7 @@ import { plainErrors } from './fixtures/plain-errors.mjs';
 import { printer } from '../global/launch/render.mjs';
 import { humanError } from './human-error.mjs';
 import test from 'node:test';
+import { ready } from './managed-server.mjs';
 import assert from 'node:assert/strict';
 import { execFile, spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -12,7 +13,7 @@ import { promisify } from 'node:util';
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
 
-test('plain packed CLI failures preserve machine diagnostics and large JSON reports drain at both CLI entries', async t => {
+test('plain packed CLI failures and human readiness keep machine diagnostics, phase timing and output distinct; large JSON reports drain at both CLI entries', async t => {
  await plainErrors(t, base);
  const stderr = [];
  const capture = t.mock.method(process.stderr, 'write', text => { stderr.push(text); return true; });
@@ -24,6 +25,40 @@ test('plain packed CLI failures preserve machine diagnostics and large JSON repo
  assert.equal(humanError({ code: 'command_failed', message: `Synthetic cause\n${detail}` }), 'Synthetic cause\nCommand: synthetic-base-1\nExit code: 27\nLast output:\nSynthetic failure\nLog: synthetic-base-2');
  assert.equal(humanError({ code: 'launch_failed', message: 'Synthetic cause\n    at synthetic-base-1:1' }), 'Synthetic cause\nRun the same command with --json for details.');
  assert.equal(humanError({ code: 'command_failed', message: 'Synthetic cause. It holds:\n  synthetic-base-1: rer deploy --environment synthetic-base-1' }), 'Synthetic cause. It holds:\n  synthetic-base-1: rer deploy --environment synthetic-base-1');
+ {
+  const stdout = [], stderr = [];
+  let now = 0;
+  const mocks = [t.mock.method(process.stdout, 'write', text => { stdout.push(text); return true; }), t.mock.method(process.stderr, 'write', text => { stderr.push(text); return true; }), t.mock.method(Date, 'now', () => now)];
+  try {
+   const details = { version: 1, verb: 'dev', event: 'ready', url: 'http://127.0.0.1:3000', signedInAs: 'synthetic-base-1@example.test', openUrl: 'http://127.0.0.1:3000/#synthetic-base-1', siteUrl: 'http://127.0.0.1:3001' };
+   const out = printer({ json: false, stopHint: 'Ctrl-C' });
+   out.phase({ phase: 'install', message: 'installing' }); now = 60400; out.heartbeat();
+   out.phase({ phase: 'setup', message: 'setting up' }); now = 68600; out.phase({phase:'note',message:'working'}); now = 88600; out.heartbeat();
+   assert.match(stderr.join(''), /still installing \(1m 0s\)/);
+   assert.match(stderr.join(''), /still setting up \(28s\)/);
+   out.ready(details, {});
+   assert.equal(stdout.join('').split('\n')[0], `Your app is ready, open it: ${details.openUrl}`);
+   assert.match(stdout.join(''), /Site: http:\/\/127\.0\.0\.1:3001/);
+   const machine = stdout.join('').split('\n').filter(line => line.startsWith('RER_')).join('\n');
+   assert.equal(machine, `RER_READY ${details.url}\nRER_SIGNED_IN ${details.signedInAs}\nRER_OPEN ${details.openUrl}\nRER_SITE ${details.siteUrl}`);
+   stdout.length = 0;
+   printer({json:true}).ready(details, {pid:123});
+   assert.equal(stdout.join(''), JSON.stringify({version:1,verb:'dev',event:'server',pid:123})+'\n'+JSON.stringify(details)+'\n');
+   stdout.length = 0;
+   const output = {human: text => stdout.push(text+'\n'),event:(event,fields)=>stdout.push(JSON.stringify({version:1,verb:'dev',event,...fields})+'\n')};
+   ready(output, details.url, details, true, details.siteUrl);
+   assert.equal(stdout.join(''), JSON.stringify(details)+'\n');
+   stdout.length = 0; ready(output, details.url, details, false, details.siteUrl);
+   assert.equal(stdout[0], `Your app is ready, open it: ${details.openUrl}\n`);
+   assert.equal(stdout.join('').split('\n').filter(line=>line.startsWith('RER_')).join('\n'), machine);
+   stdout.length = 0; printer({json:false,keyless:true}).ready(details, {});
+   assert.equal(stdout.join('').split('\n')[0], `Your app is ready, open it: ${details.url}`);
+   assert.ok(!stdout.join('').includes(details.openUrl), 'front-door logs keep the private link out of the new lead line too');
+   stdout.length = 0; ready(output, details.url);
+   assert.equal(stdout.join(''), `Your app is ready, open it: ${details.url}\nRER_READY ${details.url}\n`);
+  } finally { for (const mock of mocks) mock.mock.restore(); }
+ }
+
  const root = await mkdtemp(join(tmpdir(), 'rer-output-'));
  t.after(() => rm(root, { recursive: true, force: true }));
  const effects = 'Read the complete description: café 日本語. '.repeat(16384);
