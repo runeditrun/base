@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime, SETUP, SECRET } from './runtime.mjs';
@@ -7,7 +8,9 @@ import { readFile } from 'node:fs/promises';
 import { applySql } from './apply-sql.mjs';
 const post = (input, cookie) => ({ method: 'POST', input, cookie });
 
-test('D1 auth writes survive audit triggers and storage failures without partial authority', async () => {
+test("native authority transactions preserve atomic writes and invalidate stale credentials", async t => {
+  const foldedCases = [];
+foldedCases.push(['D1 auth writes survive audit triggers and storage failures without partial authority', async () => {
   const r = await runtime({ externalIssuers: ['https://idp.example.com'] });
   try {
     const db = await r.db;
@@ -52,9 +55,8 @@ test('D1 auth writes survive audit triggers and storage failures without partial
     assert.deepEqual(await conflict.json(), { error: 'email_in_use' });
     assert.equal((await (await r.call('/auth/session', { cookie: proofOwner })).json()).operator.email, 'next@example.com');
   } finally { await r.close(); }
-});
-
-test('an actor revoked after JS authorization cannot commit an invitation through a stale snapshot', async () => {
+}]);
+foldedCases.push(['an actor revoked after JS authorization cannot commit an invitation through a stale snapshot', async () => {
   const r = await runtime();
   try {
     const cookie = await r.bootstrap();
@@ -69,9 +71,8 @@ test('an actor revoked after JS authorization cannot commit an invitation throug
     assert.equal(await store.byEmail('late@example.com'), null);
     assert.equal((await db.prepare('SELECT count(*) AS n FROM oa_tokens').first()).n, 0);
   } finally { await r.close(); }
-});
-
-test('configuration narrowing and disabling review immediately deny preexisting credentials', async () => {
+}]);
+foldedCases.push(['configuration narrowing and disabling review immediately deny preexisting credentials', async () => {
   const r = await runtime({ origin: 'http://localhost:8787', local: true, review: { enabled: true, operatorEmail: 'owner@example.com' } });
   try {
     const owner = await r.bootstrap();
@@ -90,9 +91,8 @@ test('configuration narrowing and disabling review immediately deny preexisting 
     assert.equal((await r.call('/auth/confirm?token=' + token)).status, 400);
     assert.equal((await r.call('/auth/bootstrap', post({ token: SETUP, displayName: 'Owner' }))).status, 403);
   } finally { await r.close(); }
-});
-
-test('role mutation expires existing sessions and last-owner trigger protects direct SQL too', async () => {
+}]);
+foldedCases.push(['role mutation expires existing sessions and last-owner trigger protects direct SQL too', async () => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -108,4 +108,6 @@ test('role mutation expires existing sessions and last-owner trigger protects di
     await assert.rejects(db.prepare("UPDATE oa_operators SET role='member' WHERE role='owner'").run(), /last_owner/);
     assert.equal((await r.call('/auth/session', { cookie: owner })).status, 200);
   } finally { await r.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

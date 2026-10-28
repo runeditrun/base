@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runtime } from './runtime.mjs';
@@ -21,7 +22,9 @@ async function invalidLink(r, token) {
   assert.equal(response.headers.get('set-cookie'), null);
 }
 
-test('cancelInvitation invalidates all links, retains operator/history, and cannot remove the last owner', async () => {
+test("invitation cancellation retains history and admits only current authorized requests", async t => {
+  const foldedCases = [];
+foldedCases.push(['cancelInvitation invalidates all links, retains operator/history, and cannot remove the last owner', async () => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap(), db = await r.db;
@@ -62,9 +65,8 @@ test('cancelInvitation invalidates all links, retains operator/history, and cann
       { operator_id: pending.row.id, operator_version: pending.row.version + 1 });
     assert.equal((await db.prepare('SELECT count(*) AS n FROM oa_sessions WHERE operator_id=?').bind(pending.row.id).first()).n, 0);
   } finally { await r.close(); }
-});
-
-test('cancellation enforces HTTP origin/session and default target role policy before changing invitation authority', async () => {
+}]);
+foldedCases.push(['cancellation enforces HTTP origin/session and default target role policy before changing invitation authority', async () => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -87,9 +89,8 @@ test('cancellation enforces HTTP origin/session and default target role policy b
     assert.equal((await r.call(`/auth/confirm?token=${pendingAdmin.token}`)).status, 200);
     assert.equal((await r.call('/auth/invite/cancel', post({ operatorId: 'missing' }, owner))).status, 404);
   } finally { await r.close(); }
-});
-
-test('already accepted invitations conflict without revoking their sessions or changing history', async () => {
+}]);
+foldedCases.push(['already accepted invitations conflict without revoking their sessions or changing history', async () => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap();
@@ -102,4 +103,6 @@ test('already accepted invitations conflict without revoking their sessions or c
     assert.deepEqual(await db.prepare('SELECT * FROM oa_operators WHERE id=?').bind(member.row.id).first(), before);
     assert.equal((await r.call('/auth/session', { cookie: member.cookie })).status, 200);
   } finally { await r.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

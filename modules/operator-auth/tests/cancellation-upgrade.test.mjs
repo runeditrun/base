@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
@@ -12,7 +13,9 @@ async function invitation(r, owner) {
   return { operator: await (await r.db).prepare("SELECT * FROM oa_operators WHERE email='pending@example.com'").first(), token: await r.link() };
 }
 
-test('additive cancellation migration preserves existing operators and credentials and survives restart/credential pruning', async () => {
+test("durable cancellation upgrades preserve authority and roll back failed writes", async t => {
+  const foldedCases = [];
+foldedCases.push(['additive cancellation migration preserves existing operators and credentials and survives restart/credential pruning', async () => {
   const r = await runtime({ existingStore: true });
   try {
     const owner = await r.bootstrap(), db = await r.db;
@@ -41,9 +44,8 @@ test('additive cancellation migration preserves existing operators and credentia
     assert.equal((await r.call('/auth/confirm', post({ token: pending.token }))).status, 400);
     assert.deepEqual((await snapshot(restored))[1], before[1], 'The bootstrap ledger is retained');
   } finally { await r.close(); }
-});
-
-test('a failed durable cancellation write rolls back status and authority version in real D1', async () => {
+}]);
+foldedCases.push(['a failed durable cancellation write rolls back status and authority version in real D1', async () => {
   const r = await runtime();
   try {
     const owner = await r.bootstrap(), db = await r.db;
@@ -58,4 +60,6 @@ test('a failed durable cancellation write rolls back status and authority versio
     assert.equal((await r.call('/auth/invite/cancel', post({ operatorId: pending.operator.id }, owner))).status, 200);
     assert.equal((await db.prepare('SELECT count(*) AS n FROM oa_invitation_cancellations').first()).n, 1);
   } finally { await r.close(); }
+}]);
+  await runCases(t, foldedCases);
 });

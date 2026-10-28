@@ -1,3 +1,4 @@
+import { runCases } from './cases.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createPortability } from '../index.mjs';
@@ -22,15 +23,19 @@ test('large Unicode values survive durable segment boundaries and a full round t
     assert.equal((await archive(destination)).contentHash,first.contentHash);
   }
 });
-test('default exclusions cover SQLite identifier case variants',async t=>{
+test("SQLite case aliases cannot bypass excluded-table dependency protection", async t => {
+  const foldedCases = [];
+foldedCases.push(['default exclusions cover SQLite identifier case variants', async t=>{
   const source=await runtime(t),names=['OA_TRANSFER_TEST','OC_TRANSFER_TEST','RER_PORTABILITY_TRANSFER_TEST','RER_MAIL_DEVELOPMENT_OUTBOX'];
   for(const name of names)await source.db.prepare('CREATE TABLE "'+name+'"(id TEXT)').run();
   const bundle=await archive(await source.connect());
   for(const name of names)assert.ok(bundle.manifest.excludedTables.includes(name),'default exclusion must cover '+name);
-});
-test('foreign keys into excluded parents are refused through SQLite case aliases',async t=>{
+}]);
+foldedCases.push(['foreign keys into excluded parents are refused through SQLite case aliases', async t=>{
   const source=await runtime(t,{policy:{...fixturePolicy,excludeTables:[...fixturePolicy.excludeTables,'ParentTable']}});
   await source.db.prepare('CREATE TABLE "ParentTable"(id TEXT PRIMARY KEY)').run();
   await source.db.prepare('CREATE TABLE mixed_child(id TEXT PRIMARY KEY,parent TEXT REFERENCES parenttable(id))').run();
   await assert.rejects(source.connect(),/excluded_foreign_key:mixed_child:ParentTable/);
+}]);
+  await runCases(t, foldedCases);
 });

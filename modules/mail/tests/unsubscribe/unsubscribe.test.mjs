@@ -1,3 +1,4 @@
+import { runCases } from '../helpers/cases.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sendDevelopment } from '../../src/development/index.mjs';
@@ -17,7 +18,9 @@ const rejectsCode = (operation, code) => assert.throws(operation, error => error
 const rejectsPromiseCode = (promise, code) => assert.rejects(promise, error => error instanceof MailValidationError && error.code === code && !error.message.includes('SENSITIVE'));
 const rejectsValidation = operation => assert.throws(operation, error => error instanceof MailValidationError && !error.message.includes('SENSITIVE'));
 
-test('HTTPS, optional mailto, and one-click headers are assembled without mutating input', () => {
+test("unsubscribe assembly preserves safe and consistent one-click list headers", async t => {
+  const foldedCases = [];
+foldedCases.push(['HTTPS, optional mailto, and one-click headers are assembled without mutating input', () => {
   const input = message({ unsubscribe: {
     url: 'https://example.com/unsubscribe?token=abc', mailto: 'mailto:leave@example.com', oneClick: true,
   } });
@@ -35,9 +38,8 @@ test('HTTPS, optional mailto, and one-click headers are assembled without mutati
   });
   assert.equal('unsubscribe' in prepared, false);
   assert.deepEqual(input, original);
-});
-
-test('HTTPS-only assembly omits one-click and retains matching custom headers', () => {
+}]);
+foldedCases.push(['HTTPS-only assembly omits one-click and retains matching custom headers', () => {
   const prepared = applyUnsubscribeHeaders(message({
     headers: { 'X-Trace': 'trace-7', 'list-unsubscribe': '<https://example.com/u>' },
     unsubscribe: { url: 'https://example.com/u' },
@@ -45,9 +47,8 @@ test('HTTPS-only assembly omits one-click and retains matching custom headers', 
   assert.equal(prepared.headers['list-unsubscribe'], '<https://example.com/u>');
   assert.equal(prepared.headers['List-Unsubscribe-Post'], undefined);
   assert.equal(prepared.headers['X-Trace'], 'trace-7');
-});
-
-test('unsafe URL and mailbox inputs fail closed', () => {
+}]);
+foldedCases.push(['unsafe URL and mailbox inputs fail closed', () => {
   for (const url of [
     'http://example.com/u',
     'javascript:alert(1)',
@@ -72,9 +73,8 @@ test('unsafe URL and mailbox inputs fail closed', () => {
   ]) {
     rejectsValidation(() => applyUnsubscribeHeaders(message({ unsubscribe: { url: 'https://example.com/u', mailto } })));
   }
-});
-
-test('custom list headers must agree with the structured unsubscribe request', () => {
+}]);
+foldedCases.push(['custom list headers must agree with the structured unsubscribe request', () => {
   rejectsCode(() => applyUnsubscribeHeaders(message({
     headers: { 'List-Unsubscribe': '<https://other.example/u>' },
     unsubscribe: { url: 'https://example.com/u' },
@@ -90,9 +90,8 @@ test('custom list headers must agree with the structured unsubscribe request', (
   rejectsCode(() => applyUnsubscribeHeaders(message({
     headers: { 'List-Unsubscribe': '<https://example.com/u>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click; extra=value' },
   })), 'invalid_list_unsubscribe_post');
-});
-
-test('header conflicts and duplicate names fail before the development outbox is called', async () => {
+}]);
+foldedCases.push(['header conflicts and duplicate names fail before the development outbox is called', async () => {
   let writes = 0;
   const outbox = { async put() { writes += 1; } };
   const dispatch = async input => sendDevelopment(
@@ -113,9 +112,8 @@ test('header conflicts and duplicate names fail before the development outbox is
     unsubscribe: { url: 'https://example.com/u' },
   })), 'reserved_or_duplicate_header');
   assert.equal(writes, 0);
-});
-
-test('valid custom list headers are preserved, while malformed or injected values fail', () => {
+}]);
+foldedCases.push(['valid custom list headers are preserved, while malformed or injected values fail', () => {
   const custom = {
     'List-Unsubscribe': '<https://example.com/u?a=1,2>, <mailto:leave@example.com>',
     'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
@@ -133,4 +131,6 @@ test('valid custom list headers are preserved, while malformed or injected value
   ]) {
     rejectsCode(() => applyUnsubscribeHeaders(message({ headers })), headers['List-Unsubscribe-Post'] ? 'invalid_list_unsubscribe_post' : 'invalid_list_unsubscribe');
   }
+}]);
+  await runCases(t, foldedCases);
 });
