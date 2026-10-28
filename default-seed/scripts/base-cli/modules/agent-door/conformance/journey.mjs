@@ -34,7 +34,6 @@ async function checkResources(c, step, answer, phase, held) {
  }
 }
 export async function runJourney(c, phase, { held = false, injections = false, replay = false } = {}) {
- await c.prepare(phase);
  const outputs = new Map(); let replayed = false;
  try {
   for (const step of c.surface.journey) {

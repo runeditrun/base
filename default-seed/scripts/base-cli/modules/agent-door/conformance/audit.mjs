@@ -2,22 +2,9 @@ import { isDeepStrictEqual } from 'node:util';
 import { classIds } from './protocol.mjs';
 import { AGENT_CLASSES } from './surface.mjs';
 import { targetIdentity } from './target.mjs';
+import { auditRows } from './audit-rows.mjs';
 
-export async function auditRows(c) {
- const rows = []; let differs = 0;
- for (const agentId of new Set([c.agentId, ...c.nativeAgents ?? []])) {
-  let cursor = null;
-  for (let page = 0; ; page++) {
-   if (page === 100) throw new Error('Audit pagination exceeded 100 pages');
-   const result = await c.personJson(`/agents/api/audit?agent=${encodeURIComponent(agentId)}${cursor ? `&after=${encodeURIComponent(cursor)}` : ''}`);
-   if (!Array.isArray(result.rows) || !Number.isInteger(result.differs_from_policy)) throw new Error('Audit API must return rows and differs_from_policy');
-   rows.push(...result.rows); differs += result.differs_from_policy;
-   if (result.cursor == null || result.cursor === cursor) break;
-   cursor = result.cursor;
-  }
- }
- return { rows, differs };
-}
+export { auditRows } from './audit-rows.mjs';
 export async function auditPhase(c) {
  const { rows, differs } = await auditRows(c), expected = [...c.calls];
  c.add('BASE-AGENT-009.1.count', rows.length === expected.length, `Expected exactly ${expected.length} audit rows for tool calls, resource reads and approval executions, found ${rows.length}.`);
