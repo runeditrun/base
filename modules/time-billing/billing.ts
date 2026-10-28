@@ -53,7 +53,7 @@ export async function preparePacket(env: Environment, input: PrepareInput): Prom
       queries.push(guard(await env.options.nativeLineGuard(env.ctx, line), 'authority')); lines.push(structuredClone(line));
     }
     demand(new Set(lines.map(l => canonical({ kind: l.source.kind, id: l.source.id }))).size === lines.length, 'conflict', 'duplicate source entitlement');
-    const currency = lines[0].currency; demand(lines.every(l => l.currency === currency), 'conflict', 'mixed currency');
+    const currency = lines[0].currency; demand(lines.every(l => l.currency === currency), 'invalid', 'mixed currency');
     const totalMinor = lines.reduce((n, l) => n + BigInt(l.amountMinor), 0n).toString(); demand(totalMinor.replace('-', '').length <= LIMITS.integerDigits, 'capacity');
     const packet: BillingPacket = { id: input.id, revision: 1, destination: input.destination, currency, lines, totalMinor, state: 'prepared', sourceFingerprint: await digest(json(lines)), artifact: null, attribution: env.ctx };
     queries.push(sql('INSERT INTO tb_packets(installation,id,work_kind,work_id,revision,body) VALUES(?,?,?,?,?,?)', env.ctx.installationId, packet.id, packet.destination.kind, packet.destination.id, 1, json(packet)));

@@ -1,7 +1,7 @@
-import type { Action, Authority, CommandResult, Context, Options, Resource, Sql, Write } from './types.ts';
+import type { Action, Authority, CommandResult, Context, EntryInput, EntryRecord, Options, Resource, Sql, TimeEntry, Write } from './types.ts';
 import { demand, LIMITS, TimeBillingError } from './errors.ts';
 import { projectEntry } from './projection.ts';
-import { canonical, context, digest, identifier, json, sql } from './encoding.ts';
+import { both, canonical, context, digest, identifier, json, sql } from './encoding.ts';
 export type Environment = { options: Options; ctx: Context };
 export const statement = (db: D1Database, query: Sql): D1PreparedStatement => {
   demand(query.sql.length <= 16000 && (query.params?.length ?? 0) <= LIMITS.sqlParameters, 'capacity');
@@ -48,17 +48,42 @@ const actor = (ctx: Context) => canonical({ personId: ctx.personId, agentId: ctx
 export type Prepared<T> = { result: T; queries: Sql[] };
 /** One operation writer. Replay checks current authority but never repeats native outcomes. */
 export async function command<T extends CommandResult | {restored: true}>(env: Environment, action: Action, resource: Resource, input: Write, financial: boolean,
-  prepare: (authority: Authority) => Promise<Prepared<T>>): Promise<T> {
+  prepare: (authority: Authority) => Promise<Prepared<T>>, replayChecks?: (saved: T) => Promise<Sql[]>): Promise<T> {
   context(env.ctx); identifier(input.operationKey);
   demand(input.operationKey.length <= LIMITS.operationLength && Number.isSafeInteger(input.expectedRevision) && input.expectedRevision >= 0);
   const authority = await authorize(env, action, resource, financial);
-  const present = (value: T): T => value && typeof value === 'object' && 'kind' in value && (value.kind === 'entry' || value.kind === 'legacy') ? projectEntry(value as unknown as import('./types.ts').EntryRecord, authority.projection) as T : value;
+  const present = (value: T): T => value && typeof value === 'object' && 'kind' in value && (value.kind === 'entry' || value.kind === 'legacy') ? projectEntry(value as unknown as EntryRecord, authority.projection) as T : value;
   const payload = await digest(json(input)), keys = [env.ctx.installationId, actor(env.ctx), resource.subject, action, input.operationKey];
   const replay = async (): Promise<T | undefined> => {
     const rows = await authorizedRows<{payload: string; result: string}>(env, authority, sql('SELECT payload,result FROM tb_commands WHERE installation=? AND actor=? AND subject=? AND action=? AND operation_key=?', ...keys));
     if (!rows.length) return undefined;
     demand(rows[0].payload === payload, 'conflict', 'operation key reused with changed content');
-    return present(JSON.parse(rows[0].result) as T);
+    const saved = JSON.parse(rows[0].result) as T;
+    const checks: Sql[] = [];
+    if (saved && typeof saved === 'object') {
+      if ('kind' in saved && saved.kind === 'entry') {
+        const e = saved as TimeEntry;
+        checks.push(fence(env, 'tb_entries', e.id, e.revision));
+        const native: EntryInput = { id: e.id, work: e.work, timekeeperId: e.timekeeperId, duration: e.duration, billable: e.billable, category: e.category, source: e.source, policyId: e.policy.id };
+        const current = await env.options.entryGuard(env.ctx, native);
+        const allowed = await authorizedRows<{ok:number}>(env, authority, sql(`SELECT CASE WHEN (${current.sql}) THEN 1 ELSE 0 END AS ok`, ...current.params ?? []));
+        demand(allowed[0]?.ok === 1, 'forbidden');
+        checks.push(current);
+        if (action === 'correct') checks.push(fence(env, 'tb_entries', resource.subject, input.expectedRevision));
+        if (action === 'stopTimer') checks.push(fence(env, 'tb_timers', resource.subject, input.expectedRevision + 1));
+      } else if ('kind' in saved && saved.kind === 'time') {
+        const rated = saved as import('./types.ts').RatedTime;
+        checks.push(fence(env, 'tb_entries', rated.entryId, rated.entryRevision));
+      } else if ('lines' in saved && 'revision' in saved) checks.push(fence(env, 'tb_packets', resource.subject, saved.revision as number));
+      else if ('startedAt' in saved && 'revision' in saved) checks.push(fence(env, 'tb_timers', resource.subject, saved.revision as number));
+    }
+    checks.push(...await replayChecks?.(saved) ?? []);
+    if (checks.length) {
+      const predicate = both(...checks);
+      const live = await authorizedRows<{ok:number}>(env, authority, sql(`SELECT CASE WHEN (${predicate.sql}) THEN 1 ELSE 0 END AS ok`, ...predicate.params ?? []));
+      demand(live[0]?.ok === 1, 'conflict', 'operation result has a newer revision or changed native basis');
+    }
+    return present(saved);
   };
   const existing = await replay(); if (existing !== undefined) return existing;
   const prepared = await prepare(authority);

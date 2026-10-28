@@ -25,7 +25,7 @@ export async function newEntry(env: Environment, input: EntryInput, corrects: st
     duration: input.duration, billable: input.billable, category: input.category, state: policy.review === 'none' ? 'approved' : 'draft', corrects,
     source: input.source, policy, rate: null, locked: false, attribution: env.ctx };
   const queries = [guard(await env.options.entryGuard(env.ctx, input), 'authority')];
-  if (input.billable && (policy.rateStage === 'entry' || policy.review === 'none' && policy.rateStage === 'approval')) {
+  if (input.billable && policy.billing && (policy.rateStage === 'entry' || policy.review === 'none' && policy.rateStage === 'approval')) {
     const selected = await env.options.selectRate(env.ctx, entry, policy.rateStage);
     validateRate(selected.rate); demand(selected.rate.selectedAt === policy.rateStage); entry.rate = selected.rate;
     queries.push(guard(selected.guard));
@@ -66,12 +66,16 @@ export async function decide(env: Environment, input: DecisionInput): Promise<Ti
     const eligibility = await env.options.reviewGuard(env.ctx, old, input.decision); identifier(eligibility.policyRevision);
     const entry: TimeEntry = { ...old, revision: old.revision + 1, state: input.decision === 'approve' ? 'approved' : 'returned' };
     const queries = [guard(fence(env, 'tb_entries', old.id, old.revision)), guard(eligibility.predicate, 'authority')];
-    if (input.decision === 'approve' && entry.billable && entry.policy.rateStage === 'approval') {
+    if (input.decision === 'approve' && entry.billable && entry.policy.billing && entry.policy.rateStage === 'approval') {
       const selected = await env.options.selectRate(env.ctx, entry, 'approval'); validateRate(selected.rate); demand(selected.rate.selectedAt === 'approval');
       entry.rate = selected.rate; queries.push(guard(selected.guard));
     }
     queries.push(...entryRows(env, entry, old.revision), await reviewRow(env, entry, input.decision, eligibility.policyRevision, input.reason));
     return { result: entry, queries };
+  }, async () => {
+    const current = await env.options.reviewGuard(env.ctx, old, input.decision);
+    // Replays are recovery, but still require today's native personal eligibility.
+    return [current.predicate];
   });
 }
 export async function correct(env: Environment, input: CorrectionInput): Promise<TimeEntry> {
