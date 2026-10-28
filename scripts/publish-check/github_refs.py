@@ -75,7 +75,7 @@ def markdown_repository_context(match, text):
     end = text.find('\n', match.end())
     tail = text[match.end():end if end != -1 else len(text)]
     declaration = (re.fullmatch(r'[ \t#>*_~`\[\]-]*(?:[0-9]+\.[ \t]+)?', prefix) and
-                   re.fullmatch(r'[ \t`*_~\[\].,;:!)]*', tail))
+                   re.fullmatch(r'[ \t\r`*_~\[\].,;:!)]*', tail))
     return bool(match['markup'] or command or declaration)
 
 

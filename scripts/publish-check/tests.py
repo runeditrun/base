@@ -305,13 +305,14 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
             'source.mjs': 'const repository: string = "{repo}";',
         }
         for index, (name, form) in enumerate(forms.items()):
-            for state in ('public', 'missing', 'private'):
-                repository = f'acme-org/declared-{index}-{state}-app'
-                truth[repository] = state
-                path = f'declarations/{state}/{name}'
-                self.write(path, form.format(repo=repository))
-                if state != 'public':
-                    expected.add((path, 'hygiene.github-' + state))
+            for ending, newline in (('lf', '\n'), ('crlf', '\r\n')):
+                for state in ('public', 'missing', 'private'):
+                    repository = f'acme-org/declared-{index}-{ending}-{state}-app'
+                    truth[repository] = state
+                    path = f'declarations/{state}/{ending}/{name}'
+                    self.write(path, (form.format(repo=repository) + '\n').replace('\n', newline))
+                    if state != 'public':
+                        expected.add((path, 'hygiene.github-' + state))
         # Actual declarations/URLs outrank even a coincident local path. Neither
         # a familiar prefix nor a file suffix grants a remote-reference bypass.
         for repository in ('components/runtime', 'tests/fixture.mjs'):
