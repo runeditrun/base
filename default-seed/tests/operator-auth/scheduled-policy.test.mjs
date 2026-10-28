@@ -1,11 +1,14 @@
+import { runRows } from '../rows.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { emittedRuntime, setupToken, owner } from './emitted-runtime.mjs'
 import { scheduledHarness, definition } from './scheduled-harness.mjs'
 
+const policyRows = []
+
 const cookieOf = response => { assert.equal(response.status, 303); return response.headers.get('set-cookie').split(';')[0] }
 
-test('scheduled approval refuses a definition whose snapshotted id differs from the requested policy', async () => {
+policyRows.push(['scheduled approval refuses a definition whose snapshotted id differs from the requested policy', {}, async () => {
   let changingId = false
   const h = await scheduledHarness({ definitions: () => {
     if (!changingId) return [definition({ id: 'other-policy' })]
@@ -31,9 +34,9 @@ test('scheduled approval refuses a definition whose snapshotted id differs from 
     assert.deepEqual([run.status, run.error], ['refused', 'invalid_policy'])
     assert.equal(entered, false)
   } finally { await h.close() }
-})
+}])
 
-test('scheduled Worker door: exact owner approval bounds actions, audits runs, and stops on edits, revocation or owner demotion', async () => {
+policyRows.push(['scheduled Worker door: exact owner approval bounds actions, audits runs, and stops on edits, revocation or owner demotion', {}, async () => {
   const r = await emittedRuntime()
   const post = (path, input, cookie, headers) => r.call(path, { method: 'POST', input, cookie, headers })
   const confirm = async () => cookieOf(await post('/auth/confirm', { token: new URL(r.mails.at(-1).text.match(/https?:\/\/[^\s]+/)[0]).searchParams.get('token') }))
@@ -134,4 +137,8 @@ test('scheduled Worker door: exact owner approval bounds actions, audits runs, a
     assert.ok(runs.runs.every(run => run.finishedAt !== null && run.id))
     assert.ok((await list(coowner.cookie)).approvals.length >= 3)
   } finally { await r.close() }
+}])
+
+test("scheduled owner approval binds the exact definition and controls Worker actions", async t => {
+  await runRows(t, policyRows)
 })
