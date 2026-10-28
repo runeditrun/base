@@ -1,3 +1,4 @@
+import { caseRows } from '../onboarding/test-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,cp,mkdtemp,writeFile,rm} from 'node:fs/promises';
@@ -7,7 +8,8 @@ import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {BUSINESS_FIELD_INPUTS} from './business-field-inputs.mjs';
 const root=new URL('../',import.meta.url);
-test('setup doors share the Business input table and retain developer audiences and owner defaults',async t=>{
+test("portable setup consumers share declared Business hints, audiences and answer validation", t => caseRows(t, [
+  ['setup doors share the Business input table and retain developer audiences and owner defaults', async t=>{
  const destination=await mkdtemp(join(tmpdir(),'setup-audience-'));
  t.after(()=>rm(destination,{recursive:true,force:true}));
  const manifest={schema:1,title:'Workspace settings',groups:[{id:'technical',label:'Technical settings',audience:'developer'}],fields:[
@@ -52,49 +54,14 @@ test('setup doors share the Business input table and retain developer audiences 
  manifest.fields[2].audience='developer';
  await writeFile(file,JSON.stringify(manifest));
  assert.equal((await loadInstallerSeed(destination,{product:'Workspace',setup:{manifestFile:'rer-setup.json'}})).model.fieldDefinition('WORKSPACE_TITLE',{}).audience,'owner');
-});
-test('setup doors refuse off-list and invalid hints, structural secrets, duplicate claims and invalid audiences',async t=>{
- const destination=await mkdtemp(join(tmpdir(),'invalid-setup-audience-'));
- t.after(()=>rm(destination,{recursive:true,force:true}));
- const base={schema:1,title:'Settings',groups:[{id:'technical',label:'Technical settings'}],fields:[
-  {name:'PROFILE',label:'Profile',kind:'text',group:'technical'},
- ],steps:[{type:'extension',id:'workspace'}]};
- const {loadInstallerSeed}=await import('../onboarding/setup-manifest.mjs');
- const {loadInstallerSeed:loadShippedInstallerSeed}=await import('../default-seed/scripts/base-onboarding/setup-manifest.mjs');
- for(const [mutate,message] of [
-  [data=>{data.fields[0].businessField='unknown_business_field';},/businessField.*not one of/],
-  [data=>{data.fields[0].businessField=null;},/businessField.*not one of/],
-  [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:true,input:'entered',businessField:'owner_email'});},/kind is "secret".*excluded schema/],
-  [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:false,input:'managed',businessField:'legal_name'});},/kind is "secret".*excluded schema/],
-  [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:false,generate:'hex',businessField:'mail_sender'});},/kind is "secret".*excluded schema/],
-  [data=>{Object.assign(data.fields[0],{name:'APP_CLIENTSECRET',businessField:'display_name'});}],
-  ...[
-   ['LEGAL_NAME','TRADING_NAME','legal_name'],
-   ['OWNER_EMAIL','SUPPORT_EMAIL','owner_email'],
-  ].map(([first,second,businessField])=>[
-   data=>{data.fields=[first,second].map(name=>({name,label:'Profile value',kind:'text',businessField}));},
-   new RegExp(`(?=.*${first})(?=.*${second})(?=.*${businessField})`),
-  ]),
-  [data=>{data.fields[0].audience='admin';},/PROFILE.*audience.*owner.*developer/],
-  [data=>{data.groups[0].audience='admin';},/technical.*audience.*owner.*developer/],
-  [data=>{data.groups[0].audience='developer';data.fields[0].audience='owner';},/PROFILE.*owner.*developer.*technical/],
-  [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:false,audience:'developer'});},/PROFILE.*secret.*audience/],
- ]){
-  const candidate=structuredClone(base);mutate(candidate);
-  const file=join(destination,'rer-setup.json');await writeFile(file,JSON.stringify(candidate));
-  const result=spawnSync(process.execPath,[new URL('schema/validate.mjs',root).pathname,'--schema','SETUP',file],{encoding:'utf8'});
-  assert.equal(result.status,1);if(message)assert.match(result.stderr,message);
-  await assert.rejects(loadInstallerSeed(destination,{product:'Synthetic setup',setup:{manifestFile:'rer-setup.json'}}),message);
-  await assert.rejects(loadShippedInstallerSeed(destination,{product:'Synthetic setup',setup:{manifestFile:'rer-setup.json'}}),message);
- }
-});
-test('onboarding vendors the exact portable Base schema and validators',async()=>{
+}],
+  ['onboarding vendors the exact portable Base schema and validators', async()=>{
  for(const name of ['SETUP.schema.json','json-schema.mjs','setup-validation.mjs','business-field-inputs.mjs']){
   assert.deepEqual(await readFile(new URL('onboarding/schema/'+name,root)),await readFile(new URL('schema/'+name,root)));
  }
  for(const name of ['json-schema.mjs','setup-validation.mjs','business-field-inputs.mjs'])assert.doesNotMatch(await readFile(new URL('schema/'+name,root),'utf8'),/node:/);
-});
-test('a standalone installer copy reads the manifest and validates its declared answers', async t=>{
+}],
+  ['a standalone installer copy reads the manifest and validates its declared answers', async t=>{
  const destination=await mkdtemp(join(tmpdir(),'copied-setup-reader-'));
  t.after(()=>rm(destination,{recursive:true,force:true}));
  await cp(new URL('onboarding/',root),join(destination,'kit'),{recursive:true});
@@ -135,5 +102,41 @@ test('a standalone installer copy reads the manifest and validates its declared 
   for(const name of Object.keys(publicDefaults))assert.equal(answers[name],`Public answer for ${name}`,name);
   for(const name of Object.keys(hintedPublicFields))assert.equal(answers[name],`Business answer for ${name}`,name);
   assert.throws(()=>seed.model.validateInput({...answers,UNDECLARED:'value'}),/Undeclared setup input/);
+ }
+}]
+]));
+test('setup doors refuse off-list and invalid hints, structural secrets, duplicate claims and invalid audiences',async t=>{
+ const destination=await mkdtemp(join(tmpdir(),'invalid-setup-audience-'));
+ t.after(()=>rm(destination,{recursive:true,force:true}));
+ const base={schema:1,title:'Settings',groups:[{id:'technical',label:'Technical settings'}],fields:[
+  {name:'PROFILE',label:'Profile',kind:'text',group:'technical'},
+ ],steps:[{type:'extension',id:'workspace'}]};
+ const {loadInstallerSeed}=await import('../onboarding/setup-manifest.mjs');
+ const {loadInstallerSeed:loadShippedInstallerSeed}=await import('../default-seed/scripts/base-onboarding/setup-manifest.mjs');
+ for(const [mutate,message] of [
+  [data=>{data.fields[0].businessField='unknown_business_field';},/businessField.*not one of/],
+  [data=>{data.fields[0].businessField=null;},/businessField.*not one of/],
+  [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:true,input:'entered',businessField:'owner_email'});},/kind is "secret".*excluded schema/],
+  [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:false,input:'managed',businessField:'legal_name'});},/kind is "secret".*excluded schema/],
+  [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:false,generate:'hex',businessField:'mail_sender'});},/kind is "secret".*excluded schema/],
+  [data=>{Object.assign(data.fields[0],{name:'APP_CLIENTSECRET',businessField:'display_name'});}],
+  ...[
+   ['LEGAL_NAME','TRADING_NAME','legal_name'],
+   ['OWNER_EMAIL','SUPPORT_EMAIL','owner_email'],
+  ].map(([first,second,businessField])=>[
+   data=>{data.fields=[first,second].map(name=>({name,label:'Profile value',kind:'text',businessField}));},
+   new RegExp(`(?=.*${first})(?=.*${second})(?=.*${businessField})`),
+  ]),
+  [data=>{data.fields[0].audience='admin';},/PROFILE.*audience.*owner.*developer/],
+  [data=>{data.groups[0].audience='admin';},/technical.*audience.*owner.*developer/],
+  [data=>{data.groups[0].audience='developer';data.fields[0].audience='owner';},/PROFILE.*owner.*developer.*technical/],
+  [data=>{Object.assign(data.fields[0],{kind:'secret',required:false,ownerVisible:false,audience:'developer'});},/PROFILE.*secret.*audience/],
+ ]){
+  const candidate=structuredClone(base);mutate(candidate);
+  const file=join(destination,'rer-setup.json');await writeFile(file,JSON.stringify(candidate));
+  const result=spawnSync(process.execPath,[new URL('schema/validate.mjs',root).pathname,'--schema','SETUP',file],{encoding:'utf8'});
+  assert.equal(result.status,1);if(message)assert.match(result.stderr,message);
+  await assert.rejects(loadInstallerSeed(destination,{product:'Synthetic setup',setup:{manifestFile:'rer-setup.json'}}),message);
+  await assert.rejects(loadShippedInstallerSeed(destination,{product:'Synthetic setup',setup:{manifestFile:'rer-setup.json'}}),message);
  }
 });

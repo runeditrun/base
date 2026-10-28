@@ -1,3 +1,6 @@
+import {caseRows} from './test-fixture.mjs';
+const outputCases = [];
+const outputCase = (name, check) => outputCases.push([name, check]);
 import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +20,7 @@ const jwt = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJzeW50aGV0aWMifQ.test-signature';
 const quotedCredential = 'test ' + 'opaque-synthetic-fragment '.repeat(30) + 'end';
 const longJwt = 'eyJ' + 'a'.repeat(750) + '.' + 'b'.repeat(750) + '.test-long-signature';
 
-// Each row: [shape, text, private parts that must never reach output].
+// Each row: [shape, text, private parts that must never reach output, optional exact output].
 const secretShapes = [
  ['prefixed password assignment', 'DB_PASSWORD=test-hunter2value', ['hunter2value']],
  ['prefixed token assignment', 'GITHUB_TOKEN=test-abcdef123456', ['abcdef123456']],
@@ -58,8 +61,8 @@ const secretShapes = [
  // Authorization schemes, cookies, PGP blocks and more provider prefixes.
  // JWTs need no word boundary before their header.
  ...['session-', 'session_', 'x', 'x-', '9'].flatMap(prefix => [
-  [`JWT after ${prefix}`, `${prefix}${jwt} end`, ['test-signature']],
-  [`long JWT after ${prefix}`, `${prefix}${longJwt} end`, ['test-long-signature']],
+  [`JWT after ${prefix}`, `${prefix}${jwt} end`, ['test-signature'], `${prefix}${MASK} end`],
+  [`long JWT after ${prefix}`, `${prefix}${longJwt} end`, ['test-long-signature'], `${prefix}${MASK} end`],
  ]),
  ['long quoted camelCase token', `refreshToken="${quotedCredential}"`, ['opaque-synthetic-fragment']],
  ['long quoted acronym token', `APIToken='${quotedCredential}'`, ['opaque-synthetic-fragment']],
@@ -156,20 +159,34 @@ function eachRow(rows, check) {
  assert.deepEqual(failures, []);
 }
 
-test('table: secret-bearing shapes redact in complete text, byte-split streams and long lines', () => {
+outputCase('table: secret-bearing shapes redact in complete text, byte-split streams and long lines', t => {
  assert.ok(secretShapes.length + registeredShapes.length + prose.length >= 110);
- eachRow(secretShapes, (shape, text, privateParts) => {
-  const redaction = createRedaction();
-  const outputs = [redaction.redact(`BEFORE_MARKER ${text} AFTER_MARKER`), redaction.redact(text)];
-  // Whole, byte-split, and on a line long enough to leave the line hold window.
-  for (const unit of [1, 3, 4096]) outputs.push(streamed(redaction, `BEFORE_MARKER\n${text}\nAFTER_MARKER\n`, unit), streamed(redaction, text, unit));
-  outputs.push(streamed(redaction, 'context '.repeat(60) + text + '\n', 1));
-  for (const output of outputs) privateOutput(output, privateParts);
-  for (const output of [outputs[0], outputs[2]]) { assert.match(output, /BEFORE_MARKER/); assert.match(output, /AFTER_MARKER/); }
- });
+ return caseRows(t, secretShapes.flatMap(([shape, text, privateParts, exactOutput]) => [
+  [`${shape}: whole text`, () => {
+   const redaction = createRedaction();
+   const output = redaction.redact(`BEFORE_MARKER ${text} AFTER_MARKER`);
+   privateOutput(output, privateParts);
+   assert.match(output, /BEFORE_MARKER/); assert.match(output, /AFTER_MARKER/);
+   const bare = redaction.redact(text);
+   privateOutput(bare, privateParts);
+   if (exactOutput !== undefined) assert.equal(bare, exactOutput, `${shape}: JWT leaked or nearby diagnostics changed (whole text)`);
+  }],
+  ...[1, 3, 4096].map(unit => [`${shape}: ${unit}-byte stream`, () => {
+   const redaction = createRedaction();
+   const output = streamed(redaction, `BEFORE_MARKER\n${text}\nAFTER_MARKER\n`, unit);
+   privateOutput(output, privateParts);
+   if (unit === 1) { assert.match(output, /BEFORE_MARKER/); assert.match(output, /AFTER_MARKER/); }
+   const bare = streamed(redaction, text, unit);
+   privateOutput(bare, privateParts);
+   if (exactOutput !== undefined) assert.equal(bare, exactOutput, `${shape}: JWT leaked or nearby diagnostics changed (${unit}-byte stream)`);
+  }]),
+  [`${shape}: long line`, () => {
+   privateOutput(streamed(createRedaction(), 'context '.repeat(60) + text + '\n', 1), privateParts);
+  }],
+ ]));
 });
 
-test('table: re-encodings and parts of registered values redact', () => {
+outputCase('table: re-encodings and parts of registered values redact', () => {
  eachRow(registeredShapes, (shape, secrets, text, privateParts) => {
   const redaction = createRedaction(); redaction.addSecrets(secrets);
   privateOutput(redaction.redact(`BEFORE_MARKER ${text} AFTER_MARKER`), privateParts);
@@ -180,7 +197,7 @@ test('table: re-encodings and parts of registered values redact', () => {
  });
 });
 
-test('table: diagnostic prose stays intact as complete text and as a final unterminated line', () => {
+outputCase('table: diagnostic prose stays intact as complete text and as a final unterminated line', () => {
  eachRow(prose.map(text => [text]), text => {
   const redaction = createRedaction();
   assert.equal(redaction.redact(text), text);
@@ -191,7 +208,7 @@ test('table: diagnostic prose stays intact as complete text and as a final unter
  });
 });
 
-test('step labels, reports and a final unterminated child line reach every sink unchanged', async t => {
+outputCase('step labels, reports and a final unterminated child line reach every sink unchanged', async t => {
  const root = await mkdtemp(join(tmpdir(), 'redaction-shapes-')); const state = { logs: [] }; let terminal = '';
  const child = new EventEmitter(); child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.exitCode = null; child.signalCode = null;
  const store = await createCommands(root, state, { spawn: () => child, terminal: text => { terminal += text; } });
@@ -207,18 +224,16 @@ test('step labels, reports and a final unterminated child line reach every sink 
  }
 });
 
-test('credential variable names are whole word parts, so ordinary variables are not registered', () => {
+test("redaction preserves public diagnostics and bounds while protecting credential names, shapes and stream fragments", t => caseRows(t, [
+  ['credential variable names are whole word parts, so ordinary variables are not registered', () => {
  const ordinary = { PATH: '/usr/local/bin:/usr/bin:/bin', DESIGN_MODE: 'production-mode', SIGNAL_NAME: 'termination', KEYBOARD_LAYOUT: 'english-us', COMPASS_DIR: '/opt/compass', AUTHOR_NAME: 'Fixture Author' };
  assert.deepEqual(credentialValues(ordinary), []);
  const credentials = { GITHUB_TOKEN: 'test-synthetic-1', DB_PASSWORD: 'test-synthetic-2', apiKey: 'test-synthetic-3', clientSecret: 'test-synthetic-4', AWS_SECRET_ACCESS_KEY: 'test-synthetic-5', APIKEY: 'test-synthetic-6', PASSWD: 'test-synthetic-7', SESSION_COOKIE: 'test-synthetic-8', SECRETS: 'test-synthetic-9', TOKEN: 'test-synthetic-10' };
  assert.deepEqual(credentialValues(credentials), Object.values(credentials));
  const redaction = createRedaction(); redaction.addSecrets(credentialValues(ordinary));
  assert.equal(redaction.redact('Building in production-mode for english-us'), 'Building in production-mode for english-us');
-});
-
-// Pathological 4 MiB inputs must cost about as much as ordinary output of the
-// same size: adjacent \s* runs and JWT runs used to backtrack quadratically.
-test('4 MiB pathological inputs redact in time comparable to ordinary output', () => {
+}],
+  ['4 MiB pathological inputs redact in time comparable to ordinary output', () => {
  const size = 4 * 1024 * 1024;
  const time = text => {
   const redaction = createRedaction(); let started = Date.now();
@@ -237,15 +252,22 @@ test('4 MiB pathological inputs redact in time comparable to ordinary output', (
   const elapsed = time(text);
   assert.ok(elapsed < budget, `${name}: ${elapsed} ms against ${budget} ms (ordinary ${ordinary} ms)`);
  }
-});
-
-
-test('acronym-prefixed credential variables register their values', () => {
+}],
+  ['acronym-prefixed credential variables register their values', () => {
  const values = { APIToken: 'test-synthetic-api-token', AWSSecretKey: 'test-synthetic-aws-key', APISecret: 'test-synthetic-api-secret', APIPassword: 'test-synthetic-api-password' };
  assert.deepEqual(credentialValues(values), Object.values(values));
-});
+}],
+  ['redacted output preserves public diagnostics across input shapes and stream boundaries', t => caseRows(t, outputCases)]
+]));
 
-test('camelCase prefix and JWT holds protect long values split beyond the output window', () => {
+// Pathological 4 MiB inputs must cost about as much as ordinary output of the
+// same size: adjacent \s* runs and JWT runs used to backtrack quadratically.
+
+
+
+
+
+outputCase('camelCase prefix and JWT holds protect long values split beyond the output window', () => {
  for (const [name, prefix, value, suffix, privatePart] of [
   ['camelCase', 'refreshToken:' + ' '.repeat(700), 'test-synthetic-refresh-' + 'a'.repeat(700), ' end', 'synthetic-refresh'],
   ['acronym', 'APIToken:' + ' '.repeat(700), 'test-synthetic-api-' + 'a'.repeat(700), ' end', 'synthetic-api'],
@@ -260,7 +282,7 @@ test('camelCase prefix and JWT holds protect long values split beyond the output
  }
 });
 
-test('oversized quoted credentials stay bounded and private until their closing quote', () => {
+outputCase('oversized quoted credentials stay bounded and private until their closing quote', () => {
  for (const prefix of ['refreshToken="', "APIToken='", '--token "']) {
   const quote = prefix.at(-1), redaction = createRedaction(); let output = '';
   const stream = redaction.stream(chunk => { output += chunk; });

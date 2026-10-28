@@ -1,3 +1,6 @@
+import {caseRows} from './test-fixture.mjs';
+const outputCases = [];
+const outputCase = (name, check) => outputCases.push([name, check]);
 import { generateKeyPairSync } from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,7 +31,7 @@ test('environment credential names and URL userinfo register long values without
  assert.equal(explicit.redact('value 12'),'value [REDACTED]');
 });
 
-test('raw, base64, base64url and percent-encoded registered credentials survive every split byte',()=>{
+outputCase('raw, base64, base64url and percent-encoded registered credentials survive every split byte',()=>{
  const secret='synth-päss/word?=# private-42';
  const forms=[secret,Buffer.from(secret).toString('base64'),Buffer.from(secret).toString('base64url'),encodeURIComponent(secret),encodeURIComponent(secret).replace(/%[0-9A-F]{2}/g,value=>value.toLowerCase()),encodeURIComponent(secret).replace(/%20/g,'+')];
  for(const form of forms)for(const unit of [1,2,7,4096]) {
@@ -37,7 +40,7 @@ test('raw, base64, base64url and percent-encoded registered credentials survive 
  }
 });
 
-test('credential shapes redact in one buffer and across individual bytes with nearby diagnostics intact',()=>{
+outputCase('credential shapes redact in one buffer and across individual bytes with nearby diagnostics intact',()=>{
  const pkcs8 = generateKeyPairSync('ed25519').privateKey.export({ type: 'pkcs8', format: 'pem' });
  const cases=[
   ['https://url-user:test-private-userinfo@host.invalid/path','private-userinfo'],
@@ -55,7 +58,7 @@ test('credential shapes redact in one buffer and across individual bytes with ne
  }
 });
 
-test('snapshot and EOF never expose an incomplete secret, PEM header, body, Basic value or URL userinfo',()=>{
+outputCase('snapshot and EOF never expose an incomplete secret, PEM header, body, Basic value or URL userinfo',()=>{
  const known='registered-private-value-ends-here';
  const encrypted = generateKeyPairSync('ed25519').privateKey.export({ type: 'pkcs8', format: 'pem', cipher: 'aes-256-cbc', passphrase: known }).split('\n');
  for(const [partial,privatePart] of [
@@ -73,7 +76,7 @@ test('snapshot and EOF never expose an incomplete secret, PEM header, body, Basi
  }
 });
 
-test('oversized PEM bodies stay bounded and private through a split end marker',()=>{
+outputCase('oversized PEM bodies stay bounded and private through a split end marker',()=>{
  const pem='-----BEGIN OPENSSH PRIVATE KEY-----\nTEST_PRIVATE_BODY_FRAGMENT\n-----END OPENSSH PRIVATE KEY-----';
  const [header,fragment,footer]=pem.split('\n');
  const redaction=createRedaction();let output='';const stream=redaction.stream(text=>{output+=text;});
@@ -86,7 +89,7 @@ test('oversized PEM bodies stay bounded and private through a split end marker',
  stream.end();absent(output,[fragment]);assert.match(output,/BEFORE_MARKER/);assert.match(output,/AFTER_MARKER/);assert.ok(output.length<200);
 });
 
-test('C1, DEL, bidi and control-string payloads are removed across UTF-8 byte boundaries',()=>{
+outputCase('C1, DEL, bidi and control-string payloads are removed across UTF-8 byte boundaries',()=>{
  const input='BEFORE_MARKER\n'+
   '\x9d52;c;PRIVATE_OSC_PAYLOAD\x9c'+
   '\x90PRIVATE_DCS_PAYLOAD\x9c'+
@@ -101,7 +104,7 @@ test('C1, DEL, bidi and control-string payloads are removed across UTF-8 byte bo
  assert.equal(createRedaction().redact(input),output);
 });
 
-test('unterminated OSC and DCS recover on newline, at 4 KiB, and after end resets state',()=>{
+outputCase('unterminated OSC and DCS recover on newline, at 4 KiB, and after end resets state',()=>{
  for(const start of ['\x1b]','\x1bP','\x9d','\x90']) {
   const output=captured('BEFORE_MARKER\n'+start+'PRIVATE_SEQUENCE\nAFTER_MARKER\n');
   absent(output,['PRIVATE_SEQUENCE']);assert.match(output,/AFTER_MARKER/);
@@ -113,7 +116,7 @@ test('unterminated OSC and DCS recover on newline, at 4 KiB, and after end reset
 });
 
 
-test('deploy secret binding recovery commands remain usable while values remain private', () => {
+outputCase('deploy secret binding recovery commands remain usable while values remain private', () => {
  const input = 'rer deploy --unset-secret SETUP_TOKEN; rer deploy --set-secret SESSION_SECRET; --api-key synthetic-private-value';
  for (const unit of [1, 7, 4096]) {
   const result = captured(input, ['synthetic-private-value'], unit);
@@ -122,3 +125,5 @@ test('deploy secret binding recovery commands remain usable while values remain 
   absent(result, ['synthetic-private-value']);
  }
 });
+
+test('redacted output preserves public diagnostics across input shapes and stream boundaries', t => caseRows(t, outputCases));

@@ -19,7 +19,12 @@ function emittedReviewTestNames() {
     '--test', '--test-reporter=tap', reviewTestPath
   ], {cwd: baseDirectory, encoding: 'utf8', env});
   assert.equal(run.status, 0, run.stderr || run.stdout);
-  return new Set([...`${run.stdout}\n${run.stderr}`.matchAll(/^ok \d+ - (.*)$/gm)].map(match => match[1]));
+  const output = `${run.stdout}\n${run.stderr}`;
+  const tests = [...output.matchAll(/^ok \d+ - (.*)$/gm)].map(match => match[1]);
+  // Table rows are not registrations. Their labels are emitted only after the
+  // row's assertions finish, so a source label alone cannot establish coverage.
+  const cases = [...output.matchAll(/^# SETUP_REVIEW_CASE (".*")$/gm)].map(match => JSON.parse(match[1]));
+  return new Set([...tests, ...cases]);
 }
 
 function reviewRejectionNames(testNames) {
@@ -28,9 +33,9 @@ function reviewRejectionNames(testNames) {
   for (let index = 0; index < lines.length; index += 1) {
     if (!/\binvalid\(data\)|validateSetupManifest\(schema,data\)\.some\(/.test(lines[index])) continue;
     let declaration = index;
-    while (declaration >= 0 && !/\btest\(\s*['"`]/.test(lines[declaration])) declaration -= 1;
+    while (declaration >= 0 && !/\b(?:test|manifestCase)\(\s*['"`]/.test(lines[declaration])) declaration -= 1;
     assert(declaration >= 0, `rejection assertion on line ${index + 1} must be inside a named test`);
-    const titleMatch = lines[declaration].match(/\btest\(\s*(['"`])((?:\\.|(?!\1).)*)\1/);
+    const titleMatch = lines[declaration].match(/\b(?:test|manifestCase)\(\s*(['"`])((?:\\.|(?!\1).)*)\1/);
     assert(titleMatch, `could not read review test title on line ${declaration + 1}`);
     const titleExpression = titleMatch[2];
     const fragments = titleExpression.split(/\$\{[^}]*\}/);
