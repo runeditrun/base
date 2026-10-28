@@ -1,3 +1,4 @@
+import { runCase } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare } from '../provider.mjs';
@@ -7,6 +8,16 @@ import { hash } from '../validation.mjs';
 import { providerFixture } from './provider-fixture.mjs';
 import { migrate } from '../migrations.mjs';
 import { defaultStagePlan } from '../default-stage.mjs';
+
+const secretCaseRows = [];
+const secretCase = (name, run) => secretCaseRows.push({name,run});
+const sqlCaseRows = [];
+const sqlCase = (name, run) => sqlCaseRows.push({name,run});
+const repeatCaseRows = [];
+const repeatCase = (name, run) => repeatCaseRows.push({name,run});
+const ledgerCaseRows = [];
+const ledgerCase = (name, run) => ledgerCaseRows.push({name,run});
+
 function setup(t) {
   const fixture=providerFixture();t.after(()=>fixture.close());
   const api=cloudflare(fixture);const sql='CREATE TABLE notes(id INTEGER PRIMARY KEY, body TEXT NOT NULL);';
@@ -24,17 +35,17 @@ test('real SQLite data and prior migration remain; second deployment has zero mu
   assert.equal(state.databases[0].db.prepare('SELECT body FROM notes').get().body,'retained owner data');assert.equal(state.objects.get('owner.txt').toString(),'retained object');
   assert.deepEqual(second.migrations[0].applied,[]);assert(!JSON.stringify(second).includes(secret));
 });
-test('missing required secret fails before any resource mutation',async t=>{const {args,plan,state}=setup(t);plan.secrets=[{binding:'MAIL',environment:'RESEND_API_KEY'}];await assert.rejects(deploy(args),/missing-secret/);assert.equal(state.writes.length,0);});
-test('secret reuse does not need secret values',async t=>{const {args,plan,state}=setup(t);plan.secrets=[{binding:'MAIL',environment:'RESEND_API_KEY'}];const first=await deploy({...args,env:{RESEND_API_KEY:'test-only'}});const n=state.writes.length;await deploy({...args,previousReceipt:first});assert.equal(state.writes.length,n);});
-test('changed migration bytes and missing historical migration fail before upload',async t=>{const {args,plan,state}=setup(t);const first=await deploy(args);const n=state.writes.length;plan.d1[0].migrations[0].sql+='\nSELECT 1;';plan.d1[0].migrations[0].sha256=hash(plan.d1[0].migrations[0].sql);await assert.rejects(deploy({...args,previousReceipt:first}),/migration-history/);assert.equal(state.writes.length,n);});
-test('failed SQL retains prior data and uncertain claim blocks subsequent replay',async t=>{const {args,plan,state,api}=setup(t);await deploy(args);state.databases[0].db.exec("INSERT INTO notes(body) VALUES ('retained')");const sql="INSERT INTO notes(body) VALUES ('new'); INSERT INTO missing VALUES (1);";const migrations=[...plan.d1[0].migrations,{name:'0002_broken.sql',sql,sha256:hash(sql)}];await assert.rejects(migrate(api,state.databases[0].uuid,migrations));assert.equal(state.databases[0].db.prepare('SELECT count(*) n FROM notes').get().n,1);const n=state.writes.length;await assert.rejects(migrate(api,state.databases[0].uuid,migrations),/uncertain/);assert.equal(state.writes.length,n);});
-test('new pending migration applies once on changed artifact and keeps prior rows',async t=>{const {args,plan,state}=setup(t);const first=await deploy(args);state.databases[0].db.exec("INSERT INTO notes(body) VALUES ('retained')");const sql='ALTER TABLE notes ADD COLUMN tag TEXT;';plan.d1[0].migrations.push({name:'0002_tag.sql',sql,sha256:hash(sql)});const second=await deploy({...args,previousReceipt:first});assert.equal(second.changed,true);assert.deepEqual(second.migrations[0].applied,['0002_tag.sql']);assert.equal(state.databases[0].db.prepare('SELECT body FROM notes').get().body,'retained');});
+secretCase('missing required secret fails before any resource mutation',async t=>{const {args,plan,state}=setup(t);plan.secrets=[{binding:'MAIL',environment:'RESEND_API_KEY'}];await assert.rejects(deploy(args),/missing-secret/);assert.equal(state.writes.length,0);});
+secretCase('secret reuse does not need secret values',async t=>{const {args,plan,state}=setup(t);plan.secrets=[{binding:'MAIL',environment:'RESEND_API_KEY'}];const first=await deploy({...args,env:{RESEND_API_KEY:'test-only'}});const n=state.writes.length;await deploy({...args,previousReceipt:first});assert.equal(state.writes.length,n);});
+sqlCase('changed migration bytes and missing historical migration fail before upload',async t=>{const {args,plan,state}=setup(t);const first=await deploy(args);const n=state.writes.length;plan.d1[0].migrations[0].sql+='\nSELECT 1;';plan.d1[0].migrations[0].sha256=hash(plan.d1[0].migrations[0].sql);await assert.rejects(deploy({...args,previousReceipt:first}),/migration-history/);assert.equal(state.writes.length,n);});
+sqlCase('failed SQL retains prior data and uncertain claim blocks subsequent replay',async t=>{const {args,plan,state,api}=setup(t);await deploy(args);state.databases[0].db.exec("INSERT INTO notes(body) VALUES ('retained')");const sql="INSERT INTO notes(body) VALUES ('new'); INSERT INTO missing VALUES (1);";const migrations=[...plan.d1[0].migrations,{name:'0002_broken.sql',sql,sha256:hash(sql)}];await assert.rejects(migrate(api,state.databases[0].uuid,migrations));assert.equal(state.databases[0].db.prepare('SELECT count(*) n FROM notes').get().n,1);const n=state.writes.length;await assert.rejects(migrate(api,state.databases[0].uuid,migrations),/uncertain/);assert.equal(state.writes.length,n);});
+sqlCase('new pending migration applies once on changed artifact and keeps prior rows',async t=>{const {args,plan,state}=setup(t);const first=await deploy(args);state.databases[0].db.exec("INSERT INTO notes(body) VALUES ('retained')");const sql='ALTER TABLE notes ADD COLUMN tag TEXT;';plan.d1[0].migrations.push({name:'0002_tag.sql',sql,sha256:hash(sql)});const second=await deploy({...args,previousReceipt:first});assert.equal(second.changed,true);assert.deepEqual(second.migrations[0].applied,['0002_tag.sql']);assert.equal(state.databases[0].db.prepare('SELECT body FROM notes').get().body,'retained');});
 test('stale healthy version, mixed traffic, redirects and malformed health cannot pass',async t=>{const {args,state,api,plan}=setup(t);const receipt=await deploy(args);state.version.id='12345678-1234-1234-1234-123456789abc';await assert.rejects(verifyHealth({api,plan,receipt,fetch:args.fetch}));state.version.id=receipt.provider.versionId;state.healthOverride=()=>Response.json({ok:true,deployment:{sourceSha:'old'}});await assert.rejects(verifyHealth({api,plan,receipt,fetch:args.fetch}),/identity/);state.healthOverride=()=>new Response('',{status:302,headers:{location:'https://evil.example'}});await assert.rejects(verifyHealth({api,plan,receipt,fetch:args.fetch}),/http/);state.healthOverride=()=>new Response('bad json');await assert.rejects(verifyHealth({api,plan,receipt,fetch:args.fetch}),/malformed/);});
-test('no-op refuses code drift even when copied fingerprint still looks healthy',async t=>{const {args,state}=setup(t);const receipt=await deploy(args);state.version.resources.script.etag='changed';const n=state.writes.length;await assert.rejects(deploy({...args,previousReceipt:receipt}),/authenticated-prior/);assert.equal(state.writes.length,n);});
-test('no-op does not silently repair cron drift',async t=>{const {args,state}=setup(t);const receipt=await deploy(args);state.schedules=[];const n=state.writes.length;await assert.rejects(deploy({...args,previousReceipt:receipt}),/cron-drift/);assert.equal(state.writes.length,n);});
-test('queue consumer belonging to a different Worker blocks',async t=>{const {args,state}=setup(t);const receipt=await deploy(args);state.queues[0].consumers[0].script_name='someone-else';const n=state.writes.length;await assert.rejects(deploy({...args,previousReceipt:receipt}),/consumer-conflict/);assert.equal(state.writes.length,n);});
-test('mixed active traffic is refused before reconciliation',async t=>{const {args,state}=setup(t);const receipt=await deploy(args);state.deployments[0].versions[0].percentage=50;const n=state.writes.length;await assert.rejects(deploy({...args,previousReceipt:receipt}),/mixed/);assert.equal(state.writes.length,n);});
-test('repeat-only refuses changed fingerprint without repair writes',async t=>{const {args,state}=setup(t);const receipt=await deploy(args);state.settings.bindings.find(x=>x.name==='RER_DEPLOY_FINGERPRINT').text='drift';const n=state.writes.length;await assert.rejects(deploy({...args,previousReceipt:receipt,repeatOnly:true}),/repeat-deployment-drift/);assert.equal(state.writes.length,n);});
+repeatCase('no-op refuses code drift even when copied fingerprint still looks healthy',async t=>{const {args,state}=setup(t);const receipt=await deploy(args);state.version.resources.script.etag='changed';const n=state.writes.length;await assert.rejects(deploy({...args,previousReceipt:receipt}),/authenticated-prior/);assert.equal(state.writes.length,n);});
+repeatCase('no-op does not silently repair cron drift',async t=>{const {args,state}=setup(t);const receipt=await deploy(args);state.schedules=[];const n=state.writes.length;await assert.rejects(deploy({...args,previousReceipt:receipt}),/cron-drift/);assert.equal(state.writes.length,n);});
+repeatCase('queue consumer belonging to a different Worker blocks',async t=>{const {args,state}=setup(t);const receipt=await deploy(args);state.queues[0].consumers[0].script_name='someone-else';const n=state.writes.length;await assert.rejects(deploy({...args,previousReceipt:receipt}),/consumer-conflict/);assert.equal(state.writes.length,n);});
+repeatCase('mixed active traffic is refused before reconciliation',async t=>{const {args,state}=setup(t);const receipt=await deploy(args);state.deployments[0].versions[0].percentage=50;const n=state.writes.length;await assert.rejects(deploy({...args,previousReceipt:receipt}),/mixed/);assert.equal(state.writes.length,n);});
+repeatCase('repeat-only refuses changed fingerprint without repair writes',async t=>{const {args,state}=setup(t);const receipt=await deploy(args);state.settings.bindings.find(x=>x.name==='RER_DEPLOY_FINGERPRINT').text='drift';const n=state.writes.length;await assert.rejects(deploy({...args,previousReceipt:receipt,repeatOnly:true}),/repeat-deployment-drift/);assert.equal(state.writes.length,n);});
 test('a failed initial health retains identity receipt so next explicit invocation can authenticate without uploading',async t=>{const {args,state}=setup(t);state.healthOverride=()=>Response.json({ok:false});let receipt;await assert.rejects(deploy({...args,onReceipt:async value=>{receipt=value;}}),/health-identity/);assert(receipt);const n=state.writes.length;state.healthOverride=null;await deploy({...args,previousReceipt:receipt,repeatOnly:true});assert.equal(state.writes.length,n);});
 
 function legacyLedger(db) {
@@ -42,7 +53,7 @@ function legacyLedger(db) {
     INSERT INTO _rer_deploy_migrations SELECT name,sha256,state FROM d1_migrations;
     DROP TABLE d1_migrations;`);
 }
-test('unchanged deployment upgrades verified old kit history once, retaining data and provider identity', async t => {
+ledgerCase('unchanged deployment upgrades verified old kit history once, retaining data and provider identity', async t => {
   const {args,state,api,plan}=setup(t);const first=await deploy(args);const db=state.databases[0].db;
   db.exec("INSERT INTO notes(body) VALUES ('owner data')");legacyLedger(db);
   const writes=state.writes.length;
@@ -63,7 +74,7 @@ test('unchanged deployment upgrades verified old kit history once, retaining dat
   const after=state.writes.length;await deploy({...args,previousReceipt:next});assert.equal(state.writes.length,after);
 });
 
-test('ledger transition requires exact hashes, completed states and ordered Wrangler prefix before any mutation', async t => {
+ledgerCase('ledger transition requires exact hashes, completed states and ordered Wrangler prefix before any mutation', async t => {
   const {args,state,api,plan}=setup(t);await deploy(args);const db=state.databases[0].db;legacyLedger(db);
   const migration=plan.d1[0].migrations[0], id=state.databases[0].uuid;
   db.exec('CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,applied_at TEXT)');
@@ -84,7 +95,7 @@ test('ledger transition requires exact hashes, completed states and ordered Wran
   const before=state.writes.length;await assert.rejects(migrate(api,id,[migration]),/reviewed-hash-adoption/);assert.equal(state.writes.length,before);
 });
 
-test('failed ledger transition rolls back metadata without replaying product SQL or losing prior rows', async t => {
+ledgerCase('failed ledger transition rolls back metadata without replaying product SQL or losing prior rows', async t => {
   const {args,state,api,plan}=setup(t);await deploy(args);const db=state.databases[0].db;legacyLedger(db);
   db.exec("INSERT INTO notes(body) VALUES ('retained')");state.failSql='DROP TABLE _rer_deploy_migrations';
   await assert.rejects(migrate(api,state.databases[0].uuid,plan.d1[0].migrations),/d1-import-failed/);
@@ -93,8 +104,7 @@ test('failed ledger transition rolls back metadata without replaying product SQL
   assert.equal(db.prepare("SELECT count(*) n FROM sqlite_master WHERE name='d1_migrations'").get().n,0);
 });
 
-
-test('standard Wrangler name-only inserts remain possible but never become attested Base history', async t => {
+ledgerCase('standard Wrangler name-only inserts remain possible but never become attested Base history', async t => {
   const {args,state,api,plan}=setup(t);await deploy(args);const db=state.databases[0].db;
   db.prepare('INSERT INTO d1_migrations(name) VALUES (?)').run('0002_wrangler.sql');
   const sql='CREATE TABLE from_wrangler(value TEXT);';
@@ -103,4 +113,20 @@ test('standard Wrangler name-only inserts remain possible but never become attes
   await assert.rejects(migrate(api,state.databases[0].uuid,desired),/uncertain-migration-history/);
   assert.equal(state.writes.length,before);
   assert.equal(db.prepare("SELECT count(*) n FROM sqlite_master WHERE name='from_wrangler'").get().n,0);
+});
+
+test('deployment requires new secrets and preserves already deployed secret values', async () => {
+  for (const {name,run} of secretCaseRows) await runCase(name,run);
+});
+
+test('deployment applies only missing migration bytes and preserves prior data on refusal', async () => {
+  for (const {name,run} of sqlCaseRows) await runCase(name,run);
+});
+
+test('retained deployment refuses provider drift without repair writes', async () => {
+  for (const {name,run} of repeatCaseRows) await runCase(name,run);
+});
+
+test('deployment adopts only attested compatible migration ledgers without replaying product SQL', async () => {
+  for (const {name,run} of ledgerCaseRows) await runCase(name,run);
 });

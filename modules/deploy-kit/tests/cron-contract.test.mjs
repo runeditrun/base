@@ -1,3 +1,4 @@
+import { runCase } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare } from '../provider.mjs';
@@ -7,6 +8,9 @@ import { checkCronOwnership, reconcileTriggers } from '../resources.mjs';
 import { hash } from '../validation.mjs';
 import { defaultStagePlan } from '../default-stage.mjs';
 import { documentedProvider } from './documented-provider.mjs';
+
+const cronCaseRows = [];
+const cronCase = (name, run) => cronCaseRows.push({name,run});
 
 function setup(t) {
   const fixture = documentedProvider(); t.after(() => fixture.close());
@@ -20,7 +24,7 @@ function setup(t) {
   return {...fixture,api,plan,artifact,args:{api,plan,artifact,artifactSha256:hash(artifact),fetch:fixture.fetch}};
 }
 
-test('Cron deployment reapplies changed releases, checks capability and schedule readback, and retains no-write repeats', async t => {
+cronCase('Cron deployment reapplies changed releases, checks capability and schedule readback, and retains no-write repeats', async t => {
   const {state,args,api,plan} = setup(t);
   plan.crons = ['* * * * *'];
   plan.r2 = [{binding:'FILES',name:'cron-proof-files'}];
@@ -108,7 +112,7 @@ test('schedule timestamps and ordering do not cause redundant PUTs', async () =>
   assert.equal(calls[0].options,undefined);
 });
 
-test('unmanaged Cron on ordinary changed-source upgrade fails before upload, migrations or any other mutation', async t => {
+cronCase('unmanaged Cron on ordinary changed-source upgrade fails before upload, migrations or any other mutation', async t => {
   const {state,args,plan,artifact} = setup(t);
   const first = await deploy(args);
   state.databases[0].db.exec("INSERT INTO notes(body) VALUES ('keep')");
@@ -126,7 +130,7 @@ test('unmanaged Cron on ordinary changed-source upgrade fails before upload, mig
   assert.equal(state.databases[0].db.prepare('PRAGMA table_info(notes)').all().length,2);
 });
 
-test('existing Worker without a prior receipt also rejects unmanaged Cron before writes', async t => {
+cronCase('existing Worker without a prior receipt also rejects unmanaged Cron before writes', async t => {
   const {state,args,artifact} = setup(t);
   await deploy(args);
   state.schedules.push({cron:'0 12 * * *'});
@@ -135,7 +139,7 @@ test('existing Worker without a prior receipt also rejects unmanaged Cron before
   assert.equal(state.writes.length,writes);
 });
 
-test('intentional Cron removal is refused instead of deleting an existing schedule', async t => {
+cronCase('intentional Cron removal is refused instead of deleting an existing schedule', async t => {
   const {state,args,plan} = setup(t);
   const first = await deploy(args);
   plan.crons = [];
@@ -145,7 +149,7 @@ test('intentional Cron removal is refused instead of deleting an existing schedu
   assert.equal(state.schedules.length,1);
 });
 
-test('ordinary upgrade may add a requested Cron while retaining old schedules and prior migrations', async t => {
+cronCase('ordinary upgrade may add a requested Cron while retaining old schedules and prior migrations', async t => {
   const {state,args,plan} = setup(t);
   const first = await deploy(args);
   plan.crons.push('0 12 * * *');
@@ -157,7 +161,7 @@ test('ordinary upgrade may add a requested Cron while retaining old schedules an
   assert.equal(state.writes.length,writes);
 });
 
-test('Cron drift introduced after upload is detected before trigger writes and retained', async t => {
+cronCase('Cron drift introduced after upload is detected before trigger writes and retained', async t => {
   const {state,args,api} = setup(t);
   const first = await deploy(args);
   args.plan.vars = {RELEASE:'changed'};
@@ -173,7 +177,7 @@ test('Cron drift introduced after upload is detected before trigger writes and r
   assert(state.schedules.some(x => x.cron === '0 12 * * *'));
 });
 
-test('same-source missing Cron, extra Cron and stale health still fail without repair', async t => {
+cronCase('same-source missing Cron, extra Cron and stale health still fail without repair', async t => {
   const {state,args,plan,api} = setup(t);
   const first = await deploy(args);
   const schedules = structuredClone(state.schedules);
@@ -212,7 +216,7 @@ test('valid upgrade extends Durable Object and D1 migration history once and ret
   assert.equal(state.writes.length,writes);
 });
 
-test('malformed schedule read on an existing Worker stops an upgrade before writes', async t => {
+cronCase('malformed schedule read on an existing Worker stops an upgrade before writes', async t => {
   const {state,args,api} = setup(t);
   const first = await deploy(args);
   args.plan.vars = {RELEASE:'next'};
@@ -223,11 +227,15 @@ test('malformed schedule read on an existing Worker stops an upgrade before writ
   assert.equal(state.writes.length,writes);
 });
 
-test('no-op still requires the recorded active version and etag with correct Cron responses', async t => {
+cronCase('no-op still requires the recorded active version and etag with correct Cron responses', async t => {
   const {state,args} = setup(t);
   const first = await deploy(args);
   const writes = state.writes.length;
   state.version.resources.script.etag = 'changed-by-another-writer';
   await assert.rejects(deploy({...args,previousReceipt:first}),/no-op-requires-authenticated-prior-receipt/);
   assert.equal(state.writes.length,writes);
+});
+
+test('deployment reconciles declared Cron schedules while refusing removal, drift and stale identities', async () => {
+  for (const {name,run} of cronCaseRows) await runCase(name,run);
 });

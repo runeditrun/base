@@ -1,7 +1,11 @@
+import { runCase } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { workerConsumerScript } from '../index.mjs';
 import { reconcileTriggers } from '../resources.mjs';
+
+const identityCaseRows = [];
+const identityCase = (name, run) => identityCaseRows.push({name,run});
 
 const worker = 'identity-proof-worker';
 const valid = {type:'worker',script:worker,consumer_id:'a'.repeat(32),settings:{batch_size:10,max_retries:3,max_wait_time_ms:1000,retry_delay:0},dead_letter_queue:'identity-proof-dead'};
@@ -14,7 +18,7 @@ const invalid = [
   ['bad observed alias',{...valid,script_name:worker,script:{name:worker}}],
 ];
 
-test('consumer identity accepts explicit string variants and agreeing aliases without changing the row', () => {
+identityCase('consumer identity accepts explicit string variants and agreeing aliases without changing the row', () => {
   for (const row of [valid,{...valid,script_name:worker,script:undefined},{...valid,script_name:worker}]) {
     if (row.script === undefined) delete row.script;
     const before = structuredClone(row);
@@ -35,7 +39,7 @@ function transport(consumers) {
   return {api,plan,resources,calls};
 }
 
-for (const [label,row] of invalid) test(`malformed consumer ${label} fails closed without writes`,async () => {
+for (const [label,row] of invalid) identityCase(`malformed consumer ${label} fails closed without writes`,async () => {
   assert.equal(workerConsumerScript(row),null);
   for (const mutate of [false,true]) {
     const {api,plan,resources,calls} = transport([row]);
@@ -48,7 +52,7 @@ for (const [label,consumers] of [
   ['foreign',[{...valid,script:'foreign-worker'}]],
   ['duplicate observed',[valid,valid]],
   ['duplicate mixed',[valid,{...valid,script_name:worker}]],
-]) test(`${label} consumers fail closed without writes`,async () => {
+]) identityCase(`${label} consumers fail closed without writes`,async () => {
   for (const mutate of [false,true]) {
     const {api,plan,resources,calls} = transport(consumers);
     await assert.rejects(reconcileTriggers(api,plan,resources,{mutate}),/queue-consumer-conflict/);
@@ -77,4 +81,8 @@ test('observed response settings and DLQ remain strict; repair uses documented r
     assert.equal(writes[0].path,`/queues/${resources.queues[0].id}/consumers/${valid.consumer_id}`);
     assert.deepEqual(writes[0].options,{method:'PUT',body:{type:'worker',script_name:worker,settings:valid.settings,dead_letter_queue:valid.dead_letter_queue}});
   }
+});
+
+test('consumer identity admission accepts agreeing Worker aliases and refuses malformed or foreign owners', async () => {
+  for (const {name,run} of identityCaseRows) await runCase(name,run);
 });
