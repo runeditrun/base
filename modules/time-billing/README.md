@@ -144,7 +144,7 @@ byte length and `custody: 'd1'`. Bytes, claims, module state and SQL returned by
 only a module commitment; it does not create or issue a native invoice.
 No provider I/O belongs in that transaction.
 
-`Archive` format `time-billing/1` retains entries, immutable revisions,
+`Archive` uses `{"format":"time-billing/1"}` and retains entries, immutable revisions,
 ratings, reviews, timers, packets/claims/artifact bytes and event bodies.
 `verifyArchive` checks the content digest, packet fingerprints and artifact
 digest/length before custody transfer. Retain the returned archive bytes through
