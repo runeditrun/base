@@ -1,3 +1,4 @@
+import { setupCommand } from './setup-command.mjs';
 import { scanCommand } from './scan-command.mjs';
 import { connect } from './connect.mjs';
 import { vendorKey, disconnect, status } from './local-commands.mjs';
@@ -10,6 +11,9 @@ Business keeps your business name, logo and brand colour together for the apps
 that support shared Business settings. Choose what to share in your browser.
 
 Advanced commands (Usage: rer business VERB)
+  setup --origin URL --session-file PATH --hosting self_host|managed|assisted
+        --confirm-demo-policy [--json]
+                                 Provision the synthetic demo through the owner's session
   scan [DIR...] [--json]          Names-only local discovery
   connect [--code CODE] [--origin URL]
                                  Pair this computer, waiting until the owner approves in the browser
@@ -29,6 +33,7 @@ In an agent sandbox that writes only inside its working folder, use RER_BUSINESS
 `;
 
 export async function businessCommand(argv) {
+ if (argv[0] === 'setup') return setupCommand(argv.slice(1));
  if (!argv.length || argv[0] !== 'scan' && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(usage); return 0; }
  if (argv[0] === 'scan') return scanCommand(argv);
  try {

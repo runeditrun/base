@@ -1,0 +1,19 @@
+{
+  "schema": "rer-demo-company/1",
+  "synthetic": true,
+  "name": "Juniper Demo Software (synthetic)",
+  "profile": {
+    "display_name": "Juniper Demo Software (synthetic)",
+    "legal_name": "Juniper Demo Software LLC (synthetic)",
+    "owner_name": "Demo Owner",
+    "timezone": "America/New_York",
+    "currency": "USD",
+    "jurisdiction": "US-DE",
+    "entity_type": "LLC",
+    "state_of_organization": "Delaware",
+    "country": "US",
+    "state": "Delaware",
+    "tax_method": "accrual",
+    "fiscal_year_start": "01-01"
+  }
+}
