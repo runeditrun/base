@@ -310,6 +310,55 @@ test('refresh-base checks read-only destinations before updating any copy and pe
   }
 });
 
+test('refresh-base completes required dependencies of a sparse historical module copy', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-sparse-'));
+  try {
+    const base = path.join(temp, 'base'), seed = path.join(temp, 'seed');
+    const module = 'modules/operator-auth';
+    const sparse = {
+      'index.mjs': 'export const auth = true;\n',
+      'accounts/display-name.mjs': "export {admin} from './admin.mjs';\n",
+      'accounts/one-click.mjs': "import './store.mjs';\nimport './roles.mjs';\nimport '../policy.mjs';\n",
+      'scheduled/index.mjs': "import '../accounts/roles.mjs';\nimport './no-source.mjs';\n",
+      'signin/one-click.mjs': "export {page} from '../page.mjs';\n",
+    };
+    const missing = {
+      'accounts/admin.mjs': "import './store.mjs';\nexport const admin = true;\n",
+      'accounts/store.mjs': "import './roles.mjs';\nimport '../policy.mjs';\n",
+      'accounts/roles.mjs': 'export const roles = true;\n',
+      'policy.mjs': 'export const policy = true;\n',
+      'page.mjs': 'export const page = true;\n',
+    };
+    init(base); init(seed);
+    for (const [name, bytes] of Object.entries({...sparse, ...missing})) write(base, `${module}/${name}`, bytes);
+    const pin = commit(base);
+    for (const [name, bytes] of Object.entries(sparse)) write(seed, `${module}/${name}`, bytes);
+    ok(seed, 'record-base', module, module, pin, '--base', base);
+    commit(seed);
+    // A refreshed entry point now needs the omitted historical files too.
+    write(base, `${module}/index.mjs`, "export * from './accounts/admin.mjs';\nexport * from './page.mjs';\n");
+    const next = commit(base);
+    const report = ok(seed, 'refresh-base', next, '--base', base);
+    const copy = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json'))).copies.find(copy => copy.path === module);
+    const changes = report.copies.find(copy => copy.path === module);
+    for (const [name, bytes] of Object.entries(missing)) {
+      const target = `${module}/${name}`;
+      assert.equal(fs.readFileSync(path.join(seed, target), 'utf8'), bytes);
+      assert.equal(copy.files[target], sha(bytes));
+      assert.ok(changes.added.includes(target));
+    }
+    // A genuinely absent source stays unresolved, without blocking completion.
+    assert.equal(fs.existsSync(path.join(base, `${module}/scheduled/no-source.mjs`)), false);
+    assert.equal(fs.existsSync(path.join(seed, `${module}/scheduled/no-source.mjs`)), false);
+    assert.equal(fs.readFileSync(path.join(seed, `${module}/scheduled/index.mjs`), 'utf8'), sparse['scheduled/index.mjs']);
+    ok(seed, 'verify-base', '--base', base);
+    const before = snapshotTree(seed);
+    const repeated = ok(seed, 'refresh-base', next, '--base', base);
+    assert.deepEqual(snapshotTree(seed), before);
+    assert.deepEqual(repeated.copies.flatMap(copy => copy.added), []);
+  } finally { fs.rmSync(temp, {recursive: true, force: true}); }
+});
+
 test('refresh-base closes authoring sibling imports while preserving edition-owned helpers', () => {
   closureClasses({init, write, commit, git, run, ok, snapshotTree});
   const mirror = 'export/scripts/base-cli/edition-authoring';

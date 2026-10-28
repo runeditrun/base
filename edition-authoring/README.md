@@ -272,7 +272,9 @@ conditions; `types` is enabled only for erased edges. Export targets are exact
 files for both loaders. Unknown external packages remain package-manager inputs.
 Imports already unresolved in that same file before refresh remain untouched,
 except for missing authoring-toolkit bootstrap siblings and recorded removals.
-Refresh compares the retained ordinary unresolved set before writing.
+Files required elsewhere in the refresh plan may also satisfy these imports,
+completing a sparse historical copy; they are delivered and recorded normally.
+Unresolved imports without a planned dependency remain unresolved.
 When a preserved tracked sibling becomes equal to incoming Base bytes, refresh
 adds its path to `ignore` as a discovery exception; it stays unrecorded and keeps
 its bytes and mode. Recorded files continue to receive their incoming Base mode.
