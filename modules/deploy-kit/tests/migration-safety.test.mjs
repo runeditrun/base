@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { caseRow, caseRows } from './fold-case.mjs';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { validateMigrations, migrate } from '../migrations.mjs';
@@ -6,6 +7,9 @@ import { ledgerShapeQuery, migrationLedgerShape } from '../migration-ledger.mjs'
 import { hash } from '../validation.mjs';
 import { cloudflare } from '../provider.mjs';
 import { providerFixture } from './provider-fixture.mjs';
+
+const admissionRows = [];
+const admission = (name, run) => admissionRows.push({name,run});
 
 const migration = (sql, name = '0001_schema.sql') => ({ name, sql, sha256: hash(sql) });
 const validate = sql => validateMigrations([migration(sql)]);
@@ -25,7 +29,7 @@ function database(t) {
   return db;
 }
 
-test('SQLite executes nested CASE triggers, multiple body statements and SQL after the trigger', t => {
+admission('SQLite executes nested CASE triggers, multiple body statements and SQL after the trigger', t => {
   const db = database(t);
   const sql = `${schema}\n${trigger}\nINSERT INTO source VALUES (1);`;
   validate(sql);
@@ -35,7 +39,7 @@ test('SQLite executes nested CASE triggers, multiple body statements and SQL aft
   });
 });
 
-test('temporary and quoted trigger names, comments and unterminated-final-semicolon syntax execute', t => {
+admission('temporary and quoted trigger names, comments and unterminated-final-semicolon syntax execute', t => {
   const db = database(t);
   const sql = `${schema}
     -- BEGIN; COMMIT; ROLLBACK; _rer_deploy_migrations
@@ -50,7 +54,7 @@ test('temporary and quoted trigger names, comments and unterminated-final-semico
   assert.equal(db.prepare('SELECT value FROM audit').get().value, 9);
 });
 
-test('control words inside quoted identifiers and strings remain ordinary application data', t => {
+admission('control words inside quoted identifiers and strings remain ordinary application data', t => {
   const db = database(t);
   const sql = `CREATE TABLE "BEGIN" ([COMMIT] TEXT, \`ROLLBACK\` TEXT, "quote"";END" TEXT);
     INSERT INTO "BEGIN" VALUES ('ATTACH; VACUUM; SAVEPOINT; DETACH', 'END; RELEASE', 'it''s -- a /* literal */');`;
@@ -65,14 +69,14 @@ const controls = [
   "ATTACH DATABASE ':memory:' AS other", 'DETACH DATABASE other', 'VACUUM', "VACUUM INTO 'copy.db'",
 ];
 for (const control of controls) {
-  test(`refuses executable ${control} before and after CASE triggers`, () => {
+  admission(`refuses executable ${control} before and after CASE triggers`, () => {
     for (const prefix of ['', `${schema}\n`, `${schema}\n${trigger}\n`, `${schema}\n${trigger}\n${trigger.replace('record_change', 'another_change')}\n`]) {
       assert.throws(() => validate(`${prefix}; /* boundary */ ${control.toLowerCase()};`), /unsafe-migration-control/);
     }
   });
 }
 
-test('a real COMMIT after a trigger would escape a SQLite transaction, and validation prevents it', t => {
+admission('a real COMMIT after a trigger would escape a SQLite transaction, and validation prevents it', t => {
   const db = database(t);
   db.exec('BEGIN;');
   assert.equal(db.isTransaction, true);
@@ -83,11 +87,18 @@ test('a real COMMIT after a trigger would escape a SQLite transaction, and valid
 });
 
 for (const name of ['_rer_deploy_migrations', 'd1_migrations']) {
-  test(`reserves ${name} across SQLite name quoting and schema qualification`, t => {
+  admission(`reserves ${name} across SQLite name quoting and schema qualification`, async t => {
+  await caseRows(t, [['independent checks', async t => {
     const db = database(t);
     db.exec(`CREATE TABLE ${name}(value INTEGER); INSERT INTO ${name} VALUES (7);`);
-    for (const quoted of [name, name.toUpperCase(), `"${name}"`, `[${name}]`, `\`${name}\``, `'${name}'`]) {
-      for (const reference of [quoted, `main.${quoted}`, `"main"./* schema boundary */${quoted}`]) {
+    let rowAt93 = 0;
+  for (const quoted of [name, name.toUpperCase(), `"${name}"`, `[${name}]`, `\`${name}\``, `'${name}'`]) {
+    await caseRow(t, 'table at line 93 row ' + rowAt93++, async () => {
+
+      let rowAt94 = 0;
+  for (const reference of [quoted, `main.${quoted}`, `"main"./* schema boundary */${quoted}`]) {
+    await caseRow(t, 'table at line 94 row ' + rowAt94++, async () => {
+
         const sql = `SELECT value FROM ${reference};`;
         assert.equal(db.prepare(sql).get().value, 7, reference);
         assert.throws(() => validate(sql), /unsafe-migration-control/, reference);
@@ -95,18 +106,21 @@ for (const name of ['_rer_deploy_migrations', 'd1_migrations']) {
           `UPDATE ${reference} SET value=8;`, `DELETE FROM ${reference};`,
           `DROP TABLE ${reference};`, `ALTER TABLE ${reference} RENAME TO stolen;`,
         ]) assert.throws(() => validate(mutation), /unsafe-migration-control/, mutation);
-      }
-      assert.throws(() => validate(`CREATE TABLE source(value); CREATE TRIGGER attack AFTER INSERT ON source BEGIN DELETE FROM ${quoted}; END;`), /unsafe-migration-control/);
-      assert.throws(() => validate(`ALTER TABLE source RENAME TO ${quoted};`), /unsafe-migration-control/);
-    }
+          });
+  }
+      await caseRow(t, 'following assertion at line 103', async () => { assert.throws(() => validate(`CREATE TABLE source(value); CREATE TRIGGER attack AFTER INSERT ON source BEGIN DELETE FROM ${quoted}; END;`), /unsafe-migration-control/); });
+      await caseRow(t, 'following assertion at line 104', async () => { assert.throws(() => validate(`ALTER TABLE source RENAME TO ${quoted};`), /unsafe-migration-control/); });
+        });
+  }
     // Single quotes can become identifiers in SQLite, so the exact reserved
     // names are conservatively unavailable even as string values.
-    assert.throws(() => validate(`SELECT '${name}';`), /unsafe-migration-control/);
+    await caseRow(t, 'following assertion at line 108', async () => { assert.throws(() => validate(`SELECT '${name}';`), /unsafe-migration-control/); });
     validate(`SELECT 'documentation mentions ${name} here'; -- ${name}\n`);
-  });
+    }]]);
+});
 }
 
-test('incomplete quotes/comments/triggers and NUL cannot swallow controller completion SQL', () => {
+admission('incomplete quotes/comments/triggers and NUL cannot swallow controller completion SQL', () => {
   for (const sql of [
     "SELECT 'open", 'SELECT "open', 'SELECT [open', 'SELECT `open', 'SELECT 1; /* open',
     'SELECT 1;\0COMMIT;', `${schema}CREATE TRIGGER incomplete AFTER INSERT ON source BEGIN SELECT 1;`,
@@ -173,7 +187,7 @@ test('migrationLedgerShape accepts the kit, Wrangler, adopted and 0.2.1 ledgers 
   assert.throws(() => widened.shape(), /invalid-migration-ledger/);
 });
 
-test('conflict and trigger ROLLBACK policies cannot implicitly end the provider transaction', t => {
+admission('conflict and trigger ROLLBACK policies cannot implicitly end the provider transaction', t => {
   const db = database(t);
   db.exec('CREATE TABLE unique_values(value INTEGER UNIQUE); INSERT INTO unique_values VALUES (1); BEGIN;');
   const conflict = 'INSERT OR ROLLBACK INTO unique_values VALUES (1);';
@@ -187,7 +201,7 @@ test('conflict and trigger ROLLBACK policies cannot implicitly end the provider 
   ]) assert.throws(() => validate(sql), /unsafe-migration-control/);
 });
 
-test('exact ledger tokens remain reserved even when SQLite would return them as data', t => {
+admission('exact ledger tokens remain reserved even when SQLite would return them as data', t => {
   const db = database(t);
   for (const query of [
     "SELECT '_rer_deploy_migrations', 'd1_migrations';",
@@ -199,7 +213,7 @@ test('exact ledger tokens remain reserved even when SQLite would return them as 
   }
 });
 
-test('legacy quoted ledger relations cannot hide after FROM commas, joins or nested table groups', t => {
+admission('legacy quoted ledger relations cannot hide after FROM commas, joins or nested table groups', t => {
   const db = database(t);
   db.exec(`${schema} INSERT INTO source VALUES (1);`);
   for (const name of ['_rer_deploy_migrations', 'd1_migrations']) {
@@ -226,12 +240,16 @@ test('legacy quoted ledger relations cannot hide after FROM commas, joins or nes
   }
 });
 
-test('legacy single quotes remain ledger identifiers in writes, DDL and trigger targets', t => {
+admission('legacy single quotes remain ledger identifiers in writes, DDL and trigger targets', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const db = database(t);
   db.exec(schema);
   for (const name of ['_rer_deploy_migrations', 'd1_migrations']) {
     db.exec(`CREATE TABLE ${name}(value);`);
-    for (const reference of [`'${name}'`, `main.'${name}'`, `'main'.'${name}'`]) {
+    let rowAt238 = 0;
+  for (const reference of [`'${name}'`, `main.'${name}'`, `'main'.'${name}'`]) {
+    await caseRow(t, 'table at line 238 row ' + rowAt238++, async () => {
+
       for (const sql of [
         `INSERT INTO ${reference} VALUES (1);`,
         `REPLACE INTO ${reference} VALUES (1);`,
@@ -242,7 +260,8 @@ test('legacy single quotes remain ledger identifiers in writes, DDL and trigger 
         assert.doesNotThrow(() => db.prepare(sql), sql);
         assert.throws(() => validate(sql), /unsafe-migration-control/, sql);
       }
-    }
+        });
+  }
     for (const sql of [
       `CREATE INDEX lookup ON '${name}'(value);`,
       `CREATE TABLE child(value REFERENCES '${name}'(value));`,
@@ -253,9 +272,10 @@ test('legacy single quotes remain ledger identifiers in writes, DDL and trigger 
       `CREATE TRIGGER read_ledger AFTER INSERT ON source BEGIN SELECT * FROM source, main.'${name}'; END;`,
     ]) assert.throws(() => validate(sql), /unsafe-migration-control/, sql);
   }
+  }]]);
 });
 
-test('incomplete or crossing CASE and parenthesis scopes never become a trigger terminator', t => {
+admission('incomplete or crossing CASE and parenthesis scopes never become a trigger terminator', t => {
   const db = database(t);
   db.exec(schema);
   for (const sql of [
@@ -277,8 +297,7 @@ test('incomplete or crossing CASE and parenthesis scopes never become a trigger 
   }
 });
 
-
-test('END used as a SQLite result alias does not open or close an expression scope', t => {
+admission('END used as a SQLite result alias does not open or close an expression scope', t => {
   const db = database(t);
   const sql = `${schema}
     CREATE TRIGGER end_alias AFTER INSERT ON source
@@ -289,7 +308,7 @@ test('END used as a SQLite result alias does not open or close an expression sco
   assert.equal(db.prepare('SELECT CASE WHEN 1 THEN 2 END END').get().END, 2);
 });
 
-test('safe trigger SQL reaches the provider byte-for-byte before the completion marker', async t => {
+admission('safe trigger SQL reaches the provider byte-for-byte before the completion marker', async t => {
   const fixture = providerFixture();
   t.after(() => fixture.close());
   const api = cloudflare(fixture);
@@ -304,8 +323,7 @@ test('safe trigger SQL reaches the provider byte-for-byte before the completion 
   assert.equal(fixture.state.databases[0].db.prepare('SELECT value FROM audit').get().value, 11);
 });
 
-
-test('CASE END distinguishes keyword identifiers from the expression terminator', t => {
+admission('CASE END distinguishes keyword identifiers from the expression terminator', t => {
   const db = database(t);
   const sql = `CREATE TABLE source(value, end); CREATE TABLE audit(value);
     CREATE TRIGGER end_column AFTER INSERT ON source
@@ -317,7 +335,7 @@ test('CASE END distinguishes keyword identifiers from the expression terminator'
   assert.equal(db.prepare('SELECT value FROM audit').get().value, 3);
 });
 
-test('END after OVER names a window and cannot close an unfinished CASE', t => {
+admission('END after OVER names a window and cannot close an unfinished CASE', t => {
   const db = database(t);
   const sql = `CREATE TABLE source(value);
     CREATE TRIGGER tr AFTER INSERT ON source
@@ -326,7 +344,7 @@ test('END after OVER names a window and cannot close an unfinished CASE', t => {
   assert.throws(() => validate(sql), /unsafe-migration-control/);
 });
 
-test('a named END window and its separate CASE terminator execute in a trigger', t => {
+admission('a named END window and its separate CASE terminator execute in a trigger', t => {
   const db = database(t);
   const query = 'SELECT CASE WHEN 1 THEN count(*) OVER end END WINDOW end AS ()';
   const sql = `CREATE TABLE source(value);
@@ -338,7 +356,7 @@ test('a named END window and its separate CASE terminator execute in a trigger',
   assert.equal(db.prepare('SELECT value FROM source').get().value, 1);
 });
 
-test('OVER remains an operand when used as a column or named window', t => {
+admission('OVER remains an operand when used as a column or named window', t => {
   const db = database(t);
   const sql = `CREATE TABLE source(over); INSERT INTO source VALUES (7);`;
   validate(sql);
@@ -353,8 +371,7 @@ test('OVER remains an operand when used as a column or named window', t => {
   }
 });
 
-
-test('ledger tokens cannot be used as virtual-table content or introspection arguments', t => {
+admission('ledger tokens cannot be used as virtual-table content or introspection arguments', t => {
   const db = database(t);
   for (const name of ['_rer_deploy_migrations', 'd1_migrations']) {
     db.exec(`CREATE TABLE ${name}(name); INSERT INTO ${name} VALUES ('controller row');`);
@@ -373,7 +390,7 @@ test('ledger tokens cannot be used as virtual-table content or introspection arg
   }
 });
 
-test('BEGIN in a trigger name or header operand is distinct from the body boundary', t => {
+admission('BEGIN in a trigger name or header operand is distinct from the body boundary', t => {
   const db = database(t);
   const sql = `CREATE TABLE source(value, begin); CREATE TABLE audit(value);
     CREATE TRIGGER begin AFTER INSERT ON source
@@ -384,4 +401,8 @@ test('BEGIN in a trigger name or header operand is distinct from the body bounda
   db.exec(sql);
   assert.equal(db.prepare('SELECT value FROM audit').get().value, 3);
   assert.throws(() => validate(`${sql} COMMIT;`), /unsafe-migration-control/);
+});
+
+test('migration SQL admission preserves application SQL and refuses controller transaction or ledger access', async (t) => {
+  await caseRows(t, admissionRows.map(({name,run}) => [name,run]));
 });

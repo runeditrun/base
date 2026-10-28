@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from '../deploy-kit/tests/fold-case.mjs';
 import { test } from 'node:test';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -69,7 +70,8 @@ test('heading and bold-paragraph clauses list the same as bullets, and only publ
   ]);
 });
 
-test('catalogue omits empty clause bodies and rejects contracts with no published clauses', () => {
+test('catalogue omits empty clause bodies and rejects contracts with no published clauses', async (t) => {
+  await caseRows(t, [['independent checks', async t => {
   const listing = manifestFor(contractAround([
     '- **DEMO-001 — Empty body.**',
     '- **DEMO-002 — Published body.** This clause has content.',
@@ -78,11 +80,17 @@ test('catalogue omits empty clause bodies and rejects contracts with no publishe
     { id: 'DEMO-002', title: 'Published body', text: 'This clause has content.' },
   ]);
 
+  let rowAt81 = 0;
   for (const contract of [
     contractAround(['- **DEMO-001 — Empty body.**', ''], [['DEMO-001', 'Empty body']]),
     contractText([{ id: 'DEMO-001', title: 'Later work', body: 'Not published.', kind: 'target' }]),
-  ]) assert.throws(() => manifestFor(contract), /CONTRACT\.md must contain published clauses/);
-  assert.throws(() => manifestFor('# Contract\nUnstructured text only.\n'), /CONTRACT\.md:\d+: CONTRACT\.md has no "## Status" section/);
+  ]) {
+    await caseRow(t, 'table at line 81 row ' + rowAt81++, async () => {
+assert.throws(() => manifestFor(contract), /CONTRACT\.md must contain published clauses/);
+    });
+  }
+  await caseRow(t, 'following assertion at line 85', async () => { assert.throws(() => manifestFor('# Contract\nUnstructured text only.\n'), /CONTRACT\.md:\d+: CONTRACT\.md has no "## Status" section/); });
+  }]]);
 });
 
 

@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -57,6 +58,7 @@ test('owner CLI deploys with only the owner token and account id, then re-runs a
 });
 
 test('owner CLI inspection uses the native receipt origin even when current settings differ or are absent', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const provider = ownerProvider(); t.after(() => provider.close());
   const root = await seed(t), options = {fetch:provider.fetch,cwd:root,notice:() => {}};
   const args = ['--declaration','deploy.json','--environment','production'];
@@ -65,13 +67,18 @@ test('owner CLI inspection uses the native receipt origin even when current sett
   const state = JSON.parse(await readFile(deployed.state,'utf8'));
   state.receipt.origin = 'https://operator.example.test';
   await writeFile(deployed.state,JSON.stringify(state));
+  let rowAt68 = 0;
   for (const env of [inputs(provider),inputs(provider,{APP_HOST:'changed.example.test'})]) {
+    await caseRow(t, 'table at line 68 row ' + rowAt68++, async () => {
+
     assert.equal((await main(['inspect',...args],env,options)).origin,state.receipt.origin);
+      });
   }
   // Older records without an origin retain the account's derived workers.dev origin.
   delete state.receipt.origin;
   await writeFile(deployed.state,JSON.stringify(state));
-  assert.equal((await main(['inspect',...args],inputs(provider),options)).origin,deployed.origin);
+  await caseRow(t, 'following assertion at line 74', async () => { assert.equal((await main(['inspect',...args],inputs(provider),options)).origin,deployed.origin); });
+  }]]);
 });
 
 test('owner CLI refuses missing inputs and uncommitted source before any provider write', async t => {
@@ -131,6 +138,7 @@ test('owner CLI reports refusal codes and resource names, never other error text
 });
 
 test('postdeploy readback waits only for fresh workers.dev 1042 within the upload deadline', async t => {
+  await caseRows(t, [['independent checks', async t => {
  const provider = ownerProvider(); t.after(() => provider.close());
  const root = await seed(t); let elapsed = 0, attempts = 0;
  const healthOptions = { now: () => elapsed, sleep: async ms => { elapsed += ms; } };
@@ -145,7 +153,8 @@ test('postdeploy readback waits only for fresh workers.dev 1042 within the uploa
  provider.state.healthOverride = () => ++attempts === 1 ? new Response('error code: 1042', {status:404}) : healthy();
  assert.equal((await main(['health',...args], inputs(provider), {...options,propagation:first.propagation})).ok, true);
  assert.equal(attempts, 2); assert.ok(elapsed > 0 && elapsed < deadline, 'a transient response waits within the upload budget');
- for (const [name, response, fresh] of [
+ let rowAt148 = 0;
+  for (const [name, response, fresh] of [
   ['established', () => new Response('error code: 1042', {status:404}), false],
   ['other 404', () => new Response('not found', {status:404}), true],
   ['truncated 1042 prefix', () => new Response('error code: 1042' + ' '.repeat(300) + 'unrelated error', {status:404}), true],
@@ -153,19 +162,25 @@ test('postdeploy readback waits only for fresh workers.dev 1042 within the uploa
   ['redirect', () => new Response(null, {status:302,headers:{location:'https://elsewhere.invalid/health'}}), true],
   ['malformed', () => new Response('not json', {status:200}), true],
  ]) {
+    await caseRow(t, 'table at line 148 row ' + rowAt148++, async () => {
+
   attempts = 0;
   provider.state.healthOverride = () => { attempts++; return response(); };
   await assert.rejects(main(['health',...args], inputs(provider), {...options,...(fresh ? {propagation:first.propagation} : {})}), undefined, name);
   assert.equal(attempts, 1, name);
- }
+     });
+  }
  elapsed += first.propagation.window.remaining() - Math.min(1, budget / 2); attempts = 0;
  provider.state.healthOverride = () => { attempts++; return new Response('error code: 1042', {status:404}); };
- await assert.rejects(main(['health',...args], inputs(provider), {...options,propagation:first.propagation}), /last-status-404/);
- assert.equal(attempts, 1, 'no probe starts after the original upload deadline');
- assert.ok(elapsed <= deadline, 'postdeploy readback stops by the original upload deadline');
- assert.equal(first.propagation.window.remaining(), 0, 'persistent propagation exhausts only the original budget');
+ await caseRow(t, 'following assertion at line 163', async () => { await assert.rejects(main(['health',...args], inputs(provider), {...options,propagation:first.propagation}), /last-status-404/); });
+ await caseRow(t, 'following assertion at line 164', async () => { assert.equal(attempts, 1, 'no probe starts after the original upload deadline'); });
+ await caseRow(t, 'following assertion at line 165', async () => { assert.ok(elapsed <= deadline, 'postdeploy readback stops by the original upload deadline'); });
+ await caseRow(t, 'following assertion at line 166', async () => { assert.equal(first.propagation.window.remaining(), 0, 'persistent propagation exhausts only the original budget'); });
  // Expiry before entry and during a provider read use the same owned deadline.
- for (const phase of ['before-entry','after-entry']) {
+ let rowAt168 = 0;
+  for (const phase of ['before-entry','after-entry']) {
+    await caseRow(t, 'table at line 168 row ' + rowAt168++, async () => {
+
   const slow = ownerProvider(); t.after(() => slow.close());
   const slowRoot = await seed(t), time = deadlineClock(), barrier = slow.holdSettingsAfterUpload();
   const readiness = {...time.readiness};
@@ -185,7 +200,8 @@ test('postdeploy readback waits only for fresh workers.dev 1042 within the uploa
   await rejected;
   assert.equal(barrier.reads, phase === 'after-entry' ? 1 : 0, 'expiry never retries or enters a later settings read');
   assert.equal(barrier.pending, 0, 'abort releases the settings read and its listener');
- }
+     });
+  }
 
  // A transient failure can land after clock expiry while the abort timer is pending.
  const boundary = ownerProvider(); t.after(() => boundary.close());
@@ -202,8 +218,8 @@ test('postdeploy readback waits only for fresh workers.dev 1042 within the uploa
   if (init.method === 'PUT' && url.searchParams.get('bindings_inherit') === 'strict') boundaryUploaded = true;
   return result;
  };
- await assert.rejects(main(['deploy',...args], inputs(boundary), {cwd:boundaryRoot,fetch:boundaryFetch,notice:()=>{},healthOptions:{readiness:boundaryTime.readiness}}), /provider-transport-failed/);
- assert.equal(boundaryReads, 1, 'clock expiry blocks another provider read before the abort timer fires');
+ await caseRow(t, 'following assertion at line 205', async () => { await assert.rejects(main(['deploy',...args], inputs(boundary), {cwd:boundaryRoot,fetch:boundaryFetch,notice:()=>{},healthOptions:{readiness:boundaryTime.readiness}}), /provider-transport-failed/); });
+ await caseRow(t, 'following assertion at line 206', async () => { assert.equal(boundaryReads, 1, 'clock expiry blocks another provider read before the abort timer fires'); });
 
  // A changed-source upload can briefly lose its established route too.
  await writeFile(join(root,'source.mjs'),'export const edition = "updated";');
@@ -212,14 +228,15 @@ test('postdeploy readback waits only for fresh workers.dev 1042 within the uploa
  git('add','source.mjs'); git('commit','-qm','update source');
  provider.state.healthOverride = null;
  const updated = await main(['deploy',...args], inputs(provider), options);
- assert.equal(updated.changed, true);
- assert.equal(updated.propagation.freshUpload, false, 'a redeploy does not gain first-creation token replay permission');
- assert.notEqual(updated.versionId, first.versionId);
+ await caseRow(t, 'following assertion at line 215', async () => { assert.equal(updated.changed, true); });
+ await caseRow(t, 'following assertion at line 216', async () => { assert.equal(updated.propagation.freshUpload, false, 'a redeploy does not gain first-creation token replay permission'); });
+ await caseRow(t, 'following assertion at line 217', async () => { assert.notEqual(updated.versionId, first.versionId); });
  attempts = 0;
  provider.state.healthOverride = () => ++attempts === 1 ? new Response('error code: 1042', {status:404}) : healthy();
  const redeployDeadline = elapsed + updated.propagation.window.remaining();
- assert.equal((await main(['health',...args], inputs(provider), {...options,propagation:updated.propagation})).ok, true);
- assert.equal(attempts, 2);
- assert.ok(elapsed < redeployDeadline, 'redeploy readback uses its own remaining upload budget');
+ await caseRow(t, 'following assertion at line 221', async () => { assert.equal((await main(['health',...args], inputs(provider), {...options,propagation:updated.propagation})).ok, true); });
+ await caseRow(t, 'following assertion at line 222', async () => { assert.equal(attempts, 2); });
+ await caseRow(t, 'following assertion at line 223', async () => { assert.ok(elapsed < redeployDeadline, 'redeploy readback uses its own remaining upload budget'); });
 
+  }]]);
 });

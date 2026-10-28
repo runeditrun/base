@@ -1,3 +1,4 @@
+import { caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { access, mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
@@ -7,6 +8,9 @@ import { cloudflare } from '../provider.mjs';
 import { ownerDeploy, ownerPlan, ownerTarget } from '../owner.mjs';
 import { hash } from '../validation.mjs';
 import { ownerProvider } from './owner-provider.mjs';
+
+const replacementCaseRows = [];
+const replacementCase = (name, run) => replacementCaseRows.push({name,run});
 
 const declaration = {version:1,project:'runeditrun/penny',compatibilityDate:'2026-09-08',
   r2:[{binding:'FILES'}],crons:['* * * * *']};
@@ -37,7 +41,7 @@ function upgrade(args, declared = declaration) {
 }
 
 // Replacing a resource during upload must refuse the in-flight upgrade.
-test('R2 replaced during asset upload must be refused before the Worker PUT', async t => {
+replacementCase('R2 replaced during asset upload must be refused before the Worker PUT', async t => {
   const {args,state,foreign} = await setup(t);
   await ownerDeploy(args);
   const bytes = await readFile(args.statePath), count = uploads(state);
@@ -81,7 +85,7 @@ function replaceResource(state, foreign, kind, name) {
 }
 
 for (const kind of ['worker',...kinds.filter(kind => kind !== 'r2')]) {
-  test(`${kind} replaced during asset upload is refused before the Worker PUT`, async t => {
+  replacementCase(`${kind} replaced during asset upload is refused before the Worker PUT`, async t => {
     const declared = {...declaration,...(kind === 'worker' ? {} : {[kind]:[{binding:'EXTRA'}]})};
     const {args,state,foreign} = await setup(t,declared);
     await ownerDeploy(args);
@@ -112,7 +116,7 @@ for (const kind of ['worker',...kinds.filter(kind => kind !== 'r2')]) {
 }
 
 for (const kind of kinds) {
-  test(`the final guard checks saved ${kind} identities omitted from the upgrade plan`, async t => {
+  replacementCase(`the final guard checks saved ${kind} identities omitted from the upgrade plan`, async t => {
     const declared = {...declaration,[kind]:[{binding:'EXTRA'}]};
     const {args,state,foreign} = await setup(t,declared);
     await ownerDeploy(args);
@@ -136,3 +140,7 @@ for (const kind of kinds) {
     assert.deepEqual(await readFile(args.statePath),bytes);
   });
 }
+
+test('asset upload refuses replaced Worker or resource identities before the Worker PUT', async (t) => {
+  await caseRows(t, replacementCaseRows.map(({name,run}) => [name,run]));
+});

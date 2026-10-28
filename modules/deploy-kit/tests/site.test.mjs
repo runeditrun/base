@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { caseRow, caseRows } from './fold-case.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -29,20 +30,28 @@ async function site(t) {
   return { root, folder, files: await collectFiles(folder), receiptPath: join(root, '.rer/deploy/site-production.json') };
 }
 
-test('a run site declaration names only an apex domain, and its plan never names the app Worker', () => {
+test('a run site declaration names only an apex domain, and its plan never names the app Worker', async (t) => {
+  await caseRows(t, [['independent checks', async t => {
+  let rowAt34 = 0;
   for (const domain of ['https://run-cradle.com', 'run-cradle.com/run', 'run-cradle.com:443', 'www.run-cradle.com', 'Run-Cradle.com', 'localhost', ''])
-    assert.throws(() => siteDeclaration({ version: 1, domain }), /invalid-site-domain/, domain);
-  assert.throws(() => siteDeclaration({ version: 1, domain: 'run-cradle.com', worker: 'x' }), /invalid-site-declaration/);
+    {
+    await caseRow(t, 'table at line 34 row ' + rowAt34++, async () => {
+assert.throws(() => siteDeclaration({ version: 1, domain }), /invalid-site-domain/, domain);
+    });
+  }
+  await caseRow(t, 'following assertion at line 36', async () => { assert.throws(() => siteDeclaration({ version: 1, domain: 'run-cradle.com', worker: 'x' }), /invalid-site-declaration/); });
   const plan = sitePlan({ ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: '/checkout/dist/site' });
-  assert.notEqual(plan.worker, plan.appWorker);
-  assert.deepEqual([plan.bindings, plan.secrets, plan.crons], [['ASSETS'], [], []]);
-  assert.deepEqual(plan.hostnames, ['run-cradle.com', 'www.run-cradle.com']);
-  assert.deepEqual(plan.redirects.map(({ from, to, status }) => ({ from, to, status })), [{ from: 'https://www.run-cradle.com/*', to: 'https://run-cradle.com/', status: 301 }]);
+  await caseRow(t, 'following assertion at line 38', async () => { assert.notEqual(plan.worker, plan.appWorker); });
+  await caseRow(t, 'following assertion at line 39', async () => { assert.deepEqual([plan.bindings, plan.secrets, plan.crons], [['ASSETS'], [], []]); });
+  await caseRow(t, 'following assertion at line 40', async () => { assert.deepEqual(plan.hostnames, ['run-cradle.com', 'www.run-cradle.com']); });
+  await caseRow(t, 'following assertion at line 41', async () => { assert.deepEqual(plan.redirects.map(({ from, to, status }) => ({ from, to, status })), [{ from: 'https://www.run-cradle.com/*', to: 'https://run-cradle.com/', status: 301 }]); });
   // No app environment name can produce the site Worker's name.
   for (const environment of ['production', 'site', 'production-site', 'site-production']) assert.notEqual(sitePlan({ ...app, environment, declaration: { version: 1, domain: 'run-cradle.com' }, assets: '/x' }).worker, sitePlan({ ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: '/x' }).appWorker);
+  }]]);
 });
 
-test('site fingerprints preserve assets-only identity and bind search code, model, corpus and vector bytes', () => {
+test('site fingerprints preserve assets-only identity and bind search code, model, corpus and vector bytes', async (t) => {
+  await caseRows(t, [['independent checks', async t => {
   const options = { ...app, declaration: { version: 1, domain: 'run-cradle.com' }, assets: '/checkout/dist/site' };
   const plain = sitePlan(options), files = [{ path: 'index.html', sha256: hash('home') }, { path: 'docs-search-vectors.json', sha256: hash('vectors') }];
   assert.equal(siteKit.siteFingerprint(plain, files), hash({ files, config: plain.assetsConfig, module: hash(siteKit.SITE_WORKER), compatibilityDate: plain.compatibilityDate }));
@@ -51,17 +60,23 @@ test('site fingerprints preserve assets-only identity and bind search code, mode
   assert.deepEqual(search.runtime, runtime);
   const fingerprint = siteKit.siteFingerprint(search, files);
   assert.notEqual(fingerprint, siteKit.siteFingerprint(plain, files));
+  let rowAt55 = 0;
   for (const change of [{ source: `${runtime.source}\n// rebuilt` }, { model: '@cf/baai/bge-large-en-v1.5' }, { corpusHash: hash('new corpus') }])
-    assert.notEqual(siteKit.siteFingerprint(sitePlan({ ...options, runtime: searchRuntime(change) }), files), fingerprint);
-  assert.notEqual(siteKit.siteFingerprint(search, files.map(file => file.path === 'docs-search-vectors.json' ? { ...file, sha256: hash('new vectors') } : file)), fingerprint);
-  assert.throws(() => siteKit.siteFingerprint(search, files.slice(0, 1)), /missing-site-search-vectors/);
+    {
+    await caseRow(t, 'table at line 55 row ' + rowAt55++, async () => {
+assert.notEqual(siteKit.siteFingerprint(sitePlan({ ...options, runtime: searchRuntime(change) }), files), fingerprint);
+    });
+  }
+  await caseRow(t, 'following assertion at line 57', async () => { assert.notEqual(siteKit.siteFingerprint(search, files.map(file => file.path === 'docs-search-vectors.json' ? { ...file, sha256: hash('new vectors') } : file)), fingerprint); });
+  await caseRow(t, 'following assertion at line 58', async () => { assert.throws(() => siteKit.siteFingerprint(search, files.slice(0, 1)), /missing-site-search-vectors/); });
   for (const change of [{ type: 'custom' }, { bindings: ['ASSETS', 'AI', 'DB'] }, { endpoint: '/custom' }, { annotations: {} }, { pooling: 'mean' }])
     assert.throws(() => sitePlan({ ...options, runtime: searchRuntime(change) }), /invalid-site-runtime/);
+  }]]);
 });
 
 test('search deploy uploads the generated runtime and verifies exact serving version modules and AI bindings', async t => {
   const { siteProvider } = await import('./site-provider.mjs');
-  for (const scenario of ['search upload', 'missing AI', 'missing ASSETS', 'wrong AI type', 'extra binding', 'module changed', 'model changed', 'pooling changed', 'corpus changed', 'wrong entry', 'extra module', 'settings differ', 'final readback changed']) await t.test(scenario, async t => {
+  await caseRows(t, (['search upload', 'missing AI', 'missing ASSETS', 'wrong AI type', 'extra binding', 'module changed', 'model changed', 'pooling changed', 'corpus changed', 'wrong entry', 'extra module', 'settings differ', 'final readback changed']).map((scenario) => [scenario, async t => {
     const provider = siteProvider({ domain: 'run-cradle.com' }), { folder, receiptPath } = await site(t);
     t.after(() => provider.close());
     await writeFile(join(folder, 'docs-search-vectors.json'), JSON.stringify({ model: '@cf/baai/bge-base-en-v1.5', pooling: 'cls', corpusHash: hash('search corpus'), chunks: [] }));
@@ -103,12 +118,12 @@ test('search deploy uploads the generated runtime and verifies exact serving ver
       assert.equal(provider.state.domains.length, scenario === 'final readback changed' ? 2 : 0, 'both Worker readbacks enforce the runtime');
       await assert.rejects(readFile(receiptPath), { code: 'ENOENT' });
     }
-  });
+  }]));
 });
 
 test('search deploy waits for the uploaded runtime instead of checking an older serving runtime, and waits for its version content visibility', async t => {
   const { siteProvider } = await import('./site-provider.mjs');
-  for (const scenario of ['previous runtime', 'missing content']) await t.test(scenario, async t => {
+  await caseRows(t, (['previous runtime', 'missing content']).map((scenario) => [scenario, async t => {
     const provider = siteProvider({ domain: 'run-cradle.com' }), { folder, receiptPath } = await site(t);
     t.after(() => provider.close());
     const api = cloudflare({ accountId: provider.accountId, token: provider.token, fetch: provider.fetch });
@@ -133,7 +148,7 @@ test('search deploy waits for the uploaded runtime instead of checking an older 
     assert.equal(sleeps, 2);
     assert.ok(lagging >= 3);
     assert.equal(provider.state.writes.slice(writes).filter(write => write.path === `/workers/scripts/${result.receipt.worker}`).length, 1);
-  });
+  }]));
 });
 
 // Ownership is read from the provider: a fresh checkout (a CI runner, no .rer/)
@@ -206,7 +221,7 @@ test('site deploy refuses a Worker or domain it did not make, a rolled-back Work
 
 test('site upload waits for its own version through lagging provider reads without accepting replacements', async t => {
   const { siteProvider } = await import('./site-provider.mjs');
-  for (const scenario of ['deployments', 'versions', 'missing deployments', 'missing version', 'fresh Worker missing', 'final readback', 'timeout', 'foreign version', 'foreign newest', 'foreign fingerprint', 'foreign owner', 'split deployment']) await t.test(scenario, async t => {
+  await caseRows(t, (['deployments', 'versions', 'missing deployments', 'missing version', 'fresh Worker missing', 'final readback', 'timeout', 'foreign version', 'foreign newest', 'foreign fingerprint', 'foreign owner', 'split deployment']).map((scenario) => [scenario, async t => {
     const provider = siteProvider({ domain: 'run-cradle.com' }), { files, folder, receiptPath } = await site(t);
     t.after(() => provider.close());
     const api = cloudflare({ accountId: provider.accountId, token: provider.token, fetch: provider.fetch });
@@ -259,12 +274,12 @@ test('site upload waits for its own version through lagging provider reads witho
       assert.ok(elapsed > 0 && elapsed < readiness.totalMs);
     }
     assert.equal(provider.state.writes.slice(writes).filter(write => write.path === `/workers/scripts/${plan.worker}`).length, 1, 'only readback is retried');
-  });
+  }]));
 });
 
 test('site deploy polls the zone domain list within the readiness window: a lagging list succeeds, a hostname never listed fails at the deadline naming it, another Worker fails at once', async t => {
   const { siteProvider } = await import('./site-provider.mjs');
-  for (const scenario of ['lags two polls', 'never lists www', 'bound to another Worker']) await t.test(scenario, async t => {
+  await caseRows(t, (['lags two polls', 'never lists www', 'bound to another Worker']).map((scenario) => [scenario, async t => {
     const provider = siteProvider({ domain: 'run-cradle.com' }), { files, folder, receiptPath } = await site(t);
     t.after(() => provider.close());
     let attached = false, lists = 0, elapsed = 0, sleeps = 0;
@@ -291,5 +306,5 @@ test('site deploy polls the zone domain list within the readiness window: a lagg
       if (scenario === 'never lists www') assert.equal(elapsed, readiness.totalMs, 'the wait ends at the deploy deadline');
       else assert.equal(sleeps, 0, 'a foreign Worker is refused without a retry');
     }
-  });
+  }]));
 });

@@ -1,3 +1,4 @@
+import { caseRows } from '../deploy-kit/tests/fold-case.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { handoffFixture } from './publish-handoff-fixture.mjs';
@@ -12,7 +13,7 @@ test('generated POSIX handoff requires command success for every pinned output',
   const guards = commands.slice(0, -1).concat(': > "$artifact/push-point"').join('\n');
   assert.doesNotMatch(guards, /release_git push /);
 
-  await t.test('successful real commands reach the marker from an unrelated cwd with shell metacharacters in the path', () => {
+  const rows = [['successful real commands reach the marker from an unrelated cwd with shell metacharacters in the path', () => {
     const result = f.run(guards);
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.reachedPush, true);
@@ -21,10 +22,10 @@ test('generated POSIX handoff requires command success for every pinned output',
       assert.equal(operation.status, 0);
       assert.equal(operation.stdout.replace(/\n+$/, ''), f.expected[operation.label]);
     }
-  });
+  }]];
 
   for (const [guard, expected] of Object.entries(f.expected)) {
-    await t.test(`${guard}: exact expected stdout with failed command status stops before publication`, () => {
+    rows.push([`${guard}: exact expected stdout with failed command status stops before publication`, () => {
       const result = f.run(guards, guard);
       assert.notEqual(result.status, 0);
       assert.equal(result.reachedPush, false);
@@ -34,6 +35,7 @@ test('generated POSIX handoff requires command success for every pinned output',
       assert.equal(operation.underlyingStatus, 0);
       assert.equal(operation.status, 79);
       assert.equal(operation.stdout.replace(/\n+$/, ''), expected);
-    });
+    }]);
   }
+  await caseRows(t, rows);
 });
