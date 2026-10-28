@@ -524,7 +524,7 @@ caller-provided attribution. This is attribution only: keep native authorization
 and transaction fences inside the tool's native services.
 
 The audit row's `resource` is this exact `{kind, id}` for a tool, a URI string
-for `resources/read`, or null without a resolved target. The door adds the same
+for resource reads, or null without a resolved target. The door adds the same
 kind/id to `summary.target`, whose hash binds an approval to that target. The
 person's approval and review pages show its kind and id. Execution resolves it
 again; changed summary evidence refuses with `approval_evidence_changed`.
@@ -535,7 +535,7 @@ and `/agents/api/approvals/:id`, including a changed-target negative.
 
 ## Resource refusal machine codes
 
-A refused `resources/read` returns its stable refusal in JSON-RPC
+A refused resource read returns its stable refusal in JSON-RPC
 `error.data.code`, matching the tool pipeline's code. Missing and native-hidden
 records both return `resource_unavailable`, including unknown resource templates;
 neither returns content or reveals which condition applied. Scope, policy,
