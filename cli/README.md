@@ -587,3 +587,14 @@ The route order, policy, synthetic company profile and receipt are mirrored from
 `scripts/business/demo.mjs` and `demo/company.json`. The platform owns the seed
 catalogue, fixture data and door proofs. This command does not pair the computer
 or use its stored device credential.
+
+## Sync agent contract clauses
+
+`rer door clauses --write` synchronizes Base's thirteen shared agent duties
+into a seed's `CONTRACT.md` and runs its contract-docs generator and check.
+`rer door clauses --check` names missing or stale clauses and exits nonzero;
+`--cwd DIR` selects the seed root. Existing statuses, evidence and gaps survive,
+new clauses start missing, and seed-owned AGENT and SURFACE clauses stay intact.
+Run the edition's source-lock command last. See
+[Contract clauses](../modules/agent-door/ADOPTING.md#contract-clauses) for source
+delivery and generation details.
