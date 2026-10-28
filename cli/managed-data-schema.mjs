@@ -37,6 +37,16 @@ export async function managedSchema(db, plan, policy, ledger) {
    }
    previous = current;
   }
+  // A Managed dump omits derived virtual tables and their shadow storage.
+  // Install only exact policy names that the destination's own migrations
+  // establish as virtual tables. Source SQL never gains a virtual-table door.
+  const virtual = scratch.prepare('PRAGMA table_list').all().filter(table => table.type === 'virtual');
+  for (const table of virtual) if ((policy.derivedTables ?? []).includes(table.name) && !(policy.includeTables ?? []).includes(table.name)) {
+   insist(!objects.some(object => object.type === 'table' && object.name === table.name), 'managed_data_schema_incompatible', 409);
+   const target = previous.get(key({ type: 'table', name: table.name }));
+   try { await db.prepare(target.sql).run(); }
+   catch { throw new PortabilityError('managed_data_derived_refused', 409); }
+  }
   // Native restore also installs runtime-owned bookkeeping. Derive it with
   // the same destination helpers, never a source name or a policy wildcard.
   const native = nativeDatabase(scratch);

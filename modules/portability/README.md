@@ -275,8 +275,10 @@ owner claim. Such a destination keeps that claim and recovers access through
 ordinary native sign-in; setup does not grant another owner. Other tables are
 discovered automatically. Exclusion rules follow SQLite's ASCII identifier case matching.
 Unlisted virtual tables, hidden virtual-table columns and foreign keys into
-excluded tables fail by name. The product must explicitly regenerate derived
-data. A schema upgrade may change columns but cannot silently omit tables.
+excluded tables fail by name. Restore rebuilds policy-declared external-content
+FTS5 indexes from their content tables in the same transaction as the restored
+rows. The product must explicitly regenerate other derived data. A schema
+upgrade may change columns but cannot silently omit tables.
 
 Provider link keys and transient provider sessions never travel. Export marks
 retained dependency links as needing re-link and turns provider sign-in and
@@ -994,6 +996,7 @@ modules/portability/sqlite-tokens.mjs
 modules/portability/bookkeeping.mjs
 modules/portability/storage.mjs
 modules/portability/copies.mjs
+modules/portability/derived.mjs
 modules/portability/dev-data.mjs
 modules/portability/provider-data.mjs
 modules/portability/policy-data.mjs
@@ -1108,6 +1111,13 @@ source table, index, trigger and view against native schema or a named retiremen
 in destination migrations, including objects attached to excluded tables. Internal
 prefixes are compared literally. A scratch native import preflight checks the
 projected archive before native restore can open the destination.
+
+Policy-declared derived virtual tables omitted from a Managed dump are created
+in the sandbox from the destination's migrated definitions. Their triggers must
+still be present and compatible; omitting those triggers remains a schema
+refusal. The dump statement allowlist still refuses all `CREATE VIRTUAL TABLE`
+statements, including declared names. A native copy-normalization SQLite failure
+is reported as `copy_normalization_failed`, without SQL diagnostics or row values.
 
 The current intake supports one database and declared buckets, local Workers
 transport, stored ZIP members, at most 10,000 entries and statements, a 128 MiB
