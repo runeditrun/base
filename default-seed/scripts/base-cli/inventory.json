@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.gdb888446",
+  "cliVersion": "0.2.85-dev.g3b11b3dc",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1219,11 +1219,11 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "2a69f0b033d178f04746f0a25c4ef4bb2b7adec770147ad1a7da7716ee95629c"
+      "sha256": "088612d5ed58acd3d6b43a52590dade1ed2c425b2c6ce190e1e23542be607818"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
-      "sha256": "ea39cb9b8c101a446d6fdf023866bb2c86965926f316f6030a0394f1cffeaf17"
+      "sha256": "16ce1f72f7078b67def503e307f44f39714772a9bafb413c9573aa1d4784283a"
     },
     "edition-authoring/copy-checkout.mjs": {
       "source": "edition-authoring/copy-checkout.mjs",
@@ -1791,7 +1791,7 @@
     },
     "foundation/runtime/contract-docs.mjs": {
       "source": "foundation/runtime/contract-docs.mjs",
-      "sha256": "d98e14f489c57f60446c2cc68310db09f298f7974d77026dbaa2c62868cc4838"
+      "sha256": "706e5eb0c227eb33ed101d0489a7ce62a4b3d11ec57920b653731ada2773bf50"
     },
     "foundation/runtime/run-data.d.mts": {
       "source": "foundation/runtime/run-data.d.mts",
