@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { nativeStagingFixture } from './retained-fixtures.ts';
@@ -6,7 +8,7 @@ import { sqliteRuntime } from './retained-fixtures.ts';
 import { sqliteSource,sqliteMapping } from './sqlite-runtime.ts';
 import { canonicalJson,sha256,planD1ImportStream,createD1ImportStream,resumeD1ImportStream,undoD1ImportStream } from '../../src/d1/index.ts';
 
-for(const staged of [false,true])for(const restore of [false,true])test(`deleted related provenance stays absent through ${restore?'restore':'supersession'} with private transport ${staged}`,async t=>{
+for(const staged of [false,true])for(const restore of [false,true])familyRows[0].push([`deleted related provenance stays absent through ${restore?'restore':'supersession'} with private transport ${staged}`, async t=>{
   const large=staged?await nativeStagingFixture(t):undefined,r=large??await sqliteRuntime(t),targets=large?{...large.targets,write(row:any){return [...large.targets.remove(row.destination,row.targetKind,row.targetId),...large.targets.write(row)];}}:r.context().storage.targets;
   let privateBatches=0;const wire:number[]=[];
   const context=()=>{const database=r.db();return {...r.context(),maxBatchBytes:2*1024*1024,maxBatches:1,storage:{database:{prepare:database.prepare,async batch(statements:any[]){privateBatches+=Number(statements.some(row=>row.query.startsWith('INSERT INTO ik_d1_native_staging_values')));wire.push(Buffer.byteLength(JSON.stringify(statements.map(row=>({sql:row.query,params:row.values})))));return database.batch(statements);}},targets}};};
@@ -39,4 +41,6 @@ for(const staged of [false,true])for(const restore of [false,true])test(`deleted
   if(!restore)assert.equal((await resumeD1ImportStream(next.id,context())).state,'completed');
   assert.equal((await undoD1ImportStream(next.id,context())).state,'undone');
   assert.deepEqual(await targets.read(r.db(),'workspace','record','0'),original);
-});
+}]);
+
+ test("d1 deleted provenance preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

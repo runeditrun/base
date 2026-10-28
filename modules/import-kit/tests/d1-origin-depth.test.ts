@@ -1,10 +1,12 @@
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { originDepthFixture } from './d1/origin-depth-fixture.ts';
 import { source, mapping } from './d1/fixtures.ts';
 import { initializeD1ImportStorage, planD1ImportStream, createD1ImportStream, readD1ImportStream, readD1ImportJob, resumeD1ImportStream, undoD1ImportStream, resumeD1Import } from '../src/d1/index.ts';
 
-test('real D1 origin predicates fit its depth limit through setup, live parent lifecycle and cold replay',async t=>{
+familyRows[0].push(['real D1 origin predicates fit its depth limit through setup, live parent lifecycle and cold replay', async t=>{
   const r=await originDepthFixture(t),bundle=source(101);
   bundle.artifacts[0].original={status:'unavailable',reason:'not-supplied'};
   const plan=await r.request('plan',()=>planD1ImportStream(bundle,mapping,r.context()));
@@ -45,9 +47,9 @@ test('real D1 origin predicates fit its depth limit through setup, live parent l
   assert.deepEqual((await r.db().prepare('SELECT * FROM ik_d1_stream_origins ORDER BY ordinal').all()).results,origins);
   for(const table of ['ik_d1_staging','ik_d1_staging_pages','ik_d1_staging_chunks','ik_d1_staging_index','ik_d1_staging_originals','ik_d1_native_staging','ik_d1_assertions'])assert.equal((await r.db().prepare(`SELECT count(*) n FROM ${table}`).first()).n,0,table);
   t.diagnostic(JSON.stringify(r.summary()));
-});
+}]);
 
-test('real D1 balanced origin guards reject changed parent binding and captured orphans',async t=>{
+familyRows[0].push(['real D1 balanced origin guards reject changed parent binding and captured orphans', async t=>{
   const r=await originDepthFixture(t),bundle=source(1);bundle.artifacts[0].original={status:'unavailable',reason:'not-supplied'};
   const plan=await r.request('plan',()=>planD1ImportStream(bundle,mapping,r.context()));
   const job=await r.request('create',()=>createD1ImportStream(plan,{...r.context(),reviewedFingerprint:plan.fingerprint}));
@@ -67,4 +69,6 @@ test('real D1 balanced origin guards reject changed parent binding and captured 
   assert.equal((await r.db().prepare('SELECT version FROM ik_original_sets').first()).version,3);
   assert.equal((await r.db().prepare('SELECT count(*) n FROM contacts').first()).n,0);
   t.diagnostic(JSON.stringify(r.summary()));
-});
+}]);
+
+ test("d1 origin depth preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, source } from './fixtures.ts';
@@ -18,7 +20,7 @@ async function unpublished(r: Awaited<ReturnType<typeof runtime>>, id: string) {
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM ik_d1_assertions').first())?.n, 0);
 }
 
-test('real D1: zero-effect replay refuses a matching claim owned by an unrelated valid job', async t => {
+familyRows[0].push(['real D1: zero-effect replay refuses a matching claim owned by an unrelated valid job', async t => {
   const r = await runtime(t), { ctx, replay } = await sourceOnly(r);
   const unrelatedPlan = await planD1Import(source(0), mapping, ctx);
   const unrelated = await createD1ImportJob(unrelatedPlan, { ...ctx, reviewedFingerprint: unrelatedPlan.fingerprint });
@@ -26,9 +28,9 @@ test('real D1: zero-effect replay refuses a matching claim owned by an unrelated
   await r.db().prepare('UPDATE ik_sources SET job_id=?').bind(unrelated.id).run();
   await assert.rejects(applyD1ImportBatches(replay.id, ctx), /IMPORT_INVENTORY_MISMATCH/);
   await unpublished(r, replay.id);
-});
+}]);
 
-test('real D1: zero-effect replay binds the claim mapping version to its owner plan', async t => {
+familyRows[0].push(['real D1: zero-effect replay binds the claim mapping version to its owner plan', async t => {
   const r = await runtime(t), { ctx, owner, replay } = await sourceOnly(r);
   await undoD1Import(owner.id, ctx);
   const otherContext = { ...ctx, mappingVersion: 'v2' };
@@ -38,13 +40,13 @@ test('real D1: zero-effect replay binds the claim mapping version to its owner p
   await r.db().prepare("UPDATE ik_sources SET mapping_version='v1'").run();
   await assert.rejects(applyD1ImportBatches(replay.id, ctx), /IMPORT_INVENTORY_MISMATCH/);
   await unpublished(r, replay.id);
-});
+}]);
 
 for (const [name, mutation] of [
   ['owner checkpoint', 'UPDATE ik_jobs SET checkpoint=0 WHERE id=?'],
   ['owner plan', "UPDATE ik_jobs SET plan_json=json_set(plan_json,'$.principalId','changed') WHERE id=?"],
   ['recorded decision', 'DELETE FROM ik_d1_entries WHERE job_id=?'],
-] as const) test(`real D1: zero-effect replay atomically rejects a late ${name} change`, async t => {
+] as const) familyRows[0].push([`real D1: zero-effect replay atomically rejects a late ${name} change`, async t => {
   const r = await runtime(t), { ctx, owner, replay } = await sourceOnly(r), db = r.db();
   let batches = 0;
   const database = { prepare: db.prepare.bind(db), async batch(statements: any[]) {
@@ -53,9 +55,9 @@ for (const [name, mutation] of [
   } };
   await assert.rejects(applyD1ImportBatches(replay.id, { ...ctx, storage: { ...ctx.storage, database } }), /IMPORT_ATOMIC_GUARD/);
   assert.equal(batches, 2); await unpublished(r, replay.id);
-});
+}]);
 
-test('real D1: valid zero-effect replay and undo preserve the original owner', async t => {
+familyRows[0].push(['real D1: valid zero-effect replay and undo preserve the original owner', async t => {
   const r = await runtime(t), { ctx, owner, replay } = await sourceOnly(r);
   assert.equal((await applyD1ImportBatches(replay.id, ctx)).state, 'completed');
   assert.equal((await applyD1ImportBatches(replay.id, ctx)).state, 'completed');
@@ -63,4 +65,6 @@ test('real D1: valid zero-effect replay and undo preserve the original owner', a
   assert.equal((await r.db().prepare('SELECT job_id FROM ik_sources').first())?.job_id, owner.id);
   assert.equal((await undoD1Import(owner.id, ctx)).state, 'undone');
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM ik_sources').first())?.n, 0);
-});
+}]);
+
+ test("d1 reuse owner preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runtime, source} from './fixtures.ts';
@@ -27,16 +29,16 @@ const mutations = [
   ['missing claim', 'DELETE FROM ik_sources WHERE identity=?'],
 ] as const;
 
-for (const [name, mutation] of mutations) test(`real D1: previously reused zero-effect ${name} is validated before the next checkpoint`, async t => {
+for (const [name, mutation] of mutations) familyRows[0].push([`real D1: previously reused zero-effect ${name} is validated before the next checkpoint`, async t => {
   const {db, ctx, plan, owner, replay, unchanged} = await partialReplay(t);
   await db.prepare(mutation).bind(plan.entries[0].identity).run();
   // The original owner and the replay must reject the same invalid custody.
   await assert.rejects(applyD1ImportBatches(owner.id, ctx), /PROVENANCE_SOURCE_CLAIM_MISMATCH/);
   await assert.rejects(applyD1ImportBatches(replay.id, ctx), /PROVENANCE_SOURCE_CLAIM_MISMATCH/);
   await unchanged();
-});
+}]);
 
-test('real D1: previously reused zero-effect claim remains fenced after valid preflight', async t => {
+familyRows[0].push(['real D1: previously reused zero-effect claim remains fenced after valid preflight', async t => {
   const {db, ctx, plan, replay, unchanged} = await partialReplay(t);
   let batches = 0;
   const database = {prepare: db.prepare.bind(db), async batch(statements: any[]) {
@@ -46,9 +48,9 @@ test('real D1: previously reused zero-effect claim remains fenced after valid pr
   await assert.rejects(applyD1ImportBatches(replay.id, {...ctx, storage: {...ctx.storage, database}}), /IMPORT_ATOMIC_GUARD/);
   assert.equal(batches, 2);
   await unchanged();
-});
+}]);
 
-test('real D1: validated source-only reuse and later owner undo preserve historical replay decisions', async t => {
+familyRows[0].push(['real D1: validated source-only reuse and later owner undo preserve historical replay decisions', async t => {
   const {db, ctx, owner, replay} = await partialReplay(t);
   assert.equal((await applyD1ImportBatches(replay.id, ctx)).state, 'completed');
   assert.equal((await applyD1ImportBatches(replay.id, ctx)).state, 'completed');
@@ -59,4 +61,6 @@ test('real D1: validated source-only reuse and later owner undo preserve histori
   assert.equal((await undoD1Import(replay.id, ctx)).state, 'undone');
   assert.equal((await undoD1Import(replay.id, ctx)).state, 'undone');
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM ik_d1_entries WHERE job_id=?').bind(replay.id).first())?.n, 2);
-});
+}]);
+
+ test("d1 reused claim validity preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

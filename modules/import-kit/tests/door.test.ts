@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[], [], [], [], [], []];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { door, documents } from './door/fixture.ts';
@@ -8,7 +10,7 @@ import { canonicalJson, sha256 } from '../src/provenance/identity.ts';
 import { sqliteTargets } from './d1/sqlite-runtime.ts';
 import type { ImportMapping, Json, ParsedRecord } from '../src/types.ts';
 
-test('HTTP import door is absent until the installation opts in',async t=>{
+familyRows[0].push(['HTTP import door is absent until the installation opts in', async t=>{
   const d=await door(t);
   for (const action of ['uploads','plan','apply','status','reconcile','undo'] as const) assert.equal((await d.call(action,{})).status,404);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
@@ -20,9 +22,9 @@ test('HTTP import door is absent until the installation opts in',async t=>{
   delete (d.options.claim.publicKeys as Record<string, JsonWebKey>).test;
   for (const action of ['uploads','plan','apply','status','reconcile','undo'] as const) assert.equal((await d.call(action,{})).status,404);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
-});
+}]);
 
-test('A Business install opens its door at the first owner claim and never reopens it after the owner turns it off',async t=>{
+familyRows[0].push(['A Business install opens its door at the first owner claim and never reopens it after the owner turns it off', async t=>{
   const d=await door(t),native=d.runtime.native(),key=d.options.claim.installationId;
   const closed=async ()=>{for (const action of ['uploads','status'] as const) assert.equal((await d.call(action,{})).status,404,action);};
   // Before any owner exists the claim path cannot enable it, and writes nothing.
@@ -53,9 +55,9 @@ test('A Business install opens its door at the first owner claim and never reope
   const selfHosted=await door(t);
   for (const action of ['uploads','status'] as const) assert.equal((await selfHosted.call(action,{})).status,404,action);
   assert.equal(selfHosted.runtime.native().prepare('SELECT count(*) n FROM ik_door_settings').get()!.n,0);
-});
+}]);
 
-test('verifyRerGrant accepts only an exact RER-signed read for its route and refuses everything else',async t=>{
+familyRows[0].push(['verifyRerGrant accepts only an exact RER-signed read for its route and refuses everything else', async t=>{
   const d=await door(t),claim=d.options.claim;
   // A seed route outside the import door, as Uptime mounts POST /api/rer/runner-status.
   const route=async (request:Request,action='runner-status'):Promise<Response|null>=>{
@@ -100,9 +102,9 @@ test('verifyRerGrant accepts only an exact RER-signed read for its route and ref
     const refused=await route(new Request(d.origin+'/api/rer/runner-status',{method:'POST',headers:await bearer(read({action}))}),action);
     assert.deepEqual([refused!.status,await refused!.json()],[503,{error:'invalid_configuration'}],action);
   }
-});
+}]);
 
-test('HTTP door uploads and applied snapshots erase with their destination in the journal batch',async t=>{
+familyRows[1].push(['HTTP door uploads and applied snapshots erase with their destination in the journal batch', async t=>{
   for (const mode of [{bounded:false,legacy:false},{bounded:true,legacy:false},{bounded:false,legacy:true},{bounded:true,legacy:true}]) {
     const {bounded,legacy}=mode;
     const d=await door(t);await d.enable();
@@ -176,9 +178,9 @@ test('HTTP door uploads and applied snapshots erase with their destination in th
   // The additive migration still applies over that schema.
   await d.db.batch(importDoorSchema.map(q=>d.db.prepare(q)));
   assert.equal(native.prepare('SELECT count(*) n FROM ik_door_scopes').get()!.n,0);
-});
+}]);
 
-test('HTTP upload, reviewed plan, bounded apply, reconcile and owner-visible undo preserve original custody',async t=>{
+familyRows[2].push(['HTTP upload, reviewed plan, bounded apply, reconcile and owner-visible undo preserve original custody', async t=>{
   const d=await door(t);await d.enable();
   const badBytes=Buffer.from('[{"id":"bad","title":"Bad bundle"}]'),badUploadId=crypto.randomUUID();
   assert.equal((await d.call('uploads',{uploadId:badUploadId,name:'bad.json',bundleSha256:'0'.repeat(64),totalBytes:badBytes.length,totalChunks:1,index:0,chunkSha256:sha256(badBytes),base64:badBytes.toString('base64')})).status,409);
@@ -234,9 +236,9 @@ test('HTTP upload, reviewed plan, bounded apply, reconcile and owner-visible und
   assert.ok(present.body.sourceIds.every((r:any)=>r.status==='present'));
   await d.undo(returned.body.planId);await d.undo(absent.body.planId);await d.undo(returningBase.body.planId);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
-});
+}]);
 
-test('HTTP grants and bounded catch-up fail closed while valid snapshot replacements preserve undo lineage',async t=>{
+familyRows[0].push(['HTTP grants and bounded catch-up fail closed while valid snapshot replacements preserve undo lineage', async t=>{
   const d=await door(t);await d.enable();
   const forged=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
   assert.equal((await d.call('plan',{}, {},await d.token('plan',{},forged.privateKey))).status,403);
@@ -290,7 +292,7 @@ test('HTTP grants and bounded catch-up fail closed while valid snapshot replacem
   await d.apply(replacement.body,{approvalRecordId:'test-replacement-approval'});await d.undo(replacement.body.planId);
   await writeImportDoorSettings(d.db,d.options.claim.installationId,{enabled:true,revokedKids:['test']},d.ownerPredicate);
   assert.equal((await d.call('plan',{})).status,403);
-});
+}]);
 
 const checkpoint=[{sql:'UPDATE native_authority SET enabled=enabled'}];
 type Native=ReturnType<Awaited<ReturnType<typeof door>>['runtime']['native']>;
@@ -308,7 +310,7 @@ function assertJournal(erased:{stores:{store:string;rows:number}[]},before:Recor
   for (const table of Object.keys(before)) assert.equal(erased.stores.find(row=>row.store===table)?.rows ?? 0,before[table]-after[table],`${table} journal count`);
 }
 
-test('Erasure withdraws door rows the previous Base wrote without a destination binding, in any destination',async t=>{
+familyRows[1].push(['Erasure withdraws door rows the previous Base wrote without a destination binding, in any destination', async t=>{
   const d=await door(t);await d.enable();
   const native=d.runtime.native(),other={...d.runtime.context(),destination:'other-workspace'};
   // The previous Base door wrote these same rows without ik_door_scopes; a
@@ -352,9 +354,9 @@ test('Erasure withdraws door rows the previous Base wrote without a destination 
   for (const table of ['ik_door_chunks','ik_door_uploads']) assert.equal(native.prepare(`SELECT count(*) n FROM ${table}`).get()!.n,1,`${table}: the other destination's bound upload survives`);
   assert.equal(native.prepare("SELECT count(*) n FROM native_records WHERE id='legacy-kept'").get()!.n,1);
   assert.equal((await readD1ErasureJournal(d.runtime.context())).length,2);
-});
+}]);
 
-test('A values-only erasure that withdraws door content requires and commits the restore checkpoint',async t=>{
+familyRows[1].push(['A values-only erasure that withdraws door content requires and commits the restore checkpoint', async t=>{
   for (const bounded of [false,true]) {
     const d=await door(t);await d.enable();
     const native=d.runtime.native(),options=bounded?{operationKey:'values-only'}:{};
@@ -373,9 +375,9 @@ test('A values-only erasure that withdraws door content requires and commits the
     assertJournal(erased,before,after);assertNoResidue(native,['values-only-secret']);
     assert.equal(after.ik_door_chunks,0);
   }
-});
+}]);
 
-test('Erasing one person keeps the surviving door import history, status and undo',async t=>{
+familyRows[1].push(['Erasing one person keeps the surviving door import history, status and undo', async t=>{
   const d=await door(t);await d.enable();
   const native=d.runtime.native();
   const planned=await d.plan([{id:'erased',title:'history-erased-secret'},{id:'kept',title:'history-kept'}]);assert.equal(planned.status,200);
@@ -403,9 +405,9 @@ test('Erasing one person keeps the surviving door import history, status and und
   assert.equal((await readImportDoorHistory(d.db,d.options.claim.installationId,d.ownerPredicate))[0].state,'undone');
   // Undo moved the namespace head back, so a new baseline plans there again.
   const again=await d.plan([{id:'kept',title:'history-kept'}]);assert.equal(again.status,200,JSON.stringify(again.body));
-});
+}]);
 
-test('A person erased while a catch-up plan for their import is being saved never comes back',async t=>{
+familyRows[1].push(['A person erased while a catch-up plan for their import is being saved never comes back', async t=>{
   for (const when of [1,2]) {
     const d=await door(t);await d.enable();
     const native=d.runtime.native(),secret='catchup-erased-secret';
@@ -438,7 +440,7 @@ test('A person erased while a catch-up plan for their import is being saved neve
     assert.equal((await d.call('undo',{planId:body.details.planId})).body.state,'cancelled');
     assert.equal((await d.call('status',{planId:baseline.body.planId})).body.job.state,'completed');
   }
-});
+}]);
 
 // Every row of every table, with base64 text and bytes decoded, holds none of these values.
 function assertNowhere(native:Native,values:string[]) {
@@ -450,7 +452,7 @@ function assertNowhere(native:Native,values:string[]) {
   }
 }
 
-test('Erasing a person unchanged in a door catch-up leaves no copy in the catch-up job, which keeps its status and undo',async t=>{
+familyRows[1].push(['Erasing a person unchanged in a door catch-up leaves no copy in the catch-up job, which keeps its status and undo', async t=>{
   // A long lineage: daily catch-ups that keep a copy of the unchanged person in every job, more than one request can sever;
   // the same lineage with the person changed in every daily catch-up, so each earlier import of them is superseded;
   // and 11 jobs of 250 records of 3 KB, whose steps must also fit one D1 request in bytes.
@@ -510,9 +512,9 @@ test('Erasing a person unchanged in a door catch-up leaves no copy in the catch-
       :await retireD1ImportCustody({target:{kind:'record',id:'kept'}},keep,d.runtime.context(),checkpoint);
     assert.equal(next.phase,'complete');assertNowhere(native,['catchup-kept']);
   }
-});
+}]);
 
-test('A door upload in flight across an erasure, or holding an erased person, leaves nothing of them behind',async t=>{
+familyRows[1].push(['A door upload in flight across an erasure, or holding an erased person, leaves nothing of them behind', async t=>{
   for (const when of ['continuation','opening','after'] as const) {
     const d=await door(t);await d.enable();
     const native=d.runtime.native(),secret='upload-erased-'+when;
@@ -554,9 +556,9 @@ test('A door upload in flight across an erasure, or holding an erased person, le
     assertNowhere(native,[secret]);
     assert.equal(native.prepare("SELECT count(*) n FROM native_records WHERE id='kept'").get()!.n,1);
   }
-});
+}]);
 
-test('The default seed\'s resumable erasure severs a door catch-up that an earlier redaction step read, on a destination with many jobs',async t=>{
+familyRows[1].push(['The default seed\'s resumable erasure severs a door catch-up that an earlier redaction step read, on a destination with many jobs', async t=>{
   // A redaction step reads 25 jobs; the catch-up job must sort among the first step's jobs, which random job ids give most of the time.
   for (let attempt=0;attempt<12;attempt++) {
     const d=await door(t);await d.enable();
@@ -585,9 +587,9 @@ test('The default seed\'s resumable erasure severs a door catch-up that an earli
     return;
   }
   assert.fail('no attempt placed the catch-up job in the first redaction step');
-});
+}]);
 
-test('After an erasure, a plan of an upload holding the erased person deletes it even where the namespace snapshot is withdrawn',async t=>{
+familyRows[1].push(['After an erasure, a plan of an upload holding the erased person deletes it even where the namespace snapshot is withdrawn', async t=>{
   const d=await door(t);await d.enable();
   const native=d.runtime.native(),secret=['withdrawn','namespace','secret'].join('-');
   const base=[{id:'person',title:secret},{id:'kept',title:'withdrawn-kept'}];
@@ -607,9 +609,9 @@ test('After an erasure, a plan of an upload holding the erased person deletes it
   const withdrawn=await d.call('plan',{uploadId,catchup:true});
   assert.deepEqual([withdrawn.status,withdrawn.body.error],[410,'snapshot_withdrawn'],JSON.stringify(withdrawn.body));
   assert.equal((await d.call('uploads',{uploadId})).status,200);
-});
+}]);
 
-test('After an erasure withdraws a pending catch-up, a plan of an upload holding the erased person deletes it; a clean upload keeps the refusal',async t=>{
+familyRows[1].push(['After an erasure withdraws a pending catch-up, a plan of an upload holding the erased person deletes it; a clean upload keeps the refusal', async t=>{
   const d=await door(t);await d.enable();
   const native=d.runtime.native(),secret=['pending','catchup','secret'].join('-');
   const base=[{id:'person',title:secret},{id:'kept',title:'pending-kept'}];
@@ -633,9 +635,9 @@ test('After an erasure withdraws a pending catch-up, a plan of an upload holding
   const refused=await d.call('plan',{uploadId,catchup:true});
   assert.deepEqual([refused.status,refused.body.error],[409,'namespace_has_pending_import'],JSON.stringify(refused.body));
   assert.equal((await d.call('uploads',{uploadId})).status,200);
-});
+}]);
 
-test('After an erasure, a catch-up plan that a size limit would refuse deletes an upload holding the erased person; a clean upload keeps its 413',async t=>{
+familyRows[1].push(['After an erasure, a catch-up plan that a size limit would refuse deletes an upload holding the erased person; a clean upload keeps its 413', async t=>{
   const d=await door(t);await d.enable();
   const native=d.runtime.native(),secret='size-limit-erased-secret';
   const first=await d.plan([{id:'person',title:secret},{id:'kept',title:'size-limit-kept'}]);assert.equal(first.status,200,JSON.stringify(first.body));await d.apply(first.body);
@@ -656,9 +658,9 @@ test('After an erasure, a catch-up plan that a size limit would refuse deletes a
   assert.deepEqual([planned.status,planned.body.error],[409,'source_erased'],JSON.stringify(planned.body).slice(0,300));
   assert.equal((await d.call('uploads',{uploadId},big)).status,404,'the upload holding the erased person goes');
   assertNowhere(native,[secret]);
-});
+}]);
 
-test('HTTP failed target writes keep approval evidence, roll back the batch and require a fresh plan and approval',async t=>{
+familyRows[2].push(['HTTP failed target writes keep approval evidence, roll back the batch and require a fresh plan and approval', async t=>{
   const d1=(message:string)=>new Error('D1_ERROR: '+message);
   // null is a real insert-only constraint failure; the rest are provider errors.
   const failures:[Error|null,string][]=[
@@ -758,9 +760,9 @@ test('HTTP failed target writes keep approval evidence, roll back the batch and 
   const retry=await d.plan(records);assert.equal(retry.status,200);assert.notEqual(retry.body.planId,planned.body.planId);
   await d.apply(retry.body,{approvalRecordId:'test-retry-after-rollback'});await d.undo(retry.body.planId);
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
-});
+}]);
 
-test('HTTP catch-ups keep planning and reconciling however long the chain grows',async t=>{
+familyRows[2].push(['HTTP catch-ups keep planning and reconciling however long the chain grows', async t=>{
   const d=await door(t);await d.enable();
   let records=documents(50,true);
   const base=await d.plan(records);assert.equal(base.status,200,JSON.stringify(base.body));await d.apply(base.body);
@@ -781,9 +783,9 @@ test('HTTP catch-ups keep planning and reconciling however long the chain grows'
   }
   const titles=d.runtime.native().prepare("SELECT id,json_extract(value_json,'$.title') AS title FROM native_records WHERE id IN ('0','19','20')").all();
   assert.deepEqual(Object.fromEntries(titles.map(r=>[r.id,r.title])),{'0':'Knowledge article 0, revision 1','19':'Knowledge article 19, revision 10','20':'Knowledge article 20'});
-});
+}]);
 
-test('HTTP door names a native snapshot too large for one read instead of a bare conflict',async t=>{
+familyRows[2].push(['HTTP door names a native snapshot too large for one read instead of a bare conflict', async t=>{
   const d=await door(t);await d.enable();
   const quota={maxBytes:3_000_000,maxChunks:64};
   // Each record fits the reader's 1 MiB record limit; their exact row guards together exceed one read.
@@ -798,9 +800,9 @@ test('HTTP door names a native snapshot too large for one read instead of a bare
     assert.doesNotMatch(JSON.stringify(response.body),/Archived knowledge/);
   }
   await d.undo(planned.body.planId);assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n,0);
-});
+}]);
 
-test('HTTP reconcile and catch-up planning fail closed on a native edit between reads',async t=>{
+familyRows[2].push(['HTTP reconcile and catch-up planning fail closed on a native edit between reads', async t=>{
   const d=await door(t);await d.enable();
   const records=documents(600),base=await d.plan(records);assert.equal(base.status,200,JSON.stringify(base.body));await d.apply(base.body);
   const reconciled=await d.call('reconcile',{planId:base.body.planId});assert.equal(reconciled.status,200,JSON.stringify(reconciled.body));
@@ -823,9 +825,9 @@ test('HTTP reconcile and catch-up planning fail closed on a native edit between 
   assert.equal(planned.body.summary.updated,1);assert.equal(planned.body.summary.created,1);assert.equal(planned.body.differences.conflicts.length,0);
   await d.apply(planned.body);
   const caughtUp=await d.call('reconcile',{planId:planned.body.planId});assert.equal(caughtUp.body.ok,true);assert.equal(caughtUp.body.counts.present,601);
-});
+}]);
 
-test('owner-session HTTP pipeline works in a seed with no owner-claim module or grant key ring',async t=>{
+familyRows[3].push(['owner-session HTTP pipeline works in a seed with no owner-claim module or grant key ring', async t=>{
   const d=await door(t,'operator');
   for (const action of ['uploads','plan','apply','status','reconcile','undo']) {
     assert.equal((await d.request(d.origin+'/api/rer/import/'+action,{method:'POST'})).status,404);
@@ -886,9 +888,9 @@ test('owner-session HTTP pipeline works in a seed with no owner-claim module or 
   assert.equal(baseline.status,200,JSON.stringify(baseline.body));assert.deepEqual(baseline.body.summary,{sourceRecords:1,created:1,updated:0,unchanged:0,gone:0});
   assert.equal(d.runtime.native().prepare('SELECT COUNT(*) n FROM ik_door_grants').get()!.n,0);
   assert.equal(d.runtime.native().prepare('SELECT enabled FROM ik_door_settings').get()!.enabled,0);
-});
+}]);
 
-test('Business added later under a different RER claim id keeps the door key, owner history and catch-up lineage',async t=>{
+familyRows[3].push(['Business added later under a different RER claim id keeps the door key, owner history and catch-up lineage', async t=>{
   const d=await door(t,'operator'),key=d.options.claim.installationId,count=()=>d.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get()!.n;
   const kept=await d.plan(documents(5));assert.equal(kept.status,200,JSON.stringify(kept.body));await d.apply(kept.body);
   // RER supplies its own claim installation id later; the grant mount keeps the operator's door key.
@@ -910,9 +912,9 @@ test('Business added later under a different RER claim id keeps the door key, ow
   // The owner's own mount still undoes the newest snapshot, then the original.
   d.state.via='operator';
   await d.undo(catchup.body.planId);assert.equal(count(),5);await d.undo(kept.body.planId);assert.equal(count(),0);
-});
+}]);
 
-test('one owner-session mount serves several import sources chosen per request from a server-side allow-list',async t=>{
+familyRows[4].push(['one owner-session mount serves several import sources chosen per request from a server-side allow-list', async t=>{
   const d=await door(t,'operator'),count=(table:string)=>d.runtime.native().prepare(`SELECT COUNT(*) n FROM ${table}`).get()!.n;
   // ADOPTING.md steps 3 and 4: one server-owned allow-list picks namespace, parser and mapping for both mounts.
   const sources:Record<string,{parse(value:Json):{kind:string;sourceId:string;payload:Json}}>={
@@ -989,7 +991,7 @@ test('one owner-session mount serves several import sources chosen per request f
   assert.equal((await d.call('status',{planId:businessTickets.body.planId})).status,404);
   await d.undo(businessWiki.body.planId);await d.undo(wiki.body.planId);assert.equal(count('native_records'),4);
   d.state.headers={'X-Import-Source':'tickets'};await d.undo(businessTickets.body.planId);await d.undo(tickets.body.planId);assert.equal(count('native_records'),0);
-});
+}]);
 
 // UptimeRobot v3 monitor pages as Uptime's door receives them: NDJSON pages whose
 // every monitor carries `apiKey: null`, with one monitor checking a user:pass@ URL.
@@ -1011,7 +1013,7 @@ function stored(native:ReturnType<Awaited<ReturnType<typeof door>>['runtime']['n
     .map(row=>JSON.stringify(row)+Object.values(row).map(v=>typeof v==='string'&&/^[A-Za-z0-9+/]+=*$/.test(v)&&v.length>=16?Buffer.from(v,'base64').toString():'').join('')).join('\n');
 }
 
-test('HTTP door imports UptimeRobot pages whose records carry empty credential fields, and removes real credential values per record without storing them',async t=>{
+familyRows[4].push(['HTTP door imports UptimeRobot pages whose records carry empty credential fields, and removes real credential values per record without storing them', async t=>{
   const d=await door(t);await d.enable();
   d.mount(createImportDoorHandler({...d.options,format:'ndjson',...monitorSource()}));
   // Compound names, header pairs and URLs of any scheme, as raw uploads (the
@@ -1192,9 +1194,9 @@ test('HTTP door imports UptimeRobot pages whose records carry empty credential f
   const withheld=await e.call('plan',{uploadId:refusedUpload,catchup:true});
   assert.deepEqual([withheld.status,withheld.body.error],[410,'upload_credentials_withheld']);
   const caughtUp=await e.call('plan',{uploadId:await e.upload(later),catchup:true});assert.equal(caughtUp.status,200,JSON.stringify(caughtUp.body));
-});
+}]);
 
-test('HTTP door names every reader and bundle-check refusal with a 4xx and the field kind, never a bare conflict or the value',async t=>{
+familyRows[4].push(['HTTP door names every reader and bundle-check refusal with a 4xx and the field kind, never a bare conflict or the value', async t=>{
   const d=await door(t);await d.enable();
   const mount=(source:ReturnType<typeof monitorSource>,limits?:{maxRecordBytes:number})=>d.mount(createImportDoorHandler({...d.options,format:'ndjson',...source,...(limits?{limits}:{})}));
   const refusals:[string,Buffer,ReturnType<typeof monitorSource>,number,string,string?][]=[
@@ -1221,9 +1223,9 @@ test('HTTP door names every reader and bundle-check refusal with a 4xx and the f
   const large=await d.call('plan',{uploadId:await d.upload(pages([monitor(6,{friendlyName:'Long name '.repeat(60)})]))});
   assert.deepEqual([large.status,large.body.error],[413,'source_record_byte_limit'],JSON.stringify(large.body));
   assert.equal(d.runtime.native().prepare('SELECT count(*) n FROM native_records').get()!.n,0);
-});
+}]);
 
-test('A declared door adapter preserves native edits on undo, with durable policy across resume and replay',async t=>{
+familyRows[5].push(['A declared door adapter preserves native edits on undo, with durable policy across resume and replay', async t=>{
   const d=await door(t);await d.enable();
   d.mount(createImportDoorHandler({...d.options,targets:sqliteTargets}));
   const planned=await d.plan(documents(3));assert.equal(planned.status,200,JSON.stringify(planned.body));
@@ -1268,9 +1270,9 @@ test('A declared door adapter preserves native edits on undo, with durable polic
   assert.equal(reports.filter(r=>r.disposition==='reversed').length,29);
   assert.deepEqual(reports.filter(r=>r.disposition==='retained').map(r=>[r.targetId,r.reason]),[['4','superseded']]);
   assert.equal((await readD1ImportJob(baseJob.id,{...l.runtime.context(),namespace:baseJob.namespace,reversalPolicy:'preserve-conflicts'})).state,'undone');
-});
+}]);
 
-test('An undeclared door adapter keeps strict undo, including jobs created before a preserving adapter upgrade',async t=>{
+familyRows[5].push(['An undeclared door adapter keeps strict undo, including jobs created before a preserving adapter upgrade', async t=>{
   const d=await door(t);await d.enable();
   const planned=await d.plan(documents(3));assert.equal(planned.status,200);
   const job=await d.apply(planned.body),native=d.runtime.native();
@@ -1292,4 +1294,16 @@ test('An undeclared door adapter keeps strict undo, including jobs created befor
   assert.equal((await readD1ImportJob(resumed.id,{...s.runtime.context(),namespace:resumed.namespace,reversalPolicy:'strict'})).state,'completed');
   assert.throws(()=>createImportDoorHandler({...d.options,reversalPolicy:'preserve-conflicts'}),/invalid_configuration/);
   assert.throws(()=>createImportDoorHandler({...d.options,reversalPolicy:'keep-everything' as 'strict'}),/invalid_configuration/);
-});
+}]);
+
+ test("HTTP import authority stays bound to owner activation and signed grants", async t => { await caseRows(t, familyRows[0]); });
+
+ test("HTTP privacy withdrawal removes every copy while preserving peer imports", async t => { await caseRows(t, familyRows[1]); });
+
+ test("HTTP reviewed imports and catch-up preserve atomic native state and approval evidence", async t => { await caseRows(t, familyRows[2]); });
+
+ test("HTTP owner sessions retain installation identity and import history across adoption", async t => { await caseRows(t, familyRows[3]); });
+
+ test("HTTP source intake keeps supported readers bounded and refusal diagnostics safe", async t => { await caseRows(t, familyRows[4]); });
+
+ test("HTTP undo honors the declared native conflict policy across resume and replay", async t => { await caseRows(t, familyRows[5]); });

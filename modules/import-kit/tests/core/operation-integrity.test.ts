@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyImportBatches, createImportJob, undoImport, rollbackImport, resumeImport, readImportJob, readImportOriginals, readPersistedImport, reconcileImport, canonicalJson } from '../../src/index.ts';
@@ -11,7 +13,7 @@ const corruptions = {
   'SQL and JSON reversal flags lack a reversal commit': (ctx, row) => ctx.storage.database.prepare('UPDATE ik_provenance SET reversed=1,record_json=? WHERE id=?').run(canonicalJson({ ...JSON.parse(row.record_json), reversed: true }), row.id)
 };
 for (const [action, reverse] of Object.entries({ undo: undoImport, rollback: rollbackImport })) for (const [name, corrupt] of Object.entries(corruptions)) {
-  test(`${action} preflights all six native effects before any write: ${name}`, async t => {
+  familyRows[0].push([`${action} preflights all six native effects before any write: ${name}`, async t => {
     const { ctx } = nativeSetup(t), { plan, job } = await nativeJob(ctx); await applyImportBatches(job, ctx);
     ctx.operationKey = 'queued-other'; const other = await createImportJob(plan, ctx);
     corrupt(ctx, firstArticle(ctx), other);
@@ -20,17 +22,17 @@ for (const [action, reverse] of Object.entries({ undo: undoImport, rollback: rol
     assert.deepEqual(snapshot(ctx), before); assert.equal(nativeRows(ctx).length, 6);
     assert.equal(readImportJob(job.id, ctx).state, 'completed');
     assert.deepEqual(readImportOriginals(job.id, ctx), originals);
-  });
+  }]);
 }
-test('completed resume and completed apply validate corrupt JSON attribution without accepting completion', async t => {
+familyRows[0].push(['completed resume and completed apply validate corrupt JSON attribution without accepting completion', async t => {
   const { ctx } = nativeSetup(t), { plan, job } = await nativeJob(ctx); await applyImportBatches(job, ctx);
   ctx.operationKey = 'queued'; const other = await createImportJob(plan, ctx);
   corruptions['JSON job changed'](ctx, firstArticle(ctx), other);
   const before = snapshot(ctx);
   for (const operation of [resumeImport, applyImportBatches]) await assert.rejects(operation(job.id, ctx), /PROVENANCE_STORAGE_MISMATCH/);
   assert.deepEqual(snapshot(ctx), before);
-});
-test('replay refuses extra physical provenance with a reused JSON ID before advancing any checkpoint', async t => {
+}]);
+familyRows[0].push(['replay refuses extra physical provenance with a reused JSON ID before advancing any checkpoint', async t => {
   const { ctx } = nativeSetup(t), { plan, job } = await nativeJob(ctx); await applyImportBatches(job, ctx);
   const row = firstArticle(ctx), db = ctx.storage.database;
   db.prepare('INSERT INTO ik_provenance(id,job_id,ordinal,effect_ordinal,source_identity,destination,target_kind,target_id,record_json) VALUES(?,?,?,?,?,?,?,?,?)').run('extra', job.id, row.ordinal, row.effect_ordinal, row.source_identity, ctx.destination, 'article', 'orphan', row.record_json);
@@ -38,8 +40,8 @@ test('replay refuses extra physical provenance with a reused JSON ID before adva
   ctx.operationKey = 'replay'; const replay = await createImportJob(plan, ctx), before = snapshot(ctx);
   await assert.rejects(applyImportBatches(replay, ctx), /PROVENANCE_/);
   assert.deepEqual(snapshot(ctx), before); assert.equal(readImportJob(replay.id, ctx).checkpoint, 0);
-});
-test('source-only ownership moved to an unexecuted real job cannot become valid through apply', async t => {
+}]);
+familyRows[0].push(['source-only ownership moved to an unexecuted real job cannot become valid through apply', async t => {
   const { ctx } = nativeSetup(t), { plan, job } = await nativeJob(ctx, { version: 'v1', map: () => ({ effects: [], unmapped: [{ reason: 'Unsupported native object' }] }) });
   await applyImportBatches(job, ctx); ctx.operationKey = 'queued'; const other = await createImportJob(plan, ctx);
   ctx.storage.database.prepare('UPDATE ik_sources SET job_id=?').run(other.id);
@@ -47,8 +49,8 @@ test('source-only ownership moved to an unexecuted real job cannot become valid 
   const before = snapshot(ctx);
   await assert.rejects(applyImportBatches(other, ctx), /PROVENANCE_SOURCE_CLAIM_MISMATCH/);
   assert.deepEqual(snapshot(ctx), before); assert.equal(nativeRows(ctx).length, 0);
-});
-test('valid replay owns no native effects; its reversal preserves the actual publishing job', async t => {
+}]);
+familyRows[0].push(['valid replay owns no native effects; its reversal preserves the actual publishing job', async t => {
   const { ctx } = nativeSetup(t), { plan, job } = await nativeJob(ctx); await applyImportBatches(job, ctx);
   const native = nativeRows(ctx), originals = readImportOriginals(job.id, ctx);
   ctx.operationKey = 'repeat'; const replay = await createImportJob(plan, ctx); await applyImportBatches(replay, ctx);
@@ -60,8 +62,8 @@ test('valid replay owns no native effects; its reversal preserves the actual pub
   assert.equal(nativeRows(ctx).length, 5); delete ctx.maxBatches;
   assert.equal((await resumeImport(job.id, ctx)).state, 'undone'); assert.equal((await undoImport(job.id, ctx)).state, 'undone');
   assert.equal(nativeRows(ctx).length, 0); assert.deepEqual(readImportOriginals(job.id, ctx), originals);
-});
-test('source-only replay, partial apply and rollback keep original publishing attribution', async t => {
+}]);
+familyRows[0].push(['source-only replay, partial apply and rollback keep original publishing attribution', async t => {
   const { ctx } = nativeSetup(t), { plan, job } = await nativeJob(ctx, { version: 'v1', map: () => ({ effects: [] }) });
   ctx.maxBatches = 1; await applyImportBatches(job, ctx); delete ctx.maxBatches;
   assert.equal((await resumeImport(job.id, ctx)).state, 'completed');
@@ -69,17 +71,19 @@ test('source-only replay, partial apply and rollback keep original publishing at
   await rollbackImport(replay.id, ctx);
   assert.ok(ctx.storage.database.prepare('SELECT job_id FROM ik_sources').all().every(row => row.job_id === job.id));
   await rollbackImport(job.id, ctx); assert.equal(ctx.storage.database.prepare('SELECT count(*) n FROM ik_sources').get().n, 0);
-});
-test('same-operation create cannot return a completed job with known corrupt attribution', async t => {
+}]);
+familyRows[0].push(['same-operation create cannot return a completed job with known corrupt attribution', async t => {
   const { ctx } = nativeSetup(t), { plan, job } = await nativeJob(ctx); await applyImportBatches(job, ctx);
   const row = firstArticle(ctx);
   ctx.storage.database.prepare('UPDATE ik_provenance SET record_json=? WHERE id=?').run(canonicalJson({ ...JSON.parse(row.record_json), jobId: 'corrupt-job' }), row.id);
   const before = snapshot(ctx); await assert.rejects(createImportJob(plan, ctx), /PROVENANCE_STORAGE_MISMATCH/); assert.deepEqual(snapshot(ctx), before);
-});
-for (const action of ['resume', 'undo'] as const) test(`${action} validates publication checkpoint and journal before using otherwise valid provenance`, async t => {
+}]);
+for (const action of ['resume', 'undo'] as const) familyRows[0].push([`${action} validates publication checkpoint and journal before using otherwise valid provenance`, async t => {
   const { ctx } = nativeSetup(t), { job } = await nativeJob(ctx); await applyImportBatches(job, ctx);
   ctx.storage.database.prepare("DELETE FROM ik_batches WHERE job_id=? AND action='apply' AND position=0").run(job.id);
   const before = snapshot(ctx);
   await assert.rejects(action === 'resume' ? resumeImport(job.id, ctx) : undoImport(job.id, ctx), /PROVENANCE_CHECKPOINT_MISMATCH/);
   assert.deepEqual(snapshot(ctx), before);
-});
+}]);
+
+ test("core operation integrity preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

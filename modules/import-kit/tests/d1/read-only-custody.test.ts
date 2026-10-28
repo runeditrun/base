@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sqliteRuntime, sqliteSource, sqliteMapping } from './sqlite-runtime.ts';
@@ -15,7 +17,7 @@ async function custody(t: any, large = true) {
   const job = await createD1ImportJob(plan, { ...r.context(), reviewedFingerprint: plan.fingerprint });
   return { ...r, bundle, plan, job };
 }
-for (const version of [1, 2, 3]) test(`query-only custody version ${version} retains empty, unavailable and Unicode originals`, async t => {
+for (const version of [1, 2, 3]) familyRows[0].push([`query-only custody version ${version} retains empty, unavailable and Unicode originals`, async t => {
   const r = await custody(t, version !== 1), native = r.native();
   if (version !== 3) {
     const encoded = originalStorage(r.plan, r.job.id, version);
@@ -29,9 +31,9 @@ for (const version of [1, 2, 3]) test(`query-only custody version ${version} ret
   const originals = await readD1ImportOriginals(r.job.id, r.context());
   assert.deepEqual(originals.map(o => [o.name, o.sha256, o.size, o.original]), r.bundle.artifacts.map(a => [a.name, a.sha256, a.size, a.original!.status === 'available' ? { status: 'retained', base64: a.original!.base64 } : a.original]));
   assert.equal(totalChanges(native), count); assert.deepEqual(sqliteSnapshot(native), before);
-});
+}]);
 
-for (const table of ['ik_d1_plan_chunks', 'ik_d1_original_chunks']) for (const position of ['first', 'last']) test(`read rejects late ${position} ${table} byte edit without writes`, async t => {
+for (const table of ['ik_d1_plan_chunks', 'ik_d1_original_chunks']) for (const position of ['first', 'last']) familyRows[0].push([`read rejects late ${position} ${table} byte edit without writes`, async t => {
   const r = await custody(t), native = r.native();
   const column = table === 'ik_d1_plan_chunks' ? 'body' : 'bytes';
   const row = native.prepare(`SELECT rowid,${column} AS content FROM ${table} ORDER BY ordinal ${position === 'first' ? 'ASC' : 'DESC'} LIMIT 1`).get()!;
@@ -45,9 +47,9 @@ for (const table of ['ik_d1_plan_chunks', 'ik_d1_original_chunks']) for (const p
   const ctx = { ...r.context(), storage: { ...r.context().storage, database: observed.database } };
   await assert.rejects(table === 'ik_d1_plan_chunks' ? readD1ImportJob(r.job.id, ctx) : readD1ImportOriginals(r.job.id, ctx), /IMPORT_ATOMIC_GUARD/);
   assert.equal(batches, 2); assert.equal(totalChanges(native), count); assert.deepEqual(sqliteSnapshot(native), before); observed.assertSelectOnly();
-});
+}]);
 
-for (const version of [1, 2]) test(`legacy version ${version} late inline original byte edit is rejected without read writes`, async t => {
+for (const version of [1, 2]) familyRows[0].push([`legacy version ${version} late inline original byte edit is rejected without read writes`, async t => {
   const r = await custody(t, false), native = r.native(), encoded = originalStorage(r.plan, r.job.id, version);
   native.prepare('UPDATE ik_original_sets SET version=?').run(version); native.exec('DELETE FROM ik_d1_original_chunks');
   for (const row of encoded.rows) native.prepare('UPDATE ik_originals SET bytes=? WHERE job_id=? AND kind=? AND original_key=?').run(row.bytes === null ? null : Buffer.from(row.bytes, 'hex'), r.job.id, row.kind, row.original_key);
@@ -60,4 +62,6 @@ for (const version of [1, 2]) test(`legacy version ${version} late inline origin
   const ctx = { ...r.context(), storage: { ...r.context().storage, database: observed.database } };
   await assert.rejects(readD1ImportOriginals(r.job.id, ctx), /IMPORT_ATOMIC_GUARD/);
   assert.equal(batches, 2); assert.equal(totalChanges(native), count); assert.deepEqual(sqliteSnapshot(native), before); observed.assertSelectOnly();
-});
+}]);
+
+ test("d1 read only custody preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

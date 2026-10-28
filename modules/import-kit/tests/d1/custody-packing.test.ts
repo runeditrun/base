@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, source, mapping } from './fixtures.ts';
@@ -12,7 +14,7 @@ function input() {
   bundle.artifacts.push({ name: 'empty.bin', size: 0, sha256: sha256(''), original: { status: 'available', base64: '' } });
   return bundle;
 }
-test('real D1: encoded custody preserves every byte including invalid UTF-8, empty bytes and exact undo retention', async t => {
+familyRows[0].push(['real D1: encoded custody preserves every byte including invalid UTF-8, empty bytes and exact undo retention', async t => {
   const r = await runtime(t), m = meter(r.db()), ctx = { ...r.context(), storage: { ...r.context().storage, database: m.database } };
   const bundle = input(), plan = await m.request('plan', () => planD1Import(bundle, mapping, ctx));
   const admission = preflightD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint });
@@ -29,8 +31,8 @@ test('real D1: encoded custody preserves every byte including invalid UTF-8, emp
     assert.deepEqual({ size: original.size, hash: original.sha256, original: original.original }, { size: expected.size, hash: expected.sha256, original: { status: 'retained', base64: (expected.original as any).base64 } });
   }
   console.log(JSON.stringify({ encodedCustody: m.snapshots, admission }));
-});
-for (const corruption of ['missing', 'extra', 'content', 'ordinal']) test(`real D1: encoded original ${corruption} chunk fails closed`, async t => {
+}]);
+for (const corruption of ['missing', 'extra', 'content', 'ordinal']) familyRows[0].push([`real D1: encoded original ${corruption} chunk fails closed`, async t => {
   const r = await runtime(t), ctx = r.context(), plan = await planD1Import(input(), mapping, ctx);
   const job = await createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint });
   const row = await r.db().prepare('SELECT * FROM ik_d1_original_chunks WHERE job_id=? AND ordinal=1 LIMIT 1').bind(job.id).first();
@@ -42,15 +44,15 @@ for (const corruption of ['missing', 'extra', 'content', 'ordinal']) test(`real 
   await assert.rejects(readD1ImportOriginals(job.id, ctx), /ORIGINAL_CUSTODY_MISMATCH/);
   await assert.rejects(resumeD1Import(job.id, ctx), /ORIGINAL_CUSTODY_MISMATCH/);
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM contacts').first())?.n, 0);
-});
-for (const failure of ['sql', 'revoke', 'missing-plan']) test(`real D1: ${failure} during packed custody creation leaves zero changes`, async t => {
+}]);
+for (const failure of ['sql', 'revoke', 'missing-plan']) familyRows[0].push([`real D1: ${failure} during packed custody creation leaves zero changes`, async t => {
   const r = await runtime(t), ctx = r.context(), plan = await planD1Import(input(), mapping, ctx);
   await r.db().prepare(failure === 'sql' ? "CREATE TRIGGER fail_custody BEFORE INSERT ON ik_d1_original_chunks WHEN NEW.ordinal=1 BEGIN SELECT RAISE(ABORT,'CUSTODY_FAILURE'); END" : failure === 'revoke' ? 'CREATE TRIGGER revoke_custody AFTER INSERT ON ik_d1_original_chunks BEGIN UPDATE sessions SET enabled=0; END' : 'CREATE TRIGGER remove_plan_chunk AFTER INSERT ON ik_d1_plan_chunks WHEN NEW.ordinal=0 BEGIN DELETE FROM ik_d1_plan_chunks WHERE job_id=NEW.job_id AND ordinal=0; END').run();
   await assert.rejects(createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint }), failure === 'sql' ? /CUSTODY_FAILURE/ : /IMPORT_ATOMIC_GUARD/);
   for (const table of ['ik_jobs','ik_d1_plan_chunks','ik_original_sets','ik_originals','ik_d1_original_chunks','ik_d1_assertions']) assert.equal((await r.db().prepare(`SELECT COUNT(*) AS n FROM ${table}`).first())?.n, 0, table);
   assert.equal((await r.db().prepare('SELECT enabled FROM sessions').first())?.enabled, 1);
-});
-for (const version of [1, 2]) for (const shape of ['inline', 'chunked']) test(`real D1: legacy version ${version} ${shape} binary custody still reads and survives undo`, async t => {
+}]);
+for (const version of [1, 2]) for (const shape of ['inline', 'chunked']) familyRows[0].push([`real D1: legacy version ${version} ${shape} binary custody still reads and survives undo`, async t => {
   const r = await runtime(t), ctx = r.context(), plan = await planD1Import(shape === 'inline' ? source(1) : input(), mapping, ctx);
   const job = await createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint });
   const legacy = originalStorage(plan, job.id, version);
@@ -63,9 +65,9 @@ for (const version of [1, 2]) for (const shape of ['inline', 'chunked']) test(`r
   const before = await readD1ImportOriginals(job.id, ctx);
   await resumeD1Import(job.id, ctx); await undoD1Import(job.id, ctx);
   assert.deepEqual(await readD1ImportOriginals(job.id, ctx), before);
-});
+}]);
 
-test('real D1: reviewed plan changes during lookup reject before creating any custody', async t => {
+familyRows[0].push(['real D1: reviewed plan changes during lookup reject before creating any custody', async t => {
   const r = await runtime(t), ctx = r.context(), plan = await planD1Import(source(1), mapping, ctx), db = r.db();
   const wrap = (statement: any): any => ({
     bind(...params: any[]) { return wrap(statement.bind(...params)); },
@@ -78,4 +80,6 @@ test('real D1: reviewed plan changes during lookup reject before creating any cu
   };
   await assert.rejects(createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint, storage: { ...ctx.storage, database: racing } }), /REVIEW_FINGERPRINT_MISMATCH/);
   for (const table of ['ik_jobs','ik_d1_plan_chunks','ik_original_sets','ik_originals','ik_d1_original_chunks','ik_d1_assertions']) assert.equal((await db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first())?.n, 0, table);
-});
+}]);
+
+ test("d1 custody packing preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

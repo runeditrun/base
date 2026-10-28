@@ -1,10 +1,12 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import { boundedRuntime } from './retained-fixtures.ts';
 import assert from 'node:assert/strict';
 import { sqliteSource,sqliteMapping } from './sqlite-runtime.ts';
 import { planD1ImportStream,createD1ImportStream,readD1ImportJob,resumeD1ImportStream,undoD1ImportStream,eraseD1ImportTarget } from '../../src/d1/index.ts';
 
-for(const applied of [false,true])test(`bounded erasure reconciles eighty-four ${applied?'reused completed':'queued'} stream copies within one request`,async t=>{
+for(const applied of [false,true])familyRows[0].push([`bounded erasure reconciles eighty-four ${applied?'reused completed':'queued'} stream copies within one request`, async t=>{
   const r=await boundedRuntime(t),context=()=>({...r.context(),maxBatchBytes:2*1024*1024}),source=sqliteSource(1);
   source.artifacts.forEach(a=>a.original={status:'unavailable',reason:'not-supplied'});
   const plan=await planD1ImportStream(source,sqliteMapping,context()),streams:string[]=[];
@@ -26,9 +28,9 @@ for(const applied of [false,true])test(`bounded erasure reconciles eighty-four $
   assert.equal(r.native().prepare('SELECT count(*) n FROM native_records').get()!.n,0);
   await assert.rejects(createD1ImportStream(plan,{...context(),operationKey:'after-privacy',reviewedFingerprint:plan.fingerprint}),/IMPORT_SOURCE_ERASED/);
   t.diagnostic(JSON.stringify({copies:84,applied,queries,maxBatchBytes:Math.max(...wire)}));
-});
+}]);
 
-test('bounded erasure fences custody changes between numeric measurement and payload reads',async t=>{
+familyRows[0].push(['bounded erasure fences custody changes between numeric measurement and payload reads', async t=>{
   const r=await boundedRuntime(t),source=sqliteSource(1);source.artifacts.forEach(a=>a.original={status:'unavailable',reason:'not-supplied'});
   const plan=await planD1ImportStream(source,sqliteMapping,r.context()),stream=await createD1ImportStream(plan,{...r.context(),reviewedFingerprint:plan.fingerprint});
   await resumeD1ImportStream(stream.id,r.context());
@@ -47,9 +49,9 @@ test('bounded erasure fences custody changes between numeric measurement and pay
   assert.equal(r.native().prepare('SELECT fence FROM ik_jobs WHERE id=?').get(child)!.fence,Number(originalJob.fence)+1);
   for(const table of ['ik_d1_erased_sources','ik_d1_erased_targets','ik_d1_native_staging','ik_d1_native_staging_index','ik_d1_native_staging_values','bounded_native_fences'])assert.equal(r.native().prepare(`SELECT count(*) n FROM ${table}`).get()!.n,0,table);
   assert.equal((await readD1ImportJob(child,r.context())).erasedRecords,0);
-});
+}]);
 
-test('bulk erasure rejects unexpected strict reversal rows before private preparation',async t=>{
+familyRows[0].push(['bulk erasure rejects unexpected strict reversal rows before private preparation', async t=>{
   const r=await boundedRuntime(t),source=sqliteSource(1);source.artifacts.forEach(a=>a.original={status:'unavailable',reason:'not-supplied'});
   const plan=await planD1ImportStream(source,sqliteMapping,r.context());await createD1ImportStream(plan,{...r.context(),reviewedFingerprint:plan.fingerprint});
   const child=r.native().prepare('SELECT id FROM ik_jobs').get()!.id as string;
@@ -59,4 +61,6 @@ test('bulk erasure rejects unexpected strict reversal rows before private prepar
   assert.deepEqual(r.native().prepare('SELECT * FROM ik_jobs').all(),before);
   assert.equal(r.native().prepare('SELECT count(*) n FROM ik_d1_reversal_reports').get()!.n,1);
   for(const table of ['ik_d1_erased_sources','ik_d1_erased_targets','ik_d1_native_staging','ik_d1_native_staging_index','ik_d1_native_staging_values','bounded_native_fences'])assert.equal(r.native().prepare(`SELECT count(*) n FROM ${table}`).get()!.n,0,table);
-});
+}]);
+
+ test("d1 erasure many copies preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

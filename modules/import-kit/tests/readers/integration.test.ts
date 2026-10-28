@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -10,7 +12,7 @@ import { readApiSource, readFileSource, ReaderError } from '../../src/readers/in
 import type { ImportContext, ImportMapping } from '../../src/types.ts';
 import { apiInput, bytes, code, jsonResponse, record } from './helpers.ts';
 
-test('reader bundles pass frozen core planning/apply/reconciliation, and database never retains bearer tokens', async () => {
+familyRows[0].push(['reader bundles pass frozen core planning/apply/reconciliation, and database never retains bearer tokens', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'import-reader-core-'));
   const filename = join(directory, 'import.sqlite');
   const storage = openSqliteImportStorage(filename);
@@ -38,9 +40,9 @@ test('reader bundles pass frozen core planning/apply/reconciliation, and databas
     const conflicting = await readFileSource({ namespace: 'source-a', name: 'duplicate.json', format: 'json', bytes: bytes('[{"id":"a"},{"id":"a","changed":true}]'), parse: record });
     assert.throws(() => planImport(conflicting, mapping, context), /DUPLICATE_SOURCE_CONFLICT/);
   } finally { storage.close(); await rm(directory, { recursive: true, force: true }); }
-});
+}]);
 
-test('actual fetch follows same-origin redirects manually and reads both streamed pages', async () => {
+familyRows[0].push(['actual fetch follows same-origin redirects manually and reads both streamed pages', async () => {
   const received: { url: string; authorization: string | undefined }[] = [];
   const server = createServer((request, response) => {
     received.push({ url: request.url!, authorization: request.headers.authorization });
@@ -55,9 +57,11 @@ test('actual fetch follows same-origin redirects manually and reads both streame
     assert.deepEqual(received.map(r => r.url), ['/start', '/items', '/items?page=2']);
     assert.ok(received.every(r => r.authorization === 'Bearer synthetic-http-credential'));
   } finally { server.closeAllConnections(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
-});
+}]);
 
-test('external streams cannot inject token-bearing ReaderError diagnostics', async () => {
+familyRows[0].push(['external streams cannot inject token-bearing ReaderError diagnostics', async () => {
   async function* broken() { throw new ReaderError('synthetic-secret'); yield bytes(''); }
   await assert.rejects(readFileSource({ namespace: 'source-a', name: 'source.json', format: 'json', bytes: broken(), parse: record }), code('SOURCE_READ_FAILED'));
-});
+}]);
+
+ test("readers integration preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

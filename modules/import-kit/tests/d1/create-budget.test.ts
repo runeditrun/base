@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import { fullScale } from './scale-size.ts';
 import { logicalValue } from '../helpers/logical-size.ts';
@@ -6,7 +8,7 @@ import { runtime, source, mapping } from './fixtures.ts';
 import { meter } from './meter.ts';
 import { planD1Import, preflightD1ImportJob, createD1ImportJob, readD1ImportOriginals, sha256, PLAN_BYTES_LIMIT, PlanTooLargeError } from '../../src/d1/index.ts';
 
-test('real D1: an original fits chunked atomic custody, with chunked-plan return reads inside the request budget', async t => {
+familyRows[0].push(['real D1: an original fits chunked atomic custody, with chunked-plan return reads inside the request budget', async t => {
   const r = await runtime(t), m = meter(r.db()), ctx = { ...r.context(), storage: { ...r.context().storage, database: m.database } };
   const bytes = Buffer.alloc(fullScale ? 55_570_000 : 800_000, 120), bundle = source(0);
   bundle.artifacts = [{ name: 'large.bin', sha256: sha256(bytes), size: bytes.length, original: { status: 'available', base64: bytes.toString('base64') } }];
@@ -21,9 +23,9 @@ test('real D1: an original fits chunked atomic custody, with chunked-plan return
   assert.deepEqual(original.original, { status: 'retained', base64: (bundle.artifacts[0].original as any).base64 });
   assert.ok(m.snapshots.every(s => s.count <= 1000));
   console.log(JSON.stringify({ createBudget: m.snapshots, admission }));
-});
+}]);
 
-test('real D1: an oversized logical plan is refused before encoding or database writes', async t => {
+familyRows[0].push(['real D1: an oversized logical plan is refused before encoding or database writes', async t => {
   const r = await runtime(t), m = meter(r.db()), ctx = { ...r.context(), storage: { ...r.context().storage, database: m.database } };
   const plan = await planD1Import(source(1), mapping, ctx);
   const grown = { ...plan, diagnostics: [{ severity: 'warning', code: 'size', message: 'size', details: logicalValue(BigInt(PLAN_BYTES_LIMIT)) }] };
@@ -32,4 +34,6 @@ test('real D1: an oversized logical plan is refused before encoding or database 
   const { results: tables } = await r.db().prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'ik\\_%' ESCAPE '\\'").all();
   assert.ok(tables.length >= 10);
   for (const { name } of tables as { name: string }[]) assert.equal((await r.db().prepare(`SELECT COUNT(*) AS n FROM ${name}`).first())?.n, 0);
-});
+}]);
+
+ test("d1 create budget preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

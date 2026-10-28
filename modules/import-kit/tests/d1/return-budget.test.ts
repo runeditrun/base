@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, source, mapping, targets } from './fixtures.ts';
@@ -14,7 +16,7 @@ const nativeAdapter = (writeCount: number, removeCount = 0): D1TargetAdapter => 
   remove(...args) { return [...targets.remove(...args), ...nativeStatements(removeCount)]; },
 });
 
-for (const chunked of [false, true]) for (const action of ['apply', 'undo']) test(`real D1: default ${action} reserves ${chunked ? 'chunked' : 'inline'} return reads before native publication`, async t => {
+for (const chunked of [false, true]) for (const action of ['apply', 'undo']) familyRows[0].push([`real D1: default ${action} reserves ${chunked ? 'chunked' : 'inline'} return reads before native publication`, async t => {
   const r = await runtime(t), m = meter(r.db());
   const ctx: D1ImportContext = { ...r.context(), batchSize: undefined, storage: { database: m.database, targets } };
   const bundle = source(1);
@@ -52,9 +54,9 @@ for (const chunked of [false, true]) for (const action of ['apply', 'undo']) tes
   }
   assert.ok(m.snapshots.every(s => s.count <= 1000));
   console.log(JSON.stringify({ returnBudget: chunked ? 'chunked' : 'inline', action, requests: m.snapshots }));
-});
+}]);
 
-for (const exhaustedAt of ['preflight', 'publication']) test(`real D1: default multi-batch resume returns durable progress when later ${exhaustedAt} exhausts its budget`, async t => {
+for (const exhaustedAt of ['preflight', 'publication']) familyRows[0].push([`real D1: default multi-batch resume returns durable progress when later ${exhaustedAt} exhausts its budget`, async t => {
   const r = await runtime(t), m = meter(r.db()), ctx = { ...r.context(), storage: { database: m.database, targets } };
   const plan = await m.request('plan', () => planD1Import(source(2), mapping, ctx));
   const job = await m.request('create', () => createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint }));
@@ -81,9 +83,9 @@ for (const exhaustedAt of ['preflight', 'publication']) test(`real D1: default m
   assert.equal((await m.request('complete-undo', () => resumeD1Import(job.id, ctx))).state, 'undone');
   assert.ok(m.snapshots.every(s => s.count <= 1000));
   console.log(JSON.stringify({ multiBatchReturnBudget: exhaustedAt, requests: m.snapshots }));
-});
+}]);
 
-test('real D1: adapter errors with a budget-shaped message still reject after progress', async t => {
+familyRows[0].push(['real D1: adapter errors with a budget-shaped message still reject after progress', async t => {
   const r = await runtime(t), ctx = r.context();
   const plan = await planD1Import(source(2), mapping, ctx);
   const job = await createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint });
@@ -97,4 +99,6 @@ test('real D1: adapter errors with a budget-shaped message still reject after pr
   await assert.rejects(undoD1Import(job.id, { ...ctx, storage: { ...ctx.storage, targets: failing('0') } }), /IMPORT_D1_REQUEST_LIMIT/);
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM ik_provenance WHERE job_id=? AND reversed=1').bind(job.id).first())?.n, 1);
   assert.equal((await resumeD1Import(job.id, ctx)).state, 'undone');
-});
+}]);
+
+ test("d1 return budget preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

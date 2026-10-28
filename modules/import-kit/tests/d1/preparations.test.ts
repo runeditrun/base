@@ -1,10 +1,12 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sqliteRuntime,sqliteMapping,sqliteTargets } from './sqlite-runtime.ts';
 import { planD1ImportStream,prepareD1ImportStream,publishD1ImportPreparation,readD1ImportPreparation,readD1ImportStream,readD1ImportJob,resumeD1ImportStream,undoD1ImportStream,cancelD1ImportStaging,type D1PlanCodec,type ImportPlan,type Json } from '../../src/d1/index.ts';
 import { normalizedPreparation,emptyPreparationTables,publicPreparationTables } from './preparation-fixture.ts';
 
-for(const codec of [undefined,{id:'full-json-v1',encode:(plan:ImportPlan)=>structuredClone(plan) as unknown as Json,decode:(value:Json)=>structuredClone(value) as unknown as ImportPlan} satisfies D1PlanCodec])test(`unverified ${codec?'codec':'inline'} preparation cold-verifies exact canonical values before publication`,async t=>{
+for(const codec of [undefined,{id:'full-json-v1',encode:(plan:ImportPlan)=>structuredClone(plan) as unknown as Json,decode:(value:Json)=>structuredClone(value) as unknown as ImportPlan} satisfies D1PlanCodec])familyRows[0].push([`unverified ${codec?'codec':'inline'} preparation cold-verifies exact canonical values before publication`, async t=>{
   const r=await sqliteRuntime(t),source=normalizedPreparation(),context=()=>({...r.context(),storage:{database:r.db(),targets:{...sqliteTargets,...(codec?{planCodec:codec}:{})}}});
   const mapping={...sqliteMapping};
   const reviewed=await planD1ImportStream(source,mapping,context());emptyPreparationTables(r.native());emptyPreparationTables(r.native(),publicPreparationTables);
@@ -24,21 +26,23 @@ for(const codec of [undefined,{id:'full-json-v1',encode:(plan:ImportPlan)=>struc
   for(const record of source.records)assert.deepEqual(values.find(value=>value.targetId===record.sourceId)?.value,record.payload);
   while(job.state!=='undone')job=await undoD1ImportStream(job.id,context());
   assert.equal((await sqliteTargets.list(r.db(),'workspace')).length,0);
-});
+}]);
 
-test('the supplied fingerprint remains unverified until cold comparison and failure removes its private generation',async t=>{
+familyRows[0].push(['the supplied fingerprint remains unverified until cold comparison and failure removes its private generation', async t=>{
   const r=await sqliteRuntime(t),source=normalizedPreparation(3);
   const prepared=await prepareD1ImportStream(source,sqliteMapping,{...r.context(),reviewedFingerprint:'0'.repeat(64)});
   assert.equal(prepared.state,'preparing');emptyPreparationTables(r.native(),publicPreparationTables);
   await assert.rejects(publishD1ImportPreparation(prepared.id,r.context()),/REVIEW_FINGERPRINT_MISMATCH/);
   emptyPreparationTables(r.native());emptyPreparationTables(r.native(),publicPreparationTables);
-});
+}]);
 
-test('preparation reads, replay and cancellation are principal-bound',async t=>{
+familyRows[0].push(['preparation reads, replay and cancellation are principal-bound', async t=>{
   const r=await sqliteRuntime(t),source=normalizedPreparation(3),review=await planD1ImportStream(source,sqliteMapping,r.context()),input={...r.context(),reviewedFingerprint:review.fingerprint};
   const prepared=await prepareD1ImportStream(source,sqliteMapping,input),other={...r.context(),authorization:{...r.context().authorization,principalId:'other'}};
   await assert.rejects(readD1ImportPreparation(prepared.id,other),/IMPORT_PREPARATION_NOT_FOUND/);
   await assert.rejects(publishD1ImportPreparation(prepared.id,other),/IMPORT_PREPARATION_NOT_FOUND/);
   await cancelD1ImportStaging(review.fingerprint,other);assert.equal((await readD1ImportPreparation(prepared.id,r.context())).id,prepared.id);
   await cancelD1ImportStaging(review.fingerprint,input);emptyPreparationTables(r.native());emptyPreparationTables(r.native(),publicPreparationTables);
-});
+}]);
+
+ test("d1 preparations preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

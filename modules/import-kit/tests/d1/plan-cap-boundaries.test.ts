@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, source, mapping } from './fixtures.ts';
@@ -12,7 +14,7 @@ function duringLookup(db: any, change: () => void) {
   return { prepare(q: string) { const s = db.prepare(q); return q.startsWith('SELECT * FROM ik_jobs WHERE destination=') ? wrap(s) : s; }, batch(s: any[]) { return db.batch(s); } };
 }
 
-for (const replay of [false, true]) for (const growth of ['small', 'over-cap']) test(`real D1: ${replay ? 'replay' : 'fresh'} lookup rejects ${growth} caller mutation`, async t => {
+for (const replay of [false, true]) for (const growth of ['small', 'over-cap']) familyRows[0].push([`real D1: ${replay ? 'replay' : 'fresh'} lookup rejects ${growth} caller mutation`, async t => {
   const r = await runtime(t), ctx = r.context(), plan = await planD1Import(source(1), mapping, ctx);
   const reviewed = { ...ctx, reviewedFingerprint: plan.fingerprint, operationKey: 'reviewed' };
   if (replay) await createD1ImportJob(plan, reviewed);
@@ -28,9 +30,9 @@ for (const replay of [false, true]) for (const growth of ['small', 'over-cap']) 
   assert.deepEqual(await tableCounts(r.db()), before);
   if (!replay) assert.ok(Object.values(before).every(n => n === 0));
   if (growth === 'over-cap') assert.throws(() => preflightD1ImportJob(plan, reviewed), (e: any) => e instanceof PlanTooLargeError && e.bytes === PLAN_BYTES_LIMIT + 1);
-});
+}]);
 
-test('real D1: admission does not authorize revoked creation or replay; valid replay preserves reviewed identity', async t => {
+familyRows[0].push(['real D1: admission does not authorize revoked creation or replay; valid replay preserves reviewed identity', async t => {
   const r = await runtime(t), ctx = r.context(), plan = await planD1Import(source(1), mapping, ctx);
   const reviewed = { ...ctx, reviewedFingerprint: plan.fingerprint };
   preflightD1ImportJob(plan, reviewed);
@@ -44,9 +46,9 @@ test('real D1: admission does not authorize revoked creation or replay; valid re
   await r.db().prepare('UPDATE sessions SET enabled=0').run();
   await assert.rejects(createD1ImportJob(plan, reviewed), /IMPORT_ATOMIC_GUARD/);
   assert.deepEqual(await tableCounts(r.db()), before);
-});
+}]);
 
-test('real D1: a mapper expansion from a tiny input is refused before encoding and leaves every kit table empty', async t => {
+familyRows[0].push(['real D1: a mapper expansion from a tiny input is refused before encoding and leaves every kit table empty', async t => {
   const r = await runtime(t), ctx = r.context();
   const small = await planD1Import(source(1), { version: 'v1', map: () => ({ effects: [{ targetKind: 'contact', targetId: '0', value: Array(300).fill('') }] }) }, ctx);
   const { fingerprint: _, ...content } = small;
@@ -60,9 +62,9 @@ test('real D1: a mapper expansion from a tiny input is refused before encoding a
   await assert.rejects(planD1Import(source(1), { version: 'v1', map: () => ({ effects: [{ targetKind: 'contact', targetId: '0', value }] }) }, ctx),
     (e: any) => e instanceof PlanTooLargeError && e.bytes === expected && e.subject === 'plan');
   assert.ok(Object.values(await tableCounts(r.db())).every(n => n === 0));
-});
+}]);
 
-for (const phase of ['stored', 'originals', 'inventory']) test(`real D1: replay detects a plan changed while awaiting ${phase}`, async t => {
+for (const phase of ['stored', 'originals', 'inventory']) familyRows[0].push([`real D1: replay detects a plan changed while awaiting ${phase}`, async t => {
   const r = await runtime(t), ctx = r.context(), plan = await planD1Import(source(1), mapping, ctx), db = r.db();
   const reviewed = { ...ctx, reviewedFingerprint: plan.fingerprint };
   await createD1ImportJob(plan, reviewed);
@@ -82,4 +84,6 @@ for (const phase of ['stored', 'originals', 'inventory']) test(`real D1: replay 
   await assert.rejects(createD1ImportJob(plan, { ...reviewed, storage: { ...ctx.storage, database } }), /REVIEW_FINGERPRINT_MISMATCH/);
   assert.equal(changed, true);
   assert.deepEqual(await tableCounts(db), before);
-});
+}]);
+
+ test("d1 plan cap boundaries preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

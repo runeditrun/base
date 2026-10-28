@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sqliteRuntime } from './retained-fixtures.ts';
@@ -12,7 +14,7 @@ for(const [name,mutation] of [
   ['original metadata',"UPDATE ik_originals SET name='changed'"],
   ['original version','UPDATE ik_original_sets SET version=4'],
   ['current authority',"UPDATE native_authority SET enabled=0 WHERE id='owner'"],
-])test(`bounded ordinary creation checks ${name} after assertion cleanup`,async t=>{
+])familyRows[0].push([`bounded ordinary creation checks ${name} after assertion cleanup`, async t=>{
   const r=await sqliteRuntime(t),context=()=>({...r.context(),maxBatchBytes:2*1024*1024}),source=sqliteSource(1);
   const plan=await planD1Import(source,sqliteMapping,context());
   r.native().exec(`CREATE TRIGGER creation_cleanup AFTER DELETE ON ik_d1_assertions WHEN EXISTS(SELECT 1 FROM ik_jobs) BEGIN ${mutation};END`);
@@ -24,9 +26,9 @@ for(const [name,mutation] of [
   assert.equal(job.checkpoint,0);assert.equal(job.state,'queued');
   const originals=await readD1ImportOriginals(job.id,context());
   assert.deepEqual(originals[0].original,{status:'retained',base64:(source.artifacts[0].original as {base64:string}).base64});
-});
+}]);
 
-test('bounded ordinary creation preflight includes exact final checks and its real return path',async t=>{
+familyRows[0].push(['bounded ordinary creation preflight includes exact final checks and its real return path', async t=>{
   const r=await sqliteRuntime(t),base=r.context(),source=sqliteSource(1),plan=await planD1Import(source,sqliteMapping,base);
   let queries=0;const wire:number[]=[];
   const wrap=(statement:any):any=>({query:statement.query,values:statement.values,bind(...values:any[]){return wrap(statement.bind(...values));},async first(){queries++;return statement.first();},async all(){queries++;return statement.all();}});
@@ -35,4 +37,6 @@ test('bounded ordinary creation preflight includes exact final checks and its re
   const admitted=preflightD1ImportJob(plan,context);
   await createD1ImportJob(plan,context);
   assert.equal(queries,admitted.totalExecutions);assert.ok(queries<=1000);assert.ok(wire.every(size=>size<=2*1024*1024));
-});
+}]);
+
+ test("d1 bounded creation preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });
