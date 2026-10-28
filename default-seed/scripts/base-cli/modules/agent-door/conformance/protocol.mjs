@@ -93,7 +93,7 @@ export function createProtocol(context) {
   }, body: JSON.stringify({ jsonrpc: '2.0', id, method, params: version === '2025-11-25' ? params : { ...params, _meta: { 'io.modelcontextprotocol/protocolVersion': version, 'io.modelcontextprotocol/clientCapabilities': { elicitation: { url: {} } }, 'io.modelcontextprotocol/clientInfo': { name: 'rer-agent-conformance', version: '1' }, ...params._meta } } }) });
   const body = await responseBody(response), result = body.result, decision = result?._meta?.[DECISION] ?? body.error?.data?._meta?.[DECISION];
   const answer = { status: response.status, headers: response.headers, body, message: body, result, decision };
-  if (['tools/call', 'resources/read'].includes(method) && track && response.status !== 401) context.calls.push({
+  if (['tools/call', 'resources/read'].includes(method) && track && (response.status !== 401 || typeof body.error?.data?.code === 'string')) context.calls.push({
    kind: method, name: method === 'resources/read' ? 'resources/read' : params.name,
    args: structuredClone(method === 'resources/read' ? { uri: params.uri } : params.arguments ?? {}),
    decision: structuredClone(decision ?? null), code: errorCode(answer), result: structuredClone(result),
@@ -102,7 +102,19 @@ export function createProtocol(context) {
   });
   return answer;
  };
- context.tool = (name, args, options) => context.mcp('tools/call', { name, arguments: args, ...(options?.requestState === undefined ? {} : { requestState: options.requestState }) }, options);
+ context.proof = async (name, args, handoff) => {
+  const tool = context.surface.tools.find(tool => tool.name === name);
+  if (!tool?.proof) return {};
+  if (typeof context.prove !== 'function') throw new Error(`${name} requires the seed-declared verification.proof module`);
+  const reference = await context.prove({ tool: name, args, kind: tool.proofKind, handoff, origin: context.origin, agentId: context.agentId, request: (path, init) => {
+   const url = new URL(path, context.origin);
+   if (url.origin !== context.origin) throw new Error('Native proof test request must use the fresh installation origin');
+   return context.personRequest(url.href, init);
+  } });
+  if (typeof reference !== 'string' || !reference) throw new Error('Native proof test hook must return a reference');
+  return { proofReference: reference };
+ };
+ context.tool = (name, args, options) => context.mcp('tools/call', { name, arguments: args, ...(options?.proofReference ? { _meta: { 'com.runeditrun/native-proof': options.proofReference } } : {}), ...(options?.requestState === undefined ? {} : { requestState: options.requestState }) }, options);
  context.resolve = (value, outputs = new Map(), options = {}) => resolveArgs(value, outputs, { ...options, sponsor: context.sponsor });
  context.args = (step, outputs, options) => {
   const args = context.resolve(step.args, outputs, options);

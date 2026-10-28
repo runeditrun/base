@@ -164,10 +164,10 @@ const prerequisites = ['foundation','composition','schema','onboarding','export'
 const fixtureRoots = [...new Set([...prerequisites, ...sourceRoots])].filter(name => !prerequisites.some(root => name.startsWith(`${root}/`)))
 for (const name of fixtureRoots) await cp(resolve(root,name),resolve(base,name),{recursive:true,filter:p=>!p.includes('node_modules')})
 await cp(resolve(root,'LICENSE'),resolve(base,'LICENSE'))
-git(base,'init');git(base,'add','.');git(base,'-c','user.name=Test','-c','user.email=test@example.com','commit','-qm','verification fixture')
+git(base,'init');git(base,'add','.');git(base,'-c','user.name=Test','-c','user.email=base-test@example.invalid','commit','-qm','verification fixture')
 const ref=git(base,'rev-parse','HEAD')
 await initialize({baseRepo:base,ref,family:'future',edition:'first',repository:'just-every/run-orbit',output:family})
-git(family,'init');git(family,'add','.');git(family,'-c','user.name=Test','-c','user.email=test@example.com','commit','-qm','verification fixture')
+git(family,'init');git(family,'add','.');git(family,'-c','user.name=Test','-c','user.email=base-test@example.invalid','commit','-qm','verification fixture')
 execFileSync(process.execPath,[root+'/composition/cli.mjs','first','--family-repo',family,'--base-repo',base,'--output',output],{stdio:'inherit'})
 execFileSync(process.execPath, ['scripts/rer.mjs', 'describe'], { cwd: output, stdio: 'inherit' })
 // The v2 descriptor now declares owner-account deploy inputs. Inspector checks

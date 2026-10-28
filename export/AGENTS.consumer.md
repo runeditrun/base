@@ -136,6 +136,8 @@ binding until the owner changes them.
 
 ## Work on the product
 
+A handler, registry or route table indexed by a request-derived name must use an own-property guard (`Object.hasOwn`) or a null-prototype/Map registry; inherited names (`constructor`, `__proto__`, `toString`) must answer 404/unknown.
+
 Follow this edition's README and RER command contract for installation, local
 startup, verification, provisioning and deployment. Check required accounts,
 credentials, bindings and migrations before running an operation. Use the

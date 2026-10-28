@@ -3,12 +3,17 @@ import { randomUUID } from 'node:crypto';
 
 const service = 'com.runeditrun.business';
 const sandboxed = 'an agent sandbox blocks this. Run this one command outside the sandbox (in Codex, approve running it outside the sandbox when it asks), or in your own terminal';
+// Inside a Codex workspace-write sandbox with network on, security answers 161
+// for a write or a removal (UNIX Operation not permitted), even after printing
+// "password has been deleted."; the item stays in the keychain.
+const refusedBySandbox = result => /Operation not permitted|Unable to obtain authorization/.test(result?.stderr ?? '') || result?.code === 161;
 // Causes come from fixed phrases matched in the tool's diagnostics; the
 // diagnostics themselves are never printed.
 function cause(binary, result) {
  const text = result?.stderr ?? '';
  if (result?.spawnFailed) return binary === 'secret-tool' ? 'secret-tool is not installed. Install it and unlock a Secret Service session' : `${binary} could not start`;
  if (/Operation not permitted/.test(text)) return `macOS Keychain refused the write (Operation not permitted); ${sandboxed}`;
+ if (result?.code === 161) return `macOS Keychain refused the change (security exited with status 161: Operation not permitted); ${sandboxed}`;
  if (/Unable to obtain authorization/.test(text)) return `macOS Keychain refused authorization; ${sandboxed}`;
  if (/User interaction is not allowed|interaction is not allowed/i.test(text)) return 'the keychain is locked and cannot ask for its password here. Unlock it, then try again';
  if (/autolaunch D-Bus|Cannot spawn a message bus|org\.freedesktop\.secrets/.test(text)) return 'no unlocked Secret Service session is running. Unlock one, then try again';
@@ -17,7 +22,7 @@ function cause(binary, result) {
 }
 const unavailable = (operation, binary, result) => {
  const error = new Error(`OS credential storage could not ${operation} a credential: ${cause(binary, result)}. No credential was written to a file.`);
- error.sandboxRefused = /Operation not permitted|Unable to obtain authorization/.test(result?.stderr ?? '');
+ error.sandboxRefused = refusedBySandbox(result); error.osStatus = result?.code ?? null;
  return error;
 };
 
@@ -107,6 +112,8 @@ export function createCredentialStore({ platform = process.platform, env = proce
     ? await call('remove', '/usr/bin/security', ['delete-generic-password', ...macArgs(handle)])
     : await call('remove', 'secret-tool', ['clear', ...linuxArgs(handle)]);
    if (result.code !== 0 && !(platform === 'darwin' && result.code === 44)) throw unavailable('remove', binary, result);
+   // A refused removal can still print success; only a read-back proves it.
+   if (await get(handle) !== null) throw unavailable('remove', binary, { code: result.code, stderr: '' });
   },
  };
 }

@@ -11,12 +11,12 @@ import { createHash } from 'node:crypto';
 const stagingTables = async seed => (await seed.data("SELECT name FROM sqlite_master WHERE type='table' AND name GLOB 'rer_portability_stage_*' ORDER BY name"))[0].results;
 const manifest = async (seed, file) => JSON.parse((await readFile(join(seed.root, file), 'utf8')).split('\n')[0]);
 
-async function tableOnlyArchive(seed,source,destination) {
+async function tableOnlyArchive(seed,source,destination,{recorded=true}={}) {
  const {schemaIdentityOf}=await import('../modules/portability/schema-identity.mjs');
  const {ContentVerifier,ArchiveVerifier}=await import('../modules/portability/format.mjs');
  const {canonicalJson}=await import('../modules/portability/hash.mjs');
  const records=(await readFile(join(seed.root,source),'utf8')).trim().split('\n').map(JSON.parse);
- delete records[0].schemaObjects;records[0].schema=await schemaIdentityOf(records[0].tables);
+ delete records[0].schemaObjects;if(!recorded)delete records[0].migrations;records[0].schema=await schemaIdentityOf(records[0].tables);
  const content=new ContentVerifier(records[0]),integrity=new ArchiveVerifier(records[0]);
  for(const part of records.slice(1,-1)){integrity.add(part);for(const item of part.items)content.add(item);}
  records.at(-1).contentHash=content.digest();records.at(-1).archiveHash=integrity.digest();
@@ -165,7 +165,12 @@ test('a file rer just exported imports in place after reset, repeatedly; shared 
   assert.deepEqual(await stagingTables(seed), [], 'a completed import drops every staging copy and sidecar');
   assert.deepEqual((await seed.data(query))[0].results, rows);
  }
- const retained=await tableOnlyArchive(seed,'exports/round-1.rer','exports/retained.rer');
+ await tableOnlyArchive(seed,'exports/round-1.rer','exports/verified.rer');
+ await seed.run(['reset','--yes']);
+ const verified=(await seed.run(['import','--input','exports/verified.rer','--yes'])).at(-1);
+ assert.equal(verified.schemaUnverified,undefined);
+ assert.deepEqual((await seed.data(query))[0].results,rows,'recorded migration replay verifies legacy restore without acknowledgment');
+ const retained=await tableOnlyArchive(seed,'exports/round-1.rer','exports/retained.rer',{recorded:false});
  await seed.run(['reset','--yes']);
  const recovery=['import','--input','exports/retained.rer','--acknowledge-unverified-schema-objects'];
  const confirmation=await seed.text(recovery,4);assert.match(confirmation.stderr,/explicit --yes/);
@@ -175,7 +180,7 @@ test('a file rer just exported imports in place after reset, repeatedly; shared 
  assert.deepEqual((await seed.data(query))[0].results,rows);
  const audit=(await seed.data("SELECT metadata FROM rer_portability_jobs WHERE kind='import' AND phase='complete'"))[0].results.map(row=>JSON.parse(row.metadata));
  assert.equal(audit.length,1);assert.equal(audit[0].schemaUnverified.archiveHash,retained.at(-1).archiveHash);
- console.log('public rer import => missing confirmation refuses; ordinary legacy schema refuses; acknowledged rows and schema-unverified receipt restored');
+ console.log('public rer import => recorded legacy replay restores without acknowledgment; missing confirmation and unrecorded legacy schema refuse; acknowledged rows and schema-unverified receipt restored');
  const after = (await seed.run(['export', '--output', 'exports/after.rer'])).at(-1);
  assert.equal(after.contentHash, previous);
  assert.deepEqual((await manifest(seed, 'exports/after.rer')).excludedTables, excludedTables);
