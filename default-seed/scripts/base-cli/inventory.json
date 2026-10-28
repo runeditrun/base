@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g0cad22d3",
+  "cliVersion": "0.2.85-dev.g45f4aafd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -831,7 +831,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "3058270b9d950dc1243ca7c58c0f1874043695ea8c867b11c390b9b9894e36bb"
+      "sha256": "c379b1f1c563b5e26f733564cbbceb1e23af88ba067a3b7a1894c12c079c6bf0"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1803,7 +1803,15 @@
     },
     "foundation/runtime/contract-docs.mjs": {
       "source": "foundation/runtime/contract-docs.mjs",
-      "sha256": "d98e14f489c57f60446c2cc68310db09f298f7974d77026dbaa2c62868cc4838"
+      "sha256": "e9e2500a87ab7cc1fbb94215de5c76b264bd5d59983ceeaf992c4e71a2470a42"
+    },
+    "foundation/runtime/contract-prose-patterns.mjs": {
+      "source": "foundation/runtime/contract-prose-patterns.mjs",
+      "sha256": "5519a7439e28f7c2635a0170749c43ccdc96eaccc0c313f55a2294d0665c8ba4"
+    },
+    "foundation/runtime/contract-prose.mjs": {
+      "source": "foundation/runtime/contract-prose.mjs",
+      "sha256": "7f606da0b4ac6f259fdaaa2a263250c1b6a20d5c906104c5a961271d23e818e0"
     },
     "foundation/runtime/run-data.d.mts": {
       "source": "foundation/runtime/run-data.d.mts",

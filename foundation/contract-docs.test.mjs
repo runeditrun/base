@@ -32,13 +32,58 @@ async function installation(fixture) {
   const root = await mkdtemp(join(tmpdir(), 'contract-docs-'))
   await cp(join(fixtures, fixture), root, { recursive: true })
   await mkdir(join(root, 'src/base'), { recursive: true })
-  await Promise.all(['contract-docs.mjs', 'seed-contract.mjs'].map(file =>
+  await Promise.all(['contract-docs.mjs', 'contract-prose.mjs', 'contract-prose-patterns.mjs', 'seed-contract.mjs'].map(file =>
     cp(join(import.meta.dirname, 'runtime', file), join(root, 'src/base', file))))
   git(root, 'init', '-q')
   git(root, 'add', '.')
   git(root, '-c', 'user.name=Synthetic author', '-c', 'user.email=synthetic@example.invalid', 'commit', '-qm', 'Synthetic source')
   return root
 }
+
+test('the seed CLI refuses generated acceptance and unclassified tools, while literal prose matches only warn', async () => {
+  const root = await installation('standard')
+  try {
+    await edit(root, 'ACCEPTANCE.md', '# Accept the catalogue\n\n#### E1 — Maintain an entry\n\n1. A saved description remains readable after reopening the entry.\n')
+    git(root, 'add', '.')
+    git(root, '-c', 'user.name=Synthetic author', '-c', 'user.email=synthetic@example.invalid', 'commit', '-qm', 'Handwritten acceptance')
+    succeeds(root, 'coverage', 'init', '--old', 'HEAD')
+    succeeds(root, 'write')
+    succeeds(root, 'check-prose')
+    const source = await read(root, 'CONTRACT.md')
+    const coveragePath = 'docs/contract/COVERAGE.json'
+    const coverage = JSON.parse(await read(root, coveragePath))
+    const acceptance = coverage.fragments.find(fragment => fragment.file === 'ACCEPTANCE.md' && fragment.text.startsWith('1.'))
+    assert.ok(acceptance, 'the old acceptance outcome must remain placed')
+    acceptance.to = 'generated'
+    acceptance.note = 'The contract generator writes this status or count.'
+    delete acceptance.ids
+    await edit(root, coveragePath, JSON.stringify(coverage))
+    await edit(root, 'CONTRACT.md', source
+      .replace('standard or access |', ' |')
+      .replace('An invalid description leaves the saved description intact.', 'An invalid description leaves the saved description intact. Assignment never grants access. Run pnpm test:push.'))
+    succeeds(root, 'write')
+    const result = cli(root, 'check-prose')
+    assert.notEqual(result.status, 0, result.output)
+    for (const family of ['a', 'b', 'c', 'd']) assert.match(result.output, new RegExp(`(?:ERROR|WARN) E1 ${family} `))
+    assert.match(result.output, /matched .*Assignment never grants access/)
+    assert.match(result.output, /matched .*Run pnpm test:push/)
+    refuses(root, 'E1', 'check')
+
+    // Removing a whole class column is also an unclassified declaration.
+    await edit(root, 'CONTRACT.md', source.replace(/ \| Risk class/g, '').replace(/ \| standard(?: or access)?/g, ''))
+    refuses(root, 'tool-class', 'check-prose')
+    acceptance.to = 'clause'
+    acceptance.ids = ['E1']
+    await edit(root, coveragePath, JSON.stringify(coverage))
+    await edit(root, 'CONTRACT.md', source.replace('An invalid description leaves the saved description intact.', 'An invalid description leaves the saved description intact. Assignment never grants access.'))
+    assert.match(succeeds(root, 'check-prose').output, /WARN E1 b /)
+    await edit(root, 'CONTRACT.md', source)
+    succeeds(root, 'write')
+    assert.match(succeeds(root, 'check').output, /Contract prose: 0 errors, 0 warnings/)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
 async function generatedJourney(root) {
   succeeds(root, 'write')
