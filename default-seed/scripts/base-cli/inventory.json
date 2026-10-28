@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.gdb888446",
+  "cliVersion": "0.2.85-dev.g410ba59d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -423,7 +423,7 @@
     },
     "cli/business/carry.mjs": {
       "source": "cli/business/carry.mjs",
-      "sha256": "acbe454c9e61b2b3076eec1ef1d3e51e5f875c15d3c4924fd1afc9f3d709e0db"
+      "sha256": "384219fb6aa8ddfbf174d75a3577678d94f25335967cd88805faad02609762ff"
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
@@ -475,7 +475,7 @@
     },
     "cli/business/opt-ins.mjs": {
       "source": "cli/business/opt-ins.mjs",
-      "sha256": "b136d5f44671b7f831af9ac2cf9f564e0c69f6df4bf64c75a218fc9bf942c440"
+      "sha256": "bb3412c5d0175b566ff66089e61178fdcf1071ab47f06f99f36adb429d4e0993"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
@@ -1791,7 +1791,7 @@
     },
     "foundation/runtime/contract-docs.mjs": {
       "source": "foundation/runtime/contract-docs.mjs",
-      "sha256": "d98e14f489c57f60446c2cc68310db09f298f7974d77026dbaa2c62868cc4838"
+      "sha256": "6ca67857ddb69d4425335dabb787ed034bbbb3b3e4ad2e1882a727aa6d277a3e"
     },
     "foundation/runtime/run-data.d.mts": {
       "source": "foundation/runtime/run-data.d.mts",
@@ -4691,7 +4691,7 @@
     },
     "scripts/publish-check/github_refs.py": {
       "source": "scripts/publish-check/github_refs.py",
-      "sha256": "2bcc18b36162af8e29ef463704b2cbf85147286eeecf86f8c909c24a9c0adee7"
+      "sha256": "2cdf8b05242aacb508d8d0131063782eea85ab710b9dd510b7b052c2cdf2bab7"
     },
     "scripts/publish-check/gitleaks.py": {
       "source": "scripts/publish-check/gitleaks.py",
