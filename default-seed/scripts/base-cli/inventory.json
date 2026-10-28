@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.gdb888446",
+  "cliVersion": "0.2.85",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -987,7 +987,7 @@
     },
     "cli/portability-empty.mjs": {
       "source": "cli/portability-empty.mjs",
-      "sha256": "7d60605f7ac9b093d3c6c28f1a5eafee5c9492185fd3c3e4086f4086d5695420"
+      "sha256": "076d758d357e5e1d2d740b68ecff37af389079a7e56be5ab67e69a8befeede8a"
     },
     "cli/portability-migrations.mjs": {
       "source": "cli/portability-migrations.mjs",
