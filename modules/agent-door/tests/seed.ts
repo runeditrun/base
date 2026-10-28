@@ -38,7 +38,7 @@ export default {
       defineTool({ name: 'synthetic.access.change', title: 'Change authority', description: 'Change authority of a named person.', scope: 'records:write', readOnly: false, inputSchema: idInput, outputSchema: idInput, classes: ['access'], clauses: ['BASE-AGENT-006'], authority: async args => ({ subject: args.id as string, widens: true }), classify: () => [{ class: 'access', facts: { measure: 1, direction: 'widens' } }], async run(args) { return { result: { id: args.id } } } }),
     ]
     const door = createAgentDoor({ seed: 'synthetic', name: 'Synthetic Base', specialist: 'operations', origin: config.origin, db: env.DB, trust: JSON.parse(env.TRUST), now,
-      tools, people: operatorAuthPeople({ db: env.DB, session: request => auth.getSession(request) }),
+      tools, limits: config.limits, people: operatorAuthPeople({ db: env.DB, session: request => auth.getSession(request) }),
       localCredentials: async request => request.headers.get('authorization') === 'Bearer synthetic-base-local' ? { sponsor: { email: config.OWNER_EMAIL }, agent: { id: 'synthetic-base-local', name: 'Synthetic Local' }, scopes: ['records:read','records:write','events:read'] } : null,
       resources: [{ uriTemplate: 'synthetic://record/{id}', name: 'Record', scope: 'records:read', read: async uri => { const row = await read(uri.split('/').pop()!); return row && row.exposure !== 'hidden' ? { json: row, untrusted: true } : null } }],
       onEvent: async event => { await env.DB.prepare('INSERT INTO test_callbacks(id,event) VALUES(?,?)').bind(event.id, JSON.stringify(event)).run() },

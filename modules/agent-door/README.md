@@ -53,7 +53,7 @@ owner-claim trust, with the canonical MCP audience, sponsor, agent, scopes and
 at most 15 minutes' lifetime. Resolve the sponsor's current account on each
 request. Local credentials require an explicit edition adapter; a rejected
 recognizable Business credential cannot fall through to it. Local credential
-issuance and Business consent revocation propagation remain adopter/platform
+issuance and Business consent revocation propagation remain adopter and platform
 work.
 
 The policy catalogue, validator and decision function derive from platform
@@ -82,7 +82,7 @@ Retry the original call with a new JSON-RPC ID and unchanged state; URL or form
 is checked through the person door.
 
 Mutating tools require `idempotency_key`; `expected_revision` is optional for
-tools with native revision lookup. Same agent/key and arguments return the
+tools with native revision lookup. Same agent and key and arguments return the
 recorded outcome; changed arguments conflict. Recorded outcomes are retained
 indefinitely. Native actions still own their transaction guards and recovery.
 Admission reservations prevent concurrent calls from exceeding daily policy sums; an admission lease cannot execute after it loses its fence. `decision_busy` and `call_in_progress` refuse overlapping admissions without an effect. An unexpected execution failure keeps the key claimed because the native action may have committed; the edition must reconcile that action before recovery. The module does not supply a generic long-job executor.
@@ -108,7 +108,7 @@ rate and size; they are not daily business-volume policy. Subscriptions poll
 retained events every **one second** and close after at most **120 seconds**;
 reopen the subscription and use the cursor-based events tool for replay. The
 first SSE message acknowledges the honored notification filter; subsequent
-resource/tool-list notifications carry the originating subscription ID. Access,
+resource and tool-list notifications carry the originating subscription ID. Access,
 Pause and policy are rechecked while streaming. SSE has no transport replay.
 
 ## Verification boundary
@@ -120,9 +120,9 @@ surface, under autonomous, held, blocked, unset and paused policy phases.
 Stable `BASE-AGENT-xxx.n` point prefixes identify the checks it implements.
 They are not evidence that every clause or every adopting edition has passed.
 Module tests under `tests/`, this reusable journey and an edition's integrated
-browser/native journey are separate evidence.
+browser and native journey are separate evidence.
 
-Remaining work includes full clause/tier and role/UI parity, grant narrowing,
+Remaining work includes full clause and tier and role and UI parity, grant narrowing,
 Business consent revocation, provider-spend caps and byte budgets, long jobs,
 outside-mail attribution, standalone credential issuance,
 self-host delivery, stranger-specialist completion, generated agent docs, and

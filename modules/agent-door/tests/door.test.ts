@@ -118,6 +118,11 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
  const r = await runtime()
  try {
   await r.adopt()
+  for (const method of ['GET','DELETE']) assert.equal((await r.fetch('/mcp',{method})).status,405)
+  assert.equal((await r.mcp('synthetic/unknown')).status,404)
+  const legacy=await r.post('/mcp',{jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-11-25',capabilities:{}}}); assert.equal((await legacy.json()).result.protocolVersion,'2025-11-25')
+  const valid=await r.token(), payload=JSON.parse(Buffer.from(valid.split('.')[1],'base64url').toString())
+  for (const bad of [await r.sign('at+jwt',payload,'synthetic-base-unknown'),await r.sign('other+jwt',payload),valid.slice(0,-8)+'AAAAAAAA']) assert.equal((await r.mcp('tools/list',{}, {token:bad})).status,401)
   for (const token of [null,await r.token({aud:'https://synthetic-base-3.invalid/mcp'}),await r.token({exp:Math.floor(r.c.now/1000)-1}),await r.token({exp:Math.floor(r.c.now/1000)+901}),await r.token({business:'synthetic-base-3'}),await r.sign('other+jwt',{}),await r.sign('at+jwt',{},'synthetic-base-unknown')]) assert.equal((await r.mcp('tools/list',{}, {token})).status,401)
   assert.equal((await r.tool('records.write',args(),{token:await r.token({scope:'events:read'})})).status,403)
   await r.adopt(autonomousPolicy(),{paused:true}); assert.equal(code(await r.tool('records.list',{})),'agents_paused'); assert.equal((await r.person('/agents/api/state')).status,200)
@@ -138,6 +143,12 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
   const vectors=JSON.parse(await readFile(new URL('../policy/vectors.json',import.meta.url),'utf8'))
   for(const vector of vectors) assert.deepEqual(decide({...vector,usageToday:(rule:any,cls:any)=>vector.usageToday[`${rule.id}:${cls}`]??0}),vector.expected,vector.name)
  } finally { await r.close() }
+ const rate=await runtime({limits:{requestsPerMinute:3}})
+ try {
+  const capacity=(await rate.mcp('server/discover')).result._meta['com.runeditrun/limits'].requestsPerMinute
+  for(let i=0;i<capacity;i++)assert.equal((await rate.mcp('tools/list')).status,200)
+  const refused=await rate.mcp('tools/list');assert.equal(refused.status,429);assert.ok(Number(refused.headers.get('retry-after'))>0)
+ } finally {await rate.close()}
  const local=await runtime({paired:false})
  try {
   assert.equal((await local.adopt()).status,404)

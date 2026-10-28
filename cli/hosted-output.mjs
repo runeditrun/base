@@ -13,7 +13,7 @@ import { hostedMailCredentials } from './hosted-mail.mjs';
 // Serve the production build the way rer deploy hosts it (assets behind the
 // Worker, deploy identity bound, a public https origin) on loopback, with no
 // network or account. The ingress hands the app the hosted URL and Host.
-const ORIGIN = 'https://rer-hosted-check.invalid';
+export const HOSTED_ORIGIN = 'https://rer-hosted-check.invalid';
 const ingress = `export default {fetch(request,env){const url=new URL(request.headers.get('x-rer-original-url')),headers=new Headers(request.headers);headers.delete('x-rer-original-url');headers.set('host',url.host);return env.APP.fetch(new Request(url,{method:request.method,headers,redirect:'manual',...(!['GET','HEAD'].includes(request.method)?{body:request.body}:{})}))}}`;
 const read = async path => JSON.parse(await readFile(path, 'utf8'));
 const optional = path => read(path).catch(error => { if (error.code === 'ENOENT') return {}; throw error; });
@@ -43,7 +43,7 @@ const links = html => [...html.matchAll(/(?:src|href)=["'](\/[^"'#?\s]+)/g)].map
 
 /** The build served as rer deploy hosts it, with declared vars, origin and
  * stand-in deploy/Managed mail secrets. `fetch(path, init)` uses the deployed origin. */
-export async function serveHosted(root, { declaration: declarationPath = 'deploy.json' } = {}) {
+export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService } = {}) {
  const build = join(root, 'dist/server'), client = join(root, 'dist/client');
  let config;
  try { config = await read(join(build, 'wrangler.json')); }
@@ -61,9 +61,9 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   if (!Object.hasOwn(secrets, binding)) secrets[binding] = standIn({}, manifest.fields?.find(field => field.name === binding));
  }
  const mf = new Miniflare(convertV4MiniflareOptions({ host: '127.0.0.1', port: 0, cf: false, workers: [{ name: 'ingress', modules: true, script: ingress, serviceBindings: { APP: 'app' } }, {
-  name: 'app', modules, modulesRoot: build, compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
-  bindings: { ...config.vars, ...declaration.vars, ...secrets, ...(declaration.originVar ? { [declaration.originVar]: ORIGIN } : {}),
-   RER_DEPLOY_SOURCE: identity.sourceSha, RER_DEPLOY_FINGERPRINT: identity.fingerprint, RER_VERSION: { id: identity.versionId, tag: '', timestamp: new Date().toISOString() } },
+  name: 'app', ...(outboundService ? { outboundService } : {}), modules, modulesRoot: build, compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
+  bindings: { ...config.vars, ...declaration.vars, ...secrets, ...(declaration.originVar ? { [declaration.originVar]: HOSTED_ORIGIN } : {}),
+   RER_DEPLOY_SOURCE: identity.sourceSha, RER_DEPLOY_FINGERPRINT: identity.fingerprint, RER_VERSION: { id: identity.versionId, tag: '', timestamp: new Date().toISOString() }, ...bindings },
   d1Databases: Object.fromEntries((config.d1_databases ?? []).map(item => [item.binding, item.database_id ?? item.database_name])),
   r2Buckets: Object.fromEntries((config.r2_buckets ?? []).map(item => [item.binding, item.bucket_name])),
   kvNamespaces: Object.fromEntries((config.kv_namespaces ?? []).map(item => [item.binding, item.id ?? item.binding])),
@@ -84,8 +84,8 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    await migrate(await mf.getD1Database(item.binding, 'app'), withRewrites(plan, await readMigrationRewrites(root), { partial: true }));
   }
  } catch (error) { await mf.dispose(); throw error; }
- return { client, identity, origin: ORIGIN, close: () => mf.dispose(),
-  fetch: (path, { headers, ...init } = {}) => fetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${ORIGIN}/${path}` } }) };
+ return { client, identity, origin: HOSTED_ORIGIN, close: () => mf.dispose(),
+  fetch: (path, { headers, ...init } = {}) => fetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }) };
 }
 
 export async function checkHostedOutput(root, options) {

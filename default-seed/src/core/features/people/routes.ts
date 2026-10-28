@@ -1,3 +1,4 @@
+import { personRecordEvent } from '../../../agent-door/person-events.server'
 import { Hono, type MiddlewareHandler } from 'hono'
 import { z } from 'zod'
 import { ErasureError, toD1Sql } from '../../../../../modules/erasure/index.mjs'
@@ -88,16 +89,17 @@ function retiringPeopleContext(context: D1ImportContext, subject: string): D1Imp
  * stands after each one (job ids and revisions, never a value), so a lost
  * request or queued step never strands it: the cron sweep takes it over. The
  * person's native erasure deletes that record. */
-export async function erasePerson(bindings: Bindings, operator: { id: string; role: string }, id: string) {
+type ErasureOperator = { id: string; role: string; auditActor?: string }
+export async function erasePerson(bindings: Bindings, operator: ErasureOperator, id: string) {
   const chain = newUlid()
   // Repeating the request takes the erasure over from where it stands.
-  const pending = (await bindings.DB.prepare('INSERT INTO person_erasure_redactions(person_id,operator_id,chain,updated_at) VALUES(?,?,?,?) ON CONFLICT(person_id) DO UPDATE SET operator_id=excluded.operator_id,chain=excluded.chain,updated_at=excluded.updated_at RETURNING continuation')
-    .bind(id, operator.id, chain, new Date().toISOString()).first<{ continuation: string | null }>())!
+  const pending = (await bindings.DB.prepare('INSERT INTO person_erasure_redactions(person_id,operator_id,chain,updated_at,audit_actor) VALUES(?,?,?,?,?) ON CONFLICT(person_id) DO UPDATE SET operator_id=excluded.operator_id,chain=excluded.chain,updated_at=excluded.updated_at,audit_actor=excluded.audit_actor RETURNING continuation')
+    .bind(id, operator.id, chain, new Date().toISOString(), operator.auditActor ?? null).first<{ continuation: string | null }>())!
   return eraseStep(bindings, operator, id, chain, pending.continuation)
 }
 
 /** One step of the erasure under the chain that owns it. */
-async function eraseStep(bindings: Bindings, operator: { id: string; role: string }, id: string, chain: string, continuation: string | null) {
+async function eraseStep(bindings: Bindings, operator: ErasureOperator, id: string, chain: string, continuation: string | null) {
   if (!bindings.FILES) throw new Error('Missing Worker binding: FILES')
   const db = bindings.DB, files = bindings.FILES
   // Retiring import custody committed the request audit: only the native erasure remains.
@@ -111,7 +113,7 @@ async function eraseStep(bindings: Bindings, operator: { id: string; role: strin
     // Native-created people can also be named in imported peers. Retirement,
     // reference redaction, custody and the restore checkpoint commit together.
     const result = await retireD1ImportCustody({ target: { kind: PERSON, id }, values: [person.email], related: { fields } },
-      [toD1Sql(erasureRequestedStatement(db, operator.id, id))], imports, await custodyCheckpoint(db, files, true), { resumable: true, continuation: continuation ?? undefined })
+      [toD1Sql(erasureRequestedStatement(db, operator.auditActor ?? operator.id, id))], imports, await custodyCheckpoint(db, files, true), { resumable: true, continuation: continuation ?? undefined })
     if (result.phase === 'redacting') {
       await db.prepare('UPDATE person_erasure_redactions SET continuation=?,updated_at=? WHERE person_id=? AND chain=?').bind(result.continuation, new Date().toISOString(), id, chain).run()
       await bindings.JOBS.send({ redact: id, chain })
@@ -131,10 +133,10 @@ const custodyRetired = async (db: D1Database, id: string) =>
  * it (their role is checked again inside every step's batch). A step whose chain
  * a repeated request or the sweep took over, or whose erasure finished, stops. */
 export async function continueRedaction(bindings: Bindings, id: string, chain: string) {
-  const pending = await bindings.DB.prepare("SELECT r.continuation,o.id,o.role FROM person_erasure_redactions r JOIN oa_operators o ON o.id=r.operator_id AND o.status='active' WHERE r.person_id=? AND r.chain=?")
-    .bind(id, chain).first<{ continuation: string | null; id: string; role: string }>()
+  const pending = await bindings.DB.prepare("SELECT r.continuation,r.audit_actor,o.id,o.role FROM person_erasure_redactions r JOIN oa_operators o ON o.id=r.operator_id AND o.status='active' WHERE r.person_id=? AND r.chain=?")
+    .bind(id, chain).first<{ continuation: string | null; audit_actor: string | null; id: string; role: string }>()
   if (!pending || !await personExists(bindings.DB, id)) return
-  await eraseStep(bindings, { id: pending.id, role: pending.role }, id, chain, pending.continuation)
+  await eraseStep(bindings, { id: pending.id, role: pending.role, auditActor: pending.audit_actor ?? undefined }, id, chain, pending.continuation)
 }
 
 export async function continueErasure(bindings: Bindings, id: string) {
@@ -179,6 +181,7 @@ export function peopleRoutes() {
     const actor = context.get('session').operatorId
     const create = async () => {
       const id = await createPerson(context.env.DB, actor, parsed.data)
+      await personRecordEvent(context.env, context.get('session').operator, 'person.created', id)
       const mail = context.env.MAIL_FROM ? operatorMail(context.env) : undefined
       if (mail) await mail.send({ deliveryId: newUlid(), from: context.env.MAIL_FROM!, to: [parsed.data.email], subject: 'You were added',
         text: `Hello ${parsed.data.name}, an operator added you to this workspace.`, html: '', headers: {} })
@@ -195,7 +198,9 @@ export function peopleRoutes() {
     if (!await personExists(context.env.DB, id)) return context.json({ error: 'not found' }, 404)
     const parsed = noteInput.safeParse(await context.req.json().catch(() => null))
     if (!parsed.success) return context.json({ error: 'invalid_note' }, 400)
-    return context.json({ id: await addNote(context.env.DB, context.get('session').operatorId, id, parsed.data.body) }, 201)
+    const note = await addNote(context.env.DB, context.get('session').operatorId, id, parsed.data.body)
+    await personRecordEvent(context.env, context.get('session').operator, 'person.note.added', id)
+    return context.json({ id: note }, 201)
   })
   app.post('/api/people/:id/files', async (context) => {
     const id = context.req.param('id')
@@ -207,7 +212,9 @@ export function peopleRoutes() {
     const bytes = await file.arrayBuffer()
     if (!name || name.length > 255 || bytes.byteLength === 0 || bytes.byteLength > MAX_FILE_BYTES) return context.json({ error: 'invalid_file' }, 400)
     const contentType = file.type || 'application/octet-stream'
-    return context.json({ id: await attachFile(context.env.DB, context.get('files'), context.get('session').operatorId, id, { name, contentType, bytes }) }, 201)
+    const fileId = await attachFile(context.env.DB, context.get('files'), context.get('session').operatorId, id, { name, contentType, bytes })
+    await personRecordEvent(context.env, context.get('session').operator, 'person.file.attached', id)
+    return context.json({ id: fileId }, 201)
   })
   app.get('/api/people/:id/export', async (context) => {
     const data = await exportPerson(context.env.DB, context.get('files'), context.req.param('id'))
@@ -226,6 +233,7 @@ export function peopleRoutes() {
     const parsed = erasureInput.safeParse(await context.req.json().catch(() => null))
     if (!parsed.success || parsed.data.confirmation !== `erase ${id}`) return context.json({ error: 'confirmation_mismatch', expected: 'erase <id>' }, 400)
     const result = await erasePerson(context.env, context.get('session').operator, id)
+    await personRecordEvent(context.env, context.get('session').operator, 'person.erasure.requested', id)
     return context.json(result, 'receipt' in result && result.receipt?.phase === 'complete' ? 200 : 202)
   })
   app.get('/api/erasures/:id', async (context) => {

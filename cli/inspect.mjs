@@ -25,6 +25,7 @@ import { checkoutPlaceholderMarks } from './placeholder-mark.mjs';
 import { contractStatusClauses } from './contract-status.mjs';
 import { hostedExportCommand } from './hosted-export-command.mjs';
 import { cloudflareCredentials } from './deploy-needs.mjs';
+import { agentSurfaceClauses } from './agent-surface.mjs';
 
 // cliVersion: the rer version of the code answering (absent for a vendored copy
 // too old to record one). defaults: what a server start applies when the person
@@ -81,6 +82,7 @@ export async function check(project, explicitProfile) {
  // A warning, never a failing clause: live run sites redeploy while seeds keep Base's mark.
  let placeholderMarks = [];
  clauses.push(...await deliveryDeclarationClauses(project.root));
+ clauses.push(...await agentSurfaceClauses(project.root));
  for (const command of project.commands) add('SC-10.inputs.' + command.name, command.available, `Restore the declared inputs for ${command.name}.`);
  for (const loop of project.descriptor.loops ?? []) add('SC-10.loop.' + loop.id, !loop.required || loop.enabled, `Enable the required ${loop.id} loop or correct its declaration.`);
  if (project.profile === 'first-party' || explicitProfile === 'first-party') {

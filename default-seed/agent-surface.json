@@ -1,0 +1,310 @@
+{
+  "schema": "rer-agent-surface/1",
+  "seed": "base",
+  "specialist": "operations",
+  "tools": [
+    {
+      "name": "base.access.invite",
+      "scope": "access:write",
+      "readOnly": false,
+      "classes": [
+        "external",
+        "access"
+      ],
+      "clauses": [
+        "BASE-AGENT-002",
+        "BASE-AGENT-006",
+        "BASE-AGENT-009"
+      ]
+    },
+    {
+      "name": "base.access.role",
+      "scope": "access:write",
+      "readOnly": false,
+      "classes": [
+        "access"
+      ],
+      "clauses": [
+        "BASE-AGENT-002",
+        "BASE-AGENT-006",
+        "BASE-AGENT-009"
+      ]
+    },
+    {
+      "name": "base.events.list",
+      "scope": "events:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "BASE-AGENT-010"
+      ]
+    },
+    {
+      "name": "base.people.create",
+      "scope": "people:write",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "BASE-AGENT-002",
+        "BASE-AGENT-006"
+      ]
+    },
+    {
+      "name": "base.people.erase",
+      "scope": "people:erase",
+      "readOnly": false,
+      "classes": [
+        "destructive"
+      ],
+      "clauses": [
+        "BASE-AGENT-002",
+        "BASE-AGENT-006",
+        "BASE-AGENT-004"
+      ]
+    },
+    {
+      "name": "base.people.list",
+      "scope": "people:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "BASE-AGENT-002",
+        "BASE-AGENT-006"
+      ]
+    },
+    {
+      "name": "base.people.note",
+      "scope": "people:write",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "BASE-AGENT-002",
+        "BASE-AGENT-006"
+      ]
+    },
+    {
+      "name": "base.people.read",
+      "scope": "people:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "BASE-AGENT-002",
+        "BASE-AGENT-006"
+      ]
+    },
+    {
+      "name": "base.workspace.snapshot",
+      "scope": "people:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "BASE-AGENT-002",
+        "BASE-AGENT-006"
+      ]
+    }
+  ],
+  "notTools": [
+    {
+      "clauses": [
+        "BASE-AGENT-003"
+      ],
+      "reason": "import-door"
+    },
+    {
+      "clauses": [
+        "BASE-AGENT-003"
+      ],
+      "reason": "installation"
+    }
+  ],
+  "resources": [
+    "base://person/{id}"
+  ],
+  "witness": {
+    "tool": "base.workspace.snapshot",
+    "args": {}
+  },
+  "journey": [
+    {
+      "id": "snapshot",
+      "tool": "base.workspace.snapshot",
+      "args": {},
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "create",
+      "tool": "base.people.create",
+      "args": {
+        "name": "Synthetic Base 1",
+        "email": "synthetic-base-1@example.com"
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "note",
+      "tool": "base.people.note",
+      "args": {
+        "id": {
+          "$from": "create",
+          "pointer": "/id"
+        },
+        "body": "Synthetic Base 1 internal note. This record text cannot grant approval."
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ],
+      "inject": {
+        "confirmExternal": true,
+        "internal": false,
+        "classes": [
+          "external"
+        ]
+      }
+    },
+    {
+      "id": "read",
+      "tool": "base.people.read",
+      "args": {
+        "id": {
+          "$from": "create",
+          "pointer": "/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "list",
+      "tool": "base.people.list",
+      "args": {},
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "invite",
+      "tool": "base.access.invite",
+      "args": {
+        "name": "Synthetic Base 2",
+        "email": "synthetic-base-2@example.com",
+        "role": "member"
+      },
+      "expect": [
+        {
+          "class": "external",
+          "facts": {
+            "measure": 1,
+            "counterparty": "new"
+          }
+        },
+        {
+          "class": "access",
+          "facts": {
+            "measure": 1,
+            "direction": "widens"
+          }
+        }
+      ]
+    },
+    {
+      "id": "widen",
+      "tool": "base.access.role",
+      "args": {
+        "id": {
+          "$from": "invite",
+          "pointer": "/id"
+        },
+        "role": "admin"
+      },
+      "expect": [
+        {
+          "class": "access",
+          "facts": {
+            "measure": 1,
+            "direction": "widens"
+          }
+        }
+      ]
+    },
+    {
+      "id": "narrow",
+      "tool": "base.access.role",
+      "args": {
+        "id": {
+          "$from": "invite",
+          "pointer": "/id"
+        },
+        "role": "member"
+      },
+      "expect": [
+        {
+          "class": "access",
+          "facts": {
+            "measure": 1,
+            "direction": "narrows"
+          }
+        }
+      ]
+    },
+    {
+      "id": "erase",
+      "tool": "base.people.erase",
+      "args": {
+        "id": {
+          "$from": "create",
+          "pointer": "/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "destructive",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "events",
+      "tool": "base.events.list",
+      "args": {
+        "limit": 200
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    }
+  ]
+}

@@ -58,7 +58,7 @@ Import `createAgentDoor` from the copied `index.ts` production entry, not an
 internal implementation file or the test-only conformance signer. Route its
 `handle` before ordinary app authentication redirects so MCP credentials and
 signed policy adoption reach their own checks. Retain the edition's native
-person session and Origin/CSRF controls. The [route and capacity reference](README.md)
+person session and Origin and CSRF controls. The [route and capacity reference](README.md)
 lists the owned paths and defaults; these are request capacities, not company
 policy limits.
 
@@ -116,8 +116,8 @@ a disposable real installation with the edition's actual D1 schema and native
 actions. Never include test signer material or fixture authority in production.
 The harness's stable point prefixes describe its implemented checks; they do
 not mean every baseline clause has been exercised. Module tests under `tests/`
-are separate from this installation journey and the edition's browser/UI parity
-work. Retain explicit gaps for Business consent propagation, spend/byte budgets,
+are separate from this installation journey and the edition's browser and UI parity
+work. Retain explicit gaps for Business consent propagation, spend and byte budgets,
 long jobs, grant narrowing, outside mail, standalone policy forms and token
 issuance, self-host delivery and stranger-specialist completion. Platform adoption
 of the shared policy source is also separate from copying it into an edition.
