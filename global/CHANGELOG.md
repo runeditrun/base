@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Convert handwritten homepage claims with reviewed alias maps bound to the original revision, file, line and claim text, preserving the original obligations and judgments.
+- Keep reviewed license, launcher and hosted-demo facts in converted claims as explicit non-product rows, with their historical status separate from current unassessed status.
+- Preserve an explicitly recorded negative-scope boundary without inventing a product clause, using the supported `boundary` basis and the original source record.
+- Publication scans use each retained revision's repository context so local source paths beside repository prose do not become remote declarations; explicit repository references still receive the existing visibility checks.
+- After computer choices change in Business, name `business next` as the next step and report which local apps received the Business name, including when none did.
+
 ## 0.2.85
 
 - Two starters could both take over a stale local operation lock and both act as its owner. Takeover is now exclusive: the lock's inode stays pinned through takeover, and release checks the owner token.

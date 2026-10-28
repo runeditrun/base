@@ -1,3 +1,4 @@
+import { basename } from 'node:path';
 import { installService } from './service.mjs';
 import { installPermissions } from './permissions.mjs';
 import { saveState } from './state.mjs';
@@ -18,7 +19,7 @@ export async function applyOptIns(api, state, { report = true } = {}) {
  // nothing is decided yet. This first authenticated request activates the computer.
  try { self = await api.get('/api/business/executors/self'); }
  catch (error) { if (![403, 404].includes(error.status)) throw error; }
- await carryLive(state, self);
+ const carried = await carryLive(state, self);
  const decisions = Object.fromEntries(optInNames.map(name => [name, self?.optIns?.[name] === true ? true : self?.optIns?.[name] === false ? false : null]));
  if (decisions.installPermissions === true) await installPermissions({ consent: true });
  state.awakeConsent = decisions.awakeConsent === true;
@@ -33,5 +34,8 @@ export async function applyOptIns(api, state, { report = true } = {}) {
  if (undecided.length) {
   process.stdout.write(`The owner has not chosen yet:\n${undecided.map(name => `  - ${optIns[name]}\n`).join('')}Ask them to choose on this computer's row in ${state.origin}/business/${encodeURIComponent(state.businessId)}/settings.\n`);
  }
- process.stdout.write(`Run ${rerCommand()} business next to apply the owner's latest choices and see the next task.\n`);
+ process.stdout.write(`After choosing this computer's apps or settings in Business, run ${rerCommand()} business next to apply them and see the next task.\n`);
+ if (carried) process.stdout.write(carried.checkouts.length
+  ? `Apps on this computer now show ${JSON.stringify(carried.name)}: ${carried.checkouts.map(checkout => JSON.stringify(basename(checkout))).join(', ')}.\n`
+  : `No apps on this computer were updated to show ${JSON.stringify(carried.name)}.\n`);
 }
