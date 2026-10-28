@@ -283,6 +283,14 @@ resolves the deferred choice for preflight. An explicitly selected provider
 still requires its own credentials. Undeclared environment values do not count;
 the product's deploy adapter remains responsible for applying these settings.
 
+`rer deploy --dry-run` accepts syntactically valid fixture senders on reserved
+domains: `.test`, `.example`, `.invalid`, `.localhost`, and `example.com`,
+`example.net` or `example.org` (including their subdomains). It prints the local
+plan and the sender correction needed for a real deploy. A real deploy still
+refuses these placeholder senders with `safety_refusal` before building or
+uploading. Malformed senders and placeholders on ordinary domains refuse in
+both modes. A dry run sends no mail and makes no Cloudflare request.
+
 Idle timeout is `--idle-timeout SECONDS`, then `RER_SERVER_IDLE_SECONDS`, then
 43200 seconds (12 hours). Only positive integer seconds are accepted. HTTP requests,
 including assets, reset inactivity; a live request/stream prevents idle
@@ -417,7 +425,16 @@ interactive deploy asks once and saves it there. For unattended deployment,
 without a saved or supplied name, it refuses before upload. Names use the same
 validation as `setup --owner-name`: nonblank, at most 200 characters and no
 Unicode Cc or Cf control characters. Nameless installers retain their existing
-deployment behavior.
+deployment behavior. A dry run never prompts for or requires a missing owner
+name, never saves a name, and never claims a hosted owner. An explicitly supplied
+name still must be valid and supported by the installer.
+
+For real deployments, an adapter that validates the hosted owner email in its
+managed deploy preflight does so before rer asks for the owner name. A placeholder
+email therefore receives the adapter's email refusal first; once the email is
+accepted, a missing name prompts interactively or refuses unattended deployment.
+Dry runs bypass custom deploy hooks and their owner-email preflight: they validate
+the local plan, while a real deployment validates the hosted identity before upload.
 
 `--env-file` values are available in the command's preflight, custom hook and
 child build environment and are redacted; the caller environment is restored
