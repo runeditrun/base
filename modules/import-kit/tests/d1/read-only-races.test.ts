@@ -1,3 +1,5 @@
+import { caseRow, caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { largeReversal } from './preserved-scale-fixture.ts';
@@ -26,21 +28,25 @@ const races: [string, number, string][] = [
   ['journal', 3, 'UPDATE ik_batches SET end_position=end_position+1'],
   ['decision inventory', 3, "UPDATE ik_d1_entries SET effects_hash='private-altered'"],
 ];
-for (const [name, index, mutation] of races) test(`SELECT-only read ${index} rejects late ${name} without disclosing candidates`, async t => {
-  const r = await largeReversal(t, 6), native = r.native();
-  let batches = 0, injected = false, before: any, count = -1, delivered = false;
-  const observed = observeReads(r.db(), () => {
-    if (++batches !== 2) return;
-    native.exec(mutation); injected = true;
-    before = sqliteSnapshot(native); count = totalChanges(native);
-    // The racer may write, but the ensuing read fence must work without writes.
-    native.exec('PRAGMA query_only=ON');
+familyRows[0].push(["SELECT-only reads reject late custody races without disclosing candidates", async t => {
+  for (const [name, index, mutation] of races) await caseRow(t, `SELECT-only read ${index} rejects late ${name} without disclosing candidates`, async t => {
+    const r = await largeReversal(t, 6), native = r.native();
+    let batches = 0, injected = false, before: any, count = -1, delivered = false;
+    const observed = observeReads(r.db(), () => {
+      if (++batches !== 2) return;
+      native.exec(mutation); injected = true;
+      before = sqliteSnapshot(native); count = totalChanges(native);
+      // The racer may write, but the ensuing read fence must work without writes.
+      native.exec('PRAGMA query_only=ON');
+    });
+    const ctx = { ...r.context(), storage: { ...r.context().storage, database: observed.database } };
+    await assert.rejects(publicReads(r.job.id, ctx)[index]().then(value => { delivered = true; return value; }), error => {
+      assert.equal((error as Error).message, 'IMPORT_ATOMIC_GUARD');
+      assert.doesNotMatch(String(error), /private-|original|corrupt!/); return true;
+    });
+    assert.equal(injected, true); assert.equal(delivered, false);
+    assert.equal(totalChanges(native), count); assert.deepEqual(sqliteSnapshot(native), before); observed.assertSelectOnly();
   });
-  const ctx = { ...r.context(), storage: { ...r.context().storage, database: observed.database } };
-  await assert.rejects(publicReads(r.job.id, ctx)[index]().then(value => { delivered = true; return value; }), error => {
-    assert.equal((error as Error).message, 'IMPORT_ATOMIC_GUARD');
-    assert.doesNotMatch(String(error), /private-|original|corrupt!/); return true;
-  });
-  assert.equal(injected, true); assert.equal(delivered, false);
-  assert.equal(totalChanges(native), count); assert.deepEqual(sqliteSnapshot(native), before); observed.assertSelectOnly();
-});
+}]);
+
+ test("d1 read only races preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

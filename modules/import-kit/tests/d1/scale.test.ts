@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import { fullScale } from './scale-size.ts';
 const count = fullScale ? 1001 : 25;
@@ -8,7 +10,7 @@ import { runtime, source, mapping } from './fixtures.ts';
 import { meter } from './meter.ts';
 import { canonicalJson, sha256, planD1Import, createD1ImportJob, resumeD1Import, undoD1Import, readD1PersistedImport } from '../../src/d1/index.ts';
 
-test('real D1: complete public requests stay bounded across resumable entries', async t => {
+familyRows[0].push(['real D1: complete public requests stay bounded across resumable entries', async t => {
   const r = await runtime(t); let m = meter(r.db()); const meters = [m];
   const context = () => ({ ...r.context(), batchSize: batch, maxBatches: 1, storage: { database: m.database, targets } });
   const plan = await m.request('plan', () => planD1Import(source(count), mapping, context()));
@@ -46,9 +48,9 @@ test('real D1: complete public requests stay bounded across resumable entries', 
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM ik_provenance WHERE reversed=1').first())?.n, count);
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM ik_d1_entries').first())?.n, 2 * count);
   console.log(JSON.stringify({ requests: snapshots.length, maxStatements: Math.max(...snapshots.map(s => s.count)), meter: snapshots }));
-});
+}]);
 
-test('real D1: default batch and multiple effects stop at a durable request budget', async t => {
+familyRows[0].push(['real D1: default batch and multiple effects stop at a durable request budget', async t => {
   const r = await runtime(t), m = meter(r.db()), ctx = { ...r.context(), batchSize: 100, storage: { database: m.database, targets } };
   const many = { version: 'v1', map: (record: any) => ({ effects: Array.from({ length: 30 }, (_, i) => ({ targetKind: 'contact', targetId: `${record.sourceId}:${i}`, value: record.payload })) }) };
   const records = fullScale ? 10 : 4;
@@ -58,4 +60,6 @@ test('real D1: default batch and multiple effects stop at a durable request budg
   while (job.state !== 'completed') { const prior = job.checkpoint; job = await m.request('many-resume', () => resumeD1Import(job.id, ctx)); assert.ok(job.checkpoint > prior); requests++; }
   assert.ok(requests > 1); assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM contacts').first())?.n, records * 30);
   console.log(JSON.stringify({ multiEffect: m.snapshots }));
-});
+}]);
+
+ test("d1 scale preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

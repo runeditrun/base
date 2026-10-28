@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sqliteRuntime, sqliteTargets, sqliteMapping } from './sqlite-runtime.ts';
@@ -35,7 +37,7 @@ function noPrivateValues(r:any) {
   for(const text of bodies)for(const match of text.matchAll(/"base64":"([^"]+)"/g))for(const value of planted)assert.ok(!Buffer.from(match[1],'base64').toString().includes(value),`plan original ${value}`);
   for(const body of groups.values())for(const value of planted)assert.ok(!Buffer.from(body,'base64').toString().includes(value),`decoded ${value}`);
 }
-for(const bounded of [false,true])test(`public D1 privacy withdrawal retains peers and resumes exact API custody (${bounded?'bounded':'unbounded'})`,async t=>{
+for(const bounded of [false,true])familyRows[0].push([`public D1 privacy withdrawal retains peers and resumes exact API custody (${bounded?'bounded':'unbounded'})`, async t=>{
   const r=await fixture(t,bounded),erase=()=>eraseD1ImportTarget('record','0',sqliteTargets.remove('workspace','record','0'),r.context());
   const originals=await readD1ImportOriginals(r.job.id,r.context());
   assert.equal(originals[0].original.status,'retained');
@@ -67,9 +69,9 @@ for(const bounded of [false,true])test(`public D1 privacy withdrawal retains pee
   noPrivateValues(r);
   assert.equal(await sqliteTargets.read(r.db(),'workspace','record','0'),undefined);
   assert.equal((await readD1ImportOriginals(r.job.id,r.context()))[0].original.status,'unavailable');
-});
+}]);
 
-for(const bounded of [false,true])test(`public privacy withdrawal removes prior images, preserved reports and pending preparation (${bounded})`,async t=>{
+for(const bounded of [false,true])familyRows[0].push([`public privacy withdrawal removes prior images, preserved reports and pending preparation (${bounded})`, async t=>{
   const r=await fixture(t,bounded);
   await resumeD1Import(r.job.id,r.context());
   r.native().exec("UPDATE native_records SET revision='edited'");
@@ -89,20 +91,20 @@ for(const bounded of [false,true])test(`public privacy withdrawal removes prior 
   await assert.rejects(publishD1ImportPreparation(prepared.id,r.context()));
   await resumeD1Import(r.job.id,r.context());
   noPrivateValues(r);
-});
+}]);
 
 // A consumer codec is for normalized plans; remaining exact raw artifacts stay
 // in canonical original-bearing custody even when the native adapter has a codec.
-test('withdrawal preserves unrelated raw custody with a consumer plan codec',async t=>{
+familyRows[0].push(['withdrawal preserves unrelated raw custody with a consumer plan codec', async t=>{
   const r=await fixture(t,true),base=r.context();
   const context={...base,storage:{...base.storage,targets:{...sqliteTargets,planCodec:{id:'identity',encode:(plan:any)=>plan,decode:(plan:any)=>plan}}}};
   await eraseD1ImportTarget('record','0',sqliteTargets.remove('workspace','record','0'),context);
   assert.equal((await readD1ImportOriginals(r.job.id,context))[1].original.status,'retained');
   await resumeD1Import(r.job.id,context);
   noPrivateValues(r);
-});
+}]);
 
-for(const bounded of [false,true])test(`all-job withdrawal covers a second contributing raw page without deleting peers (${bounded})`,async t=>{
+for(const bounded of [false,true])familyRows[0].push([`all-job withdrawal covers a second contributing raw page without deleting peers (${bounded})`, async t=>{
   const r=await fixture(t,bounded,true),context={...r.context(),originalErasurePolicy:'withdraw-all-job-artifacts' as const};
   await eraseD1ImportTarget('record','0',sqliteTargets.remove('workspace','record','0'),context);
   noPrivateValues(r);
@@ -117,4 +119,6 @@ for(const bounded of [false,true])test(`all-job withdrawal covers a second contr
   await eraseD1ImportTarget('record','0',sqliteTargets.remove('workspace','record','0'),context);
   noPrivateValues(r);
   assert.deepEqual(await readD1ImportOriginals(r.job.id,context),originals);
-});
+}]);
+
+ test("d1 erasure originals preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

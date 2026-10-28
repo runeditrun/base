@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { planImport } from '../src/plan/index.ts';
@@ -9,7 +11,7 @@ import { setup, source } from './core/fixtures.ts';
 const unit = 'x'.repeat(1_000_000);
 const expansion = () => Array(300).fill(unit);
 
-test('mapper-only expansion is refused before any large string is encoded', t => {
+familyRows[0].push(['mapper-only expansion is refused before any large string is encoded', t => {
   const { ctx } = setup(t);
   const small = planImport(source(1), { version: 'v1', map: () => ({ effects: [{ targetKind: 'item', targetId: '0', value: Array(300).fill('') }] }) }, ctx);
   const { fingerprint: _, ...content } = small;
@@ -22,9 +24,9 @@ test('mapper-only expansion is refused before any large string is encoded', t =>
   const mapped = { effects: [{ targetKind: 'item', targetId: '0', value: expansion() }] };
   assert.throws(() => planImport(source(1), { version: 'v1', map: () => mapped }, ctx),
     (error: any) => error instanceof PlanTooLargeError && error.subject === 'plan' && error.bytes === expected);
-});
+}]);
 
-test('cumulative mapper rejections include both entry and diagnostic bytes before encoding', t => {
+familyRows[0].push(['cumulative mapper rejections include both entry and diagnostic bytes before encoding', t => {
   const { ctx } = setup(t), bundle = source(3);
   // Two entries of this shape have exactly four serialized copies of reason.
   const small = planImport(bundle, { version: 'v1', map: () => ({ effects: [], rejection: 'x' }) }, ctx);
@@ -42,9 +44,9 @@ test('cumulative mapper rejections include both entry and diagnostic bytes befor
   assert.throws(() => planImport(bundle, { version: 'v1', map: () => { calls++; return { effects: [], rejection: 'x'.repeat(length) }; } }, ctx),
     (error: any) => error instanceof PlanTooLargeError && error.bytes === expected && error.subject === 'plan');
   assert.equal(calls, 2, 'stop as soon as the cumulative retained plan crosses the cap');
-});
+}]);
 
-test('source diagnostics duplicated in the initial plan are guarded before copying source', t => {
+familyRows[0].push(['source diagnostics duplicated in the initial plan are guarded before copying source', t => {
   const { ctx } = setup(t), bundle = source(0), stringify = JSON.stringify;
   bundle.diagnostics.push({ severity: 'warning', code: 'NOTE', message: 'x'.repeat(150_000_000) });
   t.mock.method(JSON, 'stringify', (value: unknown, ...args: any[]) => {
@@ -53,9 +55,9 @@ test('source diagnostics duplicated in the initial plan are guarded before copyi
   });
   assert.throws(() => planImport(bundle, { version: 'v1', map: () => ({ effects: [] }) }, ctx),
     (error: any) => error instanceof PlanTooLargeError && error.bytes > PLAN_BYTES_LIMIT && error.subject === 'plan');
-});
+}]);
 
-test('the repeated entry source is admitted before encoding payload or cloning mapper input', t => {
+familyRows[0].push(['the repeated entry source is admitted before encoding payload or cloning mapper input', t => {
   const { ctx } = setup(t), bundle = source(1);
   // The cap must win before hashing or mapping: the doubled source alone is
   // already too large. Count encoding calls so only the admitted source copy
@@ -71,4 +73,6 @@ test('the repeated entry source is admitted before encoding payload or cloning m
     (error: any) => error instanceof PlanTooLargeError && error.bytes > 302_000_000 && error.subject === 'plan');
   assert.equal(largeStrings, 151);
   assert.equal(calls, 0);
-});
+}]);
+
+ test("plan mapping size preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

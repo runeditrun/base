@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, source, mapping } from './d1/fixtures.ts';
@@ -12,7 +14,7 @@ const oracle = (value: any): string => {
   return JSON.stringify(value);
 };
 
-test('initial source-page reuse preserves the independent complete canonical fingerprint and maps each record once', async t => {
+familyRows[0].push(['initial source-page reuse preserves the independent complete canonical fingerprint and maps each record once', async t => {
   const r=await runtime(t), bundle=source(257);
   bundle.artifacts[0].original={status:'unavailable',reason:'not-supplied'};
   for(const [index,record] of bundle.records.entries()) {
@@ -29,19 +31,21 @@ test('initial source-page reuse preserves the independent complete canonical fin
   bundle.records=[];
   await createD1ImportStream(stream,{...r.context(),reviewedFingerprint:stream.fingerprint});
   assert.equal(calls,257);
-});
+}]);
 
-test('a source changed by mapping is refused before a stream can be published', async t => {
+familyRows[0].push(['a source changed by mapping is refused before a stream can be published', async t => {
   const r=await runtime(t), bundle=source(3);
   bundle.artifacts[0].original={status:'unavailable',reason:'not-supplied'};
   await assert.rejects(planD1ImportStream(bundle,{version:mapping.version,map(record){bundle.records[0].sourceId='changed-after-normalization';return mapping.map(record);}},r.context()),/IMPORT_STREAM_SOURCE_CHANGED/);
   assert.equal((await r.db().prepare('SELECT count(*) n FROM ik_jobs').first())!.n,0);
-});
+}]);
 
-test('target identity guards still reject a duplicate across independent normalized pages before custody', async t => {
+familyRows[0].push(['target identity guards still reject a duplicate across independent normalized pages before custody', async t => {
   const r=await runtime(t), bundle=source(101);
   bundle.artifacts[0].original={status:'unavailable',reason:'not-supplied'};
   const duplicate={version:mapping.version,map(record: any){return {effects:[{targetKind:'contact',targetId:record.sourceId==='100'?'0':record.sourceId,value:record.payload}]};}};
   await assert.rejects(planD1ImportStream(bundle,duplicate,r.context()),/DUPLICATE_TARGET/);
   assert.equal((await r.db().prepare('SELECT count(*) n FROM ik_jobs').first())!.n,0);
-});
+}]);
+
+ test("reviewed source native preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtime, source, mapping, targets } from './fixtures.ts';
@@ -11,7 +13,7 @@ const preserved: D1TargetAdapter = { ...targets, async preparePreservedUndo(db, 
 for (const [name, trigger] of [
   ['unused plan ordinal zero disappears', 'CREATE TRIGGER corrupt_plan AFTER INSERT ON ik_d1_plan_chunks WHEN NEW.ordinal=0 BEGIN DELETE FROM ik_d1_plan_chunks WHERE job_id=NEW.job_id AND ordinal=0; END'],
   ['original bytes change with preserved count', "CREATE TRIGGER corrupt_original AFTER INSERT ON ik_d1_original_chunks BEGIN UPDATE ik_d1_original_chunks SET bytes='AAAA' WHERE job_id=NEW.job_id AND kind=NEW.kind AND original_key=NEW.original_key AND ordinal=NEW.ordinal; END"],
-] as const) test(`real D1 atomic creation rejects ${name} without custody writes`, async t => {
+] as const) familyRows[0].push([`real D1 atomic creation rejects ${name} without custody writes`, async t => {
   const r = await runtime(t), ctx = r.context(), bundle = source(0), bytes = Buffer.alloc(300000, 97);
   bundle.diagnostics = [{ code: 'padding', severity: 'warning', message: 'x'.repeat(300000) }];
   bundle.artifacts = [{ name: 'raw.bin', sha256: sha256(bytes), size: bytes.length, original: { status: 'available', base64: bytes.toString('base64') } }];
@@ -19,8 +21,8 @@ for (const [name, trigger] of [
   await r.db().prepare(trigger).run();
   await assert.rejects(createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint }), /IMPORT_ATOMIC_GUARD/);
   for (const table of ['ik_jobs','ik_d1_plan_chunks','ik_originals','ik_original_sets','ik_d1_original_chunks','ik_d1_assertions','ik_d1_reversal_reports','ik_d1_creation_plans']) assert.equal((await r.db().prepare(`SELECT COUNT(*) AS n FROM ${table}`).first())!.n, 0, table);
-});
-for (const batchSize of [1,4,20]) test(`real D1 mixed preserved undo, restart, current authority and bounded report batch ${batchSize}`, async t => {
+}]);
+for (const batchSize of [1,4,20]) familyRows[0].push([`real D1 mixed preserved undo, restart, current authority and bounded report batch ${batchSize}`, async t => {
   const r = await runtime(t), context = () => ({ ...r.context(), batchSize, storage: { database: r.db(), targets: preserved } }), ctx = { ...context(), reversalPolicy: 'preserve-conflicts' as const };
   const plan = await planD1Import(source(25), mapping, ctx), reviewed = { ...ctx, reviewedFingerprint: plan.fingerprint }, m = meter(r.db());
   const admission = preflightD1ImportJob(plan, reviewed);
@@ -39,8 +41,8 @@ for (const batchSize of [1,4,20]) test(`real D1 mixed preserved undo, restart, c
   assert.equal((await readD1ImportOriginals(job.id, context())).length, 1);
   await r.db().prepare('UPDATE sessions SET enabled=0').run();
   await assert.rejects(undoD1Import(job.id, context()), /IMPORT_ATOMIC_GUARD/);
-});
-test('real D1 conflict-only authority revocation and report-write corruption publish no reversal', async t => {
+}]);
+familyRows[0].push(['real D1 conflict-only authority revocation and report-write corruption publish no reversal', async t => {
   const r = await runtime(t), base = { ...r.context(), reversalPolicy: 'preserve-conflicts' as const, storage: { database: r.db(), targets: preserved } };
   const plan = await planD1Import(source(2), mapping, base), job = await createD1ImportJob(plan, { ...base, reviewedFingerprint: plan.fingerprint });
   await resumeD1Import(job.id, base);
@@ -57,8 +59,8 @@ test('real D1 conflict-only authority revocation and report-write corruption pub
   await r.db().prepare('DROP TRIGGER corrupt_report').run();
   assert.equal((await undoD1Import(job.id, base)).state, 'undone');
   assert.equal((await readD1ImportUndoReport(job.id, base)).dispositions.filter(d => d.reason === 'edited').length, 2);
-});
-test('real D1 atomically grouped partial rollback preserves mixed owned effects and mode fences', async t => {
+}]);
+familyRows[0].push(['real D1 atomically grouped partial rollback preserves mixed owned effects and mode fences', async t => {
   const r = await runtime(t);
   const grouped: D1TargetAdapter = { ...preserved, async preparePreservedUndo(...args) { const result = await preserved.preparePreservedUndo!(...args); const ids = args[2].filter(e => ['0','1'].includes(e.expected.targetId)).map(e => e.provenance.id); result.atomicGroups = ids.length ? [ids] : []; return result; } };
   const ctx = { ...r.context(), reversalPolicy: 'preserve-conflicts' as const, batchSize: 3, maxBatches: 1, storage: { database: r.db(), targets: grouped } };
@@ -76,9 +78,9 @@ test('real D1 atomically grouped partial rollback preserves mixed owned effects 
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM contacts').first())!.n, 1);
   const report = await readD1ImportUndoReport(job.id, reopened);
   assert.equal(report.cursor, 3); assert.equal(report.dispositions.filter(d => d.disposition === 'retained').length, 1);
-});
+}]);
 
-test('real D1 reviewed strict conversion preserves custody, current undo authority and later activity', async t => {
+familyRows[0].push(['real D1 reviewed strict conversion preserves custody, current undo authority and later activity', async t => {
   const { previewD1PreservedUndo, convertD1ReversalPolicy, D1ReversalPolicyConversionError, canonicalJson } = await import('../../src/d1/index.ts');
   const r = await runtime(t);
   await r.db().prepare('CREATE TABLE later_activity(id TEXT PRIMARY KEY,kind TEXT,contact_id TEXT REFERENCES contacts(id) ON DELETE CASCADE,payload TEXT)').run();
@@ -166,4 +168,6 @@ test('real D1 reviewed strict conversion preserves custody, current undo authori
   const terminal = await snapshot();
   await undoD1Import(job.id, context());
   assert.deepEqual(await snapshot(), terminal);
-});
+}]);
+
+ test("d1 preserved provider preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

@@ -1,10 +1,12 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { nativeStagingFixture, nativePrivateTables } from './native-staging-fixture.ts';
 import { initializeD1ImportStorage, resumeD1ImportStream, undoD1ImportStream, eraseD1ImportTarget, planD1Import, createD1ImportJob, resumeD1Import, readD1PersistedImport, retireD1ImportCustody } from '../../src/d1/index.ts';
 import { runtime, source as d1Source, mapping as d1Mapping, targets as d1Targets } from './fixtures.ts';
 
-test('additive custody revision migration preserves prior public bytes and cold erasure and undo',async t=>{
+familyRows[0].push(['additive custody revision migration preserves prior public bytes and cold erasure and undo', async t=>{
   const r=await nativeStagingFixture(t),before=r.native().prepare('SELECT * FROM ik_jobs ORDER BY id').all();
   const triggers=r.native().prepare("SELECT name,sql FROM sqlite_master WHERE type='trigger'").all() as {name:string;sql:string}[];
   for(const trigger of triggers)if(trigger.sql.includes('ik_d1_custody_states'))r.native().exec(`DROP TRIGGER ${trigger.name}`);
@@ -23,9 +25,9 @@ test('additive custody revision migration preserves prior public bytes and cold 
   assert.equal((await undoD1ImportStream(r.job.id,r.context())).state,'undone');
   assert.equal(r.native().prepare('SELECT count(*) n FROM native_records').get()!.n,0);
   for(const table of nativePrivateTables)assert.equal(r.native().prepare(`SELECT count(*) n FROM ${table}`).get()!.n,0,table);
-});
+}]);
 
-test('custody revisions cover parent, membership and body writes and cannot rewind or disappear',async t=>{
+familyRows[0].push(['custody revisions cover parent, membership and body writes and cannot rewind or disappear', async t=>{
   const r=await nativeStagingFixture(t),id=r.native().prepare('SELECT id FROM ik_jobs LIMIT 1').get()!.id;
   const revision=()=>Number(r.native().prepare('SELECT revision FROM ik_d1_custody_states WHERE job_id=?').get(id)!.revision);
   for(const statement of [
@@ -39,7 +41,7 @@ test('custody revisions cover parent, membership and body writes and cannot rewi
   assert.throws(()=>r.native().prepare('UPDATE ik_d1_custody_states SET revision=? WHERE job_id=?').run(before-1,id),/IMPORT_CUSTODY_STATE_CHANGED/);
   assert.throws(()=>r.native().prepare('DELETE FROM ik_d1_custody_states WHERE job_id=?').run(id),/IMPORT_CUSTODY_STATE_CHANGED/);
   assert.equal(revision(),before);
-});
+}]);
 
 const FINAL_READ='SELECT COUNT(*) FROM ik_provenance WHERE reversed=0 AND (destination=?';
 /** Real D1 that runs `between` after readD1PersistedImport captured custody, just before its final atomic read. */
@@ -76,7 +78,7 @@ async function readWith(s:Awaited<ReturnType<typeof chain>>,between:()=>Promise<
   return outcome;
 }
 
-test('real D1: an insert over a custody revision or a reused job id cannot rewind or keep a revision',async t=>{
+familyRows[0].push(['real D1: an insert over a custody revision or a reused job id cannot rewind or keep a revision', async t=>{
   const {r,ctx,A}=await chain(await runtime(t)),db=r.db(),before=await custodyRevision(db,A),revisions:Record<string,unknown>={};
   for(const statement of [
     'INSERT OR REPLACE INTO ik_d1_custody_states(job_id,revision) VALUES(?,0)',
@@ -103,9 +105,9 @@ test('real D1: an insert over a custody revision or a reused job id cannot rewin
   assert.equal(await db.prepare('SELECT 1 FROM ik_jobs WHERE id=?').bind(A).first(),null);
   await assert.rejects(replace(db,'ik_jobs',job),/IMPORT_JOB_ID_REUSED/);
   await assert.rejects(db.prepare(`INSERT INTO ik_jobs(${Object.keys(job)}) VALUES(${Object.keys(job).map(()=>'?')})`).bind(...Object.values(job)).run(),/IMPORT_JOB_ID_REUSED/);
-});
+}]);
 
-test('real D1: a REPLACE between the persisted read\'s custody capture and its final read fails closed',async t=>{
+familyRows[0].push(['real D1: a REPLACE between the persisted read\'s custody capture and its final read fails closed', async t=>{
   const firstRow=async(db:any,table:string,job:string)=>db.prepare(`SELECT * FROM ${table} WHERE job_id=? ${table==='ik_provenance'?'AND reversed=0':''} ORDER BY rowid LIMIT 1`).bind(job).first();
   type Scene=Awaited<ReturnType<typeof chain>>;
   // B is the only page of an open stream; the read uses B's custody, so its stream is part of it.
@@ -189,4 +191,6 @@ test('real D1: a REPLACE between the persisted read\'s custody capture and its f
     outcomes[name]=await readWith(s,()=>change(s));
   }
   assert.deepEqual(outcomes,Object.fromEntries(Object.keys(cases).map(name=>[name,'IMPORT_ATOMIC_GUARD'])));
-});
+}]);
+
+ test("d1 custody state preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

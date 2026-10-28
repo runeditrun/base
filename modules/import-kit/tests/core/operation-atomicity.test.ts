@@ -1,9 +1,11 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyImportBatches, undoImport, rollbackImport, resumeImport, readImportJob, canonicalJson } from '../../src/index.ts';
 import { nativeSetup, nativeJob, nativeRows, nativeTargets, firstArticle } from './operation-native-fixtures.ts';
 
-for (const action of ['apply', 'undo'] as const) test(`${action} detects attribution corruption introduced between batches, before another native effect`, async t => {
+for (const action of ['apply', 'undo'] as const) familyRows[0].push([`${action} detects attribution corruption introduced between batches, before another native effect`, async t => {
   let ctx: any, saved: any, injected = false;
   const corruptAfterCommit = () => setImmediate(() => {
     saved = firstArticle(ctx); injected = true;
@@ -26,8 +28,8 @@ for (const action of ['apply', 'undo'] as const) test(`${action} detects attribu
   const result = await resumeImport(job.id, ctx);
   assert.equal(result.state, action === 'apply' ? 'completed' : 'undone');
   assert.equal(nativeRows(ctx).length, action === 'apply' ? 6 : 0);
-});
-for (const action of ['apply', 'undo'] as const) test(`${action} checks final transaction state after native triggers and rolls back corruption plus native work`, async t => {
+}]);
+for (const action of ['apply', 'undo'] as const) familyRows[0].push([`${action} checks final transaction state after native triggers and rolls back corruption plus native work`, async t => {
   const { ctx } = nativeSetup(t), { job } = await nativeJob(ctx), db = ctx.storage.database;
   if (action === 'apply') { ctx.maxBatches = 1; await applyImportBatches(job, ctx); delete ctx.maxBatches; }
   else await applyImportBatches(job, ctx);
@@ -40,8 +42,8 @@ for (const action of ['apply', 'undo'] as const) test(`${action} checks final tr
   assert.equal(db.prepare("SELECT count(*) n FROM ik_batches WHERE action='undo'").get().n, 0);
   db.exec('DROP TRIGGER corrupt_provenance'); await resumeImport(job.id, ctx);
   assert.equal(nativeRows(ctx).length, action === 'apply' ? 6 : 0);
-});
-test('corruption of an already reversed record blocks further reversal and finalization', async t => {
+}]);
+familyRows[0].push(['corruption of an already reversed record blocks further reversal and finalization', async t => {
   const { ctx } = nativeSetup(t), { job } = await nativeJob(ctx); await applyImportBatches(job, ctx);
   ctx.maxBatches = 1; await undoImport(job.id, ctx); delete ctx.maxBatches;
   const db = ctx.storage.database, row = db.prepare('SELECT * FROM ik_provenance WHERE reversed=1').get();
@@ -50,8 +52,8 @@ test('corruption of an already reversed record blocks further reversal and final
   await assert.rejects(resumeImport(job.id, ctx), /PROVENANCE_(MISSING|REVERSAL_MISMATCH)/);
   assert.deepEqual(nativeRows(ctx), before); assert.equal(readImportJob(job.id, ctx).state, 'undoing');
   assert.equal(db.prepare('SELECT count(*) n FROM ik_sources').get().n, 2);
-});
-test('later native edits remain explicit conflicts and partial reversal can resume after restoration', async t => {
+}]);
+familyRows[0].push(['later native edits remain explicit conflicts and partial reversal can resume after restoration', async t => {
   const { ctx } = nativeSetup(t), { job } = await nativeJob(ctx); await applyImportBatches(job, ctx);
   const db = ctx.storage.database, original = nativeTargets.read(db, ctx.destination, 'article', '0')!;
   nativeTargets.write(db, { ...original, revision: 'native-edit', value: { title: 'Changed natively', body: 'Keep this' } });
@@ -60,16 +62,16 @@ test('later native edits remain explicit conflicts and partial reversal can resu
   assert.equal(readImportJob(job.id, ctx).state, 'rolling_back');
   nativeTargets.write(db, original); assert.equal((await resumeImport(job.id, ctx)).state, 'rolled_back');
   assert.equal(nativeRows(ctx).length, 0);
-});
-test('final native apply commit rechecks authority after checkpoint-triggered changes', async t => {
+}]);
+familyRows[0].push(['final native apply commit rechecks authority after checkpoint-triggered changes', async t => {
   const { ctx } = nativeSetup(t), { job } = await nativeJob(ctx), db = ctx.storage.database;
   db.exec("CREATE TRIGGER revoke_on_completion AFTER UPDATE OF checkpoint ON ik_jobs WHEN NEW.checkpoint=NEW.total BEGIN UPDATE native_authority SET allowed=0; END;");
   await assert.rejects(applyImportBatches(job, ctx), /NOT_AUTHORIZED/);
   assert.equal(readImportJob(job.id, ctx).checkpoint, 1); assert.equal(nativeRows(ctx).length, 3);
   assert.equal(db.prepare("SELECT allowed FROM native_authority WHERE id='owner'").get().allowed, 1);
   db.exec('DROP TRIGGER revoke_on_completion'); assert.equal((await resumeImport(job.id, ctx)).state, 'completed');
-});
-test('native replacements restore full before-images after validated partial reversal', async t => {
+}]);
+familyRows[0].push(['native replacements restore full before-images after validated partial reversal', async t => {
   const { ctx } = nativeSetup(t), db = ctx.storage.database;
   const before = { destination: ctx.destination, targetKind: 'article', targetId: '0', revision: 'native-original', value: { title: 'Existing', body: 'Original body' } };
   nativeTargets.write(db, before);
@@ -81,4 +83,6 @@ test('native replacements restore full before-images after validated partial rev
   } });
   await applyImportBatches(job, ctx); ctx.maxBatches = 1; await undoImport(job.id, ctx); delete ctx.maxBatches;
   await resumeImport(job.id, ctx); assert.deepEqual(nativeRows(ctx), [before]);
-});
+}]);
+
+ test("core operation atomicity preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

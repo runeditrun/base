@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sqliteRuntime, sqliteMapping, sqliteSource } from './sqlite-runtime.ts';
@@ -8,7 +10,7 @@ for (const [name, trigger] of [
   ['original bytes replaced preserving cardinality', "CREATE TRIGGER corrupt_bytes AFTER INSERT ON ik_d1_original_chunks BEGIN UPDATE ik_d1_original_chunks SET bytes='AAAA' WHERE job_id=NEW.job_id AND kind=NEW.kind AND original_key=NEW.original_key AND ordinal=NEW.ordinal; END"],
   ['original metadata changed', "CREATE TRIGGER corrupt_name AFTER INSERT ON ik_originals BEGIN UPDATE ik_originals SET name='changed' WHERE job_id=NEW.job_id; END"],
   ['creation policy changed', "CREATE TRIGGER corrupt_policy AFTER INSERT ON ik_jobs BEGIN UPDATE ik_jobs SET reversal_policy='preserve-conflicts' WHERE id=NEW.id; END"],
-] as const) test(`atomic custody rejects ${name} with zero durable writes`, async t => {
+] as const) familyRows[0].push([`atomic custody rejects ${name} with zero durable writes`, async t => {
   const r = await sqliteRuntime(t), ctx = r.context(), source = sqliteSource(0), bytes = Buffer.alloc(300000, 112);
   // Diagnostics occupy ordinal zero, which no original-copy descriptor uses.
   source.diagnostics = [{ code: 'padding', severity: 'warning', message: 'x'.repeat(300000) }];
@@ -17,8 +19,8 @@ for (const [name, trigger] of [
   r.native().exec(trigger);
   await assert.rejects(createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint }), /IMPORT_ATOMIC_GUARD/);
   for (const table of custodyTables) assert.equal(r.native().prepare(`SELECT COUNT(*) AS n FROM ${table}`).get()!.n, 0, table);
-});
-test('exact empty, Unicode and control originals survive fresh instance restart', async t => {
+}]);
+familyRows[0].push(['exact empty, Unicode and control originals survive fresh instance restart', async t => {
   const r = await sqliteRuntime(t), source = sqliteSource(0);
   source.artifacts = ['', '🌱\u0000"\\\n漢', 'unavailable'].map((name, i) => { const bytes = i === 0 ? Buffer.alloc(0) : Buffer.from([0, 255, 13, 10, 42]); return { name, size: bytes.length, sha256: sha256(bytes), original: i === 2 ? { status: 'unavailable' as const, reason: 'not-supplied' as const } : { status: 'available' as const, base64: bytes.toString('base64') } }; });
   // Artifact names are intentionally nonempty per the public source contract.
@@ -29,12 +31,14 @@ test('exact empty, Unicode and control originals survive fresh instance restart'
   const job = await createD1ImportJob(plan, ctx); r.reopen();
   const originals = await readD1ImportOriginals(job.id, r.context());
   assert.deepEqual(originals.map(o => [o.name, o.sha256, o.size, o.original]), source.artifacts.map(a => [a.name, a.sha256, a.size, a.original!.status === 'available' ? { status: 'retained', base64: a.original!.base64 } : a.original]));
-});
-for (const operation of ["UPDATE ik_d1_creation_plans SET body='corrupt' WHERE job_id=NEW.job_id", 'DELETE FROM ik_d1_creation_plans WHERE job_id=NEW.job_id']) test(`creation exact snapshots cannot change before guarded release: ${operation}`, async t => {
+}]);
+for (const operation of ["UPDATE ik_d1_creation_plans SET body='corrupt' WHERE job_id=NEW.job_id", 'DELETE FROM ik_d1_creation_plans WHERE job_id=NEW.job_id']) familyRows[0].push([`creation exact snapshots cannot change before guarded release: ${operation}`, async t => {
   const r = await sqliteRuntime(t), ctx = r.context(), bundle = sqliteSource(0);
   bundle.diagnostics = [{ code: 'chunked', severity: 'warning', message: 'x'.repeat(200000) }];
   const plan = await planD1Import(bundle, sqliteMapping, ctx);
   r.native().exec(`CREATE TRIGGER corrupt_snapshot AFTER INSERT ON ik_d1_creation_plans BEGIN ${operation}; END`);
   await assert.rejects(createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint }), /IMPORT_CREATION_SNAPSHOT_CHANGED/);
   for (const table of custodyTables) assert.equal(r.native().prepare(`SELECT COUNT(*) AS n FROM ${table}`).get()!.n, 0, table);
-});
+}]);
+
+ test("d1 creation atomicity preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

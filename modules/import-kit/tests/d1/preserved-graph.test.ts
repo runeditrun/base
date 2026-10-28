@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sqliteRuntime, sqliteMapping, sqliteSource, sqliteTargets } from './sqlite-runtime.ts';
@@ -25,7 +27,7 @@ function dependencyAdapter(r: Awaited<ReturnType<typeof sqliteRuntime>>, retenti
 function dependencies(r: Awaited<ReturnType<typeof sqliteRuntime>>) {
   r.native().exec('CREATE UNIQUE INDEX native_id ON native_records(id); CREATE TABLE native_dependencies(owner TEXT NOT NULL REFERENCES native_records(id),target TEXT NOT NULL REFERENCES native_records(id),PRIMARY KEY(owner,target))');
 }
-test('unchanged owned content may exclude shared revision while strict comparison stays strict', async t => {
+familyRows[0].push(['unchanged owned content may exclude shared revision while strict comparison stays strict', async t => {
   const { r, job } = await setup(t, 2);
   r.native().exec("UPDATE native_records SET revision='shared-wrapper-changed' WHERE id='1'");
   r.native().prepare("UPDATE native_records SET value_json=? WHERE id='0'").run(canonicalJson({ id: '0', label: 'scalar edit' }));
@@ -34,8 +36,8 @@ test('unchanged owned content may exclude shared revision while strict compariso
   const report = await readD1ImportUndoReport(job.id, { ...r.context(), storage: { database: r.db(), targets: adapter } });
   assert.equal(report.dispositions.find(d => d.targetId === '1')!.disposition, 'reversed');
   assert.equal(report.dispositions.find(d => d.targetId === '0')!.reason, 'edited');
-});
-test('fresh dependency closure retains edited descendants and ancestors, independently removes unrelated effects', async t => {
+}]);
+familyRows[0].push(['fresh dependency closure retains edited descendants and ancestors, independently removes unrelated effects', async t => {
   const { r, job } = await setup(t); dependencies(r);
   r.native().exec("INSERT INTO native_dependencies VALUES('0','1'),('1','2')");
   r.native().prepare("UPDATE native_records SET value_json=? WHERE id='0'").run(canonicalJson({ id: '0', label: 'edited child' }));
@@ -45,8 +47,8 @@ test('fresh dependency closure retains edited descendants and ancestors, indepen
   assert.deepEqual(report.dispositions.filter(d => d.disposition === 'retained').map(d => d.targetId).sort(), ['0','1','2']);
   assert.ok(report.dispositions.filter(d => d.reason === 'dependency').every(d => d.protectedBy.length));
   assert.equal(r.native().prepare('SELECT COUNT(*) AS n FROM native_dependencies').get()!.n, 2);
-});
-test('unchanged acyclic dependent rows reverse before targets under live restrict foreign keys', async t => {
+}]);
+familyRows[0].push(['unchanged acyclic dependent rows reverse before targets under live restrict foreign keys', async t => {
   const { r, job } = await setup(t); dependencies(r);
   r.native().exec("INSERT INTO native_dependencies VALUES('0','1'),('1','2')");
   const adapter = dependencyAdapter(r), ctx = { ...r.context(), batchSize: 1, storage: { database: r.db(), targets: adapter } };
@@ -54,8 +56,8 @@ test('unchanged acyclic dependent rows reverse before targets under live restric
   const ids = (await readD1ImportUndoReport(job.id, ctx)).dispositions.map(d => d.targetId);
   assert.ok(ids.indexOf('0') < ids.indexOf('1') && ids.indexOf('1') < ids.indexOf('2'));
   assert.equal(r.native().prepare('SELECT COUNT(*) AS n FROM native_records').get()!.n, 0);
-});
-test('outside incoming dependencies protect imported targets transitively', async t => {
+}]);
+familyRows[0].push(['outside incoming dependencies protect imported targets transitively', async t => {
   const { r, job } = await setup(t); dependencies(r);
   r.native().prepare('INSERT INTO native_records VALUES(?,?,?,?,?)').run('workspace','record','outside','native',canonicalJson({ id: 'outside' }));
   r.native().exec("INSERT INTO native_dependencies VALUES('outside','0'),('0','1')");
@@ -63,8 +65,8 @@ test('outside incoming dependencies protect imported targets transitively', asyn
   await undoD1Import(job.id, ctx);
   assert.deepEqual((await readD1ImportUndoReport(job.id, ctx)).dispositions.filter(d => d.reason === 'dependency').map(d => d.targetId).sort(), ['0','1']);
   assert.equal(r.native().prepare('SELECT COUNT(*) AS n FROM native_dependencies').get()!.n, 2);
-});
-test('retention-only edges preserve required joins without introducing a removal-order cycle', async t => {
+}]);
+familyRows[0].push(['retention-only edges preserve required joins without introducing a removal-order cycle', async t => {
   const { r, job } = await setup(t, 2); dependencies(r);
   // 0 is a separately owned join and 1 its owner. The physical edge orders
   // join removal before owner; the validity edge retains join when owner stays.
@@ -77,8 +79,8 @@ test('retention-only edges preserve required joins without introducing a removal
   const report = await readD1ImportUndoReport(job.id, ctx);
   assert.equal(report.dispositions.find(d => d.targetId === '0')!.reason, 'dependency');
   assert.equal(r.native().prepare('SELECT COUNT(*) AS n FROM native_records').get()!.n, 2);
-});
-for (const race of ['same-revision', 'incoming', 'second-undo']) test(`preserved preflight race is atomic: ${race}`, async t => {
+}]);
+for (const race of ['same-revision', 'incoming', 'second-undo']) familyRows[0].push([`preserved preflight race is atomic: ${race}`, async t => {
   const { r, job } = await setup(t, 2); dependencies(r);
   r.native().prepare('INSERT INTO native_records VALUES(?,?,?,?,?)').run('workspace','record','outside','native',canonicalJson({ id: 'outside' }));
   const base = dependencyAdapter(r);
@@ -96,8 +98,8 @@ for (const race of ['same-revision', 'incoming', 'second-undo']) test(`preserved
   await assert.rejects(undoD1Import(job.id, { ...r.context(), storage: { database: r.db(), targets: adapter } }), /IMPORT_ATOMIC_GUARD/);
   assert.equal(r.native().prepare('SELECT COUNT(*) AS n FROM ik_d1_reversal_reports').get()!.n, race === 'second-undo' ? 2 : 0);
   if (race !== 'second-undo') assert.equal(r.native().prepare('SELECT COUNT(*) AS n FROM ik_provenance WHERE reversed=0').get()!.n, 2);
-});
-test('edited successor keeps the owner edit and releases its predecessor, which then undoes fully, while independent successor effects reverse', async t => {
+}]);
+familyRows[0].push(['edited successor keeps the owner edit and releases its predecessor, which then undoes fully, while independent successor effects reverse', async t => {
   const { r, job: first } = await setup(t, 1), predecessor = r.native().prepare('SELECT * FROM ik_provenance').get()!;
   const prior = await sqliteTargets.read(r.db(), 'workspace', 'record', '0');
   const source = sqliteSource(2, 'new export'); source.records.forEach(rec => { rec.namespace = 'second'; });
@@ -119,8 +121,8 @@ test('edited successor keeps the owner edit and releases its predecessor, which 
   const report = await readD1ImportUndoReport(first.id, r.context());
   assert.deepEqual(report.dispositions.map(d => [d.targetId, d.disposition, d.reason]), [['0', 'retained', 'superseded']]);
   assert.equal(r.native().prepare("SELECT value_json FROM native_records WHERE id='0'").get()!.value_json, canonicalJson({ id: '0', label: 'successor edit' }));
-});
-test('removed predecessor history is an integrity error even when successor is edited', async t => {
+}]);
+familyRows[0].push(['removed predecessor history is an integrity error even when successor is edited', async t => {
   const { r } = await setup(t, 1);
   const prior = await sqliteTargets.read(r.db(), 'workspace', 'record', '0');
   const source = sqliteSource(1, 'next export'); source.records[0].namespace = 'second';
@@ -130,8 +132,8 @@ test('removed predecessor history is an integrity error even when successor is e
   r.native().exec("UPDATE native_records SET revision='edited'; DELETE FROM ik_d1_history");
   await assert.rejects(undoD1Import(job.id, ctx), /IMPORT_HISTORY_MISMATCH/);
   assert.equal(r.native().prepare('SELECT COUNT(*) AS n FROM ik_d1_reversal_reports').get()!.n, 0);
-});
-test('required native owner and joins reverse atomically even with batchSize one', async t => {
+}]);
+familyRows[0].push(['required native owner and joins reverse atomically even with batchSize one', async t => {
   const { r, job } = await setup(t, 3); dependencies(r);
   r.native().exec("INSERT INTO native_dependencies VALUES('0','1')");
   const base = dependencyAdapter(r), ps = r.native().prepare('SELECT * FROM ik_provenance ORDER BY target_id').all();
@@ -149,8 +151,8 @@ test('required native owner and joins reverse atomically even with batchSize one
     result = await undoD1Import(job.id, ctx);
   }
   assert.equal((await readD1ImportUndoReport(job.id, ctx)).cursor, 3);
-});
-test('an edited member protects its whole required atomic unit with explicit causes', async t => {
+}]);
+familyRows[0].push(['an edited member protects its whole required atomic unit with explicit causes', async t => {
   const { r, job } = await setup(t, 3), ps = r.native().prepare('SELECT * FROM ik_provenance ORDER BY target_id').all();
   const adapter = { ...sqliteTargets, async preparePreservedUndo(...args: Parameters<NonNullable<D1TargetAdapter['preparePreservedUndo']>>) {
     const snapshot = await sqliteTargets.preparePreservedUndo!(...args);
@@ -164,4 +166,6 @@ test('an edited member protects its whole required atomic unit with explicit cau
   const held = report.dispositions.find(d => d.targetId === '0')!;
   assert.equal(held.reason, 'dependency'); assert.equal(held.protectedBy[0].evidence && (held.protectedBy[0].evidence as any).reason, 'atomic-reversal-unit');
   assert.equal(r.native().prepare('SELECT COUNT(*) AS n FROM native_records').get()!.n, 2);
-});
+}]);
+
+ test("d1 preserved graph preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

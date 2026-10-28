@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "./helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildImportPlan, buildStreamPagePlan } from '../src/plan/index.ts';
@@ -5,7 +7,7 @@ import { canonicalJson, sha256 } from '../src/provenance/identity.ts';
 import { source } from './d1/fixtures.ts';
 const context = { destination: 'workspace', namespace: 'archive', mappingVersion: 'v1', authorization: { principalId: 'owner' } };
 
-test('ordinary and stream page planning retain identical source, mapping, rejection and fingerprints with independent containers', () => {
+familyRows[0].push(['ordinary and stream page planning retain identical source, mapping, rejection and fingerprints with independent containers', () => {
   const results = [buildImportPlan, buildStreamPagePlan].map(build => {
     const bundle = source(2), before = canonicalJson(bundle), returned: any[] = [];
     const plan = build(bundle, { version: 'v1', map: record => {
@@ -22,9 +24,9 @@ test('ordinary and stream page planning retain identical source, mapping, reject
     return plan;
   });
   assert.deepEqual(results[0], results[1]);
-});
+}]);
 
-for (const build of [buildImportPlan, buildStreamPagePlan]) test(`${build.name} captures hostile mapper getters once before size, credential and effect checks`, () => {
+for (const build of [buildImportPlan, buildStreamPagePlan]) familyRows[0].push([`${build.name} captures hostile mapper getters once before size, credential and effect checks`, () => {
   let reads = 0;
   const plan = build(source(1), { version: 'v1', map: () => ({ effects: [{ targetKind: 'record', targetId: 'one', value: { get label() { reads++; return reads === 1 ? 'reviewed' : 'https://example.test/?token=private'; } } }] }) }, context);
   assert.equal(reads, 1); assert.equal(plan.entries[0].effects[0].value.label, 'reviewed');
@@ -34,4 +36,6 @@ for (const build of [buildImportPlan, buildStreamPagePlan]) test(`${build.name} 
   assert.deepEqual(rejected.entries[0].effects, []); assert.equal(rejected.entries[0].rejection, 'Unsupported');
   const changed = [0, 1]; Object.defineProperty(changed, 0, { get() { changed.length = 0; return null; } });
   assert.throws(() => build(source(1), { version: 'v1', map: () => ({ effects: [], extra: changed }) }, context), /INVALID_JSON/);
-});
+}]);
+
+ test("stream planner parity preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

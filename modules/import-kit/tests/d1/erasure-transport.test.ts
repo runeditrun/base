@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { nativeStagingFixture, nativePrivateTables } from './native-staging-fixture.ts';
@@ -16,7 +18,7 @@ async function fixture(t:any){
   while(job.state!=='completed')job=await resumeD1ImportStream(job.id,r.context());
   return {...r,source,plan,job};
 }
-for(const interrupted of [false,true])test(`bounded atomic erasure retains unrelated low-compression values with interruption ${interrupted}`,async t=>{
+for(const interrupted of [false,true])familyRows[0].push([`bounded atomic erasure retains unrelated low-compression values with interruption ${interrupted}`, async t=>{
   const r=await fixture(t),bytes:number[]=[],input=r.context();let staged=0,stopped=false;
   const database={prepare:input.storage.database.prepare,async batch(statements:any[]){
     bytes.push(Buffer.byteLength(JSON.stringify(statements.map(statement=>({sql:statement.query,params:statement.values})))));
@@ -56,10 +58,10 @@ for(const interrupted of [false,true])test(`bounded atomic erasure retains unrel
   for(const table of nativePrivateTables)assert.equal(r.native().prepare(`SELECT count(*) n FROM ${table}`).get()!.n,0,table);
   r.reopen();await resumeD1ImportStream(r.job.id,r.context());
   assert.equal(await r.targets.read(r.db(),'workspace','record','0'),undefined);
-});
+}]);
 
 
-test('bounded erasure visits multiple retained copies and reserves the complete query and wire budget',async t=>{
+familyRows[0].push(['bounded erasure visits multiple retained copies and reserves the complete query and wire budget', async t=>{
   const r=await fixture(t);
   for(let i=0;i<2;i++)await createD1ImportStream(r.plan,{...r.context(),operationKey:`retained-copy-${i}`,reviewedFingerprint:r.plan.fingerprint});
   const affected=r.native().prepare("SELECT DISTINCT job_id FROM ik_d1_plan_index WHERE target_identity IN (SELECT target_identity FROM ik_d1_plan_index WHERE ordinal=0)").all();
@@ -78,9 +80,9 @@ test('bounded erasure visits multiple retained copies and reserves the complete 
   assert.deepEqual((await r.targets.read(r.db(),'workspace','record','1'))!.value,r.source.records[1].payload);
   assert.deepEqual((await r.targets.read(r.db(),'workspace','record','2'))!.value,r.source.records[2].payload);
   for(const table of nativePrivateTables)assert.equal(r.native().prepare(`SELECT count(*) n FROM ${table}`).get()!.n,0,table);
-});
+}]);
 
-for(const mutation of ['authority','body','revision'])test(`bounded erasure refuses changed ${mutation} during private preparation without native deletion`,async t=>{
+for(const mutation of ['authority','body','revision'])familyRows[0].push([`bounded erasure refuses changed ${mutation} during private preparation without native deletion`, async t=>{
   const r=await fixture(t),before=r.native().prepare('SELECT * FROM ik_jobs ORDER BY id').all();
   if(mutation==='authority')r.native().exec("CREATE TRIGGER erase_fault AFTER INSERT ON ik_d1_native_staging_values BEGIN UPDATE native_authority SET enabled=0;END");
   if(mutation==='body')r.native().exec("CREATE TRIGGER erase_fault AFTER INSERT ON ik_d1_native_staging_values BEGIN UPDATE ik_d1_native_staging_values SET body=replace(body,substr(body,1,1),'x') WHERE stage_id=NEW.stage_id AND value_ordinal=NEW.value_ordinal AND ordinal=NEW.ordinal;END");
@@ -90,4 +92,6 @@ for(const mutation of ['authority','body','revision'])test(`bounded erasure refu
   assert.deepEqual((await r.targets.read(r.db(),'workspace','record','0'))!.value,r.source.records[0].payload);
   assert.equal(r.native().prepare('SELECT count(*) n FROM ik_d1_erased_targets').get()!.n,0);
   for(const table of nativePrivateTables)assert.equal(r.native().prepare(`SELECT count(*) n FROM ${table}`).get()!.n,0,table);
-});
+}]);
+
+ test("d1 erasure transport preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });

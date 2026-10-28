@@ -1,3 +1,5 @@
+import { caseRows, type CaseRow } from "../helpers/case-row.ts";
+const familyRows: CaseRow[][] = [[]];
 import test from 'node:test';
 import { effectCount } from './scale-size.ts';
 import assert from 'node:assert/strict';
@@ -9,7 +11,7 @@ import type { D1UndoDisposition } from '../../src/d1/undo-types.ts';
 import { classification } from './preserved-native-set.ts';
 import { classifyUndo } from '../../src/d1/undo-snapshot.ts';
 
-test('production reversal guards pack distinct dispositions with bounded SQL and bindings', () => {
+familyRows[0].push(['production reversal guards pack distinct dispositions with bounded SQL and bindings', () => {
   const jobId = "job'); DROP TABLE ik_jobs; --";
   const evidence = { revision: null, valueHash: null, attachmentHash: null, ownedHash: null, ownedValue: null };
   const dispositions: D1UndoDisposition[] = Array.from({ length: effectCount }, (_, i) => ({
@@ -22,9 +24,9 @@ test('production reversal guards pack distinct dispositions with bounded SQL and
   assert.ok(packed.length < rows.length, 'reversal guards are packed rather than expanded per disposition');
   for (const statement of packed) { checkSql(statement); assert.ok(!statement.sql.includes(jobId)); }
   console.log(JSON.stringify({ accumulatedGuardBudget: { rows: rows.length, statements: packed.length, maxBindings: Math.max(...packed.map(s => s.params?.length ?? 0)), maxSqlBytes: Math.max(...packed.map(s => Buffer.byteLength(s.sql))) } }));
-});
+}]);
 
-for (const presence of ['all', 'mixed', 'none']) test(`production first undo snapshot packs effects without per-observation SQL (present=${presence})`, () => {
+for (const presence of ['all', 'mixed', 'none']) familyRows[0].push([`production first undo snapshot packs effects without per-observation SQL (present=${presence})`, () => {
   const { effects, snapshot, context } = classification(effectCount);
   // Use mixed edited/absent effects so every observation has a disposition,
   // including SQL NULL-sensitive evidence, without any native mutation batch.
@@ -36,4 +38,6 @@ for (const presence of ['all', 'mixed', 'none']) test(`production first undo sna
   assert.ok(packed.length < effects.length, 'snapshots are packed rather than expanded per observation');
   packed.forEach(checkSql);
   console.log(JSON.stringify({ firstSnapshotBudget: { effects: effects.length, present: snapshot.nativeRows.length, statements: packed.length, maxBindings: Math.max(...packed.map(s => s.params?.length ?? 0)), maxSqlBytes: Math.max(...packed.map(s => Buffer.byteLength(s.sql))) } }));
-});
+}]);
+
+ test("d1 preserved guard budget preserves its public behavior across supported inputs and refusals", async t => { await caseRows(t, familyRows[0]); });
