@@ -21,6 +21,9 @@ on:
 permissions:
   contents: read
 
+env:
+  CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 # Keep each main run; a green push of the same SHA to a branch or tag can satisfy it.
 # A distinct run key also avoids GitHub replacing a pending main run.
 concurrency:
@@ -36,10 +39,13 @@ jobs:
     outputs:
       matrix: ${{ steps.stages.outputs.matrix }}
       skip: ${{ steps.duplicate.outputs.skip }}
+      qualify-browser: ${{ steps.browser.outputs.changed }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22.20.0'
@@ -49,6 +55,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node export/verify-ci.mjs --main-skip
+      - name: Select browser setup qualification when its implementation changes
+        id: browser
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          changed=false
+          if [ "$EVENT_NAME" = pull_request ]; then
+            if git diff --name-only "$BASE_SHA" HEAD -- scripts/agent-bootstrap.sh scripts/ci/browser-probe.mjs scripts/ci/browser-qualification.mjs | read -r _; then changed=true; fi
+          fi
+          printf 'changed=%s\n' "$changed" >> "$GITHUB_OUTPUT"
       - id: stages
         name: Assign every full-verify stage exactly once
         env:
@@ -67,6 +84,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22.20.0'
@@ -75,9 +93,75 @@ jobs:
       - name: Run all four companion tests inside the supported OS boundary
         run: node --test --test-concurrency=1 cli/companion.test.mjs
 
-  verify:
-    name: Verify (${{ matrix.group }}${{ matrix.shard && format(' {0}/{1}', matrix.shard, matrix.total) || '' }})
+  build-reference:
+    name: Build reference once
     needs: plan
+    if: ${{ needs.plan.outputs.skip != 'true' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.20.0'
+      - name: Install pinned package manager
+        run: npm install --global pnpm@10.12.4 --no-audit --no-fund
+      - name: Cache build dependencies
+        if: ${{ !inputs.clean_bootstrap }}
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: ~/.local/share/pnpm/store
+          key: base-build-ubuntu24-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install frozen build dependencies
+        run: pnpm --config.only-built-dependencies=esbuild --config.only-built-dependencies=workerd install --frozen-lockfile
+      - name: Build and qualify credential-free reference output
+        run: node scripts/ci/reference-build.mjs "$RUNNER_TEMP/reference-build"
+      - name: Share reviewed output with this run
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: reference-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/reference-build
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  browser-qualification:
+    name: Browser setup (${{ matrix.seed }}, ${{ matrix.strategy }})
+    needs: plan
+    if: ${{ needs.plan.outputs.qualify-browser == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [pegboard, nook]
+        strategy: [baseline, candidate]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.20.0'
+      - name: Install pinned package manager
+        run: npm install --global pnpm@10.12.4 --no-audit --no-fund
+      - name: Measure actual pinned snapshot browser setup cold and warm
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/browser-qualification.mjs "${{ matrix.seed }}" "${{ matrix.strategy }}"
+      - name: Retain browser setup context and timings
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: browser-setup-${{ matrix.seed }}-${{ matrix.strategy }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-qualification-${{ matrix.seed }}-${{ matrix.strategy }}.json
+          if-no-files-found: error
+
+  verify:
+    name: Verify (Linux ${{ matrix.group }})
+    needs: [plan, build-reference]
     if: ${{ needs.plan.outputs.skip != 'true' }}
     strategy:
       fail-fast: false
@@ -115,13 +199,18 @@ jobs:
             exit 1
           fi
       - name: Reclaim unused hosted Android tools for native consumer verification
+        if: ${{ matrix.native }}
         run: |
           set -euo pipefail
           df -Pk "$GITHUB_WORKSPACE"
-          du -sk /runner-preinstalled/android
-          # Delete only the explicitly mounted host SDK, retaining the mount
-          # point and all runner Actions runtimes, tool caches and Docker images.
-          find /runner-preinstalled/android -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+          # Retain the mount, runner runtimes, caches and images. Check before
+          # each individual deletion and stop as soon as 20 GiB is available.
+          while IFS= read -r -d '' entry; do
+            available_kib=$(df --output=avail -k "$GITHUB_WORKSPACE" | tail -n 1)
+            if (( available_kib >= 20 * 1024 * 1024 )); then break; fi
+            du -sk -- "$entry"
+            rm -rf -- "$entry"
+          done < <(find /runner-preinstalled/android -mindepth 1 -maxdepth 1 -print0)
           df -Pk "$GITHUB_WORKSPACE"
       - name: Install checkout prerequisites
         run: |
@@ -167,6 +256,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Record clean Linux preconditions before cache restore
         run: |
           test "$(uname -s)" = Linux
@@ -191,41 +281,50 @@ jobs:
         with:
           path: ~/.cache/rer-apt/archives
           key: base-apt-ubuntu24-${{ runner.arch }}-playwright-${{ steps.apt-cache-inputs.outputs.playwright }}-${{ hashFiles('scripts/agent-bootstrap.sh') }}
-      - name: Cache shared pnpm store and Playwright browsers
+      - name: Cache shared pnpm store
         if: ${{ !inputs.clean_bootstrap }}
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
         with:
-          path: |
-            ~/.local/share/pnpm/store
-            ~/.cache/ms-playwright
+          path: ~/.local/share/pnpm/store
           key: base-ubuntu24-${{ runner.arch }}-${{ hashFiles('scripts/agent-bootstrap.sh', 'scripts/install-gitleaks.sh', 'pnpm-lock.yaml', 'modules/mail/pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'default-seed/package.json', 'foundation/template/package.json', 'foundation/template/pnpm-lock.yaml') }}
+      - name: Cache Chromium only for browser jobs
+        if: ${{ matrix.browser && !inputs.clean_bootstrap }}
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: ~/.cache/ms-playwright
+          key: base-browser-ubuntu24-${{ runner.arch }}-${{ steps.apt-cache-inputs.outputs.playwright }}
       - name: Bootstrap pinned Linux toolchain
         env:
           APT_CACHE_HIT: ${{ steps.apt-cache.outputs.cache-hit || 'false' }}
+          BROWSER_NEEDED: ${{ matrix.browser }}
+          NATIVE_CONSUMER: ${{ matrix.native }}
         run: |
           printf 'Apt archive cache hit: %s\n' "$APT_CACHE_HIT"
           # Checkout configures a temporary HOME; the root container's test
           # shell needs this exact reviewed workspace trusted in its own HOME.
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git rev-parse HEAD
-          bash scripts/agent-bootstrap.sh
+          browser_args=()
+          if [ "$BROWSER_NEEDED" = true ]; then browser_args+=(--browser); fi
+          bash scripts/agent-bootstrap.sh "${browser_args[@]}"
           # Measure the actual consumer filesystem after dependency/browser
           # installation. The editor's own 15 GiB guard remains authoritative.
           df -Pk "$GITHUB_WORKSPACE"
           available_kib=$(df --output=avail -k "$GITHUB_WORKSPACE" | tail -n 1)
-          if (( available_kib < 15 * 1024 * 1024 )); then
+          if [ "$NATIVE_CONSUMER" = true ] && (( available_kib < 15 * 1024 * 1024 )); then
             printf 'Verification requires at least 15 GiB free after bootstrap; available: %s KiB\n' "$available_kib" >&2
             exit 1
           fi
-      - name: Strict checks of seed module copies
-        if: ${{ matrix.group == 'modules' && matrix.shard == 1 }}
-        run: pnpm typecheck:modules
+      - name: Download this run's reference build
+        if: ${{ matrix.group == '5' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: reference-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/reference-build
       - name: Run full-verify stages assigned to this job
         env:
           VERIFY_GROUP: ${{ matrix.group }}
-          CLI_SHARD: ${{ matrix.shard }}
-          MODULE_SHARD: ${{ matrix.shard }}
-          REFERENCE_SHARD: ${{ matrix.shard }}
+          BASE_VERIFY_BUILD_ARTIFACT: ${{ matrix.group == '5' && format('{0}/reference-build', runner.temp) || '' }}
           RER_TEST_EVIDENCE_DIRECTORY: ${{ runner.temp }}/rer-test-evidence
         run: |
           mkdir -p "$RER_TEST_EVIDENCE_DIRECTORY"
@@ -234,11 +333,11 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: verify-evidence-${{ matrix.group }}-${{ matrix.shard || 'all' }}
+          name: verify-evidence-${{ matrix.group }}
           path: ${{ runner.temp }}/rer-test-evidence
           if-no-files-found: ignore
       - name: Fetch pinned active HappyToHelp source without credentials
-        if: ${{ !cancelled() && matrix.group == 'launcher' }}
+        if: ${{ !cancelled() && matrix.group == '8' }}
         env:
           GIT_CONFIG_NOSYSTEM: '1'
           GIT_CONFIG_GLOBAL: /dev/null
@@ -249,15 +348,15 @@ jobs:
           git -c credential.helper= -C "$RUNNER_TEMP/public-happytohelp" fetch --depth=1 https://github.com/just-every/happytohelp.git 60e9a84688ea41575d56a8f692bbb8173366c7c5
           git -c credential.helper= -C "$RUNNER_TEMP/public-happytohelp" checkout --detach FETCH_HEAD
       - name: Select the active edition's pinned runtime after Base stages finish
-        if: ${{ !cancelled() && matrix.group == 'launcher' }}
+        if: ${{ !cancelled() && matrix.group == '8' }}
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '26.8.1'
       - name: Packed launcher acquisition, browser onboarding and offline resume for active HappyToHelp
-        if: ${{ !cancelled() && matrix.group == 'launcher' }}
+        if: ${{ !cancelled() && matrix.group == '8' }}
         run: node scripts/ci/launcher-acceptance.mjs
       - name: Remove active-edition acceptance checkouts
-        if: ${{ always() && matrix.group == 'launcher' }}
+        if: ${{ always() && matrix.group == '8' }}
         run: |
           rm -rf -- "$RUNNER_TEMP/public-happytohelp" "$RUNNER_TEMP/base-launcher-evidence"
           rm -f -- "$RUNNER_TEMP/launcher-release-manifest.json"
