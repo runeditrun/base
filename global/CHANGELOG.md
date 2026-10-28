@@ -1,17 +1,23 @@
 # Changelog
 
-## Unreleased
+## 0.2.84
 
-- The publication scan accepts the upstream copyright notice of a Base-listed third-party licence text only under an exact licence file name with the listed Git blob ID (initially the vendored yaml 2.9.1 `LICENSE`) and reports each in `thirdPartyNotices`; Base's per-path review records for it are removed, so scans of the unpacked rer tarball and of refreshed seeds pass without review records.
+- The publication scan accepts the upstream copyright notice of a Base-listed third-party licence text only under an exact licence file name with the listed Git blob ID (initially the vendored yaml 2.9.1 `LICENSE`) and reports each in `thirdPartyNotices`; seed configuration cannot extend the list, and scans of the unpacked rer tarball and of refreshed seeds pass without review records.
 - Refresh resolves every runtime import form without declaration files, reads workflow run steps from a YAML AST, preserves equal-byte tracked siblings as edition-owned discovery exceptions, and keeps ordinary baseline-unresolved imports unresolved. Local package conditions are selected by Node itself, excluding types for runtime edges. JavaScript runtime paths follow Node's explicit-file rules; TypeScript source resolution is retained.
+- Parse those import edges and workflow files with Babel parser 7.29.8 (MIT) and yaml 2.9.1 (ISC), vendored unchanged in behaviour as portable ESM modules under `edition-authoring/vendor`, so refresh installs no parser package.
 - The edition-authoring tool includes its vendored YAML and JavaScript parsers with their licences: deploy-kit templates and the review-harness upgrade guide copy the whole `vendor/` directory, and the lock's toolchain identity covers it, so a copied tool's `lock` and `check` no longer fail on a missing `vendor/yaml/index.mjs`.
-
-- Fix the Verify template's unavailable job-level runner context, lint delivered workflows in Base Verify, and upgrade unchanged historical Verify templates and their helper closure during refresh.
+- Fix the Verify template's unavailable job-level runner context, keep its pnpm store under the runner temporary directory, lint delivered workflows in Base Verify, and upgrade unchanged historical Verify templates and their helper closure during refresh.
 - Close every recorded code module over relative imports and declarations using existing copy namespaces, preserving seed-owned dependencies and pre-existing unresolved imports; withhold optional directory additions without a witnessed destination and refuse missing seed-owned bindings atomically.
 - Declare edition migrations `run-data-paths` and `run-data-pricing`; repeat `--edition-migration ID` to consent to refresh while leaving the documented edition-owned edits owed.
 - Check physical spelling before refresh writes or relies on a path; preserve unrecorded template aliases with a notice and refuse aliases on recorded paths and dependencies.
 - Discover workflow helpers across shell wrappers, quoted paths, command substitutions and interpreter options, using the caller's template namespace.
 - Pass the resolved demo Run exit from the CLI to Vite without loading adapters from copied demo modules, remove an empty authoring catch, and keep the Run guide link lint-clean.
+- Add the contract document generator `foundation/runtime/contract-docs.mjs`: `write` regenerates `ACCEPTANCE.md`, `docs/CLAIMS.md` and the Status summary rows from `CONTRACT.md`, `check` fails on stale outputs, and `convert`, `id-map` and `coverage` support structural contract rewrites. `BASELINE.md` adds shared conformance and agent access duties that seeds cite by Base id.
+
+### Known issues
+
+- The two refresh recovery guidance issues documented in 0.2.82 still apply, with the same manual recoveries.
+- The delivered Verify template's runner-temporary pnpm store, Chromium and apt cache lifecycle is not yet exercised end to end on a GitHub Ubuntu 24.04 runner; Base Verify covers only Base's own bootstrap.
 
 ## 0.2.83
 
