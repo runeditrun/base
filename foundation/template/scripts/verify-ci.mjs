@@ -188,9 +188,9 @@ if (invokedDirectly()) {
   const readers = JSON.parse(process.env.LIGHT_READERS);
   if (!Array.isArray(readers) || readers.some(command => typeof command !== 'string')) throw Error('Invalid light readers');
   run('node scripts/edition-authoring/cli.mjs check');
-  run('node scripts/rer.mjs check');
+  run('pnpm run check');
   for (const command of readers) run(command);
-  run('node scripts/rer.mjs build --site');
+  run('pnpm run build --site');
  } else if (mode === '--check-workflows' && !tier) {
   const errors = await workflowPermissionErrors();
   for (const error of errors) console.error(error);
