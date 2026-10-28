@@ -179,7 +179,7 @@ native source/session guards as well as the module's request checks.
 - `nativeCommit`: at most eight SQL statements joining native outcomes/audit to
   the module's D1 transaction. No network I/O, independent transaction or second
   native signing writer.
-- `artifacts.read/put`: immutable byte custody. `put` must refuse different bytes
+- `artifacts.read` and `artifacts.put`: immutable byte custody. `put` must refuse different bytes
   for an existing ID/version; `read` must return those exact bytes or absence.
 - `credentialKey`: a persistent native AES-GCM `CryptoKey` used for recoverable
   authorized command replay. Keep it in secret custody, outside archives,
