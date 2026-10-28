@@ -12,7 +12,7 @@ const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 export function completeModuleCopies(root, plans, {tree, read, revision, base, deliveries = [], ownerSources = new Map(), relocations = new Map()}) {
   const index = new Set(raw(root, 'ls-files', '-z').toString('utf8').split('\0').filter(Boolean));
   const required = new Set();
-  const mappings = plans.filter(plan => !plan.retired).map(plan => plan.copy);
+  const mappings = plans.filter(plan => !plan.retired).map(({copy}) => ({copy, ...namespace(copy)})).filter(mapping => mapping.from);
   const cache = new Map(), planned = new Map(), recorded = new Map(), queue = [], withheld = [];
   const disk = {has: name => {
     try { return fs.lstatSync(path.join(root, name)).isFile(); }
@@ -39,24 +39,28 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
     for (const target of Object.keys(plan.copy.adapted ?? {})) enqueue(plan, plan.copy.originPath + target.slice(plan.copy.path.length), null, true);
   }
   const directoryAdditions = new Set([...planned].filter(([target, {plan}]) => !Object.hasOwn(plan.copy.files, target) && !tree.has(plan.copy.originPath)).map(([target]) => target));
+  function namespace(copy) {
+    const file = Object.hasOwn(copy.files, copy.path) || tree.has(copy.originPath);
+    if (file && path.posix.basename(copy.path) !== path.posix.basename(copy.originPath)) return {};
+    return {to: file ? path.posix.dirname(copy.path) : copy.path,
+      from: file ? path.posix.dirname(copy.originPath) : copy.originPath};
+  }
   function witness(target, source) {
     return plans.some(({copy}) => {
-      const file = Object.hasOwn(copy.files, copy.path) || tree.has(copy.originPath);
-      if (file && path.posix.basename(copy.path) !== path.posix.basename(copy.originPath)) return false;
-      const to = file ? path.posix.dirname(copy.path) : copy.path;
-      const from = file ? path.posix.dirname(copy.originPath) : copy.originPath;
-      return inside(target, to) && path.posix.join(from, path.posix.relative(to, target)) === source;
+      const {to, from} = namespace(copy);
+      return from && inside(target, to) && path.posix.join(from, path.posix.relative(to, target)) === source;
     });
   }
   function recordedDestination(source) {
     // Prefer the explicitly selected subtree over a broader, sparse runtime
     // copy. Never choose between equally specific namespaces for the seed.
-    let candidates = mappings.filter(copy => inside(source, copy.originPath));
-    const specificity = Math.max(...candidates.map(copy => copy.originPath.length));
-    candidates = candidates.filter(copy => copy.originPath.length === specificity);
-    const members = candidates.filter(copy => Object.hasOwn(copy.files, mapped(source, copy)));
+    let candidates = mappings.filter(({from}) => inside(source, from));
+    const specificity = Math.max(...candidates.map(({from}) => from.length));
+    candidates = candidates.filter(({from}) => from.length === specificity);
+    const destination = ({from, to}) => path.posix.join(to, path.posix.relative(from, source));
+    const members = candidates.filter(mapping => Object.hasOwn(mapping.copy.files, destination(mapping)));
     if (members.length) candidates = members;
-    return [...new Set(candidates.map(copy => mapped(source, copy)))];
+    return [...new Set(candidates.map(destination))];
   }
   function include(source, target) {
     required.add(target);
