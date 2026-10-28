@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g7794ba69",
+  "cliVersion": "0.2.85-dev.g6d944962",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -387,11 +387,11 @@
     },
     "cli/agent-door.mjs": {
       "source": "cli/agent-door.mjs",
-      "sha256": "aa581d202181f87f1d776217b698ec52c56cd2bfe47b6b88cd3df5264aa7973d"
+      "sha256": "3990b48b1731fa39f1ed6143188532de058716146a4838946265a31c3f2d10a3"
     },
     "cli/agent-network.mjs": {
       "source": "cli/agent-network.mjs",
-      "sha256": "01bce1b50336b24486cd9d7a5c8e86d20a02e1e450fe006b0356a9fc6b37a4cd"
+      "sha256": "642fb6fd095ea82fb69f32f5eb0381b4a54bc6122bcac92dcfd0ef8b8abf4741"
     },
     "cli/agent-surface.mjs": {
       "source": "cli/agent-surface.mjs",
@@ -419,7 +419,7 @@
     },
     "cli/authoring.mjs": {
       "source": "cli/authoring.mjs",
-      "sha256": "b595169f84c013fcce1e1681f218a3653d41a15bf9614491dbcc3aedf9bd678a"
+      "sha256": "2ee79ca7f810ba61cff8d6147096ee5a9edf75589f1329ac72e40e6ed74efbaa"
     },
     "cli/bounded.mjs": {
       "source": "cli/bounded.mjs",
@@ -703,7 +703,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "1e9f5fc264cf6835c0d9feba1f1227ee58ed1317b1898fb93ce50a9328074c5d"
+      "sha256": "14bac6012fceb753aab6f387e7cc5946d574ca9e13df24baa3700e31320a18a2"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -855,7 +855,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "52a807d930961915b11f53dd85c1b52a97f12671acab4d776f9b4efe7d722cb3"
+      "sha256": "8d72079a05622d8896c72cec3436346b778548c22e2ff39776f959338b27a01e"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1249,17 +1249,21 @@
       "source": "edition-authoring/adopt.mjs",
       "sha256": "c9cf80207b5f14164ce18cce63e08e0fcbb254d93b66263911ba74cdd4079c8f"
     },
+    "edition-authoring/archive-source.mjs": {
+      "source": "edition-authoring/archive-source.mjs",
+      "sha256": "073b0b6515e5df412065cba7ba82717a9fc35f794cfcaf4bcfd796d70320f8b5"
+    },
     "edition-authoring/base-acknowledgements.mjs": {
       "source": "edition-authoring/base-acknowledgements.mjs",
       "sha256": "fd486d607c019f2ff162830149ef717063bcae9ba995ec7f18f14fd3f2cb4b32"
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "088612d5ed58acd3d6b43a52590dade1ed2c425b2c6ce190e1e23542be607818"
+      "sha256": "97348449bd9a4d39d70d898963f677c184e3afdbb0a42f7ad140bb8ead96be99"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
-      "sha256": "16ce1f72f7078b67def503e307f44f39714772a9bafb413c9573aa1d4784283a"
+      "sha256": "d4302ecd51794bbf9d92ea08c23fc1447f043088952c53689418c03e8750bb7f"
     },
     "edition-authoring/copy-checkout.mjs": {
       "source": "edition-authoring/copy-checkout.mjs",
@@ -1267,7 +1271,7 @@
     },
     "edition-authoring/edition-migrations.mjs": {
       "source": "edition-authoring/edition-migrations.mjs",
-      "sha256": "06bd0265a1ea1910d5982ecb7d6c22f48435c67caab3e067e24f724b10856eeb"
+      "sha256": "7e9837c9a373cf7f394a575230c9f386a289786a15cc9685e4f11911e9a84e88"
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
@@ -1864,6 +1868,14 @@
     "modules/agent-door/conformance/negative.mjs": {
       "source": "modules/agent-door/conformance/negative.mjs",
       "sha256": "c6ec83ec2204bd4d0e00874e0caf6276c8f94a558b950190e8027f513e58b399"
+    },
+    "modules/agent-door/conformance/network-modules.mjs": {
+      "source": "modules/agent-door/conformance/network-modules.mjs",
+      "sha256": "85210fb178b27f00c4d0cc8e623ebb9282e99780137d7b3db7ea32cf436d73b8"
+    },
+    "modules/agent-door/conformance/network-runtime.mjs": {
+      "source": "modules/agent-door/conformance/network-runtime.mjs",
+      "sha256": "dea7ecfa67dd73c33a40365b66dc81a9f6be6016f62ed9bffc66970a181e5244"
     },
     "modules/agent-door/conformance/policy-phases.mjs": {
       "source": "modules/agent-door/conformance/policy-phases.mjs",

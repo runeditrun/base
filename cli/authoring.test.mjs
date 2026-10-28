@@ -70,7 +70,11 @@ test('a package-pinned seed adopts authoring and refreshes through the packed pu
   fs.rmSync(path.join(seed, 'one.mjs'));
   fs.rmSync(path.join(seed, 'vendor/two.mjs'));
   write(source, 'module/one.mjs', 'export const one = 2;\n');
-  const next = commit(source), refreshed = result('refresh-base', '--ref', next);
+  const next = commit(source);
+  const archive = path.join(path.dirname(source), 'base-export');
+  fs.mkdirSync(archive);
+  execFileSync('tar', ['-xf', '-', '-C', archive], { input: execFileSync('git', ['-C', source, 'archive', next]), stdio: ['pipe', 'pipe', 'pipe'] });
+  const refreshed = result('refresh-base', '--ref', next, ...(untrackedRecord ? ['--base-archive', archive] : []));
   assert.deepEqual(refreshed.retired, ['one.mjs']);
   assert.ok(refreshed.copies.find(c => c.path === 'one.mjs').removed.includes('one.mjs'));
   assert.equal(fs.existsSync(path.join(seed, 'one.mjs')), false);
@@ -80,6 +84,9 @@ test('a package-pinned seed adopts authoring and refreshes through the packed pu
   const after = fs.readFileSync(path.join(seed, 'base-copies.json'));
   assert.deepEqual(result('refresh-base', '--ref', next, '--base', source, '--offline').retired, []);
   assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
+  assert.deepEqual(result('refresh-base', '--ref', next, '--base-archive', archive, '--offline').retired, []);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
+  t.diagnostic('Packed rer refresh-base --base-archive --ref: PASS; checkout/archive mappings and digests retained.');
   assert.notEqual(revision, next);
  }
 });
