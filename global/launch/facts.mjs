@@ -76,8 +76,8 @@ export async function portTaken(port) {
 }
 
 // The first port from 8787 (RER_DEV_PORT_FROM moves the start), among the next
-// `searchCandidates` ports, that is not `held` (by a registered server, or saved
-// by another checkout that is stopped), nothing listens on, binds on both
+// `searchCandidates` ports, that is not `held` by a live server or launch
+// owner, nothing listens on, binds on both
 // 127.0.0.1 and ::1 (a browser that tries ::1 first never reaches another
 // server) and that `claim` secures against another launch choosing it at the
 // same time. The search is bounded by that count, never by time or load.

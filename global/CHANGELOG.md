@@ -23,6 +23,7 @@
 - A fresh owner could not sign in to a local `rer preview`, and `rer demo` offered only its persona. Preview now prints a single-use native owner entry and demo adds one beside its persona, through the existing fragment gate and native owner grant; links expire within 15 minutes and are never saved.
 - First runs needed a shell PATH detour, led with machine lines and an unlabelled site URL, showed a fixed owner address without explanation, and timed every phase from the launch. The installer now prints a quoted absolute launch command, ready output leads with one plain app link and labels the site, the owner form explains the local account, and each launch phase is timed separately; machine ready output is unchanged.
 - The shared hosting guide listed its options in a different order from the Run chooser. It now follows the chooser: the one-line local run first, then Assisted, then Managed for a listing that offers it, then the do-it-yourself Cloudflare steps, with plan copy, sign-up state and links taken from the chooser.
+- Automatic `rer dev` port selection could exhaust its 1,000 candidates when stopped checkouts kept saved setup records. A saved setup port now excludes a candidate only while that checkout's launch worker or server still runs with its recorded start identity; live servers, active claims and bound sockets still exclude their ports, and an exhausted search still names its range and candidate count.
 
 ## 0.2.84
 
