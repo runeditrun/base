@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 /** Fake Cloudflare account for the hosted demo: Workers with versions and
  * deployments, Durable Object namespaces, Workers Custom Domains and Container
@@ -12,7 +12,11 @@ export function demoAccount() {
   const ok = (result, result_info) => Response.json({ success: true, errors: [], result, ...result_info ? { result_info } : {} });
   const missing = () => Response.json({ success: false, errors: [{ code: 10007, message: 'not found' }] }, { status: 404 });
   const worker = (name, message) => {
-    const version = { id: randomUUID(), annotations: { 'workers/message': message } };
+    const version = { id: randomUUID(), annotations: { 'workers/message': message }, resources: {
+      script: { etag: createHash('sha256').update(name).digest('hex'), handlers: ['fetch'], last_deployed_from: 'wrangler' },
+      script_runtime: { compatibility_date: '2026-09-08', compatibility_flags: ['nodejs_compat'] },
+      bindings: [{ name: 'TURNSTILE_SECRET_KEY', type: 'secret_text' }],
+    } };
     state.workers.set(name, { versions: [version], deployments: [{ id: randomUUID(), versions: [{ version_id: version.id, percentage: 100 }] }], schedules: [] });
   };
   const namespace = (script, className) => { const row = { id: id(), name: `${script}_${className}`, script, class: className }; state.namespaces.push(row); return row; };
@@ -36,7 +40,16 @@ export function demoAccount() {
       const [, name, rest = ''] = match, script = state.workers.get(name);
       if (!script) return missing();
       if (rest === '' && method === 'DELETE') { state.workers.delete(name); state.namespaces = state.namespaces.filter(row => row.script !== name); return ok(null); }
-      if (rest === '/settings') return ok({ bindings: [] });
+      if (rest === '/secrets' && method === 'PUT') {
+        const previous = script.versions[0], body = typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
+        const version = { ...structuredClone(previous), id: randomUUID(), annotations: { 'workers/triggered_by': 'secret' } };
+        version.resources.script.last_deployed_from = 'api';
+        version.resources.bindings = [...version.resources.bindings.filter(row => row.name !== body.name), { name: body.name, type: 'secret_text' }];
+        script.versions.unshift(version);
+        script.deployments.unshift({ id: randomUUID(), versions: [{ version_id: version.id, percentage: 100 }] });
+        return ok({ name: body.name, type: 'secret_text' });
+      }
+      if (rest === '/settings') return ok({ bindings: script.versions[0].resources.bindings });
       if (rest === '/deployments') return ok({ deployments: script.deployments });
       if (rest === '/versions') return ok({ items: script.versions });
       const version = /^\/versions\/([^/]+)$/.exec(rest);
