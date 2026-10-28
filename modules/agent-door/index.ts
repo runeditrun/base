@@ -7,7 +7,6 @@ import { mcp } from './transport.ts'
 import { adoptPolicy, policyState } from './policy-store.ts'
 import { admit } from './admission.ts'
 import { callTool } from './pipeline.ts'
-import { revoked } from './execution.ts'
 import { json } from './errors.ts'
 
 export { defineTool } from './registry.ts'
@@ -45,8 +44,8 @@ export function createAgentDoor(options: AgentDoorOptions): AgentDoor {
     async invoke(name, args, who) {
       const person = await options.people.person(who.person.id)
       if (!person?.active || person.id !== who.person.id) return { outcome: 'refused', code: 'unauthenticated', decision: null }
-      const principal = { person, agent: who.agent, scopes: [...new Set(rt.tools.map(tool => tool.scope))] }
-      if (revoked(await policyState(rt), principal)) return { outcome: 'refused', code: 'unauthenticated', decision: null }
+      const principal = { person, agent: who.agent, consent: who.consent, scopes: [...new Set(rt.tools.map(tool => tool.scope))] }
+      if ((await policyState(rt)).revoked.agents.includes(principal.agent.id)) return { outcome: 'refused', code: 'unauthenticated', decision: null }
       const capacity = await admit(rt, principal)
       if (capacity !== null) return { outcome: 'refused', code: capacity === 'revoked' ? 'unauthenticated' : 'rate_limited', decision: null }
       return (await callTool(rt, name, args, principal, 'embedded')).result

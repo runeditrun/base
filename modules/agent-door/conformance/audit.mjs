@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { classIds } from './protocol.mjs';
 import { AGENT_CLASSES } from './surface.mjs';
 
-async function auditRows(c) {
+export async function auditRows(c) {
  const rows = []; let cursor = null, differs = 0;
  for (let page = 0; page < 100; page++) {
   const result = await c.personJson(`/agents/api/audit?agent=${encodeURIComponent(c.agentId)}${cursor ? `&after=${encodeURIComponent(cursor)}` : ''}`);

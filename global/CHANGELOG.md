@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Agent-door verification can map declared native environment binding names to its disposable issuer, installation, origin and owner credentials.
+- Durable agent-door invocations retain the originating consent through native tool context and audit, and refuse revoked consent at final execution admission before effects.
+
 - Agent-door verification follows signed and native owner lifecycles, supports isolated seed provider adapters, and accepts Base source archives for copy authoring.
 
 - Bind agent sponsors to durable Business person ids from signed settings, enforce native admission including the allow-list, and honour signed agent and consent revocation. Resources now use the policy and audit pipeline. Approvals show saved summaries, bind decisions to their hash, execute with named approvers and leave a separate execution audit; Undo is the reviewer's act. Running audits commit before effects and recover from recorded outcomes. Standalone spend caps and unscoped Business daily limits are refused until their enforcement exists. The reference journey exercises self-escalation fixtures and real settings pairing.

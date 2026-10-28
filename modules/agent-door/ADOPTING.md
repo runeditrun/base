@@ -134,6 +134,47 @@ the same policy, approval, review and audit path as tools. A resource read must 
 access. Mark device, screen, connector, import-door and installation operations
 as outside the tool registry when they require another supported door.
 
+## Retain consent for durable invocation
+
+A native scheduler persists the tool name, arguments (including a stable
+idempotency key), and attribution from the authenticated `ToolContext`:
+
+```ts
+const job = {
+  tool: 'seed.posts.publish',
+  args,
+  who: { person: ctx.person, agent: ctx.agent, consent: ctx.consent },
+}
+// Persist job through the edition's native queue. Later, in its worker:
+const result = await door.invoke(job.tool, job.args, job.who)
+```
+
+`consent` is the originating consent identifier, never the bearer credential.
+Retain it with the agent and native sponsor; never accept replacement attribution
+from untrusted enqueue or worker input. Existing embedded actions without an
+originating Business consent may omit it. Consent-backed work must preserve it
+across serialization, retries and rescheduling. `door.invoke` re-reads the native
+sponsor and current policy, and execution re-reads consent state immediately
+before calling the native tool. A revoked consent returns
+`{outcome: 'refused', code: 'consent_revoked', ...}` without invoking the effect.
+The attempt still has an embedded audit row with consent, agent, sponsor, tool,
+time, decision, current policy revision, outcome and refusal code. Completed
+actions retain the same consent attribution. A job never gains authority merely
+because it was queued before revocation.
+
+The module journey accepts an optional `durable` adapter with
+`queue({request, token, previous})` and `run({request, handle})`. Queue returns a
+native job handle; run returns the worker's `CallResult`. The first queue uses
+the supplied short-lived bearer token through the edition's actual enqueue
+door, which saves authenticated context. When `previous` is supplied, use the
+native scheduler to reschedule that saved job with a fresh invocation key and
+the same attribution. Use the supplied `request` for the edition's existing
+public doors; do not add a production verification route. The inherited final
+phase runs a job, checks its effect and consent audit, adopts signed consent
+revocation, reschedules it, and checks `consent_revoked`, unchanged native state
+and the complete refused audit. Supply this adapter in an edition's integrated
+module journey when it has durable jobs; the reference app has none.
+
 ## Keep runtime and CLI evidence separate
 
 The copied module is application runtime source pinned by `base-copies.json`.
@@ -182,15 +223,30 @@ Seeds with a native initializer or a different owner binding declare this in
       "email": "synthetic-owner@example.com",
       "emailField": "SETUP_OPERATOR_EMAIL",
       "tokenField": "H2H_SETUP_TOKEN",
+      "bindings": {
+        "RER_MANAGEMENT_ORIGIN": "issuer",
+        "RER_INSTALLATION_ID": "installationId"
+      },
       "initializer": "tests/initialize-agent-owner.mjs"
     }
   }
 }
 ```
 
-All four keys are optional. Email defaults to `synthetic-base-1@example.com`;
-the manifest's email and token fields are always bound too. The initializer is
-a contained seed module default-exporting an async function receiving
+All owner keys are optional. Email defaults to `synthetic-base-1@example.com`;
+the manifest's email and token fields are always bound too. `bindings` maps any
+native environment binding name (`A-Z`, digits and underscores, starting with a
+letter, at most 64 characters) to a per-run value: `issuer` is the signing issuer
+origin, `installationId` is the disposable installation id, `origin` is the
+hosted application origin, `email` and `sub` identify the verification owner, and
+`token` is the private setup credential. `sessionSecret` is a separate random
+credential for native session signing.
+Only named aliases are injected, into this run's runtime; the existing manifest
+and standard trust bindings remain available. No value comes from the caller's
+environment, and the verifier does not print token or session values. These
+bindings configure native admission; they do not change signed claim checks.
+
+The initializer is a contained seed module default-exporting an async function receiving
 `{request, origin, email, sub, displayName, token, claim, returnTo}`. `claim` is
 `{mode, path, token}` with the signed credential when signed mode is declared;
 `token` is the private per-run setup token. Use `request(absoluteURL, init)` to

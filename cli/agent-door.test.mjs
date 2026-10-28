@@ -8,9 +8,10 @@ import { randomUUID, webcrypto } from 'node:crypto';
 import { fixtureSeed, buildFixture } from './tests/fixtures/agent-door/seed.mjs';
 import { isolatedQueue } from './fixtures/queue.mjs';
 import { serveHosted, HOSTED_ORIGIN } from './hosted-output.mjs';
+import { seconds, signJws } from '../modules/agent-door/conformance/crypto.mjs';
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
 
-test('rer verify drives signed, setup-token and native owner lifecycles through isolated JSON, streaming and signed provider edges', { timeout: 240000 }, async t => {
+test('rer verify binds native issuer and installation names and drives signed, setup-token and native owner lifecycles through isolated JSON, streaming and signed provider edges', { timeout: 240000 }, async t => {
  const env = await isolatedQueue(t, { ...process.env, CI: 'true', WRANGLER_SEND_METRICS: 'false' });
  for (const mode of ['signed', 'setup-token', 'native']) {
   const root = await fixtureSeed(t, mode);
@@ -18,21 +19,42 @@ test('rer verify drives signed, setup-token and native owner lifecycles through 
   const result = JSON.parse(stdout.trim().split('\n').at(-1));
   assert.equal(result.ok, true, stderr + stdout);
   assert.equal(result.agentDoor.ok, true, stdout);
-  t.diagnostic(`${mode}: rer verify PASS; ${result.agentDoor.points.length} conformance points; JSON/SSE, signed receiver, undeclared 502 and adapter network denial completed.`);
+  t.diagnostic(`${mode}: rer verify PASS; ${result.agentDoor.points.filter(point => point.ok).length}/${result.agentDoor.points.length} conformance points; JSON/SSE, signed receiver, undeclared 502 and adapter network denial completed.`);
   if (mode === 'signed') {
    // This is outside the runner: the same production signed route with its
    // trusted configuration must still refuse a bare setup token.
    const pair = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
    const rawToken = 'fixture-raw-setup-token-at-least-32-bytes';
-   const hosted = await serveHosted(root, { bindings: { OWNER_EMAIL: 'synthetic-base-1@example.com', SETUP_TOKEN: rawToken,
-    RER_OWNER_CLAIM_ISSUER: 'https://issuer.example.invalid', RER_OWNER_CLAIM_INSTALLATION_ID: randomUUID(), RER_OWNER_CLAIM_APP_ORIGIN: HOSTED_ORIGIN,
+   const issuer = 'https://issuer.example.invalid', installationId = randomUUID();
+   const bindings = { OWNER_EMAIL: 'synthetic-base-1@example.com', SETUP_TOKEN: rawToken,
+    RER_OWNER_CLAIM_ISSUER: issuer, RER_OWNER_CLAIM_INSTALLATION_ID: installationId, RER_OWNER_CLAIM_APP_ORIGIN: HOSTED_ORIGIN,
     RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify({ fixture: await webcrypto.subtle.exportKey('jwk', pair.publicKey) }),
-   } });
+   };
+   const unbound = await serveHosted(root, { bindings });
+   try {
+    const unavailable = await unbound.fetch('auth/owner-claim', { method: 'POST', headers: { Origin: unbound.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: rawToken, displayName: 'Owner' }) });
+    assert.equal(unavailable.status, 503);
+    await unavailable.body?.cancel();
+   } finally { await unbound.close(); }
+   const hosted = await serveHosted(root, { bindings: { ...bindings, RER_MANAGEMENT_ORIGIN: issuer, RER_INSTALLATION_ID: installationId } });
    try {
     const denied = await hosted.fetch('auth/owner-claim', { method: 'POST', headers: { Origin: hosted.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: rawToken, displayName: 'Owner' }) });
     assert.equal(denied.status, 403);
     assert.equal((await denied.json()).error, 'invalid_claim');
-    t.diagnostic('Outside runner: raw owner token HTTP 403 invalid_claim.');
+    assert.equal(denied.headers.has('set-cookie'), false);
+    const iat = seconds(), token = await signJws(pair.privateKey, 'fixture', 'rer-owner-claim+jwt', {
+     v: 1, iss: issuer, aud: hosted.origin, installationId, email: bindings.OWNER_EMAIL, jti: randomUUID(), iat, exp: iat + 300,
+    });
+    const claim = () => hosted.fetch('auth/owner-claim', { method: 'POST', headers: { Origin: hosted.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token, displayName: 'Owner' }) });
+    const admitted = await claim();
+    assert.equal(admitted.status, 303);
+    assert.equal(admitted.headers.getSetCookie().length, 1);
+    await admitted.body?.cancel();
+    const replay = await claim();
+    assert.equal(replay.status, 409);
+    assert.equal(replay.headers.has('set-cookie'), false);
+    await replay.body?.cancel();
+    t.diagnostic('Outside runner: missing native bindings HTTP 503; raw owner token HTTP 403 invalid_claim without a session; signed admission HTTP 303 with one session; replay HTTP 409.');
    } finally { await hosted.close(); }
   }
  }
