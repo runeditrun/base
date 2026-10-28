@@ -20,7 +20,9 @@ async function participantGuard(store: Store, ctx: ParticipantContext, request: 
 async function guards(store: Store, request: RequestRecord, ctx: ParticipantContext, person: Participant, credential: string | null, operation: 'review' | 'sign', reviewBinding: ReviewBinding): Promise<Sql> {
   let credentialSql: Sql;
   if (store.options.invitations === 'capability') {
-    requireThat(typeof credential === 'string' && /^[A-Za-z0-9_-]{43}$/.test(credential), 'credential');
+    // New capabilities have 256 random bits; existing URLs may use another
+    // native encoding. Custody is the exact digest, scope, expiry and revocation.
+    requireThat(typeof credential === 'string' && credential.length > 0 && credential.length <= limits.credentialLength && !credential.includes('\0'), 'credential');
     credentialSql = sql("EXISTS(SELECT 1 FROM as_credentials WHERE digest=? AND request_id=? AND recipient_id=? AND revoked=0 AND julianday(expires_at)>julianday('now'))", await sha256(credential), request.id, person.id);
   } else { requireThat(credential === null, 'credential'); credentialSql = sql('1'); }
   const authority = and(await store.source(ctx, request, operation), await store.options.participantGuard(ctx, request, person, reviewBinding));

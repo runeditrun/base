@@ -211,6 +211,9 @@ artifact bytes. Persisted JSON records are at most 64 KiB; there are at most
 per commit. Review authority lasts at most 10 minutes, and invitation authority
 at most 30 days, capped by request expiry. Capacity refusals never publish a
 partial act. Size the native D1 tier and archive runner for the bounded batch.
+New invitation tokens use 256 random bits. Imported current links can retain
+their existing encoding (up to 512 characters); exact digest custody and all
+native/module authority, scope, expiry and revocation guards still apply.
 
 ## Scope and proof
 

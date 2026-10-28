@@ -3,7 +3,7 @@ import type { ArtifactRef } from './types.ts';
 export const limits = Object.freeze({
   documents: 16, recipients: 32, consents: 4, artifacts: 64, artifactBytes: 8_388_608,
   bundleBytes: 33_554_432, jsonBytes: 65_536, events: 128, nativeStatements: 8,
-  credentialSeconds: 2_592_000, reviewSeconds: 600,
+  credentialSeconds: 2_592_000, credentialLength: 512, reviewSeconds: 600,
 });
 const encoder = new TextEncoder();
 /** Deliberately versioned by evidence: sha256-canonical-json-v1, sorted object keys. */
