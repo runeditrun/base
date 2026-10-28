@@ -50,7 +50,7 @@ export async function auditPhase(c) {
   if (applicable) c.add(`BASE-AGENT-010.6.${type}`, events.some(event => event.type === type), `Missing ${type} event.`);
  }
  const writeTools = new Set(rows.filter(row => row.tool !== 'resources/read' && ['done', 'replayed'].includes(row.outcome) && c.surface.tools.find(tool => tool.name === row.tool)?.readOnly === false).map(row => row.tool));
- c.add('BASE-AGENT-010.1.effects', !writeTools.size || events.some(event => event.actor?.kind === 'agent' && !['policy.decision', 'approval.pending', 'approval.decided'].includes(event.type)), 'Completed writes must produce record-change events attributed to the agent.');
+ c.add('BASE-AGENT-010.1.effects', !writeTools.size || [...events, ...c.effectEvents ?? []].some(event => event.actor?.kind === 'agent' && !['policy.decision', 'approval.pending', 'approval.decided'].includes(event.type)), 'Completed writes must produce record-change events attributed to the agent while their native resources are readable.');
  if (events.length > 1) {
   const cursor = events[0].id;
   const replay1 = await c.tool(`${c.surface.seed}.events.list`, { after: cursor, limit: 200 });

@@ -11,7 +11,7 @@
     { "name": "fixture.events.list", "scope": "events:read", "readOnly": true, "classes": ["standard"], "clauses": ["BASE-AGENT-010"] }
   ],
   "notTools": [],
-  "resources": [],
+  "resources": ["fixture://record/{id}"],
   "escalations": [],
   "witness": { "tool": "fixture.records.list", "args": {} },
   "journey": [

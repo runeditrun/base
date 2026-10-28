@@ -256,3 +256,40 @@ so promoting a seed admin does not confer Business approval authority.
 Business can revoke agents or consents in the signed envelope's optional
 `revoked` lists. Tokens require `consent`; affected pending approvals expire and
 execution rechecks revocation. Retain both these lists and historical attribution.
+
+## Event visibility and native revisions
+
+Retained event replay, listing and subscription delivery re-read each event's
+current native resource with `ResourceDefinition.read`. A sponsor, actor or
+Business role cannot override that reader's refusal or null result. Readers
+must authorize on every call, including after grants narrow. Unknown resources
+and refused reads produce no event, notification or new cursor. Base approval
+resources use their current approval reader rules.
+
+Tool names use `<seed>.<segment>(.<segment>)*`: each segment is lowercase
+`[a-z][a-z0-9_]*`. The existing seed-id grammar allows hyphens in the seed
+prefix. Names have at most 128 ASCII characters, within MCP's allowed character
+set. Duplicate, foreign-seed and malformed names fail the existing
+`BASE-AGENT-013.surface.<name>.name` declaration check and runtime registration.
+
+Native `revision(args,ctx)` returns an opaque string or number, or null when no
+record exists. Declare `revisionType: 'string'` for UUIDs or other string tokens,
+`'number'` for numeric tokens, or retain the default `'integer'`. The generated
+`expected_revision` input schema uses that type. Tokens are compared strictly
+and saved unchanged with pending approvals. A stale initial token returns
+`revision_conflict`; a token changed before approved execution returns the
+existing `approval_evidence_changed` without running the tool. Native services
+still own atomic revision checks at their effect boundary.
+
+## MCP version compatibility
+
+The negotiated versions remain `2026-07-28` and `2025-11-25`. Both initialize
+and list the same registry; unsupported negotiation returns
+`UnsupportedProtocolVersion` (-32022). March `2025-03-26` is deliberately not
+advertised: its Streamable HTTP transport permits batched requests, which this
+door's single-message parser rejects, and its pre-June schema lacks structured
+results, output schemas, resource links and elicitation. March also predates the
+protocol-version HTTP header and modern method/name metadata. Supporting it
+would require a batch dispatcher and a separate legacy result/approval shape,
+not merely adding a version string. Seed contracts should use a supported
+version until that transport work is implemented.

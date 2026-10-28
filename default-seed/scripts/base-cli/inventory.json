@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g45f4aafd",
+  "cliVersion": "0.2.85-dev.gd555e789",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1823,7 +1823,7 @@
     },
     "modules/agent-door/conformance/audit.mjs": {
       "source": "modules/agent-door/conformance/audit.mjs",
-      "sha256": "d33ca5825155b5e49051771ec7766f43d69c6c906a49e13083edc386861ba5f3"
+      "sha256": "4ed79a93286680a4c58259c6320a693e7eab496c771a8635ef5bfcda3aa59cc9"
     },
     "modules/agent-door/conformance/crypto.mjs": {
       "source": "modules/agent-door/conformance/crypto.mjs",
@@ -1831,7 +1831,7 @@
     },
     "modules/agent-door/conformance/discovery.mjs": {
       "source": "modules/agent-door/conformance/discovery.mjs",
-      "sha256": "34d1c8ccca89fa7d160079e8603a0daa1e2540e69d5ff7d8f148c63d15c6ba21"
+      "sha256": "366fb3180d6c0d5b211558986c2105c289f3e68189b04f2d073368bfb7fb8856"
     },
     "modules/agent-door/conformance/index.mjs": {
       "source": "modules/agent-door/conformance/index.mjs",
@@ -1839,7 +1839,7 @@
     },
     "modules/agent-door/conformance/journey.mjs": {
       "source": "modules/agent-door/conformance/journey.mjs",
-      "sha256": "8702611a1c5ab03a3ac73bf1add691c90e688041942c6d75cebb1fc0bd3bfc54"
+      "sha256": "20f91358a4fcfc2daa1a13139f934ac99f233a21e849e09aab965cd389b51a6a"
     },
     "modules/agent-door/conformance/negative.mjs": {
       "source": "modules/agent-door/conformance/negative.mjs",
@@ -1867,7 +1867,15 @@
     },
     "modules/agent-door/conformance/surface.mjs": {
       "source": "modules/agent-door/conformance/surface.mjs",
-      "sha256": "e17d57994f839decacbb9d8e749e7d2aef53e3fe57a138c8bb11b8d8dec52d19"
+      "sha256": "3a35bdc6c79250684559e989073679f148b304d4a8506629187e4791eed53aeb"
+    },
+    "modules/agent-door/conformance/tool-name.d.mts": {
+      "source": "modules/agent-door/conformance/tool-name.d.mts",
+      "sha256": "1decc30a4b3ad7eeb46248114ef01a4967fea47129c00f25794d75c9912f505a"
+    },
+    "modules/agent-door/conformance/tool-name.mjs": {
+      "source": "modules/agent-door/conformance/tool-name.mjs",
+      "sha256": "2bedd64a69b1e2a7dc02f7218cdda66e541a955b1a0cfc289d15d96630e616e8"
     },
     "modules/ai/LICENSE": {
       "source": "modules/ai/LICENSE",

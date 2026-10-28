@@ -161,7 +161,7 @@ export default {
     const auth = createOperatorAuth({ db: env.DB, config, clientIp, businessSettings: settings });
     const trust = { issuer: env.RER_OWNER_CLAIM_ISSUER, installationId: env.RER_OWNER_CLAIM_INSTALLATION_ID, appOrigin: origin, publicKeys: JSON.parse(env.RER_OWNER_CLAIM_PUBLIC_KEYS) };
     const records = nativeRecords(env.DB, nativeMode);
-    const door = createAgentDoor({ seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [],
+    const door = createAgentDoor({ seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [{ uriTemplate: 'fixture://record/{id}', name: 'Record', scope: 'records:read', classes: ['standard'], classify: standard, async read(resource, ctx) { try { return { json: await records.read(resource.split('/').pop(), ctx.person) }; } catch (error) { if (error instanceof ToolRefusal) return null; throw error; } } }],
       limits: { requestsPerMinute: 10000 }, tools: recordTools(env.DB, records),
       people: memberPeople(operatorAuthPeople({ db: env.DB, session: incoming => auth.getSession(incoming) }), env.DB, nativeMode) });
     const handled = await door.handle(request) ?? await settings.handle(request);
