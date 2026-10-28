@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.86
+
+- `rer refresh-base` refused sparse historical module copies when required dependency additions also resolved their old missing imports. Refresh now delivers and records those planned dependencies without a manual copy-record edit; ordinary unresolved imports without a planned dependency remain preserved.
+
 ## 0.2.85
 
 - Two starters could both take over a stale local operation lock and both act as its owner. Takeover is now exclusive: the lock's inode stays pinned through takeover, and release checks the owner token.
