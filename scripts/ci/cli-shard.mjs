@@ -102,14 +102,22 @@ export async function cliShardPlan() {
   for (const file of isolated) assert.ok(files.includes(file), `Missing CLI suite: ${file}`);
   const groups = balanceFiles(files, {
     seconds, fallback: 5, isolated,
-    // Reserve the measured auxiliary stages assigned to these same jobs.
-    // Partition 1: Linux 3, .
+    // Keep the measured file packing while Linux 3 takes reference/auxiliary
+    // work in its observed 12:47 job. The packing weights overestimated it.
+    // Partition 1: Linux 3, added work fills measured spare capacity.
     // Partition 2: Linux 4, owner-claim.
     // Partition 3: Linux 6, authoring, rer.
     // Keep 90s of extra cold native setup margin on Linux 8.
     overhead: { '1': 0, '2': 20, '3': 385, '4': 1145 },
     fixed: { '4': ['cli/describe-effects.test.mjs'] },
   });
+  // Linux 4 still had only 19s to the 22-minute gate in 40661725807.
+  // Move these independent ~2-minute files into Linux 3's measured spare time.
+  const offload = ['cli/site-flows.test.mjs', 'cli/portability-policy.test.mjs'];
+  for (const file of offload) assert.ok(groups['2'].includes(file), 'Revisit the measured CLI offload when file packing changes');
+  groups['2'] = groups['2'].filter(file => !offload.includes(file));
+  groups['1'].push(...offload);
+  groups['1'].sort((a, b) => (seconds[b] ?? 5) - (seconds[a] ?? 5) || a.localeCompare(b));
   assert.ok(Object.values(groups).every(files => files.length), 'Each CLI shard must have test files');
   assert.deepEqual(Object.values(groups).flat().sort(), files, 'CLI CI must cover every push file exactly once');
   return groups;

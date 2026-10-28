@@ -316,7 +316,7 @@ jobs:
             exit 1
           fi
       - name: Download this run's reference build
-        if: ${{ matrix.group == '5' }}
+        if: ${{ matrix.group == '3' || matrix.group == '5' }}
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: reference-build-${{ github.run_id }}-${{ github.run_attempt }}
@@ -324,7 +324,7 @@ jobs:
       - name: Run full-verify stages assigned to this job
         env:
           VERIFY_GROUP: ${{ matrix.group }}
-          BASE_VERIFY_BUILD_ARTIFACT: ${{ matrix.group == '5' && format('{0}/reference-build', runner.temp) || '' }}
+          BASE_VERIFY_BUILD_ARTIFACT: ${{ (matrix.group == '3' || matrix.group == '5') && format('{0}/reference-build', runner.temp) || '' }}
           RER_TEST_EVIDENCE_DIRECTORY: ${{ runner.temp }}/rer-test-evidence
         run: |
           mkdir -p "$RER_TEST_EVIDENCE_DIRECTORY"
@@ -337,7 +337,7 @@ jobs:
           path: ${{ runner.temp }}/rer-test-evidence
           if-no-files-found: ignore
       - name: Fetch pinned active HappyToHelp source without credentials
-        if: ${{ !cancelled() && matrix.group == '5' }}
+        if: ${{ !cancelled() && matrix.group == '3' }}
         env:
           GIT_CONFIG_NOSYSTEM: '1'
           GIT_CONFIG_GLOBAL: /dev/null
@@ -348,15 +348,15 @@ jobs:
           git -c credential.helper= -C "$RUNNER_TEMP/public-happytohelp" fetch --depth=1 https://github.com/just-every/happytohelp.git 60e9a84688ea41575d56a8f692bbb8173366c7c5
           git -c credential.helper= -C "$RUNNER_TEMP/public-happytohelp" checkout --detach FETCH_HEAD
       - name: Select the active edition's pinned runtime after Base stages finish
-        if: ${{ !cancelled() && matrix.group == '5' }}
+        if: ${{ !cancelled() && matrix.group == '3' }}
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '26.8.1'
       - name: Packed launcher acquisition, browser onboarding and offline resume for active HappyToHelp
-        if: ${{ !cancelled() && matrix.group == '5' }}
+        if: ${{ !cancelled() && matrix.group == '3' }}
         run: node scripts/ci/launcher-acceptance.mjs
       - name: Remove active-edition acceptance checkouts
-        if: ${{ always() && matrix.group == '5' }}
+        if: ${{ always() && matrix.group == '3' }}
         run: |
           rm -rf -- "$RUNNER_TEMP/public-happytohelp" "$RUNNER_TEMP/base-launcher-evidence"
           rm -f -- "$RUNNER_TEMP/launcher-release-manifest.json"

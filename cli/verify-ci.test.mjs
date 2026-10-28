@@ -12,6 +12,11 @@ test('Base and delivered workflow templates parse with their local reusable work
  const { ciPlan, groups } = await import('../scripts/ci/verify.mjs');
  const { MODULE_SHARDS, moduleShardPlan, moduleTestFiles } = await import('../scripts/ci/module-shard.mjs');
  const { CLI_SHARDS, cliShardPlan, cliTestFiles } = await import('../scripts/ci/cli-shard.mjs');
+ const { referenceShardPlan, referencePushShardPlan, verifyReferenceShard } = await import('../scripts/ci/reference-shard.mjs');
+ const reference = await referenceShardPlan(), push = await referencePushShardPlan();
+ assert.deepEqual(Object.values(push).flat().sort(), [...reference.push].sort());
+ assert.deepEqual(push['2'], ['auth-emitted', 'journey-demo'], 'move complete measured reference entries');
+ await assert.rejects(verifyReferenceShard('push', { partition: '3' }), /Choose a reference push partition/);
  const matrix = await ciPlan();
  assert.equal(matrix.include.length, 8, 'retain the eight-job Linux cap');
  assert.equal(Object.keys(await moduleShardPlan()).length, MODULE_SHARDS);

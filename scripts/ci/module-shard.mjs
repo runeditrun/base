@@ -172,8 +172,9 @@ export async function moduleShardPlan() {
   for (const file of browserFiles) assert.ok(files.includes(file), `Missing module browser suite: ${file}`);
   const groups = balanceFiles(files, {
     seconds, fallback: 3,
-    // Reserve the measured auxiliary stages assigned to these same jobs.
-    // Partition 1: Linux 1, deployment, launcher, onboarding-browser.
+    // Retain the verified file packing. Partition 1 keeps its former 109s
+    // auxiliary budget as margin after that work moves to spare Linux 2.
+    // Partition 1: Linux 1, module files only; 109s packing margin.
     // Partition 2: Linux 2, typecheck:modules, release, publish-check, onboarding, review-harness, job-queue, operations, schema, mail-relay.
     // Partition 3: Linux 7, .
     overhead: { '1': 109, '2': 909, '3': 0 },

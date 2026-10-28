@@ -7,16 +7,16 @@ import { verifyStages } from '../verify-stages.mjs';
 import { verify } from '../verify.mjs';
 import { CLI_SHARDS, cliShardPlan, verifyCLIShard } from './cli-shard.mjs';
 import { MODULE_SHARDS, moduleShardPlan, verifyModuleShard } from './module-shard.mjs';
-import { referenceShardPlan, verifyReferenceShard } from './reference-shard.mjs';
+import { REFERENCE_SHARDS, referencePushShardPlan, verifyReferenceShard } from './reference-shard.mjs';
 
 const stage = name => ({ stage: `verify:${name}` });
 const partition = (name, shard) => ({ stage: `verify:${name}`, shard });
 export const groups = {
-  '1': [partition('modules', 1), stage('deployment'), stage('launcher'), stage('onboarding-browser')],
-  '2': [partition('modules', 2), stage('release'), stage('publish-check'), stage('onboarding'), stage('review-harness'), stage('job-queue'), stage('operations'), stage('schema'), stage('mail-relay')],
-  '3': [partition('cli', 1)],
+  '1': [partition('modules', 1)],
+  '2': [partition('modules', 2), stage('release'), stage('publish-check'), stage('onboarding'), stage('review-harness'), stage('job-queue'), stage('operations'), stage('schema'), stage('mail-relay'), stage('deployment'), stage('launcher'), stage('onboarding-browser')],
+  '3': [partition('cli', 1), partition('reference', 2), stage('boundary-checker'), stage('edition-authoring')],
   '4': [partition('cli', 2), stage('owner-claim')],
-  '5': [stage('reference'), stage('boundary-checker'), stage('edition-authoring')],
+  '5': [partition('reference', 1)],
   '6': [partition('cli', 3), stage('authoring'), stage('rer')],
   '7': [partition('modules', 3)],
   '8': [partition('cli', 4), stage('editor'), stage('operator-auth'), stage('delivery-producer'), stage('foundation'), stage('portability'), stage('container'), stage('composition')],
@@ -28,12 +28,12 @@ export async function ciPlan({ journeys = false } = {}) {
   assert.deepEqual(stages.sort(), [...verifyStages].sort(), 'CI must cover every full-verify stage');
   for (const name of verifyStages) {
     const owners = tasks.filter(task => task.stage === name);
-    const total = name === 'verify:modules' ? MODULE_SHARDS : name === 'verify:cli' ? CLI_SHARDS : 1;
+    const total = name === 'verify:modules' ? MODULE_SHARDS : name === 'verify:cli' ? CLI_SHARDS : name === 'verify:reference' ? REFERENCE_SHARDS : 1;
     assert.equal(owners.length, total, `CI repeats or omits a verify stage: ${name}`);
     if (total > 1) assert.deepEqual(owners.map(task => task.shard).sort(), Array.from({ length: total }, (_, index) => index + 1), `CI repeats a verify partition: ${name}`);
     else assert.equal(owners[0].shard, undefined, `Unexpected partition: ${name}`);
   }
-  await Promise.all([moduleShardPlan(), cliShardPlan(), referenceShardPlan()]);
+  await Promise.all([moduleShardPlan(), cliShardPlan(), referencePushShardPlan()]);
   // Native disk setup follows the editor. A job containing only a module
   // partition without the two fixed browser files needs workerd alone.
   const include = Object.keys(groups).map(group => ({ group, browser: groups[group].some(task => task.stage !== 'verify:modules' || task.shard === 1), native: groups[group].some(task => task.stage === 'verify:editor') }));
@@ -69,7 +69,7 @@ export async function verifyGroup(group) {
   for (const task of groups[group]) {
     const result = task.stage === 'verify:modules' ? await verifyModuleShard(String(task.shard))
       : task.stage === 'verify:cli' ? await verifyCLIShard(String(task.shard))
-        : task.stage === 'verify:reference' ? await verifyReferenceShard('push')
+        : task.stage === 'verify:reference' ? await verifyReferenceShard('push', { partition: String(task.shard) })
           : await verify([task.stage]);
     code ||= result;
     if (result === 130 || result === 143) return result;
