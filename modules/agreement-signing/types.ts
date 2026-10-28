@@ -121,7 +121,7 @@ export type VerificationIssue = 'shape' | 'artifact-digest' | 'artifact-size' | 
 export type VerificationResult = { valid: true; root: string | null } | { valid: false; issues: readonly VerificationIssue[] };
 export type SigningErrorCode = 'invalid_input' | 'capacity' | 'unauthorized' | 'not_found' | 'conflict' | 'replay_mismatch'
   | 'stale' | 'expired' | 'closed' | 'wrong_participant' | 'ordering' | 'credential' | 'review_used'
-  | 'unsupported' | 'artifact_missing' | 'artifact_mismatch' | 'legacy_read_only' | 'restored_inert';
+  | 'unsupported' | 'artifact_missing' | 'artifact_mismatch' | 'legacy_read_only' | 'restored_inert' | 'unavailable';
 export type NativeOperation = AuditEvent['payload']['operation'];
 export interface NativeCommit {
   operation: NativeOperation; commandId: string; request: RequestRecord;
@@ -143,7 +143,6 @@ export interface SigningOptions {
   credentialKey: CryptoKey;
   /** Explicit capability mode, no mandatory public tokens. */
   invitations: 'capability' | 'native-session';
-  now?: () => Date;
 }
 export interface SigningService {
   prepare(ctx: CommandContext, definition: SigningDefinition): Promise<RequestRecord>;

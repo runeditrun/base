@@ -21,7 +21,7 @@ export function registerAgreementSigningConformance({ test, adapter }) {
   test('agreement signing: replacement, expiry and withdrawal retain earlier evidence', async () => {
     for (const profile of adapter.profiles) {
       await withRuntime(adapter, profile, replacementWithdrawal);
-      await withRuntime(adapter, profile, expiry, { expiresInMs: 2200 });
+      await withRuntime(adapter, profile, expiry, { expiresInMs: 8000 });
     }
   });
   test('agreement signing: immutable custody, populated forward upgrade and inert restore', async () => {

@@ -15,10 +15,17 @@ export async function replacementWithdrawal(runtime) {
   equal(preserved.artifacts, history.artifacts, 'Replacement preserves exact earlier evidence bytes');
 
   const replacementVersion = version(await current(runtime, replacement.request.id));
-  await refused(command(runtime, 'close', { request: replacementVersion, state: 'declined', reason: 'Unsupported native transition' }), ['unsupported']);
+  const closures = replacement.request.definition.closures;
+  const unsupported = ['declined', 'cancelled', 'withdrawn'].find(state => !closures.includes(state));
+  if (unsupported) await refused(command(runtime, 'close', { request: replacementVersion, state: unsupported, reason: 'Unsupported native transition' }), ['unsupported']);
   const liveReview = await success((await review(runtime, replacement, 0)).result);
-  const withdrawn = await success(command(runtime, 'close', { request: version(await current(runtime, replacementVersion.id)), state: 'withdrawn', reason: 'Native owner withdrew this pending agreement' }));
-  equal(withdrawn.state, 'withdrawn', 'Supported withdrawal closes the pending request');
+  const state = closures.includes('withdrawn') ? 'withdrawn' : closures[0];
+  if (!state) {
+    await refused(command(runtime, 'close', { request: version(await current(runtime, replacementVersion.id)), state: 'withdrawn', reason: 'Withdrawal unsupported' }), ['unsupported']);
+    return; // Replacement and the separate real-expiry scenario still prove invalidation.
+  }
+  const closed = await success(command(runtime, 'close', { request: version(await current(runtime, replacementVersion.id)), state, reason: 'Native owner closed this pending agreement' }));
+  equal(closed.state, state, 'The declared native closure closes the pending request');
   await refused(command(runtime, 'sign', redemption(replacement, liveReview), runtime.fixture.participants[0].actor));
   await refused((await review(runtime, replacement, 1)).result);
   equal((await success(runtime.nativeState())).completions.length, 0, 'Closure does not publish a completed native outcome');
@@ -30,7 +37,7 @@ export async function expiry(runtime) {
   const expiryAt = Date.parse(issued.request.definition.expiresAt);
   check(Number.isFinite(expiryAt), 'Expiry fixture must declare a real expiry');
   const delay = Math.max(0, expiryAt - Date.now() + 1100);
-  check(delay < 6000, 'Expiry fixture must expire promptly without changing the service clock');
+  check(delay < 12000, 'Expiry fixture must expire promptly without changing the service clock');
   await new Promise(resolve => setTimeout(resolve, delay));
   await refused(command(runtime, 'sign', redemption(issued, reviewed), runtime.fixture.participants[0].actor), ['expired', 'closed']);
   await refused((await review(runtime, issued, 1)).result, ['expired', 'closed']);

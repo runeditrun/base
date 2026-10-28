@@ -83,6 +83,11 @@ export async function withRuntime(adapter, profile, run, options = {}) {
       check(typeof runtime?.[method] === 'function', `Conformance runtime requires ${method}().`);
     }
     check(runtime.fixture?.participants?.length >= 3, 'Fixture needs equal-order participants followed by a later participant.');
+    const definition = runtime.fixture.definition;
+    check(definition?.kind === (profile === 'text-terms' ? 'terms-acceptance' : 'electronic-signature'), 'Fixture must implement the declared evidence kind.');
+    const media = definition.documents.map(document => document.mediaType.split(';')[0]);
+    check(profile === 'text-terms' ? media.includes('text/plain') : media.includes('application/pdf') && media.includes('text/html'), 'Fixture must retain the declared actual media.');
+    check(['supported', 'unsupported'].includes(runtime.fixture.externalExecution), 'Declare external execution support explicitly.');
     return await run(runtime);
   } finally {
     await runtime?.close?.();

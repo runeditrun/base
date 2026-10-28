@@ -1,6 +1,6 @@
 import { boundedJson, canonical, limits, randomToken, sha256 } from './encoding.ts';
 import { requireThat, SigningError } from './errors.ts';
-import { stage, verifyReferences } from './custody.ts';
+import { bytes, stage, verifyReferences } from './custody.ts';
 import { active, and, sql, Store, unexpired } from './store.ts';
 import { binding, digest, object, participantContext, text, version } from './validation.ts';
 import type { ActionRecord, OneUseReview, Participant, ParticipantContext, RequestRecord, ReviewBinding, ReviewInput, ReviewRedemption, SigningResult, Sql } from './types.ts';
@@ -107,10 +107,14 @@ export async function sign(store: Store, ctx: ParticipantContext, input: ReviewR
       requireThat(intent && intent.payload_digest === payloadDigest, 'replay_mismatch');
       action = JSON.parse(intent.action) as ActionRecord;
       let artifactWrites: Sql[] = [];
+      if (action.act.type === 'drawn-signature') {
+        const reference = action.act.artifact;
+        artifactWrites.push(...await stage(store, request.id, commandId, fence, [{ reference, bytes: await bytes(store, reference) }]));
+      }
       if (completed && store.options.finalize) {
         const uploads = await store.options.finalize(request, [...prior, action]);
         requireThat(uploads.length > 0 || request.definition.completion !== 'artifacts-required', 'artifact_missing');
-        if (uploads.length) artifactWrites = await stage(store, request.id, await store.commandId(ctx, 'sign'), fence, uploads);
+        if (uploads.length) artifactWrites.push(...await stage(store, request.id, commandId, fence, uploads));
         action.artifacts = uploads.map(upload => upload.reference);
       }
       action.receiptDigest = await sha256(canonical({ ...action, receiptDigest: '' }));

@@ -29,7 +29,12 @@ export async function exactSourceParticipant(runtime) {
   equal(first.action.consents.map(item => ({ purpose: item.purpose, wording: item.wording, language: item.language })), fixture.definition.consents, 'Consent records retain wording, version and language');
   check(first.action.consents.every(item => Boolean(item.acceptedAt)), 'Actual consent has an acceptance time');
   check(first.action.authentication === fixture.definition.recipients[0].authentication, 'Identity assurance is not upgraded');
-  await sign(runtime, issued, 1);
+  if (fixture.drawnSignature) {
+    const act = { type: 'drawn-signature', name: 'Bob Participant', artifact: fixture.drawnSignature };
+    const drawnReview = await success((await review(runtime, issued, 1, { binding: { act } })).result);
+    const drawn = await success(command(runtime, 'sign', redemption(issued, drawnReview), fixture.participants[1].actor));
+    equal(drawn.action.act, act, 'Drawn signature keeps its distinct original media reference');
+  } else await sign(runtime, issued, 1);
   const completed = await sign(runtime, issued, 2);
   equal(completed.request.state, 'completed', 'Every required participant completes the request');
   const native = await success(runtime.nativeState());

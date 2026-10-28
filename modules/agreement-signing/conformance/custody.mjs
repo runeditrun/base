@@ -20,12 +20,17 @@ export async function custodyUpgradeRestore(adapter, profile, runtime) {
   await refused(runtime.evidence(baseline.id, 'outsider'));
 
   const issued = await issue(runtime);
-  const execution = await success(command(runtime, 'recordExternal', { request: { id: issued.request.id, revision: issued.request.revision },
+  const externalInput = { request: { id: issued.request.id, revision: issued.request.revision },
     provider: 'native-provider-adapter', providerRequestId: 'returned-provider-packet',
     provenance: { source: 'provider-original-download', receivedAt: new Date().toISOString(), attribution: 'native-owner' },
-    disposition: 'mismatch-pending', artifacts: [runtime.fixture.externalArtifact] }));
+    disposition: 'mismatch-pending', artifacts: [runtime.fixture.externalArtifact ?? issued.request.definition.documents[0]] };
+  let execution = null;
+  if (runtime.fixture.externalExecution === 'supported') {
+    check(runtime.fixture.externalArtifact, 'Supported external execution requires actual provider-original bytes.');
+    execution = await success(command(runtime, 'recordExternal', externalInput));
+  } else await refused(command(runtime, 'recordExternal', externalInput), ['unsupported', 'not_found']);
   const externalHistory = await evidence(runtime, issued.request.id);
-  equal(externalHistory.executions[0], execution, 'Provider-original provenance and mismatch disposition remain distinct evidence');
+  equal(externalHistory.executions, execution ? [execution] : [], 'Provider-original evidence is distinct; unsupported capability creates none');
   equal(externalHistory.actions.length, 0, 'Provider execution never invents a native personal act');
   equal(externalHistory.request.state, 'issued', 'Unresolved provider mismatch does not complete a native request');
   await sign(runtime, issued, 0);
@@ -39,6 +44,7 @@ export async function custodyUpgradeRestore(adapter, profile, runtime) {
   await runtime.failArtifactPut(false);
   const completed = await success(command(runtime, 'sign', redemption(issued, finalReview), runtime.fixture.participants[2].actor, 'complete-with-custody'));
   equal(completed.request.state, 'completed', 'The same command can complete after real custody recovers');
+  const beforeReads = await success(runtime.nativeState());
   const bundle = await evidence(runtime, issued.request.id);
   equal((await success(command(runtime, 'verify', { bundle }))).valid, true, 'Exported bytes and complete lineage verify');
   check(bundle.artifacts.length >= runtime.fixture.definition.documents.length, 'Export includes the referenced original and completed bytes');
@@ -58,6 +64,8 @@ export async function custodyUpgradeRestore(adapter, profile, runtime) {
   const altered = structuredClone(bundle);
   altered.events[0].payload.actorId = 'different-native-person';
   equal((await success(command(runtime, 'verify', { bundle: altered }))).valid, false, 'Modified audit lineage fails verification');
+  equal(await success(runtime.nativeState()), beforeReads, 'Reads, downloads and verification publish no native effects');
+  equal((await current(runtime, issued.request.id)).root, bundle.request.root, 'Ordinary reads append no domain event');
   await refused(runtime.evidence(issued.request.id, 'outsider'));
 
   await withRuntime(adapter, profile, async target => {
@@ -72,7 +80,7 @@ export async function custodyUpgradeRestore(adapter, profile, runtime) {
     await refused(command(target, 'issue', { id: restored.id, revision: restored.revision }), ['restored_inert']);
     await refused(command(target, 'sign', redemption(issued, finalReview), target.fixture.participants[2].actor), ['restored_inert']);
     await refused(command(target, 'recordExternal', { request: { id: restored.id, revision: restored.revision }, provider: 'provider-history', providerRequestId: 'historical-provider-request',
-      provenance: { source: 'provider-export', receivedAt: new Date().toISOString(), attribution: 'native-owner' }, disposition: 'matched', artifacts: bundle.request.definition.documents }), ['restored_inert']);
+      provenance: { source: 'provider-export', receivedAt: new Date().toISOString(), attribution: 'native-owner' }, disposition: 'matched', artifacts: bundle.request.definition.documents }), runtime.fixture.externalExecution === 'supported' ? ['restored_inert'] : ['restored_inert', 'unsupported', 'not_found']);
     await refused(target.evidence(restored.id, 'outsider'));
     await target.revoke('owner');
     await refused(target.evidence(restored.id));

@@ -14,8 +14,8 @@ copied module would turn a refreshable shared source copy into edition code.
 
 `ReadContext.authority` and both guard callbacks return a trusted SQL boolean
 expression, such as `EXISTS(SELECT 1 FROM ... WHERE ...)`, that is true only while
-the native authorization remains valid. Do not return a standalone `SELECT`
-statement. Bind values through `params`. The module composes these predicates into its same-database
+the native authorization remains valid. A scalar `SELECT` returning one boolean
+column is also supported. Bind values through `params`. The module composes these predicates into its same-database
 checks; never accept SQL, actor, sponsor, subject, session binding, authentication
 or peer metadata from a request body. Verify actual session revocation/rotation,
 not just a cookie's former validity. An authorization query must cover the
@@ -96,7 +96,6 @@ export function mountSigning(options: SigningOptions, native: NativeBoundary) {
     credentialKey: options.credentialKey,
     invitations: options.invitations,
     ...(options.finalize ? { finalize: options.finalize } : {}),
-    ...(options.now ? { now: options.now } : {}),
   });
 
   return async function signingRoute(request: Request): Promise<Response | null> {
@@ -266,6 +265,17 @@ sessions and provider authority. `restore` is a history operation: it must not
 run `nativeCommit`, resend, invoke callbacks, sign or reactivate a pending source.
 Recheck current native visibility on direct read/export and command replay.
 
+The portable domain tables are `as_requests`, `as_source_map`, `as_documents`,
+`as_recipients`, `as_actions`, retained `as_artifacts`, `as_events` and
+`as_external_executions`. Exclude `as_credentials`, `as_reviews`,
+`as_action_intents`, `as_commands` (including sealed replay material) and the
+ephemeral `as_transaction_guard`. Native restoration must mark restored requests
+inert and restore no usable participant/provider authority. `restore` performs
+this for a scoped evidence bundle; installation archives use the edition's
+portability boundary and must apply the same rule. Native retention may remove
+whole expired evidence sets under its hold/erasure policy; ordinary writes never
+edit an action, snapshot or event to implement a correction.
+
 ## Register reusable conformance
 
 The exported registrar uses the edition's test runner and adapter. This wrapper
@@ -292,6 +302,11 @@ records before applying the actual numbered forward migrations, and retain
 `fixture.legacyBefore` from that pre-upgrade state. Declare only supported
 profiles: `text-terms` and/or `pdf-html-signature`; Base exercising both does not
 authorize adding a new document profile to an edition.
+Declare `fixture.externalExecution` as `supported` or `unsupported`; supported
+fixtures provide their real provider-original `externalArtifact`. An unsupported
+route must explicitly refuse and create no execution. The closure flow uses the
+definition's supported closures and verifies absent ones refuse; it never claims
+that a product implements withdrawal when its native definition omits it.
 
 The returned runtime translates `command`, `evidence`, `download`, `nativeState`
 and `reviseSource` into actual public routes/commands and current native
@@ -341,7 +356,7 @@ dispositions, policy evaluation or a client-provided risk flag into this module.
 
 ## Copy, record and refresh source
 
-Run from the edition root with its installed package, using a full landed commit
+Run from the edition's Git checkout root with its installed package, using a full landed commit
 in `BASE_REF`. These commands copy committed bytes rather than a dirty checkout:
 
 ```sh
@@ -370,6 +385,11 @@ git -C "$BASE_CHECKOUT" show \
 
 Replace that illustrative directory/filename with the real unused native path
 before applying. Do not record the numbered migration for automatic refresh.
+If discovery reports those identical SQL bytes as an unrecorded copy, add the
+exact seed-owned numbered path to `base-copies.json`'s `ignore` array (for example,
+`"ignore": ["migrations/0043_agreement_signing.sql"]`). Keep its origin path and
+full source commit in the adoption notes. This ownership declaration keeps an
+applied migration outside source refresh; it does not ignore runtime drift.
 Commit module source, `base-copies.json`, native adapters, additive migrations
 and adoption/schema provenance together. Regenerate the edition's source lock
 through its declared lock command after intentional source changes.
@@ -398,3 +418,15 @@ new CLI behavior, pin an actual published package that contains it. Use the
 installed package's authoring CLI above, not legacy copied authoring scripts.
 See [edition authoring](../../edition-authoring/README.md#copied-base-source) for
 recorded digests/modes, acknowledged adaptations and offline verification.
+
+The disposable copying exercise uses the published `@runeditrun/rer@0.2.85`
+package for `record-base`, `verify-base` and `rer refresh-base`, independently of
+the two committed runtime snapshots. Initialize Git first when reproducing it
+in an empty directory. Keep the native authority/artifact/outcome adapter at
+`src/signing/native-adapter.mjs`, outside `src/base/modules/agreement-signing`;
+keep applied numbered SQL in its native migration directory with its recorded
+schema origin and exact ownership exception. After refresh, build the actual
+consumer Worker (which resolves every production import), run the exported
+conformance against its actual numbered migrations/D1, and check the seed-owned
+adapter and applied migration remain byte-identical. This exercise proves the
+copying path, not an Inkwell, Platter, Glove or Pantry adoption.

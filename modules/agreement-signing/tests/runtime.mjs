@@ -44,6 +44,12 @@ export async function openSigningRuntime(options) {
     const { fixture, identities } = await seedNative(db, options);
     await migration(db, '0002_agreement_signing.sql');
     await migration(db, '0003_preserve_populated_history.sql');
+    // Private setup is finished before the real expiry interval starts. Migration
+    // time on a loaded runner must not consume the participant's review window.
+    if (options.expiresInMs) {
+      fixture.definition.expiresAt = new Date(Date.now() + options.expiresInMs).toISOString();
+      await db.prepare('UPDATE native_sources SET definition=? WHERE id=?').bind(JSON.stringify(fixture.definition), fixture.sourceId).run();
+    }
     const call = (path, { input, actor = 'owner', key, method = input === undefined ? 'GET' : 'POST' } = {}) => mf.dispatchFetch(`https://signing.test${path}`, {
       method, headers: { Cookie: identities[actor]?.cookie ?? 'native_session=unknown',
         ...(key ? { 'Idempotency-Key': key } : {}), ...(input !== undefined ? { 'Content-Type': 'application/json' } : {}) },

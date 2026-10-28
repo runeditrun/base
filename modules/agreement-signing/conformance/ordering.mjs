@@ -3,6 +3,7 @@ import { check, equal, success, refused, command, evidence, current, review, sig
 export async function orderingConcurrentRedemption(runtime) {
   const prepared = await success(command(runtime, 'prepare', { sourceId: runtime.fixture.sourceId, replaces: null }, 'owner', 'prepare-replay'));
   equal(await success(command(runtime, 'prepare', { sourceId: runtime.fixture.sourceId, replaces: null }, 'owner', 'prepare-replay')), prepared, 'Same prepare command recovers the same request');
+  await refused(command(runtime, 'prepare', { sourceId: runtime.fixture.sourceId, replaces: null }, 'owner', 'second-source-claim'), ['conflict']);
   const issued = await success(command(runtime, 'issue', { id: prepared.id, revision: prepared.revision }, 'owner', 'issue-replay'));
   equal(await success(command(runtime, 'issue', { id: prepared.id, revision: prepared.revision }, 'owner', 'issue-replay')), issued, 'Authorized issue replay recovers identical invitations');
   await refused((await review(runtime, issued, 2)).result, ['ordering']);

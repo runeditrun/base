@@ -27,10 +27,12 @@ export async function seedNative(db, { profile, expiresInMs, legacy = true }) {
   const purposes = terms ? ['accept-terms'] : ['electronic-records', 'signature-intent'];
   const consentObjects = purposes.map(purpose => ({ bytes: encode(purpose === 'accept-terms'
     ? 'I accept these exact offered terms.' : purpose === 'electronic-records'
-      ? 'I consent to receive and retain these records electronically.' : 'I intend this typed name to be my signature on this exact offer.'), mediaType: 'text/plain' }));
+      ? 'I consent to receive and retain these records electronically.' : 'I intend this signature to sign this exact offer.'), mediaType: 'text/plain' }));
   const consentRefs = consentObjects.map((object, index) => reference(`offer-main/consent-${index}`, object.mediaType, object.bytes));
   const providerObject = { bytes: encode('Provider-original execution returned for a different selected option. Preserve pending mismatch review.'), mediaType: 'text/plain' };
   const externalArtifact = reference('offer-main/provider-original', providerObject.mediaType, providerObject.bytes);
+  const signatureObject = { bytes: encode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 50"><path d="M5 35 Q25 5 35 32 T65 25 Q70 40 90 20 T120 30 L170 20" fill="none" stroke="black" stroke-width="2"/></svg>'), mediaType: 'image/svg+xml' };
+  const drawnSignature = terms ? null : reference('offer-main/bob-signature', signatureObject.mediaType, signatureObject.bytes);
   const approvedFields = { option: 'offer-a', quantity: 3, totalMinor: 12450 };
   const participants = ['alice', 'bob', 'hr'].map((actor, index) => ({ actor, recipientId: `recipient-${index}` }));
   const definition = { source: { kind: 'native-offer', id: 'offer-main', revision: '1' }, kind: terms ? 'terms-acceptance' : 'electronic-signature',
@@ -42,8 +44,8 @@ export async function seedNative(db, { profile, expiresInMs, legacy = true }) {
     consents: purposes.map((purpose, index) => ({ purpose, wording: consentRefs[index], language: 'en-AU' })),
     completion: 'artifacts-required', closures: ['withdrawn', 'cancelled'], replaces: null };
   await db.prepare('INSERT INTO native_sources VALUES (?,?,?,?,?,?,?)').bind('offer-main', 1, JSON.stringify(definition), 12450, 'AUD', 'approved', JSON.stringify(approvedFields)).run();
-  const allObjects = [...objects, ...consentObjects, providerObject];
-  for (const [index, ref] of [...documentRefs, ...consentRefs, externalArtifact].entries()) {
+  const allObjects = [...objects, ...consentObjects, providerObject, ...drawnSignature ? [signatureObject] : []];
+  for (const [index, ref] of [...documentRefs, ...consentRefs, externalArtifact, ...drawnSignature ? [drawnSignature] : []].entries()) {
     await db.prepare('INSERT INTO native_objects VALUES (?,?,?,?,?)').bind(ref.id, ref.version, JSON.stringify(ref), allObjects[index].bytes, 'offer-main').run();
   }
   for (const participant of definition.recipients) await db.prepare('INSERT INTO native_participants VALUES (?,?,?)').bind('offer-main', participant.id, participant.subjectId).run();
@@ -56,7 +58,7 @@ export async function seedNative(db, { profile, expiresInMs, legacy = true }) {
       'native-session', actor === 'agent' ? actorId : null, actor === 'agent' ? 'person-alice' : null).run();
     if (actor !== 'outsider') await db.prepare('INSERT INTO native_access VALUES (?,?,?)').bind(actorId, 'offer-main', actor === 'owner' || actor === 'agent' ? 1 : 0).run();
   }
-  const fixture = { sourceId: 'offer-main', definition, participants, externalArtifact,
+  const fixture = { sourceId: 'offer-main', definition, participants, externalArtifact, externalExecution: 'supported', drawnSignature,
     sessionSecrets: Object.values(identities).map(identity => identity.cookie.split('=')[1]),
     binding: { documentIds: documentRefs.map(item => item.id), approvalDigest: definition.approvalDigest, selectionDigest: definition.selectionDigest,
       fields: approvedFields, act: terms ? { type: 'accept', statement: 'I accept the offered terms.' } : { type: 'typed-signature', name: 'Alex Participant' },

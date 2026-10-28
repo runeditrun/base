@@ -132,6 +132,8 @@ creates one-use authority; it is not the read-only preview operation.
 
 [types.ts](types.ts) is the complete contract, including closed input types and
 `SigningErrorCode`. Contexts always come from trusted server code.
+Boundary/storage failures surface as `unavailable` (503), preserving their cause
+for server diagnostics; they never report a completed outcome or substitute data.
 
 | Method | Contract |
 | --- | --- |
@@ -170,7 +172,10 @@ native source/session guards as well as the module's request checks.
   alone cannot guard a concurrent commit.
 - `participantGuard`: trusted SQL checking the present subject, session binding,
   authentication basis, resource/category rights and any witness, delegated or
-  guardian authority. Request JSON cannot supply these facts.
+  guardian authority. Its fourth argument carries the exact proposed binding
+  for native field/selection policy (`null` for committed-command recovery).
+  Request JSON cannot supply authority. Portable actions retain only a digest
+  of the session binding, never its usable credential.
 - `nativeCommit`: at most eight SQL statements joining native outcomes/audit to
   the module's D1 transaction. No network I/O, independent transaction or second
   native signing writer.
@@ -186,13 +191,26 @@ native source/session guards as well as the module's request checks.
   bytes. It must not write objects, mail, provider state or native records. With
   `completion: 'artifacts-required'`, supply the actual final artifacts; with
   `receipt-only`, no executed PDF or certificate is invented.
-- Optional `now`: the clock boundary, principally for deterministic integration
-  tests.
+
+Evidence times come from the Worker clock; expiry is also rechecked with the
+database clock inside the write transaction. There is no backdating input.
 
 Artifact custody is staged before completion. A failed artifact write must not
 leave a completed request with missing final bytes; immutable staged objects
 may need native retention cleanup after a refused database commit. Treat object
 custody and D1 as different systems, even when the adapter stores native BLOBs.
+The first guarded signing attempt retains its actual act/consent time in a
+transient intent, so retrying after failed custody renders the same evidence.
+Render from frozen source and acts, and address immutable output by those facts;
+unrelated kernel revisions must not reuse an ID/version for different bytes.
+
+The exported `limits` bound each request to 16 documents, 32 participants,
+4 consent purposes, 64 artifact references, 8 MiB per artifact and 32 MiB of
+artifact bytes. Persisted JSON records are at most 64 KiB; there are at most
+128 audit revisions and outstanding signing intents, and 8 native SQL statements
+per commit. Review authority lasts at most 10 minutes, and invitation authority
+at most 30 days, capped by request expiry. Capacity refusals never publish a
+partial act. Size the native D1 tier and archive runner for the bounded batch.
 
 ## Scope and proof
 
@@ -216,5 +234,12 @@ the media and identity profile it actually supports.
 From the Base root, the targeted reference consumer command is:
 
 ```sh
-node --test --test-concurrency=1 modules/agreement-signing/tests/conformance.test.ts
+node --test --test-concurrency=2 modules/agreement-signing/tests/*.test.ts
+./default-seed/node_modules/.bin/tsc --project modules/agreement-signing/tsconfig.json
+./default-seed/node_modules/.bin/tsc --project modules/agreement-signing/tests/tsconfig.json
 ```
+
+`tests/conformance.test.ts` is discovered by the existing module glob in
+`scripts/ci/module-shard.mjs`. Runtime TypeScript and conformance declarations
+also participate in `default-seed/tsconfig.seed-copies.json`; no separate CI
+shard or npm export is required.

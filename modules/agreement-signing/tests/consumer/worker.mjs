@@ -38,7 +38,7 @@ async function handle(request, env) {
     if (request.method === 'GET' && !action) {
       const actions = await env.DB.prepare('SELECT payload FROM native_signing_actions WHERE source_id=? ORDER BY rowid').bind(sourceId).all();
       const completions = await env.DB.prepare('SELECT request_id,source_id,amount_minor,currency FROM native_completed_agreements WHERE source_id=? ORDER BY rowid').bind(sourceId).all();
-      const legacy = await env.DB.prepare('SELECT * FROM native_legacy_agreements ORDER BY id').all();
+      const legacy = await env.DB.prepare('SELECT l.* FROM native_legacy_agreements l JOIN native_access a ON a.source_id=l.source_id WHERE a.actor_id=? ORDER BY l.id').bind(session.actor_id).all();
       return json({ source: { id: source.id, revision: source.revision, amountMinor: source.amount_minor, currency: source.currency },
         actions: actions.results.map(row => JSON.parse(row.payload)), completions: completions.results, legacy: legacy.results });
     }

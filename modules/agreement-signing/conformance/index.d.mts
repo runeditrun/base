@@ -7,7 +7,9 @@ export interface AgreementSigningFixture {
   definition: SigningDefinition;
   binding: ReviewBinding;
   participants: readonly { actor: string; recipientId: string }[];
-  externalArtifact: ArtifactRef;
+  externalExecution: 'supported' | 'unsupported';
+  externalArtifact?: ArtifactRef;
+  drawnSignature?: ArtifactRef | null;
   /** Test-only known native credentials; none may occur in portable evidence. */
   sessionSecrets: readonly string[];
   /** Snapshot captured before the actual numbered forward migrations run. */

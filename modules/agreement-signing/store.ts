@@ -21,7 +21,7 @@ export function record(row: RequestRow): RequestRecord | LegacyRecord {
 export class Store {
   readonly options: SigningOptions;
   constructor(options: SigningOptions) { this.options = options; }
-  now(): string { const now = this.options.now?.() ?? new Date(); return now.toISOString(); }
+  now(): string { return new Date().toISOString(); }
   statement(query: Sql) { return this.options.database.prepare(query.sql).bind(...query.params ?? []); }
   async first<T>(query: Sql): Promise<T | null> { return this.statement(query).first<T>(); }
   async rows<T>(query: Sql): Promise<T[]> { return (await this.statement(query).all<T>()).results; }
