@@ -72,6 +72,7 @@ export async function* providerPages(envelope, path, {field, pagination = 'page'
     } catch (error) {
       // No response bodies, query values, account IDs or cursors in diagnostics.
       error.providerCall ??= {operation:`GET ${url.pathname}`,reason:error.message};
+      error.providerCall.page ??= page;
       throw error;
     }
     yield {rows,data};
@@ -80,7 +81,7 @@ export async function* providerPages(envelope, path, {field, pagination = 'page'
     pageMode = next === true;
   }
   const error = new Error('provider-pagination-limit');
-  error.providerCall = {operation:`GET ${url.pathname}`,reason:'Cloudflare continued advertising pages beyond the request limit'};
+  error.providerCall = {operation:`GET ${url.pathname}`,page:100,reason:'Cloudflare continued advertising pages beyond the request limit'};
   throw error;
 }
 

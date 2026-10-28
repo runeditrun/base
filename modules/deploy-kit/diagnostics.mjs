@@ -145,7 +145,8 @@ export function providerFailure(error, redact = String) {
   const call = error?.providerCall;
   if (typeof call?.operation !== 'string') return undefined;
   const clean = value => redact(String(value)).replace(/[\x00-\x1f\x7f-\x9f]+/g,' ').replace(/\b[a-f0-9]{32}\b/gi,'[REDACTED]').slice(0,300);
-  return `Cloudflare call ${clean(call.operation)}: ${clean(call.reason ?? error.message)} (no Cloudflare error code or message supplied)`;
+  const page = Number.isSafeInteger(call.page) && call.page > 0 ? ` (page ${call.page})` : '';
+  return `Cloudflare call ${clean(call.operation)}${page}: ${clean(call.reason ?? error.message)} (no Cloudflare error code or message supplied)`;
 }
 
 // Asset paths are build inputs; the CLI still redacts them before display.

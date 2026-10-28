@@ -1,7 +1,8 @@
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { assert, hash, resourceName } from './validation.mjs';
-import { ownerWorkerName } from './owner.mjs';
+import { ownerWorkerName, withSettledLists } from './owner.mjs';
+import { providerListShape } from './pagination.mjs';
 import { uploadAssets, workerOrigin } from './worker.mjs';
 import { readinessWindow, readinessAPI } from './readiness-window.mjs';
 import { uploadVersionId } from './uploaded-worker.mjs';
@@ -98,9 +99,20 @@ export async function siteDeploy({ api, plan, files, receiptPath, readiness = {}
   assert(typeof receiptPath === 'string' && receiptPath.length, 'missing-receipt-path');
   assert(plan?.module === SITE_MODULE && Array.isArray(files) && files.some(file => file.path === 'index.html'), 'invalid-site-assets');
   const provider = api;
+  // request/zoneRequest preserve list result wrappers (items, deployments).
+  // Restart only GET lists, using the owner's bounded settling policy; writes
+  // and non-list reads keep their existing transport/readiness behavior.
+  const settledRequest = (method, step) => {
+    const lists = withSettledLists({list:(path, options) => provider[method](path, options)});
+    return (path, options = {}) => {
+      const readList = (!options.method || options.method === 'GET') && providerListShape(path);
+      const call = {...options, step:options.step ?? step(path)};
+      return readList ? lists.list(path, call) : provider[method](path, call);
+    };
+  };
   api = {...api,
-    zoneRequest:(path,options = {}) => provider.zoneRequest(path,{step:'checking site zone',...options}),
-    request:(path,options = {}) => provider.request(path,{step:path.includes('/domains') ? 'checking site custom domains' : 'checking site Worker',...options}),
+    zoneRequest:settledRequest('zoneRequest', () => 'checking site zone'),
+    request:settledRequest('request', path => path.includes('/domains') ? 'checking site custom domains' : 'checking site Worker'),
   };
   const runtime = siteRuntime(plan.runtime);
   const fingerprint = siteFingerprint(plan, files);

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g0cad22d3",
+  "cliVersion": "0.2.85-dev.g45f4aafd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2411,7 +2411,7 @@
     },
     "modules/deploy-kit/diagnostics.mjs": {
       "source": "modules/deploy-kit/diagnostics.mjs",
-      "sha256": "4ebb3ba6c33328200858bfd585c79a15c80b6b06ef07e74ac8e869955c92c052"
+      "sha256": "05a4de1fce56f2fa97f43b1f87e559ef6a01b724193acca623846490a46d932c"
     },
     "modules/deploy-kit/env-file.mjs": {
       "source": "modules/deploy-kit/env-file.mjs",
@@ -2479,7 +2479,7 @@
     },
     "modules/deploy-kit/pagination.mjs": {
       "source": "modules/deploy-kit/pagination.mjs",
-      "sha256": "0689960eeeb65c326dfa1830c6d24edb51d69dc9438159c46935168544705d6a"
+      "sha256": "ec3a2c6e78a365da0c7bb76506ce083d63a92e0f0ed85d7e22b1b74775fdbe33"
     },
     "modules/deploy-kit/prepare.mjs": {
       "source": "modules/deploy-kit/prepare.mjs",
@@ -2539,7 +2539,7 @@
     },
     "modules/deploy-kit/site.mjs": {
       "source": "modules/deploy-kit/site.mjs",
-      "sha256": "42be01967b48d1f22135af5b804380b9548c5b97196c07104cc7373d73205a1d"
+      "sha256": "2e103a0754ece1d5d02aacfe9ca79dacd3ccdf27b8f498ef25a3bbf6487eb536"
     },
     "modules/deploy-kit/sql-safety.mjs": {
       "source": "modules/deploy-kit/sql-safety.mjs",
