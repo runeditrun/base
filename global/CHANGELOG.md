@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Re-exporting the maintained reference leaves its CLI inventory unchanged after generated copies are committed; its development version tracks the last exported source change.
 - Contract conversion retains observed homepage table headers, escaped pipes, quoted prose and historical claim statuses, and refuses dropped or changed source claims. `record-base --from-api` records verified immutable Base copies through the GitHub API when a local checkout is unavailable.
 - Convert handwritten homepage claims with reviewed alias maps bound to the original revision, file, line and claim text, preserving the original obligations and judgments.
 - Keep reviewed license, launcher and hosted-demo facts in converted claims as explicit non-product rows, with their historical status separate from current unassessed status.
