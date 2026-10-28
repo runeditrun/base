@@ -36,6 +36,12 @@ host. See [adoption and deployment](https://github.com/runeditrun/base/blob/main
 - `upgrade.mjs`: verifies ownership, removes the old Container application and
   derives the class migration from deployed namespaces and migration tag.
 - `remove.mjs`: exact-id teardown, ownership collision checks and absence reads.
+- `ownership.mjs`: read-only recovery when secret PUT removed the version message.
+  The served version must be newest, with a contiguous secret-triggered history
+  back to this demo's rer record and identical script ETag, runtime and bindings
+  (including secret names and bound resource IDs). Only upload-tool provenance may
+  differ. Missing history, changed resources or a foreign message refuses before
+  writes. The next ordinary deploy writes the annotation again.
 
 The historical resource-name hash remains stable so released container demos
 can upgrade and be removed from a fresh checkout. Portable container hosting

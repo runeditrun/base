@@ -39,7 +39,7 @@ host. See [adoption and deployment](https://github.com/runeditrun/base/blob/main
 - `ownership.mjs`: read-only recovery when secret PUT removed the version message.
   The served version must be newest, with a contiguous secret-triggered history
   back to this demo's rer record and identical script ETag, runtime and bindings
-  (including binding names and resource IDs). Only upload-tool provenance may
+  (including secret names and bound resource IDs). Only upload-tool provenance may
   differ. Missing history, changed resources or a foreign message refuses before
   writes. The next ordinary deploy writes the annotation again.
 
