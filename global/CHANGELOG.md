@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Unify managed mail's public `MAIL_FROM` input across deploy declarations and delivery production. Accept its environment-mapped deploy input alongside an empty public default; refuse disagreeing configured senders with both values and source locations before packaging or deployment. Keep credential overlaps private and refused. See `modules/delivery-producer/ADOPTING.md`.
+
 ## 0.2.86
 
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.

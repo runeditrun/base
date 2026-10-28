@@ -4,6 +4,7 @@ import { refuse } from './errors.mjs';
 import { parseAddress } from '../modules/mail/src/core/validation.mjs';
 import { deliveryDeclarationSources } from './delivery-declarations.mjs';
 import { validateRerConfig } from '../modules/mail/src/adapters/rer/contract.mjs';
+import { validateMailSenders } from '../modules/delivery-producer/mail.mjs';
 
 const providers = ['resend', 'sendgrid', 'cloudflare', 'rer'];
 const nativeCredential = { sendgrid: 'SENDGRID_API_KEY', resend: 'RESEND_API_KEY' };
@@ -30,11 +31,13 @@ const placeholderSender = value => {
 // keys or the adapter's executable source, before any build or provider write.
 export async function productionMail(root, declaration, env, declarationPath = 'deploy.json') {
  const bindings = { ...declaration.vars }, secrets = new Set(), publicInputs = new Set(), declaredProviders = new Set();
+ const senders = [{ source: `${declarationPath} vars.MAIL_FROM`, value: declaration.vars?.MAIL_FROM }];
  let senderFix = `Edit vars.MAIL_FROM in ${declarationPath}`;
  const environmentFix = name => `Set ${name} in your environment or owned 0600 --env-file`;
  for (const secret of declaration.secrets ?? []) {
   secrets.add(secret.binding);
   if (present(env[secret.environment])) {
+   if (secret.binding === 'MAIL_FROM') senders.push({ source: `${declarationPath} secrets.MAIL_FROM from ${secret.environment} (environment or --env-file)`, value: env[secret.environment] });
    bindings[secret.binding] = env[secret.environment];
    if (secret.binding === 'MAIL_FROM') senderFix = environmentFix(secret.environment);
   }
@@ -47,6 +50,7 @@ export async function productionMail(root, declaration, env, declarationPath = '
   try { spec = select(JSON.parse(text)); }
   catch { throw refuse(`Restore a valid mail deployment declaration at ${path}. Nothing was built or uploaded.`); }
   if (!spec) continue;
+  senders.push({ source: `${path} publicVariables.MAIL_FROM`, value: spec.publicVariables?.MAIL_FROM });
   for (const name of spec.publicVariableNames ?? []) publicInputs.add(name);
   for (const [name, value] of Object.entries(spec.publicVariables ?? {})) {
    if (!(name in bindings) || name === 'MAIL_PROVIDER' && bindings[name] === 'later') {
@@ -59,15 +63,19 @@ export async function productionMail(root, declaration, env, declarationPath = '
    // A root secret's explicit environment-to-binding mapping wins.
    if (!declaration.secrets?.some(secret => secret.binding === name) && present(env[name])) {
     bindings[name] = env[name];
+    if (name === 'MAIL_FROM') senders.push({ source: `${path} secret MAIL_FROM (environment or --env-file)`, value: env[name] });
     if (name === 'MAIL_FROM') senderFix = environmentFix(name);
    }
   }
   for (const provider of spec.mail?.providers ?? []) if (providers.includes(provider)) declaredProviders.add(provider);
  }
  for (const name of publicInputs) if (present(env[name])) {
+  if (name === 'MAIL_FROM') senders.push({ source: 'public MAIL_FROM (environment or --env-file)', value: env[name] });
   bindings[name] = env[name];
   if (name === 'MAIL_FROM') senderFix = environmentFix(name);
  }
+ try { validateMailSenders(senders); }
+ catch (error) { throw refuse(`${error.message} Nothing was built or uploaded.`); }
  let senderIssue;
  if (present(bindings.MAIL_FROM) && (!sender(bindings.MAIL_FROM) || placeholderSender(bindings.MAIL_FROM))) {
   senderIssue = `MAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>). ${senderFix}, then run rer deploy --dry-run again.`;
