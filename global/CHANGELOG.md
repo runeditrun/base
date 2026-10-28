@@ -2,11 +2,15 @@
 
 ## Unreleased
 
+- Contract conversion retains observed homepage table headers, escaped pipes, quoted prose and historical claim statuses, and refuses dropped or changed source claims. `record-base --from-api` records verified immutable Base copies through the GitHub API when a local checkout is unavailable.
 - Convert handwritten homepage claims with reviewed alias maps bound to the original revision, file, line and claim text, preserving the original obligations and judgments.
 - Keep reviewed license, launcher and hosted-demo facts in converted claims as explicit non-product rows, with their historical status separate from current unassessed status.
 - Preserve an explicitly recorded negative-scope boundary without inventing a product clause, using the supported `boundary` basis and the original source record.
 - Publication scans use each retained revision's repository context so local source paths beside repository prose do not become remote declarations; explicit repository references still receive the existing visibility checks.
 - After computer choices change in Business, name `business next` as the next step and report which local apps received the Business name, including when none did.
+- `rer refresh-base` accepts literal apostrophes in double-quoted workflow text while still refusing unclosed shell quotes before writing files.
+- Editions can declare reviewed test-reader dependencies in `verification.json` so contract, source-lock and evidence-only changes can select the Verify light tier; unknown readers still require full coverage.
+- `rer refresh-base` no longer prints the template-adoption notice when a preserved workflow already matches the incoming template, including acknowledged adaptations.
 
 ## 0.2.85
 
