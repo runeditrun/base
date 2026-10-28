@@ -11,7 +11,7 @@ const generatedFiles = ['CONTRACT.md', 'ACCEPTANCE.md', 'docs/CLAIMS.md']
 const read = (root, path) => readFile(join(root, path), 'utf8')
 const edit = (root, path, contents) => writeFile(join(root, path), contents)
 const snapshot = root => Promise.all(generatedFiles.map(path => read(root, path)))
-const git = (root, ...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
+const git = (root, ...args) => execFileSync('git', ['-c', 'user.name=Base test', '-c', 'user.email=base-test@example.invalid', ...args], { cwd: root, encoding: 'utf8' }).trim()
 const cli = (root, ...args) => {
   const result = spawnSync(process.execPath, ['src/base/contract-docs.mjs', ...args], { cwd: root, encoding: 'utf8' })
   assert.ifError(result.error)
@@ -36,7 +36,7 @@ async function installation(fixture) {
     cp(join(import.meta.dirname, 'runtime', file), join(root, 'src/base', file))))
   git(root, 'init', '-q')
   git(root, 'add', '.')
-  git(root, '-c', 'user.name=Synthetic author', '-c', 'user.email=synthetic@example.invalid', 'commit', '-qm', 'Synthetic source')
+  git(root, 'commit', '-qm', 'Synthetic source')
   return root
 }
 
@@ -105,7 +105,7 @@ test('contract docs convert handwritten contracts and keep generated documents a
         await generatedJourney(root)
         assert.deepEqual(parseContract(await read(root, 'CONTRACT.md')), original)
         git(root, 'add', '.')
-        git(root, '-c', 'user.name=Synthetic author', '-c', 'user.email=synthetic@example.invalid', 'commit', '-qm', 'Generated documents')
+        git(root, 'commit', '-qm', 'Generated documents')
         succeeds(root, 'write')
         assert.equal(git(root, 'status', '--porcelain'), '', 'a second write leaves the committed checkout clean')
         const acceptance = await read(root, 'ACCEPTANCE.md')
