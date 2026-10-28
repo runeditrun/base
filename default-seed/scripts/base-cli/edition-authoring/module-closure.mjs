@@ -120,7 +120,8 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   const key = (target, request) => JSON.stringify([target, request.kind, request.types, request.specifier]);
   const bootstrap = source => /^(?:edition-authoring|(?:default-seed|export)\/scripts\/base-cli\/edition-authoring)\//.test(source);
   // Snapshot the original unresolved set once, before closure can add a file.
-  // Only toolkit bootstraps and recorded removals may change that baseline.
+  // Preserve these edges during traversal; required planned files may still
+  // complete a sparse historical copy by satisfying them.
   const baseline = new Set();
   for (const {plan, source, target} of queue) {
     if (!Object.hasOwn(plan.copy.files, target) || !disk.has(target) || bootstrap(source)) continue;
@@ -212,21 +213,6 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
         }
       }
     }
-  }
-  const expected = new Set(), unresolved = new Set();
-  const removed = new Set(plans.flatMap(plan => plan.removed));
-  const final = {has: name => planned.has(name) || !removed.has(name) && disk.has(name), read: view.read};
-  for (const {plan, source, target, entry, adapted} of queue) {
-    if (!adapted && !plan.sources.some(([name]) => name === source)) continue;
-    for (const request of requests(adapted ? local(target) : blob(entry), source, target)) {
-      const id = key(target, request);
-      if (!baseline.has(id)) continue;
-      expected.add(id);
-      if (!resolve(final, target, request.specifier, request)) unresolved.add(id);
-    }
-  }
-  if (expected.size !== unresolved.size || [...expected].some(id => !unresolved.has(id))) {
-    refuse('baseline imports', 'a planned file would resolve an edition-owned unresolved edge', '${EDITOR:-vi} base-copies.json');
   }
   return withheld;
 }

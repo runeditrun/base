@@ -1,0 +1,40 @@
+{
+  "schema": "rer-agent-surface/1",
+  "seed": "fixture",
+  "specialist": "operations",
+  "tools": [
+    {"name": "fixture.records.list", "scope": "records:read", "readOnly": true, "classes": ["standard"], "clauses": ["BASE-AGENT-002"]},
+    {"name": "fixture.records.create", "scope": "records:write", "readOnly": false, "classes": ["standard"], "clauses": ["BASE-AGENT-002"]},
+    {"name": "fixture.records.send", "scope": "records:write", "readOnly": false, "classes": ["external"], "clauses": ["BASE-AGENT-006"]},
+    {"name": "fixture.records.deliver", "scope": "records:write", "readOnly": false, "classes": ["external"], "clauses": ["BASE-AGENT-006"]},
+    {"name": "fixture.records.denied", "scope": "records:write", "readOnly": false, "classes": ["external"], "clauses": ["BASE-AGENT-006"]},
+    {"name": "fixture.events.list", "scope": "events:read", "readOnly": true, "classes": ["standard"], "clauses": ["BASE-AGENT-010"]},
+    {"name": "fixture.access.grant", "scope": "access:write", "readOnly": false, "classes": ["access"], "clauses": ["BASE-AGENT-005"]},
+    {"name": "fixture.access.revoke", "scope": "access:write", "readOnly": false, "classes": ["access"], "clauses": ["BASE-AGENT-005"], "widens": false, "narrowing": {"effect": "revoke", "target": "id"}, "inputSchema": {"type": "object", "properties": {"id": {"type": "string", "minLength": 1}}, "required": ["id"], "additionalProperties": false}},
+    {"name": "fixture.access.grants", "scope": "records:read", "readOnly": true, "classes": ["standard"], "clauses": ["BASE-AGENT-005"]},
+    {"name": "fixture.records.protected", "scope": "records:write", "readOnly": false, "classes": ["sensitive"], "clauses": ["BASE-AGENT-004"], "proof": "native", "proofKind": "step_up"}
+  ],
+  "notTools": [],
+  "resources": ["fixture://record/{id}"],
+  "escalations": [
+    {"id": "grant-sponsor", "tool": "fixture.access.grant", "args": {"id": {"$sponsor": "id"}, "scope": "records:read"}}
+  ],
+  "witness": {"tool": "fixture.records.list", "args": {}},
+  "journey": [
+    {"id": "create", "tool": "fixture.records.create", "args": {"value": "Quarterly operations note"}, "expect": [{"class": "standard", "facts": {"measure": 1}}], "inject": {"classes": ["external"], "counterparty": "public", "policy": "blocked"}},
+    {"id": "send-json", "tool": "fixture.records.send", "args": {"id": {"$from": "create", "pointer": "/id"}, "stream": false}, "expect": [{"class": "external", "facts": {"measure": 1, "counterparty": "known"}}], "inject": {"classes": ["standard"], "counterparty": "internal"}},
+    {"id": "send-stream", "tool": "fixture.records.send", "args": {"id": {"$from": "create", "pointer": "/id"}, "stream": true}, "expect": [{"class": "external", "facts": {"measure": 1, "counterparty": "known"}}]},
+    {"id": "deliver", "tool": "fixture.records.deliver", "args": {"id": {"$from": "create", "pointer": "/id"}}, "expect": [{"class": "external", "facts": {"measure": 1, "counterparty": "known"}}]},
+    {"id": "deny-undeclared", "tool": "fixture.records.denied", "args": {"id": {"$from": "create", "pointer": "/id"}}, "expect": [{"class": "external", "facts": {"measure": 1, "counterparty": "new"}}]},
+    {"id": "list", "tool": "fixture.records.list", "args": {}, "expect": [{"class": "standard", "facts": {"measure": 1}}]},
+    {"id": "events", "tool": "fixture.events.list", "args": {"limit": 200}, "expect": [{"class": "standard", "facts": {"measure": 1}}]},
+    {"id": "grant", "tool": "fixture.access.grant", "args": {"id": {"$from": "create", "pointer": "/id"}, "scope": "records:read"}, "expect": [{"facts": {"measure": 1, "direction": "widens"}, "class": "access"}]},
+    {"id": "grants", "tool": "fixture.access.grants", "args": {"id": {"$from": "create", "pointer": "/id"}}, "expect": [{"facts": {"measure": 1}, "class": "standard"}]},
+    {"id": "revoke", "tool": "fixture.access.revoke", "args": {"id": {"$from": "create", "pointer": "/id"}}, "expect": [{"facts": {"measure": 1, "direction": "narrows"}, "class": "access"}]},
+    {"id": "protected", "tool": "fixture.records.protected", "args": {"id": {"$from": "create", "pointer": "/id"}}, "expect": [{"facts": {"measure": 1, "kind": "personal"}, "class": "sensitive"}]}
+  ],
+  "verification": {"network": {"module": "provider.mjs", "origins": ["https://api.openai.com", "https://receiver.example.invalid"]}},
+  "narrowings": [
+    {"tool": "fixture.access.revoke", "step": "revoke", "witness": {"tool": "fixture.access.grants", "args": {"id": {"$from": "create", "pointer": "/id"}}, "pointer": "/grants"}}
+  ]
+}

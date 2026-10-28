@@ -9,6 +9,7 @@ import { migrate } from '../modules/container/migrations.mjs';
 import { readMigrationRewrites, withRewrites } from '../modules/deploy-kit/migrations.mjs';
 import { RerError } from './errors.mjs';
 import { hostedMailCredentials } from './hosted-mail.mjs';
+import { shared } from './shared.mjs';
 
 // Serve the production build the way rer deploy hosts it (assets behind the
 // Worker, deploy identity bound, a public https origin) on loopback, with no
@@ -44,6 +45,7 @@ const links = html => [...html.matchAll(/(?:src|href)=["'](\/[^"'#?\s]+)/g)].map
 /** The build served as rer deploy hosts it, with declared vars, origin and
  * stand-in deploy/Managed mail secrets. `fetch(path, init)` uses the deployed origin. */
 export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService } = {}) {
+ const { loopbackFetch } = await shared('loopback-fetch.mjs');
  const build = join(root, 'dist/server'), client = join(root, 'dist/client');
  let config;
  try { config = await read(join(build, 'wrangler.json')); }
@@ -84,8 +86,16 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    await migrate(await mf.getD1Database(item.binding, 'app'), withRewrites(plan, await readMigrationRewrites(root), { partial: true }));
   }
  } catch (error) { await mf.dispose(); throw error; }
- return { client, identity, origin: HOSTED_ORIGIN, close: () => mf.dispose(),
-  fetch: (path, { headers, ...init } = {}) => fetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }) };
+ return { client, identity, origin: HOSTED_ORIGIN,
+  database: async binding => {
+   if (!(config.d1_databases ?? []).some(item => item.binding === binding)) throw new RerError('hosted_database_invalid', 'Verification can read only a declared disposable database binding.', 1);
+   const db = await mf.getD1Database(binding, 'app');
+   return { prepare(sql) {
+    if (typeof sql !== 'string' || !/^\s*SELECT\b/i.test(sql) || sql.includes(';')) throw new RerError('hosted_database_invalid', 'Verification state access is read-only SELECT.', 1);
+    return db.prepare(sql);
+   } };
+  }, close: () => mf.dispose(),
+  fetch: (path, { headers, ...init } = {}) => loopbackFetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }) };
 }
 
 export async function checkHostedOutput(root, options) {

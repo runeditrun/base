@@ -24,27 +24,32 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  // Simulate git pull after setup: the old build cannot know this migration.
  await writeFile(path, "CREATE TABLE local_upgrade(value TEXT); INSERT INTO local_upgrade VALUES('applied');\n");
  const settings = await readFile(join(f.root, '.dev.vars'));
- const ready = events(await f.run(['dev', '--detach', '--json'])).find(event => event.event === 'ready');
- assert.ok(ready);
- assert.equal((await fetch(ready.url + '/health')).status, 200);
- assert.deepEqual((await f.sql('SELECT value FROM local_upgrade'))[0].results, [{ value: 'applied' }]);
- assert.deepEqual((await f.sql('SELECT value FROM saved_before_upgrade'))[0].results, [{ value: 'owner content' }]);
- assert.deepEqual((await f.sql("SELECT name FROM d1_migrations WHERE name='9998_local_upgrade.sql'"))[0].results, [{ name: '9998_local_upgrade.sql' }]);
- const capture = await readFile(join(f.root, '.seed/installer/install.log'), 'utf8');
- assert.ok(capture.split('\n').some(line => line.includes('Applied local migrations:') && line.includes('9998_local_upgrade.sql')), 'startup names the applied migration');
- await devEntryBrowser(ready);
- // rer dev --as takes anyone in the local database by email; an unknown email names the people it takes.
- await f.sql("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('local-member','jordan@example.test','Jordan','member','active',1)");
- assert.equal(events(await f.run(['dev', '--as', 'jordan@example.test', '--json'])).find(event => event.event === 'ready')?.signedInAs, 'jordan@example.test');
- // Someone added at a built-in persona's address is signed in by that email, as the person they are.
- await f.sql("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('local-ada','admin@dev.localhost','Ada','member','active',1)");
- assert.equal(events(await f.run(['dev', '--as', 'admin@dev.localhost', '--json'])).find(event => event.event === 'ready')?.signedInAs, 'admin@dev.localhost');
- const unknown = events(await f.run(['dev', '--as', 'nobody@example.test', '--json'], 2)).find(event => event.event === 'error')?.message;
- assert.match(unknown, /nobody@example\.test[^]*owner \(migration-owner@example\.test\)[^]*jordan@example\.test/);
- await f.run(['dev', '--stop', '--json']);
- const repeated = events(await f.run(['dev', '--detach', '--json'])).find(event => event.event === 'ready');
- assert.equal((await fetch(repeated.url + '/health')).status, 200, 'an up-to-date database starts without reapplying SQL');
- await f.run(['dev', '--stop', '--json']);
+ let ready;
+ try {
+  ready = events(await f.run(['dev', '--detach', '--json'])).find(event => event.event === 'ready');
+  assert.ok(ready);
+  assert.equal((await fetch(ready.url + '/health')).status, 200);
+  assert.deepEqual((await f.sql('SELECT value FROM local_upgrade'))[0].results, [{ value: 'applied' }]);
+  assert.deepEqual((await f.sql('SELECT value FROM saved_before_upgrade'))[0].results, [{ value: 'owner content' }]);
+  assert.deepEqual((await f.sql("SELECT name FROM d1_migrations WHERE name='9998_local_upgrade.sql'"))[0].results, [{ name: '9998_local_upgrade.sql' }]);
+  const capture = await readFile(join(f.root, '.seed/installer/install.log'), 'utf8');
+  assert.ok(capture.split('\n').some(line => line.includes('Applied local migrations:') && line.includes('9998_local_upgrade.sql')), 'startup names the applied migration');
+  await devEntryBrowser(ready);
+  // rer dev --as takes anyone in the local database by email; an unknown email names the people it takes.
+  await f.sql("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('local-member','jordan@example.test','Jordan','member','active',1)");
+  assert.equal(events(await f.run(['dev', '--as', 'jordan@example.test', '--json'])).find(event => event.event === 'ready')?.signedInAs, 'jordan@example.test');
+  // Someone added at a built-in persona's address is signed in by that email, as the person they are.
+  await f.sql("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('local-ada','admin@dev.localhost','Ada','member','active',1)");
+  assert.equal(events(await f.run(['dev', '--as', 'admin@dev.localhost', '--json'])).find(event => event.event === 'ready')?.signedInAs, 'admin@dev.localhost');
+  const unknown = events(await f.run(['dev', '--as', 'nobody@example.test', '--json'], 2)).find(event => event.event === 'error')?.message;
+  assert.match(unknown, /nobody@example\.test[^]*owner \(migration-owner@example\.test\)[^]*jordan@example\.test/);
+  await f.run(['dev', '--stop', '--json']);
+  const repeated = events(await f.run(['dev', '--detach', '--json'])).find(event => event.event === 'ready');
+  assert.equal((await fetch(repeated.url + '/health')).status, 200, 'an up-to-date database starts without reapplying SQL');
+ } finally {
+  // A detached server outlives its CLI, including when an assertion fails.
+  await f.run(['dev', '--stop', '--json']);
+ }
  assert.deepEqual(await readFile(join(f.root, '.dev.vars')), settings);
 
  await writeFile(join(f.root, 'migrations/core/9999_broken_upgrade.sql'), 'INSERT INTO missing_upgrade_table VALUES (1);\n');

@@ -82,7 +82,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.RER_RUNNER_WIN == 'online' && fromJSON('["self-hosted","rer-win"]') || 'ubuntu-24.04' }}
     permissions:
       contents: read
       packages: read
@@ -95,7 +95,7 @@ jobs:
       options: --init
       volumes:
         - /usr/local/lib/android:/runner-preinstalled/android
-    timeout-minutes: ${{ matrix.group == 'journeys' && 60 || 25 }}
+    timeout-minutes: ${{ matrix.group == 'journeys' && 60 || matrix.group == 'modules' && 35 || 25 }}
     env:
       TZ: UTC
       RER_VERIFY_WORKERS: '1'
@@ -115,6 +115,7 @@ jobs:
             exit 1
           fi
       - name: Reclaim unused hosted Android tools for native consumer verification
+        if: runner.environment == 'github-hosted'
         run: |
           set -euo pipefail
           df -Pk "$GITHUB_WORKSPACE"

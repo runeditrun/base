@@ -19,6 +19,8 @@ The front door serves every registered checkout at http://NAME.localhost:PORT
 from one process on one port. A checkout starts on its first visit in a browser
 and stops when idle. It is opt-in for this computer.
 
+  rer door clauses (--write | --check) [--cwd DIR]
+                        Sync Base agent requirements into a seed contract, preserving judgments.
   rer door enable [--port N] [--server-limit N] [--idle-timeout S]
                         Opt this computer in, record the policy and start the door.
                         Defaults: port 8700, 10 servers, 43200 s (12 hours) idle.
@@ -247,7 +249,7 @@ export async function doorCommand(args, env = process.env) {
  const [verb, ...rest] = args;
  if (!verb || ['--help', '-h', 'help'].includes(verb) || rest.includes('--help')) { process.stdout.write(doorHelp); return 0; }
  const verbs = { enable, disable, add, remove, status, start: (_, e) => start(e), stop: (_, e) => stop(e), restart: (_, e) => restart(e) };
- if (!verbs[verb]) { err(`Unknown rer door command: ${verb}. Run rer door --help.`); return 2; }
+ if (!Object.hasOwn(verbs, verb)) { err(`Unknown rer door command: ${verb}. Run rer door --help.`); return 2; }
  if (['start', 'stop', 'restart'].includes(verb) && rest.length) { err(`rer door ${verb} takes no arguments.`); return 2; }
  try { return await verbs[verb](rest, env); }
  catch (error) { if (error instanceof DoorFailure || error.exitCode) { err(error.message); return error.exitCode ?? 1; } throw error; }

@@ -10,6 +10,7 @@ import { cloudflare } from '../modules/deploy-kit/provider.mjs';
 import { RUNTIME_FILES } from '../modules/demo-host/native/config.mjs';
 import { prepareNative } from '../modules/demo-host/native/prepare.mjs';
 import { TESTING_SECRET } from '../modules/demo-host/measurement.mjs';
+import { demoDeployFailure } from './demo-deploy-error.mjs';
 import { awaitCertificates } from '../modules/demo-host/certificate.mjs';
 
 export async function nativeDemoCommand(project, options, store, signal, out, operation, app, plan) {
@@ -52,7 +53,9 @@ export async function nativeDemoCommand(project, options, store, signal, out, op
   const required = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY'];
   if (required.some(name => !process.env[name]?.trim())) throw missing(`${required.join(', ')} are required`);
   const api = cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
-  config.migrations = await upgradeDemo({ api, plan, report: line => store.report(line) });
+  await store.step(`Checking ownership of the demo Worker ${plan.worker}`);
+  try { config.migrations = await upgradeDemo({ api, plan, report: line => store.report(line) }); }
+  catch (error) { throw demoDeployFailure(error, store); }
   await writeFile(join(folder, 'wrangler.json'), JSON.stringify(config, null, 2) + '\n');
   const testing = TESTING_SECRET.test(process.env.TURNSTILE_SECRET_KEY);
   const measurement = testing ? process.env.RER_DEMO_MEASUREMENT_TOKEN || randomBytes(32).toString('base64url') : undefined;
