@@ -15,6 +15,8 @@ that existing vendor namespace instead of requiring `foundation` outside the
 edition. Within equally specific directory mappings, an already recorded file
 takes precedence over an omitted member. Existing resolvable edition imports
 keep their destinations.
+Singleton records also retain their existing ability to witness siblings in
+the same source and destination namespaces; relocation uses those same rules.
 
 Refresh rewrites parsed dependency literals only. The result's `relocated` list
 names the delivered files whose imports changed. These files become acknowledged

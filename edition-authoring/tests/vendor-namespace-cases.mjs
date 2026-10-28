@@ -16,7 +16,7 @@ function ok(root, ...args) {
 }
 
 export function vendorNamespaceCases({init, write, commit, git, snapshotTree}) {
-  for (const shape of ['directory', 'sparse', 'unmapped', 'ambiguous']) {
+  for (const shape of ['directory', 'sparse', 'singleton', 'unmapped', 'ambiguous']) {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'vendor-namespace-'));
     const base = path.join(temp, 'base'), seed = path.join(temp, 'seed');
     const origin = 'foundation/runtime/hydration', vendor = 'src/vendor/base/hydration';
@@ -34,8 +34,9 @@ export function vendorNamespaceCases({init, write, commit, git, snapshotTree}) {
       ok(seed, 'record-base', 'src/routes/index.ts', 'default-seed/src/routes/index.ts', pin, '--base', base);
       if (shape !== 'unmapped') {
         write(seed, vendor + '/report.ts', 'export const report = "synthetic hydration report";\n');
-        if (shape !== 'sparse') write(seed, vendor + '/unit.tsx', unit);
-        ok(seed, 'record-base', vendor, origin, pin, '--base', base);
+        if (!['sparse', 'singleton'].includes(shape)) write(seed, vendor + '/unit.tsx', unit);
+        ok(seed, 'record-base', shape === 'singleton' ? vendor + '/report.ts' : vendor,
+          shape === 'singleton' ? origin + '/report.ts' : origin, pin, '--base', base);
         if (shape === 'directory') for (const broader of ['src/base', 'src/site/base']) {
           write(seed, broader + '/run-site.ts', 'export const run = "synthetic run";\n');
           if (broader === 'src/base') write(seed, broader + '/setup.ts', 'export const needsSetup = false;\n');
@@ -70,7 +71,7 @@ export function vendorNamespaceCases({init, write, commit, git, snapshotTree}) {
       if (shape === 'directory') assert.match(bytes, /from ["']\.\.\/base\/setup["']/);
       assert.equal(fs.existsSync(path.join(temp, 'foundation')), false);
       const record = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json')));
-      assert.equal(record.copies.filter(copy => copy.path.startsWith(vendor)).length, 1);
+      assert.equal(record.copies.filter(copy => copy.path.startsWith(vendor)).length, shape === 'singleton' ? 2 : 1);
       assert.ok(record.copies.find(copy => copy.path === route).adapted[route]);
       assert.equal(ok(seed, 'verify-base', '--base', base).ok, true);
       git(seed, 'add', '-A');
