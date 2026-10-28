@@ -64,7 +64,7 @@ export function demoAccount() {
         return ok({ jwt: 'test-asset-upload', buckets: [Object.values(manifest).map(row => row.hash)] });
       }
       if (rest === '/versions' && method === 'POST') {
-        const metadata = JSON.parse(await init.body.get('metadata').text()), previous = script.versions[0];
+        const raw = init.body.get('metadata'), metadata = JSON.parse(typeof raw === 'string' ? raw : await raw.text()), previous = script.versions[0];
         const files = await Promise.all([...init.body].filter(([name]) => name !== 'metadata').map(async ([name, file]) => ({ name, sha256: hash(Buffer.from(await file.arrayBuffer())) })));
         const bindings = [...(metadata.bindings ?? []).map(row => row.type === 'inherit' ? previous.resources.bindings.find(held => held.name === row.name) : row.type === 'secret_text' ? { name: row.name, type: row.type } : row)];
         if (metadata.keep_bindings?.includes('secret_text')) for (const row of previous.resources.bindings.filter(row => row.type === 'secret_text')) if (!bindings.some(held => held.name === row.name)) bindings.push(row);
