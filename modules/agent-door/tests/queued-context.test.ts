@@ -120,7 +120,7 @@ test('approved native preparation preserves operation identity, key and named ap
  const r = await runtime({ queueContext: true })
  try {
   await r.adopt({ ...autonomousPolicy(), rules: [{ id: 'held', class: 'standard', do: 'approval', approver: ['sponsor'], wait: 'PT1H' }] })
-  const input = job(), held = await r.tool('queue.prepare', input)
+  const input = job(), sibling = crypto.randomUUID(), held = await r.tool('queue.prepare', { ...input, additional: [sibling] })
   const approval = held.result?._meta?.['com.runeditrun/approval'] ?? held.error?.data?.approval
   const view = (await r.person(`/agents/api/approvals/${approval.id}`)).body.approval
   const executed = await r.person(`/agents/api/approvals/${approval.id}/approve`, { revision: view.revision, summary_sha256: view.summary_sha256 })
@@ -131,5 +131,19 @@ test('approved native preparation preserves operation identity, key and named ap
   await r.adopt()
   assert.equal((await drain(r, input.id)).outcome, 'done')
   assert.deepEqual(await saved(r, 'test_effects', input.id), admission)
+  assert.equal((await drain(r, sibling)).outcome, 'done')
+  assert.deepEqual(await saved(r, 'test_effects', sibling), admission)
+  const delayed = job()
+  assert.ok(result(await r.tool('queue.prepare', delayed))?.operationId)
+  await r.adopt({ ...autonomousPolicy(), rules: [{ id: 'held', class: 'standard', do: 'approval', approver: ['sponsor'], wait: 'PT1H' }] })
+  const waiting = await drain(r, delayed.id)
+  assert.equal(waiting.outcome, 'pending')
+  const path = `/agents/api/approvals/${waiting.approval.id}`
+  const pending = (await r.person(path)).body.approval
+  const identity = await saved(r, 'test_jobs', delayed.id)
+  await r.db.prepare('UPDATE test_jobs SET saved=? WHERE id=?').bind(JSON.stringify({ ...identity, operationId: crypto.randomUUID() }), delayed.id).run()
+  const refused = (await r.person(`${path}/approve`, { revision: pending.revision, summary_sha256: pending.summary_sha256 })).body.approval
+  assert.equal(refused.state, 'refused'); assert.equal(refused.code, 'operation_mismatch')
+  assert.equal(await saved(r, 'test_effects', delayed.id), null)
  } finally { await r.close() }
 })
