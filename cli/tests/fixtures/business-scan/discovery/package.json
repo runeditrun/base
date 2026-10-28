@@ -3,6 +3,7 @@
   "private": true,
   "dependencies": {
     "@stripe/stripe-js": "^5.0.0",
+    "algoliasearch": "^5.0.0",
     "@supabase/supabase-js": "^2.0.0"
   },
   "devDependencies": {

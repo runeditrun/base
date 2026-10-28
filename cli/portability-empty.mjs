@@ -47,6 +47,12 @@ export async function emptyNativePreflight({ root, binding, policy, policyModule
   const after = await Promise.all(paths.map(status));
   insist(before.every((info, i) => info ? after[i] && ['ino', 'size', 'mtimeMs', 'ctimeMs'].every(key => info[key] === after[i][key]) : !after[i]), 'restore_state_changed', 409);
   snapshot = new DatabaseSync(join(directory, 'database.sqlite'), { readOnly: true });
+  // Wrangler can create a D1 file before any product migrations run. Only
+  // literal SQLite/Cloudflare engine internals may exist in that empty file;
+  // policy exclusions and migration ledgers do not make other schema empty.
+  // Every existing product/foreign object still goes through the full policy
+  // and occupied-table checks before migrations can change the destination.
+  if (!snapshot.prepare("SELECT 1 FROM sqlite_master WHERE substr(lower(name),1,7) <> 'sqlite_' AND substr(lower(name),1,4) <> '_cf_' LIMIT 1").get()) return;
   const db = { prepare(sql) { const query = snapshot.prepare(sql); let values = []; return {
    bind(...args) { values = args; return this; },
    async all() { return { results: query.all(...values) }; },

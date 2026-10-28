@@ -70,7 +70,11 @@ test('a package-pinned seed adopts authoring and refreshes through the packed pu
   fs.rmSync(path.join(seed, 'one.mjs'));
   fs.rmSync(path.join(seed, 'vendor/two.mjs'));
   write(source, 'module/one.mjs', 'export const one = 2;\n');
-  const next = commit(source), refreshed = result('refresh-base', '--ref', next);
+  const next = commit(source);
+  const archive = path.join(path.dirname(source), 'base-export');
+  fs.mkdirSync(archive);
+  execFileSync('tar', ['-xf', '-', '-C', archive], { input: execFileSync('git', ['-C', source, 'archive', next]), stdio: ['pipe', 'pipe', 'pipe'] });
+  const refreshed = result('refresh-base', '--ref', next, ...(untrackedRecord ? ['--base-archive', archive] : []));
   assert.deepEqual(refreshed.retired, ['one.mjs']);
   assert.ok(refreshed.copies.find(c => c.path === 'one.mjs').removed.includes('one.mjs'));
   assert.equal(fs.existsSync(path.join(seed, 'one.mjs')), false);
@@ -80,6 +84,9 @@ test('a package-pinned seed adopts authoring and refreshes through the packed pu
   const after = fs.readFileSync(path.join(seed, 'base-copies.json'));
   assert.deepEqual(result('refresh-base', '--ref', next, '--base', source, '--offline').retired, []);
   assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
+  assert.deepEqual(result('refresh-base', '--ref', next, '--base-archive', archive, '--offline').retired, []);
+  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), after);
+  t.diagnostic('Packed rer refresh-base --base-archive --ref: PASS; checkout/archive mappings and digests retained.');
   assert.notEqual(revision, next);
  }
 });
@@ -366,4 +373,29 @@ test('packed refresh fetches missing Base ancestry and refuses unreachable or of
    t.diagnostic(mode + ': exit 4; revisions, remote and executable repair named; record and copy unchanged');
   }
  }
+});
+
+
+test('packed refresh preserves literal workflow text and refreshes an acknowledged current template quietly', async t => {
+ const {seed, source, old, result} = await fixture(t);
+ const workflow = '.github/workflows/verify.yml', origin = 'export/verify.yml';
+ const current = `jobs:
+  check:
+    steps:
+      - run: |
+          echo "the owner's workflow"
+          node scripts/polish-helper.mjs
+`;
+ write(source, origin, current);
+ write(source, 'export/polish-helper.mjs', 'export const helper = true;\n');
+ const revision = commit(source);
+ write(seed, workflow, current);
+ old('record-base', workflow, origin, revision, '--base', source);
+ old('adapt-base', workflow);
+ commit(seed);
+ const refreshed = result('refresh-base', '--ref', revision, '--base', source);
+ assert.deepEqual(refreshed.notices, []);
+ assert.equal(fs.readFileSync(path.join(seed, workflow), 'utf8'), current);
+ assert.equal(fs.readFileSync(path.join(seed, 'scripts/polish-helper.mjs'), 'utf8'), fs.readFileSync(path.join(source, 'export/polish-helper.mjs'), 'utf8'));
+ assert.equal(old('verify-base', '--base', source).ok, true);
 });

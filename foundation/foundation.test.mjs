@@ -19,9 +19,9 @@ test('public foundation CLI keeps author identity private from Run data and comp
     const base = resolve(tmp, 'base')
     await cp(resolve(root, 'foundation'), resolve(base, 'foundation'), { recursive: true, filter: p => !p.includes('node_modules') })
     for (const name of new Set([...sourceRoots,'composition', 'edition-authoring', 'schema', 'onboarding', 'modules/operator-auth', 'export'])) await cp(resolve(root, name), resolve(base, name), { recursive: true })
-    git(base, 'init'); git(base, 'add', '.'); git(base, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'fixture')
+    git(base, 'init'); git(base, 'add', '.'); git(base, '-c', 'user.name=Test', '-c', 'user.email=base-test@example.invalid', 'commit', '-qm', 'fixture')
     await cp(resolve(root, 'LICENSE'), resolve(base, 'LICENSE'))
-    git(base, 'add', 'LICENSE'); git(base, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'license')
+    git(base, 'add', 'LICENSE'); git(base, '-c', 'user.name=Test', '-c', 'user.email=base-test@example.invalid', 'commit', '-qm', 'license')
     const ref = git(base, 'rev-parse', 'HEAD')
     const authorRepository = `author-${process.pid}/family-${Date.now()}`
     const editionName = 'first'
@@ -54,7 +54,7 @@ test('public foundation CLI keeps author identity private from Run data and comp
     const secondSetup = JSON.parse(await readFile(resolve(secondEdition, `editions/${secondEditionName}/rer-setup.json`)))
     assert.equal(secondSetup.title, secondEditionName)
     assert.equal(secondSetup.fields.find(field => field.name === 'APP_NAME').default, secondEditionName)
-    git(family, 'init'); git(family, 'add', '.'); git(family, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'starter')
+    git(family, 'init'); git(family, 'add', '.'); git(family, '-c', 'user.name=Test', '-c', 'user.email=base-test@example.invalid', 'commit', '-qm', 'starter')
     const output = resolve(tmp, 'edition')
     await assemble({ familyRepo: family, baseRepo: base, edition: 'first', output, toolCommit: ref })
     // Exercise the composed mail facade with the real selected mail module.
