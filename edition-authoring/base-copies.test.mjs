@@ -1,5 +1,6 @@
 import test from 'node:test';
 import {closureClasses} from './tests/closure-cases.mjs';
+import {archiveSourceCases} from './tests/archive-cases.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -99,6 +100,7 @@ test('record-base pins Base bytes and verify-base passes only for exact recorded
     ok(seed, 'record-base', 'scripts/helper.mjs', 'tools/helper.mjs', revision, '--base', base);
     assert.equal(ok(seed, 'verify-base', '--offline').ok, true);
     assert.notEqual(run(seed, 'verify-base').status, 0);
+    archiveSourceCases(temp, run, snapshotTree);
   } finally { fs.rmSync(temp, {recursive: true, force: true}); }
 });
 
@@ -169,6 +171,10 @@ test('verify-base checks recorded hashes and paths against Base at the recorded 
     write(seed, 'vendor/sample/index.mjs', 'locally rewritten\n');
     record.copies[0].files['vendor/sample/index.mjs'] = sha('locally rewritten\n');
     record.copies[0].files['vendor/sample/invented.mjs'] = sha('invented\n');
+    // Forge the new membership metadata too, so offline consistency passes
+    // and the real source comparison still has to detect the invented file.
+    record.copies[0].originFiles.push('modules/sample/invented.mjs');
+    record.copies[0].originFiles.sort();
     write(seed, 'vendor/sample/invented.mjs', 'invented\n');
     fs.writeFileSync(recordPath, JSON.stringify(record));
     assert.equal(ok(seed, 'verify-base', '--offline').ok, true);
@@ -308,6 +314,55 @@ test('refresh-base checks read-only destinations before updating any copy and pe
       fs.rmSync(temp, {recursive: true, force: true});
     }
   }
+});
+
+test('refresh-base completes required dependencies of a sparse historical module copy', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'base-copies-sparse-'));
+  try {
+    const base = path.join(temp, 'base'), seed = path.join(temp, 'seed');
+    const module = 'modules/operator-auth';
+    const sparse = {
+      'index.mjs': 'export const auth = true;\n',
+      'accounts/display-name.mjs': "export {admin} from './admin.mjs';\n",
+      'accounts/one-click.mjs': "import './store.mjs';\nimport './roles.mjs';\nimport '../policy.mjs';\n",
+      'scheduled/index.mjs': "import '../accounts/roles.mjs';\nimport './no-source.mjs';\n",
+      'signin/one-click.mjs': "export {page} from '../page.mjs';\n",
+    };
+    const missing = {
+      'accounts/admin.mjs': "import './store.mjs';\nexport const admin = true;\n",
+      'accounts/store.mjs': "import './roles.mjs';\nimport '../policy.mjs';\n",
+      'accounts/roles.mjs': 'export const roles = true;\n',
+      'policy.mjs': 'export const policy = true;\n',
+      'page.mjs': 'export const page = true;\n',
+    };
+    init(base); init(seed);
+    for (const [name, bytes] of Object.entries({...sparse, ...missing})) write(base, `${module}/${name}`, bytes);
+    const pin = commit(base);
+    for (const [name, bytes] of Object.entries(sparse)) write(seed, `${module}/${name}`, bytes);
+    ok(seed, 'record-base', module, module, pin, '--base', base);
+    commit(seed);
+    // A refreshed entry point now needs the omitted historical files too.
+    write(base, `${module}/index.mjs`, "export * from './accounts/admin.mjs';\nexport * from './page.mjs';\n");
+    const next = commit(base);
+    const report = ok(seed, 'refresh-base', next, '--base', base);
+    const copy = JSON.parse(fs.readFileSync(path.join(seed, 'base-copies.json'))).copies.find(copy => copy.path === module);
+    const changes = report.copies.find(copy => copy.path === module);
+    for (const [name, bytes] of Object.entries(missing)) {
+      const target = `${module}/${name}`;
+      assert.equal(fs.readFileSync(path.join(seed, target), 'utf8'), bytes);
+      assert.equal(copy.files[target], sha(bytes));
+      assert.ok(changes.added.includes(target));
+    }
+    // A genuinely absent source stays unresolved, without blocking completion.
+    assert.equal(fs.existsSync(path.join(base, `${module}/scheduled/no-source.mjs`)), false);
+    assert.equal(fs.existsSync(path.join(seed, `${module}/scheduled/no-source.mjs`)), false);
+    assert.equal(fs.readFileSync(path.join(seed, `${module}/scheduled/index.mjs`), 'utf8'), sparse['scheduled/index.mjs']);
+    ok(seed, 'verify-base', '--base', base);
+    const before = snapshotTree(seed);
+    const repeated = ok(seed, 'refresh-base', next, '--base', base);
+    assert.deepEqual(snapshotTree(seed), before);
+    assert.deepEqual(repeated.copies.flatMap(copy => copy.added), []);
+  } finally { fs.rmSync(temp, {recursive: true, force: true}); }
 });
 
 test('refresh-base closes authoring sibling imports while preserving edition-owned helpers', () => {

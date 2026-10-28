@@ -114,6 +114,8 @@ export async function installPermissions(input = {}) {
  });
 }
 
+export async function permissionsAdded(input = {}) { return await readOptional(paths(input).receipt) !== null; }
+
 /** Re-read current settings and subtract only our additions; preserve all
  * preexisting rules and unrelated edits rather than restoring an old document.
  */

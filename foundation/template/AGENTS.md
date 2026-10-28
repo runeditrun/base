@@ -168,6 +168,8 @@ and dynamic imports inside `createServerFn` handlers so secrets never enter the
 client. Consult the pinned Base migration recipe and default-seed reference and
 run equivalent direct unauthenticated transport checks.
 
+A handler, registry or route table indexed by a request-derived name must use an own-property guard (`Object.hasOwn`) or a null-prototype/Map registry; inherited names (`constructor`, `__proto__`, `toString`) must answer 404/unknown.
+
 Keep actual Queue and Cron handlers and named Worker exports in `src/server.ts`
 when adding those capabilities. The dispatcher only selects HTTP ownership; it
 does not authenticate or catch failures.
