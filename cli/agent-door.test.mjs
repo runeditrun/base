@@ -6,6 +6,7 @@ import { readFile, writeFile, symlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomBytes, randomUUID, webcrypto } from 'node:crypto';
 import { fixtureSeed, buildFixture } from './tests/fixtures/agent-door/seed.mjs';
+import { validateAgentSurface } from '../modules/agent-door/conformance/surface.mjs';
 import { isolatedQueue } from './fixtures/queue.mjs';
 import { serveHosted, HOSTED_ORIGIN } from './hosted-output.mjs';
 import { checkAgentDoor } from './agent-door.mjs';
@@ -21,6 +22,7 @@ test('rer verify drives signed, setup-token and native owner lifecycles through 
   assert.equal(result.ok, true, stderr + stdout);
   assert.equal(result.agentDoor.ok, true, stdout);
   assert.doesNotMatch(stdout + stderr, /(?:eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|operator_session=)/);
+  for (const gap of ['narrowing', 'native-proof']) { const points = result.agentDoor.points.filter(point => point.id.includes(`.${gap}.`)); assert.ok(points.length > 0); t.diagnostic(`${mode}: ${gap} ${points.filter(point => point.ok).length}/${points.length} public-door points passed.`); }
   t.diagnostic(`${mode}: rer verify PASS; ${result.agentDoor.points.length} conformance points; JSON/SSE, signed receiver, undeclared 502 and adapter network denial completed.`);
   if (mode === 'signed') {
    const surfaceFile = join(root, 'agent-surface.json'), surface = JSON.parse(await readFile(surfaceFile, 'utf8'));
@@ -74,4 +76,26 @@ test('rer verify refuses provider modules that import Node APIs or escape the se
   const events = failure.stdout.trim().split('\n').map(JSON.parse);
   assert.ok(events.some(event => event.code === 'agent_network_invalid'), failure.stdout + failure.stderr);
  }
+});
+
+// A narrowing declaration is evidence only when its input cannot add authority.
+test('narrowing declarations reject widening fields, open objects and hidden schema branches', async t => {
+ const original = JSON.parse(await readFile(new URL('./tests/fixtures/agent-door/surface.json', import.meta.url), 'utf8'));
+ assert.equal(validateAgentSurface(original).ok, true);
+ const mutations = [
+  schema => { schema.properties.grant_to_add = { type: 'string' }; },
+  schema => { schema.additionalProperties = true; },
+  schema => { schema.oneOf = [{ properties: { role: { type: 'string' } } }]; },
+ ];
+ for (const mutate of mutations) {
+  const surface = structuredClone(original);
+  mutate(surface.tools.find(tool => tool.widens === false).inputSchema);
+  const validation = validateAgentSurface(surface);
+  assert.ok(validation.points.some(point => point.id === 'BASE-AGENT-005.surface.fixture.access.revoke.narrowing-contract' && !point.ok));
+  assert.equal(validation.ok, false);
+ }
+ const incomplete = structuredClone(original);
+ delete incomplete.tools.find(tool => tool.widens === false).narrowing;
+ assert.equal(validateAgentSurface(incomplete).ok, false);
+ t.diagnostic(`Gap N negative declarations: ${mutations.length + 1}/${mutations.length + 1} refused.`);
 });

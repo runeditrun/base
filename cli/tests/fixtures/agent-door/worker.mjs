@@ -7,6 +7,7 @@ import { createBusinessSettings } from '../../../../modules/business-settings/in
 import { createReceiver } from './receiver.mjs';
 import { deliverySecret, openAiAuthorization } from './credentials.mjs';
 const { deliveryRequest, verifyDeliveryReceipt } = createReceiver(deliverySecret);
+import { authorityTools, nativeProof, issueProof } from './authority.mjs';
 
 const object = (properties, required = Object.keys(properties)) => ({ type: 'object', properties, required, additionalProperties: false });
 const text = { type: 'string', minLength: 1 }, integer = { type: 'integer' };
@@ -42,7 +43,8 @@ function nativeRecords(db, nativeMode) {
       db.prepare('SELECT id,record_id AS recordId,kind,status,body FROM fixture_receipts WHERE operator_id=? ORDER BY id').bind(person.id).all(),
     ]);
     const receipts = saved.results.map(receipt => ({ ...receipt, body: JSON.parse(receipt.body) }));
-    return { records: records.results, receipts, counts: { records: records.results.length, receipts: receipts.length } };
+    const grants = (await db.prepare('SELECT id,scope FROM fixture_grants WHERE operator_id=? ORDER BY id,scope').bind(person.id).all()).results;
+    return { records: records.results, receipts, grants, counts: { records: records.results.length, receipts: receipts.length } };
   }
   async function receipt(record, person, kind, status, body, id = crypto.randomUUID()) {
     await db.prepare('INSERT INTO fixture_receipts(id,record_id,kind,status,body,operator_id,created_at) VALUES(?,?,?,?,?,?,?)')
@@ -94,7 +96,7 @@ function recordTools(db, records) {
   const target = async (args, ctx, recipient) => ({ target: { id: (await records.read(args.id, ctx.person)).id }, recipients: [recipient] });
   return [
     defineTool({ name: 'fixture.records.list', title: 'List records and receipts', description: 'Read your native records and retained external receipts.', scope: 'records:read', readOnly: true,
-      inputSchema: object({}), outputSchema: object({ records: { type: 'array', items: recordSchema }, receipts: { type: 'array', items: receiptSchema }, counts: object({ records: integer, receipts: integer }) }),
+      inputSchema: object({}), outputSchema: object({ records: { type: 'array', items: recordSchema }, receipts: { type: 'array', items: receiptSchema }, grants: { type: 'array', items: { type: 'object' } }, counts: object({ records: integer, receipts: integer }) }),
       classes: ['standard'], clauses: ['BASE-AGENT-002'], classify: standard,
       async run(_args, ctx) { return { result: await records.list(ctx.person) }; } }),
     defineTool({ name: 'fixture.records.create', title: 'Create record', description: 'Save an internal record. Undo is available until a record has external receipts.', scope: 'records:write', readOnly: false,
@@ -167,13 +169,20 @@ export default {
     if (!trust.issuer || !trust.installationId) return new Response('Native owner bindings required', { status: 503 });
     const records = nativeRecords(env.DB, nativeMode);
     const door = createAgentDoor({ seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [],
-      limits: { requestsPerMinute: 10000 }, tools: recordTools(env.DB, records),
+      limits: { requestsPerMinute: 10000 }, tools: [...recordTools(env.DB, records), ...authorityTools(env.DB, records)], nativeProof: nativeProof(env.DB),
       people: memberPeople(operatorAuthPeople({ db: env.DB, session: incoming => auth.getSession(incoming) }), env.DB, nativeMode) });
     const handled = await door.handle(request) ?? await settings.handle(request);
     if (handled) return handled;
     if (path === '/auth/owner-claim' && env.OWNER_MODE === 'signed') return createOwnerClaimHandler({ db: env.DB, authConfig: config, clientIp, ...trust, expectedEmail: config.OWNER_EMAIL })(request);
     if (path === '/auth/bootstrap' && env.OWNER_MODE === 'signed') return new Response('Not found', { status: 404 });
     try {
+      if (path === '/app/native-proof') {
+        requirePost(request, config);
+        const session = await auth.getSession(request);
+        if (!session) return new Response('Native session required', { status: 401 });
+        await records.authorize(session.operator);
+        return Response.json({ reference: await issueProof(env.DB, session.operator, await request.json()) });
+      }
       if (path === '/app/membership/link' && nativeMode) {
         requirePost(request, config);
         const session = await auth.getSession(request);

@@ -110,10 +110,87 @@ person id, email or agent id; the door normalises these and refuses self-widenin
 before classification and again at approval execution. Return null only when
 no standing authority is changed. Other people's changes still follow policy.
 Declare `escalations: [{ id, tool, args }]` in `agent-surface.json`, covering each
-access or security tool. Use `{ "$sponsor": "id" }` or
+access or security tool that can widen authority. Use `{ "$sponsor": "id" }` or
 `{ "$sponsor": "email" }` as argument values; the conformance journey resolves
 these and requires `self_escalation` with an unchanged native witness. Retain a
 journey call proving an ordinary narrowing change too.
+
+For a tool whose only effect is revocation or reduction, declare `widens: false`
+and `narrowing: {effect: 'revoke', target: 'id'}` (or effect `narrow`) in both
+its runtime definition and surface tool. Include its exact native `inputSchema`
+in the surface. This checked contract accepts a closed object with one required
+string target identifier (`id` or a name ending `_id`); it refuses extra fields,
+open objects, references and schema unions. An operation accepting roles, scopes
+or grants to add must retain its escalation fixture. Separate the revoke-only
+operation from an operation that also grants authority when needed.
+
+A narrowing-only tool still declares `authority`, returning `widens: false`.
+A contradictory widening answer refuses as `narrowing_contract_violation`.
+Unlike ordinary tools' ignored extras, undeclared narrowing-tool arguments
+refuse as `invalid_arguments`, including attempts to replay a prior key.
+Every such tool needs a normal journey step and a `narrowings` entry:
+
+```json
+{
+  "tool": "seed.access.revoke",
+  "step": "revoke",
+  "witness": {
+    "tool": "seed.access.grants",
+    "args": {"id": {"$from": "grant", "pointer": "/id"}},
+    "pointer": "/grants"
+  }
+}
+```
+
+The read-only witness returns the targeted subject's native effective grants as
+unique strings. Use the same target argument in the witness and revoke call.
+The journey prepares a nonempty grant set through native tools, then proves a
+strict subset after the action and refuses a smuggled grant-adding argument
+without an effect. Output point names identify every narrowing tool. No tool
+is exempted from execution, policy, audit, schema or journey coverage.
+
+## Hand off native human proof
+
+A native authentication requirement stays independent of company approval.
+Declare `proof: 'native', proofKind: 'step_up'` on the runtime and surface tool.
+Supply `nativeProof: {handoff, verify}` to `createAgentDoor`. Both hooks receive
+`{kind, tool, principal}`; `verify` also receives the exact native `args` and an
+opaque `reference`. The seed verifies its own recent human proof and returns
+true only for the matching person, originating agent/client and action. Base
+never handles passwords, second factors, recovery codes or session credentials.
+
+Without a valid reference, the tool returns `native_proof_required` with `kind`
+and a same-origin `handoff` URL from the seed hook. Keep secrets out of that URL.
+The challenge has its own complete refused audit row and makes no native effect,
+including under autonomous company policy. The human opens the native handoff
+and completes the seed's authentication. The agent retries with the opaque
+reference in `params._meta["com.runeditrun/native-proof"]`; an embedded caller
+passes it as `door.invoke(name,args,principal,proofReference)`.
+
+The reference is retained with a pending approval and the seed verifier checks
+it again immediately before native execution. Expired or revoked proof refuses
+with the same challenge even if all business approvers have approved. A valid
+proof still passes scopes, classification, company policy and named approval.
+The native action receives the verified `{kind, reference}` as `ctx.nativeProof`.
+The seed must fence the proof and grant checks within its native transaction
+when concurrent revocation requires it. Native proof references must be opaque,
+non-secret handles of at most 512 characters, never bearer credentials.
+
+For disposable conformance, declare
+`verification: {proof: {module: 'tests/native-proof.mjs'}}` in the surface.
+That contained test module default-exports an async function receiving
+`{request, origin, agentId, tool, args, kind, handoff}` and returns a valid native
+proof reference using the seed's human lifecycle. The supplied `request(path,
+init)` uses the test person's native session and only the fresh installation's
+origin. It must never contact providers or read real credentials. As with owner
+initializers, this is trusted test tooling and never production authority.
+Direct harness callers can provide the same function as `prove`.
+
+Conformance challenges each proof tool, refuses a bogus reference with an
+unchanged native witness, checks those audits, and succeeds with the test hook's
+valid proof through autonomous and held policy. The ordinary autonomous-success
+requirement applies directly to tools without `proof`; proof tools require the
+native reference first.
 
 Return resource references for outcomes the user can inspect. Supply undo only
 when the native action has a real reversal; review and approval do not invent one.
@@ -129,7 +206,26 @@ edition with a different domain. Use `door.invoke` for embedded agents and
 
 Expose resources through explicit readers and treat imported or external
 content as untrusted. Every resource declares non-empty catalogue `classes`
-and `classify(record,ctx)`, based on the record itself. Resource reads pass through
+and `classify(record,ctx)`, based on the record itself. Resource readers and classifiers receive `{person, agent, clientId, scopes, db}`.
+Use this authenticated authority for service and client fences, including events
+and subscriptions; a sponsor's administrator role never bypasses a registered
+resource's reader. `ToolContext` carries the same scopes and client id.
+`door.invoke(name,args,{person,agent,scopes,clientId})` requires explicit scopes
+and never supplies registry scopes. Omit `clientId` only for a native agent with
+no separate client identity.
+
+If the seed has mutable client grants, declare `currentScopes(principal)` to
+read them from its native store. The door intersects this with the original
+credential scopes before calls and again at approval execution and subscription
+delivery. It cannot widen the token or saved approval. Removing the tool's scope
+before approval execution returns `insufficient_scope`, runs no native action,
+and retains the execution audit linked to its original decision. Seeds without
+client grants can omit the hook. Approval retries and idempotency digests retain
+the originating client id; approved-read retries recheck native resource access
+before returning retained content. Keep grant checks in the native transaction too
+when the seed needs a fence against concurrent grant edits.
+
+Resource reads pass through
 the same policy, approval, review and audit path as tools. A resource read must enforce the current person's native
 access. Mark device, screen, connector, import-door and installation operations
 as outside the tool registry when they require another supported door.
@@ -137,13 +233,14 @@ as outside the tool registry when they require another supported door.
 ## Durable invocation consent
 
 Persist the originating `ctx.consent` alongside the native sponsor id, agent
-attribution, tool, arguments and idempotency key when preparing scheduled or
+attribution, scopes, client id, tool, arguments and idempotency key when preparing scheduled or
 durable work. The trusted worker later calls the public door with that saved
 identity:
 
 ```ts
 const result = await door.invoke(job.tool, job.args, {
   person: { id: job.sponsorId }, agent: job.agent, consent: job.consent,
+  scopes: job.scopes, clientId: job.clientId,
 })
 ```
 
@@ -186,7 +283,7 @@ are separate from this installation journey and the edition's browser and UI par
 work. `rer verify` pairs its per-run ring through `RER_BUSINESS_TRUST`, posts a
 real signed settings document with the owner's Business `owner_id`, then mints
 journey tokens carrying that subject and `consent`. No setup-mode bypass exists. Retain explicit gaps for Business consent propagation, spend and byte budgets,
-long jobs, grant narrowing, outside mail, standalone policy forms and token
+long jobs, Business delivery of grant narrowing, outside mail, standalone policy forms and token
 issuance, self-host delivery and stranger-specialist completion. Platform adoption
 of the shared policy source is also separate from copying it into an edition.
 

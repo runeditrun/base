@@ -208,7 +208,7 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
     {id:'erase',tool:'synthetic.records.erase',args:{id:'synthetic-base-1'},expect:[{class:'destructive'}]},
     {id:'events',tool:'synthetic.events.list',args:{},expect:[{class:'standard'}]}]}
   const result=await runAgentDoorConformance({fetch:fresh.fetch,origin:fresh.c.origin,surface,signer:fresh.c.signer,person:fresh.c.person,now:()=>fresh.c.now,
-   invoke: async (name: string, args: Record<string, unknown>, who: any) => (await fresh.person('/__embedded',{name,args,agent:who.agent,consent:who.consent})).body })
+   invoke: async (name: string, args: Record<string, unknown>, who: any) => (await fresh.person('/__embedded',{name,args,agent:who.agent,consent:who.consent,scopes:who.scopes})).body })
   assert.deepEqual(result.points.filter((p:any)=>!p.ok),[])
  } finally { await fresh.close() }
 })

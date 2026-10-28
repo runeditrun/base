@@ -120,7 +120,7 @@ test('embedded calls retain and enforce originating consent with complete audit'
  const r = await runtime()
  try {
   await r.adopt()
-  const schedule = (value: string) => JSON.stringify({ consent: r.c.consent, args: args(value) })
+  const schedule = (value: string) => JSON.stringify({ consent: r.c.consent, scopes: ['records:write'], args: args(value) })
   const run = async (saved: string) => {
    const response = await r.post('/__embedded', JSON.parse(saved), { cookie: r.c.person.cookie })
    return response.json()
