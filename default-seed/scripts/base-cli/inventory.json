@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.85-dev.g72baef43",
+  "cliVersion": "0.2.85-dev.g8579cd03",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4691,7 +4691,7 @@
     },
     "scripts/publish-check/github_refs.py": {
       "source": "scripts/publish-check/github_refs.py",
-      "sha256": "e66205a21dd865c652e8f40c1729812bc7ceba6b88c295903d16b2a177c83ae3"
+      "sha256": "2cdf8b05242aacb508d8d0131063782eea85ab710b9dd510b7b052c2cdf2bab7"
     },
     "scripts/publish-check/gitleaks.py": {
       "source": "scripts/publish-check/gitleaks.py",

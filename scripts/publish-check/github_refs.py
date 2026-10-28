@@ -41,7 +41,7 @@ TYPED_REPOSITORY = re.compile(r'''(?im)(?<![\w$])(?:repository|repo|github|sourc
 DECLARED_SHORTHAND = re.compile(r'''(?im)(?<![\w$])["'`]?(?:url|fullURL)["'`]?\s*[:=]\s*["'`](''' + PAIR + r''')["'`]''')
 REPOSITORY_ROUTE = re.compile(r'/(?:tree|blob|issues|pull|pulls|commit|commits|releases|actions|wiki|discussions|compare|tags)(?:/|$)')
 SHORTHAND = PAIR + r'(?:[/?#][^\s`<>]*)?'
-REPOSITORY_CONTEXT = r'github|repositor(?:y|ies)|repos?|source|upstream|downstream|origin|submodules?|fork(?:s|ed)?(?:\s+(?:from|of|into))?|clone(?:s|d)?(?:\s+from)?|gh\s+repo\s+(?:clone|view|fork)'
+REPOSITORY_CONTEXT = r'github|repository|repo|source|upstream|downstream|fork(?:ed)?(?:\s+(?:from|of|into))?|clone(?:d)?(?:\s+from)?|gh\s+repo\s+(?:clone|view|fork)'
 MARKUP = r'[`*_~\[\]]*'
 MARKDOWN_REFERENCE = re.compile(r'`(?P<code>' + SHORTHAND + r')`|(?<![A-Za-z])(?P<label>(?i:' + REPOSITORY_CONTEXT + r'))(?:\s+(?:repository|repo))?' + MARKUP + r'(?P<separator>\s*[:=|]\s*|\s+)(?P<markup>' + MARKUP + r')\s*(?P<reference>' + SHORTHAND + r')(?![A-Za-z0-9_./-])')
 
@@ -51,12 +51,15 @@ CONTEXT_URL = re.compile(r'(?i)(?<![A-Za-z])(?:' + REPOSITORY_CONTEXT + r')'
                          + r'''[`*_~\[\]\s"']*(?:''' + URL.pattern.replace('(?i)', '') + ')')
 LINK_URL = re.compile(r'(?i)\[(?P<label>[^]\n]+)\]\(\s*(?P<url>' + URL.pattern.replace('(?i)', '') + ')')
 REPOSITORY_LABEL = re.compile(r'(?i)\b(?:' + REPOSITORY_CONTEXT + r')\b')
+CODE_PREFIX = re.compile(r'(?i)(?<![A-Za-z])(?:origin|submodules?|repositories|repos|forks|clones)' + MARKUP + r'[ \t]*(?:[:=][ \t]*)?$')
+CODE_SUFFIX = re.compile(r'(?i)[ \t]+(?:repositor(?:y|ies)|repos?)\b')
 
 
 def markdown_repository_context(match, text):
     """A declaration or command must attach to the token, not nearby prose."""
     if match['reference'] is None:
-        return False
+        prefix = text[text.rfind('\n', 0, match.start()) + 1:match.start()]
+        return bool(CODE_PREFIX.search(prefix) or CODE_SUFFIX.match(text, match.end()))
     separator = match['separator']
     if '\n' in text[match.start():match.start('reference')] and not re.search(r'[:=]', separator):
         return False
@@ -145,7 +148,7 @@ def reference_sets(text, path, local_paths=frozenset(), project_identity=None):
                 continue
             # A plain multi-segment path is ambiguous; GitHub's repository
             # routes, a labeled field or a GitHub command disambiguate it.
-            labeled = explicit and (re.search(r'[:=|]', match['separator']) or re.match(r'(?i)github|gh\s', match['label']))
+            labeled = explicit and match['reference'] is not None and (re.search(r'[:=|]', match['separator']) or re.match(r'(?i)github|gh\s', match['label']))
             if REPOSITORY_ROUTE.match(suffix) or labeled:
                 found.add(normalize(repository))
             elif not suffix:

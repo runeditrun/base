@@ -292,6 +292,7 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
             'equals.md': 'The repository = **{repo}** is maintained upstream.',
             'table.md': '| **Repository** | `{repo}` |',
             'inline.md': 'Use the repository `{repo}` for builds.',
+            'postfix.md': 'Use the `{repo}` repository for builds.',
             'declaration.md': 'Repository {repo}',
             'command.md': 'Clone {repo} first.',
             'quoted-command.md': 'Clone `{repo}` first.',
