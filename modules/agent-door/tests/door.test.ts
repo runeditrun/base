@@ -20,6 +20,14 @@ test('policy adoption closes the door until answered and preserves the last vali
   const listed = await r.mcp('tools/list'); assert.deepEqual(listed.result.tools, [])
   const refused = await r.tool('records.write', args()); assert.equal(code(refused), 'policy_unset'); assert.equal(decision(refused).disposition, 'unset'); assert.deepEqual(await rows(r), [])
   const setup = refused.result._meta['com.runeditrun/error'].setup_url; assert.equal(new URL(setup).origin, r.c.origin)
+  const correlation = async (expected: string, tool = 'records.write') => {
+   const key = crypto.randomUUID(), trace = '00-11111111111111111111111111111111-1111111111111111-01'
+   const reply = await r.mcp('tools/call', { name: `synthetic.${tool}`, arguments: { ...args(), idempotency_key: key, confirmExternal: true }, _meta: { traceparent: trace } })
+   assert.equal(code(reply), expected)
+   const records = (await r.person('/agents/api/audit')).body.rows.filter((row: any) => row.idempotency_key === key)
+   assert.equal(records.length, 1); assert.equal(records[0].trace, trace); assert.deepEqual(records[0].ignored_arguments, tool === 'records.write' ? ['confirmExternal'] : ['confirmExternal','value'])
+  }
+  await correlation('policy_unset')
   const adopted = await r.adopt(); assert.equal(adopted.status, 200)
   assert.deepEqual(Object.keys(adopted.body).sort(), ['adopted','door'])
   assert.deepEqual(adopted.body.adopted, { seq: r.c.seq, revision: r.c.revision })
@@ -33,11 +41,12 @@ test('policy adoption closes the door until answered and preserves the last vali
   assert.notEqual((await r.post('/api/rer/agent-policy', { policy: invalid.policy })).status, 200)
   const refreshed = await r.adopt(autonomousPolicy(), { seq: r.c.seq, revision: r.c.revision, iat: Math.floor(r.c.now/1000)+1 }); assert.equal(refreshed.status, 200)
   const partial = autonomousPolicy(); partial.rules = [{ id:'standard',class:'standard',do:'autonomous' }]
-  await r.adopt(partial); const names = (await r.mcp('tools/list')).result.tools.map((t: any) => t.name)
+  await r.adopt(partial); await correlation('policy_unset', 'records.erase'); const names = (await r.mcp('tools/list')).result.tools.map((t: any) => t.name)
   assert.ok(names.includes('synthetic.records.write')); assert.ok(!names.includes('synthetic.records.erase'))
   assert.equal(code(await r.tool('records.erase', { id:'synthetic-base-1',idempotency_key:crypto.randomUUID() })), 'policy_unset')
   await r.adopt(null); assert.equal(code(await r.tool('records.list', {})), 'policy_unset'); assert.deepEqual(await rows(r), [])
-  await r.adopt(); await r.setNow(r.c.now+301000); assert.equal(code(await r.tool('records.list', {})), 'policy_unavailable')
+  await r.adopt(autonomousPolicy(), { paused: true }); await correlation('agents_paused')
+  await r.adopt(); await r.setNow(r.c.now+301000); await correlation('policy_unavailable'); assert.equal(code(await r.tool('records.list', {})), 'policy_unavailable')
   await r.adopt(); assert.equal((await r.tool('records.list', {})).result.isError, false)
   await r.setNow(r.c.now + 86400000)
   await r.adopt({ ...autonomousPolicy(), rules: [{ id:'base',class:'standard',do:'blocked' }, { id:'daily',class:'standard',do:'autonomous',max_per_day:2 }] })
@@ -143,6 +152,24 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
   const vectors=JSON.parse(await readFile(new URL('../policy/vectors.json',import.meta.url),'utf8'))
   for(const vector of vectors) assert.deepEqual(decide({...vector,usageToday:(rule:any,cls:any)=>vector.usageToday[`${rule.id}:${cls}`]??0}),vector.expected,vector.name)
  } finally { await r.close() }
+ const admission = await runtime()
+ try {
+  await admission.adopt()
+  await admission.db.prepare("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('synthetic-base-admin','synthetic-base-admin@example.com','Synthetic Admin','admin','active',0)").run()
+  const token = await admission.token({ email: 'synthetic-base-admin@example.com' })
+  const call = (name: string, arguments_: any) => admission.tool(name, arguments_, { token })
+  assert.equal((await call('records.write',args())).result.isError, false)
+  assert.equal((await call('records.list',{})).result.isError, false)
+  assert.ok((await admission.mcp('resources/read',{uri:'synthetic://record/synthetic-base-1'},{token})).result.contents)
+  await admission.post('/__allowlist',{ emails: [admission.c.person.email] })
+  assert.equal((await call('records.list',{})).status,401)
+  assert.equal((await call('records.write',args('synthetic-base-excluded'))).status,401)
+  assert.equal((await admission.mcp('resources/read',{uri:'synthetic://record/synthetic-base-1'},{token})).status,401)
+  await admission.post('/__allowlist',{ emails: [admission.c.person.email,'synthetic-base-admin@example.com'] })
+  assert.equal((await call('records.list',{})).result.isError,false)
+  assert.equal((await call('records.write',args())).result.isError,false)
+  assert.ok((await admission.mcp('resources/read',{uri:'synthetic://record/synthetic-base-1'},{token})).result.contents)
+ } finally { await admission.close() }
  const rate=await runtime({limits:{requestsPerMinute:3}})
  try {
   const capacity=(await rate.mcp('server/discover')).result._meta['com.runeditrun/limits'].requestsPerMinute

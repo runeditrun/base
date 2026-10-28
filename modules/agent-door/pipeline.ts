@@ -21,6 +21,12 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
   try {
     const tool = rt.tools.find(tool => tool.name === name)
     if (!tool) { status = 400; return refuse('tool_not_found') }
+    const raw = input && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : null
+    const properties = tool.inputSchema.properties ?? {}
+    const declared = Object.fromEntries(Object.entries(raw ?? {}).filter(([key]) => Object.hasOwn(properties, key)))
+    row.ignored_arguments = Object.keys(raw ?? {}).filter(key => !Object.hasOwn(properties, key)).sort()
+    const key = !tool.readOnly && typeof raw?.idempotency_key === 'string' && raw.idempotency_key.length > 0 && raw.idempotency_key.length <= 200 ? raw.idempotency_key : null
+    row.idempotency_key = key
     if (!principal.scopes.includes(tool.scope)) { status = 403; scope = tool.scope; return refuse('insufficient_scope') }
     const state = await policyState(rt)
     row.revision = state.revision
@@ -30,12 +36,6 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       result.decision = { id: row.id, disposition, revision: state.revision, classes: [] }
       return refuse(refusal.code, refusal.fields)
     }
-    const raw = input && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : null
-    const properties = tool.inputSchema.properties ?? {}
-    const declared = Object.fromEntries(Object.entries(raw ?? {}).filter(([key]) => Object.hasOwn(properties, key)))
-    row.ignored_arguments = Object.keys(raw ?? {}).filter(key => !Object.hasOwn(properties, key)).sort()
-    const key = !tool.readOnly && typeof raw?.idempotency_key === 'string' && raw.idempotency_key.length > 0 && raw.idempotency_key.length <= 200 ? raw.idempotency_key : null
-    row.idempotency_key = key
     if (!tool.readOnly && !key) return refuse('idempotency_key_required')
     const requestDigest = await digest({ name, arguments: declared })
     if (key !== null) {
