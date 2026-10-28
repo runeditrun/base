@@ -4,6 +4,7 @@
 
 - Fix two starters both taking over a stale local operation lock by keeping its inode pinned through exclusive takeover and checking the owner token before release.
 - Bind shared local runtimes before reporting their port to the CLI, and fail early when an application listens on another port instead of waiting about 15 minutes. Bound application health readiness to 60 seconds.
+- Fix an import at the planner's accepted cap failing part-way with `IMPORT_D1_REQUEST_LIMIT`: count each D1 batch call as one paid-plan query, share creation admission with execution, keep existing erasure statement ceilings separate, and size plan read pages from their actual chunk bytes so the public door retains room for its own queries. The canonical plan byte cap stays unchanged.
 
 ## 0.2.84
 
