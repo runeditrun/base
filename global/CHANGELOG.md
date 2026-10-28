@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.85
 
 - Two starters could both take over a stale local operation lock and both act as its owner. Takeover is now exclusive: the lock's inode stays pinned through takeover, and release checks the owner token.
 - A local app listening on a different port than the CLI assigned left `rer dev`, `rer preview` and test runs waiting about 15 minutes. Shared local runtimes now bind before reporting their port, a mismatched listener fails within seconds, and application health readiness is bounded to 60 seconds.
@@ -27,6 +27,11 @@
 - Publication scans rejected OpenAI noreply co-author trailers in commit messages. That provider's exact `noreply` address is now accepted in the final trailer paragraph, as the Anthropic and GitHub ones are; personal addresses, body text, other trailer keys, other or lookalike domains, files and annotated tags still fail.
 - Refresh refused with "fetch full Base history" when a shallow Base checkout lacked the ancestry its migration comparison needs. Online refresh now fetches just the two immutable comparison tips, with no tags and a 60-second transport deadline, into a temporary bare repository and leaves the supplied checkout unchanged; failed or offline acquisition refuses before any write and names both revisions, the Base remote and an exact one-line repair command.
 - Seed Verify ran the push shards in full for both a branch push and its pull request, ran every push shard again on each nightly schedule, and installed system browser libraries before trying Chromium. The delivered workflow now plans each run: it reuses the newest full push proof of an identical tree (the pull request's head push, the same commit on another branch, or a direct parent with the same tree), runs light coverage (the edition lock check, `pnpm run check`, the reviewed readers and the site build) when a branch push changes only contract documents, `sources.lock.json` or evidence on top of a push-verified parent, and otherwise runs in full. Schedules run only the nightly shards, on Monday and Thursday at a time rendered from the seed name; release tags still run every shard; and Chromium's system libraries are installed only after a failed launch probe.
+
+### Known issues
+
+- The two refresh recovery guidance issues documented in 0.2.82 still apply, with the same manual recoveries.
+- The delivered Verify template's runner-temporary pnpm store, Chromium and apt cache lifecycle is not yet exercised end to end on a GitHub Ubuntu 24.04 runner; Base Verify covers only Base's own bootstrap.
 
 ## 0.2.84
 
