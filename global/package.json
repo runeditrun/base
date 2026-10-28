@@ -94,7 +94,9 @@
     "./modules/dependencies": "./modules/dependencies/index.mjs",
     "./internal/*": "./*",
     "./package.json": "./package.json",
-    "./modules/import-kit/door": "./modules/import-kit/src/door/index.ts"
+    "./modules/import-kit/door": "./modules/import-kit/src/door/index.ts",
+    "./modules/import-kit/receipt": "./modules/import-kit/src/receipt/index.ts",
+    "./modules/import-kit/status": "./modules/import-kit/src/status/index.ts"
   },
   "engines": {
     "node": ">=22"

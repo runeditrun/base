@@ -247,7 +247,7 @@ export async function doorCommand(args, env = process.env) {
  const [verb, ...rest] = args;
  if (!verb || ['--help', '-h', 'help'].includes(verb) || rest.includes('--help')) { process.stdout.write(doorHelp); return 0; }
  const verbs = { enable, disable, add, remove, status, start: (_, e) => start(e), stop: (_, e) => stop(e), restart: (_, e) => restart(e) };
- if (!verbs[verb]) { err(`Unknown rer door command: ${verb}. Run rer door --help.`); return 2; }
+ if (!Object.hasOwn(verbs, verb)) { err(`Unknown rer door command: ${verb}. Run rer door --help.`); return 2; }
  if (['start', 'stop', 'restart'].includes(verb) && rest.length) { err(`rer door ${verb} takes no arguments.`); return 2; }
  try { return await verbs[verb](rest, env); }
  catch (error) { if (error instanceof DoorFailure || error.exitCode) { err(error.message); return error.exitCode ?? 1; } throw error; }

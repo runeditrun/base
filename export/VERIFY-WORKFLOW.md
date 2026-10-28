@@ -108,6 +108,24 @@ not infer arbitrary dependencies or exempt unknown readers. The maintained
 runtime, auth, setup and installer tests have no direct semantic dependencies
 on the permitted documents. Contract consistency is checked explicitly.
 
+An edition declares additional reviewed readers in `verification.json`, beside
+`push` and `nightly`:
+
+```json
+"readers": {
+  "tests/product-contract.test.mjs": ["CONTRACT.md", "STATUS.md"]
+}
+```
+
+Each key is a test path (or the exact test glob used in a shard command); its
+value lists the repository-relative files that test reads semantically. An
+empty array declares that it reads none of the permitted light inputs. A
+declaration replaces the maintained entry for that same test, so editions that
+adapt a maintained test must also review its dependencies. When a listed file
+changes, light coverage runs that test through Node's test runner. Missing
+tests, malformed declarations and undeclared tests still select full coverage.
+The table does not expand the permitted light inputs or supported command forms.
+
 Light coverage performs the edition source-lock validation, `rer check`, all
 selected existing reader tests, generated contract-document consistency when a
 contract document changed, and `rer build --site`. Source-lock validation is
