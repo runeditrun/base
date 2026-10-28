@@ -18,14 +18,21 @@ export async function audienceAndArithmetic(runtime) {
   refused(await runtime.request(buyer, 'selection', { ...f.selection, price: { coefficient: '0', scale: 0 } }), ['invalid_input'], 'request supplied price');
   refused(await runtime.request(buyer, 'selection', { ...f.selection, actor: { personId: 'other-person' } }), ['invalid_input'], 'request supplied actor');
 
-  for (const example of f.profiles) {
+  for (const [index, example] of f.profiles.entries()) {
     const resolved = value(await runtime.request(buyer, 'selection', example.selection), `native ${example.profile} selection`);
     equal(resolved.total, example.total, `${example.profile}: total`);
     equal(resolved.lines[0].extension, example.extension, `${example.profile}: extension`);
     equal(resolved.lines[0].arithmetic.id, example.arithmeticId, `${example.profile}: stored arithmetic`);
     if ('baseQuantity' in example) equal(resolved.lines[0].baseQuantity, example.baseQuantity, `${example.profile}: exact converted quantity`);
     if (example.baseQuantityRatio) equal(resolved.lines[0].baseQuantityRatio, example.baseQuantityRatio, `${example.profile}: exact converted ratio`);
+    if (example.calculationBasis) equal(resolved.lines[0].calculationBasis, example.calculationBasis, 'native final calculation classification');
+    if (example.inputFingerprint) equal(resolved.lines[0].inputFingerprint, example.inputFingerprint, 'native final input evidence');
     commercialOnly(resolved, `${example.profile}: selection`);
+    const prepared = await reviewed(runtime, `profile-${index}`, example.selection);
+    const committed = value(await runtime.request(buyer, 'commit', commitInput(prepared, `profile-key-${index}`)), `${example.profile}: native outcome`);
+    const frozen = value(await runtime.request(buyer, 'snapshot', { id: committed.snapshotId }), `${example.profile}: frozen snapshot`);
+    equal(frozen.total, example.total, `${example.profile}: frozen total`);
+    equal(frozen.lines[0], resolved.lines[0], `${example.profile}: frozen line evidence`);
   }
 
   const review = await reviewed(runtime, 'copied-commercial-facts');

@@ -25,6 +25,7 @@ CREATE TABLE native_offers (
  price_coefficient TEXT, price_scale INTEGER NOT NULL, currency TEXT NOT NULL,
  currency_exponent INTEGER NOT NULL, profile TEXT NOT NULL, numerator TEXT NOT NULL,
  denominator TEXT NOT NULL, active INTEGER NOT NULL,
+ final_coefficient TEXT, final_scale INTEGER, input_fingerprint TEXT,
  PRIMARY KEY(installation,id)
 );
 CREATE TABLE native_command_controls (installation TEXT PRIMARY KEY, allowed INTEGER NOT NULL);

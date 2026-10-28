@@ -72,7 +72,8 @@ export function nativeOptions(db, session) {
           lines: lines.map((line, index) => {
             const row = rows[index];
             return { id: line.selection.id, price: { coefficient: row.price_coefficient, scale: row.price_scale },
-              conversion: { numerator: row.numerator, denominator: row.denominator }, arithmetic: ARITHMETIC[row.profile], calculation: { basis: 'exact' },
+              conversion: { numerator: row.numerator, denominator: row.denominator }, arithmetic: ARITHMETIC[row.profile],
+              calculation: row.final_coefficient === null ? { basis: 'exact' } : { basis: 'native-final', extension: { coefficient: row.final_coefficient, scale: row.final_scale }, inputFingerprint: row.input_fingerprint },
               breakdown: [
                 { kind: row.price_coefficient.startsWith('-') ? 'discount' : 'price', amount: { coefficient: row.price_coefficient, scale: row.price_scale }, source: line.offer.item, visibility: 'commercial' },
                 { kind: 'cost', amount: { coefficient: '1713', scale: 2 }, source: line.offer.item, visibility: 'cost' },

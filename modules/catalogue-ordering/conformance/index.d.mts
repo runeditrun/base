@@ -10,6 +10,8 @@ export interface ProfileExample {
   extension: Decimal;
   baseQuantity?: Decimal | null;
   baseQuantityRatio?: { numerator: string; denominator: string };
+  calculationBasis?: 'exact' | 'native-final';
+  inputFingerprint?: string;
 }
 export interface ConformanceFixture {
   /** Opaque test session selectors, never person IDs accepted as request authority. */
