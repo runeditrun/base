@@ -12,7 +12,7 @@ import { narrowPrincipal } from './principal.ts'
 export interface Effect { type: string; uri: string; data?: Record<string, unknown> }
 export function context(rt: Runtime, principal: Principal, door: ToolContext['door'], effects: Effect[], approvers: ToolContext['approvers'] = []): ToolContext {
   const actor = preparedBy(principal)
-  return Object.freeze({ db: rt.options.db, person: Object.freeze({ ...principal.person }), agent: Object.freeze({ ...principal.agent }),
+  return Object.freeze({ db: rt.options.db, person: Object.freeze({ ...principal.person }), agent: Object.freeze({ ...principal.agent, specialist: principal.agent.specialist ?? null }),
     consent: principal.consent, scopes: Object.freeze([...principal.scopes]), clientId: principal.clientId,
     operationId: principal.operationId!, idempotencyKey: principal.idempotencyKey ?? null,
     nativeProof: principal.nativeProof && Object.freeze({ ...principal.nativeProof }),

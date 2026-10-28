@@ -276,7 +276,9 @@ const result = await door.invoke('example.queue.execute', {
 
 `invoke` accepts `operationId` only at the trusted worker boundary; MCP arguments
 cannot supply it. The door checks it against the retained completed admission,
-including the exact sponsor, agent, consent, client, granted scope set and key.
+including the exact sponsor, agent (id, name and specialist), consent, client,
+granted scope set and key. The execution context restores recorded scope order
+and agent metadata from that admission.
 Missing, incomplete or mismatched admissions return `operation_mismatch` without
 running the tool. It does not reconstruct scopes from the registry. The door
 re-reads the current native person, current grants and signed policy. A removed

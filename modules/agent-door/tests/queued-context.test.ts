@@ -23,7 +23,7 @@ test('native queue retains admission identity through one effect and replay', as
   assert.equal(admission.consent, r.c.consent); assert.deepEqual(admission.scopes, ['records:read', 'records:write', 'events:read'])
   assert.equal(admission.agent.id, r.c.agentId); assert.ok(admission.person.id); assert.deepEqual(admission.approvers, [])
   assert.deepEqual(result(await r.tool('queue.prepare', input)), handle)
-  assert.equal((await drain(r, input.id)).outcome, 'done')
+  assert.equal((await drain(r, input.id, { scopes: [...admission.scopes].reverse() })).outcome, 'done')
   assert.deepEqual(await saved(r, 'test_effects', input.id), admission)
   assert.equal((await drain(r, input.id)).outcome, 'done')
   assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM test_effects').first()).n, 1)
@@ -74,7 +74,8 @@ test('tools cannot mutate admission identity or widen scopes; forged queue ident
   assert.equal(result(attacked)?.blocked, 9); assert.deepEqual(result(attacked)?.scopes, ['records:read'])
   assert.equal(errorCode(await r.tool('queue.prepare', job(), { token })), 'insufficient_scope')
   const input = job(); assert.ok(result(await r.tool('queue.prepare', input))?.operationId)
-  for (const override of [{ scopes: ['records:read', 'records:write', 'access:write'] }, { consent: crypto.randomUUID() }, { operationId: crypto.randomUUID() }, { person: { id: crypto.randomUUID() } }, { agent: { id: crypto.randomUUID(), name: 'Other' } }, { clientId: crypto.randomUUID() }]) {
+  const admission = await saved(r, 'test_jobs', input.id)
+  for (const override of [{ agent: { ...admission.agent, name: 'Changed' } }, { agent: { ...admission.agent, specialist: 'Changed' } }, { scopes: ['records:read', 'records:write', 'access:write'] }, { consent: crypto.randomUUID() }, { operationId: crypto.randomUUID() }, { person: { id: crypto.randomUUID() } }, { agent: { id: crypto.randomUUID(), name: 'Other' } }, { clientId: crypto.randomUUID() }]) {
    assert.equal((await drain(r, input.id, override)).outcome, 'refused')
   }
   assert.equal(await saved(r, 'test_effects', input.id), null)

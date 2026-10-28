@@ -34,7 +34,9 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     row.ignored_arguments = Object.keys(raw ?? {}).filter(key => !Object.hasOwn(properties, key)).sort()
     const key = !tool.readOnly && typeof raw?.idempotency_key === 'string' && raw.idempotency_key.length > 0 && raw.idempotency_key.length <= 200 && !raw.idempotency_key.includes('\0') ? raw.idempotency_key : null
     row.idempotency_key = key
-    const approvers = operationId === undefined ? [] : await resumeOperation(rt, operationId, principal, key)
+    const operation = operationId === undefined ? undefined : await resumeOperation(rt, operationId, principal, key)
+    const approvers = operation?.approvers ?? []
+    principal = operation?.principal ?? principal
     claimKey = key === null ? null : operationId === undefined ? key : operationKey(operationId, name, key)
     const current = await narrowPrincipal(rt, principal)
     if (operationId !== undefined && principal.scopes.some(scope => !current.scopes.includes(scope))) return refuse('insufficient_scope')
