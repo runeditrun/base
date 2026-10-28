@@ -98,9 +98,11 @@ export async function carryLive(state, self) {
  try {
   const carry = buildCarry(state, self);
   if (!carry) return;
+  const checkouts = [];
   for (const checkout of await liveCheckouts()) {
-   try { await writeCarry(checkout, carry); } catch (error) { warning(state.origin, error); }
+   try { await writeCarry(checkout, carry); checkouts.push(checkout); } catch (error) { warning(state.origin, error); }
   }
+  return { name: carry.name, checkouts };
  } catch (error) { warning(state.origin, error); }
 }
 

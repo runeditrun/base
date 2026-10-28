@@ -267,6 +267,13 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
         self.write('public.md', '\n'.join('https://github.com/' + repository for repository in public))
         for name in ('vault', 'absent', 'saml'):
             self.write(f'{name}.md', f'https://github.com/acme-org/{name}-app')
+        # A prior table cell mentioning a repository cannot turn a real local
+        # source path into a remote declaration. Scan the retained source tree
+        # after its local file disappears from the candidate head.
+        self.write('components/runtime', 'A local source file.\n')
+        self.write('context.md', '| Outcome | Source |\n| --- | --- |\n| Registered against a local Git repository | `components/runtime:59` |\n')
+        self.commit()
+        self.git('rm', '-q', 'components/runtime', 'context.md')
         self.commit()
         with tempfile.TemporaryDirectory() as network:
             gh, log = os.path.join(network, 'gh'), os.path.join(network, 'calls.jsonl')
