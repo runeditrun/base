@@ -42,6 +42,8 @@ test('per-surface sponsor fixtures cover real self widening while native record 
   const surface = sponsorSurface(teammate.id)
   const result = await runAgentDoorConformance({ fetch: r.fetch, origin: r.c.origin, surface, signer: r.c.signer, person: r.c.person, now: () => r.c.now })
   assert.deepEqual(result.points.filter((point: any) => !point.ok), [])
+  t.diagnostic(`Sponsor surface fixture: ${result.points.length}/${result.points.length} conformance points`)
+  r.c.business = (await r.person('/agents/api/state')).body.policy.business
   const narrowing = result.points.filter((point: any) => point.id.includes('.restrict-record') || point.id.includes('.demote-teammate'))
   assert.ok(narrowing.length > 0 && narrowing.every((point: any) => point.ok))
   const code = (answer: any) => answer.result?._meta?.['com.runeditrun/error']?.code

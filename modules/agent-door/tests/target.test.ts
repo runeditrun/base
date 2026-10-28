@@ -20,7 +20,7 @@ test('native target conformance binds audit and approval evidence; resource refu
   t.diagnostic(`Native target/resource fixture: ${result.points.length - failed.length}/${result.points.length} conformance points`)
   assert.deepEqual(failed, [])
   const policy = (await r.person('/agents/api/state')).body.policy
-  r.c.seq = policy.seq; r.c.revision = policy.revision
+  r.c.seq = policy.seq; r.c.revision = policy.revision; r.c.business = policy.business
 
   // An incorrect native identity must remain a conformance failure.
   const c: any = createProtocol({ ...r.c, surface, fetch: r.fetch, points: [] })
