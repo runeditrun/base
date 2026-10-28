@@ -1,5 +1,5 @@
 import type { D1Database } from '../d1/types.ts';
-import type { DoorRequest, ImportDoorRuntimeOptions } from './types.ts';
+import type { DoorRequest, ImportDoorRuntime, ImportDoorRawSource } from './types.ts';
 import { DoorError, GRANT_ONLY_ACTIONS, type DoorAction } from './protocol.ts';
 import { authorized, erasedSince } from './store.ts';
 import { sizeLimitError } from './limits.ts';
@@ -31,16 +31,22 @@ async function readInput(request: Request): Promise<Record<string,unknown>> {
   if (!value || typeof value!=='object' || Array.isArray(value)) throw new DoorError('invalid_input',400);
   return value;
 }
+type RuntimeConfiguration = {[K in keyof ImportDoorRuntime]?: ImportDoorRuntime[K]} & {
+  readRaw?: ImportDoorRawSource['readRaw'];
+};
+
 /** The settings every mount needs whatever its source: a preserving undo policy needs the adapter's preserved undo. */
-export function mountValid(options: Partial<ImportDoorRuntimeOptions>): boolean {
+export function mountValid(options: RuntimeConfiguration): boolean {
   return !!options.ownerPrincipalId?.trim() && !!options.destination?.trim() && [undefined,'strict','preserve-conflicts'].includes(options.reversalPolicy)
     && (options.reversalPolicy!=='preserve-conflicts' || typeof options.targets?.preparePreservedUndo==='function');
 }
 /** Refuses a mount, or a resolved source, missing what the pipeline needs. */
-export function runtimeOptions<T extends Partial<ImportDoorRuntimeOptions>>(options: T): T & ImportDoorRuntimeOptions {
-  if (!options.mapping?.version || typeof options.parse!=='function' || !mountValid(options)) throw new DoorError('invalid_configuration',503);
+export function runtimeOptions<T extends RuntimeConfiguration>(options: T): T & ImportDoorRuntime {
+  if (!options.mapping?.version || !mountValid(options)
+    || (options.format === 'raw' ? typeof options.readRaw !== 'function' || options.intake !== undefined
+      : typeof options.parse !== 'function')) throw new DoorError('invalid_configuration',503);
   if (options.intake !== undefined) intakeIdentity(options.intake);
-  return options as T & ImportDoorRuntimeOptions;
+  return options as T & ImportDoorRuntime;
 }
 /** Server-side mount only. A null response belongs to another dispatcher. Every
  * statement of one request, the door's own, the adapter's and each kit call's,

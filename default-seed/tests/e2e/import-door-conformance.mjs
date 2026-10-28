@@ -1,3 +1,4 @@
+export { rawDoorRecords, rawDoorZip, readRawDoorZip } from './import-door-raw-fixture.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 
