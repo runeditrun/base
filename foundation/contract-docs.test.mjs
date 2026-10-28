@@ -66,6 +66,7 @@ async function nonProductJourney() {
       [73, '"100% free and open source. MIT licensed."', '—', 'license/public-repository ownership'],
       [76, '"Try the demo" opens the hosted demo', '—', 'hosted-demo action'],
     ],
+    [[37, 'Limits: "No desktop or screen-scraping robots"', 'none needed: a boundary, true of the code', 'boundary']],
   ]
   for (const facts of sources) {
     const root = await installation('legacy')
