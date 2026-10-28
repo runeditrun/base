@@ -51,10 +51,35 @@ CONTEXT_URL = re.compile(r'(?i)(?<![A-Za-z])(?:' + REPOSITORY_CONTEXT + r')'
                          + r'''[`*_~\[\]\s"']*(?:''' + URL.pattern.replace('(?i)', '') + ')')
 LINK_URL = re.compile(r'(?i)\[(?P<label>[^]\n]+)\]\(\s*(?P<url>' + URL.pattern.replace('(?i)', '') + ')')
 REPOSITORY_LABEL = re.compile(r'(?i)\b(?:' + REPOSITORY_CONTEXT + r')\b')
-# Words that make a nearby `owner/name` a repository rather than an identifier.
-# A bare "source" is not one: "source commit/tree" is ordinary prose.
-NEARBY_CONTEXT = re.compile(r'(?i)\b(?:github|repositor(?:y|ies)|repos?|forks?|forked|clones?|cloned|upstream|downstream|origin|submodules?)\b')
-CONTEXT_WINDOW = 60
+CODE_PREFIX = re.compile(r'(?i)(?<![A-Za-z])(?:origin|submodules?|repositories|repos|forks|clones)' + MARKUP + r'[ \t]*(?:[:=][ \t]*)?$')
+CODE_SUFFIX = re.compile(r'(?i)[ \t]+(?:repositor(?:y|ies)|repos?)\b')
+
+
+def markdown_repository_context(match, text):
+    """A declaration or command must attach to the token, not nearby prose."""
+    if match['reference'] is None:
+        prefix = text[text.rfind('\n', 0, match.start()) + 1:match.start()]
+        return bool(CODE_PREFIX.search(prefix) or CODE_SUFFIX.match(text, match.end()))
+    separator = match['separator']
+    if '\n' in text[match.start():match.start('reference')] and not re.search(r'[:=]', separator):
+        return False
+    prefix = text[text.rfind('\n', 0, match.start()) + 1:match.start()]
+    if '|' in separator:
+        # A table label occupies a whole cell. The last word of an outcome
+        # such as "registered against a repository" cannot label the next cell.
+        return not prefix.rsplit('|', 1)[-1].strip(' \t`*_~[]')
+    if re.search(r'[:=]', separator):
+        return True
+    # A bare "source" is not a declaration: "source commit/tree" is prose.
+    if re.fullmatch(r'(?i)source', match['label']) and not re.search(
+            r'(?i)repository|repo', text[match.start():match.start('reference')]):
+        return False
+    command = re.match(r'(?i)github|gh\s|clone|fork', match['label'])
+    end = text.find('\n', match.end())
+    tail = text[match.end():end if end != -1 else len(text)]
+    declaration = (re.fullmatch(r'[ \t#>*_~`\[\]-]*(?:[0-9]+\.[ \t]+)?', prefix) and
+                   re.fullmatch(r'[ \t\r`*_~\[\].,;:!)]*', tail))
+    return bool(match['markup'] or command or declaration)
 
 
 def explicit_references(text, path):
@@ -109,7 +134,7 @@ def reference_sets(text, path, local_paths=frozenset(), project_identity=None):
         markdown = URL.sub('', text)
         markdown = re.sub(r'\]\((?![A-Za-z][A-Za-z0-9+.-]*://)[^)]*\)', ']()', markdown)
         for match in MARKDOWN_REFERENCE.finditer(markdown):
-            explicit = match['reference'] is not None
+            explicit = markdown_repository_context(match, markdown)
             value = re.split(r'[?#]', match['reference'] or match['code'], maxsplit=1)[0]
             # Underscores are also legal slug characters; remove a closing
             # emphasis marker only when the reference has its matching opener.
@@ -123,17 +148,11 @@ def reference_sets(text, path, local_paths=frozenset(), project_identity=None):
                 continue
             # A plain multi-segment path is ambiguous; GitHub's repository
             # routes, a labeled field or a GitHub command disambiguate it.
-            labeled = explicit and (re.search(r'[:=|]', match['separator']) or re.match(r'(?i)github|gh\s', match['label']))
+            labeled = explicit and match['reference'] is not None and (re.search(r'[:=|]', match['separator']) or re.match(r'(?i)github|gh\s', match['label']))
             if REPOSITORY_ROUTE.match(suffix) or labeled:
                 found.add(normalize(repository))
             elif not suffix:
-                if explicit:
-                    weak = re.fullmatch(r'(?i)source', match['label']) and not re.search(r'(?i)repository|repo', markdown[match.start():match.start('reference')])
-                else:
-                    line_start = markdown.rfind('\n', 0, match.start()) + 1
-                    around = markdown[max(line_start, match.start() - CONTEXT_WINDOW):match.end() + CONTEXT_WINDOW].split('\n', 1)[0]
-                    weak = not NEARBY_CONTEXT.search(around)
-                (ambiguous if weak else found).add(normalize(repository))
+                (found if explicit else ambiguous).add(normalize(repository))
     elif METADATA.search(path) or SOURCE.search(path):
         if path.lower().endswith('.json'):
             try:

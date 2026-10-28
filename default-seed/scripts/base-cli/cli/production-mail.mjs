@@ -11,11 +11,16 @@ const present = value => typeof value === 'string' && Boolean(value.trim());
 // The sender forms the mail runtime sends from: a bare address or "Display Name <address>".
 const sender = value => { try { parseAddress(value); return true; } catch { return false; } };
 const SENDER = "MAIL_FROM (a real sender on your provider's verified domain; bare address or Display Name <address>)";
+const fixtureSender = value => {
+ if (!sender(value)) return false;
+ const domain = parseAddress(value).email.toLowerCase().split('@')[1];
+ return /(?:^|\.)(?:invalid|example|test|localhost)$/.test(domain)
+  || /(?:^|\.)example\.(?:com|net|org)$/.test(domain);
+};
 const placeholderSender = value => {
  if (!sender(value)) return false;
  const { email } = parseAddress(value), [local, domain] = email.toLowerCase().split('@');
- return /(?:^|\.)(?:invalid|example|test|localhost)$/.test(domain)
-  || /(?:^|\.)example\.(?:com|net|org)$/.test(domain)
+ return fixtureSender(value)
   || /^(?:your-?domain|your-?business|fake|placeholder|changeme)\./.test(domain)
   || /^(?:fake|placeholder|change-?me|replace-?me|your-?email|your-?name|you)(?:[+._-]|$)/.test(local);
 };
@@ -99,6 +104,7 @@ export async function productionMail(root, declaration, env, declarationPath = '
  return {
   declared: 'MAIL_PROVIDER' in bindings || publicInputs.has('MAIL_PROVIDER') || secrets.has('MAIL_API_KEY') || selected.length > 0,
   senderIssue,
+  fixtureSender: fixtureSender(bindings.MAIL_FROM),
   configured: (live = []) => routes.some(missing => missing(live).length === 0),
   canInspect: sender(bindings.MAIL_FROM) && !senderIssue && routes.length > 0,
   missing: routes.length ? routes.map(missing => missing([]).join(', ')).join(' or ') : [
