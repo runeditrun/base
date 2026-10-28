@@ -1,6 +1,6 @@
 {
   "name": "@runeditrun/rer",
-  "version": "0.2.85",
+  "version": "0.2.86",
   "description": "The rer command: install, set up, run and launch Run Edit Run checkouts.",
   "license": "MIT",
   "type": "module",
@@ -94,7 +94,9 @@
     "./modules/dependencies": "./modules/dependencies/index.mjs",
     "./internal/*": "./*",
     "./package.json": "./package.json",
-    "./modules/import-kit/door": "./modules/import-kit/src/door/index.ts"
+    "./modules/import-kit/door": "./modules/import-kit/src/door/index.ts",
+    "./modules/import-kit/receipt": "./modules/import-kit/src/receipt/index.ts",
+    "./modules/import-kit/status": "./modules/import-kit/src/status/index.ts"
   },
   "engines": {
     "node": ">=22"

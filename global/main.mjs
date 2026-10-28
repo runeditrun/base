@@ -71,7 +71,7 @@ export async function main(argv) {
  if (!verb || verb === '--help' || verb === '-h' || verb === 'help') { process.stdout.write(help); return 0; }
  if (verb === 'cli') return (await import('./cli/command.mjs')).cliCommand(argv.slice(1));
  if (verb === 'list') return (await import('./list.mjs')).listCommand(argv.slice(1));
- if (verb === 'door') return (await import('./door/command.mjs')).doorCommand(argv.slice(1));
+ if (verb === 'door' && argv[1] !== 'clauses') return (await import('./door/command.mjs')).doorCommand(argv.slice(1));
  if (verb === 'run') return (await import('./run.mjs')).runScript(argv.slice(1));
  if (repositoryCommands[verb] && argv.includes('--help')) {
   const { help } = await import('../cli/parse.mjs');

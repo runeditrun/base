@@ -9,6 +9,60 @@ from test_source_metadata import public_scan
 
 
 class CopyDigestTests(RepositoryFixture, unittest.TestCase):
+    def test_mixed_directory_copy_proves_each_file_through_public_cli(self):
+        files = {'vendor/base/runtime.mjs': b'export const enabled = true;\n',
+                 'vendor/base/api-key.mjs': b'export const first = true;\n',
+                 'vendor/base/token.mjs': b'export const second = true;\n'}
+        for name, data in files.items():
+            self.write(name, data)
+        adapted = next(iter(files))
+        local = b'export const enabled = false;\n'
+        self.write(adapted, local)
+        revision = secrets.token_hex(20)
+        copy = dict(path='vendor/base', originPath='runtime', revision=revision,
+                    files={name: hashlib.sha256(data).hexdigest() for name, data in files.items()},
+                    modes={name: '100644' for name in files}, adapted={adapted: revision},
+                    acknowledged={adapted: dict(sha256=hashlib.sha256(local).hexdigest(), mode='100644')})
+        record = dict(schemaVersion=1, copies=[copy])
+        inventory = 'base-copies.json'
+
+        def save():
+            self.write(inventory, json.dumps(record, indent=2))
+
+        def fails(path):
+            report = public_scan(self)
+            self.assertEqual(report['status'], 'FAIL')
+            self.assertTrue(any(f['path'] == path and f['rule'] == 'secret.assignment'
+                                and 'working-tree' in f['scopes'] for f in report['findings']))
+
+        save()
+        self.commit()
+        self.assertEqual(public_scan(self)['status'], 'PASS')
+        # An adapted entry must neither discard earlier proofs nor prevent later ones.
+        copy['files'] = dict(reversed(list(copy['files'].items())))
+        save()
+        self.assertEqual(public_scan(self)['status'], 'PASS')
+        name = 'vendor/base/api-key.mjs'
+        self.write(name, files[name].replace(b'true', b'True', 1))
+        fails(inventory)
+        self.write(name, files[name])
+        digest = copy['files'][name]
+        copy['files'][name] = secrets.token_hex(32)
+        save()
+        fails(inventory)
+        copy['files'][name] = digest
+        save()
+        # Unlisted content and acknowledged adaptations still receive a full scan.
+        extra = 'vendor/base/unlisted.mjs'
+        credential = "const apiKey = '" + generic_credential() + "';\n"
+        self.write(extra, credential)
+        fails(extra)
+        (self.repo / extra).unlink()
+        self.write(adapted, credential)
+        copy['acknowledged'][adapted]['sha256'] = hashlib.sha256(credential.encode()).hexdigest()
+        save()
+        fails(adapted)
+
     def test_multibyte_json_offsets_preserve_only_exact_identity_matches(self):
         files = {'vendor/base/api-key-one.mjs': b'export const first = true;\n',
                  'vendor/base/api-key-two.mjs': b'export const second = true;\n'}

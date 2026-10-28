@@ -1,3 +1,4 @@
+import { productionSender } from './fixtures/production-sender.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile, readFile, rm, access } from 'node:fs/promises';
@@ -11,8 +12,8 @@ import { terminalDeploy } from './fixtures/deploy-terminal.mjs';
 // Real setup/dispatcher/deploy lifecycle; only the local and hosted HTTP edge
 // and Cloudflare are faked, using the existing owner-account fixture.
 test('setup and deploy carry the declared owner name, and unattended deploy refuses an unknown name before upload', async t => {
- for (const custom of [false, true]) for (const nameField of ['displayName', 'FIRST_OWNER_NAME', undefined]) {
-  await t.test(`${custom ? 'custom' : 'standard'} deploy / ${nameField ?? 'nameless'}`, async t => {
+ for (const custom of [false, true, 'preflight']) for (const nameField of ['displayName', 'FIRST_OWNER_NAME', undefined]) {
+  await t.test(`${custom === 'preflight' ? 'owner preflight' : custom ? 'custom' : 'standard'} deploy / ${nameField ?? 'nameless'}`, async t => {
    const { root, git } = await checkout(t, { secrets: ['OWNER_EMAIL', 'SESSION_SECRET', 'SETUP_TOKEN'].map(name => ({ binding: name, environment: name })) });
    const { provider, claimBodies } = account(t), localClaims = [];
    const savedEnv = { ...process.env };
@@ -35,41 +36,61 @@ test('setup and deploy carry the declared owner name, and unattended deploy refu
    await writeFile(join(root, 'adapter.mjs'), `import { localInstaller } from ${source('../onboarding/adapter.mjs')};
 import { commandAdapter as declareAdapter } from ${source('./adapter.mjs')};
 import { ownerDeploy } from ${source('./deploy.mjs')};
+import { missing } from ${source('./errors.mjs')};
+import { deployEnvironment } from ${source('./deploy-inputs.mjs')};
 import { main as owner } from ${source('../modules/deploy-kit/owner-cli.mjs')};
 const lifecycle = localInstaller({secrets:{file:'.dev.vars',keepExisting:true},owner:{displayName:input=>input[${JSON.stringify(name)}]?.trim()||'Owner'}});
-export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer-setup.json'},ownerBootstrap:${nameField === 'displayName'},input:{names:{name:${JSON.stringify(name)}}},deployDeclaration:'deploy.json',deploy:${custom ? "async ({root,options})=>({...await owner([options.dryRun?'dry-run':'deploy','--declaration','deploy.json','--environment',options.environment??'production'],process.env,{cwd:root}),deployed:!options.dryRun})" : "ownerDeploy('deploy.json',lifecycle)"}});`);
+export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer-setup.json'},ownerBootstrap:${nameField === 'displayName'},input:{names:{name:${JSON.stringify(name)}}},deployDeclaration:'deploy.json',deploy:${custom === 'preflight' ? `Object.assign(async context => {
+ const declaration = JSON.parse(await (await import('node:fs/promises')).readFile(context.root + '/deploy.json', 'utf8'));
+ const {env} = await deployEnvironment({...context, declaration, settings:lifecycle.settings});
+ if (!context.options.remove && /@(?:[^@]+\\.)?(?:test|invalid|localhost|example)$/i.test(env.OWNER_EMAIL ?? '')) throw missing('Deploy needs a real OWNER_EMAIL that can receive sign-in mail. Nothing was deployed.');
+ return ownerDeploy('deploy.json',lifecycle)(context);
+},{managesHostedOwner:true,declaration:'deploy.json'})` : custom ? "async ({root,options})=>({...await owner([options.dryRun?'dry-run':'deploy','--declaration','deploy.json','--environment',options.environment??'production'],process.env,{cwd:root}),deployed:!options.dryRun})" : "ownerDeploy('deploy.json',lifecycle)"}});`);
    await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'tests/fixture', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['setup', 'deploy'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs', 'deploy.json'], effects: `${verb} the installation.` }])) }));
    await writeFile(join(root, '.node-version'), process.versions.node + '\n');
    await writeFile(join(root, 'package.json'), JSON.stringify({ engines: { node: process.versions.node }, packageManager: 'pnpm@10.12.4' }));
    await writeFile(join(root, '.gitignore'), 'dist/\n.rer/\n.seed/\n.dev.vars\n');
-   await writeFile(join(root, '.dev.vars'), 'OWNER_EMAIL=owner@example.test\nSESSION_SECRET=local-only-session\nSETUP_TOKEN=test-only-local-token\n', { mode: 0o600 });
+   await writeFile(join(root, '.dev.vars'), `OWNER_EMAIL=${custom === 'preflight' ? productionSender : 'owner@example.test'}\nSESSION_SECRET=local-only-session\nSETUP_TOKEN=test-only-local-token\n`, { mode: 0o600 });
    git('add', '.'); git('commit', '-qm', 'owner name installation');
    const run = async (verb, ...flags) => {
     const output = [];
     const capture = t.mock.method(process.stdout, 'write', chunk => { output.push(String(chunk)); return true; });
     const code = await cli([verb, '--cwd', root, '--json', '--non-interactive', ...flags]).finally(() => capture.mock.restore());
     const events = output.join('').trim().split('\n').filter(Boolean).map(JSON.parse);
-    return { code, error: events.find(event => event.event === 'error')?.message };
+    return { code, error: events.find(event => event.event === 'error')?.message, result: events.at(-1) };
    };
    const answersPath = join(root, '.seed/installer/setup-answers.json');
    if (nameField) {
     const writes = provider.state.writes.length, calls = provider.state.calls.length;
+    if (custom === 'preflight') {
+     process.env.OWNER_EMAIL = 'owner@synthetic-base-1.test';
+     try {
+      const refused = await run('deploy'), dry = await run('deploy', '--dry-run');
+      assert.equal(refused.code, 3, refused.error);
+      assert.match(refused.error, /real OWNER_EMAIL/);
+      assert.doesNotMatch(refused.error, /--owner-name/);
+      assert.equal(dry.code, 0, dry.error);
+      assert.ok(dry.result.plan);
+      t.diagnostic(`Placeholder owner email before missing name: exit ${refused.code}; ${refused.error} Dry run: exit ${dry.code}; plan ${dry.result.plan.worker}`);
+     } finally { delete process.env.OWNER_EMAIL; }
+    }
     const real = await run('deploy'), dry = await run('deploy', '--dry-run');
     assert.equal(real.code, 3, real.error);
-    assert.equal(dry.code, 3, dry.error ?? 'a nameless dry run must refuse');
-    assert.match(dry.error, /--owner-name/);
-    assert.equal(dry.error, real.error, 'dry run and deploy give the same advice');
+    assert.equal(dry.code, 0, dry.error);
+    assert.ok(dry.result.plan);
+    assert.match(real.error, /--owner-name/);
+    t.diagnostic(`Missing owner name: dry run exit ${dry.code}; real deploy exit ${real.code}; ${real.error}`);
     assert.equal(provider.state.calls.length, calls, 'owner input resolves before the network edge');
     assert.equal(provider.state.writes.length, writes, 'nothing was uploaded');
     const token = process.env.CLOUDFLARE_API_TOKEN;
     delete process.env.CLOUDFLARE_API_TOKEN;
     try {
      const unnamed = await run('deploy', '--dry-run');
-     assert.equal(unnamed.code, 3);
-     assert.match(unnamed.error, /--owner-name/);
+     assert.equal(unnamed.code, 0, unnamed.error);
+     assert.ok(unnamed.result.plan);
      const credentialFree = await run('deploy', '--dry-run', '--owner-name', 'Alex Morgan');
      assert.equal(credentialFree.code, 0, credentialFree.error);
-     assert.equal(provider.state.calls.length, calls, 'credential-free refusals never reach the provider');
+     assert.equal(provider.state.calls.length, calls, 'credential-free plans never reach the provider');
     } finally { process.env.CLOUDFLARE_API_TOKEN = token; }
     const named = await run('deploy', '--dry-run', '--owner-name', 'Alex Morgan');
     assert.equal(named.code, 0, named.error);
@@ -88,6 +109,7 @@ export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer
    if (!nameField) {
     result = await run('deploy', '--owner-name', 'Maya Chen');
     assert.equal(result.code, 2, 'a nameless installer still rejects the name flag');
+    assert.equal((await run('deploy', '--dry-run', '--owner-name', 'Maya Chen')).code, 2);
     return;
    }
    const statePath = join(root, '.rer/deploy/production.json');
@@ -113,6 +135,7 @@ export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer
    assert.equal(claimBodies.length, claims);
    for (const invalid of ['\u0001', 'A'.repeat(201)]) {
     assert.equal((await run('deploy', '--owner-name', invalid)).code, 2);
+    assert.equal((await run('deploy', '--dry-run', '--owner-name', invalid)).code, 2);
     assert.equal(provider.state.writes.length, writes);
    }
    result = await run('deploy', '--owner-name', ' Alex Morgan ');
