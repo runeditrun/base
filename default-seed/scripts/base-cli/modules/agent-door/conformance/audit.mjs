@@ -21,6 +21,7 @@ export async function auditPhase(c) {
   const row = rows[index], decision = call.decision;
   c.add(`BASE-AGENT-009.1.call.${index}`, Boolean(row) && row.tool === call.name && row.agent?.id === c.agentId && row.agent?.specialist === c.surface.specialist && row.sponsor?.id === c.sponsor.id && typeof row.label === 'string' && row.label.includes(' for ') && Number.isFinite(Date.parse(row.at)) && row.door === 'mcp', `${call.name} lacks its complete ordered audit row.`);
   if (!row) continue;
+  if (call.code === 'native_proof_required') c.add(`BASE-AGENT-004.native-proof.audit.${index}`, row.outcome === 'refused' && row.code === call.code, `${call.name} native proof challenge must retain its refused audit outcome.`);
   c.add(`BASE-AGENT-009.1.resource.${index}`, row.resource === (call.kind === 'resources/read' ? call.args.uri : null), `${call.name} audit resource must identify exactly the requested URI, or be null for a tool.`);
   c.add(`BASE-AGENT-009.2.link.${index}`, call.kind === 'approval/execute' ? row.id !== decision?.id && row.decision_id === decision?.id : row.decision_id === null, `${call.name} must ${call.kind === 'approval/execute' ? 'link its own execution row to the pending decision' : 'have its own call row without an approval execution link'}.`);
   const validClasses = Array.isArray(row.classes) && new Set(classIds(row.classes)).size === row.classes.length && row.classes.every(item => AGENT_CLASSES.includes(item.class) && item.facts && typeof item.facts === 'object');

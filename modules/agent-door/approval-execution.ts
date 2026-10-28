@@ -23,6 +23,7 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
     const principal = await livePrincipal(rt, saved.principal), state = await policyState(rt), tool = savedTool(rt, saved.tool, saved.args)
     const refusal = policyRefusal(rt, state, tool?.classes)
     if (!principal || !tool) result = { ...result, outcome: 'refused', code: 'sponsor_unavailable' }
+    else if (tool.scope && !principal.scopes.includes(tool.scope)) result = { ...result, outcome: 'refused', code: 'insufficient_scope' }
     else if (refusal) result = { ...result, outcome: 'refused', ...refusal }
     else if (state.revision !== saved.revision) result = { ...result, outcome: 'refused', code: 'approval_evidence_changed' }
     else {
@@ -33,7 +34,8 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
       }
       const ctx = context(rt, principal, saved.door, [], approvers)
       const authority = await tool.authority?.(saved.args, ctx)
-      if (selfEscalation(authority, principal)) result = { ...result, outcome: 'refused', code: 'self_escalation' }
+      if (tool.widens === false && authority?.widens) result = { ...result, outcome: 'refused', code: 'narrowing_contract_violation' }
+      else if (selfEscalation(authority, principal)) result = { ...result, outcome: 'refused', code: 'self_escalation' }
       else if (tool.revision && saved.expected_revision !== undefined && await tool.revision(saved.args, ctx) !== saved.expected_revision) result = { ...result, outcome: 'refused', code: 'approval_evidence_changed' }
       else {
         const classes = await classify(tool, saved.args, ctx)
