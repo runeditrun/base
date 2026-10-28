@@ -7,23 +7,20 @@ export async function referenceShardPlan() {
   const plan = await verificationPlan();
   const push = plan.push.map(({ name }) => name);
   const groups = {
-    '1': push.filter(name => name === 'journey-erasure'),
-    '2': push.filter(name => name !== 'journey-erasure'),
+    push,
     nightly: plan.nightly.map(({ name }) => name),
   };
-  assert.equal(groups['1'].length, 1, 'Reference verification needs the journey-erasure shard');
-  assert.ok(groups['2'].length, 'Reference verification needs the remaining push shards');
-  assert.ok(groups.nightly.length, 'Reference verification needs nightly journeys');
-  assert.deepEqual([...groups['1'], ...groups['2']].sort(), [...push].sort(), 'Reference CI must cover every push shard exactly once');
+  assert.ok(groups.push.length, 'Reference verification needs push shards');
+  assert.equal(new Set(groups.push).size, push.length, 'Reference CI must cover every push shard exactly once');
   return groups;
 }
 
 export async function verifyReferenceShard(shard) {
-  assert.ok(['1', '2', 'nightly'].includes(shard), 'REFERENCE_SHARD must be 1, 2 or nightly');
+  assert.ok(['push', 'nightly'].includes(shard), 'REFERENCE_SHARD must be push or nightly');
   const names = (await referenceShardPlan())[shard];
   const cwd = fileURLToPath(new URL('../../default-seed/', import.meta.url));
   const queue = fileURLToPath(new URL('../../onboarding/queued-entry.mjs', import.meta.url));
-  const label = shard === 'nightly' ? 'nightly' : `${shard}/2`;
+  const label = shard;
   const started = performance.now();
   let child, signal, code = 0;
   const cancel = value => { signal ??= value; child?.kill(value); };

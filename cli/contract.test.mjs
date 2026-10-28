@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, cp, readFile, writeFile, rm, stat } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { mkdtemp, mkdir, cp, readFile, writeFile, rm, stat, symlink, readdir } from 'node:fs/promises';
+import { dirname, join, resolve, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
+import { testSource } from '../composition/git-source.mjs';
 import { exportCLI } from './export.mjs';
 import { verbs, aliases, pins } from './contract.mjs';
 const base = resolve(import.meta.dirname, '..');
@@ -12,7 +13,7 @@ const common = [...Object.keys(verbs), 'release'];
 // A first-party seed with every declaration check reads and no runnable app.
 async function structuralSeed(t) {
  const root = await mkdtemp(join(tmpdir(), 'rer-structural-')); t.after(() => rm(root, { recursive: true, force: true }));
- await exportCLI(base, root); await cp(join(base, 'onboarding'), join(root, 'scripts/base-onboarding'), { recursive: true });
+ await exportCLI(base, root); await cp(join(base, 'onboarding'), join(root, 'scripts/base-onboarding'), { recursive: true, filter: path => !testSource(relative(join(base, 'onboarding'), path)) });
  await writeFile(join(root, '.node-version'), pins.node + '\n');
  const pkg = { engines: { node: pins.node }, packageManager: `pnpm@${pins.pnpm}`, scripts: Object.fromEntries(Object.entries(aliases).map(([alias, verb]) => [alias, `node scripts/rer.mjs${verb ? ' ' + verb : ''}`])) };
  const descriptor = { version: 2, project: 'example/seed', requiredEnvironment: [], runtime: { requirements: [] }, seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(common.map(verb => [verb, { argv: ['node', 'scripts/rer.mjs', verb], inputs: ['scripts/rer.mjs'], effects: 'Structural fixture target; this check must never execute it.' }])) };
@@ -97,4 +98,89 @@ test("check validates a seed's CONTRACT.md Status table and names the line of ea
  assert.equal(unproven.status, 1);
  assert.deepEqual(unproven.failed.map(([id, line]) => [id, Number(line)]), [['CONTRACT.evidence.PAGE-001', row('PAGE-001')]]);
  assert.match(unproven.failed[0][2], /tests\/pages\.test\.mjs/);
+});
+
+
+test('public check enforces registration budgets without executing tests or creating state', async t => {
+ const { root, check } = await structuralSeed(t);
+ const save = (path, text) => writeFile(join(root, path), text);
+ const declare = cap => save('test-budget.json', JSON.stringify({ version: 1, cap, platforms: ['linux', 'darwin', 'win32'] }));
+ await declare(200);
+ const missingParser = check();
+ assert.equal(missingParser.status, 1);
+ assert.match(missingParser.report.testBudget.message, /installed typescript/);
+ await mkdir(join(root, 'node_modules'));
+ await symlink(join(base, 'default-seed/node_modules/typescript'), join(root, 'node_modules/typescript'));
+ await mkdir(join(root, 'tests'));
+ await save('tests/wrappers.mjs', `import {test as register} from 'node:test';
+ export function contract(...args) { register(...args); }
+ export function importedSuite({test: registerBehavior}) { for (const value of [1, 2]) registerBehavior(String(value), () => {}); }
+ `);
+ await save('tests/barrel.mjs', `export * from './wrappers.mjs';`);
+ await save('tests/edition-owned.ts', `import {test as spec, it, describe} from 'node:test';
+ import {contract, importedSuite} from './barrel.mjs';
+ import os from 'node:os';
+ import {importedSuite as sameSuite} from './wrappers.mjs';
+ import {writeFileSync} from 'node:fs';
+ writeFileSync('synthetic-base-1', 'must never execute');
+ const alias = spec;
+ for (let index = 0; index < 2; index++) alias(String(index), () => { throw Error('must never execute'); });
+ spec.each([1, 2, 3].map(value => [value]))('generated', value => {});
+ spec('one behavior with a table', () => { for (const value of [1, 2, 3]) throw Error(String(value)); });
+ spec.skip('skipped still counts', () => {});
+ spec('nested CLI cases', async t => { for (const value of [1, 2]) await t.test(String(value), () => {}); });
+ it('alias', () => {});
+ for (const name of ['synthetic-base-2', 'synthetic-base-3']) contract(name, async t => { await t.test('forwarded callback', () => {}); });
+ importedSuite({test: spec});
+ describe('suite is not a behavior', () => { if (os.platform() === 'linux') spec('linux', () => {}); else for (const value of [1, 2]) spec(String(value), () => {}); });
+ `);
+ await save('tests/assert-script.mjs', `import assert from 'node:assert/strict'; assert.ok(false); throw Error('must never execute');`);
+ await save('tests/assert-wrapper.mjs', `import './assert-script.mjs';`);
+ const packagePath = join(root, 'package.json'), pkg = JSON.parse(await readFile(packagePath, 'utf8'));
+ pkg.scripts['test:assert'] = 'node tests/assert-wrapper.mjs && node tests/assert-script.mjs';
+ await writeFile(packagePath, JSON.stringify(pkg));
+ await save('verification.json', JSON.stringify({ push: [{ commands: ['pnpm run test:assert', 'node tests/assert-script.mjs'] }] }));
+ await save('tests/shared-copy.mjs', `import {test} from 'node:test'; test('recorded shared behavior', () => {});`);
+ const copyRecord = { schemaVersion: 1, copies: [{ files: { 'tests/shared-copy.mjs': '0'.repeat(64) } }] };
+ await save('base-copies.json', JSON.stringify(copyRecord));
+ const before = (await readdir(root, { recursive: true })).sort();
+ const accepted = check();
+ assert.equal(accepted.status, 0, JSON.stringify(accepted.report.testBudget));
+ assert.equal(accepted.report.testBudget.total, 20);
+ assert.deepEqual(accepted.report.testBudget.configurations.map(config => [config.platform, config.total]), [['linux', 19], ['darwin', 20], ['win32', 20]]);
+ assert.deepEqual(accepted.report.testBudget.files, [{ file: 'tests/assert-script.mjs', count: 1 }, { file: 'tests/edition-owned.ts', count: 19 }]);
+ assert.deepEqual((await readdir(root, { recursive: true })).sort(), before, 'checking creates no files or state');
+ copyRecord.copies[0].adapted = { 'tests/shared-copy.mjs': '0'.repeat(40) };
+ await save('base-copies.json', JSON.stringify(copyRecord));
+ assert.equal(check().report.testBudget.total, 21, 'an adapted copy remains edition-owned behavior');
+ delete copyRecord.copies[0].adapted;
+ await save('base-copies.json', JSON.stringify(copyRecord));
+ await declare(19);
+ const over = check();
+ assert.equal(over.status, 1);
+ assert.match(over.report.clauses.find(clause => clause.id === 'TEST.budget').message, /exceeded by 1/);
+ assert.match(over.report.testBudget.message, /edition-owned\.ts/);
+ const human = spawnSync(process.execPath, [join(root, 'scripts/rer.mjs'), 'check'], { cwd: root, encoding: 'utf8' });
+ assert.equal(human.status, 1); assert.match(human.stdout + human.stderr, /exceeded by 1/);
+ await declare(200);
+ for (const source of [
+  `import {test} from 'node:test'; for (const value of loadCases()) test(value, () => {});`,
+  `import {test} from 'node:test'; const alias = process.env.SYNTHETIC_BASE ? test : () => {}; alias('synthetic-base-4', () => {});`,
+  `import {test} from 'node:test'; test.each(loadCases())('synthetic-base-5', () => {});`,
+  `import {test} from 'node:test'; opaque(() => { test('synthetic-base-6', () => {}); });`,
+ ]) {
+  await save('tests/dynamic.mjs', source);
+  const dynamic = check();
+  assert.equal(dynamic.status, 1, source);
+  assert.equal(dynamic.report.testBudget.total, null, 'an unresolved count is never invented');
+  assert.match(dynamic.report.testBudget.message, /tests\/dynamic\.mjs:1:.*registration/i);
+ }
+ await rm(join(root, 'tests/dynamic.mjs'));
+ for (const declaration of ['{', 'null', JSON.stringify({ version: 1, cap: -1, platforms: ['linux'] }), JSON.stringify({ version: 1, cap: 200, platforms: ['linux'], exemptions: ['tests'] })]) {
+  await save('test-budget.json', declaration);
+  const malformed = check(); assert.equal(malformed.status, 1); assert.match(malformed.report.testBudget.message, /test-budget\.json/);
+ }
+ await rm(join(root, 'test-budget.json'));
+ await rm(join(root, 'node_modules'), { recursive: true });
+ assert.equal(check().status, 0, 'an absent budget adds no parser prerequisite');
 });

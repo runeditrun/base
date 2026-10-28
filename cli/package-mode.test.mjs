@@ -234,12 +234,19 @@ test('a freshly composed foundation converted with --to-package passes check, it
 
  const converted = await run(process.execPath, [join(base, 'scripts/export-cli.mjs'), '--to-package', root], { env: { PATH: process.env.PATH, HOME: process.env.HOME, NPM_CONFIG_USERCONFIG: join(directory, 'npmrc'), npm_config_cache: join(directory, 'npm-cache') } });
  assert.equal(converted.code, 0, converted.stdout + converted.stderr);
- await mkdir(join(root, 'node_modules/@runeditrun'), { recursive: true });
- await writePackage(readPackage(bytes, { integrity: integrity(bytes) }), join(root, 'node_modules/@runeditrun/rer'));
+ // Conversion locks dependencies without installing them. Check the real
+ // installed checkout, including the parser required by its declared budget.
+ const installed = await run('pnpm', ['install', '--frozen-lockfile'], { cwd: root, env: { PATH: process.env.PATH, HOME: process.env.HOME, CI: 'true', NPM_CONFIG_USERCONFIG: join(directory, 'npmrc') } });
+ assert.equal(installed.code, 0, installed.stdout + installed.stderr);
  const checked = spawnSync(process.execPath, [join(base, 'global/rer.mjs'), 'check', '--profile', 'first-party', '--json'], { cwd: root, env: { PATH: process.env.PATH, HOME: process.env.HOME, RER_NO_UPDATE_CHECK: '1' }, encoding: 'utf8', timeout: 120000 });
  const report = JSON.parse(checked.stdout.trim().split('\n').at(-1));
- assert.deepEqual(report.clauses.filter(clause => !clause.ok).map(clause => clause.id), [], checked.stderr);
+ assert.deepEqual(report.clauses.filter(clause => !clause.ok).map(clause => clause.id), [], JSON.stringify(report.clauses.filter(clause => !clause.ok)) + checked.stderr);
  assert.equal(checked.status, 0);
+ const budget = JSON.parse(await readFile(join(root, 'test-budget.json'), 'utf8'));
+ assert.equal(report.testBudget.cap, budget.cap);
+ assert.ok(report.testBudget.ok && report.testBudget.total > 0 && report.testBudget.total <= budget.cap, JSON.stringify(report.testBudget));
+ assert.deepEqual(report.testBudget.configurations.map(({ platform }) => platform), budget.platforms);
+ t.diagnostic(`Composed package check: ${report.testBudget.total} registrations, cap ${budget.cap}; ${budget.platforms.join(', ')}.`);
 });
 
 test('converted journey and README launches bootstrap a fresh seed through their own installed rer', {timeout: 240000}, async t => {

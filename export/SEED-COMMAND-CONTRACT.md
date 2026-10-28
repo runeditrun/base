@@ -117,6 +117,54 @@ Run from the project root, or use `--cwd PATH`. Every new verb accepts `--help`,
 | `check` | `--profile first-party` | Read-only structural contract/operations validation, including required hooks, flags, aliases and pins. No credentials needed for a fresh clone. |
 | `release` | existing `--repo`, `--project`, `--repository`, `--output`, `--ref`, `--public-base`, `--dry-run`, `--local-verify`, `--verify-workflow NAME_OR_FILE`, `--tag [vVERSION]`, `--clean-history`, `--onto`, `--env-file`, `--no-queue` | Existing Base release behavior, receipts, validation, gates, local tags and exit codes preserved. |
 
+### Registration budget
+
+A checkout opts into effect-free registration counting with `test-budget.json`:
+
+```json
+{
+  "version": 1,
+  "cap": 200,
+  "platforms": ["linux", "darwin", "win32"]
+}
+```
+
+The cap is the maximum count across the declared supported platforms. Each
+platform is evaluated statically, including conditional registrations based on
+`process.platform` or the platform function from the Node OS module. Skipped,
+only and todo registrations still count. Unknown fields, invalid declarations
+and count exemptions fail `rer check`; an absent declaration leaves existing
+checkouts unaffected and does not require a parser.
+
+The reader resolves the checkout's installed TypeScript parser only for an
+applicable budget. It reads syntax without importing project modules, running
+test bodies, invoking commands or creating local state. Missing dependencies
+produce an explicit prerequisite error.
+
+`rer check --json` includes `testBudget` with `total`, `cap`, `files` (each
+with `file` and `count`), `configurations` and `diagnostics`. Contributions and
+the total describe the supported configuration with the greatest count; each
+configuration also reports its own contributions. Unresolved analysis reports
+`total: null` and file-and-line diagnostics instead of an invented total. Human
+refusals name the excess and contributing files.
+
+Every behavior registration counts once, including registering `contract`
+wrappers, aliases, nested subtests and statically imported suites. Finite array
+and integer loops and finite `.each` tables expand per generated case; a data
+table inside one behavior adds no registrations. Wrappers contribute at their
+invocation site; importing a wrapper twice adds nothing by itself. Suite groups
+do not add behaviors. Assert scripts named by verification commands count once,
+even when repeated across package scripts and the verification manifest.
+
+Discovery considers owned source regardless of filename. Installed dependencies,
+normal build outputs and copies recorded by the portable CLI inventory or the
+Base copy record are excluded; explicitly adapted Base files remain owned.
+The reader handles literal values, static property access, local functions and
+relative imports. It is bounded rather than a general JavaScript interpreter:
+dynamic registration tables, opaque registration factories, unsupported control
+flow and recursion require a static declaration in source and otherwise fail
+with a diagnostic. It never accepts a claimed count in place of registrations.
+
 `signin` is rer's own verb, not a seed operation: no seed declares it and `check` does not ask for it. `rer signin [--environment NAME] [--env-file FILE]` gives the hosted owner a one-time sign-in link without mail when the seed uses operator-auth's `accounts/schema/owner-signin.sql` migration. It uses only the Cloudflare credentials that deployed that environment, writes a single-use grant for the recorded owner into the deployment's auth D1, and prints the link once to the terminal (never to a log or receipt). The link expires within 15 minutes and its use is recorded in the owner's audit log. Those seeds document `rer signin` in their README as the way into a hosted install whose mail is not working yet; after it, the owner corrects a wrong email in settings (`POST /auth/email`). A seed with native sign-in can declare its browser page with the `commandAdapter` option `signInPath: '/login'` (a same-origin path, not a magic-link API endpoint). When the owner sign-in table is absent, `rer signin` explains that the seed uses its own sign-in flow and points to that page on the recorded environment's origin, or to `/setup` for owner recovery when no page is declared. It exits 4 and issues no link.
 
 `release` is the compatibility exception: preserve its existing parser, required `--repo`/`--output`, JSON receipt and exit codes; do not retrofit the new common flags or infer publishing identities. Root help may list the new commands. Release never pushes or deploys. A refused release prints the underlying message (a malformed `CONTRACT.md` names its file and line) on stderr and exits 2. Source inspection and locking use the package's edition-authoring implementation. `rer adopt-edition` and `rer refresh-base --ref FULL_COMMIT` are rer-owned source commands, declared through the same bootstrap contract; seeds do not add adapter hooks or OPERATIONS entries for them. See `EDITION-AUTHORING.md` for effects, acquisition, offline refusal and JSON fields.
