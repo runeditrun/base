@@ -118,7 +118,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
   proxy=await runtimeFrontDoor({host:selected.host,port:selected.port,activity,door:selected.door,devKey:devKey??undefined,origin:selected.url});const internal=proxy.runtimePort;
   if(selected.door)await announceDoorRoute(selected,proxy,registry);
   const modelsLive = options.verb==='dev' ? await prepareLiveModels(project.root,options,store,controller.signal) : undefined;
-  const adapterOptions={modelsLive,demo,selectedOrigin:selected.url,operationToken:operation.token,privateSettings:project.adapter.settings,runtimePort:internal,devKey:devKey??undefined,devLogin:false,scheduled:crons.length>0,beforeStart:options.verb==='dev'?prerequisites:undefined};
+  const adapterOptions={modelsLive,demo,selectedOrigin:selected.url,operationToken:operation.token,privateSettings:project.adapter.settings,runtimePort:internal,setRuntimePort:port=>proxy.setRuntimePort(port),devKey:devKey??undefined,devLogin:false,scheduled:crons.length>0,beforeStart:options.verb==='dev'?prerequisites:undefined};
   const input={[keys.email]:selected.vars[keys.email]};
   if(options.verb==='preview')await productionBuild(project,()=>store.run('Building fixed production output',process.execPath,[fileURLToPath(new URL('../bin/rer.mjs',import.meta.url)),'build','--cwd',project.root,'--json'],{cwd:project.root,phase:'build',signal:controller.signal,env:{...process.env,RER_LOCAL_OPERATION:operation.token},afterCommand:()=>recoverInterrupted(project.root,operation)}),text=>store.report(text));
   await serverResources(project.root);
@@ -147,7 +147,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
   activity.ready();await emitReady(out,options,project.root,selected.url,dev,site?.url,demo);
   if(crons.length){
    out.progress(`Running ${crons.length===1?'the scheduled trigger':'the scheduled triggers'} locally: ${crons.join(' | ')}\n`);
-   void runScheduled({crons,url:`http://127.0.0.1:${internal}`,path:options.verb==='preview'?'/cdn-cgi/local/scheduled':undefined,signal:scheduling.signal,report:run=>reportScheduled(out,options,run)});
+   void runScheduled({crons,url:`http://127.0.0.1:${proxy.runtimePort}`,path:options.verb==='preview'?'/cdn-cgi/local/scheduled':undefined,signal:scheduling.signal,report:run=>reportScheduled(out,options,run)});
   }
   const result=await stopped;
   if(termination)throw new RerError('cancelled',`Stopped by ${termination} after owned children were stopped.`,termination==='SIGINT'?130:143);

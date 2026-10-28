@@ -102,7 +102,7 @@ export async function trafficProxy({host,port,target,activity,door,devKey,origin
   upstream.on('error',()=>socket.destroy());socket.on('error',()=>upstream.destroy());socket.on('close',()=>upstream.destroy());upstream.on('close',()=>socket.destroy());
  });
  try{await listen(server,host,port);}catch(error){agent.destroy();throw error;}
- return {probe,port:server.address().port,async close(){closing=true;agent.destroy();for(const socket of sockets)socket.destroy();await new Promise(resolve=>server.close(resolve));}};
+ return {probe,port:server.address().port,setTarget(port){target=port;},async close(){closing=true;agent.destroy();for(const socket of sockets)socket.destroy();await new Promise(resolve=>server.close(resolve));}};
 }
 function doorAdmits(req,door){
  const host=String(req.headers.host??'').toLowerCase(),given=Buffer.from(String(req.headers[door.header]??'')),secret=Buffer.from(door.secret);

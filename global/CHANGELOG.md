@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Fix two starters both taking over a stale local operation lock by keeping its inode pinned through exclusive takeover and checking the owner token before release.
+- Bind shared local runtimes before reporting their port to the CLI, and fail early when an application listens on another port instead of waiting about 15 minutes. Bound application health readiness to 60 seconds.
 
 ## 0.2.84
 

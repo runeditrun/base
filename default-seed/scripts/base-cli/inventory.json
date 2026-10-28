@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.84",
+  "cliVersion": "0.2.84-dev.g579b37e8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "4a527623a99b8d50a6145d58f0ba4ac74e7d2ab6a8762512e0e63dfe642a927b"
+      "sha256": "d6677445506a122bc8ea7a4d6ece57e00ad7308c71652523904831a677d1f878"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -37,7 +37,7 @@
     },
     "app-fetch.mjs": {
       "source": "onboarding/app-fetch.mjs",
-      "sha256": "5c7ea0f1ffc74223c0e8aead0df84e398906feb5608eac3937af03c7a8f6e37c"
+      "sha256": "0dc8b6a1a646806736db177327f518845d6cdf0c1b7918b602cfe9868c40b0a0"
     },
     "app-processes.mjs": {
       "source": "onboarding/app-processes.mjs",
@@ -78,6 +78,10 @@
     "dev-identity.mjs": {
       "source": "onboarding/dev-identity.mjs",
       "sha256": "8bec99d94f251c62d770cb7826c9462f80c9345256946cf10b4bee9b924f8f62"
+    },
+    "development-runtime.mjs": {
+      "source": "onboarding/development-runtime.mjs",
+      "sha256": "db95a05420065e5488baec71192ab5884fdefbc8167411645207e9645066fbeb"
     },
     "email.mjs": {
       "source": "onboarding/email.mjs",
@@ -169,7 +173,7 @@
     },
     "operator-installer.mjs": {
       "source": "onboarding/operator-installer.mjs",
-      "sha256": "4b4e91216599be360165d6fd9cad68cada8e8902907e97d926469a7244632a74"
+      "sha256": "dbd8e113de3a447fc82e2cce86f42b4ff49d3e6720b8c1c85f259eb3f2866ab3"
     },
     "operator-migrations.mjs": {
       "source": "onboarding/operator-migrations.mjs",
@@ -237,7 +241,7 @@
     },
     "production-runtime.mjs": {
       "source": "onboarding/production-runtime.mjs",
-      "sha256": "b4dfd06d4cbe042e5026db23ea8299222951bef6ec9ef7839351668a44c08596"
+      "sha256": "dcdb0a44ab6fd64c9faf6457d1bb5e3431a13618fec515c9551fc4c62f74a8be"
     },
     "project-vite.mjs": {
       "source": "onboarding/project-vite.mjs",
@@ -257,7 +261,7 @@
     },
     "readiness.mjs": {
       "source": "onboarding/readiness.mjs",
-      "sha256": "9ccb41a87cf35a1e0f3f653119bf00a97a034e1982c83675d46c855bac11cbea"
+      "sha256": "7d7e9a5f137b2af3977d4e2af52053f72b6246851b5aa385ddd8b1e13e692cb2"
     },
     "redaction-jwt.mjs": {
       "source": "onboarding/redaction-jwt.mjs",
@@ -371,7 +375,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "65c73bb486d2ef124b4cd64e16f0374623546b53af9a89feeddcf0ac8e02af3f"
+      "sha256": "da116a7b0a84ec8a61fbcc852c00021b2ad97d1f228ae765e438280c9ab37b50"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -879,7 +883,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "d1599705962888376ac2c2ff66ab31608745fdbcf2a171be00244dde6dd5407c"
+      "sha256": "65e9cb02b8f1f073b05b76b0ee301a0dff26a5a8c1d5dfafcfa1410859d33626"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
@@ -903,7 +907,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "cbcc6f6dbececcee319cee9b6a842f52b74e98d5093b1d103973b1d1ebbbe1eb"
+      "sha256": "1df392c39d8ea80b8e035c76359006610d38be9d89261875ee5db49f5e7a54b7"
     },
     "cli/node-runtime-cache.mjs": {
       "source": "cli/node-runtime-cache.mjs",
@@ -999,7 +1003,7 @@
     },
     "cli/runtime-front-door.mjs": {
       "source": "cli/runtime-front-door.mjs",
-      "sha256": "9be225f807a0fd94a07fde9d85e69cba46c24af11f05727361c838195f87bd1b"
+      "sha256": "ebaae6afa52fe9129ad4d4ee3f1166018b661ab625b194a5a712cea9ca5d995b"
     },
     "cli/scheduled.mjs": {
       "source": "cli/scheduled.mjs",
@@ -1015,11 +1019,11 @@
     },
     "cli/server-proxy.mjs": {
       "source": "cli/server-proxy.mjs",
-      "sha256": "78527672b718d443a6c753e7f12fdeef5bf0c272732e6e634674df990b22b7c5"
+      "sha256": "32d65d7e9d679a1ce60e53795aebf782aea63a94f817f51d8acef0501babb67b"
     },
     "cli/server-registry.mjs": {
       "source": "cli/server-registry.mjs",
-      "sha256": "dc0fd0f89a2e046393845f17b354194ea9a143879629b89b8506621eecda5647"
+      "sha256": "04c1392d15b530222e940b1adcba4d2cfe913aee9fb0c8c261cf99674328d4d3"
     },
     "cli/server-resources.mjs": {
       "source": "cli/server-resources.mjs",

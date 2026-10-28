@@ -126,7 +126,7 @@ async function runLifecycle(project, options, out, deployRedaction) {
   const privateSettings = [...adapter.settings, '.rer/local/models.json', ...(project.privateInputs??[])];
   const run = () => adapter.run(project.root, input ?? { [emailKey]: options.ownerEmail ?? selected?.vars[emailKey] }, store,
    child => { app = child; }, signal,
-   { verb: options.verb, ownerKey: emailKey, selectedOrigin: selected?.url, runtimePort: proxy?.runtimePort, operationToken: operation?.token, dev: adapter.dev, privateSettings, devKey: devKey ?? undefined });
+   { verb: options.verb, ownerKey: emailKey, selectedOrigin: selected?.url, runtimePort: proxy?.runtimePort, setRuntimePort: port=>proxy.setRuntimePort(port), operationToken: operation?.token, dev: adapter.dev, privateSettings, devKey: devKey ?? undefined });
   // A production build never sees the checkout's local settings, whatever the seed's build runs.
   if (options.verb === 'build') await withoutLocalSettings(project.root, { settings: privateSettings, operationToken: operation?.token }, run);
   else await run();

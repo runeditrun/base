@@ -72,8 +72,9 @@ function hooks(overrides = {}) {
 }
 const input = { email: 'owner@example.test', displayName: 'First Owner' };
 
-async function installOnce(f, kit, { signal } = {}) {
+async function installOnce(f, kit, { signal, onReadiness } = {}) {
  const store = await f.open();
+ if(onReadiness){const wait=store.waitForReady;store.waitForReady=(label,child,health,options)=>{onReadiness(options);return wait(label,child,health,options);};}
  let app;
  await kit.install(f.root, input, store, child => { app = child; }, signal);
  return { store, app };
@@ -89,7 +90,7 @@ test('feature flags must describe the hooks the adapter really runs', () => {
 
 test('a complete install generates private settings, hides them from the build, claims the owner and opens the application', async t => {
  const f = await fixture(t);
- const { store, app } = await installOnce(f, localInstaller(hooks()));
+ const { store, app } = await installOnce(f, localInstaller(hooks()), {onReadiness:options=>assert.equal(options.timeoutMs,60000,'the application readiness budget is sixty seconds, including setup')});
  t.after(async () => { if (app) await store.stop(app); });
  assert.equal(store.state.phase, 'complete', store.state.error);
  const varsPath = join(f.root, '.dev.vars'), text = await readFile(varsPath, 'utf8'), vars = localVariables(text);
