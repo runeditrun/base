@@ -5,6 +5,8 @@
 - Local `rer export` and `rer import` accept the historical `_rer_deploy_migrations` plus `d1_migrations` pair: the deploy ledger remains authoritative and Wrangler is skipped. Incomplete, pending or conflicting histories still refuse before transfer.
 - **Known adapter change in 0.2.85:** the worker's `migration-preflight` receipt changed from `{platformLedger}` to `{nativeApply}`, and `platformMigrationPreflight` was renamed to `nativeMigrationPreflight`. Seeds wrapping the worker or importing the internal adapter must update; the supported adapter entry is `@runeditrun/rer/portability-migrations`, and native migrations run only when `nativeApply` is true.
 - `rer deploy --dry-run` now accepts valid senders on reserved fixture domains and no longer requires an owner name to print its local plan. Real deploys keep placeholder-sender refusals and managed adapters check the owner email before asking for a missing name; deploy help documents that order.
+- Contract conversion now reads requirement prose and acceptance lists in a blockquote after a legacy clause bullet, while preserving clause boundaries and refusing clauses with no requirement prose.
+
 - Contract conversion now keeps requirement prose and acceptance points after a leading plain, italic or bold Status line, preserves the recorded status, and still refuses a clause with no requirement prose or a conflicting status.
 
 - Import door sources may declare `format: 'raw'` and a seed-owned `readRaw` reader for ZIP and other binary exports. Verified upload bytes, hash and size reach that reader before text decoding; exact custody, reviewed plans and the existing apply, reconciliation, catch-up and Undo lifecycle are shared with JSON/NDJSON sources.
