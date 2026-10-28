@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.84-dev.g8e555075",
+  "cliVersion": "0.2.84-dev.g83c1f7ea",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -575,7 +575,7 @@
     },
     "cli/check-tests-reader.mjs": {
       "source": "cli/check-tests-reader.mjs",
-      "sha256": "096df7ec2be8608725ef247ac07e8e7fa5edeaa734bf0d187def2420d2d5e2ff"
+      "sha256": "0d8c4177a46bfc9001e82b85a8359fee541bfbfb138ec3752a53dc57bbe461c6"
     },
     "cli/check-tests.mjs": {
       "source": "cli/check-tests.mjs",

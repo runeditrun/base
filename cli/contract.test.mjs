@@ -125,7 +125,7 @@ test('public check enforces registration budgets without executing tests or crea
  writeFileSync('synthetic-base-1', 'must never execute');
  const alias = spec;
  for (let index = 0; index < 2; index++) alias(String(index), () => { throw Error('must never execute'); });
- spec.each([[1], [2], [3]])('generated', value => {});
+ spec.each([1, 2, 3].map(value => [value]))('generated', value => {});
  spec('one behavior with a table', () => { for (const value of [1, 2, 3]) throw Error(String(value)); });
  spec.skip('skipped still counts', () => {});
  spec('nested CLI cases', async t => { for (const value of [1, 2]) await t.test(String(value), () => {}); });

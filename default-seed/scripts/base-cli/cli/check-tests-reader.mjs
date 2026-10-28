@@ -153,6 +153,24 @@ export function registrationReader(ts, { root, platform, excluded, limit }) {
     if (method === 'entries') return value.map((item, index) => [index, item]);
     if (method === 'keys') return value.map((_, index) => index);
     if (method === 'values') return value;
+    if (['map', 'flatMap', 'filter'].includes(method)) {
+     const callback = valueOf(node.arguments[0], env);
+     if (!isFunction(callback) || callback.node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword)) return unknown;
+     const body = ts.isBlock(callback.node.body) && callback.node.body.statements.length === 1 && ts.isReturnStatement(callback.node.body.statements[0]) ? callback.node.body.statements[0].expression : callback.node.body;
+     if (!body || ts.isBlock(body)) return unknown;
+     const result = [];
+     for (const [index, item] of value.entries()) {
+      const scope = new Map(callback.env);
+      callback.node.parameters.forEach((parameter, position) => bind(parameter.name, [item, index, value][position] ?? unknown, scope));
+      const selected = valueOf(body, scope);
+      if (method === 'map') result.push(selected);
+      else if (selected === unknown) return unknown;
+      else if (method === 'filter') { if (selected) result.push(item); }
+      else if (Array.isArray(selected)) result.push(...selected);
+      else result.push(selected);
+     }
+     return result;
+    }
    }
    return unknown;
   }
