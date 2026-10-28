@@ -45,6 +45,11 @@ export default {
       result.fetch = (await env.RER_NATIVE_HOST.fetch(new Request(env.AUTH_ORIGIN + '/items'))).status === 404 ? 'denied' : 'reachable';
       return Response.json(result);
     }
+    if (path === '/d1-limits') {
+      const { sql, values } = await request.json();
+      try { return Response.json(await env.DB.prepare(sql).bind(...values).all()); }
+      catch (error) { return Response.json({ error: error.message }, { status: 400 }); }
+    }
     if (path === '/d1-session') {
       const session = env.DB.withSession('first-primary');
       const [items] = await session.batch([session.prepare('SELECT name FROM items ORDER BY name')]);

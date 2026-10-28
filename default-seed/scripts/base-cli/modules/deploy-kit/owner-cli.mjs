@@ -15,10 +15,11 @@ import { ownerRemove } from './owner-remove.mjs';
 import { ownerSignin } from './owner-signin.mjs';
 import { ownerRekey } from './owner-rekey.mjs';
 import { refuseLocalModels } from './local-only.mjs';
+import { validateMigrations } from './migrations.mjs';
 import { publicOrigin } from './public-origin.mjs';
 
 export const cronNotice = 'This Worker has a Cron Trigger. Cloudflare may take up to about two hours to start its first scheduled run on some accounts.';
-const usage = 'usage: owner-cli.mjs deploy|dry-run|health|remove|inspect|record-owner|signin|rekey --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
+const usage = 'usage: owner-cli.mjs deploy|dry-run|local-plan|health|remove|inspect|record-owner|signin|rekey --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
 
 /** The owner's committed source and existing local build. Run the seed's build first. */
 async function ownerArtifact(root, product) {
@@ -34,13 +35,15 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   try { parsed = parseArgs({args:argv,allowPositionals:true,strict:true,options:{declaration:{type:'string'},environment:{type:'string'},product:{type:'string',default:''},state:{type:'string'},set:{type:'string',multiple:true},unset:{type:'string',multiple:true},outcome:{type:'string'}}}); }
   catch { throw new Error('usage'); }
   const {positionals:[command,...rest],values} = parsed;
-  if (!['deploy','dry-run','health','secret','remove','inspect','record-owner','signin','rekey'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
+  if (!['deploy','dry-run','local-plan','health','secret','remove','inspect','record-owner','signin','rekey'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
   if ((command === 'secret') !== (values.set !== undefined || values.unset !== undefined) || values.set !== undefined && values.unset !== undefined) throw new Error('usage');
   if (values.outcome !== undefined && command !== 'record-owner' || command === 'record-owner' && !['claimed','kept'].includes(values.outcome)) throw new Error('usage');
   await refuseLocalModels(resolve(cwd));
-  const missing = ['CLOUDFLARE_ACCOUNT_ID','CLOUDFLARE_API_TOKEN'].filter(key => typeof env[key] !== 'string' || !env[key].trim());
-  if (missing.length) { const error = new Error('missing-input'); error.inputs = missing; throw error; }
-  assert(hexId(env.CLOUDFLARE_ACCOUNT_ID) && !/[\r\n]/.test(env.CLOUDFLARE_API_TOKEN),'invalid-cloudflare-input');
+  if (command !== 'local-plan') {
+    const missing = ['CLOUDFLARE_ACCOUNT_ID','CLOUDFLARE_API_TOKEN'].filter(key => typeof env[key] !== 'string' || !env[key].trim());
+    if (missing.length) { const error = new Error('missing-input'); error.inputs = missing; throw error; }
+    assert(hexId(env.CLOUDFLARE_ACCOUNT_ID) && !/[\r\n]/.test(env.CLOUDFLARE_API_TOKEN),'invalid-cloudflare-input');
+  }
   const root = resolve(cwd);
   let declaration;
   try { declaration = JSON.parse(await regularBytes(resolve(root,values.declaration),256 * 1024)); }
@@ -49,10 +52,20 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   // Validate even direct kit invocations before any provider request or write.
   publicOrigin(declaration, env);
   let artifact;
-  if (command === 'dry-run') {
+  if (command === 'dry-run' || command === 'local-plan') {
     artifact = await packageBuild({root,source:{sha:'0'.repeat(40),tree:'0'.repeat(40)},runIdentity:{id:'0',attempt:'1'},productDirectory:values.product});
     const worker = ownerWorkerName(declaration.project,values.environment);
-    ownerPlan({project:declaration.project,environment:values.environment,worker,origin:`https://${worker}.example.invalid`},declaration,artifact,{localOnlyKeys,env});
+    const plan = ownerPlan({project:declaration.project,environment:values.environment,worker,origin:`https://${worker}.example.invalid`},declaration,artifact,{localOnlyKeys,env});
+    if (command === 'local-plan') for (const item of plan.d1) validateMigrations(item.migrations);
+    // Print names only: configuration values and migration SQL stay local.
+    // Return before constructing a provider client or resolving an account.
+    if (command === 'local-plan') return {ok:true,dryRun:true,deployed:false,plan:{
+      worker:plan.worker,
+      d1:plan.d1.map(({binding,name,migrations}) => ({binding,name,migrations:migrations.map(item => item.name)})),
+      r2:plan.r2,kv:plan.kv ?? [],queues:plan.queues,durableObjects:plan.durableObjects,services:plan.services ?? [],
+      secrets:plan.secrets.map(({binding,optional}) => ({binding,optional:optional ?? false})),
+      vars:Object.keys(plan.vars),crons:plan.crons,
+    }};
   }
   // Removal reads identity before each object DELETE and may span many pages.
   // Bound each response, not the owner's bucket size; failures retain ownership.

@@ -17,6 +17,11 @@ import { LaunchFailure } from './failure.mjs';
 import { describeCheckout } from './facts.mjs';
 import { prepare } from './prepare.mjs';
 import { printer } from './render.mjs';
+import { access } from 'node:fs/promises';
+import { layout } from '../cli/layout.mjs';
+import { pathAdvice } from '../cli/path-link.mjs';
+import { shellQuote } from '../../cli/node-runtime-cache.mjs';
+import { showBudget } from '../../cli/run-transfers.mjs';
 import { stopLaunch } from './stop.mjs';
 import { launchDirectory, liveWorker } from './state.mjs';
 
@@ -41,8 +46,13 @@ export async function launchDev(target) {
   try { return await stopLaunch(target, devArgs, { checkout, directory }); }
   catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; process.stderr.write(failure.message + '\n'); return failure.exitCode; }
  }
+ showBudget(devArgs);
+ // The launch never asks for shell edits. Offer the optional step only at ready.
+ delete process.env.RER_LAUNCH_PATH_STEP;
+ const paths = layout();
+ if (await access(paths.launcher).then(() => true, () => false) && await pathAdvice(paths)) process.env.RER_LAUNCH_PATH_STEP = `Optional, after opening your app: make rer available in future terminals. Run ${shellQuote(paths.launcher)} cli path to see the shell step; it changes no shell file itself.`;
  const here = await realpath(process.cwd()).catch(() => undefined);
- const out = printer({ json: devArgs.includes('--json'), stopHint: `rer dev --stop${here === checkout ? '' : ` --cwd ${JSON.stringify(checkout)}`}`, keyless: doorStart });
+ const out = printer({ root: checkout, json: devArgs.includes('--json'), stopHint: `rer dev --stop${here === checkout ? '' : ` --cwd ${JSON.stringify(checkout)}`}`, keyless: doorStart });
  const detach = args.includes('--detach') || (!args.includes('--foreground') && !process.stdout.isTTY);
  return detach ? detached(target, devArgs, directory, out, doorStart) : foreground(target, devArgs, directory, out, doorStart);
 }
@@ -116,7 +126,7 @@ async function follow(directory, token, out, { worker, quiet = false }) {
     const event = JSON.parse(line);
     if (event.event === 'phase') out.phase(event);
     else if (event.event === 'redirect') return event.token ? follow(directory, event.token, out, { quiet }) : missing(directory);
-    else if (event.event === 'ready') { if (!quiet) out.ready(event.ready, event); return 0; }
+    else if (event.event === 'ready') { if (!quiet) await out.ready(event.ready, event); return 0; }
     else if (event.event === 'failed') { out.failure(new LaunchFailure(event.exitCode, event.message, event.error)); return event.exitCode; }
    }
    continue;

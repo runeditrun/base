@@ -10,6 +10,7 @@ import { unpublishedIdentities } from './site-private.mjs';
 import { privateSitePaths } from './site-inputs.mjs';
 import { redactSiteText } from './site-diagnostics.mjs';
 import { siteRuntime, buildSiteRuntime, runtimeSummary } from './site-runtime.mjs';
+import { deployDiagnostic, providerFailure } from '../modules/deploy-kit/diagnostics.mjs';
 import { siteHosting } from './site-hosting.mjs';
 
 // The run site: a seed's static marketing pages, /run and docs, built from
@@ -154,7 +155,11 @@ export async function siteCommand(project, options, store, signal, out) {
   return { dryRun: false, deployed: true, origin: result.origin, site: summary };
  } catch (error) {
   if (error instanceof RerError) throw error;
-  throw new RerError('deploy_refused', `Run site deploy stopped: ${/^[a-z0-9-]{1,80}$/.test(error.message) ? error.message : 'site-deploy-failed'}${error.resource ? ` (${error.resource})` : ''}.${siteReadbackSummary(error)}`, 1);
+  const { createRedaction } = await shared('redaction.mjs');
+  const redaction = createRedaction();
+  redaction.addSecrets(names.map(name => process.env[name]));
+  const diagnostic = deployDiagnostic(error,redaction.redact), provider = providerFailure(error,redaction.redact);
+  throw new RerError('deploy_refused', redaction.redact(`Run site deploy stopped: ${/^[a-z0-9-]{1,80}$/.test(error.message) ? error.message : 'site-deploy-failed'}${error.resource ? ` (${error.resource})` : ''}.${provider ? ` ${provider}.` : ''}${siteReadbackSummary(error)}`), 1, {step:diagnostic?.step, ...(diagnostic ? {siteDeploy:diagnostic} : {})});
  }
 }
 

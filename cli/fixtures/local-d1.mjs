@@ -1,6 +1,7 @@
+import '../../modules/container/adapters/d1-workerd-preload.mjs';
 import {readdir} from 'node:fs/promises';
 import {join} from 'node:path';
-import {DatabaseSync} from 'node:sqlite';
+import {DatabaseSync} from '../../modules/container/adapters/d1-sqlite.mjs';
 
 // The seed's canonical local D1 store opened in place: the same rows `wrangler d1
 // execute --local` reads, without launching wrangler (seconds per call on CI).

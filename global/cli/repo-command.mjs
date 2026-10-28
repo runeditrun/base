@@ -4,8 +4,7 @@ import { join } from 'node:path';
 import { parse } from '../../cli/parse.mjs';
 import { shellQuote } from '../../cli/node-runtime-cache.mjs';
 import { install } from './install.mjs';
-import { launcherOwner, layout } from './layout.mjs';
-import { pathAdvice } from './path-link.mjs';
+import { showBudget } from '../../cli/run-transfers.mjs';
 import { checkoutRepository, runCommand } from './repository.mjs';
 import { ownRoot } from '../package-info.mjs';
 import { prepare } from '../launch/prepare.mjs';
@@ -14,17 +13,14 @@ import { launchDirectory } from '../launch/state.mjs';
 export async function repoCommand(request) {
  const { verb, directory, args } = request;
  parse([verb, ...args]); // Refuse invalid options before installation or cloning.
- const paths = layout(), launcher = await launcherOwner(paths.launcher);
+ showBudget(args);
  const installed = await install({ quiet: true });
  if (installed !== 0) return installed;
  await checkoutRepository(request);
  const root = await realpath(request.root);
- if (launcher.state === 'absent') {
-  const advice = await pathAdvice(paths);
-  if (advice) process.stderr.write(advice + '\n');
- }
  const next = command => `cd ${shellQuote(directory)} && rer ${command}`;
  if (verb === 'setup') {
+  await (await import('../../cli/business/carry.mjs')).refreshCheckout(root);
   const state = await launchDirectory(root), children = new Set(), controller = new AbortController();
   const log = createWriteStream(join(state, 'launch.log'), { flags: 'a', mode: 0o600 });
   const handlers = new Map(['SIGINT', 'SIGTERM'].map(signal => [signal, () => { controller.abort(); for (const child of children) child.kill(signal); }]));

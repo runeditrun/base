@@ -1,3 +1,4 @@
+import { humanError } from '../cli/human-error.mjs';
 import { checkoutBootstrap, checkoutVerbs } from '../cli/contract.mjs';
 import { dispatcher, locate, pinnedPackage, unsupportedMessage } from './checkout.mjs';
 import { delegate } from './delegate.mjs';
@@ -28,8 +29,8 @@ else its vendored scripts/rer.mjs.
                        them off PATH): where a project's docs say pnpm run X, run rer run X.
   rer list [DIR]       The checkouts in DIR (default: here), newest first, with whether rer dev can
                        launch them, whether they are set up, and their running URL. --json for data.
-  rer business ...     Pair a Business device, store local vendor keys, inspect tasks and disconnect.
-                       rer business --help lists the commands and current protocol limitations.
+  rer business ...     Set up your business once and share its name, logo and brand colour
+                       with apps that support Business. Start with rer business connect.
   rer companion ...    Pair this computer with a Run Edit Run app and run its change requests here
                        with your own Codex or Claude. rer companion --help lists the commands.
   rer door ...         The opt-in front door: every checkout at http://NAME.localhost:PORT, started
@@ -37,6 +38,7 @@ else its vendored scripts/rer.mjs.
   rer cli status       This rer: version, contents digest, install channel, launcher and other rer
                        commands on PATH. --json for data.
   rer cli install      Install this package for the current user (~/.local/bin/rer).
+  rer cli path         Optional: make rer available in future terminals; shows the shell step.
   rer cli uninstall    Remove the launcher and the install root; ~/.rer is untouched.
   rer update           Move to the latest published rer (--version X for an exact one), the way it
                        was installed: npx and install.sh installs switch atomically, npm installs run npm.
@@ -80,7 +82,7 @@ export async function main(argv) {
   const repository = repoArguments(argv);
   if (repository) return await (await import('./cli/repo-command.mjs')).repoCommand(repository);
  } catch (error) {
-  process.stderr.write(error.message + '\n');
+  process.stderr.write((argv.includes('--json') ? error.message : humanError(error)) + '\n');
   return typeof error.exitCode === 'number' ? error.exitCode : 1;
  }
  const target = locate(argv);
@@ -95,7 +97,7 @@ export async function main(argv) {
   if ((mode !== 'bundled' || pinnedPackage(target.root)) && verb === 'doctor' && !argv.includes('--help')) {
    const { parse } = await import('../cli/parse.mjs');
    try { parse(target.args, target.root); }
-   catch (error) { process.stderr.write(error.message + '\n'); return error.exitCode ?? 2; }
+   catch (error) { process.stderr.write((argv.includes('--json') ? error.message : humanError(error)) + '\n'); return error.exitCode ?? 2; }
    const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, target.args);
    if (code !== undefined) return code;
   }
@@ -107,11 +109,11 @@ export async function main(argv) {
    // here, before provisioning the checkout's package manager.
    const publicArgs = verb === 'dev' ? target.args.filter(arg => arg !== '--door-start') : target.args;
    try { parse(publicArgs, target.root); }
-   catch (error) { process.stderr.write(error.message + '\n'); return error.exitCode ?? 2; }
+   catch (error) { process.stderr.write((argv.includes('--json') ? error.message : humanError(error)) + '\n'); return error.exitCode ?? 2; }
    const { ensureProjectPnpm } = await import('../cli/project-pnpm.mjs');
    const { RerError } = await import('../cli/errors.mjs');
    try { await ensureProjectPnpm(target.root, { report: text => process.stderr.write(text + '\n') }); }
-   catch (error) { if (!(error instanceof RerError)) throw error; process.stderr.write(error.message + '\n'); return error.exitCode; }
+   catch (error) { if (!(error instanceof RerError)) throw error; process.stderr.write((argv.includes('--json') ? error.message : humanError(error)) + '\n'); return error.exitCode; }
   }
  }
  if (verb === 'queue') {
@@ -135,7 +137,7 @@ export async function main(argv) {
    if (!(failure instanceof LaunchFailure)) throw failure;
    // A --json caller gets the failed step as data, as the checkout's own verbs report it.
    if (failure.event && target.args.includes('--json')) for (const event of [{ ...failure.event, verb }, { version: 1, verb, event: 'result', ok: false, exitCode: failure.exitCode }]) process.stdout.write(JSON.stringify(event) + '\n');
-   else process.stderr.write(failure.message + '\n');
+   else process.stderr.write(humanError(failure, { retry: `rer ${verb} --cwd '${target.root.replaceAll("'", "'\\''")}'` }) + '\n');
    return failure.exitCode;
   }
  }
@@ -144,6 +146,9 @@ export async function main(argv) {
  if (first && dispatcher(target.root).mode !== 'bundled' && verb === 'verify' && !argv.includes('--help') && !argv.includes('--site')) {
   const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, target.args);
   if (code !== undefined) return code;
+ }
+ if (first && ['setup', 'dev'].includes(verb) && !argv.some(arg => ['--help', '-h', '--stop', '--demo'].includes(arg))) {
+  await (await import('../cli/business/carry.mjs')).refreshCheckout(target.root);
  }
  if (verb === 'dev' && mode && mode !== 'package' && !argv.includes('--help')) return (await import('./launch/dev.mjs')).launchDev(target);
  // Every other server start or queued job on a vendored pin gets the person

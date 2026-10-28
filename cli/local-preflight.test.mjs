@@ -1,3 +1,4 @@
+import '../modules/container/adapters/d1-workerd-preload.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {cp,mkdir,mkdtemp,readFile,readdir,rm,writeFile,stat} from 'node:fs/promises';
@@ -7,7 +8,7 @@ import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {once} from 'node:events';
 import {createServer} from 'node:net';
-import {DatabaseSync} from 'node:sqlite';
+import {DatabaseSync} from '../modules/container/adapters/d1-sqlite.mjs';
 import {exportCLI} from './export.mjs';
 import {localOperation} from '../onboarding/local/operation.mjs';
 const base=join(import.meta.dirname,'..');

@@ -4,7 +4,7 @@ import { chromium } from './reference.mjs';
 
 // Walk the real seed from a waiting key gate to its signed-in owner screen.
 export async function devEntryBrowser(ready) {
- const browser = await chromium.launch({ headless: true });
+ const browser = await chromium.launch({ headless: true, executablePath: process.env.RER_TEST_CHROMIUM, args: ['--no-sandbox'] });
  const evidence = process.env.RER_TEST_EVIDENCE_DIRECTORY;
  try {
   for (const width of [1440, 390]) {

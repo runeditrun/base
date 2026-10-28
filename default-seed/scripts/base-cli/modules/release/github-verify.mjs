@@ -1,6 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { git } from './source.mjs';
 import { verifyWorkflow } from './verify-workflow.mjs';
+import { shared } from '../../cli/shared.mjs';
+
+const { createRedaction } = await shared('redaction.mjs');
 
 const same = (left, right) => typeof left === 'string' && left.toLowerCase() === right.toLowerCase();
 function identity(value) {
@@ -101,9 +104,15 @@ export function githubVerify(source, repository, selector) {
     }
     if (tagUnavailable) throw Error('tag');
     result.details = rejected.size ? [...rejected].join('; ') : 'No runs found for this SHA.';
-  } catch {
+  } catch (error) {
     result.reason = 'github-verify-unavailable';
-    result.details = 'GitHub Verify could not be resolved. Check gh authentication and repository access, then try again; no local verification was substituted.';
+    const fallback = 'GitHub Verify could not be resolved. Check gh authentication and repository access, then try again; no local verification was substituted.';
+    const stderr = typeof error.stderr === 'string' || Buffer.isBuffer(error.stderr)
+      ? createRedaction().redact(error.stderr.toString()).trim() : '';
+    // Redact the complete diagnostic before bounding it, including long tokens.
+    const diagnostic = stderr ? stderr.slice(0, 8192) : fallback;
+    result.details = Number.isInteger(error.status)
+      ? `gh exited with status ${error.status}: ${diagnostic}` : diagnostic;
   }
   return result;
 }

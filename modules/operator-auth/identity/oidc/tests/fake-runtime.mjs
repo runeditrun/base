@@ -1,3 +1,4 @@
+import { installD1Preflight } from '../../../../container/adapters/d1-workerd-setup.mjs';
 // Node side of the fake-provider tests: real workerd with D1 through Miniflare,
 // requests carried in a test envelope so exact Host and Origin reach the app.
 import { createRequire } from 'node:module';
@@ -12,7 +13,8 @@ const packages = await readdir(join(root, 'node_modules/.pnpm'));
 const wrangler = packages.find(n => n.startsWith('wrangler@4.129.1_'));
 if (!wrangler) throw new Error('Install the frozen workspace dependencies (Wrangler 4.129.1).');
 const require = createRequire(join(root, 'node_modules/.pnpm', wrangler, 'node_modules/wrangler/package.json'));
-const { Miniflare, convertV4MiniflareOptions } = require('miniflare');
+const { Miniflare, convertV4MiniflareOptions, D1_PLUGIN } = require('miniflare');
+installD1Preflight(D1_PLUGIN);
 const { build } = require('esbuild');
 const output = await build({ entryPoints: [fileURLToPath(new URL('./fake-worker.mjs', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022' });
 const read = path => readFile(new URL(path, import.meta.url), 'utf8');

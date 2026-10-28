@@ -176,3 +176,161 @@ test('a workflow calling Verify must grant every token permission its jobs reque
   if (refusal) assert.match(result.stderr, refusal, label);
  }
 });
+
+test('verification planning requires the newest push proof, identical trees and complete reviewed coverage', async t => {
+ const { planVerification } = await import('../export/verify-plan.mjs');
+ const { renderVerifySchedule } = await import('../foundation/verify-schedule.mjs');
+ const fixture = JSON.parse(await readFile(new URL('./tests/fixtures/verify-ci/planning.json', import.meta.url)));
+ const directory = await mkdtemp(join(tmpdir(), 'synthetic-base-1-'));
+ t.after(() => rm(directory, { recursive: true, force: true }));
+ const git = (...args) => {
+  const result = spawnSync('git', args, { cwd: directory, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim();
+ };
+ git('init', '--quiet');
+ git('config', 'user.name', 'synthetic-base-1'); git('config', 'user.email', 'synthetic-base-1@example.com');
+ const commit = async (file, contents) => {
+  await mkdir(join(directory, file, '..'), { recursive: true });
+  await writeFile(join(directory, file), contents); git('add', '.'); git('commit', '--quiet', '-m', 'synthetic-base-1');
+  return git('rev-parse', 'HEAD');
+ };
+ await commit('src/base/contract-docs.mjs', 'export {};\n');
+ await commit('scripts/edition-authoring/cli.mjs', 'export {};\n');
+ await commit('tests/e2e/reference-runtime.mjs', 'export {};\n');
+ await commit('edition.json', '{}\n');
+ const parent = await commit('sources.lock.json', '{}\n');
+ const head = await commit('STATUS.md', 'synthetic-base-1\n');
+ const tree = sha => git('rev-parse', `${sha}^{tree}`);
+ const commitBody = sha => ({ sha, commit: { tree: { sha: tree(sha) } }, parents: git('rev-list', '--parents', '-1', sha).split(' ').slice(1).map(sha => ({ sha })) });
+ const current = { ...green, id: 5000, workflow_id: 41, run_attempt: 1, repository: fixture.repository,
+  head_repository: fixture.repository, head_sha: head, head_branch: 'synthetic-base-3', event: 'push', status: 'in_progress', conclusion: null };
+ const producer = { ...current, id: 4000, head_branch: 'synthetic-base-4', status: 'completed', conclusion: 'success' };
+ const environment = { ...env, GITHUB_REPOSITORY: fixture.repository.full_name, GITHUB_RUN_ID: String(current.id),
+  GITHUB_SHA: head, GITHUB_REF: `refs/heads/${current.head_branch}`, GITHUB_WORKFLOW: current.name, GITHUB_TOKEN: 'synthetic-base-5' };
+ const plan = { push: fixture.push, nightly: [] };
+ const proofJobs = (run, names = ['plan', 'full-push-proof', 'verify', ...plan.push.map(shard => `shards (${shard.name})`)]) => ({
+  total_count: names.length, jobs: names.map((name, index) => ({ id: index + 1, run_id: run.id, run_attempt: run.run_attempt, name, status: 'completed', conclusion: 'success' })),
+ });
+ const network = ({ runs = [producer], self = current, commits = {}, jobs = proofJobs, latest = {}, listing } = {}) => async url => {
+  const parsed = new URL(url), path = parsed.pathname;
+  const runId = Number(/\/runs\/(\d+)/.exec(path)?.[1]);
+  let answer;
+  if (path.includes('/workflows/')) {
+   const matches = runs.filter(run => run.head_sha === parsed.searchParams.get('head_sha'));
+   answer = listing ? listing(matches, parsed) : list(matches);
+  } else if (path.endsWith('/jobs')) {
+   const run = runs.find(run => run.id === runId);
+   assert.equal(Number(/\/attempts\/(\d+)/.exec(path)?.[1]), (latest[runId] ?? run).run_attempt);
+   answer = jobs(latest[runId] ?? run);
+  } else if (path.includes('/runs/')) answer = runId === self.id ? self : latest[runId] ?? runs.find(run => run.id === runId);
+  else if (path.includes('/commits/')) {
+   const sha = path.split('/').at(-1);
+   answer = commits[sha] ?? commitBody(sha);
+  } else assert.fail(`Unexpected endpoint: ${path}`);
+  return new Response(JSON.stringify(answer));
+ };
+ const decide = options => planVerification({ cwd: directory, env: environment, plan, fetch: network(options) });
+ assert.equal((await decide()).coverage, 'reuse', 'exact SHA full push proof');
+ for (const change of [
+  { event: 'pull_request' }, { event: 'workflow_dispatch' }, { event: 'schedule' },
+  { workflow_id: 99 }, { repository: { id: 44, full_name: 'synthetic-base-6/synthetic-base-7' } },
+  { head_repository: { id: 44, full_name: 'synthetic-base-6/synthetic-base-7' } },
+ ]) assert.equal((await decide({ runs: [{ ...producer, ...change }] })).coverage, 'full', JSON.stringify(change));
+ assert.equal((await decide({ runs: [producer, { ...producer, id: 4001, conclusion: 'failure' }] })).coverage, 'full', 'newest failure defeats old green');
+ assert.equal((await decide({ latest: { [producer.id]: { ...producer, run_attempt: 2, conclusion: 'failure' } } })).coverage, 'full', 'latest attempt supersedes listing');
+ assert.equal((await decide({ jobs: run => proofJobs(run, ['plan', 'verify']) })).coverage, 'full', 'green aggregate without full proof');
+ assert.equal((await decide({ jobs: run => { const body = proofJobs(run); body.jobs[1].conclusion = 'skipped'; return body; } })).coverage, 'full', 'skipped proof');
+ assert.equal((await decide({ runs: [producer, { ...producer, event: 'pull_request', id: 4001, conclusion: 'failure' }] })).coverage, 'reuse', 'ineligible newer PR does not replace eligible push');
+ const parentRun = { ...producer, head_sha: parent };
+ const light = await decide({ runs: [parentRun] });
+ assert.equal(light.coverage, 'light', 'document change on verified parent');
+ assert.ok(light.readers.length, 'changed documents retain their executable consistency reader');
+ assert.equal((await decide({ runs: [parentRun], commits: { [head]: { ...commitBody(head), parents: [{ sha: parent }, { sha: parent }] } } })).coverage, 'full', 'ambiguous merge cannot select light');
+ assert.equal((await decide({ runs: [] })).coverage, 'full', 'unverified parent');
+ const changedReaders = { push: [{ ...plan.push[0], commands: ['node --test tests/synthetic-base-8.test.mjs'] }, plan.push[1]], nightly: [] };
+ assert.equal((await planVerification({ cwd: directory, env: environment, plan: changedReaders, fetch: network({ runs: [parentRun] }) })).coverage, 'full', 'unknown reader refuses light');
+ git('commit', '--allow-empty', '--quiet', '-m', 'synthetic-base-2');
+ const child = git('rev-parse', 'HEAD'), childSelf = { ...current, head_sha: child };
+ const childDecision = await planVerification({ cwd: directory, env: { ...environment, GITHUB_SHA: child }, plan,
+  fetch: network({ runs: [{ ...producer, head_sha: head }], self: childSelf }) });
+ assert.equal(childDecision.coverage, 'reuse', 'same-tree direct parent proof');
+ assert.equal((await planVerification({ cwd: directory, env: { ...environment, GITHUB_SHA: child }, plan,
+  fetch: network({ runs: [parentRun], self: childSelf }) })).coverage, 'full', 'does not search earlier ancestors');
+ const code = await commit('application.mjs', 'export const value = 1;\n');
+ assert.equal((await planVerification({ cwd: directory, env: { ...environment, GITHUB_SHA: code }, plan,
+  fetch: network({ runs: [{ ...producer, head_sha: child }], self: { ...current, head_sha: code } }) })).coverage, 'full', 'code change refuses light');
+ // A rename from code into the allowlist still contains a code deletion.
+ git('mv', 'application.mjs', 'HANDOVER.md'); git('commit', '--quiet', '-m', 'synthetic-base-3');
+ const renameHead = git('rev-parse', 'HEAD');
+ assert.equal((await planVerification({ cwd: directory, env: { ...environment, GITHUB_SHA: renameHead }, plan,
+  fetch: network({ runs: [{ ...producer, head_sha: code }], self: { ...current, head_sha: renameHead } }) })).coverage, 'full', 'both rename sides inspected');
+ const eventPath = join(directory, 'event.json');
+ const event = { pull_request: { head: { sha: head, ref: current.head_branch, repo: fixture.repository }, base: { repo: fixture.repository } } };
+ await writeFile(eventPath, JSON.stringify(event));
+ const prEnv = { ...environment, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: eventPath, GITHUB_SHA: child, GITHUB_REF: 'refs/pull/1/merge' };
+ const prSelf = { ...current, event: 'pull_request' }; // API identifies the head; the runner tests the merge SHA.
+ const headPush = { ...producer, head_branch: current.head_branch };
+ let polls = 0, sleeps = 0;
+ const waiting = network({ runs: [headPush], self: prSelf, listing: matches => {
+  polls++; return list(matches.map(run => polls < 3 ? { ...run, status: 'in_progress', conclusion: null } : run));
+ } });
+ assert.equal((await planVerification({ cwd: directory, env: prEnv, plan, fetch: waiting, sleep: async () => { sleeps++; } })).coverage, 'reuse', 'waits for separate head push');
+ assert.equal(sleeps, 2);
+ assert.equal((await planVerification({ cwd: directory, env: { ...prEnv, GITHUB_SHA: code }, plan, fetch: network({ runs: [headPush], self: prSelf }) })).coverage, 'full', 'merge tree differs');
+ assert.equal((await planVerification({ cwd: directory, env: prEnv, plan, fetch: network({ runs: [], self: prSelf }), sleep: async () => {} })).coverage, 'full', 'bounded missing producer');
+ for (const conclusion of ['failure', 'cancelled', 'timed_out']) {
+  assert.equal((await planVerification({ cwd: directory, env: prEnv, plan, fetch: network({ runs: [{ ...headPush, conclusion }], self: prSelf }) })).coverage, 'full', conclusion);
+ }
+ await writeFile(eventPath, JSON.stringify({ pull_request: { ...event.pull_request, head: { ...event.pull_request.head, repo: { id: 44, full_name: 'synthetic-base-6/synthetic-base-7' } } } }));
+ assert.equal((await planVerification({ cwd: directory, env: prEnv, plan, fetch: network({ self: prSelf }) })).coverage, 'full', 'fork PR');
+ for (const fetch of [async () => new Response('{}', { status: 403 }), async () => new Response('invalid JSON'), async () => { throw Error('synthetic-base-9'); }]) {
+  assert.equal((await planVerification({ cwd: directory, env: environment, plan, fetch })).coverage, 'full', 'lookup failures run verification');
+ }
+ assert.equal((await decide({ listing: matches => ({ total_count: 2, workflow_runs: matches }) })).coverage, 'full', 'partial page refuses reuse');
+ const hundred = Array.from({ length: 100 }, (_, index) => ({ ...producer, id: 1000 + index, conclusion: 'failure' }));
+ const pages = [];
+ assert.equal((await decide({ listing: (_, url) => {
+  const page = Number(url.searchParams.get('page')); pages.push(page);
+  return { total_count: 101, workflow_runs: page === 1 ? hundred : [producer] };
+ } })).coverage, 'reuse', 'complete pagination finds newest push');
+ assert.deepEqual(pages, [1, 2]);
+ const nightlySelf = { ...current, event: 'schedule', head_branch: 'main' };
+ const nightly = { ...producer, event: 'schedule', head_branch: 'main' };
+ const nightlyEnv = { ...environment, GITHUB_EVENT_NAME: 'schedule', GITHUB_REF: 'refs/heads/main', NIGHTLY_CACHE_HIT: 'true' };
+ const nightlyPlan = { ...plan, nightly: fixture.nightly };
+ const nightlyJobs = run => proofJobs(run, ['plan', 'nightly-proof', 'verify', 'shards (journey)']);
+ const nightlyDecision = runs => planVerification({ cwd: directory, env: nightlyEnv, plan: nightlyPlan, fetch: network({ runs, self: nightlySelf, jobs: nightlyJobs }) });
+ assert.equal((await nightlyDecision([nightly])).coverage, 'reuse', 'marker and newest successful nightly proof');
+ assert.equal((await nightlyDecision([nightly, { ...nightly, id: 4001, conclusion: 'failure' }])).coverage, 'full', 'failed nightly defeats immutable old marker');
+ assert.equal((await nightlyDecision([{ ...nightly, head_branch: current.head_branch }])).coverage, 'full', 'untrusted marker producer');
+ assert.equal((await planVerification({ cwd: directory, env: nightlyEnv, plan: nightlyPlan, fetch: network({ runs: [nightly], self: nightlySelf, jobs: nightlyJobs, latest: { [nightly.id]: { ...nightly, run_attempt: 2, conclusion: 'failure' } } }) })).coverage, 'full', 'failed latest nightly attempt rejects marker');
+ const tag = await planVerification({ env: { ...nightlyEnv, GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/tags/v1' }, plan: nightlyPlan, fetch: () => assert.fail('tag must bypass lookup') });
+ assert.equal(tag.tier, 'all'); assert.equal(tag.matrix.include.length, plan.push.length + fixture.nightly.length);
+ const emptyNight = await planVerification({ env: { ...nightlyEnv, NIGHTLY_CACHE_HIT: '' }, plan, fetch: network({ self: nightlySelf }) });
+ assert.deepEqual(emptyNight.matrix.include, [], 'empty nightly is a deliberate empty plan');
+ // Exercise matrix CLI and generation without pinning a hash or a cron value.
+ const scripts = join(directory, 'scripts');
+ for (const name of ['verify-ci.mjs', 'verify-app.mjs', 'verify-plan.mjs', 'verify-evidence.mjs', 'verify-light.mjs']) await copyFile(resolve(import.meta.dirname, '../export', name), join(scripts, name));
+ await writeFile(join(directory, 'verification.json'), JSON.stringify(nightlyPlan));
+ for (const [tier, expected] of [['push', plan.push], ['nightly', fixture.nightly], ['all', [...plan.push, ...fixture.nightly]]]) {
+  const command = spawnSync(process.execPath, [join(scripts, 'verify-ci.mjs'), '--matrix', tier], { cwd: directory, encoding: 'utf8' });
+  assert.equal(command.status, 0, command.stderr);
+  assert.deepEqual(JSON.parse(command.stdout).include, expected.map(({ name, browser }) => ({ name, browser })));
+ }
+ const output = join(directory, 'planning-output');
+ const command = spawnSync(process.execPath, [join(scripts, 'verify-ci.mjs'), '--plan'], { cwd: directory, encoding: 'utf8', env: { ...process.env, GITHUB_TOKEN: '', GITHUB_OUTPUT: output, TIER: 'push' } });
+ assert.equal(command.status, 0, command.stderr);
+ const outputs = Object.fromEntries((await readFile(output, 'utf8')).trim().split('\n').map(line => { const at = line.indexOf('='); return [line.slice(0, at), line.slice(at + 1)]; }));
+ assert.equal(outputs.coverage, 'full'); assert.equal(outputs.has_shards, 'true');
+ assert.deepEqual(JSON.parse(outputs.matrix).include, plan.push.map(({ name, browser }) => ({ name, browser })));
+ const template = await readFile(resolve(import.meta.dirname, '../export/verify-nightly.yml'), 'utf8');
+ const rendered = renderVerifySchedule(template, 'synthetic-base-1');
+ assert.equal(renderVerifySchedule(rendered, 'synthetic-base-1'), rendered);
+ const cron = /cron: '([^']+)'/.exec(rendered)[1].split(' ');
+ assert.ok(Number(cron[0]) >= 0 && Number(cron[0]) < 60 && Number(cron[1]) >= 2 && Number(cron[1]) < 8);
+ const weekdays = cron[4].split(',').map(Number);
+ const scheduled = Array.from({ length: 7 }, (_, day) => new Date(Date.UTC(2026, 0, 4 + day))).filter(date => weekdays.includes(date.getUTCDay()));
+ assert.deepEqual(scheduled.map(date => date.toLocaleDateString('en', { weekday: 'long', timeZone: 'UTC' })), ['Monday', 'Thursday']);
+ console.log('Planning flows passed: push wait, newest failure/latest attempt, merge trees, direct parent, light refusals, pagination, nightly marker, matrices and schedule rendering.');
+});

@@ -1,6 +1,6 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -11,6 +11,7 @@ import { integrity } from '../scripts/rer-package/registry.mjs';
 import { readPackage, writePackage } from '../global/update/archive.mjs';
 import { userInfo } from 'node:os';
 import { realpath } from 'node:fs/promises';
+import { identity } from '../modules/job-queue/identity.mjs';
 
 const base = resolve(import.meta.dirname, '..');
 const fixture = join(import.meta.dirname, 'fixtures/business');
@@ -41,6 +42,29 @@ async function cli(home, args, { terminal = false, input = '', columns = 120, on
   child.stdin.end(input);
  });
 }
+test('Business entry points expose setup before advanced commands and preserve the selected pairing destination', async t => {
+ const home = join(directory, 'handoff-home');
+ const outputs = await Promise.all([['business'], ['business', '--help']].map(args => cli(home, args)));
+ for (const result of outputs) {
+  assert.equal(result.code, 0);
+  const [lead, ...secondary] = result.stdout.trim().split(/\n\s*\n/);
+  assert.equal(lead.match(/\brer business connect\b/g)?.length, 1, 'one setup action leads help');
+  assert.ok(!/^\s*token(?:\s|$)/m.test(lead), 'advanced commands stay out of the lead');
+  assert.ok(secondary.some(section => /^\S[^\n]*\n/.test(section) && /^ +token(?:\s|$)/m.test(section)),
+   'the token command remains in a separate, headed section after setup');
+ }
+ const remote = await fixtureServer(t);
+ for (const terminal of [false, true]) {
+  const result = await cli(home, ['business', 'connect', '--origin', remote.origin], { terminal });
+  assert.equal(result.code, 1, 'the no-code handoff does not redeem or alter pairing');
+  const text = result.stdout + result.stderr;
+  const urls = text.match(/https?:\/\/[^\s;]+/g);
+  assert.deepEqual(urls, [remote.origin + '/business'], 'one browser link, for the selected app');
+  assert.ok(!text.includes('app.runeditrun.com'), 'an explicitly selected app is preserved');
+  assert.equal(remote.state.requests.length, 0);
+ }
+});
+
 // The fixture answers polls every second instead of the platform's five.
 async function fixtureServer(t) {
  const remote = await server(t);
@@ -344,10 +368,63 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
 
  const stateDir = join(work, '.rer-business');
  await mkdir(stateDir); await writeFile(join(stateDir, 'keep.txt'), 'not rer');
- const env = { RER_BUSINESS_STATE_DIR: stateDir };
+ const registry = join(work, 'registry'), checkout = join(work, 'synthetic-base-1'), live = join(work, 'synthetic-base-2');
+ const owner = await identity(); t.after(() => owner.close());
+ for (const root of [checkout, live]) {
+  await mkdir(root); await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, seedContract: { profile: 'first-party' } }));
+ }
+ await mkdir(registry);
+ const register = roots => writeFile(join(registry, 'state.json'), JSON.stringify({ running: roots.map(checkout => ({ checkout, mode: 'dev', owner: owner.info })) }));
+ await register([checkout]);
+ const env = { RER_BUSINESS_STATE_DIR: stateDir, RER_SERVERS_DIR: registry };
+ const carryFile = root => join(root, '.rer/local/business.json');
+ const proof = async root => {
+  const text = await readFile(carryFile(root), 'utf8');
+  assert.ok(!text.includes(remote.device));
+  t.diagnostic(spawnSync('ls', ['-ld', join(root, '.rer/local'), carryFile(root)], { encoding: 'utf8' }).stdout.trim());
+  t.diagnostic(text.trim());
+  assert.equal((await stat(join(root, '.rer/local'))).mode & 0o777, 0o700);
+  assert.equal((await stat(carryFile(root))).mode & 0o777, 0o600);
+  return text;
+ };
  remote.state.optIns = { installPermissions: null, awakeConsent: false, installService: null };
  const paired = await connect(home, remote, { env });
  assert.equal(redemptions(), before + 1, 'the same code pairs once the folder is writable');
+ const firstCarry = await proof(checkout), carried = JSON.parse(firstCarry);
+ assert.deepEqual(carried, { version: 1, origin: remote.origin, business_id: 'biz', business_url: remote.origin + '/business/biz',
+  name: 'synthetic-base-1', legal_name: null, accent: '#264f45', logo_url: null, refreshed_at: carried.refreshed_at });
+ assert.equal(new Date(carried.refreshed_at).toISOString(), carried.refreshed_at);
+ assert.deepEqual(JSON.parse(await readFile(join(stateDir, 'carried.json'), 'utf8')), [checkout]);
+ assert.equal((await stat(join(stateDir, 'carried.json'))).mode & 0o777, 0o600);
+ assert.equal((await cli(home, ['business','connect'], { env })).code, 0);
+ assert.equal(await readFile(carryFile(checkout), 'utf8'), firstCarry, 'a re-connect preserves unchanged bytes');
+ remote.state.business = { ...remote.state.business, name: 'synthetic-base-2', legal_name: 'synthetic-base-3', brand_color: 'invalid', logo_url: 'http://example.test/logo.png' };
+ const selfReads = () => remote.state.requests.filter(item => item.route === '/api/business/executors/self' && item.method === 'GET').length;
+ const beforeRun = selfReads();
+ assert.equal((await cli(home, ['business','run','--once'], { env })).code, 0);
+ assert.equal(selfReads(), beforeRun + 1, 'run once reads self once');
+ const refreshed = JSON.parse(await proof(checkout));
+ assert.deepEqual([refreshed.name, refreshed.legal_name, refreshed.accent, refreshed.logo_url], ['synthetic-base-2', 'synthetic-base-3', null, null]);
+ assert.notEqual(refreshed.refreshed_at, carried.refreshed_at);
+ const changedCarry = await readFile(carryFile(checkout), 'utf8');
+ remote.state.business.id = 'synthetic-base-4';
+ const mismatched = await cli(home, ['business','connect'], { env });
+ assert.equal(mismatched.code, 0); assert.equal(await readFile(carryFile(checkout), 'utf8'), changedCarry);
+ assert.equal(mismatched.stderr.trim().split('\n').length, 1); assert.ok(mismatched.stderr.includes(remote.origin) && mismatched.stderr.includes('another Business'));
+ await rm(carryFile(checkout));
+ assert.equal((await cli(home, ['business','connect'], { env })).code, 0);
+ await assert.rejects(stat(carryFile(checkout)), { code: 'ENOENT' });
+ remote.state.business = undefined;
+ assert.equal((await cli(home, ['business','connect'], { env })).code, 0);
+ await assert.rejects(stat(carryFile(checkout)), { code: 'ENOENT' });
+ remote.state.business = { id: 'biz', name: 'synthetic-base-2', legal_name: null, brand_color: '#264F45', logo_url: 'https://example.test/logo.png' };
+ assert.equal((await cli(home, ['business','connect'], { env })).code, 0);
+ const finalCarry = await proof(checkout);
+ // One recorded checkout is no longer live. The other live checkout was never recorded.
+ await mkdir(join(live, '.rer/local'), { recursive: true, mode: 0o700 });
+ await writeFile(carryFile(live), finalCarry, { mode: 0o600 });
+ await proof(live); await register([live]);
+
  assert.ok(!(await readdir(home)).includes('.rer'), 'nothing is written to ~/.rer when RER_BUSINESS_STATE_DIR is set');
  assert.equal((await stat(join(stateDir, 'state.json'))).mode & 0o777, 0o600);
  for (const choice of ['Add rules so Claude Code never reads your secret files', 'Install the background service']) assert.ok(paired.stdout.includes(choice), paired.stdout);
@@ -356,6 +433,9 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
  const status = await cli(home, ['business','status','--json'], { env });
  assert.equal(JSON.parse(status.stdout).paired, true);
  assert.equal((await cli(home, ['business','disconnect'], { env })).code, 0);
+ await assert.rejects(stat(carryFile(checkout)), { code: 'ENOENT' });
+ await assert.rejects(stat(carryFile(live)), { code: 'ENOENT' });
+ t.diagnostic('disconnect: recorded carry absent; live unrecorded carry absent; carried.json removed');
  assert.deepEqual(await readdir(stateDir), ['keep.txt'], 'disconnect removes only its own files from a named folder');
  delete remote.state.optIns;
 
@@ -415,6 +495,35 @@ test('browser opt-ins apply without terminal prompts, and disconnect revokes bef
   assert.equal(remote.state.revoked, true);
   assert.deepEqual(JSON.parse(await readFile(join(home, '.claude/settings.json'), 'utf8')), prior);
   assert.deepEqual(await readdir(home), baseline, 'service files, parents, keychain items, state and permission additions are removed');
+ }
+});
+
+test('paired guidance names one applying command and run and next apply later browser choices without reconnecting', async t => {
+ const remote = await fixtureServer(t);
+ for (const terminal of [false, true]) {
+  for (const command of ['next', 'run']) {
+   const home = join(directory, `later-choices-${command}-${terminal}`);
+   remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
+   const paired = await connect(home, remote, { terminal });
+   assert.match(paired.stdout, /\bbusiness next\b/);
+   // An already-paired invocation emits just the successful connection guidance,
+   // without the earlier instruction for resuming a pending approval.
+   const connected = await cli(home, ['business', 'connect'], { terminal });
+   assert.equal(connected.code, 0, connected.stderr);
+   assert.deepEqual([...new Set(Array.from(connected.stdout.matchAll(/\bbusiness (\w+)\b/g), match => match[1]))], ['next']);
+   assert.doesNotMatch(connected.stdout + connected.stderr, /\bconnect\b/);
+   assert.ok(!(await readdir(home)).includes('.claude'));
+   remote.state.optIns = { installPermissions: true, awakeConsent: true, installService: true };
+   const applied = await cli(home, ['business', command, ...(command === 'run' ? ['--once'] : [])], { terminal });
+   assert.equal(applied.code, 0, applied.stderr);
+   assert.equal(JSON.parse(await readFile(join(home, '.rer/business/state.json'), 'utf8')).awakeConsent, true);
+   assert.ok((await readdir(join(home, '.claude'))).includes('settings.json'));
+   const status = await cli(home, ['business', 'status', '--json']);
+   assert.equal(JSON.parse(status.stdout).service, 'running');
+   assert.equal(remote.state.requests.filter(entry => entry.body.code).length, 1, 'applying choices never redeems another code');
+   assert.equal((await cli(home, ['business', 'disconnect'])).code, 0);
+   remote.state.requests.length = 0;
+  }
  }
 });
 

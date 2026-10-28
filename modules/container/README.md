@@ -85,7 +85,12 @@ configuration. Keep them in the mail spec's public variables and Wrangler `vars`
 and remove them from `deploy.json` secrets. For migration, the image builder
 accepts those legacy secret declarations when the managed-mail spec declares them public,
 and prints that correction. Runtime settings override their image defaults.
-API keys, tokens and other secrets in image variables remain refused.
+Both the container and native demo builders remove exact empty-string Wrangler
+variables whose names are declared as runtime secrets, including from the packaged
+Worker configuration. Their runtime secret declarations stay intact. Non-empty
+secret values (including whitespace) in image variables remain refused with
+`Secret declared as an image variable: NAME`. The managed-mail migration rule
+above remains the only exception for non-empty public configuration.
 
 `rer deploy --platform container --host ssh://user@host --env-file FILE` uses
 strict SSH host-key checking and a Linux host with Python 3 and Docker. FILE must

@@ -35,7 +35,7 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     await writeFile(join(app, 'demo.json'), JSON.stringify({ config, migrations, assetsDir: 'app-assets' }));
     await prepareNative(folder);
     const origin = 'https://demo.example.test', measurement = 'fixture-measurement-token-1234567890123456';
-    const files = ['modules/demo-host/native/worker.mjs', ...[...RUNTIME_FILES.filter(file => file !== 'worker'), 'bundle'].map(file => `modules/demo-host/native/${file}.mjs`),
+    const files = ['modules/demo-host/native/worker.mjs', 'modules/container/adapters/d1-limits.mjs', ...[...RUNTIME_FILES.filter(file => file !== 'worker'), 'bundle'].map(file => `modules/demo-host/native/${file}.mjs`),
       ...DEMO_FILES.map(file => `modules/demo-host/${file}`), ...['migrations', 'demo-egress'].map(file => `modules/container/${file}.mjs`), ...['sql-safety', 'sql-tokens', 'migration-ledger', 'validation'].map(file => `modules/deploy-kit/${file}.mjs`)];
     mf = new Miniflare(convertV4MiniflareOptions({ name: 'native-test', unsafeInspectDurableObjects: true, modulesRoot: folder, modules: files.map(path => ({ type: 'ESModule', path: join(folder, path) })),
       compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'], workerLoaders: { LOADER: {} },
@@ -90,6 +90,13 @@ test('Loader demos claim and seed two isolated native apps, serve edge assets, a
     assert.notEqual(keyIds[1], keyIds[0], 'two visitors never share an installation key');
     assert.equal((await fetch('/items', a, { method: 'POST', body: 'visitor-a' })).status, 200);
     assert.deepEqual(await (await fetch('/items', b)).json(), [{ name: 'sample' }]);
+    for (const count of [32, 33]) {
+      const result = await fetch('/d1-limits', a, { method: 'POST', body: JSON.stringify({ sql: `SELECT max(${Array(count).fill(1).join(',')}) AS n`, values: [] }) });
+      assert.equal(result.status, count === 32 ? 200 : 400);
+      const body = await result.json();
+      if (count === 32) assert.equal(body.results[0].n, 1);
+      else assert.match(body.error, /SQL function arguments maximum 32, measured 33/);
+    }
     assert.deepEqual(await (await fetch('/d1-session', b)).json(), { names: ['sample'], bookmark: 'string', unknown: true, warnings: 1 }, 'D1 sessions read the visitor database; an unknown D1 method reads undefined and warns once');
     assert.deepEqual(await (await fetch('/modules', a)).json(), { sum: 5, data: [7, 8, 9] }, 'the app answers with its wasm and data modules');
     assert.equal((await fetch('/bindings', a, { method: 'POST', body: 'visitor-a' })).status, 201);
