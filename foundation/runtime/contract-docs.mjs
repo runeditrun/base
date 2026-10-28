@@ -644,7 +644,7 @@ function covScope(old) {
         if (level > 1 || introStarted) introEnded = true;
         continue;
       }
-      if (!text.trim()) { if (introStarted) introEnded = true; continue; }
+      if (!(insideFence ? text : withoutQuoteMarkers(text)).trim()) { if (introStarted) introEnded = true; continue; }
       if (covDivider(text)) continue;
       if (definition) clause = definition[1];
       const section = [...headings].reverse().find(entry => entry.level === 2)?.text ?? '';

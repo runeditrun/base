@@ -94,7 +94,17 @@ async function nonProductJourney() {
   }
 }
 
+async function prepareProseClaims(root) {
+  // Prose journeys use valid links; the legacy journey below separately proves
+  // that historical aliases require a reviewed, source-bound claim map.
+  const claims = await read(root, 'docs/CLAIMS.md')
+  await edit(root, 'docs/CLAIMS.md', claims.replace('| OWN-01 |', '| E1 |').replace('| Honest boundaries |', '| PUBLISH-01 |').replace('| — |', '| AUTH-HOST-01 |'))
+  git(root, 'add', 'docs/CLAIMS.md')
+  git(root, 'commit', '-qm', 'Synthetic prose journey claims')
+}
+
 async function statusLineJourney(root) {
+  await prepareProseClaims(root)
   const source = await read(root, 'CONTRACT.md')
   const requirement = "Owners can change an entry's description without changing its identity."
   const acceptance = '**Acceptance:**\n1. Save the description.\n2. Keep the entry owner.'
@@ -142,6 +152,7 @@ async function statusLineJourney(root) {
 }
 
 async function blockquoteJourney(root) {
+  await prepareProseClaims(root)
   const source = await read(root, 'CONTRACT.md')
   const original = '- **PUBLISH-01 — Publish the catalogue.** Visitors can read published entries.\n  Draft entries stay private.'
   const heading = '- **PUBLISH-01 — Publish the catalogue.**'

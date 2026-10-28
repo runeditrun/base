@@ -27,9 +27,6 @@
 - `rer refresh-base` no longer prints the template-adoption notice when a preserved workflow already matches the incoming template, including acknowledged adaptations.
 - Older v2 backups without `schemaObjects` now restore without acknowledgment when their recorded migrations prove the complete destination schema and archived tables. Unverifiable backups retain the explicit recovery option. Managed data ZIP intake also accepts old native staging-table leftovers, and its fixture preserves parent-before-child creation order for foreign keys.
 - `rer import` now restores into an existing local D1 file with no product schema, including a file created by Wrangler after reset. Migrations run before restore as they do when no file exists; occupied destinations and unknown foreign tables remain refused.
-
-## 0.2.86
-
 - `rer refresh-base` refused sparse historical module copies when required dependency additions also resolved their old missing imports. Refresh now delivers and records those planned dependencies without a manual copy-record edit; ordinary unresolved imports without a planned dependency remain preserved.
 
 ## 0.2.85
