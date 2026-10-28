@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.86
 
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.
 
@@ -12,7 +12,19 @@
 
 - Agent-door verification can map native environment binding names to its disposable issuer, installation and owner/session values. Durable invocations retain their originating consent and refuse revoked consent at worker admission, with consent attribution in the audit.
 
-## 0.2.86
+- Verify labelled sponsor lists through native lifecycles, signed Business bindings and a cross-sponsor privacy/approval phase; single-sponsor journeys keep their existing phases and point counts.
+- Provision native per-install webhook keys into isolated verification receivers through a contained, read-only state accessor; signed inbound probes verify both accepted effects and wrong-signature refusals.
+- Add explicit `authority: 'none'` security tools for justified record changes, with closed schema validation, undeclared-argument refusal, normal policy/approval handling and audit classification.
+- Recheck current agent-door admission before returning idempotent outcomes; refusals retain their own audit without exposing cached content.
+- Agent-door verification can declare independent native reviewer lifecycles with bounded, recipient-scoped captured mail; invitations, confirmation and two-person decisions still pass through the seed's production handlers.
+- Resolve seed-declared native targets into audit and hashed approval summaries; retain resolvable pause/unset classification; return resource refusal machine codes in JSON-RPC data; require sponsor-escalation fixtures only for applicable native surfaces.
+- Expose frozen agent-door admission identity, granted scopes, operation id and idempotency key to native tools. Bind queued continuations to their retained admission, preserve named approvers and once-only replay, and recheck current grants and consent before effects.
+- Add `rer business setup --origin URL --session-file FILE --confirm-demo` to provision the synthetic Run your business demo through the platform owner routes. Mirror managed/assisted/self_host hosting, resumable door proofs and read-only completed repeats; require an owned 0600 session file, keep its value out of output, and retain the platform JSON receipt and nonzero incomplete result.
+- Prove publication-scan copy digests per file, so an adapted file in a directory copy no longer discards its unchanged siblings' proofs. Mismatched digests, adapted content and unlisted files remain fully scanned.
+- Hosted demo redeploys now recognise secret-triggered versions that lost their ownership annotation when unchanged code, runtime and bindings match the retained rer deployment. Foreign or changed Workers remain refused before writes, with the actual ownership cause and recovery guidance in human and JSON output.
+- `rer check` now fails `deploy.vars-secrets` when any Wrangler source or environment declares a plain variable that the deployment also declares as a secret, including empty placeholders. It lists every binding and both declaration locations, with the repair, before a build or demo deploy.
+- Seeds can sync the canonical BASE-AGENT-001 through 013 requirements with `rer door clauses --write` or detect drift with `--check`. The command preserves seed judgments and specialist clauses, adds unjudged duties as missing, and regenerates and checks contract documents. The module copy and portable CLI inventory deliver the same canonical source.
+- `rer business setup` succeeds only when every required seed has provisioning, a token, confirmed policy, delivered settings and recorded door proofs. Completed repeats return equal receipts, and incomplete required adoptions keep `complete: false` and a nonzero exit.
 
 - Agent-door verification fixtures generate disposable setup, session, local bearer, delivery and provider credentials at runtime while retaining signed receipts and isolated provider checks.
 

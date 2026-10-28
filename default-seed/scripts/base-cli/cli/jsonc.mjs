@@ -7,8 +7,8 @@ function location(text, position) {
 // version's error wording. An explicit stack also handles deeply nested input.
 // Only comments and commas accepted by the grammar are masked; offsets stay in
 // the original source and comment removal can never join separate tokens.
-export function parseJsonc(text) {
- const result = text.split(''), stack = [{ kind: 'root', state: 'value' }];
+export function parseJsonc(text, onProperty) {
+ const result = text.split(''), stack = [{ kind: 'root', state: 'value', path: [] }];
  let index = 0;
  const fail = (message, position = index) => {
   throw new SyntaxError(`${position === text.length ? 'Unexpected end of JSON input' : message} at ${location(text, position)}`);
@@ -80,7 +80,10 @@ export function parseJsonc(text) {
    index++; stack.pop();
   } else if (frame.state === 'keyOrEnd') {
    if (char !== '"') fail('Expected a property name');
-   string(); frame.state = 'colon';
+   const start = index; string();
+   frame.key = onProperty ? JSON.parse(text.slice(start, index)) : undefined;
+   onProperty?.([...frame.path, frame.key], start);
+   frame.state = 'colon';
   } else if (frame.state === 'colon') {
    if (char !== ':') fail("Expected ':' after property name");
    index++; frame.state = 'value';
@@ -91,10 +94,11 @@ export function parseJsonc(text) {
    if (text[index] === closing) result[comma] = ' ';
    frame.state = frame.kind === 'object' ? 'keyOrEnd' : 'valueOrEnd';
   } else {
+   const path = !onProperty ? undefined : frame.kind === 'root' ? [] : [...frame.path, frame.kind === 'array' ? frame.next++ : frame.key];
    frame.state = frame.kind === 'root' ? 'end' : 'comma';
    if (char === '{' || char === '[') {
     index++;
-    stack.push({ kind: char === '{' ? 'object' : 'array', state: char === '{' ? 'keyOrEnd' : 'valueOrEnd' });
+    stack.push({ kind: char === '{' ? 'object' : 'array', state: char === '{' ? 'keyOrEnd' : 'valueOrEnd', path, next: 0 });
    } else if (char === '"') string();
    else if (char === '-' || digit()) number();
    else {

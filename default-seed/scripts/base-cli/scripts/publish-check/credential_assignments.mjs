@@ -42,6 +42,8 @@ function findCredentialAssignments(text,options={}) {
 // Known credential formats are still scanned throughout those literals.
 function referenceLiteral(value){
  if(/^(?:\.{1,2}\/|\/)[A-Za-z0-9_./{}:-]+$/.test(value))return true
+ // Contained bare module paths have the same reference meaning as ./module paths.
+ if(/^(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.-]+\.(?:[cm]?[jt]sx?|json)$/.test(value))return true
  try{const url=new URL(value);return ['https:','http:'].includes(url.protocol)&&!url.username&&!url.password&&!url.search&&!url.hash}catch{return false}
 }
 

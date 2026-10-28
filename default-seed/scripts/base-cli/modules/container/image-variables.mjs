@@ -3,10 +3,16 @@ import {deliveryDeclarationSources} from '../../cli/delivery-declarations.mjs';
 import {sourcePath} from '../delivery-producer/migrations.mjs';
 import {usesManagedMail,validateMailSpec} from '../delivery-producer/mail.mjs';
 
+/** Shared binding comparison for source checks and emitted image validation. */
+export function imageVariableSecrets(vars, secrets) {
+ return secrets.filter(secret => Object.hasOwn(vars, secret.binding));
+}
+
 /** Drop empty runtime-secret placeholders; admit only managed-mail public legacy values. */
 export async function checkImageVariables(root,vars,secrets) {
- const placeholders=secrets.filter(secret=>Object.hasOwn(vars,secret.binding) && vars[secret.binding] === '');
- const overlaps=secrets.filter(secret=>Object.hasOwn(vars,secret.binding) && vars[secret.binding] !== '');
+ const declared=imageVariableSecrets(vars,secrets);
+ const placeholders=declared.filter(secret=>vars[secret.binding] === '');
+ const overlaps=declared.filter(secret=>vars[secret.binding] !== '');
  if (!overlaps.length) {
   for (const {binding} of placeholders) delete vars[binding];
   return;
