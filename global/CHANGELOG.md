@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Restore identity suffixes in migration-history refusal tokens for pending checkout files, mixed Platform ledgers and checkout-owned migration identities, retaining constant adapter error codes, exit statuses and recovery guidance. Deliberately leave `migration_ledger:unknown:initial-page.sql` unrestored when it has no checkout provenance: the privacy contract excludes unchecked ledger values from diagnostics.
+
 - Restore seed offline deploy hooks for `rer deploy --dry-run`. Hook and generic dry-run receipts include `providerChecked: false`, and local preflight keeps listing missing real-deploy inputs without contacting Cloudflare.
 - Preserve local plans and defer missing production owner inputs when running seed dry-run hooks. Legacy hooks using the deployment kit stay offline; real deployments retain their owner preflight refusals.
 

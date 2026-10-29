@@ -72,7 +72,7 @@ test('public import uses Platform file hashes without replaying them, admits dec
  await target.data('DELETE FROM computed_entries');
  await writeFile(join(directory,'1000_pending.sql'),'CREATE TABLE pending_items(id TEXT PRIMARY KEY);');
  const pending=await target.text(['import','--input','exports/saved.rer','--yes'],4);
- assert.match(pending.stderr,/migration_ledger:unapplied/);
+ assert.match(pending.stderr,/migration_ledger:unapplied:1000_pending\.sql/);
  assert.deepEqual((await target.data("SELECT name FROM sqlite_master WHERE name='pending_items'"))[0].results,[]);
  await rm(join(directory,'1000_pending.sql'));
 });
