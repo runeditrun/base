@@ -1026,6 +1026,7 @@ modules/portability/schema-identity.mjs
 modules/portability/schema-legacy.mjs
 modules/portability/sqlite-tokens.mjs
 modules/portability/bookkeeping.mjs
+modules/portability/snapshot-objects.mjs
 modules/portability/storage.mjs
 modules/portability/copies.mjs
 modules/portability/derived.mjs

@@ -4559,7 +4559,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "27a43191be297c8a569fce461394e1df210c3177a73d7470b6abab0edaaba533"
+      "sha256": "72c45c3e64af9658fe8216c4bfbf3ef5fc1f8c63250010865661398f6eefbce9"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
