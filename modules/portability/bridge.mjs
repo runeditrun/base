@@ -65,10 +65,10 @@ async function placement(db,manifest,cat,replay,ledger,history,legacyRecovery,un
   // whatever it reads; eligible catalogue backfills are replayed.
   const catalogue=cat.tables.map(t=>t.name),archivedTables=catalogue.filter(name=>manifest.tables.some(t=>t.name===name));
   const empty=archivedTables.filter(name=>!manifest.tables.find(t=>t.name===name).count);
-  const definitions=await all(db,"SELECT name,sql FROM sqlite_master WHERE type IN ('table','view')"),tables=definitions.map(t=>t.name);
+  const tables=(await all(db,"SELECT name FROM sqlite_master WHERE type IN ('table','view')")).map(t=>t.name);
   const baseline=await replay.rowImages?.(cat.tables.filter(t=>!archivedTables.includes(t.name)).map(t=>({name:t.name,columns:t.columns.map(c=>c.name)})),0);
   const replayEmpty=baseline?[...baseline].filter(([,rows])=>!rows.length).map(([name])=>name):[];
-  const {replays,rebuilt}=laterData({applied,unapplied,replay,catalogue,archived:archivedTables,empty,tables,secrets:manifest.excludedColumns??{},manifest:manifest.tables,replayEmpty,definitions});
+  const {replays,rebuilt}=laterData({applied,unapplied,replay,catalogue,archived:archivedTables,empty,tables,secrets:manifest.excludedColumns??{},manifest:manifest.tables,replayEmpty});
   return {applied,earlier,replays,rebuilt};
 }
 // Old v2 writers recorded tables and applied migration names, but no behavioral

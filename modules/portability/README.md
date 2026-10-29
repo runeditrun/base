@@ -574,7 +574,7 @@ library path refuses in Workers with `schema_mismatch:legacy_evidence`.
 Later data statements also qualify when a surviving trigger from that same
 migration repeats the complete statement block, in order, on Base's restore
 commit transition. Those statements run through that destination-owned trigger,
-not a second finalize replay. Other replays may not consume their pending writes.
+not a second finalize replay.
 Absent tables count as empty only with an empty full replay and proof that every
 later insert and possible trigger writer preserves emptiness; a bounded empty
 copy/drop/rename rebuild and a SELECT from such an empty source carry no row.
