@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.89-dev.g15ad52fd",
+  "cliVersion": "0.2.89-dev.gc1dd6312",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,7 +391,7 @@
     },
     "cli/agent-door.mjs": {
       "source": "cli/agent-door.mjs",
-      "sha256": "6e3e0fc2fb5a86bdeeb9609cc94325cb10b3343d563d98c0c4ed8af36897496f"
+      "sha256": "47439d3f6af0c25f5d34dc9f48d6145b3c134a2289b2081e7d40be440e2e4535"
     },
     "cli/agent-fixtures.mjs": {
       "source": "cli/agent-fixtures.mjs",
