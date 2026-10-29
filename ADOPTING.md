@@ -1,5 +1,7 @@
 # Adopting Base refresh and installation transfers
 
+Agent-door adopters must refresh `modules/agent-door/credentials.ts`: the door now refuses a Business token whose email is not its subject's current native email (the `email` `people.sponsor` returns), with the same 401 and no effect as an unknown or inactive sponsor.
+
 Refresh `modules/agent-door/pipeline.ts` and `conformance/journey.mjs` together
 for completed mutation replay:
 

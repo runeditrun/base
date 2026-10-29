@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.
+- Probe sponsor admission with verifier-signed access tokens for an unknown subject and a known subject with a changed email. Native negative-phase fixtures may declare `sponsors: {inactive: {sub,email}, excluded: {sub,email}}` for lifecycle-prepared persons. Each probe requires a typed HTTP 401/403 refusal and an unchanged native witness; omitted states are reported as undeclared without passing points. Fixtures receive no signing authority and failure diagnostics omit their values and identities. See `modules/agent-door/ADOPTING.md`.
+- Additional `verification.sponsors` may declare `negativeOnly: true` when their native subjects must be registered for these probes. Their normal initialization and Business binding still run; successful cross-sponsor journeys remain required for regular sponsors.
+
 - Account for linked native continuations and refused approval executions in agent-door audit conformance without shifting later harness rows; unrelated or policy-inconsistent extra rows still fail.
 
 - Refuse continuation tools under unset, removed or unavailable policy and Business Pause before validating or resolving native continuation items, retaining current scope, revocation and once-only execution checks.
