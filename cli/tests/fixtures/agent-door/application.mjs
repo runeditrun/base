@@ -1,5 +1,6 @@
 import { createPhaseClients } from './client.mjs';
 import { createAgentDoor, defineTool, operatorAuthPeople, ToolRefusal } from '../../../../modules/agent-door/index.ts';
+import { offers } from '../../../../modules/agent-door/capabilities.mjs';
 import { createOperatorAuth } from '../../../../modules/operator-auth/index.mjs';
 import { createBusinessSettings } from '../../../../modules/business-settings/index.ts';
 import { deliveryRequest, verifyDeliveryReceipt } from './receiver.mjs';
@@ -97,7 +98,7 @@ async function openAiReview(record, stream) {
   return { providerId: document.id, output, stream, recursiveDenied: true };
 }
 
-function recordTools(db, records) {
+function recordTools(db, records, capabilities) {
   const sendInput = object({ id: text, stream: { type: 'boolean' } });
   const target = async (args, ctx, recipient) => ({ target: { id: (await records.read(args.id, ctx.person)).id }, recipients: [recipient] });
   return [
@@ -108,7 +109,7 @@ function recordTools(db, records) {
     defineTool({ name: 'fixture.records.create', title: 'Create record', description: 'Save an internal record. Undo is available until a record has external receipts.', scope: 'records:write', readOnly: false,
       inputSchema: object({ value: { ...text, maxLength: 2000 } }), outputSchema: recordSchema, classes: ['standard'], clauses: ['BASE-AGENT-002'], classify: standard,
       summary: args => ({ target: { name: args.value } }),
-      async run(args, ctx) { const record = await records.create(args.value, ctx.person); ctx.emit('record.created', uri(record.id)); return { result: record, undo: { id: record.id } }; },
+      async run(args, ctx) { const record = await records.create(args.value, ctx.person); ctx.emit('record.created', uri(record.id)); return { result: record, ...(offers(capabilities, 'resources') ? { resources: [{ uri: uri(record.id), name: 'Created record' }] } : {}), undo: { id: record.id } }; },
       async undo(saved, ctx) {
         await records.read(saved.id, ctx.person);
         const deleted = await db.prepare('DELETE FROM fixture_records WHERE id=? AND operator_id=? AND NOT EXISTS(SELECT 1 FROM fixture_receipts WHERE record_id=?)').bind(saved.id, ctx.person.id, saved.id).run();
@@ -221,7 +222,7 @@ export async function application(env) {
     const people = memberPeople(operatorAuthPeople({ db: env.DB, session: incoming => auth.getSession(incoming) }), env.DB, nativeMode, env.SKIP_SPONSOR_CHECK);
     const phaseClients = env.PHASE_FIXTURES ? createPhaseClients({ db: env.DB, records, ToolRefusal }) : null;
     const options = { capabilities: env.AGENT_CAPABILITIES ? JSON.parse(env.AGENT_CAPABILITIES) : undefined, seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [{ uriTemplate: 'fixture://record/{id}', name: 'Record', scope: 'records:read', classes: ['standard'], classify: standard, async read(resource, ctx) { try { return { json: await records.read(resource.split('/').pop(), ctx.person) }; } catch (error) { if (error instanceof ToolRefusal) return null; throw error; } } }],
-      limits: { requestsPerMinute: 10000 }, tools: [...recordTools(env.DB, records), ...authorityTools(env.DB, records), ...(phaseClients?.tools ?? []), ...(env.RPC_PROOF ? rpcTools(env, records) : []), ...(env.COMPOSITE_PROOF ? compositeTools(env.DB, records) : []), ...(env.GITHUB_PROOF ? githubTools(env) : []), ...(env.SPONSOR_PROOF ? privateRecordTools(env.DB, records) : []), ...(env.SECURITY_PROOF ? [...securityTools(env.DB, records), ...accessTools(env.DB, auth, records)] : [])], nativeProof: nativeProof(env.DB),
+      limits: { requestsPerMinute: 10000 }, tools: [...recordTools(env.DB, records, env.AGENT_CAPABILITIES ? JSON.parse(env.AGENT_CAPABILITIES) : undefined), ...authorityTools(env.DB, records), ...(phaseClients?.tools ?? []), ...(env.RPC_PROOF ? rpcTools(env, records) : []), ...(env.COMPOSITE_PROOF ? compositeTools(env.DB, records) : []), ...(env.GITHUB_PROOF ? githubTools(env) : []), ...(env.SPONSOR_PROOF ? privateRecordTools(env.DB, records) : []), ...(env.SECURITY_PROOF ? [...securityTools(env.DB, records), ...accessTools(env.DB, auth, records)] : [])], nativeProof: nativeProof(env.DB),
       people, ...(phaseClients ? { localCredentials: phaseClients.localCredentials, currentScopes: phaseClients.currentScopes } : {}) };
     if (env.CONTINUATION_PROOF) options.tools.push(...continuationTools(env.DB, records, () => options, env.FABRICATE_CONTINUATION));
     const door = createAgentDoor(options);

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Agent-door conformance requires a record-write resource fixture when a writable door offers resources. BASE-AGENT-003 acceptance 4 now rejects missing or foreign links and checks the written JSON state through the same door's resources/read; approval-gated reads still withhold content.
+
 - Reword agent-door verification path and binding examples, plus erasure column and OIDC method examples, to avoid credential-shaped quoted assignments while preserving their meaning.
 
 - Restore identity suffixes in migration-history refusal tokens for pending checkout files, mixed Platform ledgers and checkout-owned migration identities, retaining constant adapter error codes, exit statuses and recovery guidance. Deliberately leave `migration_ledger:unknown:initial-page.sql` unrestored when it has no checkout provenance: the privacy contract excludes unchecked ledger values from diagnostics.

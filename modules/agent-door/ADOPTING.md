@@ -372,6 +372,40 @@ with a redacted diagnostic. A missing declaration does not claim queue coverage.
 
 ## Keep runtime and CLI evidence separate
 
+BASE-AGENT-003 acceptance 4 requires a record-writing fixture when the door
+offers resources and has mutating tools. Add `resource` to a create or update
+journey step, naming a declared native template and a nonempty JSON state subset:
+
+```json
+{
+  "id": "create",
+  "tool": "base.people.create",
+  "args": { "name": "Synthetic Base 1", "email": "synthetic-base-1@example.com" },
+  "expect": [{ "class": "standard" }],
+  "resource": {
+    "uriTemplate": "base://person/{id}",
+    "state": {
+      "id": { "$from": "create", "pointer": "/id" },
+      "name": "Synthetic Base 1",
+      "email": "synthetic-base-1@example.com"
+    }
+  }
+}
+```
+
+Use native written fields as well as the returned identifier, with more fixtures
+for other record writes. State references may use the current step's output or
+earlier outputs. `BASE-AGENT-003.4.fixture` fails an omitted fixture;
+`BASE-AGENT-003.4.links.<phase>.<step>` requires a returned link matching its
+template, scheme and authority (HTTP resources must use the installation origin).
+`BASE-AGENT-003.4.state.<phase>.<step>` reads that link through this door using
+the step's client and compares JSON content bearing the same URI with the expected
+state subset. Missing, stale, malformed and unrelated state fails. The existing
+resource policy checks still run for every returned link. Approval-gated reads
+remain withheld in the held phase; the autonomous phase proves their state.
+Deletion and tools without record effects need no invented resource fixture.
+These points prove the declared fixtures, not every possible record or write.
+
 The copied module is application runtime source pinned by `base-copies.json`.
 The edition's pinned `rer` CLI remains its command and authoring dependency.
 Updating one does not prove or update the other. CLI conformance runs as plain
