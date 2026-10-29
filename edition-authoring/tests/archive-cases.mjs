@@ -85,8 +85,8 @@ export function archiveSourceCases(temp, run, snapshotTree) {
   assert.deepEqual(snapshotTree(archived), repeated);
   fs.rmSync(path.join(incoming, 'linked.mjs'));
 
-  // Archives preserve unrecorded workflows without inferring historical
-  // ownership. Migration introductions still require real ancestry.
+  // Archive refresh preserves unproven old workflow bytes and can match only
+  // the supplied snapshot. Migration ancestry still requires real history.
   write(base, 'export/verify.yml', 'jobs: {}\n');
   commit(base);
   write(base, 'export/verify.yml', 'name: Verify\njobs: {}\n');
@@ -98,6 +98,14 @@ export function archiveSourceCases(temp, run, snapshotTree) {
   assert.equal(refreshed.templateAdoptions.length, 0);
   assert.deepEqual(snapshotTree(archived)['.github/workflows/verify.yml'], beforeHistory['.github/workflows/verify.yml']);
   assert.ok(refreshed.notices.length > 0);
+  assert.ok(!JSON.parse(record(archived)).copies.some(copy => copy.path === '.github/workflows/verify.yml'));
+  write(archived, '.github/workflows/verify.yml', 'name: Verify\njobs: {}\n');
+  ok(archived, 'refresh-base', '--ref', withWorkflow, '--base-archive', workflowArchive);
+  assert.ok(JSON.parse(record(archived)).copies.some(copy => copy.path === '.github/workflows/verify.yml'));
+  // Remove the adopted workflow record before testing migration ancestry.
+  const adopted = JSON.parse(record(archived));
+  adopted.copies = adopted.copies.filter(copy => copy.path !== '.github/workflows/verify.yml');
+  write(archived, 'base-copies.json', JSON.stringify(adopted));
   fs.rmSync(path.join(archived, '.github/workflows/verify.yml'));
   git(archived, 'reset', '--quiet', '--', '.github/workflows/verify.yml');
   write(base, 'foundation/edition-migrations.json', JSON.stringify({schemaVersion: 1, migrations: [{id: 'sample-edit', introduced: first, origin: 'modules/sample/index.mjs', guide: 'GUIDE.md', edit: 'Review sample edit.', deliver: []}]}));

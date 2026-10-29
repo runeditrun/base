@@ -43,7 +43,7 @@ export function adoptWorkflowTemplates(root, plans, {tree, read, revision, files
     const file = files.get(target) ?? (physical.stat && {regular: true, read: () => fs.readFileSync(physical.target)});
     if (!file?.regular) continue;
     let match;
-    if (!owner && index.has(target) && read.historyAvailable !== false) {
+    if (!owner && index.has(target)) {
       const bytes = file.read();
       // Full committed history includes the published 0.2.83 runner.temp
       // template as well as earlier default-seed mirrors. No release pins or
