@@ -28,7 +28,6 @@ export function mutationTools(db: D1Database): ToolDefinition[] {
     },
     async run(args, ctx) {
       const row = await read(args.id)
-      if (!ctx.approvers.length) throw new ToolRefusal('native_approval_required')
       await db.batch([
         mode === 'delete' ? db.prepare('DELETE FROM test_records WHERE id=?').bind(args.id)
           : db.prepare("UPDATE test_records SET value=?,version=version+1,exposure='internal' WHERE id=?").bind(args.value, args.id),

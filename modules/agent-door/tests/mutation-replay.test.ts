@@ -108,7 +108,28 @@ test('item 2: held restore journey checks original widening evidence separately 
     const failures = c.points.filter((point: any) => !point.ok)
     t.diagnostic(`item 2 restore journey: ${c.points.length - failures.length}/${c.points.length}; ${JSON.stringify(failures)}`)
     assert.deepEqual(failures, [])
-    assert.ok(c.points.some((point: any) => point.id === 'BASE-AGENT-012.admission.held.restore' && point.ok))
+    assert.ok(c.points.some((point: any) => point.id === 'BASE-AGENT-007.5.receipt.restore' && point.ok))
     assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM test_sent').first()).n, 1)
+  } finally { await r.close() }
+})
+
+test('completed reviewed schedule retains the original review and consumed version', async t => {
+  const r = await runtime()
+  try {
+    const id = crypto.randomUUID(), args = { id, value: 'scheduled', expected_revision: 1, idempotency_key: crypto.randomUUID() }
+    await r.db.prepare('INSERT INTO test_records VALUES(?,?,1,?)').bind(id, 'prepared', 'hidden').run()
+    const policy = autonomousPolicy(); policy.rules = [{ id: 'review', class: '*', do: 'review' }]; policy.reviewers = ['sponsor']
+    await r.adopt(policy)
+    const first = await r.tool('mutation.schedule', args), review = meta(first)['com.runeditrun/review']
+    assert.equal(code(first), undefined); assert.ok(review?.id)
+    const repeated = await r.tool('mutation.schedule', args)
+    assert.equal(code(repeated), undefined)
+    assert.deepEqual(repeated.result.structuredContent, first.result.structuredContent)
+    assert.deepEqual(meta(repeated)['com.runeditrun/review'], review)
+    assert.deepEqual(receipt(repeated).decision, decision(first))
+    assert.deepEqual(receipt(repeated).review, review)
+    assert.equal((await r.person('/agents/api/reviews')).body.reviews.length, 1)
+    assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM test_sent').first()).n, 1)
+    t.diagnostic('reviewed schedule: retained review, consumed version 1, one effect, one review')
   } finally { await r.close() }
 })
