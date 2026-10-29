@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Let seeds declare an isolated, test-only history fixture before named agent-door journey steps. Only allowlisted INSERT statements reach fresh disposable databases; protected tables and target triggers are refused, production imports fail closed, and the normal state reader and clock remain unchanged.
+
 ## 0.2.93
 
 - Integrated inputs: deploydry-2 (HappyToHelp dry-run hook dispatch and unchecked-provider receipt), ledgertok-2 (HappyToHelp ledger refusal identities), adoptdoc-1 (safe adoption examples), reslink-1 (native record-link conformance), copy-1 (product-led optional homepage copy), and handset-history-1 (historical claim context).
