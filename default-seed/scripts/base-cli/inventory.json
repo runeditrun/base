@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.90-dev.gd316fca9",
+  "cliVersion": "0.2.90-dev.gf85ea914",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4647,7 +4647,7 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "e8847284e428de27475eadd9e79d88a6c9e5c92f0007e3f2a4ecc458a31c5fd3"
+      "sha256": "bcbf938789907501fa25e2388ade3b30340dad45666b89954f73892ac4df804f"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
@@ -4655,7 +4655,7 @@
     },
     "modules/portability/index.mjs": {
       "source": "modules/portability/index.mjs",
-      "sha256": "9efe05faa1004237bcbf77f46c49fd2a3579ff34831654fbaa27af306d1f8dfb"
+      "sha256": "a8ac1a055c8e5272270486eed64ef82bd088dc52ec76df97fd04a41312c29060"
     },
     "modules/portability/journal.mjs": {
       "source": "modules/portability/journal.mjs",
@@ -4673,9 +4673,9 @@
       "source": "modules/portability/legacy-safety.mjs",
       "sha256": "e3d61016ac811b61e6ce9a5f07582b6879da59656e8d1d5f625b6d40bf102457"
     },
-    "modules/portability/library-import.mjs": {
-      "source": "modules/portability/library-import.mjs",
-      "sha256": "2e9ceb13fb82057ad837911fa35b919a0a591c444825aaaa37b9a637ed0b4854"
+    "modules/portability/library-history.mjs": {
+      "source": "modules/portability/library-history.mjs",
+      "sha256": "e28c1ac68f332b9da1bd262f3084bc64b35e3cdb49007e451f7f10053abfd955"
     },
     "modules/portability/lines.mjs": {
       "source": "modules/portability/lines.mjs",
@@ -4683,7 +4683,7 @@
     },
     "modules/portability/migration-history.mjs": {
       "source": "modules/portability/migration-history.mjs",
-      "sha256": "f9791f669dd9aa03251978a253aa2a02275f4718ad5a9beaf24dd8bf8a65e5b9"
+      "sha256": "97eff52d9d297b53f5e51a8882166ded58633ec9cb2c3fd2a7a910a39a70d2f7"
     },
     "modules/portability/migration-sql.mjs": {
       "source": "modules/portability/migration-sql.mjs",
