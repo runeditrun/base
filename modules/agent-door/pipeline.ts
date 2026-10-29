@@ -134,7 +134,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       // A newly required review or approval cannot be satisfied by an older receipt.
       if (decision.result === 'approval' && (cached.decision?.disposition !== 'approval' || cached.decision.revision !== state.revision)) return refuse('approval_required')
       if (decision.result === 'review' && cached.decision?.disposition !== 'review') return refuse('review_required')
-      if (cached.outcome === 'done') cached.receipt = { ...cached.receipt, decision: cached.decision,
+      if (cached.outcome === 'done' && cached.receipt) cached.receipt = { ...cached.receipt, decision: cached.decision,
         ...(cached.review ? { review: cached.review } : {}) }
       await recoverAudit(rt, previous.decision_id, JSON.parse(previous.outcome))
       const original = await rt.options.db.prepare('SELECT row FROM agent_door_audit WHERE id=?').bind(previous.decision_id).first<{ row: string }>()

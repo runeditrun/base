@@ -25,7 +25,7 @@ async function decide(r: any, pending: any, action = 'approve') {
 
 for (const [item, mode] of [[1, 'delete'], [3, 'schedule'], [4, 'risk'], [5, 'restore'], [6, 'draft']] as const) {
   test(`item ${item}: approved ${mode} replay retains its effect under current admission`, async t => {
-    const r = await runtime()
+    const r = await runtime({ mutationReplay: true })
     try {
       const id = crypto.randomUUID(), args = { id, value: 'completed native work', expected_revision: 1, idempotency_key: crypto.randomUUID() }
       await r.db.prepare('INSERT INTO test_records VALUES(?,?,1,?)').bind(id, 'prepared', 'hidden').run()
@@ -98,7 +98,7 @@ for (const [item, mode] of [[1, 'delete'], [3, 'schedule'], [4, 'risk'], [5, 're
 }
 
 test('item 2: held restore journey checks original widening evidence separately from current admission', async t => {
-  const r = await runtime()
+  const r = await runtime({ mutationReplay: true })
   try {
     const id = crypto.randomUUID()
     await r.db.prepare('INSERT INTO test_records VALUES(?,?,1,?)').bind(id, 'prepared', 'hidden').run()
@@ -119,7 +119,7 @@ test('item 2: held restore journey checks original widening evidence separately 
 })
 
 test('completed reviewed schedule retains the original review and consumed version', async t => {
-  const r = await runtime()
+  const r = await runtime({ mutationReplay: true })
   try {
     const id = crypto.randomUUID(), args = { id, value: 'scheduled', expected_revision: 1, idempotency_key: crypto.randomUUID() }
     await r.db.prepare('INSERT INTO test_records VALUES(?,?,1,?)').bind(id, 'prepared', 'hidden').run()
@@ -131,8 +131,9 @@ test('completed reviewed schedule retains the original review and consumed versi
     assert.equal(code(repeated), undefined)
     assert.deepEqual(repeated.result.structuredContent, first.result.structuredContent)
     assert.deepEqual(meta(repeated)['com.runeditrun/review'], review)
-    assert.deepEqual(receipt(repeated).decision, decision(first))
-    assert.deepEqual(receipt(repeated).review, review)
+    assert.deepEqual(decision(repeated).classes, decision(first).classes)
+    assert.equal(decision(repeated).disposition, 'review')
+    assert.equal(receipt(repeated), undefined)
     assert.equal((await r.person('/agents/api/reviews')).body.reviews.length, 1)
     assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM test_sent').first()).n, 1)
     t.diagnostic('reviewed schedule: retained review, consumed version 1, one effect, one review')

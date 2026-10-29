@@ -703,9 +703,9 @@ never become completed receipts, and approval execution still rechecks the nativ
 revision, exact summary and classification before making its one effect.
 
 The response decision and replay audit describe current policy admission against
-the recorded effect facts. `com.runeditrun/receipt.decision` retains the original
+the recorded effect facts. For approved calls, `com.runeditrun/receipt.decision` retains the original
 decision, including classes/facts, revision and approval/review disposition;
-`receipt.review` retains the original review when present. The native output
+the existing review metadata retains the original review when present. The native output
 retains its consumed version. Conformance checks original class evidence against
 that receipt separately from current admission; refresh runtime and conformance
 together. Receipt access still requires current scopes (including `currentScopes`
