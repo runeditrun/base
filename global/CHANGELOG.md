@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Verify legacy v2 backups at their recorded migration schema before applying the additive bridge or a declared row upgrade. Missing or unknown history, schema drift and altered archive digests remain refused before staging.
+- Reconstruct excluded-table objects omitted by older v2 inventories only when recorded replay proves that historical inventory and the complete live destination. Unrecorded excluded objects remain refused.
+
 ## 0.2.87
 
 - Connect declared, contained agent verifier drivers to named native Worker RPC entrypoints, and run built queue consumers alongside producers. Public-door fixtures prove real queued effects, execution-time consent revocation and retained audits without a served test route.
