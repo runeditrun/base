@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Refuse continuation tools under unset, removed or unavailable policy and Business Pause before validating or resolving native continuation items, retaining current scope, revocation and once-only execution checks.
+
 - Pass the disposable state reader and current verifier time to conformance phase fixtures and native step hooks. Database refusals retain a typed, redacted diagnostic; writable backdated history remains pending at the hosted state boundary.
 
 - Audit native refusals under review policy by their refused outcome, matching returned code and absence of a review; retain linked reviews for completed effects and reject changes in bracketing native witnesses.

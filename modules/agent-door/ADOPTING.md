@@ -302,6 +302,12 @@ effect, including delayed approval execution. The resolver must use persisted
 native identity, never a caller-selected replay suffix. Such tools require the
 trusted worker's saved `operationId`; an ordinary MCP call cannot execute them.
 
+After current scope and revocation checks, an unset, removed or unavailable policy
+or Business Pause refuses before continuation input validation or native item
+resolution, including calls without an operation. Refusal-path target and
+classification remain best-effort as for other tools; a native `ToolRefusal` is
+recorded as `classification_refusal` without replacing the policy refusal.
+
 Each native item has its own once-only claim under the original operation, tool
 and public key, so replay returns that item's recorded result rather than the
 preparation handle or a sibling effect. Tools without a resolver retain the
