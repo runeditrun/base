@@ -2,8 +2,52 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile, readFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { main as cli } from './main.mjs';
 import { checkout, account } from './fixtures/owner-deploy.mjs';
+
+const execute = promisify(execFile);
+
+test('the public deploy dry run reaches offline seed hooks and reports unchecked providers with or without a hook', async t => {
+ for (const hook of ['managed', 'legacy', 'none', 'kit', 'missing-owner']) {
+  const { root } = await checkout(t, { secrets: [{ binding: 'EMAIL_API_KEY', environment: 'EMAIL_API_KEY' }] });
+  await writeFile(join(root, 'adapter.mjs'), `import {ownerDeploy} from ${JSON.stringify(new URL('./deploy.mjs', import.meta.url).href)};
+import {writeFile} from 'node:fs/promises';
+import {join} from 'node:path';
+import {main as owner} from ${JSON.stringify(new URL('../modules/deploy-kit/owner-cli.mjs', import.meta.url).href)};
+import {missing} from ${JSON.stringify(new URL('./errors.mjs', import.meta.url).href)};
+const lifecycle = {run:async()=>{},settings:[],hooks:{}};
+const offline = async ({root,options}) => {
+ if (!options.dryRun) throw Error('This seed fixture only supports offline preflight');
+ await writeFile(join(root,'offline-hook.json'),JSON.stringify({dryRun:options.dryRun}));
+ ${hook === 'missing-owner' ? "throw missing('A real deploy needs a real OWNER_EMAIL.');" : ''}
+ ${hook === 'kit' ? "return owner(['dry-run','--declaration','deploy.json','--environment','production'],process.env,{cwd:root});" : ''}
+ return {dryRun:true,deployed:false};
+};
+offline.managesHostedOwner = ${hook === 'managed' || hook === 'missing-owner'};
+export const commandAdapter = {...lifecycle,deploy:${hook === 'none' ? "ownerDeploy('deploy.json',lifecycle)" : 'offline'}};`);
+  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'tests/fixture', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { deploy: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs', 'deploy.json'], effects: 'Preflight the seed deployment offline.' } } }));
+  await writeFile(join(root, '.node-version'), process.versions.node + '\n');
+  await writeFile(join(root, 'package.json'), JSON.stringify({ engines: { node: process.versions.node }, packageManager: 'pnpm@10.12.4' }));
+  const network = join(root, 'network.mjs'), requests = join(root, 'requests.txt');
+  await writeFile(requests, '');
+  await writeFile(network, `import {appendFileSync} from 'node:fs';globalThis.fetch=async()=>{appendFileSync(${JSON.stringify(requests)},'request\\n');throw Error('Offline preflight must not access a provider')};`);
+  const env = { ...process.env, CI: 'true', HOME: root, NODE_OPTIONS: [process.env.NODE_OPTIONS, `--import=${pathToFileURL(network).href}`].filter(Boolean).join(' ') };
+  for (const name of Object.keys(env)) if (/^(CLOUDFLARE_|CF_)/.test(name) || name === 'EMAIL_API_KEY') delete env[name];
+  const { stdout: output } = await execute(process.execPath, [fileURLToPath(new URL('../bin/rer.mjs', import.meta.url)), 'deploy', '--dry-run', '--cwd', root, '--json'], { env });
+  const receipt = output.trim().split('\n').map(JSON.parse).at(-1);
+  if (hook !== 'none') assert.deepEqual(JSON.parse(await readFile(join(root, 'offline-hook.json'), 'utf8')), { dryRun: true }, `${hook} seed hook is reached`);
+  else await assert.rejects(access(join(root, 'offline-hook.json')), { code: 'ENOENT' });
+  assert.deepEqual([receipt.ok, receipt.dryRun, receipt.deployed, receipt.providerChecked], [true, true, false, false], `${hook} receipt`);
+  assert.equal(receipt.plan.worker, 'fixture-production', `${hook} keeps the local plan`);
+  if (hook === 'missing-owner') assert.match(receipt.neededForRealDeploy.join('\n'), /real OWNER_EMAIL/);
+  assert.match(receipt.neededForRealDeploy.join('\n'), /\bEMAIL_API_KEY\b/);
+  assert.equal(await readFile(requests, 'utf8'), '', `${hook} preflight makes no provider request`);
+  await assert.rejects(access(join(root, '.rer/deploy/production.json')), { code: 'ENOENT' });
+ }
+});
 
 test('deploy dry run prints a local plan without credentials or provider access while deploy keeps its refusals', async t => {
  const secrets = [
