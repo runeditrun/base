@@ -1,12 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.2.92
 
-- Restore fresh archives containing schema objects on policy-excluded transient tables absent from the destination, while retaining durable schema and original archive digest verification.
+- Renew the verifier's adopted policy before requests without changing its authority or lifetime; equal-sequence adoption may change only issue and expiry times.
+
+- Inkwell transient-snapshot restore: restore fresh archives containing schema objects on policy-excluded transient tables absent from the destination, while retaining durable schema and original archive digest verification.
 
 - Agent tools may opt into `exposure: 'invoke'` for native worker admission, hidden from MCP discovery, calls, tool-list subscriptions and unshared OAuth scopes while retaining full invoke policy, identity, replay and audit checks.
 
-- Verify hashed legacy v2 ledgers through the Node library restore door before durable staging; admit migration data repeated by its surviving restore-commit trigger. Worker build-time evidence remains pending.
+- Spool legacy archive restore: verify hashed legacy v2 ledgers through the Node library restore door before durable staging; admit migration data repeated by its surviving restore-commit trigger. Worker build-time evidence remains pending.
 
 ## 0.2.91
 
@@ -30,7 +32,6 @@
 
 ## 0.2.90
 
-- Renew the verifier's adopted policy before requests without changing its authority or lifetime; equal-sequence adoption may change only issue and expiry times.
 - Withhold optional copied Base modules and workflow helpers whose required packages the edition has not declared. Refresh preserves supported dependency closure and explains the package declaration needed to opt in.
 - Retain approved mutation outcomes and original effect facts through restore, schedule, grant, role and consumed-draft retries while rechecking current native authority, scope, pause, policy and proof. Changed arguments still conflict; read-only replay retains current native visibility.
 - Keep signing command ordering safe when an identical concurrent command consumes its intent before the next read. Conformance accepts older receipts without a `decision` field while checking their original decision identity.

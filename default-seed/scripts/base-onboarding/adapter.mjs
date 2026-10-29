@@ -216,7 +216,9 @@ async function start(context, hooks) {
   throw installationFailure('command_failed', { step: 'start', diagnostic: error });
  }
  let announcement,detectedMismatch;
- const mismatch=port=>({fatal:detectedMismatch=`the application listened on port ${port} but the CLI expected ${expectedPort}`});
+ // Keep context after the number: conservative redaction treats a trailing
+ // credential prefix as private even when it happens to be an ordinary port.
+ const mismatch=port=>({fatal:detectedMismatch=`the application listened on port ${port} but the CLI expected ${expectedPort} for the runtime listener`});
  const announced=message=>{if(message?.type==='rer-listening')announcement=message;};
  if(runtimePortHandshake)child.on('message',announced);
  context.app = child;
