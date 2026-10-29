@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.90
+
+- Withhold optional copied Base modules and workflow helpers whose required packages the edition has not declared. Refresh preserves supported dependency closure and explains the package declaration needed to opt in.
+- Retain approved mutation outcomes and original effect facts through restore, schedule, grant, role and consumed-draft retries while rechecking current native authority, scope, pause, policy and proof. Changed arguments still conflict; read-only replay retains current native visibility.
+- Keep signing command ordering safe when an identical concurrent command consumes its intent before the next read. Conformance accepts older receipts without a `decision` field while checking their original decision identity.
+- Known limitation (A1, deferred): an approved native DELETE retried with its original key can return `not_found` when its classifier re-reads the deleted target. Authority-preserving replay for deleted targets follows; see `ADOPTING.md`.
+- Make agent owner pages readable with names, action facts in sentences, local times and 44px touch targets, retaining approval, review and native authorization boundaries.
+
 ## 0.2.89
 
 - Publication email hygiene recognizes parsed dependency package contact metadata and registry deprecation notices in pnpm, npm and Yarn lockfiles. Comments, custom keys, repository author fields, source files and secret checks retain their findings; no address allowlist is needed. This scanner source update can be adopted independently of a launcher package release.
