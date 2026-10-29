@@ -286,10 +286,24 @@ admission scope returns `insufficient_scope` and requires fresh preparation;
 revoked consent still returns `consent_revoked` with no effect. Keep the same
 checks in the native effect transaction when concurrent edits need a fence.
 
-Each continuation tool has its own once-only claim under the original operation
-and public key, so replay returns its one recorded result rather than the
-preparation handle. Reusing that continuation with changed arguments returns
-`idempotency_conflict`. Public keys may not contain NUL, which separates these
+For a tool that executes multiple native items from one preparation, register a
+`continuationItem(args, ctx)` resolver on the execution tool. Re-read the native
+queue row and return `{id: job.id, operationId: job.identity.operationId}` or
+`null` if the item is unavailable. The door validates the nonempty item id (at
+most 200 characters, without NUL) and its exact originating operation before
+claiming, replaying or executing it. It resolves the item again before the native
+effect, including delayed approval execution. The resolver must use persisted
+native identity, never a caller-selected replay suffix. Such tools require the
+trusted worker's saved `operationId`; an ordinary MCP call cannot execute them.
+
+Each native item has its own once-only claim under the original operation, tool
+and public key, so replay returns that item's recorded result rather than the
+preparation handle or a sibling effect. Tools without a resolver retain the
+single-continuation claim. Reusing an item with changed arguments returns
+`idempotency_conflict`. The immutable context exposes `continuationItemId` and
+the audit records `continuation_item_id`; the original operation, consent,
+sponsor, scopes, approvers and public idempotency key remain unchanged. Public keys may not contain NUL, which
+separates these
 internal claims from ordinary keys. The existing calls table stores the claims;
 no new schema migration is needed. Keep the originating audit, approvals and
 idempotency records for as long as the queue may execute or replay them.
@@ -702,6 +716,19 @@ reviewers distinct from the owner, and capture is destroyed when verification
 closes. The harness requires every declared reviewer lifecycle to complete;
 its fixed failure diagnostic never prints mail, proofs or initializer errors.
 Keep lifecycle modules in test tooling outside the production graph.
+
+This hook is already available in 0.2.86. To use the admitted second person for
+an agent-door approval, require `person:<reviewer's Business person id>` in the
+signed policy and submit the exact approval revision and summary hash with that
+person's confirmed native session. The signed roster must bind that person to
+the native account before admission; it deliberately refuses to adopt an
+unrelated existing account. The sponsor cannot satisfy this named reference,
+even when the sponsor has an owner or editor role. `sponsor` and broad role
+references express different policies and do not guarantee independence.
+The door records the approver's native id and name in the approval, supplies it
+in `ctx.approvers`, and retains the approver id separately from the sponsor in
+the execution audit. Completing the mail lifecycle never grants the sponsor
+that person's authority.
 
 ## Client custody boundary
 

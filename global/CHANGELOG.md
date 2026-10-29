@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.87
+
+- Give native queued effects separate once-only claims through a persisted continuation-item resolver, preserving the originating operation, consent, sponsor, scopes, approvers and public idempotency key. Replays return only the selected item's result; mismatched admissions and revoked consent remain refused.
+
+- Clarify the already-shipped 0.2.86 independent-reviewer admission/mail hook and its use with a named second-person door approval. The native approver is recorded separately from the sponsor, whose self-approval remains forbidden by that named policy.
+
 ## 0.2.86
 
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.
