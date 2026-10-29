@@ -30,8 +30,14 @@ export async function agentConformanceNetwork(request) {
 
 /** Extend the paid network edge for declared origins, without running seed
  * modules in this process or giving them any route to the real network. */
-export async function createAgentConformanceNetwork(root, config, { email } = {}) {
- const mail = createCapturedMail(email);
+export async function createAgentConformanceNetwork(root, config, { email, sponsorEmails = [] } = {}) {
+ const mailboxes = new Map([email, ...sponsorEmails].map(email => [email, createCapturedMail(email)]));
+ const closeMail = () => { for (const mail of mailboxes.values()) mail.close(); };
+ const mailFor = email => {
+  const mail = mailboxes.get(email);
+  if (!mail) throw new TypeError('Captured mail requires a declared verification principal.');
+  return { read: options => mail.read(options) };
+ };
  let declaration, adapter, fixtures;
  try {
   if (config !== undefined) {
@@ -40,22 +46,22 @@ export async function createAgentConformanceNetwork(root, config, { email } = {}
   }
   fixtures = createFixtureControl(declaration?.origins ?? new Set());
  } catch (error) {
-  mail.close();
+  closeMail();
   if (error instanceof NetworkAdapterError) throw new RerError('agent_network_invalid', error.message, 1);
   throw error;
  }
- return { mail: { read: options => mail.read(options) }, fixtures: { set: (origin, value) => fixtures.set(origin, value) },
+ return { mail: mailFor(email), mailFor, fixtures: { set: (origin, value) => fixtures.set(origin, value) },
  provision: async hosted => {
   if (config?.secretSource === undefined) return {};
   const secrets = await verificationSecrets(root, config.secretSource, hosted.database);
   await adapter.provision(secrets);
   return secrets;
  },
- close: async () => { mail.close(); fixtures.close(); await adapter?.close(); }, fetch: async request => {
+ close: async () => { closeMail(); fixtures.close(); await adapter?.close(); }, fetch: async request => {
   const capture = request.clone(), origin = new URL(request.url).origin;
   try {
    const response = declaration?.origins.has(origin) ? await adapter.fetch(request, fixtures.get(origin)) : await agentConformanceNetwork(request);
-   if (response.ok) await mail.capture(capture);
+   if (response.ok) await Promise.all([...mailboxes.values()].map((mail, index) => mail.capture(index === mailboxes.size - 1 ? capture : capture.clone())));
    else void capture.body?.cancel();
    return response;
   }
