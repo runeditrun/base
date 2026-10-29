@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- For the 0.2.90 seed refresh, relock run-uptime (workflow lines 98, 256) and run-happytohelp (47, 170): drop `github.run_attempt` from shared build artifact names, use `<seed>-verify-build-<sha>-<run_id>` for both upload and download, and add `overwrite: true` to the upload. Verify's workflow guard rejects attempt-qualified downloads and their shared uploads; apply the same patch to any seed with this pattern on its next refresh. See `export/VERIFY-WORKFLOW.md`.
+
 ## 0.2.89
 
 - Publication email hygiene recognizes parsed dependency package contact metadata and registry deprecation notices in pnpm, npm and Yarn lockfiles. Comments, custom keys, repository author fields, source files and secret checks retain their findings; no address allowlist is needed. This scanner source update can be adopted independently of a launcher package release.
