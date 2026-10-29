@@ -2,6 +2,8 @@
 
 ## 0.2.88
 
+- Leave optional deploy secrets unconfigured during hosted output and agent-door verification unless they declare a nonempty `verifyStandIn`. This prevents invented SSO endpoints from causing HTTP 500 before signed owner bootstrap. Required and explicitly selected stand-ins remain; public-door coverage retains invalid-signature and replay refusals. See `ADOPTING.md`.
+
 - Agent doors can declare the mandatory tools/policy/pause/audit/idempotency core plus events, resources, prompts and subscriptions. Discovery and conformance report declared, refused and unscoped families; omitted supported capabilities are hidden and return typed refusals. Core authorization and security checks remain mandatory, and absent declarations retain the legacy full requirements. Other lifecycle families remain explicitly unscoped with their existing checks intact.
 
 - `rer refresh-base` now gives complete recovery steps when refreshed import-kit

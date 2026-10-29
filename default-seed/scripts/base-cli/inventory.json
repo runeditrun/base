@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.88-dev.ge50efae4",
+  "cliVersion": "0.2.88-dev.g57c6137d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -939,7 +939,7 @@
     },
     "cli/hosted-output.mjs": {
       "source": "cli/hosted-output.mjs",
-      "sha256": "a32ad65c543d8a7e12b9a3d2ecf4ddd3dae647029be08b704da9f428bf133824"
+      "sha256": "e142523daaaabb76a46325fff06091199817d7992388a9336ac1ef68f761b1d1"
     },
     "cli/human-error.mjs": {
       "source": "cli/human-error.mjs",
