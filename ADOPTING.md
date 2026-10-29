@@ -27,6 +27,14 @@ unchanged visibility retains the result and approval receipt. Mutation replay
 keeps its recorded outcome and once-only effect. See
 [`modules/agent-door/ADOPTING.md`](modules/agent-door/ADOPTING.md#current-admission-on-replay).
 
+Node seeds using `createPortability({db,policy})` can restore a legacy v2 backup
+that carries its own hashed migration ledger: the library reads checkout files
+and collects the ledger from authenticated parts before durable staging. Keep
+one service instance through upload/finalize. Worker adoption still needs the
+refresh/lock evidence artifact described in the
+[portability guide](modules/portability/README.md#archives-across-later-additive-migrations);
+checkout-free Workers continue to refuse this automatic path.
+
 Legacy v2 installation backups can restore across later additive migrations
 without acknowledging unverified schema objects. Import first resolves the
 backup's recorded migrations against the destination's applied files and
