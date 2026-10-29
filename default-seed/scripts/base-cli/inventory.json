@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.90",
+  "cliVersion": "0.2.90-dev.geee77546",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
