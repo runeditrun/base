@@ -601,6 +601,38 @@ Hooks cannot skip mandatory steps or alter the runner's arguments and outputs.
 Failed hooks fail the current phase with the same redacted diagnostic. A step
 that fails or yields no structured output does not receive `afterStep`.
 
+## Disposable native preparation
+
+Phase fixtures and native `beforeStep`/`afterStep` hooks receive
+`database(binding)`, `now` (verifier Unix milliseconds),
+`scheduled({scheduledTime})`, and `queues.hold()`/`queues.release()`.
+The database supports SELECT and single native-table UPDATE, INSERT INTO and
+DELETE FROM statements through `prepare(sql).bind(...).run()/all()/first()`.
+Create real records through the app's doors; use writes only to age their
+native history. For example, after obtaining `db` and a real delivery ID:
+
+```js
+await db.prepare('UPDATE native_deliveries SET completed_at=? WHERE id=?').bind(now - 7_200_000, deliveryId).run();
+await scheduled({ scheduledTime: now });
+```
+
+`scheduled` runs the app Worker's own scheduled handler and waits for its
+work, without overriding its runtime clock. A queue hold delays entry into
+the app's real queue handler; release it in `afterStep` after native approval
+and the tested dispatch. Phase preparation releases any preceding hold;
+installation disposal also releases waiting deliveries. This allows a due
+approved step without rewriting approved content or approval evidence.
+
+Every write uses a disposable D1 transaction guarded against INSERT, UPDATE
+and DELETE on **all** `agent_door_*` tables, including native triggers and
+cascades. Schema, transaction and multiple statements are refused. Refusals
+fail the phase with `agent_fixtures_database_unavailable`; values, records
+and SQL are never included in diagnostics. Each policy phase prepares fresh
+values. These powers exist only in conformance tooling; the owner initializer
+retains its SELECT-only handle, and production, `rer dev` and `rer demo` do
+not receive them. `timedLifecycle` and `queuedLifecycle` remain **unscoped**
+capability names; this preparation boundary does not add lifecycle coverage.
+
 ## Native clients and fresh phase fixtures
 
 Declare `verification.fixtures: {"module":"tests/agent-phase-fixtures.mjs"}`

@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+
+- Let disposable conformance fixtures age real native history, run the app’s scheduled handler, and hold queue deliveries through a tested step. Atomic write guards protect every agent-door table; owner initialization remains read-only and runtime clocks are unchanged.
 ## 0.2.90
 
 - Withhold optional copied Base modules and workflow helpers whose required packages the edition has not declared. Refresh preserves supported dependency closure and explains the package declaration needed to opt in.

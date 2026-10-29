@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { contained } from './project.mjs';
 import { RerError } from './errors.mjs';
+import { FixtureDatabaseError } from '../modules/agent-door/conformance/fixtures.mjs';
 
 export async function verificationInvoke(root, config) {
  if (config === undefined) return;
@@ -23,7 +24,10 @@ export async function verificationJourney(root, path, context) {
  if (typeof module.default !== 'function' || ['beforeStep', 'afterStep'].some(key => module[key] !== undefined && typeof module[key] !== 'function')) throw new RerError('agent_journey_invalid', 'verification.journey must default-export a native journey; optional beforeStep and afterStep exports must be functions.', 1);
  const call = async (fn, value) => {
   try { await fn({ ...context, ...value }); }
-  catch { throw new Error('Native verification journey failed; no captured mail or fixture values are logged.'); }
+  catch (error) {
+   if (error?.code === 'hosted_database_invalid') throw new FixtureDatabaseError();
+   throw new Error('Native verification journey failed; no captured mail or fixture values are logged.');
+  }
  };
  return { nativeJourney: value => call(module.default, value),
   nativeStep: async ({ stage, ...value }) => { if (module[stage]) await call(module[stage], value); },
