@@ -9,8 +9,8 @@ export function scopedSurface(surface) {
  // Only the built-in event tool is optional here. Native tools, authorization,
  // proofs, provider isolation and all declared native journeys remain intact.
  const enabled = tool => tool.name !== `${surface.seed}.events.list` || offers(surface.capabilities, 'events');
- const tools = surface.tools?.filter(enabled), names = new Set(tools?.map(tool => tool.name));
- return { ...surface, tools, journey: surface.journey?.filter(step => names.has(step.tool)),
+ const tools = surface.tools?.filter(enabled);
+ return { ...surface, tools, journey: surface.journey?.filter(step => step?.tool !== `${surface.seed}.events.list` || offers(surface.capabilities, 'events')),
   resources: offers(surface.capabilities, 'resources') ? surface.resources : [] };
 }
 export async function refusalPhase(c) {
