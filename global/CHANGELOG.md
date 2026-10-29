@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Agent tools may opt into `exposure: 'invoke'` for native worker admission, hidden from MCP discovery, calls, tool-list subscriptions and unshared OAuth scopes while retaining full invoke policy, identity, replay and audit checks.
+
 ## 0.2.90
 
 - Withhold optional copied Base modules and workflow helpers whose required packages the edition has not declared. Refresh preserves supported dependency closure and explains the package declaration needed to opt in.
