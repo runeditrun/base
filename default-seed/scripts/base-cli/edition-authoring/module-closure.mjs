@@ -4,6 +4,7 @@ import path from 'node:path';
 import {raw, safe, requirePhysical, testSource, freedEntries} from './files.mjs';
 import {dependencies, resolve, external, bindings, lexicalExports} from './runtime-dependencies.mjs';
 import {relocateDependencies} from './module-edges.mjs';
+import {sharedNamespaces} from './copy-namespaces.mjs';
 const code = name => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(name) && !testSource(name);
 const inside = (name, prefix) => prefix === '.' ? !name.startsWith('../') && !path.posix.isAbsolute(name) : name === prefix || name.startsWith(prefix + '/');
 const mapped = (source, copy) => copy.path + source.slice(copy.originPath.length);
@@ -13,6 +14,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   const index = new Set(raw(root, 'ls-files', '-z').toString('utf8').split('\0').filter(Boolean));
   const required = new Set();
   const mappings = plans.filter(plan => !plan.retired).map(({copy}) => ({copy, ...namespace(copy)})).filter(mapping => mapping.from);
+  const shared = sharedNamespaces(mappings);
   const cache = new Map(), planned = new Map(), recorded = new Map(), queue = [], withheld = [];
   const disk = {has: name => {
     try { return fs.lstatSync(path.join(root, name)).isFile(); }
@@ -46,19 +48,20 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
       from: file ? path.posix.dirname(copy.originPath) : copy.originPath};
   }
   function witness(target, source) {
-    return plans.some(({copy}) => {
+    if (plans.some(({copy}) => {
       const {to, from} = namespace(copy);
       return from && inside(target, to) && path.posix.join(from, path.posix.relative(to, target)) === source;
-    });
+    })) return true;
+    return recordedDestination(source).includes(target);
   }
   function recordedDestination(source) {
     // Prefer the explicitly selected subtree over a broader, sparse runtime
     // copy. Never choose between equally specific namespaces for the seed.
-    let candidates = mappings.filter(({from}) => inside(source, from));
+    let candidates = [...mappings, ...shared].filter(({from}) => inside(source, from));
     const specificity = Math.max(...candidates.map(({from}) => from.length));
     candidates = candidates.filter(({from}) => from.length === specificity);
     const destination = ({from, to}) => path.posix.join(to, path.posix.relative(from, source));
-    const members = candidates.filter(mapping => Object.hasOwn(mapping.copy.files, destination(mapping)));
+    const members = candidates.filter(mapping => mapping.copy && Object.hasOwn(mapping.copy.files, destination(mapping)));
     if (members.length) candidates = members;
     return [...new Set(candidates.map(destination))];
   }
