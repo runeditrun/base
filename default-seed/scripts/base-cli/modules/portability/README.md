@@ -249,12 +249,15 @@ provider operation.
 | Unknown hash/name, ambiguous hash/alias or conflicting name/hash | `migration_ledger:unknown`, `:ambiguous` or `:conflict`; use the matching checkout and declaration. |
 
 Refusals throw `PortabilityError` with status 409 and a constant `code`;
-`migration` names a pending checkout file, and `identity` may name a checkout
+ledger values never enter these diagnostics. `migration` names a pending
+checkout file, and `identity` may name a checkout
 file, a declared alias or the known `rer_migrations` table. The worker appends
 these safe identities to its public refusal token, retaining
 `migration_ledger:unapplied:<file>`, `migration_ledger:multiple:rer_migrations`
-and named `unknown`, `ambiguous` or `conflict` tokens. Unrecognized ledger
-values never enter these diagnostics. Propagate failures and stop before
+and named `unknown`, `ambiguous` or `conflict` tokens only when the name exactly
+equals a checkout filename or declared alias. Historical
+`migration_ledger:unknown:initial-page.sql` stays category-only without that
+provenance. Propagate failures and stop before
 native apply. IO and provider failures also propagate. A successful check
 creates no ledger, changes no row and does not attest unrecorded historical
 bytes in a plain Wrangler ledger. It never silently skips pending migrations.
