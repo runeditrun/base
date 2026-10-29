@@ -1,5 +1,30 @@
 # Adopting Base refresh and installation transfers
 
+Refresh `modules/agent-door/pipeline.ts` and `conformance/journey.mjs` together
+for completed mutation replay:
+
+- Deleted targets return the retained receipt after current admission, without a second target lookup or effect.
+- Restore retries validate current admission separately from the original widening facts in `receipt.decision`.
+- Completed schedules retain their native revision fences at execution and their original approval or review on retry.
+- Post-effect risk changes do not demand a second review; current policy evaluates the recorded effect facts.
+- Grant and role retries retain their original widening evidence, even when the current action would be a no-op.
+- Consumed draft versions stay in the recorded result; preparation checks run before execution, not again for a completed mutation.
+
+Changed arguments (including `expected_revision`) still conflict. Current scope,
+pause, policy, sponsor/agent/consent revocation and required native proof still
+control receipt access; refused, pending and rejected calls cannot gain a completed
+receipt. The response decision and replay audit describe current admission;
+`_meta["com.runeditrun/receipt"].decision` describes the original effect. Read-only retries
+continue to execute under current native visibility.
+
+Agent-door adopters must refresh `modules/agent-door/pipeline.ts` to revalidate
+completed read-only approval replays through the native read with current grants.
+This covers aggregate visibility enforced inside a tool's `run`, as well as
+resource reads. Revoked clients receive the native empty result or refusal;
+unchanged visibility retains the result and approval receipt. Mutation replay
+keeps its recorded outcome and once-only effect. See
+[`modules/agent-door/ADOPTING.md`](modules/agent-door/ADOPTING.md#current-admission-on-replay).
+
 Use an installed current RER package to refresh a seed whose copied authoring
 CLI is still from 0.2.82. Pin the package in the seed first, then invoke its
 public command rather than `scripts/edition-authoring/cli.mjs`:
