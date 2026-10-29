@@ -55,6 +55,9 @@ for (const [item, mode] of [[1, 'delete'], [3, 'schedule'], [4, 'risk'], [5, 're
         assert.equal(receipt(reply), undefined)
       }
       await denied('insufficient_scope', await r.token({ scope: 'records:read' }))
+      await r.db.prepare('INSERT INTO test_grants VALUES(?,?)').bind(r.c.agentId, JSON.stringify(['records:read'])).run()
+      await denied('insufficient_scope')
+      await r.db.prepare('DELETE FROM test_grants WHERE agent=?').bind(r.c.agentId).run()
       await r.person('/agents/api/pause', { paused: true })
       await denied('agents_paused')
       await r.person('/agents/api/pause', { paused: false })
@@ -85,6 +88,8 @@ for (const [item, mode] of [[1, 'delete'], [3, 'schedule'], [4, 'risk'], [5, 're
       await r.db.prepare('UPDATE test_records SET version=2 WHERE id=?').bind(stale.id).run()
       assert.equal((await decide(r, stalePending)).code, 'revision_conflict')
       assert.equal(receipt(await call(stale)), undefined)
+      await r.person(`/agents/api/agents/${r.c.agentId}/revoke`, {})
+      await denied('unauthenticated')
       assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM test_sent').first()).n, 1)
       assert.equal((await r.person('/agents/api/reviews')).body.reviews.length, 0)
       t.diagnostic(`item ${item} ${mode}: one effect; changed args/revision conflict; pending/rejected/stale, paused, revoked, scope and current-policy refusals preserved`)
