@@ -309,10 +309,12 @@ test('pre-schemaObjects v2 owner backup restores through file and HTTP doors onl
     'CREATE VIEW issue_events AS SELECT issues.title,events.body FROM issues JOIN events ON events.issue_id=issues.id',
     "CREATE TRIGGER event_guard BEFORE INSERT ON events WHEN length(NEW.body)=0 BEGIN SELECT RAISE(ABORT,'empty event'); END"];
   const plan=[{name:'0001_issues.sql',statements}];
-  const target=async()=>{
-    const f=await database(t,[...statements,'CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY,name TEXT,applied_at TEXT NOT NULL)',"INSERT INTO d1_migrations VALUES(1,'0001_issues.sql','2026-10-01')"],policy);
-    f.migrations=async()=>migrationReplay(plan,policy);
-    f.service=await createPortability({db:f.db,policy,migrations:f.migrations});return f;
+  const target=async({later=[],acceptedSchemas}={})=>{
+    const migrations=[...plan,...later.map((sql,i)=>({name:`000${i+2}_later.sql`,statements:[sql]}))];
+    const f=await database(t,[...migrations.flatMap(m=>m.statements),'CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY,name TEXT,applied_at TEXT NOT NULL)',
+      ...migrations.map((m,i)=>`INSERT INTO d1_migrations VALUES(${i+1},'${m.name}','2026-10-01')`)],policy);
+    f.migrations=async()=>migrationReplay(migrations,policy);
+    f.service=await createPortability({db:f.db,policy:{...policy,...(acceptedSchemas?{acceptedSchemas}:{})},migrations:f.migrations});return f;
   };
   const directory=await mkdtemp(join(tmpdir(),'legacy-issues-'));t.after(()=>rm(directory,{recursive:true,force:true}));
   const path=join(directory,'retained.rer');await writeFile(path,text);
@@ -324,6 +326,24 @@ test('pre-schemaObjects v2 owner backup restores through file and HTTP doors onl
   const f=await target(),receipt=await importArchive(f.service,path,[]);
   assert.equal(receipt.schemaUnverified,undefined);await check(f);
   t.diagnostic('legacy file restore: issues 0 -> 1, events 0 -> 1; UTF-8 and 0001FF0A80 bytes match; no acknowledgment');
+  await t.test('recorded legacy schema precedes additive migrations',async()=>{
+  const additive=await target({later:["ALTER TABLE issues ADD COLUMN status TEXT NOT NULL DEFAULT 'open'",
+    'CREATE TABLE oa_sessions(id TEXT PRIMARY KEY)', 'CREATE INDEX oa_session_id ON oa_sessions(id)']});
+  const bridged=await importArchive(additive.service,path,[]);
+  assert.equal(bridged.schemaUnverified,undefined);
+  assert.deepEqual((await additive.db.prepare('SELECT id,title,status FROM issues').all()).results,[{id:'issue-1',title:'Café — retained',status:'open'}]);
+  assert.equal((await additive.db.prepare('SELECT hex(body) AS bytes FROM events').first()).bytes,'0001FF0A80');
+  assert.ok(bridged.bridged.migrations.length);
+  t.diagnostic('legacy additive file restore: issues 0 -> 1 with default status; recorded excluded-table index accounted for');
+  });
+  await t.test('recorded legacy schema has a declared row upgrade',async()=>{
+  const upgraded=await target({later:['ALTER TABLE issues RENAME COLUMN title TO summary'],acceptedSchemas:{[manifest.schema]:{
+    upgradeRow(table,row){if(table==='issues'){row.summary=row.title;delete row.title;}return row;},
+  }}});
+  await importArchive(upgraded.service,path,[]);
+  assert.deepEqual((await upgraded.db.prepare('SELECT * FROM issues').all()).results,[{id:'issue-1',summary:'Café — retained'}]);
+  t.diagnostic('legacy verified prior-schema row upgrade: title -> summary; issues 0 -> 1');
+  });
   // Complete, archiveHash-bound mutations reach verification, not checksums.
   for(const [name,change] of [
     ['no history',m=>{delete m.migrations;}],
@@ -344,6 +364,17 @@ test('pre-schemaObjects v2 owner backup restores through file and HTTP doors onl
   }
   const drifted=await target();await drifted.db.prepare('DROP INDEX events_issue').run();
   await assert.rejects(importArchive(drifted.service,path,[]),e=>e.code==='schema_mismatch:legacy_schema');
+  const unaccounted=await target({later:['CREATE TABLE oa_sessions(id TEXT PRIMARY KEY)']});
+  await unaccounted.db.prepare('CREATE INDEX unknown_session_id ON oa_sessions(id)').run();
+  await assert.rejects(importArchive(unaccounted.service,path,[]),e=>e.code==='schema_mismatch:legacy_schema');
+  assert.equal((await unaccounted.db.prepare('SELECT count(*) AS n FROM rer_portability_jobs').first()).n,0);
+  assert.equal((await unaccounted.db.prepare('SELECT count(*) AS n FROM issues').first()).n,0);
+  const altered=structuredClone(records);altered[0].exportedAt=new Date().toISOString();
+  const damaged=join(directory,'digest-mismatch.rer');await writeFile(damaged,altered.map(JSON.stringify).join('\n')+'\n');
+  const pristine=await target();
+  await assert.rejects(importArchive(pristine.service,damaged,[]),e=>e.code==='archive_checksum');
+  assert.equal((await pristine.db.prepare('SELECT count(*) AS n FROM rer_portability_jobs').first()).n,0);
+  assert.equal((await pristine.db.prepare('SELECT count(*) AS n FROM issues').first()).n,0);
   const http=await target(),origin='https://legacy.test';
   const handler=await createPortabilityHandler({db:http.db,policy,migrations:http.migrations,appOrigin:origin,authorize:()=> 'owner'});
   const call=(suffix,method,body)=>handler(new Request(origin+'/api/portability/imports'+suffix,{method,headers:{Origin:origin},body:JSON.stringify(body)}));
