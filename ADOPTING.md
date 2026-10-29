@@ -19,8 +19,9 @@ undeclared package is withheld as a whole and reported in `withheld`; a retained
 module requiring it refuses before any writes. For example, a native D1 seed
 without `drizzle-orm` does not acquire the reference repository, schema or records
 route merely by refreshing Base. Workflow artifact inputs also do not select
-Base application source: automatic helper acquisition uses `scripts/` and local
-workflow paths, leaving generated route trees to the seed's route generator.
+Base application source: automatic helper acquisition uses `scripts/`, local
+workflow paths and explicitly selected `./` helper paths, leaving generated route
+trees to the seed's route generator.
 
 To adopt a required package, review the selected feature and declare/install its
 dependency through the seed's package manager, updating its manifest and lockfile,
