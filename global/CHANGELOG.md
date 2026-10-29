@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.2.87
+
+- Connect declared, contained agent verifier drivers to named native Worker RPC entrypoints, and run built queue consumers alongside producers. Public-door fixtures prove real queued effects, execution-time consent revocation and retained audits without a served test route.
+
+- Allow declared RPC provider verifiers in isolated Workers without application bindings or network access. Native signed delivery and approval still run; unsigned receipts and escaping modules fail.
+
+- Generate disposable native JSON/PEM owner bindings through contained test modules. A signed-claim fixture imports a fresh GitHub App RSA key and signs/verifies its JWT; invalid keys remain refused.
+
+- Run optional native journey beforeStep/afterStep hooks between mandatory autonomous and held steps, allowing real repository consent and queued-work preparation without skipping conformance.
+
+- Accept composite revoke/narrow targets consisting solely of required string identifiers. Match every witness key and retain grant-subset, neighboring-grant and widening-refusal checks.
+
+- Give native queued effects separate once-only claims through a persisted continuation-item resolver, preserving the originating operation, consent, sponsor, scopes, approvers and public idempotency key. Replays return only the selected item's result; mismatched admissions and revoked consent remain refused.
+
+- Clarify the already-shipped 0.2.86 independent-reviewer admission/mail hook and its use with a named second-person door approval. The native approver is recorded separately from the sponsor, whose self-approval remains forbidden by that named policy.
+
+- Refresh from a Base archive preserves unrecorded workflows without requesting unavailable Git history. Explicitly recorded templates still refresh; ownership, edits and ancestry-dependent migration refusals remain protected. See `ADOPTING.md`.
+
+- Deliver the full edition-authoring tool identity with yaml and Babel LICENSE/README files, so package-created locks pass the delivered template's check without relocking. Existing helper-collision protections still apply. See `ADOPTING.md`.
+
+- Refuse ambiguous undeclared `oc_` tables during installation transfers instead of silently excluding their rows; retain exact Base owner-claim exclusions and explicit include/exclude choices. See `ADOPTING.md`.
+
+- Create every accepted Managed-download table before executing interleaved inserts, retaining deferred foreign keys and the existing SQL/schema/ledger refusal boundaries. See `ADOPTING.md`.
+
+- Document the full 0.2.82 helper and case-spelling recovery sequence using the current installed package. Add a required hosted Ubuntu 24.04 Verify job for the delivered template's cold/save/remove/restore/warm cache lifecycle and real Chromium launches. See `ADOPTING.md`.
+
+- Contract document generation accepts distinct current Homepage claims when the historical source has none. Missing original claims and duplicate current claims remain refused.
+
+- Refresh read-only native revision prerequisites before argument-injection probes, while retaining class/fact/decision checks and fresh write keys.
+
+- Follow audit cursors when checking pending and completed native targets, including targets beyond the first audit page.
+
+- Accept a native reviewer's final HTTP 200 session response alongside 303, retaining independent-cookie, one-use proof and lifecycle checks.
+
+- Match current workflow templates from a Base archive's supplied snapshot; preserve unmatched seed-owned workflow bytes without requesting unavailable history. Historical migration and legacy-membership refusals remain explicit.
+
+- Document remaining native integration prerequisites: receipt fixtures need their native client and retained key before mandatory steps; creation adapters with consumed preparation need explicit current replay authorization. Neither native guard is bypassed by these probe fixes.
+
+- Unify managed mail's public `MAIL_FROM` input across deploy declarations and delivery production. Accept its environment-mapped deploy input alongside an empty public default; refuse disagreeing configured senders with both values and source locations before packaging or deployment. Keep credential overlaps private and refused. See `modules/delivery-producer/ADOPTING.md`.
+
+### Known issues
+
+- Historical 0.2.82 helper collisions and case-spelling recovery still require the explicit manual sequence in `ADOPTING.md`.
+- Native-client receipt fixtures must establish their own native client and retained operation key before mandatory journey steps. Consumed preparation still needs an explicit native replay-admission contract; cached outcomes never bypass current authorization.
+- Protected import-kit adaptations may need manual dependency reconciliation before refresh. A refused refresh preserves their bytes and copy ownership.
+
 ## 0.2.86
 
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.

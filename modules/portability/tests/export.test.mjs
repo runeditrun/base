@@ -73,8 +73,8 @@ test('invalid policies fail at construction, including NOT NULL secrets',async t
   const f=await runtime(t);for(const policy of [{product:''},{product:'x',partBytes:1},{...fixturePolicy,secretColumns:{effects:['delivery']}}])await assert.rejects(createPortability({db:f.db,buckets:{FILES:f.bucket},policy}),/invalid_/);
 });
 test('Base auth, module bookkeeping and development outbox are excluded by default',async t=>{
-  const f=await runtime(t);await seed(f);await f.db.prepare('CREATE TABLE rer_mail_development_outbox(message TEXT)').run();await f.db.prepare('CREATE TABLE rer_ai_development_outbox(record TEXT)').run();await f.db.prepare('CREATE TABLE oc_claims(id TEXT)').run();
-  const a=await archive(await f.connect());assert.ok(a.manifest.excludedTables.includes('oa_sessions'));assert.ok(a.manifest.excludedTables.includes('oc_claims'));assert.ok(a.manifest.excludedTables.includes('rer_mail_development_outbox'));assert.ok(a.manifest.excludedTables.includes('rer_ai_development_outbox'));assert.ok(!a.manifest.tables.some(t=>t.name==='rer_ai_development_outbox'));
+  const f=await runtime(t);await seed(f);await f.db.prepare('CREATE TABLE rer_mail_development_outbox(message TEXT)').run();await f.db.prepare('CREATE TABLE rer_ai_development_outbox(record TEXT)').run();await f.db.prepare('CREATE TABLE oc_owner_claims(id TEXT)').run();
+  const a=await archive(await f.connect());assert.ok(a.manifest.excludedTables.includes('oa_sessions'));assert.ok(a.manifest.excludedTables.includes('oc_owner_claims'));assert.ok(a.manifest.excludedTables.includes('rer_mail_development_outbox'));assert.ok(a.manifest.excludedTables.includes('rer_ai_development_outbox'));assert.ok(!a.manifest.tables.some(t=>t.name==='rer_ai_development_outbox'));
   assert.ok(!a.manifest.tables.some(t=>t.name.startsWith('rer_portability_')));
   const included=await createPortability({db:f.db,buckets:{FILES:f.bucket},policy:{...fixturePolicy,includeTables:['oa_sessions']}});const b=await archive(included);assert.equal(rows(b).find(x=>x.table==='oa_sessions').row.id,'excluded-session');
   // A seed's own table inventory skips exactly what archives skip, including the

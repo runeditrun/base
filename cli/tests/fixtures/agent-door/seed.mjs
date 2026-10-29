@@ -15,6 +15,9 @@ const productionSchemas = [
  'modules/agent-door/schema/agent-door.sql',
 ];
 const nativeSchema = `
+CREATE TABLE fixture_jobs (id TEXT PRIMARY KEY, input TEXT NOT NULL, result TEXT);
+CREATE TABLE fixture_consents (id TEXT PRIMARY KEY);
+CREATE TABLE fixture_team_grants (team_id TEXT NOT NULL, operator_id TEXT NOT NULL, scope TEXT NOT NULL, PRIMARY KEY(team_id,operator_id,scope));
 CREATE TABLE fixture_reviews (id TEXT PRIMARY KEY, preparer_id TEXT NOT NULL REFERENCES oa_operators(id), reviewer_id TEXT REFERENCES oa_operators(id));
 CREATE TABLE fixture_grants (id TEXT NOT NULL, scope TEXT NOT NULL, operator_id TEXT NOT NULL REFERENCES oa_operators(id), PRIMARY KEY(id,scope));
 CREATE TABLE fixture_proofs (id TEXT PRIMARY KEY, operator_id TEXT NOT NULL, agent TEXT NOT NULL, tool TEXT NOT NULL, record_id TEXT NOT NULL, expires INTEGER NOT NULL);
@@ -27,7 +30,7 @@ CREATE TABLE fixture_receipts (id TEXT PRIMARY KEY, record_id TEXT NOT NULL REFE
 
 export async function buildFixture(root) {
  const require = createRequire(join(base, 'default-seed/package.json'));
- return require('esbuild').build({ metafile: true, entryPoints: [join(import.meta.dirname, 'worker.mjs')], outfile: join(root, 'dist/server/index.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022',
+ return require('esbuild').build({ metafile: true, entryPoints: [join(import.meta.dirname, 'worker.mjs')], outfile: join(root, 'dist/server/index.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022', external: ['cloudflare:workers'],
   plugins: [{ name: 'fixture-credentials', setup(build) {
    build.onResolve({ filter: /^\.\/credentials\.mjs$/ }, () => ({ path: join(root, 'credentials.mjs') }));
   } }],
@@ -44,7 +47,7 @@ export async function fixtureSeed(t, mode, { sponsors = false, security = false 
  await writeFile(join(root, 'credentials.mjs'),
   `export const deliverySecret = ${JSON.stringify(randomBytes(32).toString('hex'))};\n`
   + `export const openAiAuthorization = ${JSON.stringify('Bearer ' + randomBytes(32).toString('hex'))};\n`);
- for (const file of ['provider.mjs', 'receiver.mjs', 'initializer.mjs', 'proof.mjs', 'confirm-mail.mjs', 'journey.mjs', 'secret-source.mjs', 'second-sponsor.mjs', 'inbound-webhook.mjs', 'reviewer-owner.mjs', 'reviewer.mjs']) await cp(join(import.meta.dirname, file), join(root, file));
+ for (const file of ['provider.mjs', 'receiver.mjs', 'initializer.mjs', 'proof.mjs', 'confirm-mail.mjs', 'journey.mjs', 'secret-source.mjs', 'second-sponsor.mjs', 'inbound-webhook.mjs', 'reviewer-owner.mjs', 'reviewer.mjs', 'invoke.mjs', 'rpc-edge.mjs', 'step-journey.mjs', 'github-binding.mjs']) await cp(join(import.meta.dirname, file), join(root, file));
  const surface = JSON.parse(await readFile(join(import.meta.dirname, 'surface.json'), 'utf8'));
  surface.verification = { journey: 'journey.mjs', proof: { module: 'proof.mjs' }, network: { module: 'provider.mjs', secretSource: 'secret-source.mjs', origins: ['https://api.openai.com', 'https://receiver.example.invalid'] },
   ...(['native', 'native-reviewer'].includes(mode) ? { owner: { email: 'native-owner@example.com', emailField: 'SETUP_OPERATOR_EMAIL', initializer: mode === 'native-reviewer' ? 'reviewer-owner.mjs' : 'initializer.mjs' } } : {}),

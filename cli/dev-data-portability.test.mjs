@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {randomBytes} from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { portabilityFixture } from './fixtures/portability.mjs';
@@ -10,10 +11,21 @@ test('default-seed moves exclude authentication identities; explicit inclusion s
  const source = await portabilityFixture(t, { generated: false }), target = await portabilityFixture(t, { generated: false });
 
  await source.run(['export', '--output', 'exports/empty.rer']);
+ for (const f of [source, target]) await writeFile(join(f.root, 'migrations/core/0999_oncall.sql'), 'CREATE TABLE IF NOT EXISTS oc_unlisted(id TEXT PRIMARY KEY, body TEXT);');
+ await source.data("CREATE TABLE IF NOT EXISTS oc_unlisted(id TEXT PRIMARY KEY, body TEXT); INSERT INTO oc_unlisted VALUES('retained','Oncall product data')");
+ const unlisted = await source.text(['export', '--output', 'exports/unlisted.rer'], 4);
+ assert.match(unlisted.stderr, /identity_table_undeclared:oc_unlisted/);
+ for (const f of [source, target]) {
+  const adapter = join(f.root, 'scripts/installer/local.mjs');
+  await writeFile(adapter, (await readFile(adapter, 'utf8')).replace('policy: portabilityPolicy', "policy: { ...portabilityPolicy, includeTables: ['oc_unlisted'] }"));
+ }
+ console.log('Unnamed oc_ export: exit=4; explicit inclusion restores its product row');
+
+ const identityHashes = Array.from({length: 5}, () => randomBytes(32).toString('hex'));
  await source.data(`INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('owner','owner@example.test','Owner','owner','active',1),('persona','admin@dev.localhost','Dev admin','admin','active',2);
-  INSERT INTO oa_tokens(id,token_hash,kind,operator_id,operator_version,return_to,created_at,expires_at) VALUES('kept-link','h1','magic','owner',1,'/app',1,2),('dev-link','h2','magic','persona',1,'/app',1,2);
+  INSERT INTO oa_tokens(id,token_hash,kind,operator_id,operator_version,return_to,created_at,expires_at) VALUES('kept-link','${identityHashes[0]}','magic','owner',1,'/app',1,2),('dev-link','${identityHashes[1]}','magic','persona',1,'/app',1,2);
   INSERT INTO oa_dev_credentials(credential,id,created_at) VALUES('oa_tokens','dev-link',1);
-  INSERT INTO oa_sessions(id,token_hash,operator_id,operator_version,kind,created_at,expires_at) VALUES('native-session','s1','owner',1,'native',1,4102444800000),('dev-session','s2','owner',1,'dev',1,4102444800000),('persona-session','s3','persona',1,'dev',1,4102444800000);`);
+  INSERT INTO oa_sessions(id,token_hash,operator_id,operator_version,kind,created_at,expires_at) VALUES('native-session','${identityHashes[2]}','owner',1,'native',1,4102444800000),('dev-session','${identityHashes[3]}','owner',1,'dev',1,4102444800000),('persona-session','${identityHashes[4]}','persona',1,'dev',1,4102444800000);`);
  await source.run(['export', '--output', 'exports/identity.rer']);
  const archive = archiveRecords(await readFile(join(source.root, 'exports/identity.rer'), 'utf8'));
  assert.deepEqual(archiveRows(archive, 'oa_sessions'), []);
@@ -25,6 +37,7 @@ test('default-seed moves exclude authentication identities; explicit inclusion s
  assert.deepEqual((await target.data('SELECT id,kind FROM oa_sessions'))[0].results, []);
  assert.deepEqual((await target.data('SELECT * FROM oa_operators ORDER BY id'))[0].results, archiveRows(archive, 'oa_operators'));
  assert.deepEqual((await target.data('SELECT * FROM oa_tokens ORDER BY id'))[0].results, archiveRows(archive, 'oa_tokens'));
+ assert.deepEqual((await target.data('SELECT * FROM oc_unlisted'))[0].results, [{id:'retained', body:'Oncall product data'}]);
  await target.run(['reset', '--yes']);
  // The module also supports explicit inclusion. Its mandatory dev-data rule
  // still removes dev rows, then refuses a checksum-valid dev-session import.
