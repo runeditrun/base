@@ -44,7 +44,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
   function namespace(copy) {
     const file = Object.hasOwn(copy.files, copy.path) || tree.has(copy.originPath);
     if (file && path.posix.basename(copy.path) !== path.posix.basename(copy.originPath)) return {};
-    return {to: file ? path.posix.dirname(copy.path) : copy.path,
+    return {directory: !file, to: file ? path.posix.dirname(copy.path) : copy.path,
       from: file ? path.posix.dirname(copy.originPath) : copy.originPath};
   }
   function witness(target, source) {

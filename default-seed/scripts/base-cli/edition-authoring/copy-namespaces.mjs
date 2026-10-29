@@ -14,7 +14,7 @@ const common = (left, right) => {
 export function sharedNamespaces(mappings) {
   // File selections witness their own siblings, not a parent above that
   // directory. Only directory copies establish a shared subtree selection.
-  mappings = mappings.filter(({copy}) => !Object.hasOwn(copy.files, copy.path));
+  mappings = mappings.filter(({directory}) => directory);
   const result = new Map();
   for (let i = 0; i < mappings.length; i++) for (const b of mappings.slice(i + 1)) {
     const a = mappings[i];

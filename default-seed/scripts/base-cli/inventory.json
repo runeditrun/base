@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.86-dev.ge13cb9f8",
+  "cliVersion": "0.2.86-dev.gbf5c5c32",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1319,7 +1319,7 @@
     },
     "edition-authoring/copy-namespaces.mjs": {
       "source": "edition-authoring/copy-namespaces.mjs",
-      "sha256": "04f3d290c8d92570d44937b5a85cc02e9bd8b7650b12610450ac4f97f1ce72f6"
+      "sha256": "2e7f2bcd34c575e9b7ac72ee41f5e676fd6ac22ab27d5b64a313326fd9b42ed9"
     },
     "edition-authoring/edition-migrations.mjs": {
       "source": "edition-authoring/edition-migrations.mjs",
@@ -1339,7 +1339,7 @@
     },
     "edition-authoring/module-closure.mjs": {
       "source": "edition-authoring/module-closure.mjs",
-      "sha256": "fc58c28c4bb55605eb980d14e480d935d3ee687d2cb307f3d01963b0c1c663e7"
+      "sha256": "cb7792dfb4137880a50e11032967bb83455deaff6c1f72fad3fcb5d626616ae8"
     },
     "edition-authoring/module-edges.mjs": {
       "source": "edition-authoring/module-edges.mjs",
