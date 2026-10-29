@@ -22,7 +22,8 @@ test('G8 installed authoring records and refreshes a fresh door/settings copy th
  run('git', ['init', '-q']);
  run('git', ['config', 'user.name', 'Run Edit Run fleet']);
  run('git', ['config', 'user.email', 'someone@example.com']);
- await writeFile(join(root, 'package.json'), JSON.stringify({ type: 'module' }));
+ const reference = JSON.parse(await readFile(join(base, 'default-seed/package.json'), 'utf8'));
+ await writeFile(join(root, 'package.json'), JSON.stringify({ type: 'module', dependencies: { react: reference.dependencies.react } }));
  await writeFile(join(root, '.gitignore'), 'node_modules\n');
  await symlink(join(base, 'default-seed/node_modules'), join(root, 'node_modules'));
  const sources = ['modules/agent-door', 'modules/business-settings', 'modules/operator-auth', 'foundation/runtime'];
