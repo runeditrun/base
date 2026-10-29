@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.91",
+  "cliVersion": "0.2.91-dev.gee8b14c1",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -403,7 +403,7 @@
     },
     "cli/agent-history-isolation.mjs": {
       "source": "cli/agent-history-isolation.mjs",
-      "sha256": "bf20790d151f29bf53a57eb8e7e3dd7bc3c0ec2adff0b534c21e120314f9aab1"
+      "sha256": "364cb4b9524b31b54c02224ff37fda62a94611a8ad1c398c92492c8d209d32fb"
     },
     "cli/agent-history.mjs": {
       "source": "cli/agent-history.mjs",

@@ -1,5 +1,5 @@
 import { readdir, readFile, realpath } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { testSource } from '../composition/git-source.mjs';
 import { dependencies } from '../edition-authoring/module-edges.mjs';
@@ -24,8 +24,18 @@ export async function refuseHistoryImports(root, source) {
   }
  }
  await walk();
- const forbidden = new Set(source.modules.filter(module => relative(source.root, module.path).startsWith('tests/')).map(module => physical.get(relative(source.root, module.path))));
- const tree = { has: name => files.has(name), read: name => readFileSync(join(root, name), 'utf8') };
+ const forbidden = new Set(await Promise.all(source.modules.filter(module => relative(source.root, module.path).startsWith('tests/')).map(module => realpath(module.path))));
+ const tree = { has: name => {
+  if (files.has(name)) return true;
+  if (name.startsWith('../') || name.split('/').some(part => ignored.has(part))) return false;
+  // Literal imports may cross a contained directory symlink that the directory
+  // walk deliberately does not follow. Resolve that file physically too.
+  try {
+   if (!statSync(join(root, name)).isFile()) return false;
+   files.add(name); physical.set(name, realpathSync(join(root, name)));
+   return true;
+  } catch { return false; }
+ }, read: name => readFileSync(join(root, name), 'utf8') };
  let paths = {};
  try { paths = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8')).compilerOptions?.paths ?? {}; } catch { /* Relative resolution still applies. */ }
  const queue = [...files].filter(name => !testSource(name) && !name.startsWith('scripts/') && /\.[cm]?[jt]sx?$/.test(name)), seen = new Set();

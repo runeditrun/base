@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, readFile, writeFile, symlink } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, symlink, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fixtureSeed, buildFixture } from './tests/fixtures/agent-door/seed.mjs';
 import { checkAgentDoor } from './agent-door.mjs';
@@ -42,7 +42,16 @@ test('history stays outside production commands and production imports are refus
  await symlink(join(root, 'tests/history.mjs'), join(root, 'alias.mjs'));
  await writeFile(join(root, 'production.mjs'), "import './alias.mjs';");
  outcomes.push(await historyDeclaration(root, declaration()).then(() => false, error => error.code === 'agent_history_invalid'));
- assert.deepEqual(outcomes, Array(7).fill(true));
+ await rm(join(root, 'alias.mjs'));
+ await symlink(join(root, 'tests'), join(root, 'runtime-tests'));
+ await writeFile(join(root, 'production.mjs'), "export {default} from './runtime-tests/history.mjs';");
+ outcomes.push(await historyDeclaration(root, declaration()).then(() => false, error => error.code === 'agent_history_invalid'));
+ await mkdir(join(root, 'native-history'));
+ await writeFile(join(root, 'native-history/outside.mjs'), 'export default {};');
+ await symlink(join(root, 'native-history'), join(root, 'tests/alias-dir'));
+ await writeFile(join(root, 'production.mjs'), "export {default} from './native-history/outside.mjs';");
+ outcomes.push(await historyDeclaration(root, {...declaration(), module:'tests/alias-dir/outside.mjs'}).then(() => false, error => error.code === 'agent_history_invalid'));
+ assert.deepEqual(outcomes, Array(9).fill(true));
 });
 
 test('history inserts only into disposable declared databases and cannot forge protocol state', { timeout: 240000 }, async t => {
