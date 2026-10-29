@@ -400,6 +400,14 @@ Comments and harmless inter-token whitespace therefore compare equally, while
 `x '31'` and `x'31'`, separated minus signs, numbers and combined operators stay
 distinct. No regular expression rewrites SQL.
 
+Restore may omit an archived schema object from its compatibility comparison
+only when its table is in the archive's excluded inventory, the destination
+policy also excludes it, neither side restores it, and the destination lacks
+it. This permits transient export snapshots without installing source SQL.
+Objects on restorable tables and excluded tables present at the destination
+remain verified against the unchanged live and migration-replay catalogues;
+the original manifest and parts still supply the archive digest.
+
 Quoted identifiers (double quotes, backticks, brackets, or a single-quoted string
 used as a name), strings, blobs, numbers, variables and ordinary identifiers keep
 their exact spelling. Only unambiguous reserved keywords fold ASCII case.

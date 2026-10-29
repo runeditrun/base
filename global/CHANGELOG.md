@@ -2,6 +2,7 @@
 
 ## 0.2.90
 
+- Restore fresh archives containing schema objects on policy-excluded transient tables absent from the destination, while retaining durable schema and original archive digest verification.
 - Withhold optional copied Base modules and workflow helpers whose required packages the edition has not declared. Refresh preserves supported dependency closure and explains the package declaration needed to opt in.
 - Retain approved mutation outcomes and original effect facts through restore, schedule, grant, role and consumed-draft retries while rechecking current native authority, scope, pause, policy and proof. Changed arguments still conflict; read-only replay retains current native visibility.
 - Keep signing command ordering safe when an identical concurrent command consumes its intent before the next read. Conformance accepts older receipts without a `decision` field while checking their original decision identity.
