@@ -367,7 +367,7 @@ extra-payload recovery responsibilities and transfer erasure behavior still appl
 The UTF-8 JSON-lines archive has a manifest, indexed checksummed parts and a
 closing record. `readArchive(stream)` uses the shared bounded, fatal UTF-8 line
 reader. The default maximum line size is 24 MiB; callers can set a smaller bound.
-No runtime or CLI materializes the whole archive. The manifest opens the archive and holds the final part count and payload hashes, so an export builds all its parts in the job before any byte is written; `exportArchive` and `importArchive` take an optional `progress` callback (`progress.mjs` turns its events into throttled lines with a time-left estimate). Readers enforce a 16 MiB
+Current-archive paths do not materialize the whole archive; the legacy ledger collector described below buffers its initial upload. The manifest opens the archive and holds the final part count and payload hashes, so an export builds all its parts in the job before any byte is written; `exportArchive` and `importArchive` take an optional `progress` callback (`progress.mjs` turns its events into throttled lines with a time-left estimate). Readers enforce a 16 MiB
 canonical UTF-8 part limit; `readArchive(stream,{partBytes})` can lower it.
 Import uploads enforce the policy's part limit before any staging write.
 A part has at most 1,000 rows;
@@ -1058,6 +1058,8 @@ modules/portability/policy-data.mjs
 modules/portability/generated.mjs
 modules/portability/restore-safety.mjs
 modules/portability/bridge.mjs
+modules/portability/library-history.mjs
+modules/portability/migration-history.mjs
 modules/portability/ledgers.mjs
 modules/portability/migration-statements.mjs
 modules/portability/sql-text.mjs

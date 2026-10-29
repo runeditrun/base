@@ -414,7 +414,7 @@ test('library restore verifies a carried legacy ledger before creating a durable
     {name:'0002_added.sql',sql:"ALTER TABLE a_children ADD COLUMN state TEXT NOT NULL DEFAULT 'retained';"}];
   for(const file of files)file.sha256=await sha256(file.sql);
   const directory=await mkdtemp(join(tmpdir(),'legacy-library-'));t.after(()=>rm(directory,{recursive:true,force:true}));
-  await writeFile(join(directory,'wrangler.jsonc'),JSON.stringify({d1_databases:[{binding:'DB',migrations_dir:'.'}]}));
+  await writeFile(join(directory,'wrangler.jsonc'),'{\n// The checkout uses Wrangler JSONC.\n"d1_databases":[{"binding":"DB","migrations_dir":".",},],\n}');
   for(const file of files)await writeFile(join(directory,file.name),file.sql);
   const ledgerSQL='CREATE TABLE rer_migrations(name TEXT PRIMARY KEY,sha256 TEXT NOT NULL,applied_at TEXT NOT NULL)';
   const source=await database(t,[...splitStatements(files[0].sql),ledgerSQL],rules);
