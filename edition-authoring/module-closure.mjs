@@ -5,12 +5,13 @@ import {raw, safe, requirePhysical, testSource, freedEntries, toolFile} from './
 import {dependencies, resolve, external, bindings, lexicalExports} from './runtime-dependencies.mjs';
 import {relocateDependencies} from './module-edges.mjs';
 import {sharedNamespaces} from './copy-namespaces.mjs';
+import {acknowledgementCommand} from './base-acknowledgements.mjs';
 const code = name => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(name) && !testSource(name);
 const inside = (name, prefix) => prefix === '.' ? !name.startsWith('../') && !path.posix.isAbsolute(name) : name === prefix || name.startsWith(prefix + '/');
 const mapped = (source, copy) => copy.path + source.slice(copy.originPath.length);
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 
-export function completeModuleCopies(root, plans, {tree, read, revision, base, deliveries = [], ownerSources = new Map(), relocations = new Map()}) {
+export function completeModuleCopies(root, plans, {tree, read, revision, base, baseArchive, recordPath, deliveries = [], ownerSources = new Map(), relocations = new Map()}) {
   const index = new Set(raw(root, 'ls-files', '-z').toString('utf8').split('\0').filter(Boolean));
   const required = new Set();
   const mappings = plans.filter(plan => !plan.retired).map(({copy}) => ({copy, ...namespace(copy)})).filter(mapping => mapping.from);
@@ -252,7 +253,16 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, d
         for (const [types, current, previous] of [[false, imports, oldBindings], [true, typeImports, oldTypes]]) {
           const exported = exportsAt(destination, types);
           for (const name of current.get(specifier) ?? []) if (exported && !exported.has(name) && !previous.get(specifier)?.has(name)) {
-            refuse(target, `${destination} does not export ${name}; merge Base ${dependency} at ${revision} into that seed-owned file`, `git -C ${quote(base)} show ${quote(revision + ':' + dependency)} > ${quote(destination + '.base')}`);
+            const comparison = destination + '.base';
+            const extract = baseArchive ? `cp ${quote(path.join(baseArchive, dependency))} ${quote(comparison)}` :
+              `git -C ${quote(base)} show ${quote(revision + ':' + dependency)} > ${quote(comparison)}`;
+            throw Error([
+              `Cannot refresh module ${target}: ${destination} does not export ${name} required by Base ${dependency} at ${revision}. No files were refreshed.`,
+              'Save the incoming dependency for comparison:', extract,
+              `Merge the required exports from ${quote(comparison)} into ${quote(destination)}, preserving seed edits.`,
+              ...(owner?.copy.adapted?.[destination] ? ['Review the reconciled bytes and mode, then acknowledge this adaptation:', acknowledgementCommand(root, destination, recordPath)] : []),
+              `Remove ${quote(comparison)} after reconciliation, then repeat refresh-base.`,
+            ].join('\n'));
           }
         }
       }
