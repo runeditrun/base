@@ -44,7 +44,7 @@ function constantRefusal(error,files) {
  // Only checkout-owned names may accompany the constant category. A ledger
  // entry with no matching file or declared alias can contain private values.
  const name=error.code.split(':').slice(2).join(':');
- const identity=name && files.some(file=>file.name===name || file.aliases?.includes(name))?name:undefined;
+ const identity=['migration_ledger:unknown','migration_ledger:ambiguous','migration_ledger:conflict'].includes(code) && name && files.some(file=>file.name===name || file.aliases?.includes(name))?name:undefined;
  return Object.assign(new PortabilityError(code,409),error.migration===undefined?{}:{migration:error.migration},identity?{identity}:{});
 }
 

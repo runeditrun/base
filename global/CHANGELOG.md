@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Restore identity suffixes in migration-history refusal tokens for pending checkout files, mixed Platform ledgers and checkout-owned migration identities, retaining constant adapter error codes, exit statuses and recovery guidance.
+- Restore identity suffixes in migration-history refusal tokens for pending checkout files, mixed Platform ledgers and checkout-owned migration identities, retaining constant adapter error codes, exit statuses and recovery guidance. Deliberately leave `migration_ledger:unknown:initial-page.sql` unrestored when it has no checkout provenance: the privacy contract excludes unchecked ledger values from diagnostics.
 
 ## 0.2.91
 
