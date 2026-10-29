@@ -948,6 +948,20 @@ disables the runtime's self-widening refusal. Checked `widens: false` tools stil
 need their narrowing schema and grant-subset witness; this flag cannot waive
 those checks. Owner-to-admin is a native demotion, never a widening operation.
 
+## Runtime audit rows beyond harness calls
+
+Conformance records approval executions that return either `executed` or
+`refused`, checking their own audit link, approval id, outcome and code. An
+honestly refused execution does not satisfy its journey's completion or receipt
+checks. Native continuations are checked separately from ordered harness calls:
+an `embedded` row must carry a nonempty `continuation_item_id` and the
+`operation_id` of an earlier harness row with the same agent, sponsor, consent
+and client. It must retain a recorded policy decision, matching rules, a `done`
+or coded `refused` outcome, and zero `differs_from_policy`. Other extra rows
+still fail the audit count; a continuation marker alone cannot hide one.
+Harness rows match their recorded decision identities in native order, so an
+unexpected row remains a distinct failure without shifting later comparisons.
+
 ## Contract clauses
 
 [`CLAUSES.md`](CLAUSES.md) is the single canonical source for
