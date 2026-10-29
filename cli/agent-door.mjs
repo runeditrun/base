@@ -13,6 +13,7 @@ import { RerError } from './errors.mjs';
 import { verificationReviewers } from './agent-reviewers.mjs';
 import { verificationSponsors } from './agent-sponsors.mjs';
 import { verificationWebhooks } from './agent-webhooks.mjs';
+import { journeyFixtures } from './agent-journey-fixtures.mjs';
 
 function finish(result, report) {
  for (const point of result.points) report(`${point.ok ? 'PASS' : 'FAIL'} ${point.id}${point.ok || !point.detail ? '' : `: ${point.detail}`}`);
@@ -135,8 +136,9 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
     catch { throw new Error('Native verification journey failed; no captured mail or fixture values are logged.'); }
    };
   }
+  const prepare = await journeyFixtures(root, verification.fixtures, { request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures });
   const result = await runAgentDoorConformance({ fetch: request, origin: hosted.origin, surface: declared.surface,
-   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors, webhooks, business, prove, nativeJourney,
+   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors, webhooks, business, prove, nativeJourney, prepare,
   });
   const points = [...result.points, ...reviewers.points()];
   return finish({ ...result, points, ok: points.every(point => point.ok) }, report);
