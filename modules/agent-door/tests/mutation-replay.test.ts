@@ -100,7 +100,7 @@ test('item 2: held restore journey checks original widening evidence separately 
     await r.adopt(heldPolicy())
     const step = { id: 'restore', tool: 'synthetic.mutation.restore', args: { id, value: 'restored', expected_revision: 1 }, expect: [{ class: 'access', facts: { measure: 1, direction: 'widens' } }] }
     const c: any = { ...r.c, fetch: r.fetch, points: [], clients: new Map(), fixtureValues: {},
-      surface: { seed: 'synthetic', capabilities: ['tools', 'policy', 'pause', 'audit', 'idempotency'], tools: [{ name: step.tool, scope: 'records:write', classes: ['access'], readOnly: false }], journey: [step], witness: { tool: 'synthetic.records.list', args: {} } } }
+      surface: { seed: 'synthetic', capabilities: ['tools', 'policy', 'pause', 'audit', 'idempotency'], tools: [{ name: step.tool, scope: 'records:write', classes: ['access'], readOnly: false }, { name: 'synthetic.records.list', scope: 'records:read', classes: ['standard'], readOnly: true }], journey: [step], witness: { tool: 'synthetic.records.list', args: {} } } }
     createProtocol(c)
     c.listed = new Map([[step.tool, { outputSchema: { type: 'object', required: ['id', 'consumed_version'], properties: { id: { type: 'string' }, consumed_version: { type: 'integer' } }, additionalProperties: false } }]])
     c.stepTool = (step: any, args: any, options: any) => c.tool(step.tool, args, options)
