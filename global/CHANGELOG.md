@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Package deploy migrations from the seed's declared `DB.migrations_dir`, sharing the native archive lookup; undeclared seeds retain `migrations/core` and their existing package bytes.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.

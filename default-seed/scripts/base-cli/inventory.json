@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.91-dev.g88951629",
+  "cliVersion": "0.2.91-dev.g7e06d05a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1095,7 +1095,7 @@
     },
     "cli/portability-migrations.mjs": {
       "source": "cli/portability-migrations.mjs",
-      "sha256": "c22307b727f573a0f0f898e3e54a0a244b54d62415f946d1a1c359f8197165ce"
+      "sha256": "369cc873120b7f80b2c6d5be7ed37bb7810670ff4a546557721dd4f768257c0d"
     },
     "cli/portability-policy.mjs": {
       "source": "cli/portability-policy.mjs",
@@ -2579,7 +2579,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "0dac46bb90172fa79c406078a9a96748ef9619e420204ad9a4df2e487a335e58"
+      "sha256": "71f068c7290d035124de27a41aa3c404118a0e1e245369ab3757f86efda8d710"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -2695,7 +2695,7 @@
     },
     "modules/deploy-kit/prepare.mjs": {
       "source": "modules/deploy-kit/prepare.mjs",
-      "sha256": "31b2834753d92dce9c837bd3b2c01f371f1f61f5e5f744670b34f1ef2b12737a"
+      "sha256": "1c8c96c88937e636be5bbc6fe1eaf020d02c1ff5129552de374ade19994ddbef"
     },
     "modules/deploy-kit/provider-transport.mjs": {
       "source": "modules/deploy-kit/provider-transport.mjs",

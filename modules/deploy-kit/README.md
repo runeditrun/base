@@ -85,7 +85,7 @@ The seed declares bindings, never names:
   "vars": { "MAIL_PROVIDER": "sendgrid" }, "originVar": "APP_ORIGIN" }
 ```
 
-Names are deterministic. The Worker is `<last segment of project>-<environment>`, for example `penny-production`. Each D1 database, R2 bucket, KV namespace and Queue is `<worker>-<binding in lower case, _ as ->`, for example `penny-production-db` and `penny-production-jobs-dead`. Durable Object namespaces belong to the Worker and are created by its upload migration. `originVar` receives `https://<worker>.<account subdomain>.workers.dev`. Migrations come from the packaged build's `migrations/core/*.sql` files. A name over 63 characters is refused, not shortened.
+Names are deterministic. The Worker is `<last segment of project>-<environment>`, for example `penny-production`. Each D1 database, R2 bucket, KV namespace and Queue is `<worker>-<binding in lower case, _ as ->`, for example `penny-production-db` and `penny-production-jobs-dead`. Durable Object namespaces belong to the Worker and are created by its upload migration. `originVar` receives `https://<worker>.<account subdomain>.workers.dev`. Migrations come from the product's `wrangler.jsonc` declaration for `DB.migrations_dir`, using the same lookup as native archive/migration checks. The directory must stay within the product. Without a declaration, packaging retains `migrations/core/*.sql`. A name over 63 characters is refused, not shortened.
 
 A declaration may also bind another owner-deployed Worker and may keep its own workers.dev route off. Both keys are optional, and a declaration without them renders and fingerprints exactly as before:
 
