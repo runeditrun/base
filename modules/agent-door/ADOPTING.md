@@ -869,7 +869,7 @@ agent-door entry point to the erasure declaration's `statements` or
 ```ts
 statements({ db, subject }) {
   return erasureFenceStatements(db, {
-    uris: [`base://person/${encodeURIComponent(subject.id)}`],
+    uris: [`base://person/${encodeURIComponent(String(subject.id))}`],
     // If the tool declares a native target, also supply its audit-safe mapping:
     // targets: [{ kind: 'person', id: subject.id }],
   })

@@ -22,7 +22,7 @@ export const personErasure = defineErasure({
   async statements({ db, subject }) {
     const person = await db.prepare('SELECT email FROM people WHERE id=?').bind(subject.id).first<{ email: string }>()
     return [
-      ...erasureFenceStatements(db, { uris: [`base://person/${encodeURIComponent(subject.id)}`] }),
+      ...erasureFenceStatements(db, { uris: [`base://person/${encodeURIComponent(String(subject.id))}`] }),
       ...person ? [db.prepare("DELETE FROM rer_mail_development_outbox WHERE EXISTS(SELECT 1 FROM json_each(json_extract(message,'$.to')) WHERE lower(value)=lower(?))").bind(person.email)] : [],
     ]
   },
