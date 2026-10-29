@@ -68,6 +68,7 @@ implementations and tests, then be verified in other editions that adopt them.
 - [Start setup without a prior clone or fork](launcher/README.md)
 - [Edition command and prerequisite inspection](operations/README.md)
 - [First-release acceptance guidance](export/FIRST-RELEASE-ACCEPTANCE.md)
+- [Adopting local Worker runtime changes](ADOPTING.md)
 - [Committed edition assembly and commands](composition/README.md)
 - [Canonical edition publication](authoring/README.md)
 - [Shared SendGrid transport](modules/sendgrid-email/README.md)
