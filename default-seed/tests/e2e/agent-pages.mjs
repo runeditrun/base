@@ -111,7 +111,7 @@ export async function agentDoorPages(root) {
    page.locator('[data-approval-action="approve"]').click(),
   ]);
   assert.deepEqual(approved.request().postDataJSON(),{revision:saved.revision,summary_sha256:saved.summary_sha256});
-  await page.locator('[data-approval-state]').filter({hasText:'executed'}).waitFor();await captureState('executed');
+  await page.locator('[data-approval-state="executed"]').waitFor();await captureState('executed');
   const invited=successful(await c.tool('base.access.invite',inviteArgs));
   const nativeInvitation=(await c.personJson('/auth/operators')).find(operator=>operator.id===invited.id);
   assert.equal(nativeInvitation.email,inviteArgs.email);assert.equal(nativeInvitation.role,inviteArgs.role);
@@ -130,25 +130,28 @@ export async function agentDoorPages(root) {
   const undone=successful(await c.tool('base.events.list',{limit:200})).events.find(event=>event.type==='person.note.removed');
   assert.equal(undone.actor.kind,'person');assert.equal(undone.actor.person.name,'Synthetic Owner');
   await page.locator(`[data-review-id="${reviewId}"] [data-review-action="flag"]`).click();
-  await page.locator(`[data-review-id="${reviewId}"]`).getByText('standard · flagged',{exact:true}).waitFor();
+  await page.locator(`[data-review-id="${reviewId}"][data-review-state="flagged"]`).waitFor();
   await page.locator(`[data-review-id="${reviewId}"] [data-review-action="reviewed"]`).click();
   await page.locator(`[data-review-id="${reviewId}"]`).waitFor({state:'detached'});
   await page.locator('[data-agents-pause]').click();await page.getByText('Agents are paused.',{exact:true}).waitFor();
-  await page.locator('[data-agents-pause]').click();await page.getByText('Agents are not paused.',{exact:true}).waitFor();
+  await page.locator('[data-agents-pause]').click();await page.getByText('Agents are on.',{exact:true}).waitFor();
   const rejectedId=approvalId(await c.tool('base.access.invite',{...inviteArgs,email:'synthetic-rejected@example.com',idempotency_key:randomUUID()}));
   await page.goto(hosted.origin+`/agents/approvals/${rejectedId}`,{waitUntil:'networkidle'});
   const [rejected]=await Promise.all([page.waitForResponse(response=>response.url().endsWith(`/${rejectedId}/reject`)),page.locator('[data-approval-action="reject"]').click()]);
   assert.equal(typeof rejected.request().postDataJSON().summary_sha256,'string');
-  await page.locator('[data-approval-state]').filter({hasText:'rejected'}).waitFor();await captureState('rejected');
+  await page.locator('[data-approval-state="rejected"]').waitFor();await captureState('rejected');
   await c.adopt(heldPolicy());
   await page.goto(hosted.origin+`/agents/approvals/${eraseId}`,{waitUntil:'networkidle'});
   await page.locator('[data-approval-action="approve"]').click();
-  await page.locator('[data-approval-state]').filter({hasText:'refused'}).waitFor();
-  assert.equal(await page.locator('[data-approval-code]').innerText(),'approval_evidence_changed');await captureState('refused');
+  await page.locator('[data-approval-state="refused"]').waitFor();
+  assert.equal(await page.locator('[data-approval-code]').getAttribute('data-approval-code'),'approval_evidence_changed');await captureState('refused');
   assert.equal((await approvedPersonRead(c,person.id)).name,'Synthetic Customer');
   await page.goto(hosted.origin+'/agents',{waitUntil:'networkidle'});
   const audit=(await c.personJson('/agents/api/audit')).rows;
-  for(const count of await page.locator('[data-agents-count]').evaluateAll(els=>els.map(el=>({class:el.dataset.class,decision:el.dataset.decision,count:Number(el.textContent)})))) {
+  const shown=await page.locator('[data-agents-count]').evaluateAll(els=>els.map(el=>({class:el.dataset.class,decision:el.dataset.decision,count:Number(el.textContent)})));
+  const expected=[...new Set(audit.flatMap(row=>row.classes.map(item=>`${item.class} ${row.decision}`)))].sort();
+  assert.deepEqual(shown.map(count=>`${count.class} ${count.decision}`).sort(),expected,'This week shows every class and decision with calls, and only those');
+  for(const count of shown) {
    assert.equal(count.count,audit.filter(row=>row.decision===count.decision&&row.classes.some(item=>item.class===count.class)).length);
   }
   await context.clearCookies();await page.goto(hosted.origin+'/agents');
