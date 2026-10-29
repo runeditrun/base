@@ -86,7 +86,7 @@ function setup(rt: Runtime, state: PolicyState, owner: boolean): string {
     if (missing.length) content += '<p>Agents wait on anything not answered.</p>'
   }
   if (current.policy.spend_caps === 'not_enforced') content += '<p class="notice" data-spend-caps="not-enforced">Paid AI spend caps are not enforced by this app. A saved cap does not limit provider charges.</p>'
-  if (rt.options.trust) content += `<p>Managed in Business${state.expires !== null ? `, renewed by ${time(state.expires)}` : ''}.</p><a href="${escape(setupUrl(rt, state))}">Manage policy in Business</a>`
+  if (rt.options.trust) content += `<p>Managed in Business.${state.expires !== null ? ` Valid until ${time(state.expires)}.` : ''}</p><a href="${escape(setupUrl(rt, state))}">Manage policy in Business</a>`
   else if (owner) {
     const draft = state.document ?? { schema: SCHEMA, catalogue: CATALOGUE, rules: [], reviewers: ['role:owner'], spend: { none: true } }
     if (quick) content += `<form action="/agents/api/policy" method="post" data-json-action data-create-policy data-method="PUT" novalidate>${classes.map(choice).join('')}${paidAI}<p><button type="submit">Save policy</button></p></form>`
@@ -120,7 +120,8 @@ function activity(rt: Runtime, rows: AuditRow[]): string {
 
 function countTable(counts: Count[], since: number): string {
   const rows = counts.filter(row => row.count > 0)
-  return `<section aria-labelledby="week-title"><h2 id="week-title">This week</h2><p class="meta">Since ${time(since)}</p>${rows.length ? `<table aria-labelledby="week-title"><thead><tr><th scope="col">Kind of action</th><th scope="col">Handled</th><th scope="col">Calls</th></tr></thead><tbody>${rows.map(row => `<tr><th scope="row">${escape(className(row.class))}</th><td>${escape(decisionName(row.decision))}</td><td data-agents-count data-class="${escape(row.class)}" data-decision="${escape(row.decision)}">${row.count}</td></tr>`).join('')}</tbody></table>` : empty('No agent calls yet this week.')}</section>`
+  if (!rows.length) return ''
+  return `<section aria-labelledby="week-title"><h2 id="week-title">This week</h2><p class="meta">Since ${time(since)}</p><table aria-labelledby="week-title"><thead><tr><th scope="col">Kind of action</th><th scope="col">Handled</th><th scope="col">Calls</th></tr></thead><tbody>${rows.map(row => `<tr><th scope="row">${escape(className(row.class))}</th><td>${escape(decisionName(row.decision))}</td><td data-agents-count data-class="${escape(row.class)}" data-decision="${escape(row.decision)}">${row.count}</td></tr>`).join('')}</tbody></table></section>`
 }
 
 async function dashboard(rt: Runtime, request: Request, person: Person): Promise<Response> {
