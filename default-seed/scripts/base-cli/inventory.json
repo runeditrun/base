@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.91-dev.g208814e5",
+  "cliVersion": "0.2.91-dev.g061deeb4",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -815,7 +815,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "efb68fd3b6c8069491dc07a53d62e4a4f81cfd8c2b7336a1528a9aae648a839d"
+      "sha256": "278a35de624b7e3f4e4ef6f822066efeed6db4fc43ef93b40763908bfaa7a48a"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -2659,7 +2659,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "b35564e7b55d4bec3e90394e8b4b12e41a5251bbe67071d22ca9961b8d525076"
+      "sha256": "07a90d974ea0f26e7d80dca11a74181d62c18f5358aa419b144a261fa1f6ebe9"
     },
     "modules/deploy-kit/owner-rekey.mjs": {
       "source": "modules/deploy-kit/owner-rekey.mjs",

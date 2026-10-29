@@ -14,7 +14,7 @@ import { observeOwner, ownerExchangeFailure } from './deploy-observation.mjs';
 import { committedSource } from './deploy-source.mjs';
 import { hookOrigin, waitForSource } from './deploy-hook.mjs';
 import { rememberHookState, hookState } from './deploy-hook-record.mjs';
-import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
+import { main as owner, withLocalDeployPlan } from '../modules/deploy-kit/owner-cli.mjs';
 import { localOnlyBinding, ownerWorkerName } from '../modules/deploy-kit/owner.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { deployDiagnostic, migrationFailure, providerFailure, assetFailure } from '../modules/deploy-kit/diagnostics.mjs';
@@ -82,21 +82,32 @@ export async function deployCommand(context) {
  const settings = adapter.hooks?.secrets ?? adapter.settings;
  // Required secrets have been checked; retain the production sign-in guidance.
  const dryRun = async result => {
-  result = { dryRun: true, deployed: false, providerChecked: false, ...result };
   const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
+  const plan = result?.plan ?? (await owner(['local-plan', '--declaration', path, '--environment', options.environment ?? 'production', ...await deployProductArguments(root, deployProductDirectory(declaration))], production.env, { cwd: root, localOnlyKeys })).plan;
+  result = { ...result, dryRun: true, deployed: false, providerChecked: false, plan };
   const { signIn } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
-  const needed = neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false });
+  const needed = [...new Set([...neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false }), ...(result.neededForRealDeploy ?? [])])];
   reportNeeded(store, needed);
   if (declaration.secrets?.some(item => item.binding === 'INSTALLATION_KEY')) store.report('deploy: INSTALLATION_KEY is a private generated binding; INSTALLATION_KEY_PREVIOUS is optional and managed only during rotation or an explicit retired-key reopen. Values are withheld.');
   return needed.length && result && typeof result === 'object' ? { ...result, neededForRealDeploy: needed } : result;
  };
+ const runHook = hookContext => options.dryRun ? withLocalDeployPlan(async () => {
+  try { return await adapter.deploy(hookContext); }
+  catch (error) {
+   // Production-only owner/input preflights may refuse before the hook builds.
+   // An offline plan defers those inputs, retaining the refusal as guidance.
+   if (!(error instanceof RerError) || error.code !== 'missing_input') throw error;
+   const result = await ownerDeploy(path, adapter)(hookContext);
+   return { ...result, neededForRealDeploy: [error.message] };
+  }
+ }) : adapter.deploy(hookContext);
  // Custom hooks historically ignored these flags. Only the ownership controller
  // may perform them; neither a build nor a custom upload runs here.
  if (options.remove || options.setSecret || options.unsetSecret || options.reopenInstallationKey) return ownerDeploy(path, adapter)(context);
  if (options.rotateSecret?.split(',').includes('INSTALLATION_KEY')) return ownerDeploy(path, adapter)(context);
  // A hook that deployed through the kit keeps what its Worker holds: rotate there as a secret change.
  if (options.rotateSecret && !adapter.deploy.managesHostedOwner && await hookState(root, options.environment ?? 'production')) return ownerDeploy(path, adapter)(context);
- if (adapter.deploy.managesHostedOwner) { const result = await adapter.deploy(context); return options.dryRun ? dryRun(result) : result; }
+ if (adapter.deploy.managesHostedOwner) { const result = await runHook(context); return options.dryRun ? dryRun(result) : result; }
  const productDirectory = deployProductDirectory(declaration);
  const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
  await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options });
@@ -133,7 +144,7 @@ export async function deployCommand(context) {
     Object.assign(process.env, env);
     // The hook builds and uploads by itself: it never sees the checkout's local settings.
     deployed = await withoutLocalSettings(root, { settings: [...(Array.isArray(adapter.settings) ? adapter.settings : []), adapter.hooks?.secrets?.file], operationToken: context.operationToken },
-     () => adapter.deploy({ ...context, input: ownerInput.input, linkDependencies: async (origin, token) => link(token, origin) }));
+     () => runHook({ ...context, input: ownerInput.input, linkDependencies: async (origin, token) => link(token, origin) }));
    } finally {
     for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key];
     Object.assign(process.env, saved);
@@ -142,8 +153,8 @@ export async function deployCommand(context) {
    await deployProductArguments(root, productDirectory);
    await refuseLocalEnvOutput(root, adapter.devIdentity?.output, { uploaded: !options.dryRun });
    if (options.dryRun) {
-    await command('local-plan');
-    return dryRun(deployed);
+    const { plan } = await command('local-plan');
+    return dryRun({ ...deployed, plan });
    }
    await rememberHookState(root, environment, deployed?.state);
    hookRecord = await hookState(root, environment);
