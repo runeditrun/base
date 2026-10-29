@@ -1,4 +1,12 @@
 import { auditRows } from './audit-rows.mjs';
+import { seconds } from './crypto.mjs';
+
+export class FixtureDatabaseError extends Error {
+ constructor() {
+  super('agent_fixtures_database_unavailable: Disposable database access refused; fixture values, records and SQL are not logged.');
+  this.code = 'agent_fixtures_database_unavailable';
+ }
+}
 
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = value => typeof value === 'string' && value.trim().length > 0;
@@ -15,7 +23,7 @@ export function phaseFixtures(c, prepare) {
   if (!prepare) return;
   try {
    const before = new Set((await auditRows(c, { agents: [null], includeFixtures: true })).rows.map(row => row.id));
-   const result = await prepare({ phase, tool: c.tool });
+   const result = await prepare({ phase, tool: c.tool, now: seconds(c.now) * 1000 });
    if (!object(result) || Object.keys(result).some(key => !['values', 'clients'].includes(key)) || !object(result.values ?? {}) || !object(result.clients ?? {})) throw new Error('Native phase preparation must return {values,clients}.');
    for (const [label, client] of Object.entries(result.clients ?? {})) {
     if (!text(label) || !object(client) || Object.keys(client).sort().join(',') !== 'agent,clientId,token'
@@ -32,8 +40,10 @@ export function phaseFixtures(c, prepare) {
     if (row.sponsor?.id !== c.sponsor.id || row.client_id !== client.clientId || row.agent?.name !== client.agent.name || row.agent?.specialist !== client.agent.specialist || row.consent !== null) throw new Error('Native fixture preparation identity differs from its declared client.');
     c.fixtureAuditIds.add(row.id);
    }
-  } catch {
+  } catch (error) {
    c.clients.clear();
+   c.fixtureValues = {};
+   if (error instanceof FixtureDatabaseError) throw error;
    throw new Error('Native phase preparation failed; fixture values are not logged.');
   }
  };

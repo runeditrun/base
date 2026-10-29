@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.89-dev.g9160d429",
+  "cliVersion": "0.2.89-dev.gd499a9bd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,7 +391,7 @@
     },
     "cli/agent-door.mjs": {
       "source": "cli/agent-door.mjs",
-      "sha256": "6e3e0fc2fb5a86bdeeb9609cc94325cb10b3343d563d98c0c4ed8af36897496f"
+      "sha256": "c837f67847b8d5785941a6a0783dfbff438248b059ae75e31d4a48fee2420e23"
     },
     "cli/agent-fixtures.mjs": {
       "source": "cli/agent-fixtures.mjs",
@@ -399,7 +399,7 @@
     },
     "cli/agent-journey-fixtures.mjs": {
       "source": "cli/agent-journey-fixtures.mjs",
-      "sha256": "a517f3a98c8c7e4c8f8bfad0bb1a3a678c38b0a3a2480be52d5613ff6ac70884"
+      "sha256": "ed99c32c72d8a78bb01a586ee739f306ea077403b196c106995b1a1e2c440b45"
     },
     "cli/agent-mail.mjs": {
       "source": "cli/agent-mail.mjs",
@@ -431,7 +431,7 @@
     },
     "cli/agent-verifier.mjs": {
       "source": "cli/agent-verifier.mjs",
-      "sha256": "ff3e2529518152aaa382aee0a21624b972ab83f0962b8f009560fdc7c7f7bbe3"
+      "sha256": "a75faa6a85a4c4bb0e83c77b97c9ba8b0bca55e73a69e46dc2595aa8c44e9ef2"
     },
     "cli/agent-webhooks.mjs": {
       "source": "cli/agent-webhooks.mjs",
@@ -1963,7 +1963,7 @@
     },
     "modules/agent-door/conformance/fixtures.mjs": {
       "source": "modules/agent-door/conformance/fixtures.mjs",
-      "sha256": "f43af45fafe14762a144c950e11daacfe24d89949921c45779cf8934ceb6d271"
+      "sha256": "95fffc0c13492577f7205d9e6d193b6b56e519fc0c15ddf79f20fb00402d0178"
     },
     "modules/agent-door/conformance/index.mjs": {
       "source": "modules/agent-door/conformance/index.mjs",
@@ -2027,7 +2027,7 @@
     },
     "modules/agent-door/conformance/step-hooks.mjs": {
       "source": "modules/agent-door/conformance/step-hooks.mjs",
-      "sha256": "fb6ef7bdbf17b5e39a1a4bba996963f6c7cdeb1ee6e441fc72a7b75d999d0306"
+      "sha256": "562f05b26b2cbfe977ec2d2a8c4afb82f401425fc534f46f44d07d626c3cd602"
     },
     "modules/agent-door/conformance/subscription.mjs": {
       "source": "modules/agent-door/conformance/subscription.mjs",
