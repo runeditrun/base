@@ -534,7 +534,7 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
     notices = templates.notices;
     completeWorkflowHelpers(root, plans, {tree: next, read, revision});
     const relocations = new Map();
-    const withheld = completeModuleCopies(root, plans, {tree: next, read, revision, base: origin.repository, ownerSources, relocations,
+    const withheld = completeModuleCopies(root, plans, {tree: next, read, revision, base: origin.repository, baseArchive, recordPath, ownerSources, relocations,
       deliveries: migrations.flatMap(step => step.deliver.map(source => ({source, origin: step.origin, importers: step.copies})))});
     // Closure may add individually recorded siblings when the seed originally
     // selected runtime files one at a time instead of copying the directory.
