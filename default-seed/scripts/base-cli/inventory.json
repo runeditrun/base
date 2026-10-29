@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.89-dev.g9160d429",
+  "cliVersion": "0.2.89-dev.g15ad52fd",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1963,7 +1963,7 @@
     },
     "modules/agent-door/conformance/fixtures.mjs": {
       "source": "modules/agent-door/conformance/fixtures.mjs",
-      "sha256": "f43af45fafe14762a144c950e11daacfe24d89949921c45779cf8934ceb6d271"
+      "sha256": "832a1352d917135320a46b269decfe96871cdcfe10756b241f616f79a0545b34"
     },
     "modules/agent-door/conformance/index.mjs": {
       "source": "modules/agent-door/conformance/index.mjs",
@@ -1991,7 +1991,7 @@
     },
     "modules/agent-door/conformance/negative.mjs": {
       "source": "modules/agent-door/conformance/negative.mjs",
-      "sha256": "59bb23033be252881bd6a25c195c2dad30e1a747b91d2f5c31b21cbd6d00463c"
+      "sha256": "bdfae9b94852a1ad573e9168fa15aefd973775879d567e9535dc38b24f752f86"
     },
     "modules/agent-door/conformance/network-modules.mjs": {
       "source": "modules/agent-door/conformance/network-modules.mjs",
