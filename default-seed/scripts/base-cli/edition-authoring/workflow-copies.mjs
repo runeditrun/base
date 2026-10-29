@@ -70,7 +70,9 @@ function invocations(text) {
       return []; // A URL or command option is not a relative helper path.
     }
   });
-  return [...new Set([...uses.map(name => safe(name.slice(2))), ...paths])];
+  // A workflow's archive/cache/build inputs do not select application source.
+  // Automatic helper acquisition is confined to the tooling namespaces.
+  return [...new Set([...uses.map(name => safe(name.slice(2))), ...paths.filter(name => name.startsWith('scripts/') || name.startsWith('.github/workflows/'))])];
 }
 
 function candidates(invoked) {
