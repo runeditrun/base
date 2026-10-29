@@ -1,8 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.2.89
 
 - Publication email hygiene recognizes parsed dependency package contact metadata and registry deprecation notices in pnpm, npm and Yarn lockfiles. Comments, custom keys, repository author fields, source files and secret checks retain their findings; no address allowlist is needed. This scanner source update can be adopted independently of a launcher package release.
+
+- Re-execute completed read-only approval replays under current native grants, so aggregate reads cannot disclose rows retained before client revocation. Native empty results and refusals replace cached payloads; unchanged visibility retains the result and approval receipt. Mutation replays still execute their effect once.
+
+- Leave optional deploy secrets unconfigured during hosted output and agent-door verification unless they declare a nonempty `verifyStandIn`. This prevents invented SSO endpoints from causing HTTP 500 before signed owner bootstrap. Required and explicitly selected stand-ins remain; public-door coverage retains invalid-signature and replay refusals. See `ADOPTING.md`.
+
+- Verify legacy v2 backups at their recorded migration schema before applying the additive bridge or a declared row upgrade. Missing or unknown history, schema drift and altered archive digests remain refused before staging.
+
+- Reconstruct excluded-table objects omitted by older v2 inventories only when recorded replay proves that historical inventory and the complete live destination. Unrecorded excluded objects remain refused.
 
 ## 0.2.88
 
