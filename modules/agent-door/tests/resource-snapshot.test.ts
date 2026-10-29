@@ -126,6 +126,18 @@ test('an in-place mutation cannot change the retained classified projection', as
   } finally { await f.r.close() }
 })
 
+test('a changed JSON serialization refuses without serving the classified body', async t => {
+  const record = { json: { at: new Date(0) } }
+  const f = await fixture(record)
+  try {
+    f.onRead(() => { record.json.at.setTime(1) })
+    const reply = await f.read()
+    t.diagnostic(`changed JSON serialization: code=${reply.error?.data?.code ?? 'none'} contents=${JSON.stringify(reply.result?.contents ?? null)}`)
+    await refused(f, reply, 'resource_changed')
+    assert.equal(f.reads(), 2)
+  } finally { await f.r.close() }
+})
+
 test('a resource removed at execution remains unavailable without contents', async () => {
   const f = await fixture()
   try {

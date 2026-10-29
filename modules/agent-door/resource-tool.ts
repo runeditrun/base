@@ -6,7 +6,12 @@ import { canonical } from './policy/document.ts'
 
 const resourceContext = (ctx: ToolContext): ResourceContext => ({ person: ctx.person, agent: ctx.agent, scopes: [...ctx.scopes], clientId: ctx.clientId, db: ctx.db,
   consent: ctx.consent, operationId: ctx.operationId, idempotencyKey: ctx.idempotencyKey, continuationItemId: ctx.continuationItemId })
-const projection = (record: NonNullable<Awaited<ReturnType<ResourceDefinition['read']>>>) => canonical({ json: record.json, text: record.text, untrusted: !!record.untrusted })
+const projection = (record: NonNullable<Awaited<ReturnType<ResourceDefinition['read']>>>) => {
+  // Retain classifier inputs and serialize the JSON fallback once for comparison and serving.
+  const value = record.json, text = record.text, untrusted = !!record.untrusted
+  const json = text == null ? JSON.stringify(value) : undefined
+  return { snapshot: canonical({ json: value, text, untrusted, serialized: json === undefined ? undefined : JSON.parse(json) }), text: text ?? json, untrusted }
+}
 
 /** A resource read uses the same admission, decision and execution as a tool. */
 export function resourceTool(rt: Runtime, uri: string): ToolDefinition | undefined {
@@ -27,7 +32,7 @@ export function resourceTool(rt: Runtime, uri: string): ToolDefinition | undefin
       try { record = await resource.read(uri, resourceContext(ctx)) } catch { record = null }
       if (!record) throw new ToolRefusal('resource_unavailable')
       // Retain values before a classifier or later read can mutate the record.
-      snapshot = projection(record)
+      snapshot = projection(record).snapshot
       return resource.classify(record, resourceContext(ctx))
     },
     async run(_args, ctx) {
@@ -35,12 +40,12 @@ export function resourceTool(rt: Runtime, uri: string): ToolDefinition | undefin
       await consentFence(ctx)
       const record = await resource.read(uri, resourceContext(ctx))
       const current = record && projection(record)
-      const contents = record && [{ uri, mimeType: resource.mimeType ?? 'application/json', text: record.text ?? JSON.stringify(record.json),
-        ...(record.untrusted ? { _meta: { 'com.runeditrun/untrusted': true } } : {}) }]
+      const contents = current && [{ uri, mimeType: resource.mimeType ?? 'application/json', text: current.text,
+        ...(current.untrusted ? { _meta: { 'com.runeditrun/untrusted': true } } : {}) }]
       // Fence the awaited read itself, including a revocation inside its hook.
       await consentFence(ctx)
       if (!contents) throw new ToolRefusal('resource_unavailable')
-      if (current !== snapshot) throw new ToolRefusal('resource_changed')
+      if (current?.snapshot !== snapshot) throw new ToolRefusal('resource_changed')
       return { result: { contents } }
     },
   }
