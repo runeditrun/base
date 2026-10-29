@@ -75,8 +75,6 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       result.decision = { id: row.id, disposition, revision: state.revision, classes: classes.map(item => ({ ...item, rule: null, do: disposition })) }
       return refuse(refusal.code, refusal.fields)
     }
-    const target = validInput ? await nativeTarget(tool, args, ctx) : null
-    if (name !== 'resources/read') row.resource = target
     if (!tool.readOnly && !key) return refuse('idempotency_key_required')
     if (tool.widens === false && row.ignored_arguments.length) return refuse('invalid_arguments')
     if (tool.authority === 'none' && row.ignored_arguments.length) return refuse('undeclared_arguments')
@@ -97,6 +95,14 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
         previous = saved
       }
     }
+    if (previous?.outcome && JSON.parse(previous.outcome).code === 'target_erased') {
+      // Admission above still wins. Never consult the erased native target,
+      // classifier or retained approval body to replay a fenced call.
+      row.replay_of = previous.decision_id
+      return refuse('target_erased')
+    }
+    const target = validInput ? await nativeTarget(tool, args, ctx) : null
+    if (name !== 'resources/read') row.resource = target
     if (!raw || !validateSchema(tool.inputSchema, declared)) return refuse('invalid_arguments')
     if (!previous && tool.revision && expected !== undefined) {
       const current = await tool.revision(args, ctx)
