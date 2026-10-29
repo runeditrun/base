@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.91-dev.g88951629",
+  "cliVersion": "0.2.91",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2787,7 +2787,7 @@
     },
     "modules/erasure/README.md": {
       "source": "modules/erasure/README.md",
-      "sha256": "2d6da40569563c43e51a41bf281305d25025349e0353b76ea96145ec350e8aa9"
+      "sha256": "51e935df481c06d68785b72916b54b43bee7bc23e3a5fa18e056c4be4513b9ad"
     },
     "modules/erasure/audit.mjs": {
       "source": "modules/erasure/audit.mjs",
@@ -4371,7 +4371,7 @@
     },
     "modules/operator-auth/identity/oidc/README.md": {
       "source": "modules/operator-auth/identity/oidc/README.md",
-      "sha256": "5e03d2ef26aee1b96ef658c3dda90fe2b4781417ff1c9f32dff0d56105f7472b"
+      "sha256": "df87b1fdc24eb020436f93c5d3e17d7823d7fc1ebcf9471368dac53d585b6a09"
     },
     "modules/operator-auth/identity/oidc/admin-audit.mjs": {
       "source": "modules/operator-auth/identity/oidc/admin-audit.mjs",

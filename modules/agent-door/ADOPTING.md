@@ -401,7 +401,6 @@ Seeds with a native initializer or a different owner binding declare this in
     "owner": {
       "email": "synthetic-owner@example.com",
       "emailField": "SETUP_OPERATOR_EMAIL",
-      "tokenField": "H2H_SETUP_TOKEN",
       "bindings": {
         "RER_MANAGEMENT_ORIGIN": "issuer",
         "RER_INSTALLATION_ID": "installationId"
@@ -411,6 +410,9 @@ Seeds with a native initializer or a different owner binding declare this in
   }
 }
 ```
+
+For a native setup-token binding, set `verification.owner.tokenField` to its
+environment binding name, for example `H2H_SETUP_TOKEN`.
 
 All keys are optional. Email defaults to `synthetic-base-1@example.com`;
 
@@ -860,9 +862,10 @@ correctly. An omitted list or one sponsor runs no extra phase or points.
 
 ## Provision verification webhook secrets
 
-A seed that creates its own random installation HMAC keys can declare
-`verification.network.secretSource` as the path `tests/read-webhook-secrets.mjs`
-alongside its existing network module and origins. The contained test-only module
+A seed that creates its own random installation HMAC keys can set the
+`verification.network.secretSource` field to the path of a test-only module
+(for example `tests/read-webhook-secrets.mjs`) alongside its existing network
+module and origins. The contained test-only module
 exports `async function ({database})`, reads the fresh installation's own state
 and returns a nonempty map of uppercase binding names to string values. The
 isolated receiver receives that map as `env.secrets` in its `fetch(request,env)`.

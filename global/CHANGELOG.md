@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Reword agent-door verification path and binding examples, plus erasure column and OIDC method examples, to avoid credential-shaped quoted assignments while preserving their meaning.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.
