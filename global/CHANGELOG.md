@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve Handset history screen, backing and time context during contract claim conversion; explicit clause links alone determine current product mappings and historical judgments remain unchanged.
+
 - Lead seed homepage heroes with what the product does for its owner, keeping free/open-source copy secondary. Optional plain-text `RunData.leadLine` supplies the composed homepage heading and the Run page introduction; omitting it preserves existing HTML and needs no seed migration.
 
 - Agent-door conformance requires a record-write resource fixture when a writable door offers resources. BASE-AGENT-003 acceptance 4 now rejects missing or foreign links and checks the written JSON state through the same door's resources/read; approval-gated reads still withhold content.

@@ -1,5 +1,15 @@
 # Adopting Base refresh and installation transfers
 
+Historical homepage claim conversion also reads `Capability claimed`, with
+`Screen` retained as location and `Code and target contract backing` retained
+verbatim as backing. Only explicit clause links supply product mappings;
+historical statuses never change current clause judgments. Refresh the
+`foundation/runtime/contract-docs.mjs` export with its adjacent parser/prose
+modules, keep the original snapshot and coverage `old.commit`, then run the
+edition's documented contract-docs check. License/public-source facts require
+an explicit source-bound non-product classification; seed coverage destination
+errors still need the seed's own reviewed correction.
+
 Agent-door adopters must refresh `modules/agent-door/credentials.ts`: the door now refuses a Business token whose email is not its subject's current native email (the `email` `people.sponsor` returns), with the same 401 and no effect as an unknown or inactive sponsor.
 
 Refresh `modules/agent-door/pipeline.ts` and `conformance/journey.mjs` together
