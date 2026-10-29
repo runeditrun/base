@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.88-dev.ge9fca289",
+  "cliVersion": "0.2.88-dev.ga29b278c",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1895,11 +1895,11 @@
     },
     "edition-authoring/workflow-copies.mjs": {
       "source": "edition-authoring/workflow-copies.mjs",
-      "sha256": "fac0780ced9ce3f653db50b2f2c41d577dd5a02017dfa9fe622fd6967b33b9de"
+      "sha256": "72d7190040f2e0169cf5e6149e88c999aa3aef3c6c93051a1c5720b5ec681281"
     },
     "edition-authoring/workflow-scripts.mjs": {
       "source": "edition-authoring/workflow-scripts.mjs",
-      "sha256": "d0e747277142e54d86acd1c01549ee8b76bf15c060366387bd074c57f77f7d2d"
+      "sha256": "d2a65622a919fb630c9759eb937edb2e06ab1ad7c18212389f6d509fb06db7f3"
     },
     "foundation/runtime/contract-docs.mjs": {
       "source": "foundation/runtime/contract-docs.mjs",

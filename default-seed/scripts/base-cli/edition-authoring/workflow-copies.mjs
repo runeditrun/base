@@ -63,7 +63,7 @@ export function adoptWorkflowTemplates(root, plans, {tree, read, revision, files
 
 function invocations(text) {
   const {scripts, uses} = workflowScripts(text);
-  const paths = scripts.flatMap(literalPaths).flatMap(name => {
+  const paths = scripts.flatMap(script => literalPaths(script, {helpersOnly: true})).flatMap(name => {
     try { return [safe(name)]; }
     catch (error) {
       if (name.startsWith('scripts/') || name.startsWith('.github/workflows/')) throw error;
@@ -71,8 +71,8 @@ function invocations(text) {
     }
   });
   // A workflow's archive/cache/build inputs do not select application source.
-  // Automatic helper acquisition is confined to the tooling namespaces.
-  return [...new Set([...uses.map(name => safe(name.slice(2))), ...paths.filter(name => name.startsWith('scripts/') || name.startsWith('.github/workflows/'))])];
+  // Tooling namespaces and explicitly selected ./ helpers retain acquisition.
+  return [...new Set([...uses.map(name => safe(name.slice(2))), ...paths])];
 }
 
 function candidates(invoked) {
