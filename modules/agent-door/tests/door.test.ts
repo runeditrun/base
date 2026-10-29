@@ -202,7 +202,7 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
    {name:'synthetic.access.change',scope:'records:write',readOnly:false,classes:['access'],clauses:['BASE-AGENT-006']},
    {name:'synthetic.events.list',scope:'events:read',readOnly:true,classes:['standard'],clauses:['BASE-AGENT-010']}],notTools:[],resources:['synthetic://record/{id}'],witness:{tool:'synthetic.records.list',args:{}},journey:[
     {id:'list',tool:'synthetic.records.list',args:{},expect:[{class:'standard'}]},
-    {id:'write',tool:'synthetic.records.write',args:{id:'synthetic-base-1',value:'synthetic-base-1'},expect:[{class:'standard'}],inject:{confirmExternal:true}},
+    {id:'write',tool:'synthetic.records.write',resource:{uriTemplate:'synthetic://record/{id}',state:{id:'synthetic-base-1',value:'synthetic-base-1'}},args:{id:'synthetic-base-1',value:'synthetic-base-1'},expect:[{class:'standard'}],inject:{confirmExternal:true}},
     {id:'send',tool:'synthetic.records.send',args:{id:'synthetic-base-1'},expect:[{class:'external'},{class:'sensitive'}]},
     {id:'access',tool:'synthetic.access.change',args:{id:'synthetic-base-other'},expect:[{class:'access'}]},
     {id:'erase',tool:'synthetic.records.erase',args:{id:'synthetic-base-1'},expect:[{class:'destructive'}]},

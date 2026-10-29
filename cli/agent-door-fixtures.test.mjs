@@ -60,6 +60,7 @@ test('phase fixtures and native step hooks share disposable state and redact dat
  surface.verification.fixtures = { module: 'context-fixtures.mjs' };
  surface.verification.journey = 'context-journey.mjs';
  surface.journey.find(step => step.id === 'create').args.value = { $fixture: 'record', pointer: '/value' };
+ surface.journey.find(step => step.id === 'create').resource.state.value = { $fixture: 'record', pointer: '/value' };
  await writeFile(join(root, 'context-owner.mjs'), `
 export let ownerDatabase;
 export default async function ({ database, request, origin, claim, displayName, returnTo }) {
