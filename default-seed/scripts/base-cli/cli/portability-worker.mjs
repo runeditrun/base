@@ -79,8 +79,10 @@ catch (error) {
  // Erasure-fence refusals name the fence: an older archive is refused, not a failed transfer.
  const refusal = error instanceof PortabilityError && (error.status === 409 || ['wrong_product', 'schema_mismatch', 'migration_ledger', 'table_inventory', 'configuration_inventory', 'erased_row', 'erasure_epoch', 'later_journal', 'invalid_journal', 'staged_validation'].includes(error.code.split(':')[0]));
  const exitCode = error.message === 'archive_json' ? 2 : refusal || error.code === 'EEXIST' ? 4 : 1;
- // Report only symbolic codes; native database errors can contain private data.
- const reason = error instanceof PortabilityError ? (error.code.startsWith('migration_ledger:') ? error.code : error.code.split(':')[0]) : /^[A-Z_]+$/.test(error.code ?? '') ? error.code : error.message === 'archive_json' ? 'archive_json' : 'native_error';
+ // Report symbolic codes and identities verified against the checkout or the
+ // known Platform ledger name; native database errors can contain private data.
+ const ledgerIdentity = error instanceof PortabilityError && error.code.startsWith('migration_ledger:') ? error.migration ?? error.identity : undefined;
+ const reason = error instanceof PortabilityError ? (error.code.startsWith('migration_ledger:') ? error.code + (ledgerIdentity ? ':' + ledgerIdentity : '') : error.code.split(':')[0]) : /^[A-Z_]+$/.test(error.code ?? '') ? error.code : error.message === 'archive_json' ? 'archive_json' : 'native_error';
  // A later migration that changes restorable data is named: it is a file of this installation.
  const migration = error instanceof PortabilityError && error.code.startsWith('schema_mismatch:migration_data:') ? error.code.slice('schema_mismatch:migration_data:'.length) : undefined;
  // An unapplied migration is a file of this checkout: it is named so it can be applied.
