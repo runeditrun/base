@@ -1,5 +1,13 @@
 # Adopting Base refresh and installation transfers
 
+Agent-door adopters must refresh `modules/agent-door/pipeline.ts` to revalidate
+completed read-only approval replays through the native read with current grants.
+This covers aggregate visibility enforced inside a tool's `run`, as well as
+resource reads. Revoked clients receive the native empty result or refusal;
+unchanged visibility retains the result and approval receipt. Mutation replay
+keeps its recorded outcome and once-only effect. See
+[`modules/agent-door/ADOPTING.md`](modules/agent-door/ADOPTING.md#current-admission-on-replay).
+
 Use an installed current RER package to refresh a seed whose copied authoring
 CLI is still from 0.2.82. Pin the package in the seed first, then invoke its
 public command rather than `scripts/edition-authoring/cli.mjs`:
