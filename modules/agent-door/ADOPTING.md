@@ -732,6 +732,22 @@ journey steps and must end with an idempotent write. Its public-door phase
 proves identical once-only replay, pause and changed-policy refusal, a newly
 required approval, current scope and the refused replay's complete audit.
 
+## Initialize each conformance agent
+
+Declare `verification.agent: {"initializer":"tests/initialize-agent.mjs"}` when
+native verification or a grant must bind to the conformance agent ID. The
+contained module default-exports an async function receiving
+`{agentId, request, origin, email, sub, mail, fixtures}`. After owner admission
+and fixture setup, it runs exactly once for each chosen agent ID, before that
+agent's first phase or MCP request, including each additional sponsor's agent.
+`request(absoluteURL, init)` is restricted to the disposable origin and carries
+that sponsor's native person session and Origin; use existing person doors to
+create the binding. Native writes retain person attribution. No signing key,
+token minter or setup token is supplied. Invalid declarations fail with
+`agent_initializer_invalid` before installation; an initializer failure stops
+the run with `BASE-AGENT-001.agent-initializer` and a fixed private-data-free
+diagnostic. Without this declaration the existing flow and audit checks apply.
+
 ## Verify multiple sponsors
 
 Keep `verification.owner` for the first owner's existing bindings and lifecycle.
