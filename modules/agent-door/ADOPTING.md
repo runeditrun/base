@@ -538,7 +538,10 @@ retain their actual native scope checks. Generate secret-shaped values at
 runtime and never log them.
 
 A journey step can select `client:"local"`; its MCP calls, proof challenges,
-approval retries, replay and resource reads then use that native bearer.
+approval retries, replay, resource reads and post-write event snapshots then use
+that native bearer. Event visibility remains limited to resources readable by
+that client's authenticated identity. Steps without a selected client retain
+the Business credential path.
 Arguments and target IDs can reference prepared values, for example
 `{"$fixture":"operation","pointer":"/key"}`. These references require the
 fixture module and fail when their value or client is absent. Audit verification

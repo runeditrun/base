@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Use the journey's selected native client for post-write event snapshots, so valid client-only change events pass conformance under the same resource visibility checks as the write and read. Steps without a selected client keep the Business credential path.
+
 - Agent conformance journeys can select real native client credentials and reference phase-local values from a contained `verification.fixtures` module. Fresh native setup runs before each policy journey round, including REST mutations that enter the actual agent door to establish receipt custody. Preparation finishes before adopting held policy, and its native audit identity is checked separately from the journey's exact audit count. Receipts, destructive state, approvals and audits retain their actual client identity and scope. Missing clients, missing fixtures and reused consumed state still fail verification. This provides fixture support for Mango and Oncall; editions must still declare their missing tool/class cases.
 
 ## 0.2.86
