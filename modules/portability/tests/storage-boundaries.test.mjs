@@ -23,7 +23,7 @@ test('large Unicode values survive durable segment boundaries and a full round t
   }
 });
 test('default exclusions cover SQLite identifier case variants',async t=>{
-  const source=await runtime(t),names=['OA_TRANSFER_TEST','OC_TRANSFER_TEST','RER_PORTABILITY_TRANSFER_TEST','RER_MAIL_DEVELOPMENT_OUTBOX'];
+  const source=await runtime(t),names=['OA_TRANSFER_TEST','OC_OWNER_CLAIMS','RER_PORTABILITY_TRANSFER_TEST','RER_MAIL_DEVELOPMENT_OUTBOX'];
   for(const name of names)await source.db.prepare('CREATE TABLE "'+name+'"(id TEXT)').run();
   const bundle=await archive(await source.connect());
   for(const name of names)assert.ok(bundle.manifest.excludedTables.includes(name),'default exclusion must cover '+name);
