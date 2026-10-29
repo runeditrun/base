@@ -703,7 +703,7 @@ never become completed receipts, and approval execution still rechecks the nativ
 revision, exact summary and classification before making its one effect.
 
 The response decision and replay audit describe current policy admission against
-the recorded effect facts. For approved calls, `com.runeditrun/receipt.decision` retains the original
+the recorded effect facts. For approved calls, `_meta["com.runeditrun/receipt"].decision` retains the original
 decision, including classes/facts, revision and approval/review disposition;
 the existing review metadata retains the original review when present. The native output
 retains its consumed version. Conformance checks original class evidence against

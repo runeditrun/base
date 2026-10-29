@@ -14,7 +14,7 @@ Changed arguments (including `expected_revision`) still conflict. Current scope,
 pause, policy, sponsor/agent/consent revocation and required native proof still
 control receipt access; refused, pending and rejected calls cannot gain a completed
 receipt. The response decision and replay audit describe current admission;
-`com.runeditrun/receipt.decision` describes the original effect. Read-only retries
+`_meta["com.runeditrun/receipt"].decision` describes the original effect. Read-only retries
 continue to execute under current native visibility.
 
 Agent-door adopters must refresh `modules/agent-door/pipeline.ts` to revalidate
