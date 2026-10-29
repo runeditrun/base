@@ -1,9 +1,11 @@
 import { statement, quote, insist } from './storage.mjs';
-import { tokens, folded } from './generated.mjs';
+import { tokens, folded, identifier } from './generated.mjs';
 import { changesData, dataStatement, reachingTables, triggerBodies, schemaChange, statementNames } from './migration-statements.mjs';
 import { splitStatements } from './sql-text.mjs';
 import { preservingRebuilds } from './rebuilds.mjs';
 import { replayViews, viewReads } from './replay-views.mjs';
+import { sqliteTokens } from './sqlite-tokens.mjs';
+import { schemaSQL } from './schema-identity.mjs';
 import { transientTables } from './transient-tables.mjs';
 
 // The data statements of later migrations, judged by the tables they write
@@ -31,13 +33,18 @@ import { transientTables } from './transient-tables.mjs';
 // statements after it is judged as the statements it holds.
 // Returns the replays in migration order and the proven CHECK rebuilds, or refuses with the first migration
 // (in `unapplied` order) holding a statement that cannot be admitted.
-export function laterData({applied,unapplied,replay,catalogue,archived,empty,tables,secrets,manifest}) {
+export function laterData({applied,unapplied,replay,catalogue,archived,empty,tables,secrets,manifest,replayEmpty=[]}) {
   const split=name=>replay.statements(name).flatMap(splitStatements),fold=list=>list.map(folded);
   const statements=applied.flatMap(split);
   const restorable=fold(catalogue),carried=fold(archived);
   const reached=reachingTables(statements,carried),writable=reachingTables(statements,restorable);
   const later=unapplied.flatMap(migration=>split(migration).map((sql,index)=>({migration,index,sql,data:dataStatement(sql)})));
   const {admitted,tables:rebuilt}=preservingRebuilds(later,manifest,tables,statements),views=replayViews(statements);
+  const restored=restoreCommitStatements(applied,split,later);
+  restored.forEach(s=>admitted.add(s));
+  const absentEmpty=emptyAbsentTables(later,statements,carried,replayEmpty,admitted);
+  // An empty absent source contributes no row to a direct INSERT SELECT.
+  for(const s of later)if(s.data && emptySelect(s.sql,absentEmpty))admitted.add(s);
   const {missing,plans:transients}=transientTables(statements,later,fold(tables),carried);
   const current=fold(tables),known=[...current,...missing],outside=later.filter(s=>s.data && !writable.includes(s.data.target) && !transients.has(s.data.target)),tainted=new Set();
   // Tables an admitted write fills from archived rows (directly, through its
@@ -61,7 +68,7 @@ export function laterData({applied,unapplied,replay,catalogue,archived,empty,tab
     // Dependencies are checked below before any of the plan is selected.
     const available=[...transients.keys(),...(!carried.includes(table)?[...writes.keys()].filter(name=>!carried.includes(name)):[])];
     const allowUpdate=!transient && !carried.includes(table) && list.some(s=>['insert','replace'].includes(s.data.verb));
-    const options={table,allowUpdate,statements,restorable,writable,carried:[...carried,...available],tables:known,secrets,views,manifest};
+    const options={table,allowUpdate,statements,restorable,writable,carried:[...carried,...absentEmpty,...available],tables:known,secrets,views,manifest};
     // Carried target rules must use the actual archive, not reconstructed reads.
     const bad=carried.includes(table) && list.length>1?list:list.filter(s=>!replayable(s,{...options,targetCarried:carried.includes(table)}));
     // Writes confined to tables created after the archive retain their
@@ -88,6 +95,10 @@ export function laterData({applied,unapplied,replay,catalogue,archived,empty,tab
   for(const [table,{create,drop}] of transients)if(choices.has(table)) {
     replays.push(create,drop);schema.set(create,table);schema.set(drop,table);
   }
+  // Commit-trigger transformations run after normal replays. A replay must
+  // not consume a value that such a transformation has yet to produce.
+  const transformed=new Set([...restored].flatMap(s=>[s.data.target,...triggerBodies(statements,s.data.target)]));
+  for(const s of replays)if(s.data?.names.some(name=>transformed.has(name)))refused.add(s);
   const first=later.find(s=>refused.has(s));
   insist(!first,'schema_mismatch:migration_data:'+first?.migration);
   const named=Object.fromEntries(catalogue.map(name=>[folded(name),name]));
@@ -141,3 +152,71 @@ export function replayStatements(db,row) {
     statement(db,`UPDATE rer_portability_jobs SET metadata=json_set(metadata,'$.bridge.replayed[${i}].rows',${r.schema?'0':'changes()'}) WHERE id=?`,row.id)])];
 }
 const autoincrement=sql=>tokens(sql).some(t=>!t.quoted && folded(t.text)==='autoincrement');
+
+// Only a surviving destination-owned trigger on the actual restore transition
+// can cover DML. The complete body must recur contiguously, in the same file
+// and order, preserving literals and identifiers. Nothing is replayed twice.
+function restoreCommitStatements(applied,split,later) {
+  const live=new Map();
+  for(const migration of applied)for(const sql of split(migration)) {
+    const list=tokens(sql),words=list.map(t=>folded(t.text));
+    if(!['create','drop'].includes(words[0]) || words[1]!=='trigger')continue;
+    const at=words[2]==='if'?(words[0]==='create'?5:4):2,name=folded(identifier(list[at]));
+    if(words[0]==='drop'){live.delete(name);continue;}
+    live.set(name,{migration,sql,list,at});
+  }
+  const admitted=new Set();
+  const header='AFTER UPDATE OF import_job ON rer_portability_state WHEN OLD.import_job IS NOT NULL AND NEW.import_job IS NULL AND OLD.applying=1';
+  for(const {migration,sql,list,at} of live.values()) {
+    const begin=list.findIndex(t=>!t.quoted && folded(t.text)==='begin');
+    if(begin<0 || schemaChange(sql)!=='trigger' || schemaSQL(sql.slice(list[at].end,list[begin].start))!==schemaSQL(header))continue;
+    const end=list.at(-1);if(!/^end;?$/i.test(end.text))continue;
+    const body=splitStatements(sql.slice(list[begin].end,end.start));
+    if(!body.length || body.some(sql=>!dataStatement(sql)))continue;
+    const file=later.filter(s=>s.migration===migration),images=body.map(schemaSQL);
+    for(let i=0;i+body.length<=file.length;i++)if(images.every((image,k)=>file[i+k].data && schemaSQL(file[i+k].sql)===image))file.slice(i,i+body.length).forEach(s=>admitted.add(s));
+  }
+  return admitted;
+}
+// Prove an absent table stays empty rather than assuming every newly created
+// table is empty. Full replay supplies the empty baseline; every later INSERT
+// and every possible trigger writer must also preserve it. A local empty
+// create/copy/drop/rename rebuild carries no row, including through its DROP.
+function emptyAbsentTables(later,statements,carried,replayEmpty,admitted) {
+  const empty=new Set(replayEmpty.map(folded).filter(name=>!carried.includes(name)));
+  const rebuilds=[];
+  for(let i=0;i+3<later.length;i++) {
+    const block=later.slice(i,i+4),a=tokens(block[0].sql),b=tokens(block[1].sql),c=tokens(block[2].sql),d=tokens(block[3].sql);
+    const text=list=>list.map(t=>folded(identifier(t)));
+    const [aa,bb,cc,dd]=[a,b,c,d].map(text);
+    if(block.some(s=>s.migration!==block[0].migration) || aa[0]!=='create' || aa[1]!=='table' || a[3]?.text!=='(' || bb.length!==7 || bb[0]!=='insert' || bb[1]!=='into' || bb[2]!==aa[2] || bb[3]!=='select' || bb[4]!=='*' || bb[5]!=='from' || cc.join(' ')!==`drop table ${bb[6]}` || dd.join(' ')!==`alter table ${aa[2]} rename to ${bb[6]}` || !empty.has(bb[6]) || carried.includes(aa[2]))continue;
+    if(later.some(s=>!block.includes(s) && statementNames(s.sql).includes(aa[2])))continue;
+    rebuilds.push({block,source:bb[6]});
+  }
+  const copyStatements=new Set(rebuilds.flatMap(r=>r.block));
+  for(let changed=true;changed;) {
+    changed=false;
+    for(const name of empty) {
+      const writes=later.filter(s=>s.data && s.data.target===name && !copyStatements.has(s) && ['insert','replace'].includes(s.data.verb));
+      const triggered=statements.some(sql=>statementNames(sql).some(table=>triggerBodies([sql],table).includes(name)));
+      if(triggered || writes.some(s=>!emptySelect(s.sql,empty))) {empty.delete(name);changed=true;}
+    }
+  }
+  for(const {block,source} of rebuilds)if(empty.has(source))block.forEach(s=>admitted.add(s));
+  return [...empty];
+}
+function emptySelect(sql,empty) {
+  const list=sqliteTokens(sql),word=t=>['keyword','identifier'].includes(t?.type)?folded(t.value):undefined;
+  let depth=0,select=-1,from=-1;
+  for(let i=0;i<list.length;i++) {
+    const t=list[i],w=word(t);
+    if(!depth && ['union','except','intersect','right','full','returning'].includes(w))return false;
+    if(!depth && w==='select' && select<0)select=i;
+    if(!depth && w==='from' && select>=0 && from<0)from=i;
+    // An aggregate over an empty input can still produce one row. Permit
+    // only known scalar expressions and EXISTS before the outer FROM.
+    if(!depth && select>=0 && from<0 && list[i+1]?.text==='(' && w && !['coalesce','exists'].includes(w))return false;
+    if(t.text==='(')depth++;if(t.text===')')depth--;
+  }
+  return from>select && [...empty].includes(folded(list[from+1]?.value??''));
+}
