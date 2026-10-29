@@ -155,10 +155,13 @@ function memberPeople(people, db, nativeMode, skipSponsorCheck) {
   const allowed = async person => person && (!nativeMode || await db.prepare('SELECT operator_id FROM fixture_members WHERE operator_id=?').bind(person.id).first()) ? person : null;
   return { ...people, person: async id => allowed(await people.person(id)), sponsor: async claims => {
     // Deliberate adapter mutant: retain the real owner and production door,
-    // while omitting subject admission to prove the conformance detects it.
+    // while omitting subject admission to prove the conformance detects it:
+    // an unmapped subject becomes the owner, and no person is checked for
+    // activity or membership.
     if (skipSponsorCheck) {
       const owner = await db.prepare('SELECT owner_id FROM bs_settings WHERE singleton=1').first();
-      return people.sponsor({ sub: owner.owner_id });
+      const person = await people.sponsor(claims) ?? await people.sponsor({ sub: owner.owner_id });
+      return person && { ...person, active: true };
     }
     return allowed(await people.sponsor(claims));
   }, session: async request => allowed(await people.session(request)) };

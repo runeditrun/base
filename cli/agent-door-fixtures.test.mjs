@@ -114,10 +114,12 @@ export default async function({phase, request, origin, cookie}) {
   return result;
  }
  const bypassed = await verify(true);
- for (const kind of kinds) assert.ok(bypassed.points.some(point => point.id === `BASE-AGENT-004.sponsor.${kind}` && !point.ok), `Skipped sponsor admission must fail ${kind}`);
+ for (const kind of ['unknown', 'inactive', 'excluded']) assert.ok(bypassed.points.some(point => point.id === `BASE-AGENT-004.sponsor.${kind}` && !point.ok), `Skipped sponsor admission must fail ${kind}`);
+ // The door binds the token email to the subject's current native email, so an adapter that skips admission still cannot admit a changed address.
+ assert.ok(bypassed.points.some(point => point.id === 'BASE-AGENT-004.sponsor.changed-email' && point.ok), 'The door must refuse a changed email even when the adapter skips admission');
  const native = await verify(false);
  assert.ok(!native.points.some(point => point.id.startsWith('BASE-AGENT-004.cross-sponsor')), 'Negative-only persons must not run successful cross-sponsor journeys');
  t.diagnostic(`Sponsor admission: ${JSON.stringify(native.points.filter(point => point.id.startsWith('BASE-AGENT-004.sponsor.')))}`);
  for (const kind of kinds) assert.ok(native.points.some(point => point.id === `BASE-AGENT-004.sponsor.${kind}` && point.ok), `Native sponsor admission must pass ${kind}`);
- t.diagnostic('Sponsor admission: bypassed adapter fails all four points; native adapter passes all four points.');
+ t.diagnostic('Sponsor admission: bypassed adapter fails unknown, inactive and excluded while the door refuses changed-email; native adapter passes all four points.');
 });
