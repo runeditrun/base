@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Reuse the original admission key when resolving agent-door injection arguments, so once-only native preparation is replayed without a second effect.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.
