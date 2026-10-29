@@ -7,6 +7,7 @@ import { refusePolicyApprovals } from './policy-data.mjs';
 import { refuseDevData } from './dev-data.mjs';
 import { catalogue, validateRow, bindCell, writableColumns } from './catalogue.mjs';
 import { platformTable, restorableManifest } from './bookkeeping.mjs';
+import { withoutAbsentExcludedObjects } from './snapshot-objects.mjs';
 import { canonicalJson, unbase64 } from './hash.mjs';
 import { checkManifest, checkPart, ContentVerifier, ArchiveVerifier } from './format.mjs';
 import { fence, mergeJournal, tombstone } from './journal.mjs';
@@ -29,6 +30,7 @@ export async function createImport(context,manifest,actor='direct',legacyRecover
   const original=manifest;manifest=await restorableManifest(original);
   const skippedTables=original.tables.filter(table=>platformTable(table.name)).map(table=>table.name);
   const cat=await catalogue(db,config),upgrade=config.acceptedSchemas[original.schema];
+  manifest=await withoutAbsentExcludedObjects(manifest,cat,config);
   const legacy=original.version===2 && manifest.schemaObjects===undefined;
   // An explicit acknowledgment keeps its existing recovery semantics. Without
   // it, legacy v2 needs positive replay evidence for its recorded schema and

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Restore fresh archives containing schema objects on policy-excluded transient tables absent from the destination, while retaining durable schema and original archive digest verification.
+
 ## 0.2.90
 
 - Withhold optional copied Base modules and workflow helpers whose required packages the edition has not declared. Refresh preserves supported dependency closure and explains the package declaration needed to opt in.
