@@ -2,10 +2,39 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { runtime } from './runtime.mjs'
 import { autonomousPolicy } from '../conformance/crypto.mjs'
+import { createProtocol } from '../conformance/protocol.mjs'
 
 const prepared = 'synthetic.queue.prepare', continued = 'synthetic.queue.execute'
 const errorCode = (reply: any) => reply.result?._meta?.['com.runeditrun/error']?.code ?? reply.error?.data?.code
 const job = () => ({ id: crypto.randomUUID(), idempotency_key: crypto.randomUUID() })
+
+async function policyMapping(r: any, exposure: string | undefined) {
+ const tools = (await r.mcp('tools/list')).result.tools.map((tool: any) => ({ name: tool.name, classes: tool._meta['com.runeditrun/classes'], scope: tool._meta['com.runeditrun/scope'] }))
+ const c: any = createProtocol({ ...r.c, surface: { seed: 'synthetic', specialist: 'operations', tools }, fetch: r.fetch, points: [] })
+ for (const options of [{}, { paused: true }, { revoked: { agents: [], consents: [c.consent] } }]) {
+  await c.adopt(autonomousPolicy(), options)
+  assert.equal(c.points.at(-1).ok, true, c.points.at(-1).detail)
+ }
+ assert.deepEqual(c.invokeTools.map((tool: any) => tool.name).sort(), exposure === 'invoke' ? [continued, prepared] : [])
+ await c.adopt(null)
+ assert.equal(c.points.at(-1).ok, true, 'the declared mapping survives unanswered policy')
+ const fetch = c.fetch
+ for (const corruption of ['visible mapping', ...(exposure === 'invoke' ? ['hidden mapping', 'discovery', 'call'] : [])]) {
+  c.fetch = async (url: string, init: any) => {
+   const response = await fetch(url, init), body = await response.json(), request = init?.body && JSON.parse(init.body)
+   if (new URL(url).pathname === '/api/rer/agent-policy') {
+    const name = corruption === 'visible mapping' ? tools[0].name : corruption === 'hidden mapping' ? prepared : null
+    if (name) for (const row of body.door.classes) row.tools = row.tools.filter((tool: string) => tool !== name)
+   }
+   if (corruption === 'discovery' && request?.method === 'tools/list') body.result.tools.push({ name: prepared })
+   if (corruption === 'call' && request?.method === 'tools/call' && request.params.name === prepared) return Response.json({ result: { structuredContent: {} } })
+   return Response.json(body, { status: response.status, headers: response.headers })
+  }
+  await c.adopt(autonomousPolicy())
+  assert.equal(c.points.at(-1).ok, false, `${corruption} must remain a conformance failure`)
+ }
+ r.c.seq = c.seq; r.c.revision = c.revision
+}
 
 test('invoke-only native work keeps full admission while MCP treats its names as unknown', async t => {
  for (const exposure of [undefined, 'invoke']) {
@@ -36,6 +65,7 @@ test('invoke-only native work keeps full admission while MCP treats its names as
     assert.equal(errorCode(called), undefined); assert.ok(called.result.structuredContent.operationId)
     assert.equal(errorCode(await r.tool('queue.execute', input)), 'operation_mismatch', 'MCP resolves the continuation and applies its native binding')
     t.diagnostic('default MCP: queue.prepare executed; queue.execute resolved and required its retained operation; ordinary tool unchanged')
+    await policyMapping(r, exposure)
     continue
    }
    assert.ok(!names.includes(prepared)); assert.ok(!names.includes(continued))
@@ -102,6 +132,7 @@ test('invoke-only native work keeps full admission while MCP treats its names as
    assert.equal(reviewed.outcome, 'done'); assert.ok(reviewed.review.id)
    assert.equal((await r.person(`/agents/api/reviews/${reviewed.review.id}/reviewed`, {})).body.review.state, 'reviewed')
    t.diagnostic('invoke-only embedded: scope, Pause, policy, native binding, one effect/replay, usage, consent/agent revocation, approval and review PASS')
+   await policyMapping(r, exposure)
   } finally { await r.close() }
  }
 })

@@ -158,7 +158,7 @@ is exempted from execution, policy, audit, schema or journey coverage.
 Set `exposure: 'invoke'` on a tool definition to admit it only through this
 seed's `door.invoke`. Omitting the field preserves MCP discovery and calls;
 other values are rejected. Read-only tools may use the flag too. Invoke-only
-tools are hidden from `tools/list`, tool-list subscription changes and OAuth
+tools are hidden from MCP tool listings, tool-list subscription changes and OAuth
 `scopes_supported` (a scope shared with an exposed tool remains advertised).
 MCP calls receive the same `tool_not_found` response and audit treatment as an
 unknown name, without running the seed callback. Keep these tools out of the
