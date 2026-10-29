@@ -6,6 +6,7 @@ import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { seedNative } from './consumer/fixtures.mjs';
+import { context, signing } from './consumer/service.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const packages = await readdir(join(root, 'node_modules/.pnpm'));
@@ -34,8 +35,9 @@ export async function openSigningRuntime(options) {
   compiled ??= (await build({ entryPoints: [fileURLToPath(new URL('./consumer/worker.mjs', import.meta.url))], bundle: true,
     write: false, format: 'esm', platform: 'browser', target: 'es2022' })).outputFiles[0].text;
   const directory = await mkdtemp(join(tmpdir(), 'agreement-signing-'));
+  const bindings = { PROFILE: options.profile, CREDENTIAL_KEY: randomBytes(32).toString('base64') };
   const mf = new Miniflare({ ...convertV4MiniflareOptions({ modules: true, script: compiled, compatibilityDate: '2026-09-01',
-    d1Databases: { DB: 'signing-db' }, bindings: { PROFILE: options.profile, CREDENTIAL_KEY: randomBytes(32).toString('base64') } }),
+    d1Databases: { DB: 'signing-db' }, bindings }),
     resourcePersistencePath: resolve(directory, 'state') });
   try {
     const db = await mf.getD1Database('DB');
@@ -63,6 +65,12 @@ export async function openSigningRuntime(options) {
     };
     return {
       fixture,
+      database: db,
+      async signWithDatabase(input, { actor, key }, database) {
+        const sessionId = identities[actor].cookie.split('=')[1];
+        const session = await db.prepare('SELECT * FROM native_sessions WHERE id=?').bind(sessionId).first();
+        return (await signing({ ...bindings, DB: database })).sign(context(session, fixture.sourceId, key), input);
+      },
       async command(operation, input, { actor, key }) {
         let path;
         if (operation === 'prepare') path = `/offers/${encodeURIComponent(input.sourceId)}/agreements`;

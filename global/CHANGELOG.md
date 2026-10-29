@@ -6,6 +6,15 @@
 
 ## 0.2.88
 
+- Replay completed deletions from retained outcomes after current admission, without reading a deleted target or repeating its effect.
+- Check approved restore admission separately from original widening evidence retained in the receipt.
+- Preserve completed schedule approval/review receipts and execution-time native revision fences across retries.
+- Evaluate current replay policy against recorded mutation facts, so post-effect risk changes cannot request a second review.
+- Retain pre-effect widening facts for approved grant and role retries, including current no-op directions.
+- Return consumed draft versions with the recorded effect outcome; changed arguments or revision still conflict, and paused/revoked callers remain refused.
+
+- Re-execute completed read-only approval replays under current native grants, so aggregate reads cannot disclose rows retained before client revocation. Native empty results and refusals replace cached payloads; unchanged visibility retains the result and approval receipt. Mutation replays still execute their effect once.
+
 - Agent doors can declare the mandatory tools/policy/pause/audit/idempotency core plus events, resources, prompts and subscriptions. Discovery and conformance report declared, refused and unscoped families; omitted supported capabilities are hidden and return typed refusals. Core authorization and security checks remain mandatory, and absent declarations retain the legacy full requirements. Other lifecycle families remain explicitly unscoped with their existing checks intact.
 
 - `rer refresh-base` now gives complete recovery steps when refreshed import-kit
