@@ -3,9 +3,9 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { contained } from './project.mjs';
 import { RerError } from './errors.mjs';
+import { ownerBindingValues, bindingGenerator } from './agent-bindings.mjs';
 
 const defaultEmail = 'synthetic-base-1@example.com';
-const ownerBindingValues = ['issuer', 'installationId', 'appOrigin', 'publicKeys', 'email', 'sub', 'token', 'sessionSecret'];
 
 export async function verificationOwner(root, value = {}) {
  if (!value || typeof value !== 'object' || Array.isArray(value)
@@ -14,7 +14,7 @@ export async function verificationOwner(root, value = {}) {
  if (typeof email !== 'string' || email !== email.trim().toLowerCase() || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email)) throw new RerError('agent_owner_invalid', 'verification.owner.email must be a canonical owner email.', 1);
  for (const key of ['emailField', 'tokenField']) if (value[key] !== undefined && !/^[A-Z][A-Z0-9_]{0,63}$/.test(value[key])) throw new RerError('agent_owner_invalid', `verification.owner.${key} must name a production binding.`, 1);
  if (value.bindings !== undefined && (!value.bindings || typeof value.bindings !== 'object' || Array.isArray(value.bindings)
-  || Object.entries(value.bindings).some(([name, source]) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || !ownerBindingValues.includes(source)))) throw new RerError('agent_owner_invalid', `verification.owner.bindings must map native binding names to ${ownerBindingValues.join(', ')}.`, 1);
+  || Object.entries(value.bindings).some(([name, source]) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || !(ownerBindingValues.includes(source) || bindingGenerator(source))))) throw new RerError('agent_owner_invalid', `verification.owner.bindings must map native binding names to ${ownerBindingValues.join(', ')} or a contained generator {module}.`, 1);
  let initialize;
  if (value.initializer !== undefined) {
   await contained(root, value.initializer);

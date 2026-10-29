@@ -119,7 +119,11 @@ For a tool whose only effect is revocation or reduction, declare `widens: false`
 and `narrowing: {effect: 'revoke', target: 'id'}` (or effect `narrow`) in both
 its runtime definition and surface tool. Include its exact native `inputSchema`
 in the surface. This checked contract accepts a closed object with one required
-string target identifier (`id` or a name ending `_id`); it refuses extra fields,
+string target identifier (`id` or a name ending `_id`), or a nonempty array of
+distinct such identifiers for a composite native target. For example,
+`narrowing: {effect:'revoke', target:['team_id','operator_id']}` accepts only
+those two required string fields. The native grant witness must supply and match
+every identifier. The schema refuses extra fields,
 open objects, references and schema unions. An operation accepting roles, scopes
 or grants to add must retain its escalation fixture. Separate the revoke-only
 operation from an operation that also grants authority when needed.
@@ -314,6 +318,20 @@ and erasure remain outside this adoption proof until retained fields and fences
 are agreed. This change does not promote those claims or supply seed-side
 `BASE-AGENT-010` contract citations.
 
+The CLI connects this boundary when `agent-surface.json` declares
+`verification.invoke: {module:'tests/agent-invoke.mjs', entrypoint:'NativeJobs'}`.
+The contained module default-exports an async driver receiving
+`{name,args,who,worker}`. `await worker('NativeJobs')` returns an RPC reference to
+that named entrypoint in the real built application Worker. It is available only
+to the verifier, through a private service binding; no HTTP invocation route is
+added. Other entrypoints are refused. The driver must serialize the supplied
+original identity and consent through the seed's native queue, wait for native
+completion and return the real `door.invoke` result. Preserve the originating
+scope, client and operation identity where present. Built Wrangler queue
+producers and consumers both run in the disposable installation, using its
+declared batch, retry and dead-letter settings. Driver failures fail conformance
+with a redacted diagnostic. A missing declaration does not claim queue coverage.
+
 ## Keep runtime and CLI evidence separate
 
 The copied module is application runtime source pinned by `base-copies.json`.
@@ -398,6 +416,43 @@ is written to the seed's environment files. Tokens and sessions are never printe
 These aliases configure the seed's existing admission and do not bypass signed
 claim verification. For a signed seed needing just its native issuer and
 installation names, declare the two `bindings` above without an initializer.
+
+A binding needing native JSON or PEM can instead name a contained test generator:
+
+```json
+{"bindings":{"GITHUB_CONNECTION":{"module":"tests/github-binding.mjs"}}}
+```
+
+The module default-exports an async function receiving the same per-run values
+listed above. Return one nonempty string, at most 64 KiB. For Spool's native
+GitHub App connection, generate a fresh RSA key with Node crypto and return
+`JSON.stringify({appId:'42',installationId:'7',privateKey})`, where `privateKey`
+is its real PKCS8 PEM export. These numeric GitHub identifiers are distinct from
+the verifier's installation UUID. The native GitHub parser, key import and App
+JWT signing still run. Generators execute once per named binding per run, before
+owner bootstrap, and configure only the disposable Worker. Keep them outside
+production imports, never read real credentials, and never print or persist their
+output. Invalid output, escaping paths and generator exceptions fail with a
+fixed diagnostic. Signed owner claim verification remains required.
+
+## Verification RPC provider edges
+
+For a production service binding such as `PENNY_EGRESS.send`, declare:
+
+```json
+{"verification":{"rpc":{"PENNY_EGRESS":{"module":"tests/egress-rpc.mjs","entrypoint":"Egress"}}}}
+```
+
+The binding must already appear in the built Worker's `services` declaration.
+Its contained `.mjs` or `.js` module exports the named class extending
+`WorkerEntrypoint` from `cloudflare:workers`. Implement only the provider's real
+RPC interface in that test edge. The application's native adapters, authority,
+privacy, signatures, receipts and persistence still execute. Each declared edge
+runs in a separate Worker in the disposable runtime, without application
+bindings, Node compatibility or outbound network access; undeclared network
+requests return 502. Relative helper imports are snapshotted and contained,
+including symlink targets. Only `cloudflare:workers` is allowed as a runtime
+builtin. This is test tooling and is never added to the production build.
 
 ## Verification provider edges
 
@@ -518,6 +573,19 @@ the run's real agent credential and records calls for that audit; no signer or
 credential is passed to the module. The standard phases still run, and a failed
 native journey fails verification. Errors are redacted to a fixed diagnostic.
 Keep these modules in test tooling outside the production dependency graph.
+
+The same journey module may export async `beforeStep` and `afterStep` functions.
+They run around each completed mandatory journey step in both `autonomous` and
+`held` phases, and around autonomous preparation in `blocked:<class>` phases.
+Along with the usual native context they receive
+`{phase,step,args,outputs,tool}`; `afterStep` also receives the completed
+`structuredContent` as `result`. These are detached copies. `beforeStep` runs
+before the effect/approval witnesses; `afterStep` runs after output, resources,
+narrowing, injection and replay checks. Use the native HTTP/person door to
+record repository consent or prepare queued work between dependent steps.
+Hooks cannot skip mandatory steps or alter the runner's arguments and outputs.
+Failed hooks fail the current phase with the same redacted diagnostic. A step
+that fails or yields no structured output does not receive `afterStep`.
 
 ## Per-run provider fixture control
 
