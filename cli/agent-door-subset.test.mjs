@@ -39,7 +39,7 @@ test('declared core and core plus events prove every offered check and refuse th
   } else {
    const deploy = join(root, 'deploy.json'), config = JSON.parse(await readFile(deploy, 'utf8'));
    config.vars.AGENT_CAPABILITIES = JSON.stringify(core); await writeFile(deploy, JSON.stringify(config));
-   await assert.rejects(run(root), error => error.code === 'agent_door_failed' && error.agentDoor.points.some(point => !point.ok && point.id.startsWith('BASE-AGENT-010.')));
+   await assert.rejects(run(root), error => error.code === 'agent_door_failed' && error.agentDoor.points.some(point => !point.ok && point.id === 'BASE-AGENT-002.1.registry'));
    t.diagnostic('Declared events with missing runtime implementation: full event checks fail.');
   }
  }
