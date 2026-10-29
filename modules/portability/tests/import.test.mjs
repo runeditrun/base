@@ -445,3 +445,105 @@ test('library restore verifies a carried legacy ledger before creating a durable
   assert.equal(result.status.phase,'complete');assert.deepEqual((await target.db.prepare('SELECT * FROM a_children').all()).results,[{id:'child',parent:'parent',state:'retained'}]);
   assert.equal((await target.db.prepare('SELECT COUNT(*) n FROM rer_migrations').first()).n,files.length);
 });
+
+test('fresh archives with absent policy-excluded snapshots retain durable schema verification',async t=>{
+  const {database,bundle}=await import('./regression-helpers.mjs');
+  const {migrationReplay}=await import('../migration-history.mjs');
+  const {importArchive}=await import('../files.mjs');
+  const {schemaIdentityOf}=await import('../schema-identity.mjs');
+  const {remakeArchive}=await import('../../../cli/fixtures/archive-records.mjs');
+  const {mkdtemp,writeFile,rm}=await import('node:fs/promises');
+  const {tmpdir}=await import('node:os');
+  const {join}=await import('node:path');
+  const policy={product:'snapshot-restore',excludeTables:['snapshot_%','private_cache'],buckets:{FILES:{}}};
+  const ddl=[
+    'CREATE TABLE notes(id TEXT PRIMARY KEY,title TEXT NOT NULL)',
+    'CREATE TABLE events(id TEXT PRIMARY KEY,note_id TEXT REFERENCES notes(id),body TEXT)',
+    'CREATE TABLE audit(note_id TEXT,action TEXT)',
+    'CREATE INDEX notes_title ON notes(title)',
+    'CREATE VIEW note_events AS SELECT notes.title,events.body FROM notes JOIN events ON events.note_id=notes.id',
+    "CREATE TRIGGER event_audit AFTER INSERT ON events BEGIN INSERT INTO audit VALUES(NEW.note_id,'created'); END",
+    'CREATE TABLE private_cache(key TEXT PRIMARY KEY,value TEXT)',
+    'CREATE INDEX cache_value ON private_cache(value)',
+  ];
+  const plan=[{name:'0001_documents.sql',statements:ddl}];
+  const target=async(t,{changes=[],destinationPolicy=policy,replay=false}={})=>{
+    const f=await database(t,[...ddl,'CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY,name TEXT,applied_at TEXT NOT NULL)',
+      "INSERT INTO d1_migrations VALUES(1,'0001_documents.sql','2026-10-01')",...changes],destinationPolicy);
+    if(replay)f.service=await createPortability({db:f.db,buckets:{FILES:f.bucket},policy:destinationPolicy,migrations:()=>migrationReplay(plan,destinationPolicy)});
+    return f;
+  };
+  const source=await target(t);
+  await source.db.batch([
+    "INSERT INTO notes VALUES('one','First'),('two','Second')",
+    "INSERT INTO events VALUES('event','one','Archived body')",
+    "INSERT INTO private_cache VALUES('local','excluded')",
+  ].map(sql=>source.db.prepare(sql)));
+  await source.bucket.put('document',Uint8Array.of(0,1,255));
+  const snapshot='snapshot_'+crypto.randomUUID().replaceAll('-',''),index=snapshot+'_title';
+  await source.db.batch([source.db.prepare(`CREATE TABLE ${snapshot} AS SELECT * FROM notes`),source.db.prepare(`CREATE INDEX ${index} ON ${snapshot}(title)`)]);
+  const original=await bundle(source.service);
+  assert.ok(original.manifest.excludedTables.includes(snapshot));
+  assert.ok(original.manifest.schemaObjects.some(o=>o.name===index && o.table===snapshot));
+  const directory=await mkdtemp(join(tmpdir(),'snapshot-restore-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+  const path=join(directory,'fresh.rer');await writeFile(path,original.records.map(JSON.stringify).join('\n')+'\n');
+  const quote=name=>'"'+name.replaceAll('"','""')+'"';
+  const state=async f=>{
+    const schema=(await f.db.prepare('SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name').all()).results;
+    const tables=schema.filter(o=>o.type==='table' && !o.name.startsWith('sqlite_') && !o.name.startsWith('_cf_'));
+    return {schema,rows:await Promise.all(tables.map(async o=>[o.name,(await f.db.prepare('SELECT * FROM '+quote(o.name)).all()).results]))};
+  };
+  const verify=async f=>{
+    for(const name of ['notes','events','audit'])assert.deepEqual((await f.db.prepare('SELECT * FROM '+name+' ORDER BY rowid').all()).results,(await source.db.prepare('SELECT * FROM '+name+' ORDER BY rowid').all()).results,name);
+    assert.equal((await f.db.prepare('SELECT count(*) AS n FROM private_cache').first()).n,0);
+    assert.equal(await f.db.prepare('SELECT name FROM sqlite_master WHERE name=? OR name=?').bind(snapshot,index).first(),null);
+    assert.deepEqual(new Uint8Array(await (await f.bucket.get('document')).arrayBuffer()),Uint8Array.of(0,1,255));
+  };
+  await t.test('in-process door without a replayer',async t=>{
+    const f=await target(t),id=await f.service.imports.create(original.manifest);
+    for(const part of original.parts)await f.service.imports.uploadPart(id,part.index,part);
+    const status=await f.service.imports.finalize(id,{contentHash:original.closing.contentHash,archiveHash:original.closing.archiveHash});
+    assert.equal(status.phase,'complete');assert.equal(status.schemaUnverified,undefined);await verify(f);
+    assert.deepEqual(original.manifest,original.records[0]);
+    t.diagnostic('in-process: complete; notes 0 -> 2, events 0 -> 1, audit 0 -> 1, objects 0 -> 1; snapshot absent; no acknowledgment or schemaUnverified');
+  });
+  await t.test('file door with migration replay',async t=>{
+    const f=await target(t,{replay:true}),receipt=await importArchive(f.service,path,[]);
+    assert.equal(receipt.schemaUnverified,undefined);
+    assert.deepEqual((await f.db.prepare("SELECT phase FROM rer_portability_jobs WHERE kind='import'").all()).results,[{phase:'complete'}]);await verify(f);
+    t.diagnostic('file: complete; notes 0 -> 2, events 0 -> 1, audit 0 -> 1, objects 0 -> 1; snapshot absent; no acknowledgment or schemaUnverified');
+  });
+  const refused=async(f,manifest)=>{
+    const before=await state(f);
+    await assert.rejects(f.service.imports.create(manifest),e=>e.code==='schema_mismatch');
+    assert.deepEqual(await state(f),before,'refusal preserves schema, ledger, jobs, lock and rows');
+    assert.equal((await f.bucket.list()).objects.length,0);
+  };
+  for(const [name,changes] of [
+    ['missing durable index',['DROP INDEX notes_title']],
+    ['changed durable index column',['DROP INDEX notes_title','CREATE INDEX notes_title ON notes(id)']],
+    ['changed durable index uniqueness',['DROP INDEX notes_title','CREATE UNIQUE INDEX notes_title ON notes(title)']],
+    ['changed durable index predicate',['DROP INDEX notes_title',"CREATE INDEX notes_title ON notes(title) WHERE title <> ''"]],
+    ['changed durable trigger',['DROP TRIGGER event_audit',"CREATE TRIGGER event_audit AFTER INSERT ON events BEGIN INSERT INTO audit VALUES(NEW.note_id,'altered'); END"]],
+    ['changed index on present excluded table',['DROP INDEX cache_value','CREATE INDEX cache_value ON private_cache(key)']],
+  ])await t.test(name,async t=>{await refused(await target(t,{changes}),original.manifest);t.diagnostic('schema_mismatch before writes; schema, ledger, jobs, lock and rows unchanged; bucket empty');});
+  for(const [name,change,destinationPolicy] of [
+    ['object table missing from archived exclusions',m=>{m.excludedTables=m.excludedTables.filter(n=>n!==snapshot);},policy],
+    ['object table not excluded by destination',()=>{},{...policy,excludeTables:['private_cache']}],
+    ['altered restorable object listed as excluded',m=>{m.excludedTables.push('notes');m.schemaObjects.find(o=>o.name==='notes_title').sql='CREATE INDEX notes_title ON notes(id)';},policy],
+  ])await t.test(name,async t=>{
+    const records=structuredClone(original.records);change(records[0]);
+    records[0].schema=await schemaIdentityOf(records[0].tables,records[0].schemaObjects);
+    const remade=await remakeArchive(records,{schema:records[0].schema});
+    await refused(await target(t,{destinationPolicy}),remade[0]);
+    t.diagnostic('valid remade digests: schema_mismatch before writes; bucket empty');
+  });
+  await t.test('malformed excluded-table inventory refuses before writes',async t=>{
+    const f=await target(t),before=await state(f);
+    for(const excludedTables of [null,'snapshot_%',[snapshot,1],[snapshot,snapshot]]) {
+      await assert.rejects(f.service.imports.create({...original.manifest,excludedTables}),e=>e.code==='manifest_inventory');
+      assert.deepEqual(await state(f),before);
+    }
+    assert.equal((await f.bucket.list()).objects.length,0);
+  });
+});

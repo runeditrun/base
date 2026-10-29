@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Restore fresh archives containing schema objects on policy-excluded transient tables absent from the destination, while retaining durable schema and original archive digest verification.
+
 - Agent tools may opt into `exposure: 'invoke'` for native worker admission, hidden from MCP discovery, calls, tool-list subscriptions and unshared OAuth scopes while retaining full invoke policy, identity, replay and audit checks.
 
 - Verify hashed legacy v2 ledgers through the Node library restore door before durable staging; admit migration data repeated by its surviving restore-commit trigger. Worker build-time evidence remains pending.
