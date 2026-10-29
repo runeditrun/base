@@ -139,3 +139,53 @@ test('completed reviewed schedule retains the original review and consumed versi
     t.diagnostic('reviewed schedule: retained review, consumed version 1, one effect, one review')
   } finally { await r.close() }
 })
+
+
+test('completed native people creation refuses a demoted sponsor without returning its result or receipt', async t => {
+  const r = await runtime({ nativePeople: true, seed: 'base' })
+  try {
+    const subject = 'native-admin', email = 'native-admin@example.com'
+    assert.equal((await r.settings({ team: [{ id: subject, email, name: 'Native admin', role: 'admin', invite: 0 }] })).status, 200)
+    const cookie = await r.signIn(email)
+    const admin = (await r.person('/auth/operators')).body.find((person: any) => person.email === email)
+    assert.equal(admin.role, 'admin'); assert.equal(admin.status, 'active')
+    const policy = autonomousPolicy(); policy.rules = [{ id: 'held', class: '*', do: 'approval', approver: ['sponsor'], wait: 'PT1H' }]
+    assert.equal((await r.adopt(policy)).status, 200)
+    const revision = r.c.revision
+    const token = await r.token({ sub: subject, email, act: { sub: 'native-admin-agent', name: 'Native admin agent' }, scope: 'people:write' })
+    const args = { name: 'Avery Morgan', email: 'avery.morgan@example.com', idempotency_key: crypto.randomUUID() }
+    const call = () => r.mcp('tools/call', { name: 'base.people.create', arguments: args }, { token })
+    const pending = await call(), id = meta(pending)['com.runeditrun/approval'].id
+    const person = async (path: string, body?: unknown) => {
+      const response = body === undefined ? await r.fetch(path, { headers: { cookie } }) : await r.post(path, body, { cookie })
+      return { status: response.status, body: await response.json() }
+    }
+    const view = (await person(`/agents/api/approvals/${id}`)).body.approval
+    assert.equal((await person(`/agents/api/approvals/${id}/approve`, { revision: view.revision, summary_sha256: view.summary_sha256 })).body.approval.state, 'executed')
+    const first = await call()
+    assert.equal(code(first), undefined); assert.ok(first.result.structuredContent.id)
+    assert.ok(first.result.content.some((item: any) => item.type === 'resource_link'))
+    assert.ok(receipt(first))
+    const repeated = await call()
+    assert.deepEqual(repeated.result.structuredContent, first.result.structuredContent)
+    assert.deepEqual(receipt(repeated), receipt(first))
+    const agentBefore = await r.db.prepare('SELECT * FROM agent_door_agents WHERE id=?').bind('native-admin-agent').first()
+    const changed = await r.person('/auth/operator/role', { operatorId: admin.id, role: 'member' })
+    assert.equal(changed.status, 200)
+    assert.equal(changed.body.role, 'member'); assert.equal(changed.body.status, 'active')
+    assert.ok(changed.body.version > admin.version)
+    assert.deepEqual(await r.db.prepare('SELECT * FROM agent_door_agents WHERE id=?').bind('native-admin-agent').first(), agentBefore)
+    // Reuse the same unexpired Business token and policy after a role-only change.
+    const replay = await call()
+    t.diagnostic(`demoted native sponsor: ${code(replay)}; result=${replay.result?.structuredContent === undefined ? 'absent' : 'present'}; receipt=${receipt(replay) === undefined ? 'absent' : 'present'}`)
+    assert.equal(code(replay), 'operator_role_required')
+    assert.equal(replay.result?.structuredContent, undefined)
+    assert.equal(replay.result?.content?.some((item: any) => item.type === 'resource_link'), false)
+    assert.equal(receipt(replay), undefined)
+    assert.equal((await r.person('/agents/api/state')).body.policy.revision, revision)
+    assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM people').first()).n, 1)
+    assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE action='person.created'").first()).n, 1)
+    // A fresh native attempt under this same role supplies the refusal oracle.
+    assert.equal(code(await r.mcp('tools/call', { name: 'base.people.create', arguments: { ...args, idempotency_key: crypto.randomUUID() } }, { token })), 'operator_role_required')
+  } finally { await r.close() }
+})

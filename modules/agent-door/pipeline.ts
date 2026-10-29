@@ -97,8 +97,8 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     }
     if (!raw || !validateSchema(tool.inputSchema, declared)) return refuse('invalid_arguments')
     const cached = previous?.outcome ? await approvalReplay(rt, JSON.parse(previous.outcome)) : undefined
-    // A completed mutation has consumed its preparation state. Admit retrieval
-    // against its recorded effect, without probing a deleted/advanced target.
+    // Completed mutations retain their effect evidence after preparation is
+    // consumed. Native classification must still admit the current sponsor.
     const completed = !tool.readOnly && cached?.outcome === 'done'
     let original: AuditRow | undefined
     if (completed) {
@@ -118,7 +118,8 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       result.decision = { id: row.id, disposition: 'self_escalation', revision: state.revision, classes: [] }
       return refuse('self_escalation')
     }
-    const classes = original ? original.classes : await classify(tool, args, ctx)
+    const currentClasses = await classify(tool, args, ctx, original?.classes)
+    const classes = original?.classes ?? currentClasses
     locked = await acquireDecision(rt, row.id)
     if (!locked) return refuse('decision_busy')
     const sums = await usage(rt, state.document!, principal)

@@ -1,10 +1,10 @@
 import { defineTool, ToolRefusal } from '../index.ts'
-import type { ToolDefinition } from '../index.ts'
+import type { JsonSchema, ToolDefinition } from '../index.ts'
 
 /** Native effects whose preparation state is consumed by the first execution. */
 export function mutationTools(db: D1Database): ToolDefinition[] {
   const text = { type: 'string', minLength: 1 }
-  const object = (properties: Record<string, unknown>) => ({ type: 'object' as const, properties, required: Object.keys(properties), additionalProperties: false })
+  const object = (properties: Record<string, JsonSchema>) => ({ type: 'object' as const, properties, required: Object.keys(properties), additionalProperties: false })
   const read = async (id: unknown) => {
     const row = await db.prepare('SELECT id,value,version,exposure FROM test_records WHERE id=?').bind(id).first<{ id: string; value: string; version: number; exposure: string }>()
     if (!row) throw new ToolRefusal('not_found')
@@ -19,7 +19,8 @@ export function mutationTools(db: D1Database): ToolDefinition[] {
     revision: async args => (await read(args.id)).version,
     summary: async args => ({ target: { id: (await read(args.id)).id }, items: [String(args.value)] }),
     ...(mode === 'restore' ? { authority: async (args: Record<string, unknown>) => ({ subject: String(args.id), widens: (await read(args.id)).exposure === 'hidden' }) } : {}),
-    async classify(args) {
+    async classify(args, _ctx, completed) {
+      if (completed) return [...completed]
       const row = await read(args.id)
       if (['schedule', 'draft'].includes(mode) && row.version !== 1) throw new ToolRefusal(`${mode}_consumed`)
       if (mode === 'restore') return [{ class: 'access', facts: { measure: 1, direction: row.exposure === 'hidden' ? 'widens' : 'narrows' } }]

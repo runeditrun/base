@@ -72,8 +72,12 @@ export async function runJourney(c, phase, { held = false, injections = false, r
     c.add(`BASE-AGENT-008.5.approver.${step.id}`, approved.ok, `Signed-in sponsor approval returned HTTP ${approved.status}.`);
     answer = await c.stepTool(step, args, { ...proof, requestState: answer.result.requestState });
     const receipt = answer.result?._meta?.['com.runeditrun/receipt'];
-    checkClasses(c, step, { decision: receipt?.decision }, `${phase}.approved`);
-    c.add(`BASE-AGENT-007.5.receipt.${step.id}`, !answer.result?.isError && answer.result?.resultType !== 'input_required' && receipt?.decision?.disposition === 'approval' && isDeepStrictEqual(receipt.decision, heldDecision) && answer.decision?.revision === c.revision && answer.decision?.disposition === 'approval' && isDeepStrictEqual(answer.decision.classes, receipt.decision.classes), 'The approved retry must retain its exact original approval evidence and pass current policy admission.');
+    // Older receipts retain the original decision id; the top-level decision
+    // describes current admission with a fresh retry id.
+    const approvedDecision = receipt && Object.hasOwn(receipt, 'decision') ? receipt.decision
+     : answer.decision && { ...answer.decision, id: receipt?.decision_id };
+    checkClasses(c, step, { decision: approvedDecision }, `${phase}.approved`);
+    c.add(`BASE-AGENT-007.5.receipt.${step.id}`, !answer.result?.isError && answer.result?.resultType !== 'input_required' && receipt && approvedDecision?.disposition === 'approval' && isDeepStrictEqual(approvedDecision, heldDecision) && answer.decision?.revision === c.revision && answer.decision?.disposition === 'approval' && isDeepStrictEqual(answer.decision.classes, approvedDecision.classes), 'The approved retry must retain its exact original approval evidence and pass current policy admission.');
    }
    c.add(`BASE-AGENT-013.4.${phase}.${step.id}`, answer.status === 200 && answer.result && !answer.result.isError && answer.result.resultType !== 'input_required', `${step.tool} did not complete (${errorCode(answer) ?? answer.status}).`);
    if (answer.result?.isError || answer.result?.structuredContent === undefined) continue;
