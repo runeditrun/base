@@ -4611,7 +4611,7 @@
     },
     "modules/portability/format.mjs": {
       "source": "modules/portability/format.mjs",
-      "sha256": "eceea630c69d6f12fd11728a7df6ebfc1a11acf4aaef724fae0e404340f72a6c"
+      "sha256": "b2eece08a86b948b5b460ecb73fa5f0f029c4774059dbd374507398da73f7a30"
     },
     "modules/portability/generated.mjs": {
       "source": "modules/portability/generated.mjs",
