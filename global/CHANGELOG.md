@@ -50,6 +50,8 @@
 
 - `rer refresh-base` places newly delivered module imports against the most specific recorded vendor namespace, including files covered by a directory copy. Relocated files retain their Base baseline as acknowledged seed-owned adaptations; unmapped and ambiguous dependencies still refuse before writes. See `edition-authoring/ADOPTING.md`.
 
+- Keep copy-record file and mode maps stable when namespace relocations become acknowledged adaptations, so repeating an identical refresh preserves the entire tree and record.
+
 ### Known issues
 
 - Historical 0.2.82 helper collisions and case-spelling recovery still require the explicit manual sequence in `ADOPTING.md`.
