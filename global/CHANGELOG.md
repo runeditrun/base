@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Pass the disposable state reader and current verifier time to conformance phase fixtures and native step hooks. Database refusals retain a typed, redacted diagnostic; writable backdated history remains pending at the hosted state boundary.
+
 ## 0.2.89
 
 - Publication email hygiene recognizes parsed dependency package contact metadata and registry deprecation notices in pnpm, npm and Yarn lockfiles. Comments, custom keys, repository author fields, source files and secret checks retain their findings; no address allowlist is needed. This scanner source update can be adopted independently of a launcher package release.
