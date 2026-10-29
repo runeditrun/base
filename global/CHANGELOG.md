@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Account for linked native continuations and refused approval executions in agent-door audit conformance without shifting later harness rows; unrelated or policy-inconsistent extra rows still fail.
+
 - Refuse continuation tools under unset, removed or unavailable policy and Business Pause before validating or resolving native continuation items, retaining current scope, revocation and once-only execution checks.
 
 - Pass the disposable state reader and current verifier time to conformance phase fixtures and native step hooks. Database refusals retain a typed, redacted diagnostic; writable backdated history remains pending at the hosted state boundary.

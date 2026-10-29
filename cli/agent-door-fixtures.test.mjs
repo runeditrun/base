@@ -126,3 +126,48 @@ export default async function ({ database }) {
  assert.doesNotMatch(report.join('\n'), /private_[a-f0-9-]+|UPDATE agent_door_audit|SET tool|operator_session=/);
  t.diagnostic(`disposable context: ${context.points.filter(point => point.ok).length}/${context.points.length}; protected-table preparation refused with a typed redacted diagnostic.`);
 });
+
+test('native continuation audits align later harness calls but unlinked embedded rows remain failures', { timeout: 120000 }, async t => {
+ const root = await fixtureSeed(t, 'signed', { phaseFixtures: true });
+ const surfaceFile = join(root, 'agent-surface.json'), surface = JSON.parse(await readFile(surfaceFile, 'utf8'));
+ surface.verification.invoke = { module: 'invoke.mjs', entrypoint: 'NativeJobs' };
+ for (const action of ['stage', 'continue']) surface.tools.push({ name: `fixture.records.${action}`, scope: 'records:write', readOnly: false, classes: [action === 'stage' ? 'standard' : 'external'], clauses: ['BASE-AGENT-009'] });
+ surface.journey.splice(surface.journey.findIndex(step => step.id === 'create') + 1, 0,
+  { id: 'stage', tool: 'fixture.records.stage', args: { value: 'Retained native record' }, expect: [{ class: 'standard', facts: { measure: 1 } }] },
+  { id: 'continue', tool: 'fixture.records.continue', args: { id: { $from: 'stage', pointer: '/id' } }, expect: [{ class: 'external', facts: { measure: 1, counterparty: 'known' } }] },
+ );
+ await writeFile(surfaceFile, JSON.stringify(surface));
+ const deployFile = join(root, 'deploy.json'), deploy = JSON.parse(await readFile(deployFile, 'utf8'));
+ deploy.vars.CONTINUATION_PROOF = true;
+ await writeFile(deployFile, JSON.stringify(deploy));
+ const configFile = join(root, 'dist/server/wrangler.json'), config = JSON.parse(await readFile(configFile, 'utf8'));
+ config.queues = { producers: [{ binding: 'JOBS', queue: 'fixture-jobs' }], consumers: [{ queue: 'fixture-jobs', max_batch_size: 1, max_batch_timeout: 0, max_retries: 0 }] };
+ await writeFile(configFile, JSON.stringify(config));
+ await buildFixture(root);
+ const positive = await checkAgentDoor(root, { report: () => {} }).catch(error => { if (error.agentDoor) return error.agentDoor; throw error; });
+ assert.equal(positive.ok, true, JSON.stringify(positive.points.filter(point => !point.ok)));
+ const continuations = positive.points.filter(point => point.id.startsWith('BASE-AGENT-009.1.continuation.'));
+ assert.ok(continuations.length > 0 && continuations.every(point => point.ok));
+ assert.ok(positive.points.some(point => point.id === 'BASE-AGENT-009.1.events-audited' && point.ok));
+ const invocations = positive.points.filter(point => point.id.startsWith('BASE-AGENT-012.invocation-'));
+ assert.ok(invocations.length > 0 && invocations.every(point => point.ok));
+ const repeated = { ...surface.journey.find(step => step.id === 'continue'), id: 'already-dispatched' };
+ surface.journey.splice(surface.journey.findIndex(step => step.id === 'continue') + 1, 0, repeated);
+ await writeFile(surfaceFile, JSON.stringify(surface));
+ const refused = await checkAgentDoor(root, { report: () => {} }).catch(error => { if (error.agentDoor) return error.agentDoor; throw error; });
+ assert.equal(refused.ok, false);
+ assert.ok(refused.points.some(point => point.id === 'BASE-AGENT-009.1.count' && point.ok));
+ assert.ok(refused.points.filter(point => point.id.startsWith('BASE-AGENT-008.5.execution.')).every(point => point.ok));
+ for (const id of ['BASE-AGENT-007.5.receipt.already-dispatched', 'BASE-AGENT-013.4.held.already-dispatched']) assert.ok(refused.points.some(point => point.id === id && !point.ok));
+ surface.journey.splice(surface.journey.indexOf(repeated), 1);
+ await writeFile(surfaceFile, JSON.stringify(surface));
+ deploy.vars.FABRICATE_CONTINUATION = true;
+ await writeFile(deployFile, JSON.stringify(deploy));
+ const negative = await checkAgentDoor(root, { report: () => {} }).catch(error => { if (error.agentDoor) return error.agentDoor; throw error; });
+ assert.ok(negative && !negative.ok);
+ assert.ok(negative.points.some(point => point.id === 'BASE-AGENT-009.1.count' && !point.ok));
+ assert.ok(negative.points.some(point => point.id.startsWith('BASE-AGENT-009.1.continuation.') && !point.ok));
+ assert.ok(negative.points.some(point => point.id.startsWith('BASE-AGENT-009.1.extra.') && !point.ok));
+ assert.ok(negative.points.some(point => point.id === 'BASE-AGENT-007.7.differs-from-policy' && !point.ok));
+ t.diagnostic(`Native continuations: ${positive.points.filter(point => point.ok).length}/${positive.points.length}; consumed native work: refused execution audited, receipt and completion fail; fabricated missing marker, unlinked operation, foreign agent/sponsor/consent/client and changed policy rule: rejected.`);
+});
