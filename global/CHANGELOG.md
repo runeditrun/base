@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Probe sponsor admission with verifier-signed access tokens for an unknown subject and a known subject with a changed email. Native negative-phase fixtures may declare `sponsors: {inactive: {sub,email}, excluded: {sub,email}}` for lifecycle-prepared persons. Each probe requires a typed HTTP 401/403 refusal and an unchanged native witness; omitted states are reported as undeclared without passing points. Fixtures receive no signing authority and failure diagnostics omit their values and identities. See `modules/agent-door/ADOPTING.md`.
+
 ## 0.2.89
 
 - Publication email hygiene recognizes parsed dependency package contact metadata and registry deprecation notices in pnpm, npm and Yarn lockfiles. Comments, custom keys, repository author fields, source files and secret checks retain their findings; no address allowlist is needed. This scanner source update can be adopted independently of a launcher package release.

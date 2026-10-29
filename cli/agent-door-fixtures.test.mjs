@@ -4,8 +4,10 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { fixtureSeed } from './tests/fixtures/agent-door/seed.mjs';
+import { randomUUID } from 'node:crypto';
+import { fixtureSeed, buildFixture } from './tests/fixtures/agent-door/seed.mjs';
 import { isolatedQueue } from './fixtures/queue.mjs';
+import { checkAgentDoor } from './agent-door.mjs';
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
 
@@ -48,4 +50,71 @@ test('native client receipts and consumed phase state require real fresh fixture
  assert.equal(stale.ok, false);
  assert.ok(stale.points.some(point => !point.ok && point.id.includes('held') && point.id.endsWith('.erase')));
  t.diagnostic(`native/phase fixtures: declared ${declared.points.filter(point => point.ok).length}/${declared.points.length}; omitted ${absent.points.filter(point => !point.ok).length} failures; missing native client ${noClient.points.filter(point => !point.ok).length} failures; reused consumed state ${stale.points.filter(point => !point.ok).length} failures.`);
+});
+
+test('valid Business tokens refuse unknown, changed-email, inactive and excluded sponsors through the native door', { timeout: 420000 }, async t => {
+ const root = await fixtureSeed(t, 'native');
+ const surfaceFile = join(root, 'agent-surface.json'), surface = JSON.parse(await readFile(surfaceFile, 'utf8'));
+ const emails = Object.fromEntries(['inactive', 'excluded'].map(kind => [kind, `${kind}-${randomUUID()}@example.invalid`]));
+ surface.verification.sponsors = [{ label: 'owner' }, ...Object.entries(emails).map(([label, email]) => ({ label, email, initializer: 'negative-sponsors.mjs' }))];
+ surface.verification.fixtures = { module: 'negative-fixtures.mjs' };
+ await writeFile(surfaceFile, JSON.stringify(surface));
+ await writeFile(join(root, 'negative-sponsors.mjs'), `
+import initialize from './second-sponsor.mjs';
+export const sponsors = {};
+export default async function(c) {
+ let response;
+ if (c.label === 'inactive') response = await initialize(c);
+ else {
+  // Accept the native invitation but leave this person outside the app's
+  // membership allow-list. This is the real owner/session/account lifecycle.
+  const db = await c.database('DB');
+  const mail = await db.prepare('SELECT body FROM fixture_mail WHERE email=? ORDER BY rowid DESC LIMIT 1').bind(c.email).first();
+  const link = new URL(mail.body.match(/https:\\/\\/[^\\s]+/)[0]);
+  response = await c.request(c.origin + '/auth/confirm', { method: 'POST', redirect: 'manual',
+   headers: { Origin: c.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: link.searchParams.get('token') }) });
+ }
+ if (response.status !== 303) throw Error('Native invitation failed');
+ sponsors[c.label] = { sub: c.sub, email: c.email };
+ return response;
+}
+`);
+ await writeFile(join(root, 'negative-fixtures.mjs'), `
+import { sponsors } from './negative-sponsors.mjs';
+export default async function({phase, request, origin, cookie}) {
+ if (phase !== 'negative') return {};
+ const headers = { Origin: origin, Cookie: cookie, 'Content-Type': 'application/json' };
+ const listed = await request(origin + '/auth/operators', { headers });
+ if (!listed.ok) throw Error('Native person list failed');
+ const people = await listed.json(), inactive = people.find(person => person.email === sponsors.inactive.email);
+ const suspended = await request(origin + '/auth/operator/status', { method: 'POST', headers,
+  body: JSON.stringify({ operatorId: inactive.id, status: 'inactive' }) });
+ if (!suspended.ok) throw Error('Native suspension failed');
+ await suspended.body?.cancel();
+ return { sponsors };
+}
+`);
+ await buildFixture(root);
+ const deployFile = join(root, 'deploy.json'), deploy = JSON.parse(await readFile(deployFile, 'utf8'));
+ const kinds = ['unknown', 'changed-email', 'inactive', 'excluded'];
+ async function verify(skip) {
+  deploy.vars.SKIP_SPONSOR_CHECK = skip;
+  await writeFile(deployFile, JSON.stringify(deploy));
+  const lines = [];
+  let result;
+  try { result = await checkAgentDoor(root, { report: line => lines.push(line) }); }
+  catch (error) { result = error.agentDoor ?? error.details?.agentDoor; if (!result) throw error; }
+  const output = JSON.stringify({ lines, result });
+  for (const email of Object.values(emails)) assert.ok(!output.includes(email), 'Sponsor fixture email leaked into diagnostics');
+  // The initializer retains the actual Business subjects only in its private module.
+  const { sponsors } = await import(new URL('negative-sponsors.mjs', 'file://' + root + '/'));
+  for (const person of Object.values(sponsors)) assert.ok(!output.includes(person.sub), 'Sponsor fixture subject leaked into diagnostics');
+  return result;
+ }
+ const bypassed = await verify(true);
+ for (const kind of kinds) assert.ok(bypassed.points.some(point => point.id === `BASE-AGENT-004.sponsor.${kind}` && !point.ok), `Skipped sponsor admission must fail ${kind}`);
+ const native = await verify(false);
+ t.diagnostic(`Sponsor admission: ${JSON.stringify(native.points.filter(point => point.id.startsWith('BASE-AGENT-004.sponsor.')))}`);
+ for (const kind of kinds) assert.ok(native.points.some(point => point.id === `BASE-AGENT-004.sponsor.${kind}` && point.ok), `Native sponsor admission must pass ${kind}`);
+ t.diagnostic('Sponsor admission: bypassed adapter fails all four points; native adapter passes all four points.');
 });
