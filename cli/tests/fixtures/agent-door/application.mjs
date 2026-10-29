@@ -151,9 +151,20 @@ function recordTools(db, records) {
   ];
 }
 
-function memberPeople(people, db, nativeMode) {
+function memberPeople(people, db, nativeMode, skipSponsorCheck) {
   const allowed = async person => person && (!nativeMode || await db.prepare('SELECT operator_id FROM fixture_members WHERE operator_id=?').bind(person.id).first()) ? person : null;
-  return { ...people, person: async id => allowed(await people.person(id)), sponsor: async claims => allowed(await people.sponsor(claims)), session: async request => allowed(await people.session(request)) };
+  return { ...people, person: async id => allowed(await people.person(id)), sponsor: async claims => {
+    // Deliberate adapter mutant: retain the real owner and production door,
+    // while omitting subject admission to prove the conformance detects it:
+    // an unmapped subject becomes the owner, and no person is checked for
+    // activity or membership.
+    if (skipSponsorCheck) {
+      const owner = await db.prepare('SELECT owner_id FROM bs_settings WHERE singleton=1').first();
+      const person = await people.sponsor(claims) ?? await people.sponsor({ sub: owner.owner_id });
+      return person && { ...person, active: true };
+    }
+    return allowed(await people.sponsor(claims));
+  }, session: async request => allowed(await people.session(request)) };
 }
 
 // Native record readers and editors share the same ownership fence as deliveries.
@@ -206,7 +217,7 @@ export async function application(env) {
       appOrigin: origin, publicKeys: JSON.parse(env.RER_OWNER_CLAIM_PUBLIC_KEYS) };
     if (!trust.issuer || !trust.installationId) return new Response('Native owner bindings required', { status: 503 });
     const records = nativeRecords(env.DB, nativeMode, env.LIFECYCLE_PROOF);
-    const people = memberPeople(operatorAuthPeople({ db: env.DB, session: incoming => auth.getSession(incoming) }), env.DB, nativeMode);
+    const people = memberPeople(operatorAuthPeople({ db: env.DB, session: incoming => auth.getSession(incoming) }), env.DB, nativeMode, env.SKIP_SPONSOR_CHECK);
     const phaseClients = env.PHASE_FIXTURES ? createPhaseClients({ db: env.DB, records, ToolRefusal }) : null;
     const door = createAgentDoor({ capabilities: env.AGENT_CAPABILITIES ? JSON.parse(env.AGENT_CAPABILITIES) : undefined, seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [{ uriTemplate: 'fixture://record/{id}', name: 'Record', scope: 'records:read', classes: ['standard'], classify: standard, async read(resource, ctx) { try { return { json: await records.read(resource.split('/').pop(), ctx.person) }; } catch (error) { if (error instanceof ToolRefusal) return null; throw error; } } }],
       limits: { requestsPerMinute: 10000 }, tools: [...recordTools(env.DB, records), ...authorityTools(env.DB, records), ...(phaseClients?.tools ?? []), ...(env.RPC_PROOF ? rpcTools(env, records) : []), ...(env.COMPOSITE_PROOF ? compositeTools(env.DB, records) : []), ...(env.GITHUB_PROOF ? githubTools(env) : []), ...(env.SPONSOR_PROOF ? privateRecordTools(env.DB, records) : []), ...(env.SECURITY_PROOF ? [...securityTools(env.DB, records), ...accessTools(env.DB, auth, records)] : [])], nativeProof: nativeProof(env.DB),

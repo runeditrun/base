@@ -43,7 +43,15 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   prove = (await import(pathToFileURL(resolve(root, verification.proof.module)))).default;
   if (typeof prove !== 'function') throw new RerError('agent_proof_invalid', 'verification.proof module must default-export a native proof test function.', 1);
  }
- const principals = await verificationSponsors(root, verification), native = principals[0], { email, sub } = native;
+ const negativeOnly = new Set();
+ const sponsorDeclarations = Array.isArray(verification.sponsors) ? verification.sponsors.map((principal, index) => {
+  if (!principal || typeof principal !== 'object' || Array.isArray(principal)) return principal;
+  const { negativeOnly: probeOnly, ...declaration } = principal;
+  if (probeOnly !== undefined && typeof probeOnly !== 'boolean' || probeOnly && index === 0) throw new RerError('agent_sponsors_invalid', 'Only additional verification sponsors may declare negativeOnly:true.', 1);
+  if (probeOnly) negativeOnly.add(principal.label);
+  return declaration;
+ }) : verification.sponsors;
+ const principals = await verificationSponsors(root, { ...verification, sponsors: sponsorDeclarations }), native = principals[0], { email, sub } = native;
  if (verification.reviewers !== undefined && !native.initialize) throw new RerError('agent_reviewer_invalid', 'verification.reviewers requires a native owner initializer to drive invitation and independent review.', 1);
  const reviewers = await verificationReviewers(root, verification.reviewers, email);
  if (claim?.mode && !['signed', 'setup-token'].includes(claim.mode) && !native.initialize) throw new RerError('agent_owner_invalid', `Owner claim mode ${claim.mode} requires verification.owner.initializer using the seed's production lifecycle.`, 1);
@@ -133,7 +141,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   const journey = await verificationJourney(root, verification.journey, { request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures });
   const prepare = await journeyFixtures(root, verification.fixtures, { request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures });
   const result = await runAgentDoorConformance({ fetch: request, origin: hosted.origin, surface: declared.surface,
-   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors, webhooks, business, prove, ...journey, prepare, invoke: workerDriver?.run(hosted),
+   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors: sponsors.filter(person => !negativeOnly.has(person.label)), webhooks, business, prove, ...journey, prepare, invoke: workerDriver?.run(hosted),
   });
   const points = [...result.points, ...reviewers.points()];
   return finish({ ...result, points, ok: points.every(point => point.ok) }, report);
