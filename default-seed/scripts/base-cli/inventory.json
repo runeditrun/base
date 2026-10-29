@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.87-dev.gceb56990",
+  "cliVersion": "0.2.87-dev.g76d046c9",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4539,7 +4539,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "0aa2a155afc47714e2b81c8106ceacdc9a0aad19dbaa15f4cdee8d2f4dbb7f81"
+      "sha256": "7cc80130cfa2d1f553ae92c49f6980f30c7fedd1ee4a87bcf2ec5aae18d5cd30"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
@@ -4551,7 +4551,7 @@
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
-      "sha256": "075fc380051b52ff8498680b32b40278ad8ce9f542231ccb076fd56ea38d9c5c"
+      "sha256": "896d465302f9a6b9342d73e88e0b86d67b0b09848d4776ca391f480133e96215"
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
@@ -4627,7 +4627,7 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "c98c5d1d325886fbd482522a903869e71b9a34b7b9ac656d51a3743abbe96473"
+      "sha256": "3a501d4b50a1fb66b783535b56fd3dc662371f9a012091bb44fcec07e06dd328"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
