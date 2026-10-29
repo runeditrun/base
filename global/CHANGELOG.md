@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Refuse continuation tools under unset, removed or unavailable policy and Business Pause before validating or resolving native continuation items, retaining current scope, revocation and once-only execution checks.
+
 ## 0.2.90
 
 - Withhold optional copied Base modules and workflow helpers whose required packages the edition has not declared. Refresh preserves supported dependency closure and explains the package declaration needed to opt in.
