@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.90-dev.g4f4019ba",
+  "cliVersion": "0.2.90",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1903,7 +1903,7 @@
     },
     "foundation/runtime/contract-docs.mjs": {
       "source": "foundation/runtime/contract-docs.mjs",
-      "sha256": "e43dc064aaedaff9309c5c52a42814784e761b82a618cf397cd91251177551e5"
+      "sha256": "db42d2817bd838636e1c18bb8d7b6817e05b6ac9438d2d4951de795a4e0e75fc"
     },
     "foundation/runtime/contract-prose-patterns.mjs": {
       "source": "foundation/runtime/contract-prose-patterns.mjs",
