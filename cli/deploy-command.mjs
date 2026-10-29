@@ -82,6 +82,7 @@ export async function deployCommand(context) {
  const settings = adapter.hooks?.secrets ?? adapter.settings;
  // Required secrets have been checked; retain the production sign-in guidance.
  const dryRun = async result => {
+  result = { dryRun: true, deployed: false, providerChecked: false, ...result };
   const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
   const { signIn } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
   const needed = neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false });
@@ -95,8 +96,7 @@ export async function deployCommand(context) {
  if (options.rotateSecret?.split(',').includes('INSTALLATION_KEY')) return ownerDeploy(path, adapter)(context);
  // A hook that deployed through the kit keeps what its Worker holds: rotate there as a secret change.
  if (options.rotateSecret && !adapter.deploy.managesHostedOwner && await hookState(root, options.environment ?? 'production')) return ownerDeploy(path, adapter)(context);
- if (options.dryRun) return dryRun(await ownerDeploy(path, adapter)(context));
- if (adapter.deploy.managesHostedOwner) return adapter.deploy(context);
+ if (adapter.deploy.managesHostedOwner) { const result = await adapter.deploy(context); return options.dryRun ? dryRun(result) : result; }
  const productDirectory = deployProductDirectory(declaration);
  const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
  await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options });
@@ -114,7 +114,7 @@ export async function deployCommand(context) {
  // A hook keeping the kit's record in its own state file named it; every kit
  // step after the hook (inspect, secret, record-owner) reads that record.
  let hookRecord = await hookState(root, environment);
- const command = async (verb, extra = [], values = env, more = {}) => owner([verb, '--declaration', path, '--environment', environment, ...(hookRecord ? ['--state', hookRecord] : []), ...(['dry-run', 'deploy', 'health'].includes(verb) ? await deployProductArguments(root, productDirectory) : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
+ const command = async (verb, extra = [], values = env, more = {}) => owner([verb, '--declaration', path, '--environment', environment, ...(hookRecord ? ['--state', hookRecord] : []), ...(['dry-run', 'local-plan', 'deploy', 'health'].includes(verb) ? await deployProductArguments(root, productDirectory) : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
  // A hook that deployed through the kit's standard record lets rer issue and
  // retire the setup token; a hook keeping an unnamed record of its own keeps its token.
  let recorded, hookReturned = false;
@@ -142,7 +142,7 @@ export async function deployCommand(context) {
    await deployProductArguments(root, productDirectory);
    await refuseLocalEnvOutput(root, adapter.devIdentity?.output, { uploaded: !options.dryRun });
    if (options.dryRun) {
-    await command('dry-run');
+    await command('local-plan');
     return dryRun(deployed);
    }
    await rememberHookState(root, environment, deployed?.state);
