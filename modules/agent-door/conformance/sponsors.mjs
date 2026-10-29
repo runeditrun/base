@@ -12,6 +12,10 @@ export async function crossSponsorPhase(c, sponsors) {
  for (const person of sponsors.slice(1)) {
   const b = createProtocol({ fetch: c.fetch, origin: c.origin, surface: c.surface, signer: c.signer, person,
    business: c.business, consent: randomUUID(), now: c.now, points: c.points, agentId: `rer-conformance-${randomUUID()}`, seq: c.seq, revision: c.revision, listed: c.listed });
+  b.renewPolicy = async () => {
+   await c.renewPolicy();
+   b.seq = c.seq; b.revision = c.revision; b.document = c.document;
+  };
   const prefix = `BASE-AGENT-004.cross-sponsor.${person.label}`;
   await c.adopt(autonomousPolicy());
   b.revision = c.revision;
