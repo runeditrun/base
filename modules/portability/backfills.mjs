@@ -33,7 +33,7 @@ import { transientTables } from './transient-tables.mjs';
 // statements after it is judged as the statements it holds.
 // Returns the replays in migration order and the proven CHECK rebuilds, or refuses with the first migration
 // (in `unapplied` order) holding a statement that cannot be admitted.
-export function laterData({applied,unapplied,replay,catalogue,archived,empty,tables,secrets,manifest,replayEmpty=[]}) {
+export function laterData({applied,unapplied,replay,catalogue,archived,empty,tables,secrets,manifest,replayEmpty=[],definitions=[]}) {
   const split=name=>replay.statements(name).flatMap(splitStatements),fold=list=>list.map(folded);
   const statements=applied.flatMap(split);
   const restorable=fold(catalogue),carried=fold(archived);
@@ -97,7 +97,7 @@ export function laterData({applied,unapplied,replay,catalogue,archived,empty,tab
   }
   // Commit-trigger transformations run after normal replays. A replay must
   // not consume a value that such a transformation has yet to produce.
-  const transformed=new Set([...restored].flatMap(s=>[s.data.target,...triggerBodies(statements,s.data.target)]));
+  const transformed=pendingWrites(statements,[...restored].map(s=>s.data),definitions);
   for(const s of replays)if(s.data?.names.some(name=>transformed.has(name)))refused.add(s);
   const first=later.find(s=>refused.has(s));
   insist(!first,'schema_mismatch:migration_data:'+first?.migration);
@@ -193,12 +193,17 @@ function emptyAbsentTables(later,statements,carried,replayEmpty,admitted) {
     if(later.some(s=>!block.includes(s) && statementNames(s.sql).includes(aa[2])))continue;
     rebuilds.push({block,source:bb[6]});
   }
-  const copyStatements=new Set(rebuilds.flatMap(r=>r.block));
+  const copyStatements=new Set(rebuilds.flatMap(r=>r.block)),triggerTargets=new Set();
+  for(const sql of statements) {
+    const list=tokens(sql);if(folded(list[0]?.text??'')!=='create' || folded(list[1]?.text??'')!=='trigger')continue;
+    const on=list.findIndex(t=>!t.quoted && folded(t.text)==='on');
+    if(on>=0)triggerBodies([sql],folded(identifier(list[on+1]))).forEach(name=>triggerTargets.add(name));
+  }
   for(let changed=true;changed;) {
     changed=false;
     for(const name of empty) {
       const writes=later.filter(s=>s.data && s.data.target===name && !copyStatements.has(s) && ['insert','replace'].includes(s.data.verb));
-      const triggered=statements.some(sql=>statementNames(sql).some(table=>triggerBodies([sql],table).includes(name)));
+      const triggered=triggerTargets.has(name);
       if(triggered || writes.some(s=>!emptySelect(s.sql,empty))) {empty.delete(name);changed=true;}
     }
   }
@@ -219,4 +224,36 @@ function emptySelect(sql,empty) {
     if(t.text==='(')depth++;if(t.text===')')depth--;
   }
   return from>select && [...empty].includes(folded(list[from+1]?.value??''));
+}
+
+// Follow only triggers whose event actually fires (an UPDATE cannot fire an
+// INSERT trigger), and their bounded writing statements. Foreign-key actions
+// use live destination definitions, including excluded intermediate tables.
+function pendingWrites(statements,initial,definitions) {
+  const live=new Map(),word=t=>['keyword','identifier'].includes(t?.type)?folded(t.value):undefined;
+  for(const sql of statements) {
+    const lex=sqliteTokens(sql),words=lex.map(word);
+    if(!['create','drop'].includes(words[0]) || words[1]!=='trigger')continue;
+    const at=words[2]==='if'?(words[0]==='create'?5:4):2,name=folded(lex[at]?.value??'');
+    if(words[0]==='drop'){live.delete(name);continue;}
+    const on=words.indexOf('on'),begin=words.indexOf('begin'),event=words.slice(at+1,on).find(w=>['insert','update','delete'].includes(w));
+    if(on<0 || begin<0 || !event || schemaChange(sql)!=='trigger')continue;
+    const body=splitStatements(sql.slice(lex[begin].end,lex.at(-1).start));
+    live.set(name,{table:folded(lex[on+1].value),event,writes:body.flatMap(sql=>{
+      const data=dataStatement(sql);if(data)return [data];
+      return /^\s*SELECT\b/i.test(sql)?[]:statementNames(sql).flatMap(target=>['insert','update','delete'].map(verb=>({target,verb})));
+    })});
+  }
+  const actions=definitions.flatMap(({name,sql})=>{
+    if(!sql)return [];
+    const lex=sqliteTokens(sql),words=lex.map(word),parents=words.flatMap((w,i)=>w==='references'?[folded(lex[i+1].value)]:[]);
+    return parents.flatMap(parent=>['update','delete'].flatMap(verb=>words.some((w,i)=>w==='on' && words[i+1]===verb && ['cascade','set'].includes(words[i+2]))?[{parent,target:folded(name),verb,write:verb==='delete' && words.some((w,i)=>w==='on' && words[i+1]==='delete' && words[i+2]==='cascade')?'delete':'update'}]:[]));
+  });
+  const queue=[...initial],seen=new Set(),tables=new Set();
+  for(let i=0;i<queue.length;i++) {
+    const data=queue[i],key=data.target+':'+data.verb;if(seen.has(key))continue;seen.add(key);tables.add(data.target);
+    for(const trigger of live.values())if(trigger.table===data.target && trigger.event===data.verb)queue.push(...trigger.writes);
+    for(const action of actions)if(action.parent===data.target && (action.verb===data.verb || data.verb==='replace'))queue.push({target:action.target,verb:action.write});
+  }
+  return tables;
 }
