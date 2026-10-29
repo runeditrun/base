@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Give each additional Business sponsor verifier initializer its own captured-mail reader, with the owner's existing provider, size, count and age limits. Native invitation confirmation can complete without exposing another principal's mail.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.

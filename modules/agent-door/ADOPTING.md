@@ -580,6 +580,12 @@ submission and five minutes of age. `after` is an optional millisecond timestamp
 Capture exists only in verifier memory and is cleared when the run closes.
 There is no HTTP outbox, application binding or production reader.
 
+Each additional `verification.sponsors` initializer receives the same `mail.read`
+interface and limits, scoped only to its own declared synthetic email. Capture
+starts before Business roster delivery so the initializer can consume its native
+invitation. It cannot select or read the owner's or another principal's mailbox.
+The owner and journey readers retain their owner-mailbox scope.
+
 Drive the native email request through `request`, read the captured code or
 link, and submit it to the seed's real confirmation handler. Preserve native
 one-use, expiry, session and step-up checks. Never print the message or proof.
@@ -838,7 +844,7 @@ unique stable `label` values and distinct canonical emails:
 These keys live under `verification`. The first principal inherits `owner` and
 runs all existing phases. Each later principal requires its own contained
 initializer and receives `{label,email,sub,displayName,claim,owner,request,
-origin,database,returnTo}`. Its fresh signed claim uses the same disposable
+origin,database,returnTo,mail,fixtures}`. Its fresh signed claim uses the same disposable
 installation ring; `owner` carries the first principal's native session for
 normal invitations. A signed Business settings roster binds each subject with
 its declared `admin` or `member` role (default `member`). Complete the seed's
