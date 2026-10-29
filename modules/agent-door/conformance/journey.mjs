@@ -71,8 +71,10 @@ export async function runJourney(c, phase, { held = false, injections = false, r
     await checkTarget(c, step, outputs, answer, phase, true);
     c.add(`BASE-AGENT-008.5.approver.${step.id}`, approved.ok, `Signed-in sponsor approval returned HTTP ${approved.status}.`);
     answer = await c.stepTool(step, args, { ...proof, requestState: answer.result.requestState });
-    checkClasses(c, step, answer, `${phase}.approved`);
-    c.add(`BASE-AGENT-007.5.receipt.${step.id}`, !answer.result?.isError && answer.result?.resultType !== 'input_required' && Boolean(answer.result?._meta?.['com.runeditrun/receipt']) && answer.decision?.disposition === 'approval', 'The approved retry must complete with an approval receipt.');
+    const receipt = answer.result?._meta?.['com.runeditrun/receipt'];
+    checkClasses(c, step, { decision: receipt?.decision }, `${phase}.approved`);
+    c.add(`BASE-AGENT-012.admission.${phase}.${step.id}`, answer.decision?.revision === c.revision && answer.decision?.disposition === 'approval' && isDeepStrictEqual(answer.decision?.classes, receipt?.decision?.classes), 'The completed retry must pass current policy admission for its original effect classes and facts.');
+    c.add(`BASE-AGENT-007.5.receipt.${step.id}`, !answer.result?.isError && answer.result?.resultType !== 'input_required' && receipt?.decision?.disposition === 'approval' && receipt.decision.revision === c.revision, 'The approved retry must complete with an approval receipt.');
    }
    c.add(`BASE-AGENT-013.4.${phase}.${step.id}`, answer.status === 200 && answer.result && !answer.result.isError && answer.result.resultType !== 'input_required', `${step.tool} did not complete (${errorCode(answer) ?? answer.status}).`);
    if (answer.result?.isError || answer.result?.structuredContent === undefined) continue;
