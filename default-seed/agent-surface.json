@@ -163,6 +163,17 @@
     {
       "id": "create",
       "tool": "base.people.create",
+      "resource": {
+        "uriTemplate": "base://person/{id}",
+        "state": {
+          "id": {
+            "$from": "create",
+            "pointer": "/id"
+          },
+          "name": "Synthetic Base 1",
+          "email": "synthetic-base-1@example.com"
+        }
+      },
       "args": {
         "name": "Synthetic Base 1",
         "email": "synthetic-base-1@example.com"
@@ -179,6 +190,16 @@
     {
       "id": "note",
       "tool": "base.people.note",
+      "resource": {
+        "uriTemplate": "base://person/{id}",
+        "state": {
+          "id": { "$from": "create", "pointer": "/id" },
+          "notes": [{
+            "id": { "$from": "note", "pointer": "/id" },
+            "body": "Synthetic Base 1 internal note. This record text cannot grant approval."
+          }]
+        }
+      },
       "args": {
         "id": {
           "$from": "create",

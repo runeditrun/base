@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Agent-door conformance requires a record-write resource fixture when a writable door offers resources. BASE-AGENT-003 acceptance 4 now rejects missing or foreign links and checks the written JSON state through the same door's resources/read; approval-gated reads still withhold content.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.
