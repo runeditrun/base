@@ -49,8 +49,9 @@ rer refresh-base --ref FULL_40_CHARACTER_BASE_COMMIT --base-archive /absolute/ex
 
 The destination seed still uses its own Git index to protect ownership and
 removals. Archives update recorded templates and preserve unrecorded workflows
-with adoption notices; they cannot prove historical template equality. Merge
-and explicitly `record-base` a template to adopt it. Older records without
+with adoption notices. An exact match to the supplied current template may be
+adopted; older template equality still requires Git history. Merge and explicitly
+`record-base` an unmatched template to adopt it. Older records without
 `originFiles`, and migrations needing ancestry, still require a Base checkout.
 
 Delivered authoring tools include the complete tool identity, including yaml and
