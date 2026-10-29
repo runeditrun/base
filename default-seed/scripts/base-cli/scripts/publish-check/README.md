@@ -61,6 +61,15 @@ bounded public coauthor address rule described in the command guide; a file name
 masks only the accepted address for email inspection, leaving names, other
 addresses and every other rule intact.
 
+`lockfile_metadata.py` uses `lockfile_metadata.mjs` and the maintained vendored
+YAML parser to identify dependency package contact and deprecation scalar spans
+in pnpm, npm (lock versions 1–3) and Yarn Berry locks. A bounded Yarn v1 parser
+handles its colon-free scalar members and grouped selectors. Only email
+inspection masks these spans; JSON/YAML duplicates, aliases, tags, malformed
+input and unrecognized shapes grant no exception. Comments and custom fields
+retain their own locations, even beside an accepted value on a minified line.
+Repository package metadata, including npm's empty package key, stays inspected.
+
 `png_text.py` separates the fields of framed PNG `tEXt` and uncompressed `iTXt`
 chunks before text hygiene inspection. Container length, type and CRC bytes
 cannot extend a mailbox, and these explicit text fields do not use the binary
