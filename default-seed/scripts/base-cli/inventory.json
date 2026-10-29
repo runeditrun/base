@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.86-dev.gbf5c5c32",
+  "cliVersion": "0.2.86-dev.g68ee25ee",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1147,7 +1147,7 @@
     },
     "cli/server-registry.mjs": {
       "source": "cli/server-registry.mjs",
-      "sha256": "28dd232f8126b5fbf36c62c1843498acaf3c1d9feb0984ee59b1a6ad5960215b"
+      "sha256": "6a60f0359220e49ca3a830e5cce2dd1460f9e3df44081e217a8ce5eb825a02dc"
     },
     "cli/server-resources.mjs": {
       "source": "cli/server-resources.mjs",

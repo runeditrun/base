@@ -185,6 +185,8 @@ export async function serverRegistry(root,{env=process.env,memory=availableMemor
  async function serve(handler) {
   control=createServer({allowHalfOpen:true},socket=>{
    let text='';socket.setTimeout(35000,()=>socket.destroy());
+   // A timed-out status caller can disconnect while its reply is in flight.
+   socket.on('error',()=>socket.destroy());
    socket.on('data',data=>{text+=data;if(text.length>1024)socket.destroy();});
    socket.on('end',async()=>{
     try{
