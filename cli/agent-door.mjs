@@ -15,6 +15,7 @@ import { verificationSponsors } from './agent-sponsors.mjs';
 import { verificationWebhooks } from './agent-webhooks.mjs';
 import { verificationInvoke, verificationJourney } from './agent-verifier.mjs';
 import { verificationBindings } from './agent-bindings.mjs';
+import { journeyFixtures } from './agent-journey-fixtures.mjs';
 
 function finish(result, report) {
  for (const point of result.points) report(`${point.ok ? 'PASS' : 'FAIL'} ${point.id}${point.ok || !point.detail ? '' : `: ${point.detail}`}`);
@@ -129,8 +130,9 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   const secrets = await network.provision(hosted);
   const webhooks = await verificationWebhooks(root, verification.webhooks, secrets);
   const journey = await verificationJourney(root, verification.journey, { request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures });
+  const prepare = await journeyFixtures(root, verification.fixtures, { request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures });
   const result = await runAgentDoorConformance({ fetch: request, origin: hosted.origin, surface: declared.surface,
-   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors, webhooks, business, prove, ...journey, invoke: workerDriver?.run(hosted),
+   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors, webhooks, business, prove, ...journey, prepare, invoke: workerDriver?.run(hosted),
   });
   const points = [...result.points, ...reviewers.points()];
   return finish({ ...result, points, ok: points.every(point => point.ok) }, report);

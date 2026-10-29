@@ -19,7 +19,7 @@ export default {
     if (path === '/' && ['GET', 'HEAD'].includes(request.method)) return new Response(request.method === 'HEAD' ? null : '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Records</title></head><body><main><h1>Records</h1><p>Save internal records, request a provider review, and retain signed delivery receipts.</p><p><a href="/app">Open your records workspace</a></p></main></body></html>', { headers: { ...securityHeaders(), 'Content-Type': 'text/html; charset=utf-8' } });
     const app = await application(env);
     if (app instanceof Response) return app;
-    const { origin, nativeMode, config, clientIp, trust, records, door, auth, settings } = app;
+    const { origin, nativeMode, config, clientIp, trust, records, door, auth, settings, people, phaseClients } = app;
     const handled = await door.handle(request) ?? await settings.handle(request);
     if (handled) return handled;
     if (path === '/deliveries' && request.method === 'POST') {
@@ -41,6 +41,8 @@ export default {
         const value = await auth.confirmLink(request, await readInput(request));
         return Response.json({ confirmed: true }, { headers: { ...securityHeaders(), 'Set-Cookie': value.cookie } });
       }
+      const phaseResponse = await phaseClients?.handle(request, { auth, config, people, door });
+      if (phaseResponse) return phaseResponse;
       if (path === '/app/review' && env.OWNER_MODE === 'native-reviewer') {
         requirePost(request, config);
         const session = await auth.getSession(request);

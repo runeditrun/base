@@ -601,6 +601,54 @@ Hooks cannot skip mandatory steps or alter the runner's arguments and outputs.
 Failed hooks fail the current phase with the same redacted diagnostic. A step
 that fails or yields no structured output does not receive `afterStep`.
 
+## Native clients and fresh phase fixtures
+
+Declare `verification.fixtures: {"module":"tests/agent-phase-fixtures.mjs"}`
+when a journey needs a real native API client, an operation receipt, or state
+consumed by a previous policy round. Its default async function receives
+`{phase, request, origin, email, cookie, mail, fixtures, tool}`. The request
+function is restricted to the disposable installation; use the native owner
+session to issue clients, then their real credentials to create native records
+and retained operation receipts. No signer, writable database or production
+fixture route is supplied.
+
+Return `{values, clients}`. `values` is an object of named phase-local JSON
+values. `clients` maps names to `{token, clientId, agent:{id,name,specialist}}`
+returned by the native credential lifecycle. The specialist must match the
+surface. Credentials and identities must belong to the signed-in owner and
+retain their actual native scope checks. Generate secret-shaped values at
+runtime and never log them.
+
+A journey step can select `client:"local"`; its MCP calls, proof challenges,
+approval retries, replay, resource reads and post-write event snapshots then use
+that native bearer. Event visibility remains limited to resources readable by
+that client's authenticated identity. Steps without a selected client retain
+the Business credential path.
+Arguments and target IDs can reference prepared values, for example
+`{"$fixture":"operation","pointer":"/key"}`. These references require the
+fixture module and fail when their value or client is absent. Audit verification
+checks each client's own agent, sponsor, client ID and null Business consent;
+Business credential and consent negatives still use the Business credential.
+
+The initial unanswered-policy round can return only clients: its refusal probes
+use unresolved arguments just as they do for `$from` references. Successful
+journeys require the real prepared values. Later preparation runs with the
+autonomous policy in force, before adopting the policy under test, so native
+REST mutations can enter the real agent door to establish receipt custody.
+Their audit rows remain available and their client identity is checked. Only
+rows created inside preparation are separated from the journey's exact audit
+count; every tested call still requires its own matching audit row.
+
+Preparation runs before `initial`, `removed`, `autonomous`, `held`, each
+`blocked:<class>`, `paused`, `negative` and `consent` round, before no-effect
+witnesses are taken. Optional replay, invocation, webhook and record-security
+phases prepare as `replay`, `invocation`, `webhook` and `no-subject`. Every
+preparation replaces the prior values and client handles. Create fresh state
+through the native doors for each round; do not resurrect erased records or
+write application tables directly. Failures remain conformance failures with
+redacted diagnostics. Omitting fixture declarations never supplies missing
+tool/class coverage, credentials or native state.
+
 ## Per-run provider fixture control
 
 The same initializer and native journey receive

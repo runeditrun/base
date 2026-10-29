@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
-import { auditRows } from './audit-pages.mjs';
+import { auditRows } from './audit-rows.mjs';
 import { APPROVAL } from './protocol.mjs';
 
 export const targetIdentity = value => value !== null && typeof value === 'object' && !Array.isArray(value)

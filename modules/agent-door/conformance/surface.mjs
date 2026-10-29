@@ -43,10 +43,11 @@ export function validateAgentSurface(surface, { contract } = {}) {
  }
  const references = (value, visit) => {
   if (Array.isArray(value)) value.forEach(item => references(item, visit));
-  else if (object(value)) { if ('$from' in value || '$sponsor' in value) visit(value); else Object.values(value).forEach(item => references(item, visit)); }
+  else if (object(value)) { if ('$from' in value || '$sponsor' in value || '$fixture' in value) visit(value); else Object.values(value).forEach(item => references(item, visit)); }
  };
  const checkReferences = (value, label, available, addPoint = add) => references(value, ref => {
   if ('$sponsor' in ref) addPoint(`${label}.sponsor`, Object.keys(ref).length === 1 && ['id', 'email'].includes(ref.$sponsor), `${label} must reference the sponsor as {$sponsor:'id'} or {$sponsor:'email'}.`);
+  else if ('$fixture' in ref) addPoint(`${label}.fixture`, text(surface.verification?.fixtures?.module) && text(ref.$fixture) && Object.keys(ref).sort().join(',') === '$fixture,pointer' && typeof ref.pointer === 'string' && (ref.pointer === '' || ref.pointer.startsWith('/')), `${label} requires verification.fixtures and a named fixture with a JSON pointer.`);
   else addPoint(`${label}.ref.${ref.$from}`, available.has(ref.$from) && typeof ref.pointer === 'string' && (ref.pointer === '' || ref.pointer.startsWith('/')), `${label} references ${ref.$from} before its structuredContent is available, or has an invalid JSON pointer.`);
  });
  for (const [i, step] of (Array.isArray(surface.journey) ? surface.journey : []).entries()) {
@@ -54,11 +55,12 @@ export function validateAgentSurface(surface, { contract } = {}) {
   add(`journey.${id}`, object(step) && text(step.id) && !steps.has(step.id) && Boolean(tool) && object(step.args) && Array.isArray(step.expect) && step.expect.length > 0, `Invalid or duplicate journey step ${id}, tool ${JSON.stringify(step?.tool)}.`);
   const expect = Array.isArray(step?.expect) ? step.expect : [];
   add(`journey.${id}.classes`, new Set(expect.map(item => item?.class)).size === expect.length && expect.every(item => object(item) && Array.isArray(tool?.classes) && tool.classes.includes(item.class) && (item.facts === undefined || object(item.facts))), `${id} expects duplicate, undeclared or malformed classes.`);
+  if (step?.client !== undefined) add(`journey.${id}.client`, text(step.client) && text(surface.verification?.fixtures?.module), `${id} requires a named native client and verification.fixtures.`);
   for (const item of expect) coverage.get(step?.tool)?.add(item?.class);
   checkReferences(step?.args, `journey.${id}`, steps);
   if (step?.target !== undefined) {
    const target = step.target;
-   add(`journey.${id}.target`, object(target) && Object.keys(target).sort().join(',') === 'id,kind' && text(target.kind) && (text(target.id) || object(target.id) && ('$from' in target.id || '$sponsor' in target.id)), `${id}.target must contain only a nonempty kind and an id string or journey reference.`);
+   add(`journey.${id}.target`, object(target) && Object.keys(target).sort().join(',') === 'id,kind' && text(target.kind) && (text(target.id) || object(target.id) && ('$from' in target.id || '$sponsor' in target.id || '$fixture' in target.id)), `${id}.target must contain only a nonempty kind and an id string or journey reference.`);
    checkReferences(target, `journey.${id}.target`, steps);
   }
   if (step?.inject !== undefined) add(`journey.${id}.inject`, object(step.inject), `${id}.inject must be an object of additional arguments.`);

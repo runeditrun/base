@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import { randomBytes } from 'node:crypto';
+import { phaseFixtureSchema } from './client.mjs';
 
 const base = resolve(import.meta.dirname, '../../../..');
 const source = path => pathToFileURL(join(base, path)).href;
@@ -37,7 +38,7 @@ export async function buildFixture(root) {
  });
 }
 
-export async function fixtureSeed(t, mode, { sponsors = false, security = false } = {}) {
+export async function fixtureSeed(t, mode, { sponsors = false, security = false, phaseFixtures = false } = {}) {
  const root = await mkdtemp(join(tmpdir(), 'rer-agent-door-'));
  t.after(() => rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
  await mkdir(join(root, 'dist/server/migrations'), { recursive: true });
@@ -48,6 +49,7 @@ export async function fixtureSeed(t, mode, { sponsors = false, security = false 
   `export const deliverySecret = ${JSON.stringify(randomBytes(32).toString('hex'))};\n`
   + `export const openAiAuthorization = ${JSON.stringify('Bearer ' + randomBytes(32).toString('hex'))};\n`);
  for (const file of ['provider.mjs', 'receiver.mjs', 'initializer.mjs', 'proof.mjs', 'confirm-mail.mjs', 'journey.mjs', 'secret-source.mjs', 'second-sponsor.mjs', 'inbound-webhook.mjs', 'reviewer-owner.mjs', 'reviewer.mjs', 'invoke.mjs', 'rpc-edge.mjs', 'step-journey.mjs', 'github-binding.mjs']) await cp(join(import.meta.dirname, file), join(root, file));
+ if (phaseFixtures) await cp(join(import.meta.dirname, 'phase-fixtures.mjs'), join(root, 'phase-fixtures.mjs'));
  const surface = JSON.parse(await readFile(join(import.meta.dirname, 'surface.json'), 'utf8'));
  surface.verification = { journey: 'journey.mjs', proof: { module: 'proof.mjs' }, network: { module: 'provider.mjs', secretSource: 'secret-source.mjs', origins: ['https://api.openai.com', 'https://receiver.example.invalid'] },
   ...(['native', 'native-reviewer'].includes(mode) ? { owner: { email: 'native-owner@example.com', emailField: 'SETUP_OPERATOR_EMAIL', initializer: mode === 'native-reviewer' ? 'reviewer-owner.mjs' : 'initializer.mjs' } } : {}),
@@ -88,6 +90,19 @@ export async function fixtureSeed(t, mode, { sponsors = false, security = false 
   });
   surface.journey.splice(1, 0, { id: 'tls', tool: 'fixture.security.tls', args: { id: { $from: 'create', pointer: '/id' }, required: true }, expect: [{ class: 'security', facts: { measure: 1, setting: 'record-tls' } }] });
  }
+ if (phaseFixtures) {
+  surface.verification.fixtures = { module: 'phase-fixtures.mjs' };
+  surface.tools.push(
+   { name: 'fixture.clients.receipt', scope: 'records:read', readOnly: true, classes: ['standard'], clauses: ['BASE-AGENT-002'] },
+   { name: 'fixture.records.erase', scope: 'records:write', readOnly: false, classes: ['destructive'], clauses: ['BASE-AGENT-006'] },
+  );
+  surface.journey.unshift(
+   { id: 'native-receipt', tool: 'fixture.clients.receipt', client: 'local', args: { key: { $fixture: 'operation', pointer: '/key' } }, expect: [{ class: 'standard', facts: { measure: 1 } }] },
+  );
+  surface.journey.push(
+   { id: 'erase', tool: 'fixture.records.erase', client: 'local', args: { id: { $fixture: 'record', pointer: '/id' } }, target: { kind: 'record', id: { $fixture: 'record', pointer: '/id' } }, expect: [{ class: 'destructive', facts: { measure: 1 } }] },
+  );
+ }
  await writeFile(join(root, 'agent-surface.json'), JSON.stringify(surface));
  const reference = JSON.parse(await readFile(join(base, 'default-seed/package.json'), 'utf8'));
  await writeFile(join(root, 'package.json'), JSON.stringify({ type: 'module', engines: reference.engines, packageManager: reference.packageManager }));
@@ -103,9 +118,9 @@ export const commandAdapter = declare(localInstaller({}), { verify: [process.exe
  await writeFile(join(root, 'rer-setup.json'), JSON.stringify({ schema: 1, title: 'Fixture installation', fields: [
   { name: 'OWNER_EMAIL', kind: 'email', required: true }, { name: 'SETUP_TOKEN', kind: 'secret', required: true, generate: 'hex' },
  ], steps: ['native', 'native-reviewer'].includes(mode) ? [{ type: 'extension', id: 'lamp-native-owner' }] : [{ type: 'owner-claim', mode, emailField: 'OWNER_EMAIL', tokenField: 'SETUP_TOKEN', path: mode === 'signed' ? '/auth/owner-claim' : '/auth/bootstrap' }] }));
- await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, vars: { OWNER_MODE: mode, ...(sponsors ? { SPONSOR_PROOF: true } : {}), ...(security ? { SECURITY_PROOF: true } : {}) }, secrets: [{ binding: 'SESSION_SECRET' }, { binding: 'MAIL_API_KEY' }] }));
+ await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, vars: { OWNER_MODE: mode, ...(sponsors ? { SPONSOR_PROOF: true } : {}), ...(security ? { SECURITY_PROOF: true } : {}), ...(phaseFixtures ? { PHASE_FIXTURES: true } : {}) }, secrets: [{ binding: 'SESSION_SECRET' }, { binding: 'MAIL_API_KEY' }] }));
  await writeFile(join(root, 'dist/server/wrangler.json'), JSON.stringify({ main: 'index.js', compatibility_date: '2026-09-01', d1_databases: [{ binding: 'DB', database_name: 'fixture', migrations_dir: 'migrations' }] }));
- const schemas = [...await Promise.all(productionSchemas.map(file => readFile(join(base, file), 'utf8'))), nativeSchema];
+ const schemas = [...await Promise.all(productionSchemas.map(file => readFile(join(base, file), 'utf8'))), nativeSchema, ...(phaseFixtures ? [phaseFixtureSchema] : [])];
  for (const [i, sql] of schemas.entries()) await writeFile(join(root, `dist/server/migrations/${String(i + 1).padStart(4, '0')}.sql`), sql);
  return realpath(root);
 }
