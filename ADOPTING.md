@@ -4,6 +4,9 @@ Treat Wrangler, Miniflare, workerd and the Cloudflare Vite plugin as one
 compatible dependency group. A lower Wrangler version alone can fail before
 the application builds: the Vite plugin checks its Wrangler peer range at
 startup. Select a plugin release whose declared range accepts the candidate.
+For example, plugin `1.54.5` requires Wrangler `^4.129.1`, while plugin
+`1.54.4` accepts `^4.129.0`. Dependency compatibility still needs journey
+validation before adoption.
 
 Base's dependency sources are:
 

@@ -2,6 +2,8 @@
 
 ## 0.2.86
 
+- Document coordinated local Worker runtime adoption across manifests, frozen locks and Verify workflows, including the Vite plugin's Wrangler peer requirement and repeated public-journey validation before a downgrade.
+
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.
 
 - Recheck native resource visibility before retained event replay and subscription delivery; accept single-segment and underscore tool names within MCP's 128-character limit; preserve opaque string or numeric revision tokens through approvals. Negotiate every advertised MCP version explicitly and document the unsupported March 2025 transport.
