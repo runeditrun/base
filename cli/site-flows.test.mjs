@@ -46,6 +46,46 @@ test('site dry-run names the usable checkout-relative asset destination in human
  }
 });
 
+test('built public doors render optional leadLine as text and preserve pages when omitted', async t => {
+ const f = await seed(t), data = join(f.root, 'src/site/run.ts');
+ const original = await readFile(data, 'utf8');
+ const built = await f.build();
+ assert.equal(built.code, 0, built.stdout + built.stderr);
+ const home = join(f.root, 'dist/site/index.html'), chooser = join(f.root, 'dist/site/run.html');
+ const before = { home: await readFile(home, 'utf8'), run: await readFile(chooser, 'utf8') };
+ const leadLine = 'Keep your records <private> & your work in one place.';
+ await writeFile(data, original.replace('name:', `leadLine: ${JSON.stringify(leadLine)},\n  name:`));
+ const changed = await f.build();
+ assert.equal(changed.code, 0, changed.stdout + changed.stderr);
+ const after = { home: await readFile(home, 'utf8'), run: await readFile(chooser, 'utf8') };
+ const escaped = leadLine.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+ assert.equal(after.home, before.home.replace(/(<div class="hero"><h1>)[\s\S]*?(<\/h1>)/, `$1${escaped}$2`));
+ assert.equal(after.run, before.run.replace(/(<div class="intro"><h1>[\s\S]*?<\/h1>)/, `$1<p class="sub">${escaped}</p>`));
+ const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]});
+ const browser = await chromium.launch({headless:true, executablePath:process.env.CHROMIUM_PATH, args:['--no-sandbox']});
+ try {
+  const page = await browser.newPage({viewport:{width:1440,height:900}});
+  for (const [route, selector] of [['/', '.hero h1'], ['/run', '.intro .sub']]) {
+   const response = await page.goto(preview.url + route);
+   assert.equal(response.status(), 200);
+   assert.equal(await page.locator(selector).textContent(), leadLine);
+   assert.equal(await page.locator(selector + ' private').count(), 0, 'leadLine stays text');
+   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  }
+ } finally { await browser.close(); await preview.close(); }
+ await writeFile(data, original.replace('name:', 'leadLine: undefined,\n  name:'));
+ const unset = await f.build();
+ assert.equal(unset.code, 0, unset.stdout + unset.stderr);
+ assert.equal(await readFile(home, 'utf8'), before.home, 'unset homepage retains every byte');
+ assert.equal(await readFile(chooser, 'utf8'), before.run, 'unset Run page retains every byte');
+ for (const value of ['null', '42', '{ text: "Not a string" }']) {
+  await writeFile(data, original.replace('name:', `leadLine: ${value},\n  name:`));
+  const invalid = await f.build();
+  assert.notEqual(invalid.code, 0);
+  assert.match(invalid.stdout + invalid.stderr, /leadLine is a plain string/);
+ }
+});
+
 test('built run-site uses US dates and keeps the one-line command start together', async t => {
  const f = await seed(t);
  await writeFile(join(f.root, 'CONTRACT.md'), (await readFile(join(base, 'foundation/template/CONTRACT.md'), 'utf8')).replaceAll('BASE_COMMIT', '0123abcd').replaceAll('BASE_DATE', '2026-10-18'));
