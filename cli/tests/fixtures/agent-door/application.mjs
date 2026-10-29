@@ -10,6 +10,7 @@ import { createMailSender } from '../../../../modules/mail/index.mjs';
 import { rpcTools } from './rpc-tools.mjs';
 import { compositeTools } from './composite.mjs';
 import { githubTools } from './github-tools.mjs';
+import { continuationTools } from './continuation.mjs';
 
 const object = (properties, required = Object.keys(properties)) => ({ type: 'object', properties, required, additionalProperties: false });
 const text = { type: 'string', minLength: 1 }, integer = { type: 'integer' };
@@ -208,8 +209,10 @@ export async function application(env) {
     const records = nativeRecords(env.DB, nativeMode, env.LIFECYCLE_PROOF);
     const people = memberPeople(operatorAuthPeople({ db: env.DB, session: incoming => auth.getSession(incoming) }), env.DB, nativeMode);
     const phaseClients = env.PHASE_FIXTURES ? createPhaseClients({ db: env.DB, records, ToolRefusal }) : null;
-    const door = createAgentDoor({ capabilities: env.AGENT_CAPABILITIES ? JSON.parse(env.AGENT_CAPABILITIES) : undefined, seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [{ uriTemplate: 'fixture://record/{id}', name: 'Record', scope: 'records:read', classes: ['standard'], classify: standard, async read(resource, ctx) { try { return { json: await records.read(resource.split('/').pop(), ctx.person) }; } catch (error) { if (error instanceof ToolRefusal) return null; throw error; } } }],
+    const options = { capabilities: env.AGENT_CAPABILITIES ? JSON.parse(env.AGENT_CAPABILITIES) : undefined, seed: 'fixture', name: 'Records', specialist: 'operations', origin, db: env.DB, trust, resources: [{ uriTemplate: 'fixture://record/{id}', name: 'Record', scope: 'records:read', classes: ['standard'], classify: standard, async read(resource, ctx) { try { return { json: await records.read(resource.split('/').pop(), ctx.person) }; } catch (error) { if (error instanceof ToolRefusal) return null; throw error; } } }],
       limits: { requestsPerMinute: 10000 }, tools: [...recordTools(env.DB, records), ...authorityTools(env.DB, records), ...(phaseClients?.tools ?? []), ...(env.RPC_PROOF ? rpcTools(env, records) : []), ...(env.COMPOSITE_PROOF ? compositeTools(env.DB, records) : []), ...(env.GITHUB_PROOF ? githubTools(env) : []), ...(env.SPONSOR_PROOF ? privateRecordTools(env.DB, records) : []), ...(env.SECURITY_PROOF ? [...securityTools(env.DB, records), ...accessTools(env.DB, auth, records)] : [])], nativeProof: nativeProof(env.DB),
-      people, ...(phaseClients ? { localCredentials: phaseClients.localCredentials, currentScopes: phaseClients.currentScopes } : {}) });
+      people, ...(phaseClients ? { localCredentials: phaseClients.localCredentials, currentScopes: phaseClients.currentScopes } : {}) };
+    if (env.CONTINUATION_PROOF) options.tools.push(...continuationTools(env.DB, records, () => options, env.FABRICATE_CONTINUATION));
+    const door = createAgentDoor(options);
     return { origin, nativeMode, config, clientIp, trust, records, door, auth, settings, people, phaseClients };
 }

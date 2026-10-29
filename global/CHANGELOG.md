@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Account for linked native continuations and refused approval executions in agent-door audit conformance without shifting later harness rows; unrelated or policy-inconsistent extra rows still fail.
+
 ## 0.2.90
 
 - Withhold optional copied Base modules and workflow helpers whose required packages the edition has not declared. Refresh preserves supported dependency closure and explains the package declaration needed to opt in.
