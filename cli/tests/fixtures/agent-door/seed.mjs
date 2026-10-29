@@ -38,7 +38,7 @@ export async function buildFixture(root) {
  });
 }
 
-export async function fixtureSeed(t, mode, { sponsors = false, security = false, phaseFixtures = false } = {}) {
+export async function fixtureSeed(t, mode, { sponsors = false, security = false, phaseFixtures = false, capabilities } = {}) {
  const root = await mkdtemp(join(tmpdir(), 'rer-agent-door-'));
  t.after(() => rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
  await mkdir(join(root, 'dist/server/migrations'), { recursive: true });
@@ -103,6 +103,7 @@ export async function fixtureSeed(t, mode, { sponsors = false, security = false,
    { id: 'erase', tool: 'fixture.records.erase', client: 'local', args: { id: { $fixture: 'record', pointer: '/id' } }, target: { kind: 'record', id: { $fixture: 'record', pointer: '/id' } }, expect: [{ class: 'destructive', facts: { measure: 1 } }] },
   );
  }
+ if (capabilities !== undefined) surface.capabilities = capabilities;
  await writeFile(join(root, 'agent-surface.json'), JSON.stringify(surface));
  const reference = JSON.parse(await readFile(join(base, 'default-seed/package.json'), 'utf8'));
  await writeFile(join(root, 'package.json'), JSON.stringify({ type: 'module', engines: reference.engines, packageManager: reference.packageManager }));
@@ -118,7 +119,7 @@ export const commandAdapter = declare(localInstaller({}), { verify: [process.exe
  await writeFile(join(root, 'rer-setup.json'), JSON.stringify({ schema: 1, title: 'Fixture installation', fields: [
   { name: 'OWNER_EMAIL', kind: 'email', required: true }, { name: 'SETUP_TOKEN', kind: 'secret', required: true, generate: 'hex' },
  ], steps: ['native', 'native-reviewer'].includes(mode) ? [{ type: 'extension', id: 'lamp-native-owner' }] : [{ type: 'owner-claim', mode, emailField: 'OWNER_EMAIL', tokenField: 'SETUP_TOKEN', path: mode === 'signed' ? '/auth/owner-claim' : '/auth/bootstrap' }] }));
- await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, vars: { OWNER_MODE: mode, ...(sponsors ? { SPONSOR_PROOF: true } : {}), ...(security ? { SECURITY_PROOF: true } : {}), ...(phaseFixtures ? { PHASE_FIXTURES: true } : {}) }, secrets: [{ binding: 'SESSION_SECRET' }, { binding: 'MAIL_API_KEY' }] }));
+ await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, vars: { OWNER_MODE: mode, ...(capabilities === undefined ? {} : { AGENT_CAPABILITIES: JSON.stringify(capabilities) }), ...(sponsors ? { SPONSOR_PROOF: true } : {}), ...(security ? { SECURITY_PROOF: true } : {}), ...(phaseFixtures ? { PHASE_FIXTURES: true } : {}) }, secrets: [{ binding: 'SESSION_SECRET' }, { binding: 'MAIL_API_KEY' }] }));
  await writeFile(join(root, 'dist/server/wrangler.json'), JSON.stringify({ main: 'index.js', compatibility_date: '2026-09-01', d1_databases: [{ binding: 'DB', database_name: 'fixture', migrations_dir: 'migrations' }] }));
  const schemas = [...await Promise.all(productionSchemas.map(file => readFile(join(base, file), 'utf8'))), nativeSchema, ...(phaseFixtures ? [phaseFixtureSchema] : [])];
  for (const [i, sql] of schemas.entries()) await writeFile(join(root, `dist/server/migrations/${String(i + 1).padStart(4, '0')}.sql`), sql);

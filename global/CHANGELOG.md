@@ -1,8 +1,16 @@
 # Changelog
 
-## 0.2.87
+## 0.2.88
 
 - Re-execute completed read-only approval replays under current native grants, so aggregate reads cannot disclose rows retained before client revocation. Native empty results and refusals replace cached payloads; unchanged visibility retains the result and approval receipt. Mutation replays still execute their effect once.
+
+- Agent doors can declare the mandatory tools/policy/pause/audit/idempotency core plus events, resources, prompts and subscriptions. Discovery and conformance report declared, refused and unscoped families; omitted supported capabilities are hidden and return typed refusals. Core authorization and security checks remain mandatory, and absent declarations retain the legacy full requirements. Other lifecycle families remain explicitly unscoped with their existing checks intact.
+
+- `rer refresh-base` now gives complete recovery steps when refreshed import-kit
+
+- Refuse resource subscriptions when resources are undeclared, retaining native visibility readers for declared event filtering. Preserve unknown journey tools for validation and return typed tool_not_found errors for unknown calls. Mandatory core authorization, policy, pause, audit and idempotency remain unconditional.
+
+## 0.2.87
 
 - Connect declared, contained agent verifier drivers to named native Worker RPC entrypoints, and run built queue consumers alongside producers. Public-door fixtures prove real queued effects, execution-time consent revocation and retained audits without a served test route.
 
