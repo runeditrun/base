@@ -2,6 +2,8 @@
 
 ## 0.2.87
 
+- Re-execute completed read-only approval replays under current native grants, so aggregate reads cannot disclose rows retained before client revocation. Native empty results and refusals replace cached payloads; unchanged visibility retains the result and approval receipt. Mutation replays still execute their effect once.
+
 - Connect declared, contained agent verifier drivers to named native Worker RPC entrypoints, and run built queue consumers alongside producers. Public-door fixtures prove real queued effects, execution-time consent revocation and retained audits without a served test route.
 
 - Allow declared RPC provider verifiers in isolated Workers without application bindings or network access. Native signed delivery and approval still run; unsigned receipts and escaping modules fail.
