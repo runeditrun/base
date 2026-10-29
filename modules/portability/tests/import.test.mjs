@@ -307,7 +307,8 @@ test('pre-schemaObjects v2 owner backup restores through file and HTTP doors onl
   const statements=[manifest.tables.find(t=>t.name==='issues').sql,manifest.tables.find(t=>t.name==='events').sql,
     'CREATE INDEX events_issue ON events(issue_id)',
     'CREATE VIEW issue_events AS SELECT issues.title,events.body FROM issues JOIN events ON events.issue_id=issues.id',
-    "CREATE TRIGGER event_guard BEFORE INSERT ON events WHEN length(NEW.body)=0 BEGIN SELECT RAISE(ABORT,'empty event'); END"];
+    "CREATE TRIGGER event_guard BEFORE INSERT ON events WHEN length(NEW.body)=0 BEGIN SELECT RAISE(ABORT,'empty event'); END",
+    'CREATE TABLE oa_sessions(id TEXT PRIMARY KEY)', 'CREATE INDEX oa_session_id ON oa_sessions(id)'];
   const plan=[{name:'0001_issues.sql',statements}];
   const target=async({later=[],acceptedSchemas}={})=>{
     const migrations=[...plan,...later.map((sql,i)=>({name:`000${i+2}_later.sql`,statements:[sql]}))];
@@ -327,22 +328,37 @@ test('pre-schemaObjects v2 owner backup restores through file and HTTP doors onl
   assert.equal(receipt.schemaUnverified,undefined);await check(f);
   t.diagnostic('legacy file restore: issues 0 -> 1, events 0 -> 1; UTF-8 and 0001FF0A80 bytes match; no acknowledgment');
   await t.test('recorded legacy schema precedes additive migrations',async()=>{
-  const additive=await target({later:["ALTER TABLE issues ADD COLUMN status TEXT NOT NULL DEFAULT 'open'",
-    'CREATE TABLE oa_sessions(id TEXT PRIMARY KEY)', 'CREATE INDEX oa_session_id ON oa_sessions(id)']});
-  const bridged=await importArchive(additive.service,path,[]);
-  assert.equal(bridged.schemaUnverified,undefined);
-  assert.deepEqual((await additive.db.prepare('SELECT id,title,status FROM issues').all()).results,[{id:'issue-1',title:'Café — retained',status:'open'}]);
-  assert.equal((await additive.db.prepare('SELECT hex(body) AS bytes FROM events').first()).bytes,'0001FF0A80');
-  assert.ok(bridged.bridged.migrations.length);
-  t.diagnostic('legacy additive file restore: issues 0 -> 1 with default status; recorded excluded-table index accounted for');
+    const additive=await target({later:["ALTER TABLE issues ADD COLUMN status TEXT NOT NULL DEFAULT 'open'",
+      'CREATE TABLE oa_links(id TEXT PRIMARY KEY)', 'CREATE INDEX oa_link_id ON oa_links(id)']});
+    const bridged=await importArchive(additive.service,path,[]);
+    assert.equal(bridged.schemaUnverified,undefined);
+    assert.deepEqual((await additive.db.prepare('SELECT id,title,status FROM issues').all()).results,[{id:'issue-1',title:'Café — retained',status:'open'}]);
+    assert.equal((await additive.db.prepare('SELECT hex(body) AS bytes FROM events').first()).bytes,'0001FF0A80');
+    assert.ok(bridged.bridged.migrations.length);
+    t.diagnostic('legacy additive file restore: issues 0 -> 1 with default status; recorded excluded-table index accounted for');
   });
   await t.test('recorded legacy schema has a declared row upgrade',async()=>{
-  const upgraded=await target({later:['ALTER TABLE issues RENAME COLUMN title TO summary'],acceptedSchemas:{[manifest.schema]:{
-    upgradeRow(table,row){if(table==='issues'){row.summary=row.title;delete row.title;}return row;},
-  }}});
-  await importArchive(upgraded.service,path,[]);
-  assert.deepEqual((await upgraded.db.prepare('SELECT * FROM issues').all()).results,[{id:'issue-1',summary:'Café — retained'}]);
-  t.diagnostic('legacy verified prior-schema row upgrade: title -> summary; issues 0 -> 1');
+    const upgraded=await target({later:['ALTER TABLE issues RENAME COLUMN title TO summary'],acceptedSchemas:{[manifest.schema]:{
+      upgradeRow(table,row){if(table==='issues'){row.summary=row.title;delete row.title;}return row;},
+    }}});
+    await importArchive(upgraded.service,path,[]);
+    assert.deepEqual((await upgraded.db.prepare('SELECT * FROM issues').all()).results,[{id:'issue-1',summary:'Café — retained'}]);
+    t.diagnostic('legacy verified prior-schema row upgrade: title -> summary; issues 0 -> 1');
+  });
+  await t.test('older object inventories account for excluded-table objects by replay',async()=>{
+    const {catalogue,policy:normalizePolicy}=await import('../catalogue.mjs');
+    const historical=structuredClone(records);
+    historical[0].schemaObjects=(await catalogue(f.db,normalizePolicy(policy))).schemaObjects.filter(object=>object.table!=='oa_sessions');
+    const inventory=join(directory,'older-inventory.rer');
+    await writeFile(inventory,(await remakeArchive(historical)).map(JSON.stringify).join('\n')+'\n');
+    const destination=await target({later:["ALTER TABLE issues ADD COLUMN status TEXT NOT NULL DEFAULT 'open'"]});
+    await importArchive(destination.service,inventory,[]);
+    assert.equal((await destination.db.prepare('SELECT title,status FROM issues').first()).status,'open');
+    const unknown=await target();await unknown.db.prepare('CREATE INDEX unrecorded_session_id ON oa_sessions(id)').run();
+    await assert.rejects(importArchive(unknown.service,inventory,[]),e=>e.code==='schema_mismatch');
+    assert.equal((await unknown.db.prepare('SELECT count(*) AS n FROM rer_portability_jobs').first()).n,0);
+    assert.equal((await unknown.db.prepare('SELECT count(*) AS n FROM issues').first()).n,0);
+    t.diagnostic('older object inventory: replay accounts for excluded index; unrecorded excluded index refuses before staging');
   });
   // Complete, archiveHash-bound mutations reach verification, not checksums.
   for(const [name,change] of [
@@ -364,7 +380,7 @@ test('pre-schemaObjects v2 owner backup restores through file and HTTP doors onl
   }
   const drifted=await target();await drifted.db.prepare('DROP INDEX events_issue').run();
   await assert.rejects(importArchive(drifted.service,path,[]),e=>e.code==='schema_mismatch:legacy_schema');
-  const unaccounted=await target({later:['CREATE TABLE oa_sessions(id TEXT PRIMARY KEY)']});
+  const unaccounted=await target();
   await unaccounted.db.prepare('CREATE INDEX unknown_session_id ON oa_sessions(id)').run();
   await assert.rejects(importArchive(unaccounted.service,path,[]),e=>e.code==='schema_mismatch:legacy_schema');
   assert.equal((await unaccounted.db.prepare('SELECT count(*) AS n FROM rer_portability_jobs').first()).n,0);
