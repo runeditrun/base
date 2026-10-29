@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Resource adapters now receive consent and operation identity; a resource that changes between check and read refuses `resource_changed`.
+
 - For the 0.2.90 seed refresh, relock run-uptime (workflow lines 98, 256) and run-happytohelp (47, 170): drop `github.run_attempt` from shared build artifact names, use `<seed>-verify-build-<sha>-<run_id>` for both upload and download, and add `overwrite: true` to the upload. Verify's workflow guard rejects attempt-qualified downloads and their shared uploads; apply the same patch to any seed with this pattern on its next refresh. See `export/VERIFY-WORKFLOW.md`.
 
 ## 0.2.90

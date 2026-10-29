@@ -210,7 +210,7 @@ edition with a different domain. Use `door.invoke` for embedded agents and
 
 Expose resources through explicit readers and treat imported or external
 content as untrusted. Every resource declares non-empty catalogue `classes`
-and `classify(record,ctx)`, based on the record itself. Resource readers and classifiers receive `{person, agent, clientId, scopes, db}`.
+and `classify(record,ctx)`, based on the record itself. Resource adapters receive consent and operation identity (`consent`, `operationId`, `idempotencyKey`, and optional `continuationItemId`) alongside `{person, agent, clientId, scopes, db}`; a resource that changes between check and read refuses `resource_changed`.
 Use this authenticated authority for service and client fences, including events
 and subscriptions; a sponsor's administrator role never bypasses a registered
 resource's reader. `ToolContext` carries the same scopes and client id.
