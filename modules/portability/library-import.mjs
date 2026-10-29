@@ -3,7 +3,7 @@ import { archivedLedgerTables, archivedHistory, ledgerReader, matchMigrationLedg
 import { appliedMigrations } from './bridge.mjs';
 import { canonicalJson } from './hash.mjs';
 import { insist, statement } from './storage.mjs';
-import { libraryMigrations } from './library-history.mjs';
+import { libraryMigrations } from './migration-history.mjs';
 
 // A ledger carried in parts cannot authorize a durable job at create time.
 // Collect this legacy upload in the service instance, authenticate it in full,

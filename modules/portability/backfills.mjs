@@ -165,6 +165,7 @@ function restoreCommitStatements(applied,split,later) {
     if(!['create','drop'].includes(words[0]) || words[1]!=='trigger')continue;
     const at=words[2]==='if'?(words[0]==='create'?5:4):2,name=folded(identifier(list[at]));
     if(words[0]==='drop'){live.delete(name);continue;}
+    if(words[2]==='if' && live.has(name))continue;
     live.set(name,{migration,sql,list,at});
   }
   const admitted=new Set();
