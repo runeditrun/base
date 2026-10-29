@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reuse the original admission key when resolving agent-door injection arguments, so once-only native preparation is replayed without a second effect.
+
 - Let seeds declare an isolated, test-only history fixture before named agent-door journey steps. Only allowlisted INSERT statements reach fresh disposable databases; protected tables and target triggers are refused, production imports fail closed, and the normal state reader and clock remain unchanged.
 
 ## 0.2.93
