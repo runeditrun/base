@@ -882,7 +882,7 @@ and resource calls still receive audit rows. Internal event collection and
 native resource visibility adapters may remain in place for audit and event
 visibility; they do not expose an undeclared public resource door.
 
-Discovery metadata `com.runeditrun/capabilities` and the conformance report
+Discovery metadata `_meta["com.runeditrun/capabilities"]` and the conformance report
 contain `mode`, `declared`, `refused` and `unscoped`. A declared optional
 capability runs its full applicable checks; it is not credited merely for being
 listed. Missing declared resources or prompts reject runtime creation; missing
