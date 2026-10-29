@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { classIds, subset, errorCode, APPROVAL } from './protocol.mjs';
-import { grantSet } from './narrowing.mjs';
+import { grantSet, narrowingTargets } from './narrowing.mjs';
 import { schemaErrors } from './schema.mjs';
 import { checkTarget } from './target.mjs';
+import { nativeStepHook } from './step-hooks.mjs';
 
 export function checkClasses(c, step, answer, phase) {
  const actual = answer.decision?.classes;
@@ -38,6 +39,7 @@ export async function runJourney(c, phase, { held = false, injections = false, r
  try {
   for (const step of c.surface.journey) {
    const args = c.args(step, outputs), needsApproval = held && step.expect.some(item => item.class !== 'standard');
+   await nativeStepHook(c, 'beforeStep', phase, step, args, outputs);
    const narrowing = !held && c.surface.narrowings?.find(fixture => fixture.step === step.id);
    const grantsBefore = narrowing ? await grantSet(c, narrowing.witness, outputs) : null;
    const before = needsApproval ? await c.witness() : undefined;
@@ -76,7 +78,8 @@ export async function runJourney(c, phase, { held = false, injections = false, r
    checkOutput(c, step, answer, phase);
    await checkResources(c, step, answer, phase, held);
    if (narrowing) {
-    c.add(`BASE-AGENT-005.narrowing.${step.tool}.target`, isDeepStrictEqual(c.resolve(narrowing.witness.args, outputs)[declared.narrowing.target], args[declared.narrowing.target]), `${step.tool} must witness the same targeted subject.`);
+    const witnessArgs = c.resolve(narrowing.witness.args, outputs);
+    c.add(`BASE-AGENT-005.narrowing.${step.tool}.target`, narrowingTargets(declared).every(target => isDeepStrictEqual(witnessArgs[target], args[target])), `${step.tool} must witness every identifier of the same targeted subject.`);
     const after = await grantSet(c, narrowing.witness, outputs);
     c.add(`BASE-AGENT-005.narrowing.${step.tool}.subset`, after.length < grantsBefore.length && after.every(grant => grantsBefore.includes(grant)), `${step.tool} must strictly reduce the targeted subject's native grant set.`);
     const beforeInjection = await c.witness();
@@ -99,6 +102,7 @@ export async function runJourney(c, phase, { held = false, injections = false, r
     c.add(`BASE-AGENT-012.1.${phase}`, !repeated.result?.isError && isDeepStrictEqual(answer.result.structuredContent, repeated.result?.structuredContent) && isDeepStrictEqual(beforeReplay, afterReplay), `${step.tool} replay changed native state or returned a different result.`);
 
    }
+   await nativeStepHook(c, 'afterStep', phase, step, args, outputs, answer.result.structuredContent);
   }
  } finally {
   if (!held) for (const step of c.surface.escalations ?? []) await c.phase(`BASE-AGENT-005.escalation.${step.id}`, async () => {

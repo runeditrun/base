@@ -60,7 +60,7 @@ export interface ToolDefinition {
   authority?: 'none' | ((args: Record<string, unknown>, ctx: ToolContext) => Promise<{ subject: string; widens: boolean } | null>)
   effect?: { kind: 'record'; justification: string }
   proof?: 'native'; proofKind?: string
-  widens?: false; narrowing?: { effect: 'revoke' | 'narrow'; target: string }
+  widens?: false; narrowing?: { effect: 'revoke' | 'narrow'; target: string | string[] }
   untrusted?: boolean
 }
 export type ResourceContext = Principal & { db: D1Database }
