@@ -155,6 +155,22 @@ strict subset after the action and refuses a smuggled grant-adding argument
 without an effect. Output point names identify every narrowing tool. No tool
 is exempted from execution, policy, audit, schema or journey coverage.
 
+## Keep worker tools behind invoke
+
+Set `exposure: 'invoke'` on a tool definition to admit it only through this
+seed's `door.invoke`. Omitting the field preserves MCP discovery and calls;
+other values are rejected. Read-only tools may use the flag too. Invoke-only
+tools are hidden from MCP tool listings, tool-list subscription changes and OAuth
+`scopes_supported` (a scope shared with an exposed tool remains advertised).
+MCP calls receive the same `tool_not_found` response and audit treatment as an
+unknown name, without running the seed callback. Keep these tools out of the
+public agent-surface declaration.
+
+`invoke` still applies full admission: current person, agent and consent,
+scopes, Pause, policy, native continuation binding, idempotency and embedded
+audit. Their classes still contribute to policy questions and usage; saved
+approval and review flows can still resolve them.
+
 ## Hand off native human proof
 
 A native authentication requirement stays independent of company approval.

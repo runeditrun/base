@@ -30,7 +30,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
   try {
     const optional = name === `${rt.options.seed}.events.list` ? 'events' : name === 'resources/read' ? 'resources' : null
     if (optional && !offers(rt.options.capabilities, optional)) return refuse('capability_not_declared', { capability: optional })
-    const tool = resourceTool ?? rt.tools.find(tool => tool.name === name)
+    const tool = resourceTool ?? rt.tools.find(tool => tool.name === name && (door !== 'mcp' || tool.exposure !== 'invoke'))
     if (!tool) { status = 400; return refuse('tool_not_found') }
     if (tool.authority === 'none') row.authority = 'none'
     const raw = input && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : null
