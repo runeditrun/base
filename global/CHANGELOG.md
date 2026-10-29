@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Publication email hygiene recognizes parsed dependency package contact metadata and registry deprecation notices in pnpm, npm and Yarn lockfiles. Comments, custom keys, repository author fields, source files and secret checks retain their findings; no address allowlist is needed. This scanner source update can be adopted independently of a launcher package release.
+
 ## 0.2.87
 
 - Connect declared, contained agent verifier drivers to named native Worker RPC entrypoints, and run built queue consumers alongside producers. Public-door fixtures prove real queued effects, execution-time consent revocation and retained audits without a served test route.

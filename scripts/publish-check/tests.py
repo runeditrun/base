@@ -15,6 +15,7 @@ from test_repo import ROOT, RepositoryFixture, resolving, generic_credential
 from history_scan import scan
 from test_partial_clone import PartialCloneTests
 from test_copy_digests import CopyDigestTests
+from test_lockfile_metadata import LockfileMetadataTests
 
 
 class HistoryTests(RepositoryFixture, unittest.TestCase):
