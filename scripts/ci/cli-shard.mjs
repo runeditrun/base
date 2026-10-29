@@ -4,8 +4,45 @@ import { readdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 
 const journeys = new Set(['reference-journey.test.mjs']);
-const isolated = ['cli/dependency-setup.test.mjs', 'cli/package-mode.test.mjs'];
 export const CLI_SHARDS = 5;
+
+// Coarse scheduling costs for the long suites, in seconds. These are not
+// deadlines: every discovered file still runs, including new, unmeasured files.
+// Alphabetical modulo sharding moved almost the entire suite when a file was
+// added, and left two jobs mostly idle. Spread the work across all five jobs.
+const costs = {
+  'export-import-recovery': 720, 'platform-ledger-leave': 620,
+  'managed-flows': 500, 'additive-restore': 490, 'dependency-setup': 465,
+  'generated-portability': 465, 'agent-door-bridges': 255,
+  'legacy-ledger-portability': 235, 'server-registry': 220, 'legacy-recovery': 210,
+  'release-github': 150, 'schema-portability': 145, 'agent-door-hooks': 135,
+  'site-flows': 125, 'dev-data-portability': 125, 'business-connect': 120,
+  'portability-policy': 115, 'authoring': 105, 'archive-integrity': 105,
+  'demo-isolation': 95, 'agent-door-fixtures': 80, 'agent-door': 80,
+  'release-workflow': 80, 'package-mode': 80, 'dev-migrations': 75,
+  'import-safety': 75, 'deploy-owner': 70, 'deploy-hooks': 60,
+  'ai-live': 55, 'deploy-name': 55, 'production-auth': 55,
+  'transfer-prepare': 50, 'hosted-portability': 45, 'local-preflight': 45,
+  'queue-wait': 45, 'agent-door-subset': 40, 'cli': 40, 'contract': 40,
+  'dev-exclusion': 40, 'agent-verification': 35,
+};
+const cost = file => costs[file.replace(/^cli\//, '').replace(/\.test\.mjs$/, '')] ?? 15;
+
+export function partitionCLIFiles(files) {
+  assert.equal(files.length, new Set(files).size, 'CLI CI must not repeat a test file');
+  const groups = Array.from({ length: CLI_SHARDS }, () => []);
+  const loads = groups.map(() => 0);
+  // Assign long files first so a new short suite cannot rotate their shards.
+  // Node retains its normal file ordering and two-file concurrency at runtime.
+  for (const file of [...files].sort((a, b) => cost(b) - cost(a) || a.localeCompare(b))) {
+    const index = loads.indexOf(Math.min(...loads));
+    groups[index].push(file);
+    loads[index] += cost(file);
+  }
+  assert.ok(groups.every(group => group.length), 'Each CLI shard must have test files');
+  assert.deepEqual(groups.flat().sort(), [...files].sort(), 'CLI CI must cover every push file exactly once');
+  return Object.fromEntries(groups.map((files, index) => [String(index + 1), files]));
+}
 
 export async function cliTestFiles({ journey = false } = {}) {
   const files = (await readdir('cli')).filter(name => name.endsWith('.test.mjs')).sort();
@@ -14,13 +51,7 @@ export async function cliTestFiles({ journey = false } = {}) {
 }
 
 export async function cliShardPlan() {
-  const files = await cliTestFiles();
-  for (const file of isolated) assert.ok(files.includes(file), `Missing CLI suite: ${file}`);
-  const regular = files.filter(file => !isolated.includes(file));
-  const groups = Object.fromEntries([1, 2, 3].map(shard => [String(shard), regular.filter((_, index) => index % 3 === shard - 1)]));
-  isolated.forEach((file, index) => { groups[String(index + 4)] = [file]; });
-  assert.deepEqual(Object.values(groups).flat().sort(), files, 'CLI CI must cover every push file exactly once');
-  return groups;
+  return partitionCLIFiles(await cliTestFiles());
 }
 
 export async function verifyCLIShard(shard, { journey = false } = {}) {
