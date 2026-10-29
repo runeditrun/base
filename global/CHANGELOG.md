@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- A managed server keeps running when a timed-out status client disconnects before its reply; the control socket contains the resulting write error.
+
+- `rer refresh-base` carries import-reached transitive siblings when two disjoint recorded directory copies establish the same shared parent placement, resolving refusals such as owner-claim's dependency on `modules/dependencies/protocol.mjs` without a product-specific copy list. Singleton selections witness their own directory siblings but cannot invent a broader competing parent namespace. More-specific mappings and seed ownership protections remain; genuinely unmapped or ambiguous dependencies still refuse before writes.
+
+- `rer refresh-base` places newly delivered module imports against the most specific recorded vendor namespace, including files covered by a directory copy. Relocated files retain their Base baseline as acknowledged seed-owned adaptations; unmapped and ambiguous dependencies still refuse before writes. See `edition-authoring/ADOPTING.md`.
+
 ## 0.2.86
 
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.
