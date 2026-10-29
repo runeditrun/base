@@ -106,7 +106,10 @@ export async function sign(store: Store, ctx: ParticipantContext, input: ReviewR
       await store.batch([...store.assert(fence), sql('INSERT OR IGNORE INTO as_action_intents(command_id,request_id,payload_digest,action) VALUES(?,?,?,?)', commandId, request.id, payloadDigest, boundedJson(action)),
         ...store.assert(sql('(SELECT COUNT(*) FROM as_action_intents WHERE request_id=?)<=?', request.id, limits.events))]);
       const intent = await store.first<{ payload_digest: string; action: string }>(sql('SELECT payload_digest,action FROM as_action_intents WHERE command_id=?', commandId));
-      requireThat(intent && intent.payload_digest === payloadDigest, 'replay_mismatch');
+      // An identical concurrent command can commit and consume the intent
+      // before this read. Recover it through the guarded conflict path below.
+      requireThat(intent, 'conflict');
+      requireThat(intent.payload_digest === payloadDigest, 'replay_mismatch');
       action = JSON.parse(intent.action) as ActionRecord;
       let artifactWrites: Sql[] = [];
       if (action.act.type === 'drawn-signature') {
