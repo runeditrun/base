@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.90-dev.g4f4019ba",
+  "cliVersion": "0.2.90-dev.g7d6f42ca",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1959,7 +1959,7 @@
     },
     "modules/agent-door/conformance/crypto.mjs": {
       "source": "modules/agent-door/conformance/crypto.mjs",
-      "sha256": "4a073f879668dd3ee3e31bb74d8cbdf48c5fdd7e7a7303b7bab2b998258d341e"
+      "sha256": "fea7829f3d31512f99649a657ecd641b554c158abd6caf99be1d4e9d357225ad"
     },
     "modules/agent-door/conformance/discovery.mjs": {
       "source": "modules/agent-door/conformance/discovery.mjs",
@@ -2007,11 +2007,11 @@
     },
     "modules/agent-door/conformance/policy-phases.mjs": {
       "source": "modules/agent-door/conformance/policy-phases.mjs",
-      "sha256": "3669235039bf900138d11d65e1a209ff1052fc9bbcf49efae71cb77c846dc9c2"
+      "sha256": "8b18db81d0c8918033f7f0b7c3796edd22e45f77c8cf86fa375118b82af5503b"
     },
     "modules/agent-door/conformance/protocol.mjs": {
       "source": "modules/agent-door/conformance/protocol.mjs",
-      "sha256": "8cae8196d4666e06e382ab4d1ef7b9118df504375804416af638435b785b67b8"
+      "sha256": "2c16956427e1ee0f748b2715f6cb581d9443183345e4f0e34894eebae4c81e06"
     },
     "modules/agent-door/conformance/replay.mjs": {
       "source": "modules/agent-door/conformance/replay.mjs",
@@ -2027,7 +2027,7 @@
     },
     "modules/agent-door/conformance/sponsors.mjs": {
       "source": "modules/agent-door/conformance/sponsors.mjs",
-      "sha256": "927c2c1adc909a553625e94841b7fe123da8dbc3bc865d3e1660df1c213b6e0b"
+      "sha256": "2707859ec07c1666ce0ba961b48ad00db9145084aa5576174eba9e6d973fc08e"
     },
     "modules/agent-door/conformance/step-hooks.mjs": {
       "source": "modules/agent-door/conformance/step-hooks.mjs",
