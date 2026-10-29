@@ -8,6 +8,19 @@ unchanged visibility retains the result and approval receipt. Mutation replay
 keeps its recorded outcome and once-only effect. See
 [`modules/agent-door/ADOPTING.md`](modules/agent-door/ADOPTING.md#current-admission-on-replay).
 
+Legacy v2 installation backups can restore across later additive migrations
+without acknowledging unverified schema objects. Import first resolves the
+backup's recorded migrations against the destination's applied files and
+reconstructs its earlier complete schema, then checks the existing additive
+bridge or the seed's declared `acceptedSchemas` row upgrade. Keep the original
+backup unchanged; unknown history, schema drift and digest mismatches still
+refuse before staging.
+
+V2 backups whose object inventory omitted objects on excluded tables use the
+same replay proof of that historical inventory. The full destination replay
+must account for those objects; an unexplained excluded-table index or trigger
+still refuses. See [older v2 backups](modules/portability/README.md#older-version-2-backups-and-acknowledged-recovery).
+
 Use an installed current RER package to refresh a seed whose copied authoring
 CLI is still from 0.2.82. Pin the package in the seed first, then invoke its
 public command rather than `scripts/edition-authoring/cli.mjs`:
