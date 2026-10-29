@@ -1,6 +1,7 @@
 import { createErasure, defineErasure, toD1Sql } from '../../../../../modules/erasure/index.mjs'
 import { createPortability } from '../../../../../modules/portability/index.mjs'
 import { portabilityPolicy } from '../../platform/portability-policy.mjs'
+import { erasureFenceStatements } from '../../../../../modules/agent-door/index.ts'
 
 /** The reference declaration a seed copies: every table holding the person, the
  * file bytes, the audit references, and the seed's own extra statements. */
@@ -20,7 +21,10 @@ export const personErasure = defineErasure({
   // Historical development mail is addressed to the person.
   async statements({ db, subject }) {
     const person = await db.prepare('SELECT email FROM people WHERE id=?').bind(subject.id).first<{ email: string }>()
-    return person ? [db.prepare("DELETE FROM rer_mail_development_outbox WHERE EXISTS(SELECT 1 FROM json_each(json_extract(message,'$.to')) WHERE lower(value)=lower(?))").bind(person.email)] : []
+    return [
+      ...erasureFenceStatements(db, { uris: [`base://person/${encodeURIComponent(subject.id)}`] }),
+      ...person ? [db.prepare("DELETE FROM rer_mail_development_outbox WHERE EXISTS(SELECT 1 FROM json_each(json_extract(message,'$.to')) WHERE lower(value)=lower(?))").bind(person.email)] : [],
+    ]
   },
 })
 

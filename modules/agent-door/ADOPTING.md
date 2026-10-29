@@ -862,7 +862,42 @@ that person's authority.
 The door retains idempotent outcomes, pending approval arguments, review
 summaries, trace text, audit and events. Native client erasure must account for
 these stores; a native record deletion alone cannot remove retained content or
-prevent replay. No generic client-scoped erasure adapter is supplied yet.
+prevent replay. Add `erasureFenceStatements(db, { targets, uris })` from the
+agent-door entry point to the erasure declaration's `statements` or
+`beforeStatements`, in the same D1 batch as the native deletion. For example:
+
+```ts
+statements({ db, subject }) {
+  return erasureFenceStatements(db, {
+    uris: [`base://person/${encodeURIComponent(subject.id)}`],
+    // If the tool declares a native target, also supply its audit-safe mapping:
+    // targets: [{ kind: 'person', id: subject.id }],
+  })
+}
+```
+
+Supply exact result resource URIs and the seed's recorded native targets; an
+argument or a guessed URI is not a native identity mapping. The fence matches
+every agent/key with that recorded audit target or result resource URI,
+including completed approvals. It replaces `agent_door_calls.outcome`,
+`agent_door_approvals.result` and the matched approval's `saved.result` with a
+`target_erased` refusal retaining only attribution IDs. Matched approval
+arguments and summary are cleared and its state becomes refused. Replay checks
+the retained refusal after admission and before native target/classification;
+it returns no native result or resource link and audits `refused` with
+`replay_of`. The current MCP wire still renders the typed refusal code as a text
+item. Before erasure, ordinary mutation replay retains its original result;
+read-only approval replay continues to execute the native read under live grants.
+
+This seam adds no table or retained subject identity. It does not scrub review
+undo/summary custody (`reviews.ts:8`), approval principal/classes/evidence
+(`approvals.ts:9`), audit row/evidence/trace (`audit.ts:10`), or retained event
+data (`events.ts:5`). Event visibility re-reads registered native resources,
+but that does not erase the stored events. Those are separate custody follow-ups.
+The fence also does not stop already executing work from capturing a later
+outcome (`execution.ts:43`, `approval-execution.ts:73`); the seed must coordinate
+concurrent execution and erasure. No generic client-scoped erasure adapter is
+supplied for those stores or races.
 Keep a native custody exception closed when these stores contain client data.
 An adoption must establish the native mapping from retained artifacts to
 clients, the permitted redaction of retained decision evidence, and the atomic

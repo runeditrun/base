@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- A seed's erasure can now fence retained replay outcomes; such a replay refuses `target_erased`.
+
 ## 0.2.89
 
 - Publication email hygiene recognizes parsed dependency package contact metadata and registry deprecation notices in pnpm, npm and Yarn lockfiles. Comments, custom keys, repository author fields, source files and secret checks retain their findings; no address allowlist is needed. This scanner source update can be adopted independently of a launcher package release.
