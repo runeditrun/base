@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.91-dev.g88951629",
+  "cliVersion": "0.2.91-dev.gee8b14c1",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,11 +391,23 @@
     },
     "cli/agent-door.mjs": {
       "source": "cli/agent-door.mjs",
-      "sha256": "1dc5b77b9f6db1a91106291bebc01e3dd86672b0650aaf17ea461b86947791e3"
+      "sha256": "2a0063066fc25998deef9a401b5d94f48f3cb0067d3f435a5aa3accff766ba59"
     },
     "cli/agent-fixtures.mjs": {
       "source": "cli/agent-fixtures.mjs",
       "sha256": "1f7b4c8ac09081595fd793222fc8a5b19e91e36a3b298602ec9da97dda5554a5"
+    },
+    "cli/agent-history-database.mjs": {
+      "source": "cli/agent-history-database.mjs",
+      "sha256": "954a75c2a877e20bb1bdcf3ac9ed3814b7955cd7a9ba991d3d6c994881c4dff1"
+    },
+    "cli/agent-history-isolation.mjs": {
+      "source": "cli/agent-history-isolation.mjs",
+      "sha256": "364cb4b9524b31b54c02224ff37fda62a94611a8ad1c398c92492c8d209d32fb"
+    },
+    "cli/agent-history.mjs": {
+      "source": "cli/agent-history.mjs",
+      "sha256": "a949337f17925bf8872599b09ae8cad41e42495e27f0c8493a938dafdfaa2455"
     },
     "cli/agent-initializer.mjs": {
       "source": "cli/agent-initializer.mjs",
@@ -943,7 +955,7 @@
     },
     "cli/hosted-output.mjs": {
       "source": "cli/hosted-output.mjs",
-      "sha256": "e142523daaaabb76a46325fff06091199817d7992388a9336ac1ef68f761b1d1"
+      "sha256": "2b81dd769049a4576ecd3bf25a867074bf04bc815717c2cc784c622a83ad90c4"
     },
     "cli/human-error.mjs": {
       "source": "cli/human-error.mjs",
@@ -999,7 +1011,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "3b1b51839a1fca839dcea6c9b0d907f701364291db8c027af0e3fc9770c54144"
+      "sha256": "a03aa5fed82bc5153b8b2183f6ed991d49da9492e8c6dab587c7f7f29418f611"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",

@@ -630,12 +630,64 @@ Database refusals fail that phase with
 `agent_fixtures_database_unavailable`, without logging values, records or SQL.
 The reader remains SELECT-only, including for every `agent_door_*` table.
 
-Backdated writes are pending: `cli/hosted-output.mjs` currently rejects all
-non-SELECT statements. Enabling native history requires a separate, explicit
-conformance-only write capability at that boundary, with protection against
-direct and trigger-mediated writes to agent-door tables. Native HTTP calls must
-retain their genuine protocol receipts. A history hook must not change the
-runtime clock.
+A seed that needs pre-service history may separately declare a test-only
+`verification.history` module. It runs just before the named mandatory journey
+steps, under both `autonomous` and `held`, before native hooks and effect witnesses:
+
+```json
+{"verification":{"history":{
+  "module":"tests/history.mjs",
+  "steps":["learning"],
+  "statements":{"observation":{
+    "binding":"DB",
+    "sql":"INSERT INTO native_history(id,observed_at,value) VALUES (?,?,?)"
+  }}
+}}}
+```
+
+The Worker-compatible module default-exports `{async fetch(request) {...}}`.
+Its JSON request contains detached `{phase,step,args,outputs,now}`; it receives
+no cookies, credentials, database client or application bindings. For example:
+
+```js
+export default { async fetch(request) {
+ const { phase, now } = await request.json();
+ return Response.json([{statement:'observation',
+  values:[phase, now - 7 * 86_400_000, 12]}]);
+} };
+```
+
+Use the seed's native calculation code to construct genuine dated source rows,
+including the native forecast's pre-service timestamps, inputs and digest.
+Do not invent protocol receipts or successful proposal results. Declare steps
+before their history-dependent reads so the normal native digest, proposal,
+authority, policy and audit paths still run. The verifier never changes time.
+The seed's regular phase/step hooks may use the native person door to decide a
+previous round's open proposal; history tooling has no HTTP/person authority.
+
+Only `checkAgentDoor` (used by `rer verify` and focused conformance) starts this
+module. Like the network edge it runs in isolated workerd: contained `.mjs`/`.js`
+relative helpers, no Node imports, filesystem, application bindings or external
+network. The entry must live under `tests/`. Production commands (`build`, `dev`,
+`preview`, `deploy`) and conformance refuse runtime imports of its test modules
+from production source, including literal re-exports, TS path aliases and symlinks.
+Keep computed imports and custom loaders out of the production dependency graph.
+Shared native calculation helpers may still be used by production.
+
+Output is an array of `{statement,values}`, at most 1,000 rows / 2 MiB per call.
+Statements are named in the declaration, never supplied by module output. The
+only allowed SQL is `INSERT INTO table(columns) VALUES (...)`, with positional
+`?` parameters or fixed simple string/integer literals. No UPDATE, DELETE,
+upsert, query, expression, schema qualifier, comment or DDL is accepted. The
+verifier applies them only to declared bindings in its fresh, nonpersistent
+Miniflare database; no provider or existing installation database is opened.
+`agent_door_*`, `oa_*` and SQLite tables, views, virtual tables and every table
+with a trigger are refused, including triggers that could indirectly forge
+agent-door evidence. Rows are batched per database. Keep declarations narrow to
+native history, never account, session, policy, approval, audit or receipt state.
+Invalid declarations, output and writes fail with `agent_history_invalid` and
+redact SQL, rows and values. Ordinary `database(binding)` remains SELECT-only.
+No declaration means no fixture Worker, writes or extra conformance points.
 
 ## Native clients and fresh phase fixtures
 
