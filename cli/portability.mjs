@@ -106,6 +106,7 @@ async function nativeWorker(store,direction,input,signal) {
    ? 'Legacy data was restored and audited, but its v2 export failed. Preserve this installation, resolve the output problem, then run rer export --output FILE. Do not reset it to retry recovery.'
    : receipt.reason === 'archive_json' ? `Restore refused: the archive is damaged or incomplete. ${reExport}`
    : receipt.reExport ? `Restore refused (schema_mismatch): the schema definitions cannot be safely verified by this version. ${reExport}`
+   : receipt.identityTable ? `Transfer refused (identity_table_undeclared:${receipt.identityTable}): declare this table in includeTables to transfer its rows or excludeTables to omit them.`
    : receipt.safety ? `Restore refused (${receipt.reason}): safety normalization for ${receipt.safety} violates the declared import policy.`
    : receipt.reason?.startsWith('migration_ledger:') ? ledgerRefusal(receipt)
    : receipt.migration ? `Restore refused (schema_mismatch:migration_data): migration ${receipt.migration} changed data after this archive was made, so its rows would skip that change. Restore an archive made after it.`

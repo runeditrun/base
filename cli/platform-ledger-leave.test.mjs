@@ -221,3 +221,9 @@ commandAdapter.portability.import = async ({ path }) => {
  t.diagnostic('Legacy JSON reader: public rer import exit=0');
  await managedDerivedJourney(t);
 });
+
+
+test('Managed dumps create every table before child rows and still refuse missing parents', {timeout: 10*60_000}, async t => {
+ const {managedOrderJourney} = await import('./fixtures/managed-order.mjs');
+ await managedOrderJourney(t, {managedSource, managedFixture});
+});
