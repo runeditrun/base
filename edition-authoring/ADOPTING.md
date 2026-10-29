@@ -16,7 +16,24 @@ edition. Within equally specific directory mappings, an already recorded file
 takes precedence over an omitted member. Existing resolvable edition imports
 keep their destinations.
 Singleton records also retain their existing ability to witness siblings in
-the same source and destination namespaces; relocation uses those same rules.
+the same source and destination directories; they cannot establish a broader
+shared parent or introduce a competing destination above those directories.
+
+Two disjoint recorded directory copies can also establish their shared parent
+when their relative placement is identical in Base and the edition. Both shared
+parents must be below their repository roots. Refresh can then deliver
+import-reached transitive siblings into that same vendor tree, including files
+omitted from the original copies. It does not copy the whole shared parent or
+require a product-specific dependency list. One copy alone cannot establish
+this broader namespace. More-specific explicit mappings take precedence, and
+equally specific competing destinations still refuse before writes.
+
+Tracked unrecorded dependencies remain seed-owned: refresh preserves their
+bytes and modes and does not traverse their imports. New imports from refreshed
+files must still find the required exports in those preserved files. Untracked
+collisions, undeclared edits and recorded dependencies removed locally but
+still imported refuse before writes; declare intentional recorded-file
+adaptations with `adapt-base` before refreshing.
 
 Refresh rewrites parsed dependency literals only. The result's `relocated` list
 names the delivered files whose imports changed. These files become acknowledged

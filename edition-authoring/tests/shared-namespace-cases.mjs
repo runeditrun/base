@@ -8,8 +8,9 @@ import {fileURLToPath} from 'node:url';
 const authoring = fileURLToPath(new URL('../cli.mjs', import.meta.url));
 const publicCli = fileURLToPath(new URL('../../bin/rer.mjs', import.meta.url));
 
-export function sharedNamespaceCases({init, write, commit, git, snapshotTree, cli = publicCli}) {
-  for (const shape of ['directory', 'singleton', 'relocated', 'sparse-files', 'single', 'ambiguous', 'seed-edit']) {
+export function sharedNamespaceCases({init, write, commit, git, snapshotTree, cli = publicCli,
+  shapes = ['directory', 'singleton', 'relocated', 'sparse-files', 'single', 'ambiguous', 'seed-edit']}) {
+  for (const shape of shapes) {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'shared-namespace-'));
     const base = path.join(temp, 'base'), seed = path.join(temp, 'seed');
     const run = (...args) => spawnSync(process.execPath,

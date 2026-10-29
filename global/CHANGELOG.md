@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `rer refresh-base` carries import-reached transitive siblings when two disjoint recorded directory copies establish the same shared parent placement, resolving refusals such as owner-claim's dependency on `modules/dependencies/protocol.mjs` without a product-specific copy list. Singleton selections witness their own directory siblings but cannot invent a broader competing parent namespace. More-specific mappings and seed ownership protections remain; genuinely unmapped or ambiguous dependencies still refuse before writes.
+
 - `rer refresh-base` places newly delivered module imports against the most specific recorded vendor namespace, including files covered by a directory copy. Relocated files retain their Base baseline as acknowledged seed-owned adaptations; unmapped and ambiguous dependencies still refuse before writes. See `edition-authoring/ADOPTING.md`.
 
 ## 0.2.86
