@@ -234,4 +234,3 @@ function emptySelect(sql,empty) {
   }
   return from>select && [...empty].includes(folded(list[from+1]?.value??''));
 }
-

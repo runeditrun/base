@@ -21,7 +21,7 @@ import { checkReferences } from './references.mjs';
 import { rebuildDerivedStatements } from './derived.mjs';
 // ledgers: the rows of each migration ledger table the archive carries, as the
 // caller read them from it ({table:rows}); uploadPart binds them to its parts.
-export async function createImport(context,manifest,actor='direct',legacyRecovery,ledgers,acknowledgeUnverifiedSchemaObjects=false) {
+export async function createImport(context,manifest,actor='direct',legacyRecovery,ledgers,acknowledgeUnverifiedSchemaObjects=false,id=crypto.randomUUID()) {
   const {db,config,buckets}=context;await checkManifest(manifest);checkArchivedLedgers(manifest,ledgers);
   insist(manifest.product===config.product,'wrong_product');
   // Explicit schema upgrades can reconcile rows, but cannot attest an interrupted deployment.
@@ -70,7 +70,7 @@ export async function createImport(context,manifest,actor='direct',legacyRecover
     if(!(await importLeaseStatus(db,await job(db,previous,'import'))).stale)throw await importRunning(db,previous);
     await abortImport(context,previous,{staleOnly:true});
   }
-  const id=crypto.randomUUID(),copies=Object.fromEntries(targets.map((t,i)=>[t.name,'rer_portability_stage_'+id.replaceAll('-','')+'_'+i]));
+  const copies=Object.fromEntries(targets.map((t,i)=>[t.name,'rer_portability_stage_'+id.replaceAll('-','')+'_'+i]));
   const row={id,kind:'import',actor,phase:'staging',completed:0,metadata:{manifest:original,...(unverified?{schemaUnverified:{reason:'acknowledged recovery of a version 2 archive without schemaObjects',sourceIdentity:original.sourceIdentity,exportedAt:original.exportedAt,acknowledgedAt:new Date().toISOString()}}:{}),...(skippedTables.length?{restoreManifest:manifest,skippedTables}:{}),copies,targets,triggers:cat.triggers,...(bridge.fromSchema?{bridge}:{}),...(replays?{replays}:{}),...(legacyRecovery?{legacyRecovery}: {}),...(ledgers?{ledgers}:{})}};
   try {
     await db.batch([guard(db,'(SELECT import_job FROM rer_portability_state WHERE id=1) IS NULL'),
