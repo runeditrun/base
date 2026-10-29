@@ -18,7 +18,7 @@ const surface = {
  ], notTools: [], resources: ['synthetic://record/{id}'], witness: { tool: 'synthetic.records.list', args: {} },
  journey: [
   ...Array.from({ length: 5 }, (_, i) => ({ id: `list-${i}`, tool: 'synthetic.records.list', args: {}, expect: [{ class: 'standard' }] })),
-  { id: 'write', tool: 'synthetic.records.write', args: { id: 'synthetic-base-1', value: 'synthetic-base-1' }, expect: [{ class: 'standard' }], inject: { confirmExternal: true } },
+  { id: 'write', tool: 'synthetic.records.write', args: { id: 'synthetic-base-1', value: 'synthetic-base-1' }, expect: [{ class: 'standard' }], inject: { confirmExternal: true }, resource: { uriTemplate: 'synthetic://record/{id}', state: { id: 'synthetic-base-1', value: 'synthetic-base-1' } } },
   { id: 'send', tool: 'synthetic.records.send', args: { id: 'synthetic-base-1' }, expect: [{ class: 'external' }, { class: 'sensitive' }] },
   { id: 'access', tool: 'synthetic.access.change', args: { id: 'synthetic-base-other' }, expect: [{ class: 'access' }] },
   { id: 'erase', tool: 'synthetic.records.erase', args: { id: 'synthetic-base-1' }, expect: [{ class: 'destructive' }] },
