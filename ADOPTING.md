@@ -12,6 +12,24 @@ Resolve a release tag in the Base checkout with
 `git -C /absolute/base-checkout rev-parse 'rer-vVERSION^{commit}'` and pass that
 full commit. A tag name is not accepted as `--ref`.
 
+The maintained reference feature is optional. Refresh checks package imports in
+every delivered JavaScript/TypeScript file against the seed's `package.json`,
+including subpath and type imports. A new optional source graph requiring an
+undeclared package is withheld as a whole and reported in `withheld`; a retained
+module requiring it refuses before any writes. For example, a native D1 seed
+without `drizzle-orm` does not acquire the reference repository, schema or records
+route merely by refreshing Base. Workflow artifact inputs also do not select
+Base application source: automatic helper acquisition uses `scripts/`, local
+workflow paths and explicitly selected `./` helper paths, leaving generated route
+trees to the seed's route generator.
+
+To adopt a required package, review the selected feature and declare/install its
+dependency through the seed's package manager, updating its manifest and lockfile,
+then repeat refresh. `packageDependencies` reports Base's version and existing
+seed version conflicts; existing versions are preserved. Refresh never edits the
+manifest or lockfile or installs packages. Keep intentional delivered-file edits
+with the existing `adapt-base` acknowledgement flow before refreshing.
+
 If the 0.2.82 refusal names a Base-equal untracked, ignored or excluded helper,
 keep its bytes and explicitly record it before repeating the refresh:
 

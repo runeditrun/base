@@ -22,7 +22,11 @@ test('G8 installed authoring records and refreshes a fresh door/settings copy th
  run('git', ['init', '-q']);
  run('git', ['config', 'user.name', 'Run Edit Run fleet']);
  run('git', ['config', 'user.email', 'someone@example.com']);
- await writeFile(join(root, 'package.json'), JSON.stringify({ type: 'module' }));
+ const reference = JSON.parse(await readFile(join(base, 'default-seed/package.json'), 'utf8'));
+ const workspace = JSON.parse(await readFile(join(base, 'package.json'), 'utf8'));
+ // Declare the reference workspace dependencies supplied by the link below.
+ await writeFile(join(root, 'package.json'), JSON.stringify({ type: 'module', dependencies: reference.dependencies,
+  devDependencies: { ...workspace.devDependencies, ...reference.devDependencies } }));
  await writeFile(join(root, '.gitignore'), 'node_modules\n');
  await symlink(join(base, 'default-seed/node_modules'), join(root, 'node_modules'));
  const sources = ['modules/agent-door', 'modules/business-settings', 'modules/operator-auth', 'foundation/runtime'];

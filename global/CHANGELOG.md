@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Refresh checks external package imports before delivery, withholds optional additions whose packages the seed has not declared, and refuses required missing dependencies without writes. Existing versions are preserved and conflicts reported. Workflow build/artifact inputs no longer select the maintained reference's generated route tree. Native D1 seeds do not acquire the optional Drizzle reference through refresh; see `ADOPTING.md`.
+
 - Publication email hygiene recognizes parsed dependency package contact metadata and registry deprecation notices in pnpm, npm and Yarn lockfiles. Comments, custom keys, repository author fields, source files and secret checks retain their findings; no address allowlist is needed. This scanner source update can be adopted independently of a launcher package release.
 
 ## 0.2.88
