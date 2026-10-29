@@ -62,7 +62,11 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
  const nativeBindings = Object.fromEntries(Object.entries(nativeWorkers).map(([entrypoint, binding]) => [binding, { name: 'app', entrypoint }]));
  const modules = [entry, ...(await files(build)).map(path => join(build, path)).filter(path => path !== entry && moduleTypes[extname(path)])].map(path => ({ type: moduleTypes[extname(path)], path }));
  const identity = { sourceSha: createHash('sha1').update(randomBytes(16)).digest('hex'), fingerprint: createHash('sha256').update(randomBytes(16)).digest('hex'), versionId: crypto.randomUUID() };
- const secrets = Object.fromEntries((declaration.secrets ?? []).map(item => [item.binding, standIn(item, manifest.fields?.find(field => field.name === item.binding))]));
+ // Optional integrations stay unconfigured unless verification opts in. Invented
+ // endpoint/certificate values can enable an invalid native auth configuration.
+ const secrets = Object.fromEntries((declaration.secrets ?? [])
+  .filter(item => item.optional !== true || typeof item.verifyStandIn === 'string' && item.verifyStandIn)
+  .map(item => [item.binding, standIn(item, manifest.fields?.find(field => field.name === item.binding))]));
  for (const binding of await hostedMailCredentials(root)) {
   if (!Object.hasOwn(secrets, binding)) secrets[binding] = standIn({}, manifest.fields?.find(field => field.name === binding));
  }

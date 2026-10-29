@@ -77,3 +77,17 @@ the sudo dependency helper, cache save/removal/restore, and a warm frozen instal
 and launch. The pnpm, browser and apt roots stay under the runner temporary
 directory and runner-owned. The proof executes the exported template's shell
 blocks and requires an actual Actions cache hit.
+
+## Hosted verification and optional integrations
+
+Hosted output and agent-door verification leave `deploy.json` secrets marked
+`optional: true` absent unless the declaration supplies a nonempty
+`verifyStandIn`. Previously, invented bytes could enable an unconfigured native
+identity provider and produce HTTP 500 during signed owner bootstrap (for
+example, an optional SAML SSO URL became a random string).
+
+Required secrets retain their disposable stand-ins. To exercise an optional
+integration, declare hosted-valid `verifyStandIn` values or supply its generated
+bindings through `agent-surface.json` verification hooks. Managed mail keeps its
+existing declared credential stand-ins. Verification does not read real deploy
+credentials. Native signature, replay, session and authority checks still run.
