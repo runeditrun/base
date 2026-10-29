@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.2.93
+
+- Integrated inputs: deploydry-2 (HappyToHelp dry-run hook dispatch and unchecked-provider receipt), ledgertok-2 (HappyToHelp ledger refusal identities), adoptdoc-1 (safe adoption examples), reslink-1 (native record-link conformance), copy-1 (product-led optional homepage copy), and handset-history-1 (historical claim context).
 
 - Preserve Handset history screen, backing and time context during contract claim conversion; explicit clause links alone determine current product mappings and historical judgments remain unchanged.
 

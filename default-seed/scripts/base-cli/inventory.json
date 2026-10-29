@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.92-dev.g13dd00a1",
+  "cliVersion": "0.2.93-dev.g2ca56ac4",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -379,7 +379,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "ed123fc49afcac169a569525a323ce19c2cc79555710f22ad655279399cd5363"
+      "sha256": "a23b01104e288a3cbfb37a9fbaf21a6698bf40fe0883e78d54b3c278dc6da300"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -815,7 +815,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "36d19a1123f49dc979c2698e8108e988baaabb42cc7d5474b756949ce32bfcab"
+      "sha256": "278a35de624b7e3f4e4ef6f822066efeed6db4fc43ef93b40763908bfaa7a48a"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -887,7 +887,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "28f575dfc0dc45c2b8019e1aaffd0a57c54cd1f7fe0d2810112e96877f192848"
+      "sha256": "f9249c900b09da192ed36c5fc9a8f2a9c264f583a99565c6f13bd4a50969f7a2"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
@@ -995,7 +995,7 @@
     },
     "cli/ledger-refusal.mjs": {
       "source": "cli/ledger-refusal.mjs",
-      "sha256": "e27e57db1d83df3415b8caf8572b3ad328c2f6c5237fffae1e4bd1c4b8207d09"
+      "sha256": "95326f968b79383ffbced2acdb408b5c1997de95d1cbe26a38f41f77c5fdf62d"
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
@@ -1095,7 +1095,7 @@
     },
     "cli/portability-migrations.mjs": {
       "source": "cli/portability-migrations.mjs",
-      "sha256": "c22307b727f573a0f0f898e3e54a0a244b54d62415f946d1a1c359f8197165ce"
+      "sha256": "848a2771700123c702643d4d65c001a14dd7ab4f448d1ac1c924ea0be6927f75"
     },
     "cli/portability-policy.mjs": {
       "source": "cli/portability-policy.mjs",
@@ -1107,7 +1107,7 @@
     },
     "cli/portability-worker.mjs": {
       "source": "cli/portability-worker.mjs",
-      "sha256": "5a2d68e45a44a31064cafa832b854b0daee93c6efb80f6b99b614594d99db4ba"
+      "sha256": "4582760b6f32d4d7a323a8db2ca0dec1ef50a01a458d72aa440402fbea9dc8ea"
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
@@ -1907,7 +1907,7 @@
     },
     "foundation/runtime/contract-docs.mjs": {
       "source": "foundation/runtime/contract-docs.mjs",
-      "sha256": "e43dc064aaedaff9309c5c52a42814784e761b82a618cf397cd91251177551e5"
+      "sha256": "db42d2817bd838636e1c18bb8d7b6817e05b6ac9438d2d4951de795a4e0e75fc"
     },
     "foundation/runtime/contract-prose-patterns.mjs": {
       "source": "foundation/runtime/contract-prose-patterns.mjs",
@@ -1987,7 +1987,7 @@
     },
     "modules/agent-door/conformance/journey.mjs": {
       "source": "modules/agent-door/conformance/journey.mjs",
-      "sha256": "8f1150f23271d0dc2acaf03b7737932ed8ab04473fee1fd534ef1dd07da34b1c"
+      "sha256": "469eec5d94d32c6d74f9bd6d5da0d25aca73ab662efd5b7711ade8c9e907ac57"
     },
     "modules/agent-door/conformance/narrowing.d.mts": {
       "source": "modules/agent-door/conformance/narrowing.d.mts",
@@ -2047,7 +2047,7 @@
     },
     "modules/agent-door/conformance/surface.mjs": {
       "source": "modules/agent-door/conformance/surface.mjs",
-      "sha256": "4270b3714052d863998bfa8b081370b0a80c93c2f007172b32567b12914607fc"
+      "sha256": "40cac36fdd04ef9fca8ffec84ee61c71c546f9e583d26b39b9d65d76d2cae1bb"
     },
     "modules/agent-door/conformance/target.mjs": {
       "source": "modules/agent-door/conformance/target.mjs",
@@ -2659,7 +2659,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "b35564e7b55d4bec3e90394e8b4b12e41a5251bbe67071d22ca9961b8d525076"
+      "sha256": "07a90d974ea0f26e7d80dca11a74181d62c18f5358aa419b144a261fa1f6ebe9"
     },
     "modules/deploy-kit/owner-rekey.mjs": {
       "source": "modules/deploy-kit/owner-rekey.mjs",
@@ -2787,7 +2787,7 @@
     },
     "modules/erasure/README.md": {
       "source": "modules/erasure/README.md",
-      "sha256": "2d6da40569563c43e51a41bf281305d25025349e0353b76ea96145ec350e8aa9"
+      "sha256": "51e935df481c06d68785b72916b54b43bee7bc23e3a5fa18e056c4be4513b9ad"
     },
     "modules/erasure/audit.mjs": {
       "source": "modules/erasure/audit.mjs",
@@ -4371,7 +4371,7 @@
     },
     "modules/operator-auth/identity/oidc/README.md": {
       "source": "modules/operator-auth/identity/oidc/README.md",
-      "sha256": "5e03d2ef26aee1b96ef658c3dda90fe2b4781417ff1c9f32dff0d56105f7472b"
+      "sha256": "df87b1fdc24eb020436f93c5d3e17d7823d7fc1ebcf9471368dac53d585b6a09"
     },
     "modules/operator-auth/identity/oidc/admin-audit.mjs": {
       "source": "modules/operator-auth/identity/oidc/admin-audit.mjs",
@@ -4563,7 +4563,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "e2cc7a9f5255b3a10ac7e16b4995f0e215ffc1982627b372bc946ecb3e8327d8"
+      "sha256": "5fb0bf1a1347dad56ac2512e26380ed3d4dcfc487c3587f512a5f5ff9ab91355"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",

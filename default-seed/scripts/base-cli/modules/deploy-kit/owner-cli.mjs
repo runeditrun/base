@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { assert, hexId } from './validation.mjs';
 import { regularBytes } from './artifact.mjs';
 import { packageBuild } from './prepare.mjs';
@@ -21,6 +22,11 @@ import { publicOrigin } from './public-origin.mjs';
 export const cronNotice = 'This Worker has a Cron Trigger. Cloudflare may take up to about two hours to start its first scheduled run on some accounts.';
 const usage = 'usage: owner-cli.mjs deploy|dry-run|local-plan|health|remove|inspect|record-owner|signin|rekey --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
 
+// The public offline command also contains legacy hooks that call kit dry-run.
+// Keep their plan local without changing direct kit callers or real deploys.
+const localPlans = new AsyncLocalStorage();
+export const withLocalDeployPlan = run => localPlans.run(true, run);
+
 /** The owner's committed source and existing local build. Run the seed's build first. */
 async function ownerArtifact(root, product) {
   const git = (...args) => { try { return execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim(); } catch { throw new Error('owner-source-not-a-git-checkout'); } };
@@ -34,8 +40,10 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   let parsed;
   try { parsed = parseArgs({args:argv,allowPositionals:true,strict:true,options:{declaration:{type:'string'},environment:{type:'string'},product:{type:'string',default:''},state:{type:'string'},set:{type:'string',multiple:true},unset:{type:'string',multiple:true},outcome:{type:'string'}}}); }
   catch { throw new Error('usage'); }
-  const {positionals:[command,...rest],values} = parsed;
+  const {positionals:[requestedCommand,...rest],values} = parsed;
+  const command = localPlans.getStore() && requestedCommand === 'dry-run' ? 'local-plan' : requestedCommand;
   if (!['deploy','dry-run','local-plan','health','secret','remove','inspect','record-owner','signin','rekey'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
+  if (localPlans.getStore() && command !== 'local-plan') throw new Error('offline-deploy-refuses-provider-operation');
   if ((command === 'secret') !== (values.set !== undefined || values.unset !== undefined) || values.set !== undefined && values.unset !== undefined) throw new Error('usage');
   if (values.outcome !== undefined && command !== 'record-owner' || command === 'record-owner' && !['claimed','kept'].includes(values.outcome)) throw new Error('usage');
   await refuseLocalModels(resolve(cwd));

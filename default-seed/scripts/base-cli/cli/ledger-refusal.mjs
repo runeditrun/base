@@ -14,5 +14,5 @@ const fixes = {
 export function ledgerRefusal(receipt) {
  const [, kind, ...name] = receipt.reason.split(':');
  const named = receipt.unapplied ?? (name.length ? name.join(':') : undefined);
- return `Migration history refused (${receipt.reason}): ${named ? `migration ${named}: ` : ''}${fixes[kind] ?? 'its history does not match this checkout.'}`;
+ return `Migration history refused (${receipt.reason}): ${named ? `${kind === 'multiple' ? 'ledger' : 'migration'} ${named}: ` : ''}${fixes[kind] ?? 'its history does not match this checkout.'}`;
 }
