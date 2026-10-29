@@ -4,6 +4,8 @@ The edition owns its tools, native adapters, migrations and release evidence. Th
 module provides the shared transport, credentials, policy and review machinery.
 Keep the edition's existing interface and authorization decisions authoritative.
 
+A review-disposition call that completes must retain its linked review; a native refusal must audit `refused` with the returned code, open no review, and preserve any bracketing native witness.
+
 ## Copy committed runtime source
 
 Choose an immutable full Base commit containing the module. A released or

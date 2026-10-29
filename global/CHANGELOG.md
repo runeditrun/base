@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Audit native refusals under review policy by their refused outcome, matching returned code and absence of a review; retain linked reviews for completed effects and reject changes in bracketing native witnesses.
+
 - Run a contained `verification.agent.initializer` once per chosen conformance agent ID, before its first public-door phase, using only the sponsor's session-bound native request and disposable mail/fixture controls. Invalid declarations refuse before installation and failures use a fixed diagnostic.
 
 - Resource adapters now receive consent and operation identity; a resource that changes between check and read refuses `resource_changed`.
