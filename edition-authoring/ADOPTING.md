@@ -47,3 +47,6 @@ A genuinely unmapped dependency or equally specific competing mappings still
 refuse before writes. Existing recorded source is never silently relocated.
 Keep the directory record; `record-base` still refuses overlapping singleton
 records rather than introducing conflicting provenance.
+
+The current CLI also contains a disconnected startup-status client on its own
+control socket, so a timed-out probe cannot terminate the managed server.
