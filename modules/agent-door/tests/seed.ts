@@ -1,6 +1,7 @@
 import { createAgentDoor, defineTool, operatorAuthPeople, ToolRefusal } from '../index.ts'
 import type { ToolDefinition, ToolContext } from '../index.ts'
 import { sponsorTools } from './sponsor-tools.ts'
+import { mutationTools } from './mutation-tools.ts'
 import { createBusinessSettings } from '../../business-settings/index.ts'
 import { createOperatorAuth, createAuthHandler } from '../../operator-auth/index.mjs'
 
@@ -80,8 +81,26 @@ export default {
         async run(args, ctx) { await env.DB.prepare('INSERT INTO test_sent(id) VALUES(?)').bind(args.id).run(); ctx.emit('record.sent', `synthetic://record/${args.id}`); return { result: { id: args.id } } } }),
       defineTool({ name: 'synthetic.access.change', title: 'Change authority', description: 'Change authority of a named person.', scope: 'records:write', readOnly: false, summary: args => ({ target: { id: String(args.id) }, role: String(args.role ?? 'admin') }), inputSchema: object({ id: text, role: {type:'string',enum:['admin','member']} }, ['id']), outputSchema: idInput, classes: ['access'], clauses: ['BASE-AGENT-006'], authority: async args => ({ subject: args.id as string, widens: args.role !== 'member' }), classify: (args,ctx) => { if (args.role !== 'member' && String(args.id).toLowerCase() === ctx.person.email.toLowerCase()) throw new ToolRefusal('classifier_refused'); return [{ class: 'access', facts: { measure: 1, direction: args.role === 'member' ? 'narrows' : 'widens' } }] }, async run(args, ctx) { await env.DB.prepare("UPDATE oa_operators SET role=? WHERE id=? AND role<>'owner'").bind(args.role ?? 'admin',args.id).run(); ctx.emit('operator.role.changed', `synthetic://operator/${args.id}`); return { result: { id: args.id } } } }),
     ]
+    if (config.mutationReplay) tools.push(...mutationTools(env.DB))
     if (config.nativeTargets) for (const tool of tools.filter(tool => tool.name.startsWith('synthetic.records.') && tool.name !== 'synthetic.records.list')) {
       tool.target = async args => ({ kind: 'record', id: config.nativeTargets === 'invalid' ? '' : config.nativeTargets === 'mutable' ? (await read(String(args.id)))?.value ?? String(args.id) : `redacted:${String(args.id)}` })
+    }
+    if (config.aggregateRead) tools.push(defineTool({
+      name: 'synthetic.context.read', title: 'Read client context', description: 'Read the aggregate visible through the native client grant.',
+      scope: 'records:read', readOnly: true, inputSchema: object({ required: { type: 'boolean' } }, []), outputSchema: object({ records: { type: 'array', items: { type: 'object' } } }),
+      classes: ['standard'], clauses: ['BASE-AGENT-012'], classify: () => [{ class: 'standard', facts: { measure: 1 } }],
+      async run(args, ctx) {
+        if (!ctx.approvers.length) throw new ToolRefusal('native_approval_required')
+        const grant = await env.DB.prepare('SELECT granted FROM test_client_grants WHERE client=?').bind(ctx.clientId ?? '').first<{ granted: number }>()
+        if (!grant?.granted && args.required) throw new ToolRefusal('native_client_revoked')
+        return { result: { records: grant?.granted ? (await env.DB.prepare('SELECT * FROM test_records WHERE exposure=? ORDER BY id').bind(ctx.clientId).all()).results : [] } }
+      },
+    }))
+    if (path === '/__client-grant') {
+      if (!await doorPerson(auth, request)) return new Response(null, { status: 401 })
+      const input = await request.json() as { clientId: string; granted: boolean }
+      await env.DB.prepare('INSERT INTO test_client_grants VALUES(?,?) ON CONFLICT(client) DO UPDATE SET granted=excluded.granted').bind(input.clientId, Number(input.granted)).run()
+      return Response.json({ ok: true })
     }
     if (config.sponsorSurface) tools.push(...sponsorTools(env.DB, auth))
     const door = createAgentDoor({ seed: config.seed, name: 'Synthetic Base', specialist: 'operations', origin: config.origin, db: env.DB, trust: JSON.parse(env.TRUST), now,
