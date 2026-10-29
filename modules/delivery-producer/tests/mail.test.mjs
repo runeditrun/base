@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {execFileSync} from 'node:child_process';
+import {execFileSync, spawnSync} from 'node:child_process';
 import {mkdtemp, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
@@ -65,6 +65,22 @@ test('generated mail setup and spec survive packaging and the independent export
   execFileSync(process.execPath, [join(exported, 'cli.mjs'), 'artifact', '--root', root, '--config', 'portable/packaging.json'], {stdio: 'pipe'});
   const artifact = JSON.parse(await readFile(join(root, 'delivery-artifact/app.json')));
   assert.deepEqual(artifact.deploymentSpec.mail, {providers: ['rer']});
+
+  // The exported public command agrees with the deploy declaration and names
+  // both senders when emitted build settings disagree. No artifact is emitted.
+  const from = 'first@sender.example.test', other = 'second@sender.example.test';
+  await writeFile(join(root, 'deploy.json'), JSON.stringify({ vars: { MAIL_FROM: from }, secrets: [{ binding: 'MAIL_FROM', environment: 'MAIL_FROM' }] }));
+  await save(setup(config.artifact.specInputs.mail), { ...publicVariables, MAIL_FROM: other });
+  const command = output => spawnSync(process.execPath, [join(exported, 'cli.mjs'), 'artifact', '--root', root, '--config', 'portable/packaging.json', '--output', output], {encoding:'utf8'});
+  const conflict = command('conflict/app.json');
+  assert.equal(conflict.status, 1, conflict.stdout + conflict.stderr);
+  for (const source of ['deploy.json', 'dist/server/wrangler.json', from, other]) assert.ok(conflict.stderr.includes(source), conflict.stderr);
+  await assert.rejects(readFile(join(root, 'conflict/app.json')));
+  t.diagnostic(`Producer refusal: exit ${conflict.status}; ${conflict.stderr.trim()}`);
+  await save(setup(config.artifact.specInputs.mail), { ...publicVariables, MAIL_FROM: from });
+  const agreed = command('agreed/app.json');
+  assert.equal(agreed.status, 0, agreed.stdout + agreed.stderr);
+  assert.equal(JSON.parse(await readFile(join(root, 'agreed/app.json'))).deploymentSpec.publicVariables.MAIL_FROM, from);
 });
 
 test('managed mail refuses missing or public credentials and undeclared public bindings before artifact output', async t => {

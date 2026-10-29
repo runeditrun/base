@@ -89,6 +89,10 @@ test('public deploy dry-run accepts reserved fixture senders while real deploy p
  assert.equal(mapped.code, 4, mapped.text);
  assert.ok(mapped.text.includes('OUTBOUND_SENDER') && mapped.text.includes('--env-file'), 'the correction follows the declared environment mapping');
  await writeFile(join(root, 'sender.env'), `OUTBOUND_SENDER=${MAIL_FROM}\n`, { mode: 0o600 });
+ const conflict = await run(true, true, '--env-file', 'sender.env');
+ assert.equal(conflict.code, 4, conflict.text);
+ assert.ok(conflict.text.includes('rer-packaging.json') && conflict.text.includes('OUTBOUND_SENDER'), 'different declared senders are refused before choosing one');
+ await writeFile(join(root, 'rer-packaging.json'), JSON.stringify({ artifact: { specInputs: { publicVariables: { MAIL_FROM } } } }));
  const corrected = await run(true, true, '--env-file', 'sender.env');
  assert.equal(corrected.code, 0, corrected.text);
  assert.equal(provider.state.writes.length, 0, 'neither refusal nor corrected dry-run writes to the provider');

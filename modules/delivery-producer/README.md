@@ -113,6 +113,11 @@ RER assigns the provider, sender and relay URL and provisions the private
 installation credential when Managed configuration is saved. No SendGrid key
 belongs in the app's configuration or build.
 
+`MAIL_FROM` is one public input, including when an existing deploy adapter
+supplies it through an environment-mapped deploy secret. Empty public defaults
+remain unconfigured; differing configured senders are refused with both source
+locations. See [sender adoption](ADOPTING.md) before refreshing copied producers.
+
 To author the matching committed setup manifest, compose the exported
 `generateMailSetupFields({providers: ["rer"]})` from `mail.mjs` into its
 `fields`. It supplies the public provider selection, sender and relay URL and

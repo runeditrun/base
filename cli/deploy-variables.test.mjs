@@ -113,4 +113,41 @@ public = true
  // Restoring the source declarations restores the entire seed gate.
  await writeFile(adapterPath, adapter);
  assert.equal(check().status, 0);
+
+ // The public managed sender is one input, also supplied by legacy deploy
+ // adapters. Empty build defaults are not a second sender identity.
+ declaration.secrets.push({ binding: 'MAIL_FROM', environment: 'OUTBOUND_SENDER' });
+ await writeFile(join(root, 'deploy.json'), JSON.stringify(declaration));
+ const policy = { mail: { providers: ['rer'] }, publicVariableNames: ['MAIL_PROVIDER', 'MAIL_FROM', 'MAIL_RELAY_URL'], optionalSecretNames: ['MAIL_API_KEY'] };
+ await writeFile(join(root, 'rer-packaging.json'), JSON.stringify({ artifact: { specInputs: policy } }));
+ const mailConfig = { ...config, vars: { MAIL_PROVIDER: 'rer', MAIL_FROM: '', MAIL_RELAY_URL: '' } };
+ await writeFile(configPath, JSON.stringify(mailConfig));
+ const managed = check();
+ assert.equal(managed.status, 0, managed.stdout + managed.stderr);
+ t.diagnostic(`Managed sender: exit ${managed.status}; ${JSON.stringify(managed.clause)}`);
+ // Other public/secret overlaps remain refused, including mail credentials.
+ mailConfig.vars.MAIL_API_KEY = '';
+ declaration.secrets.push({ binding: 'MAIL_API_KEY', environment: 'MAIL_API_KEY' });
+ await writeFile(join(root, 'deploy.json'), JSON.stringify(declaration));
+ await writeFile(configPath, JSON.stringify(mailConfig));
+ assert.match(check().clause.message, /MAIL_API_KEY/);
+ delete mailConfig.vars.MAIL_API_KEY;
+ declaration.vars.MAIL_FROM = 'first@sender.example.test';
+ mailConfig.vars.MAIL_FROM = 'second@sender.example.test';
+ await writeFile(join(root, 'deploy.json'), JSON.stringify(declaration));
+ await writeFile(configPath, JSON.stringify(mailConfig));
+ const conflict = check();
+ assert.equal(conflict.status, 1, conflict.stdout + conflict.stderr);
+ for (const source of ['deploy.json', 'wrangler.jsonc', declaration.vars.MAIL_FROM, mailConfig.vars.MAIL_FROM]) assert.ok(conflict.clause.message.includes(source), conflict.clause.message);
+ t.diagnostic(`Disagreeing senders: exit ${conflict.status}; ${conflict.clause.message}`);
+ mailConfig.vars.MAIL_FROM = declaration.vars.MAIL_FROM;
+ await writeFile(configPath, JSON.stringify(mailConfig));
+ assert.equal(check().status, 0);
+ policy.publicVariables = { MAIL_FROM: 'third@sender.example.test' };
+ await writeFile(join(root, 'rer-packaging.json'), JSON.stringify({ artifact: { specInputs: policy } }));
+ assert.match(check().clause.message, /rer-packaging.json.*third@sender/);
+ delete policy.publicVariables;
+ policy.optionalSecretNames.push('MAIL_FROM');
+ await writeFile(join(root, 'rer-packaging.json'), JSON.stringify({ artifact: { specInputs: policy } }));
+ assert.match(check().clause.message, /MAIL_FROM/);
 });
