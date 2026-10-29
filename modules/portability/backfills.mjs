@@ -215,7 +215,7 @@ function emptySelect(sql,empty) {
     if(!depth && w==='from' && select>=0 && from<0)from=i;
     // An aggregate over an empty input can still produce one row. Permit
     // only known scalar expressions and EXISTS before the outer FROM.
-    if(!depth && select>=0 && from<0 && list[i+1]?.text==='(' && w && !['coalesce','exists'].includes(w))return false;
+    if(select>=0 && from<0 && list[i+1]?.text==='(' && w && !['coalesce','exists','in'].includes(w))return false;
     if(t.text==='(')depth++;if(t.text===')')depth--;
   }
   return from>select && [...empty].includes(folded(list[from+1]?.value??''));

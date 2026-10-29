@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Verify hashed legacy v2 ledgers through the Node library restore door before durable staging; admit migration data repeated by its surviving restore-commit trigger, with replay dependency checks. Worker build-time evidence remains pending.
+
 ## 0.2.90
 
 - Withhold optional copied Base modules and workflow helpers whose required packages the edition has not declared. Refresh preserves supported dependency closure and explains the package declaration needed to opt in.

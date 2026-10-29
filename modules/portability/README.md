@@ -548,6 +548,37 @@ archive's tables restore with their archived columns, later columns take their
 defaults, and later tables stay empty unless their eligible seed or backfill is
 replayed below. This applies to normal v2 import and to backup-only v1 recovery.
 
+The Node in-process library door also verifies old v2 archives carrying a
+hash-bearing migration ledger without caller-supplied replay or ledger rows.
+`createPortability({db,policy})` reads the checkout's single D1 migration directory
+from `wrangler.jsonc` (or use `migrationRoot` to name the checkout), matches its
+files to the destination ledger, and collects the original parts in memory until
+finalize authenticates their hashes and closing binding. The archived ledger must
+be a hash-matched prefix; recorded replay must reproduce the archived tables and
+full replay the complete destination identity before any durable import job is
+created. Keep the same service instance through this initial upload; restarting
+it requires uploading again. Acknowledged recovery and runner-supplied evidence
+retain their existing paths.
+
+Worker evidence remains pending: a Worker has neither checkout files nor Node
+SQLite, and `db` plus `policy` cannot reveal migration SQL that is absent from the
+live schema. The required refresh/lock integration should generate a seed-owned
+module containing ordered file hashes, SQL statements, complete sqlite_master
+inventories and seeded row images for every migration prefix. Bind that artifact
+to the destination's hashed ledger, apply the runtime policy to each inventory,
+and verify both historical and complete live identities before admitting the
+same collector. Do not import archive SQL or substitute the live schema for a
+historical replay. Until that artifact is wired into seed builds, this automatic
+library path refuses in Workers with `schema_mismatch:legacy_evidence`.
+
+Later data statements also qualify when a surviving trigger from that same
+migration repeats the complete statement block, in order, on Base's restore
+commit transition. Those statements run through that destination-owned trigger,
+not a second finalize replay. Other replays may not consume their pending writes.
+Absent tables count as empty only with an empty full replay and proof that every
+later insert and possible trigger writer preserves emptiness; a bounded empty
+copy/drop/rename rebuild and a SELECT from such an empty source carry no row.
+
 The Base CLI runners (local Workers and container) pass `createPortability` a
 `migrations` replayer (`migration-history.mjs`, Node only) built from the
 destination's applied migration ledger and migration files, with each file's

@@ -15,11 +15,13 @@ export function libraryImports(context,direct,migrationRoot) {
   return {
     ...direct,
     async create(manifest,actor='direct',options={}) {
-      if(manifest.version!==2 || manifest.schemaObjects!==undefined || options.acknowledgeUnverifiedSchemaObjects || options.ledgers || !archivedLedgerTables(manifest).length)return direct.create(manifest,actor,options);
-      await checkManifest(manifest);insist(manifest.product===context.config.product,'wrong_product');
+      if(manifest?.version!==2 || manifest.schemaObjects!==undefined || options.acknowledgeUnverifiedSchemaObjects || options.ledgers)return direct.create(manifest,actor,options);
+      await checkManifest(manifest);
+      if(!archivedLedgerTables(manifest).length)return direct.create(manifest,actor,options);
+      insist(manifest.product===context.config.product,'wrong_product');
       await appliedMigrations(context.db);
       insist(!(await statement(context.db,'SELECT import_job FROM rer_portability_state WHERE id=1').first())?.import_job && ![...pending.values()].some(row=>row.phase==='staging'),'import_running',409);
-      context.migrations??=await libraryMigrations(context.db,context.config,migrationRoot);
+      context.migrations??=await libraryMigrations(context.db,context.inputPolicy,migrationRoot);
       const id=crypto.randomUUID();pending.set(id,{id,manifest:structuredClone(manifest),actor,parts:[],phase:'staging'});return id;
     },
     async uploadPart(id,index,part) {

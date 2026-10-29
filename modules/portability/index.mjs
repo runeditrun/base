@@ -19,8 +19,17 @@ export async function createPortability({db,buckets={},policy:input,migrations,o
   for(const name of Object.keys(config.buckets))insist(buckets[name] && typeof buckets[name].get==='function','missing_bucket:'+name);
   await ensureImportLeases(db);
   const context={db,buckets,config,migrations,onExport};
-  const importContext={...context};
-  const {lookup,actor,...imports}=libraryImports(importContext,{active:actor=>activeImport(importContext,actor),create:(manifest,actor,options={})=>createImport(importContext,manifest,actor,undefined,options.ledgers,options.acknowledgeUnverifiedSchemaObjects,options.id),uploadPart:(id,index,part)=>uploadPart(importContext,id,index,part),finalize:(id,options)=>finalizeImport(importContext,id,options),status:id=>importStatus(importContext,id),abort:id=>abortImport(importContext,id),abortAbandoned:()=>abortAbandonedImport(importContext),lookup:async id=>(await job(db,id)).kind==='export'?exportStatus(context,id):importStatus(importContext,id),actor:id=>job(db,id).then(row=>row.actor)},migrationRoot);
+  const importContext={...context,inputPolicy:input};
+  const {lookup,actor,...imports}=libraryImports(importContext,{
+    active:actor=>activeImport(importContext,actor),
+    create:(manifest,actor,options={})=>createImport(importContext,manifest,actor,undefined,options.ledgers,options.acknowledgeUnverifiedSchemaObjects,options.id),
+    uploadPart:(id,index,part)=>uploadPart(importContext,id,index,part),
+    finalize:(id,options)=>finalizeImport(importContext,id,options),
+    status:id=>importStatus(importContext,id),abort:id=>abortImport(importContext,id),
+    abortAbandoned:()=>abortAbandonedImport(importContext),
+    lookup:async id=>(await job(db,id)).kind==='export'?exportStatus(context,id):importStatus(importContext,id),
+    actor:id=>job(db,id).then(row=>row.actor),
+  },migrationRoot);
   return {
     exports:{create:actor=>createExport(context,actor),advance:(id,options)=>advanceExport(context,id,options),status:id=>exportStatus(context,id),download:id=>downloadExport(context,id),abort:id=>abortExport(context,id)},
     imports,
