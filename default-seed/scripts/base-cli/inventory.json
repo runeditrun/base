@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.89-dev.g9160d429",
+  "cliVersion": "0.2.89",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1943,7 +1943,7 @@
     },
     "modules/agent-door/conformance/audit.mjs": {
       "source": "modules/agent-door/conformance/audit.mjs",
-      "sha256": "cfd3329378f23cb7db7afe4b5be9ebdb533744c49053c1db07f9a415b30083d2"
+      "sha256": "f99028f69670587cfb5cbafd64861bd38b265047d94319a6e013f80c6e6b4248"
     },
     "modules/agent-door/conformance/authority.d.mts": {
       "source": "modules/agent-door/conformance/authority.d.mts",

@@ -6,8 +6,39 @@ import { targetIdentity } from './target.mjs';
 import { auditRows } from './audit-rows.mjs';
 
 export { auditRows } from './audit-rows.mjs';
+
+// Reuse recorded native witnesses without replaying the refused operation or
+// comparing across another effect or policy/fixture round.
+function refusalWitness(c, calls, index, direction) {
+ const witness = c.surface.witness;
+ for (let i = index + direction; i >= 0 && i < calls.length; i += direction) {
+  const call = calls[i];
+  if (call.decision?.revision !== calls[index].decision.revision) return;
+  if (call.name === witness.tool && isDeepStrictEqual(call.args, c.resolve(witness.args))) return call.result?.isError ? undefined : call.result?.structuredContent;
+  if (!c.surface.tools.find(tool => tool.name === call.name)?.readOnly && !call.code) return;
+ }
+}
+
+function reviewProblem(c, calls, index, row, reviews) {
+ const call = calls[index];
+ if (row.outcome === 'refused') {
+  if (typeof call.code !== 'string' || !call.code) return 'the returned refusal code is missing';
+  if (row.code !== call.code) return 'the audit refusal code differs from the returned code';
+  if (row.review !== null || call.result?._meta?.['com.runeditrun/review'] || reviews.some(review => review.decision_id === row.id)) return 'a refused call opened a review row';
+  const before = refusalWitness(c, calls, index, -1), after = refusalWitness(c, calls, index, 1);
+  if (before !== undefined && after !== undefined && !isDeepStrictEqual(before, after)) return 'the native witness changed across the refusal';
+  return;
+ }
+ if (!['done', 'replayed'].includes(row.outcome)) return `the audit outcome ${row.outcome} is neither completed nor refused`;
+ if (row.code != null || call.code || call.result?.isError) return 'the completed audit row contradicts the returned refusal code';
+ if (!row.review?.id) return 'the completed call is missing its review row';
+ if (!reviews.some(review => review.id === row.review.id && review.decision_id === (row.replay_of ?? row.id))) return 'the review row is not linked to the completed call';
+}
+
 export async function auditPhase(c) {
  const { rows, differs } = await auditRows(c), expected = [...c.calls];
+ const reviews = expected.some(call => call.decision?.disposition === 'review') ? (await c.personJson('/agents/api/reviews')).reviews : [];
+ if (!Array.isArray(reviews)) throw new Error('Reviews API must return reviews');
  c.add('BASE-AGENT-009.1.count', rows.length === expected.length, `Expected exactly ${expected.length} audit rows for tool calls, resource reads and approval executions, found ${rows.length}.`);
  c.add('BASE-AGENT-009.1.unique', new Set(rows.map(row => row.id)).size === rows.length, 'Every tool call, resource read and approval execution must have its own audit ID.');
  const perAgent = new Map();
@@ -27,7 +58,10 @@ export async function auditPhase(c) {
   c.add(`BASE-AGENT-006.6.audit.${index}`, validClasses && (decision ? isDeepStrictEqual(classIds(row.classes), classIds(decision.classes)) && decision.classes.every(item => row.classes.some(actual => actual.class === item.class && isDeepStrictEqual(actual.facts, item.facts))) : call.kind === 'resources/read' || row.classes.length === 0), `${call.name} audit classes/facts differ from its computed decision.`);
   if (decision) c.add(`BASE-AGENT-009.2.decision.${index}`, (call.kind === 'approval/execute' || row.id === decision.id) && row.decision === decision.disposition && row.revision === decision.revision && isDeepStrictEqual(row.rules, decision.classes.map(({ class: cls, rule, do: disposition }) => ({ class: cls, rule, do: disposition }))), `${call.name} audit decision or revision differs from the response.`);
   else if (call.kind === 'resources/read') c.add(`BASE-AGENT-009.2.resource-rules.${index}`, Array.isArray(row.rules) && isDeepStrictEqual(classIds(row.rules), classIds(row.classes)) && row.rules.every(rule => typeof rule.rule === 'string' && ['autonomous', 'review', 'approval', 'blocked', 'unset'].includes(rule.do)), 'Resource audit classes must each carry the applied policy rule and disposition.');
-  if (decision?.disposition === 'review') c.add(`BASE-AGENT-009.4.review.${index}`, Boolean(row.review?.id), `${call.name} was decided review without a review row.`);
+  if (decision?.disposition === 'review') {
+   const problem = reviewProblem(c, expected, index, row, reviews);
+   c.add(`BASE-AGENT-009.4.review.${index}`, !problem, `${call.name} review audit: ${problem}.`);
+  }
   if (call.pending) c.add(`BASE-AGENT-009.2.pending.${index}`, row.outcome === 'pending' && Boolean(call.approval?.id) && row.approval?.id === call.approval.id, `${call.name} must retain its original pending audit outcome and approval handle after the approval executes.`);
   if (call.kind === 'approval/execute') c.add(`BASE-AGENT-008.5.execution.${index}`, row.approval?.id === call.approvalId && row.approval.by?.includes(c.sponsor.id) && row.outcome === 'done', `${call.name} approved execution lacks its completed row and named sponsor approval.`);
   if (call.result?._meta?.['com.runeditrun/receipt']) c.add(`BASE-AGENT-008.5.audit.${index}`, Boolean(row.approval?.id) && row.approval.by?.includes(row.sponsor.id), `${call.name} approval receipt lacks the signed-in sponsor as approver.`);
