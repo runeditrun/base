@@ -1,5 +1,22 @@
 # Adopting Base refresh and installation transfers
 
+Refresh `modules/agent-door/pipeline.ts` and `conformance/journey.mjs` together
+for completed mutation replay:
+
+- Completed deletions can return their retained receipt after current admission when the native classifier accepts the recorded effect facts. Known limitation (A1, deferred): an approved native DELETE retried with its original key can return `not_found` when its classifier re-reads the deleted target. Authority-preserving replay for deleted targets follows.
+- Restore retries validate current admission separately from the original widening facts in `receipt.decision`.
+- Completed schedules retain their native revision fences at execution and their original approval or review on retry.
+- Post-effect risk changes do not demand a second review; current policy evaluates the recorded effect facts.
+- Grant and role retries retain their original widening evidence, even when the current action would be a no-op.
+- Consumed draft versions stay in the recorded result; preparation checks run before execution, not again for a completed mutation.
+
+Changed arguments (including `expected_revision`) still conflict. Current scope,
+pause, policy, sponsor/agent/consent revocation and required native proof still
+control receipt access; refused, pending and rejected calls cannot gain a completed
+receipt. The response decision and replay audit describe current admission;
+`_meta["com.runeditrun/receipt"].decision` describes the original effect. Read-only retries
+continue to execute under current native visibility.
+
 Agent-door adopters must refresh `modules/agent-door/pipeline.ts` to revalidate
 completed read-only approval replays through the native read with current grants.
 This covers aggregate visibility enforced inside a tool's `run`, as well as
