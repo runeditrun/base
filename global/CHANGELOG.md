@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Probe sponsor admission with verifier-signed access tokens for an unknown subject and a known subject with a changed email. Native negative-phase fixtures may declare `sponsors: {inactive: {sub,email}, excluded: {sub,email}}` for lifecycle-prepared persons. Each probe requires a typed HTTP 401/403 refusal and an unchanged native witness; omitted states are reported as undeclared without passing points. Fixtures receive no signing authority and failure diagnostics omit their values and identities. See `modules/agent-door/ADOPTING.md`.
+- Additional `verification.sponsors` may declare `negativeOnly: true` when their native subjects must be registered for these probes. Their normal initialization and Business binding still run; successful cross-sponsor journeys remain required for regular sponsors.
 
 ## 0.2.89
 

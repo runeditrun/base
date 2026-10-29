@@ -56,7 +56,7 @@ test('valid Business tokens refuse unknown, changed-email, inactive and excluded
  const root = await fixtureSeed(t, 'native');
  const surfaceFile = join(root, 'agent-surface.json'), surface = JSON.parse(await readFile(surfaceFile, 'utf8'));
  const emails = Object.fromEntries(['inactive', 'excluded'].map(kind => [kind, `${kind}-${randomUUID()}@example.invalid`]));
- surface.verification.sponsors = [{ label: 'owner' }, ...Object.entries(emails).map(([label, email]) => ({ label, email, initializer: 'negative-sponsors.mjs' }))];
+ surface.verification.sponsors = [{ label: 'owner' }, ...Object.entries(emails).map(([label, email]) => ({ label, email, initializer: 'negative-sponsors.mjs', negativeOnly: true }))];
  surface.verification.fixtures = { module: 'negative-fixtures.mjs' };
  await writeFile(surfaceFile, JSON.stringify(surface));
  await writeFile(join(root, 'negative-sponsors.mjs'), `
@@ -114,6 +114,7 @@ export default async function({phase, request, origin, cookie}) {
  const bypassed = await verify(true);
  for (const kind of kinds) assert.ok(bypassed.points.some(point => point.id === `BASE-AGENT-004.sponsor.${kind}` && !point.ok), `Skipped sponsor admission must fail ${kind}`);
  const native = await verify(false);
+ assert.ok(!native.points.some(point => point.id.startsWith('BASE-AGENT-004.cross-sponsor')), 'Negative-only persons must not run successful cross-sponsor journeys');
  t.diagnostic(`Sponsor admission: ${JSON.stringify(native.points.filter(point => point.id.startsWith('BASE-AGENT-004.sponsor.')))}`);
  for (const kind of kinds) assert.ok(native.points.some(point => point.id === `BASE-AGENT-004.sponsor.${kind}` && point.ok), `Native sponsor admission must pass ${kind}`);
  t.diagnostic('Sponsor admission: bypassed adapter fails all four points; native adapter passes all four points.');

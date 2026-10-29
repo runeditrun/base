@@ -627,6 +627,14 @@ the excluded person outside the seed's allow-list. Return only those two identit
 fields; no token, signing key or token minter is passed to the fixture. Sponsor
 handles are replaced on every preparation, just like values and clients.
 
+If the Business subject must be registered before preparation, add that person
+to `verification.sponsors` with `negativeOnly: true` and its normal native
+initializer. The initializer receives the verifier-assigned `sub` and can retain
+`{sub,email}` for the phase fixture. These additional persons complete the same
+native bootstrap and Business binding, but do not run the successful
+cross-sponsor journey after suspension or exclusion. The first owner cannot be
+negative-only. Regular sponsors keep their cross-sponsor checks.
+
 The verifier itself signs otherwise valid access tokens for each declared
 person, using an unused agent identity for each probe so an earlier sponsor
 binding cannot supply the refusal. It also always probes an unknown subject and the current subject with
