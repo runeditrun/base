@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Supply required declared public inputs only inside hosted-output verification, using setup defaults and disposable stand-ins when unset. Preserve configured public values and leave optional integrations unconfigured; deployment declarations and built artifacts are unchanged.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.
