@@ -577,7 +577,12 @@ export function refreshCopies(root, {positional: [revision], record: recordPath,
         }
       }
       changes.push({path: copy.path, from: copy.revision, files: sources.length, added, removed});
-      Object.assign(copy, {revision, files: recorded, modes, originFiles: [...next.keys()].filter(name => within(name, copy.originPath)).sort()});
+      // Relocations become adaptations during this pass. Keep their map order
+      // identical when the next refresh visits adaptations before sources.
+      Object.assign(copy, {revision,
+        files: Object.fromEntries(Object.entries(recorded).sort(([a], [b]) => a.localeCompare(b))),
+        modes: Object.fromEntries(Object.entries(modes).sort(([a], [b]) => a.localeCompare(b))),
+        originFiles: [...next.keys()].filter(name => within(name, copy.originPath)).sort()});
     }
     record.copies = plans.filter(plan => !plan.retired).map(plan => plan.copy);
     delete record.repository;
