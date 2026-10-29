@@ -11,6 +11,7 @@ import { RerError } from './errors.mjs';
 import { hostedMailCredentials } from './hosted-mail.mjs';
 import { shared } from './shared.mjs';
 import { verificationRpc } from './agent-rpc.mjs';
+import { FixtureDatabaseError } from '../modules/agent-door/conformance/fixtures.mjs';
 
 // Serve the production build the way rer deploy hosts it (assets behind the
 // Worker, deploy identity bound, a public https origin) on loopback, with no
@@ -70,7 +71,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
  for (const binding of await hostedMailCredentials(root)) {
   if (!Object.hasOwn(secrets, binding)) secrets[binding] = standIn({}, manifest.fields?.find(field => field.name === binding));
  }
- const mf = new Miniflare(convertV4MiniflareOptions({ host: '127.0.0.1', port: 0, cf: false, workers: [{ name: 'ingress', modules: true, script: ingress, serviceBindings: { APP: 'app', ...nativeBindings } }, ...rpcServices.workers, {
+ const options = { host: '127.0.0.1', port: 0, cf: false, workers: [{ name: 'ingress', modules: true, script: ingress, serviceBindings: { APP: 'app', ...nativeBindings } }, ...rpcServices.workers, {
   name: 'app', ...(outboundService ? { outboundService } : {}), modules, modulesRoot: build, compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
   bindings: { ...config.vars, ...declaration.vars, ...secrets, ...(declaration.originVar ? { [declaration.originVar]: HOSTED_ORIGIN } : {}),
    RER_DEPLOY_SOURCE: identity.sourceSha, RER_DEPLOY_FINGERPRINT: identity.fingerprint, RER_VERSION: { id: identity.versionId, tag: '', timestamp: new Date().toISOString() }, ...bindings },
@@ -85,7 +86,11 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   serviceBindings: rpcServices.serviceBindings,
   durableObjects: Object.fromEntries((config.durable_objects?.bindings ?? []).filter(item => !item.script_name).map(item => [item.name, { className: item.class_name, useSQLite: true }])),
   ...(config.assets ? { assets: { directory: client, binding: config.assets.binding ?? 'ASSETS', routerConfig: { has_user_worker: true, invoke_user_worker_ahead_of_assets: RUN_WORKER_FIRST } } } : {}),
- }] }));
+ }] };
+ const mf = new Miniflare(convertV4MiniflareOptions(options));
+ let preparation, held = false;
+ const waiting = new Set();
+ const release = () => { held = false; for (const resume of waiting) resume(); waiting.clear(); };
  let loopback;
  try {
   loopback = await mf.ready;
@@ -104,6 +109,36 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    if (!Object.hasOwn(nativeWorkers, entrypoint)) throw new RerError('agent_invoke_invalid', 'Verification can invoke only its declared native Worker entrypoint.', 1);
    return (await mf.getBindings('ingress'))[nativeWorkers[entrypoint]];
   },
+  // Only the conformance call sites request these powers. Ordinary hosted
+  // checks and owner initialization keep their SELECT-only reader below.
+  preparation: async () => preparation ??= (async () => {
+   const app = options.workers.find(worker => worker.name === 'app');
+   const wrapper = join(build, '__rer_preparation.mjs');
+   const native = './' + config.main;
+   app.modules = [{ type: 'ESModule', path: wrapper, contents:
+    `import app from ${JSON.stringify(native)};export * from ${JSON.stringify(native)};export default {...app,async queue(batch,env,ctx){await env.RER_PREPARATION_QUEUE_GATE.fetch('https://queue.invalid');return app.queue(batch,env,ctx)}}` }, ...modules];
+   app.serviceBindings = { ...app.serviceBindings, RER_PREPARATION_QUEUE_GATE: async () => {
+    if (held) await new Promise(resume => waiting.add(resume));
+    return new Response(null, { status: 204 });
+   } };
+   await mf.setOptions(convertV4MiniflareOptions(options));
+   loopback = await mf.ready;
+   return Object.freeze({
+    database: async binding => {
+     if (!(config.d1_databases ?? []).some(item => item.binding === binding)) throw new RerError('hosted_database_invalid', new FixtureDatabaseError().message, 1);
+     return fixtureDatabase(await mf.getD1Database(binding, 'app'));
+    },
+    scheduled: async ({ scheduledTime = Date.now() } = {}) => {
+     if (!Number.isFinite(scheduledTime)) throw new Error('Native scheduled preparation requires a finite Unix millisecond time.');
+     try {
+      const result = await (await mf.getWorker('app')).scheduled({ scheduledTime });
+      if (result.outcome !== 'ok') throw new Error();
+     }
+     catch { throw new Error('Native scheduled preparation failed; fixture values are not logged.'); }
+    },
+    queues: Object.freeze({ hold: () => { held = true; }, release }),
+   });
+  })(),
   database: async binding => {
    if (!(config.d1_databases ?? []).some(item => item.binding === binding)) throw new RerError('hosted_database_invalid', 'Verification can read only a declared disposable database binding.', 1);
    const db = await mf.getD1Database(binding, 'app');
@@ -111,8 +146,47 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
     if (typeof sql !== 'string' || !/^\s*SELECT\b/i.test(sql) || sql.includes(';')) throw new RerError('hosted_database_invalid', 'Verification state access is read-only SELECT.', 1);
     return db.prepare(sql);
    } };
-  }, close: () => mf.dispose(),
+  }, close: () => { release(); return mf.dispose(); },
   fetch: (path, { headers, ...init } = {}) => loopbackFetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }) };
+}
+
+// Accept native DML, never schema/transaction commands. Every write runs in a
+// D1 atomic batch with guards on all protocol tables, including cascades and
+// native triggers. A refused write rolls back both its rows and these guards.
+function fixtureDatabase(db) {
+ const refuse = () => { throw new RerError('hosted_database_invalid', new FixtureDatabaseError().message, 1); };
+ const statement = (sql, values = []) => {
+  if (typeof sql !== 'string' || sql.includes(';')) return refuse();
+  const readOnly = /^\s*SELECT\b/i.test(sql);
+  const target = /^\s*(?:UPDATE\s+|INSERT\s+INTO\s+|DELETE\s+FROM\s+)([a-z_][a-z0-9_]*)\b/i.exec(sql)?.[1];
+  if (!readOnly && (!target || /^(?:agent_door_|sqlite_)/i.test(target))) return refuse();
+  const execute = async () => {
+   try {
+    const query = db.prepare(sql).bind(...values);
+    if (readOnly) return await query.all();
+    const table = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=? COLLATE NOCASE").bind(target).first();
+    if (!table) return refuse();
+    const protectedTables = (await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND lower(substr(name,1,11))='agent_door_'").all()).results;
+    const guards = protectedTables.flatMap(({ name }) => ['INSERT', 'UPDATE', 'DELETE'].map(event => ({
+     name: 'rer_fixture_' + randomBytes(16).toString('hex'), table: name.replaceAll('"', '""'), event,
+    })));
+    const results = await db.batch([
+     ...guards.map(guard => db.prepare(`CREATE TRIGGER "${guard.name}" BEFORE ${guard.event} ON "${guard.table}" BEGIN SELECT RAISE(ABORT, 'fixture protocol write refused'); END`)),
+     query,
+     ...guards.map(guard => db.prepare(`DROP TRIGGER "${guard.name}"`)),
+    ]);
+    return results[guards.length];
+   } catch { return refuse(); }
+  };
+  return Object.freeze({
+   bind: (...bound) => statement(sql, bound),
+   all: execute,
+   run: execute,
+   first: async column => { const row = (await execute()).results[0] ?? null; return column === undefined ? row : row?.[column] ?? null; },
+   raw: async () => (await execute()).results.map(row => Object.values(row)),
+  });
+ };
+ return Object.freeze({ prepare: sql => statement(sql) });
 }
 
 export async function checkHostedOutput(root, options) {

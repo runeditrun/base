@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Pass the disposable state reader and current verifier time to conformance phase fixtures and native step hooks. Database refusals retain a typed, redacted diagnostic; writable backdated history remains pending at the hosted state boundary.
+- Let disposable conformance fixtures age real native history, run the app’s scheduled handler, and hold queue deliveries through a tested step. Atomic write guards protect every agent-door table; owner initialization remains read-only and runtime clocks are unchanged.
 ## 0.2.90
 
 - Withhold optional copied Base modules and workflow helpers whose required packages the edition has not declared. Refresh preserves supported dependency closure and explains the package declaration needed to opt in.

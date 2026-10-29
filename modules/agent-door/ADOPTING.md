@@ -601,33 +601,37 @@ Hooks cannot skip mandatory steps or alter the runner's arguments and outputs.
 Failed hooks fail the current phase with the same redacted diagnostic. A step
 that fails or yields no structured output does not receive `afterStep`.
 
-## Disposable history context
+## Disposable native preparation
 
-Phase preparation and native `beforeStep`/`afterStep` hooks receive the
-same `database(binding)` state reader as the owner initializer, plus `now`
-(the current verifier time in Unix milliseconds). For example:
+Phase fixtures and native `beforeStep`/`afterStep` hooks receive
+`database(binding)`, `now` (verifier Unix milliseconds),
+`scheduled({scheduledTime})`, and `queues.hold()`/`queues.release()`.
+The database supports SELECT and single native-table UPDATE, INSERT INTO and
+DELETE FROM statements through `prepare(sql).bind(...).run()/all()/first()`.
+Create real records through the app's doors; use writes only to age their
+native history. For example, after obtaining `db` and a real delivery ID:
 
 ```js
-export default async function ({ database, now }) {
- const db = await database('DB');
- const prior = await db.prepare('SELECT id FROM native_records WHERE created_at < ?')
-  .bind(now - 86_400_000).first();
- return { values: { prior } };
-}
+await db.prepare('UPDATE native_deliveries SET completed_at=? WHERE id=?').bind(now - 7_200_000, deliveryId).run();
+await scheduled({ scheduledTime: now });
 ```
 
-This context exists only in disposable conformance tooling; `rer dev` and
-`rer demo` do not receive it. Preparation runs afresh for each policy phase.
-Database refusals fail that phase with
-`agent_fixtures_database_unavailable`, without logging values, records or SQL.
-The reader remains SELECT-only, including for every `agent_door_*` table.
+`scheduled` runs the app Worker's own scheduled handler and waits for its
+work, without overriding its runtime clock. A queue hold delays entry into
+the app's real queue handler; release it in `afterStep` after native approval
+and the tested dispatch. Phase preparation releases any preceding hold;
+installation disposal also releases waiting deliveries. This allows a due
+approved step without rewriting approved content or approval evidence.
 
-Backdated writes are pending: `cli/hosted-output.mjs` currently rejects all
-non-SELECT statements. Enabling native history requires a separate, explicit
-conformance-only write capability at that boundary, with protection against
-direct and trigger-mediated writes to agent-door tables. Native HTTP calls must
-retain their genuine protocol receipts. A history hook must not change the
-runtime clock.
+Every write uses a disposable D1 transaction guarded against INSERT, UPDATE
+and DELETE on **all** `agent_door_*` tables, including native triggers and
+cascades. Schema, transaction and multiple statements are refused. Refusals
+fail the phase with `agent_fixtures_database_unavailable`; values, records
+and SQL are never included in diagnostics. Each policy phase prepares fresh
+values. These powers exist only in conformance tooling; the owner initializer
+retains its SELECT-only handle, and production, `rer dev` and `rer demo` do
+not receive them. `timedLifecycle` and `queuedLifecycle` remain **unscoped**
+capability names; this preparation boundary does not add lifecycle coverage.
 
 ## Native clients and fresh phase fixtures
 
