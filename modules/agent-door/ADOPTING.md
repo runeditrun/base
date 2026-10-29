@@ -546,6 +546,8 @@ so promoting a seed admin does not confer Business approval authority.
 Business can revoke agents or consents in the signed envelope's optional
 `revoked` lists. Tokens require `consent`; affected pending approvals expire and
 execution rechecks revocation. Retain both these lists and historical attribution.
+The verifier renews before requests when less than 60 seconds remain, with the same 300-second lifetime.
+An equal-sequence refresh may change only `iat`/`exp`; all authority and the exact revision signature stay unchanged.
 
 ## Event visibility and native revisions
 

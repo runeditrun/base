@@ -28,6 +28,7 @@
 
 ## 0.2.90
 
+- Renew the verifier's adopted policy before requests without changing its authority or lifetime; equal-sequence adoption may change only issue and expiry times.
 - Withhold optional copied Base modules and workflow helpers whose required packages the edition has not declared. Refresh preserves supported dependency closure and explains the package declaration needed to opt in.
 - Retain approved mutation outcomes and original effect facts through restore, schedule, grant, role and consumed-draft retries while rechecking current native authority, scope, pause, policy and proof. Changed arguments still conflict; read-only replay retains current native visibility.
 - Keep signing command ordering safe when an identical concurrent command consumes its intent before the next read. Conformance accepts older receipts without a `decision` field while checking their original decision identity.

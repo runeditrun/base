@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { accessToken, policyEnvelope } from './crypto.mjs';
+import { accessToken, policyEnvelope, renewalEnvelope, seconds } from './crypto.mjs';
 import { AGENT_CLASSES } from './surface.mjs';
 import { phaseFixtures } from './fixtures.mjs';
 import { validToolName } from './tool-name.mjs';
@@ -63,6 +63,7 @@ export function createProtocol(context) {
   // A 429 is a capacity refusal, not an action result. Honor only a bounded,
   // explicit Retry-After; never replay an application or policy refusal.
   for (let attempt = 0; ; attempt++) {
+   if (new URL(path, context.origin).pathname !== '/api/rer/agent-policy') await context.renewPolicy();
    const response = await context.fetch(new URL(path, `${context.origin}/`).href, { redirect: 'manual', ...init });
    if (response.status !== 429) return response;
    const header = response.headers.get('retry-after'), delay = header && /^\d+(?:\.\d+)?$/.test(header) ? Number(header) * 1000 : header ? Date.parse(header) - Date.now() : NaN;
@@ -135,11 +136,25 @@ export function createProtocol(context) {
   if (answer.result?.isError || answer.result?.structuredContent === undefined) throw new Error(`Witness ${context.surface.witness.tool} failed (${errorCode(answer) ?? answer.status})`);
   return answer.result.structuredContent;
  };
- context.adopt = async (document, options = {}) => {
-  const signed = await policyEnvelope(context, document, options);
+ const postPolicy = async signed => {
   const response = await context.request('/api/rer/agent-policy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ policy: signed.policy }) });
   const body = await responseBody(response);
   if (!response.ok) throw new Error(`Policy adoption failed: HTTP ${response.status} (${typeof body.code === 'string' ? body.code : 'invalid response'})`);
+  if (!isDeepStrictEqual(body.adopted, { seq: signed.payload.seq, revision: signed.payload.revision })) throw new Error('Policy adoption acknowledgement differs from its envelope');
+  context.adoptedPolicy = structuredClone(signed.payload);
+  return body;
+ };
+ let renewing;
+ context.renewPolicy = async () => {
+  if (renewing) return renewing;
+  const adopted = context.adoptedPolicy, now = seconds(context.now);
+  if (!adopted || adopted.exp - now >= 60 || now <= adopted.iat) return;
+  renewing = (async () => { await postPolicy(await renewalEnvelope(context, adopted)); })();
+  try { await renewing; } finally { renewing = undefined; }
+ };
+ context.adopt = async (document, options = {}) => {
+  const signed = await policyEnvelope(context, document, options);
+  const body = await postPolicy(signed);
   context.seq = signed.payload.seq; context.revision = signed.payload.revision; context.document = document;
   const actualClasses = body.door?.classes;
   const declared = new Set(context.surface.tools.map(tool => tool.name));
