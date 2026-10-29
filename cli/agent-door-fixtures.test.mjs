@@ -100,11 +100,13 @@ export default async function({phase, request, origin, cookie}) {
  async function verify(skip) {
   deploy.vars.SKIP_SPONSOR_CHECK = skip;
   await writeFile(deployFile, JSON.stringify(deploy));
-  const lines = [];
+  const lines = [], errors = [];
+  const diagnostics = t.mock.method(console, 'error', (...args) => errors.push(args.join(' ')));
   let result;
   try { result = await checkAgentDoor(root, { report: line => lines.push(line) }); }
   catch (error) { result = error.agentDoor ?? error.details?.agentDoor; if (!result) throw error; }
-  const output = JSON.stringify({ lines, result });
+  finally { diagnostics.mock.restore(); }
+  const output = JSON.stringify({ lines, errors, result });
   for (const email of Object.values(emails)) assert.ok(!output.includes(email), 'Sponsor fixture email leaked into diagnostics');
   // The initializer retains the actual Business subjects only in its private module.
   const { sponsors } = await import(new URL('negative-sponsors.mjs', 'file://' + root + '/'));

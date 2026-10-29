@@ -644,6 +644,12 @@ native witness before and after each call. Undeclared optional states are
 reported as undeclared and run no point; they never count as a pass. Diagnostics
 name only the state and HTTP status, never fixture values, subjects or emails.
 
+Resolving a Business subject to a native person is only part of admission. The
+token's email must also match that person's current native email. A valid
+signature and a known subject do not establish that match. An implementation
+that accepts the changed-email probe fails this requirement even when its
+unknown, inactive and excluded sponsor checks pass.
+
 A journey step can select `client:"local"`; its MCP calls, proof challenges,
 approval retries, replay, resource reads and post-write event snapshots then use
 that native bearer. Event visibility remains limited to resources readable by
