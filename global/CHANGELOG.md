@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Publication email hygiene recognizes parsed dependency package contact metadata and registry deprecation notices in pnpm, npm and Yarn lockfiles. Comments, custom keys, repository author fields, source files and secret checks retain their findings; no address allowlist is needed. This scanner source update can be adopted independently of a launcher package release.
+
 ## 0.2.88
 
 - Re-execute completed read-only approval replays under current native grants, so aggregate reads cannot disclose rows retained before client revocation. Native empty results and refusals replace cached payloads; unchanged visibility retains the result and approval receipt. Mutation replays still execute their effect once.

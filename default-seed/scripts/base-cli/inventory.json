@@ -4931,7 +4931,7 @@
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "b6380367e528f26c7d21b8704a8b875ef0f36596f88ec6187edbc395de6ea257"
+      "sha256": "ebf88282d28056dead3207f3d93eb6b23455e154a9dc71e3a09f876e6564ef5b"
     },
     "scripts/publish-check/assignment.py": {
       "source": "scripts/publish-check/assignment.py",
@@ -5057,6 +5057,14 @@
       "source": "scripts/publish-check/licenses.py",
       "sha256": "5dc4d9ff275c880295d8b2429c8589f9ecb1b4043afc2af2386697fe532c3853"
     },
+    "scripts/publish-check/lockfile_metadata.mjs": {
+      "source": "scripts/publish-check/lockfile_metadata.mjs",
+      "sha256": "f5bbeeaed0e30d60b994948a11d886f2120ca5dafc9307bb03c5c1731208d968"
+    },
+    "scripts/publish-check/lockfile_metadata.py": {
+      "source": "scripts/publish-check/lockfile_metadata.py",
+      "sha256": "f2093b2deda5739d00775f2e0990d3699d1ef3e625cff25e98e8b4a268fc109e"
+    },
     "scripts/publish-check/media.py": {
       "source": "scripts/publish-check/media.py",
       "sha256": "e954cd52e94c9c055a5c855d09c3d7bbad7a5d14746d49dcb9582649e29ac5e5"
@@ -5087,7 +5095,7 @@
     },
     "scripts/publish-check/public_hygiene.py": {
       "source": "scripts/publish-check/public_hygiene.py",
-      "sha256": "ec271875706991fb2d4490e17d51311d22cd880396c705abefc6894c98de761b"
+      "sha256": "a09db4cd5633c24b290b31ed998b50bce1556f3319e95791384c293bf093d20d"
     },
     "scripts/publish-check/publication-config.json": {
       "source": "scripts/publish-check/publication-config.json",
