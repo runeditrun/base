@@ -1,5 +1,22 @@
 # Adopting Base refresh and installation transfers
 
+Refresh `modules/agent-door/pipeline.ts` and `conformance/journey.mjs` together
+for completed mutation replay:
+
+- Completed deletions can return their retained receipt after current admission when the native classifier accepts the recorded effect facts. Known limitation (A1, deferred): an approved native DELETE retried with its original key can return `not_found` when its classifier re-reads the deleted target. Authority-preserving replay for deleted targets follows.
+- Restore retries validate current admission separately from the original widening facts in `receipt.decision`.
+- Completed schedules retain their native revision fences at execution and their original approval or review on retry.
+- Post-effect risk changes do not demand a second review; current policy evaluates the recorded effect facts.
+- Grant and role retries retain their original widening evidence, even when the current action would be a no-op.
+- Consumed draft versions stay in the recorded result; preparation checks run before execution, not again for a completed mutation.
+
+Changed arguments (including `expected_revision`) still conflict. Current scope,
+pause, policy, sponsor/agent/consent revocation and required native proof still
+control receipt access; refused, pending and rejected calls cannot gain a completed
+receipt. The response decision and replay audit describe current admission;
+`_meta["com.runeditrun/receipt"].decision` describes the original effect. Read-only retries
+continue to execute under current native visibility.
+
 Agent-door adopters must refresh `modules/agent-door/pipeline.ts` to revalidate
 completed read-only approval replays through the native read with current grants.
 This covers aggregate visibility enforced inside a tool's `run`, as well as
@@ -32,6 +49,24 @@ rer refresh-base --ref FULL_40_CHARACTER_BASE_COMMIT --base /absolute/base-check
 Resolve a release tag in the Base checkout with
 `git -C /absolute/base-checkout rev-parse 'rer-vVERSION^{commit}'` and pass that
 full commit. A tag name is not accepted as `--ref`.
+
+The maintained reference feature is optional. Refresh checks package imports in
+every delivered JavaScript/TypeScript file against the seed's `package.json`,
+including subpath and type imports. A new optional source graph requiring an
+undeclared package is withheld as a whole and reported in `withheld`; a retained
+module requiring it refuses before any writes. For example, a native D1 seed
+without `drizzle-orm` does not acquire the reference repository, schema or records
+route merely by refreshing Base. Workflow artifact inputs also do not select
+Base application source: automatic helper acquisition uses `scripts/`, local
+workflow paths and explicitly selected `./` helper paths, leaving generated route
+trees to the seed's route generator.
+
+To adopt a required package, review the selected feature and declare/install its
+dependency through the seed's package manager, updating its manifest and lockfile,
+then repeat refresh. `packageDependencies` reports Base's version and existing
+seed version conflicts; existing versions are preserved. Refresh never edits the
+manifest or lockfile or installs packages. Keep intentional delivered-file edits
+with the existing `adapt-base` acknowledgement flow before refreshing.
 
 If the 0.2.82 refusal names a Base-equal untracked, ignored or excluded helper,
 keep its bytes and explicitly record it before repeating the refresh:
