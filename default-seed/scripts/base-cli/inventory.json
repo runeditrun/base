@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.91",
+  "cliVersion": "0.2.91-dev.g208814e5",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -379,7 +379,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "ed123fc49afcac169a569525a323ce19c2cc79555710f22ad655279399cd5363"
+      "sha256": "a23b01104e288a3cbfb37a9fbaf21a6698bf40fe0883e78d54b3c278dc6da300"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
