@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Run a contained `verification.agent.initializer` once per chosen conformance agent ID, before its first public-door phase, using only the sponsor's session-bound native request and disposable mail/fixture controls. Invalid declarations refuse before installation and failures use a fixed diagnostic.
+
 ## 0.2.89
 
 - Publication email hygiene recognizes parsed dependency package contact metadata and registry deprecation notices in pnpm, npm and Yarn lockfiles. Comments, custom keys, repository author fields, source files and secret checks retain their findings; no address allowlist is needed. This scanner source update can be adopted independently of a launcher package release.

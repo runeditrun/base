@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.89-dev.g9160d429",
+  "cliVersion": "0.2.89-dev.g8f6e7096",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,11 +391,15 @@
     },
     "cli/agent-door.mjs": {
       "source": "cli/agent-door.mjs",
-      "sha256": "6e3e0fc2fb5a86bdeeb9609cc94325cb10b3343d563d98c0c4ed8af36897496f"
+      "sha256": "599c919e0911b33a269faaf8c32422483c89765df9b788e94607039a136436d0"
     },
     "cli/agent-fixtures.mjs": {
       "source": "cli/agent-fixtures.mjs",
       "sha256": "1f7b4c8ac09081595fd793222fc8a5b19e91e36a3b298602ec9da97dda5554a5"
+    },
+    "cli/agent-initializer.mjs": {
+      "source": "cli/agent-initializer.mjs",
+      "sha256": "37cfc8de452d2556e098197128a98e6f5f37720d34747cd8b0acc132b3b5c227"
     },
     "cli/agent-journey-fixtures.mjs": {
       "source": "cli/agent-journey-fixtures.mjs",
@@ -1967,7 +1971,7 @@
     },
     "modules/agent-door/conformance/index.mjs": {
       "source": "modules/agent-door/conformance/index.mjs",
-      "sha256": "afab5dc87c554446d4a2a489d6a08db84fb5e38d8e2d08e964e10a6efbf34d4f"
+      "sha256": "88d622c1ae17bcfc457dc62302ace87f61565a828322f588e592ce5678843aaf"
     },
     "modules/agent-door/conformance/injection.mjs": {
       "source": "modules/agent-door/conformance/injection.mjs",
@@ -2023,7 +2027,7 @@
     },
     "modules/agent-door/conformance/sponsors.mjs": {
       "source": "modules/agent-door/conformance/sponsors.mjs",
-      "sha256": "927c2c1adc909a553625e94841b7fe123da8dbc3bc865d3e1660df1c213b6e0b"
+      "sha256": "ce249903bfc98a3b53dc07fc85ad7669cf3133cb942c11ee9ff271b10c20da31"
     },
     "modules/agent-door/conformance/step-hooks.mjs": {
       "source": "modules/agent-door/conformance/step-hooks.mjs",

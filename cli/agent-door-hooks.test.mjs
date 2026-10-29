@@ -110,3 +110,83 @@ test('an explicitly declared single sponsor preserves the native owner lifecycle
  assert.equal(results[0], results[1]);
  t.diagnostic(`Native owner: default ${results[0]}/${results[0]}, explicitly labelled single sponsor ${results[1]}/${results[1]}; original bootstrap inputs preserved.`);
 });
+
+test('a declared agent initializer binds each chosen ID through the person door before transport and refuses invalid modules', { timeout: 120000 }, async t => {
+ const root = await fixtureSeed(t, 'signed', { sponsors: true });
+ const path = join(root, 'agent-surface.json'), surface = JSON.parse(await readFile(path, 'utf8'));
+ await writeFile(join(root, 'not-a-function.mjs'), 'export default {};');
+ for (const agent of [{ initializer: '../outside.mjs' }, { initializer: resolve(root, 'not-a-function.mjs') }, { initializer: 'not-a-function.mjs' }, { initializer: 'not-a-function.mjs', extra: true }, null]) {
+  surface.verification.agent = agent;
+  await writeFile(path, JSON.stringify(surface));
+  await assert.rejects(() => checkAgentDoor(root, { report: () => {} }), error => error.code === 'agent_initializer_invalid');
+ }
+ await writeFile(join(root, 'owner-state.mjs'), `
+ export let database;
+ export default async context => {
+  database = await context.database('DB');
+  return context.request(context.origin + context.claim.path, { method: 'POST', redirect: 'manual',
+   headers: { Origin: context.origin, 'Content-Type': 'application/json' },
+   body: JSON.stringify({ token: context.claim.token, displayName: context.displayName, returnTo: context.returnTo }) });
+ };
+ `);
+ await writeFile(join(root, 'agent-initializer.mjs'), `
+ import assert from 'node:assert/strict';
+ import { database } from './owner-state.mjs';
+ export const agents = [];
+ export const privateValue = crypto.randomUUID();
+ let failure;
+ export const failFor = email => { failure = email; };
+ export default async context => {
+  assert.deepEqual(Object.keys(context).sort(), ['agentId', 'email', 'fixtures', 'mail', 'origin', 'request', 'sub']);
+  const { agentId, email, sub, request, origin, mail, fixtures } = context;
+  assert.equal(typeof sub, 'string');
+  assert.equal(typeof mail.read, 'function');
+  assert.equal(typeof fixtures.set, 'function');
+  if (email === failure) throw new Error(privateValue + JSON.stringify(mail.read()));
+  assert.equal(agents.some(agent => agent.agentId === agentId), false);
+  await assert.rejects(async () => request('https://outside.invalid/app'));
+  const created = await request(origin + '/app/records', { method: 'POST',
+   headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ value: agentId }).toString() });
+  assert.equal(created.status, 303); await created.body?.cancel();
+  const proof = await request(origin + '/app/native-proof', { method: 'POST',
+   body: JSON.stringify({ tool: 'fixture.records.protected', id: agentId, agentId }) });
+  assert.equal(proof.status, 200); await proof.body?.cancel();
+  const binding = await database.prepare('SELECT p.agent,o.email FROM fixture_proofs p JOIN oa_operators o ON o.id=p.operator_id WHERE p.agent=?').bind(agentId).first();
+  assert.deepEqual(binding, { agent: agentId, email });
+  const record = await database.prepare('SELECT o.email FROM fixture_records r JOIN oa_operators o ON o.id=r.operator_id WHERE r.value=?').bind(agentId).first();
+  assert.equal(record.email, email);
+  agents.push({ agentId, email, sub });
+ };
+ `);
+ surface.verification.owner.initializer = 'owner-state.mjs';
+ surface.verification.agent = { initializer: 'agent-initializer.mjs' };
+ await writeFile(path, JSON.stringify(surface));
+ await buildFixture(root);
+ const requests = [], originalFetch = globalThis.fetch;
+ globalThis.fetch = (input, init) => {
+  const url = new Headers(init?.headers).get('x-rer-original-url');
+  if (url) requests.push(new URL(url).pathname);
+  return originalFetch(input, init);
+ };
+ let result;
+ try { result = await checkAgentDoor(root, { report: () => {} }); }
+ finally { globalThis.fetch = originalFetch; }
+ const hook = await import(new URL('agent-initializer.mjs', 'file://' + root + '/'));
+ assert.equal(result.ok, true);
+ assert.equal(hook.agents.length, surface.verification.sponsors.length);
+ assert.equal(new Set(hook.agents.map(agent => agent.agentId)).size, hook.agents.length);
+ assert.deepEqual(hook.agents.map(agent => agent.email), ['synthetic-base-1@example.com', 'synthetic-member@example.com']);
+ assert.ok(requests.indexOf('/app/native-proof') < requests.indexOf('/mcp'));
+ const audits = result.points.filter(point => point.id.startsWith('BASE-AGENT-009.1.') || point.id === 'BASE-AGENT-007.7.differs-from-policy' || point.id.includes('cross-sponsor'));
+ assert.ok(audits.length > 0 && audits.every(point => point.ok));
+ t.diagnostic('Native request order: ' + requests.slice(0, requests.indexOf('/mcp') + 1).join(' -> '));
+ for (const email of ['synthetic-base-1@example.com', 'synthetic-member@example.com']) {
+  hook.failFor(email);
+  const lines = [];
+  await assert.rejects(() => checkAgentDoor(root, { report: line => lines.push(line) }), error => {
+   assert.deepEqual(error.failures, ['BASE-AGENT-001.agent-initializer']);
+   return error.code === 'agent_door_failed';
+  });
+  assert.equal(lines.join('\n').includes(hook.privateValue), false);
+ }
+});

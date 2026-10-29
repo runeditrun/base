@@ -16,6 +16,7 @@ import { verificationWebhooks } from './agent-webhooks.mjs';
 import { verificationInvoke, verificationJourney } from './agent-verifier.mjs';
 import { verificationBindings } from './agent-bindings.mjs';
 import { journeyFixtures } from './agent-journey-fixtures.mjs';
+import { verificationAgentInitializer } from './agent-initializer.mjs';
 
 function finish(result, report) {
  if (result.capabilities) report(`Agent capabilities (${result.capabilities.mode}): declared=${result.capabilities.declared.join(',')}; refused=${result.capabilities.refused.join(',')}; unscoped=${result.capabilities.unscoped.join(',')}.`);
@@ -35,6 +36,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  const manifest = setupManifest ?? JSON.parse(await readFile(join(root, 'rer-setup.json'), 'utf8'));
  const claim = manifest.steps?.find(step => step.type === 'owner-claim');
  const verification = declared.surface.verification ?? {};
+ const initializeAgent = await verificationAgentInitializer(root, verification.agent);
  const workerDriver = await verificationInvoke(root, verification.invoke);
  let prove;
  if (verification.proof !== undefined) {
@@ -134,6 +136,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   const prepare = await journeyFixtures(root, verification.fixtures, { request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures });
   const result = await runAgentDoorConformance({ fetch: request, origin: hosted.origin, surface: declared.surface,
    signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors, webhooks, business, prove, ...journey, prepare, invoke: workerDriver?.run(hosted),
+   initializeAgent: initializeAgent && (({ agentId, person }) => initializeAgent({ agentId, person, request, origin: hosted.origin, mail: network.mail, fixtures: network.fixtures })),
   });
   const points = [...result.points, ...reviewers.points()];
   return finish({ ...result, points, ok: points.every(point => point.ok) }, report);
