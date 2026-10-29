@@ -603,6 +603,34 @@ Hooks cannot skip mandatory steps or alter the runner's arguments and outputs.
 Failed hooks fail the current phase with the same redacted diagnostic. A step
 that fails or yields no structured output does not receive `afterStep`.
 
+## Disposable history context
+
+Phase preparation and native `beforeStep`/`afterStep` hooks receive the
+same `database(binding)` state reader as the owner initializer, plus `now`
+(the current verifier time in Unix milliseconds). For example:
+
+```js
+export default async function ({ database, now }) {
+ const db = await database('DB');
+ const prior = await db.prepare('SELECT id FROM native_records WHERE created_at < ?')
+  .bind(now - 86_400_000).first();
+ return { values: { prior } };
+}
+```
+
+This context exists only in disposable conformance tooling; `rer dev` and
+`rer demo` do not receive it. Preparation runs afresh for each policy phase.
+Database refusals fail that phase with
+`agent_fixtures_database_unavailable`, without logging values, records or SQL.
+The reader remains SELECT-only, including for every `agent_door_*` table.
+
+Backdated writes are pending: `cli/hosted-output.mjs` currently rejects all
+non-SELECT statements. Enabling native history requires a separate, explicit
+conformance-only write capability at that boundary, with protection against
+direct and trigger-mediated writes to agent-door tables. Native HTTP calls must
+retain their genuine protocol receipts. A history hook must not change the
+runtime clock.
+
 ## Native clients and fresh phase fixtures
 
 Declare `verification.fixtures: {"module":"tests/agent-phase-fixtures.mjs"}`

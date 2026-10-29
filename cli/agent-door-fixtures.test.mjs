@@ -4,8 +4,9 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { fixtureSeed } from './tests/fixtures/agent-door/seed.mjs';
+import { fixtureSeed, buildFixture } from './tests/fixtures/agent-door/seed.mjs';
 import { isolatedQueue } from './fixtures/queue.mjs';
+import { checkAgentDoor } from './agent-door.mjs';
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
 
@@ -48,4 +49,80 @@ test('native client receipts and consumed phase state require real fresh fixture
  assert.equal(stale.ok, false);
  assert.ok(stale.points.some(point => !point.ok && point.id.includes('held') && point.id.endsWith('.erase')));
  t.diagnostic(`native/phase fixtures: declared ${declared.points.filter(point => point.ok).length}/${declared.points.length}; omitted ${absent.points.filter(point => !point.ok).length} failures; missing native client ${noClient.points.filter(point => !point.ok).length} failures; reused consumed state ${stale.points.filter(point => !point.ok).length} failures.`);
+});
+
+test('phase fixtures and native step hooks share disposable state and redact database refusals', { timeout: 120000 }, async t => {
+ const root = await fixtureSeed(t, 'signed');
+ await buildFixture(root);
+ const surfaceFile = join(root, 'agent-surface.json'), surface = JSON.parse(await readFile(surfaceFile, 'utf8'));
+ surface.verification.owner.initializer = 'context-owner.mjs';
+ surface.verification.fixtures = { module: 'context-fixtures.mjs' };
+ surface.verification.journey = 'context-journey.mjs';
+ surface.journey.find(step => step.id === 'create').args.value = { $fixture: 'record', pointer: '/value' };
+ await writeFile(join(root, 'context-owner.mjs'), `
+export let ownerDatabase;
+export default async function ({ database, request, origin, claim, displayName, returnTo }) {
+ ownerDatabase = database;
+ return request(origin + claim.path, { method: 'POST', redirect: 'manual',
+  headers: { Origin: origin, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ token: claim.token, displayName, returnTo }) });
+}
+`);
+ await writeFile(join(root, 'context-fixtures.mjs'), `
+import assert from 'node:assert/strict';
+import { ownerDatabase } from './context-owner.mjs';
+export const values = new Map();
+export default async function ({ phase, database, now }) {
+ assert.equal(database, ownerDatabase);
+ assert.ok(Number.isFinite(now));
+ const db = await database('DB');
+ assert.ok(await db.prepare("SELECT id FROM oa_operators WHERE role='owner'").first());
+ const value = crypto.randomUUID();
+ assert.ok(![...values.values()].includes(value));
+ values.set(phase, value);
+ return { values: { record: { value } } };
+}
+`);
+ await writeFile(join(root, 'context-journey.mjs'), `
+import assert from 'node:assert/strict';
+import journey from './journey.mjs';
+import { ownerDatabase } from './context-owner.mjs';
+import { values } from './context-fixtures.mjs';
+export default journey;
+export async function beforeStep({ database, now, phase, step, args }) {
+ assert.equal(database, ownerDatabase);
+ assert.ok(Number.isFinite(now));
+ const db = await database('DB');
+ assert.ok(await db.prepare('SELECT COUNT(*) AS count FROM fixture_records').first());
+ if (step.id === 'create') assert.equal(args.value, values.get(phase));
+}
+export const afterStep = beforeStep;
+`);
+ await writeFile(surfaceFile, JSON.stringify(surface));
+ const report = [];
+ async function verify() {
+  try { return await checkAgentDoor(root, { report: line => report.push(line) }); }
+  catch (error) { if (error.agentDoor) return error.agentDoor; throw error; }
+ }
+ const context = await verify();
+ assert.equal(context.ok, true, JSON.stringify(context.points.filter(point => !point.ok)));
+ for (const phase of ['autonomous', 'held']) assert.ok(context.points.some(point => point.ok && point.id.endsWith(`.${phase}.create`)));
+ // The state reader cannot be used to manufacture protocol evidence. Bind a
+ // fresh private value so even a SQL/driver failure must redact its contents.
+ surface.verification.fixtures = { module: 'forbidden-database.mjs' };
+ await writeFile(join(root, 'forbidden-database.mjs'), `
+export default async function ({ database }) {
+ const db = await database('DB');
+ await db.prepare('UPDATE agent_door_audit SET tool=?').bind('private_' + crypto.randomUUID()).run();
+ return { values: {} };
+}
+`);
+ await writeFile(surfaceFile, JSON.stringify(surface));
+ report.length = 0;
+ const forbidden = await verify();
+ assert.equal(forbidden.ok, false);
+ assert.ok(forbidden.points.some(point => !point.ok && point.id === 'BASE-AGENT-013.phase2'
+  && point.detail?.startsWith('agent_fixtures_database_unavailable:')));
+ assert.doesNotMatch(report.join('\n'), /private_[a-f0-9-]+|UPDATE agent_door_audit|SET tool|operator_session=/);
+ t.diagnostic(`disposable context: ${context.points.filter(point => point.ok).length}/${context.points.length}; protected-table preparation refused with a typed redacted diagnostic.`);
 });

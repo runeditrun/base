@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Pass the disposable state reader and current verifier time to conformance phase fixtures and native step hooks. Database refusals retain a typed, redacted diagnostic; writable backdated history remains pending at the hosted state boundary.
+
 - Audit native refusals under review policy by their refused outcome, matching returned code and absence of a review; retain linked reviews for completed effects and reject changes in bracketing native witnesses.
 
 - Run a contained `verification.agent.initializer` once per chosen conformance agent ID, before its first public-door phase, using only the sponsor's session-bound native request and disposable mail/fixture controls. Invalid declarations refuse before installation and failures use a fixed diagnostic.
