@@ -33,40 +33,42 @@ export async function removalPhase(c) {
  await renewalRefusals(c);
 }
 async function renewalRefusals(c) {
- const adopted = c.adoptedPolicy, now = seconds(c.now);
  const state = await c.personJson('/agents/api/state'), approvals = await c.personJson('/agents/api/approvals'), before = await c.witness();
  const sign = payload => signJws(c.signer.privateKey, c.signer.kid, 'rer-agent-policy+jwt', payload);
- const later = { ...adopted, iat: adopted.iat + 1, exp: now + 300 };
  const changed = autonomousPolicy(); changed.rules = [{ id: 'all', class: '*', do: 'blocked' }];
  const foreign = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
- const altered = await policyEnvelope(c, changed, { seq: adopted.seq, revision: adopted.revision, iat: later.iat });
- const revised = await policyEnvelope(c, adopted.document, { seq: adopted.seq, iat: later.iat });
- const business = await policyEnvelope({ ...c, business: `${c.business}-other` }, adopted.document, { seq: adopted.seq, revision: adopted.revision, iat: later.iat });
- const resigned = await policyEnvelope({ ...c, signer: { ...c.signer, privateKey: foreign.privateKey } }, adopted.document, { seq: adopted.seq, revision: adopted.revision, iat: later.iat });
- // Use a fresh trusted revision signature to prove that even equivalent
- // evidence cannot replace the exact adopted revision signature at equal seq.
- const revisionClaims = JSON.parse(Buffer.from(adopted.revision_signature.split('.')[1], 'base64url').toString());
- const freshSignature = await signJws(c.signer.privateKey, c.signer.kid, 'rer-agent-policy-revision+jwt', revisionClaims);
  const cases = [
-  ['expired', await sign({ ...later, exp: now - 1 }), 'policy_invalid', 400],
-  ['untrusted', await signJws(foreign.privateKey, c.signer.kid, 'rer-agent-policy+jwt', later), 'policy_invalid', 400],
-  ['revision-mismatch', await sign({ ...later, document: changed }), 'policy_revision_invalid', 400],
-  ['equal-iat', await sign({ ...later, iat: adopted.iat }), 'policy_stale', 409],
-  ['earlier-iat', await sign({ ...later, iat: adopted.iat - 1 }), 'policy_stale', 409],
-  ['document', altered.policy, 'policy_stale', 409],
-  ['revision', revised.policy, 'policy_stale', 409],
-  ['business', business.policy, 'policy_stale', 409],
-  ['paused', await sign({ ...later, paused: !adopted.paused }), 'policy_stale', 409],
-  ['revoked', await sign({ ...later, revoked: { agents: [c.agentId], consents: [c.consent] } }), 'policy_stale', 409],
-  ['revision-signature', await sign({ ...later, revision_signature: freshSignature }), 'policy_stale', 409],
-  ['untrusted-revision', await sign({ ...later, revision_signature: resigned.payload.revision_signature }), 'policy_revision_invalid', 400],
+  ['expired', (_adopted, later) => sign({ ...later, exp: seconds(c.now) - 1 }), 'policy_invalid', 400],
+  ['untrusted', (_adopted, later) => signJws(foreign.privateKey, c.signer.kid, 'rer-agent-policy+jwt', later), 'policy_invalid', 400],
+  ['revision-mismatch', (_adopted, later) => sign({ ...later, document: changed }), 'policy_revision_invalid', 400],
+  ['equal-iat', (adopted, later) => sign({ ...later, iat: adopted.iat }), 'policy_stale', 409],
+  ['earlier-iat', (adopted, later) => sign({ ...later, iat: adopted.iat - 1 }), 'policy_stale', 409],
+  ['document', (_adopted, _later, options) => policyEnvelope(c, changed, options).then(signed => signed.policy), 'policy_stale', 409],
+  ['revision', (adopted, _later, options) => policyEnvelope(c, adopted.document, { ...options, revision: adopted.revision + 1 }).then(signed => signed.policy), 'policy_stale', 409],
+  ['business', (adopted, _later, options) => policyEnvelope({ ...c, business: `${c.business}-other` }, adopted.document, options).then(signed => signed.policy), 'policy_stale', 409],
+  ['paused', (adopted, later) => sign({ ...later, paused: !adopted.paused }), 'policy_stale', 409],
+  ['revoked', (_adopted, later) => sign({ ...later, revoked: { agents: [c.agentId], consents: [c.consent] } }), 'policy_stale', 409],
+  ['revision-signature', async (adopted, later) => {
+   const claims = JSON.parse(Buffer.from(adopted.revision_signature.split('.')[1], 'base64url').toString());
+   return sign({ ...later, revision_signature: await signJws(c.signer.privateKey, c.signer.kid, 'rer-agent-policy-revision+jwt', claims) });
+  }, 'policy_stale', 409],
+  ['untrusted-revision', async (adopted, later, options) => {
+   const signed = await policyEnvelope({ ...c, signer: { ...c.signer, privateKey: foreign.privateKey } }, adopted.document, options);
+   return sign({ ...later, revision_signature: signed.payload.revision_signature });
+  }, 'policy_revision_invalid', 400],
  ];
- for (const [name, policy, code, status] of cases) {
+ for (const [name, candidate, code, status] of cases) {
+  await c.renewPolicy();
+  const adopted = c.adoptedPolicy, later = { ...adopted, iat: adopted.iat + 1, exp: seconds(c.now) + 300 };
+  const policy = await candidate(adopted, later, { seq: adopted.seq, revision: adopted.revision, iat: later.iat, exp: later.exp });
   const response = await c.request('/api/rer/agent-policy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ policy }) });
   const body = await response.json();
   const call = await c.tool(c.surface.witness.tool, c.resolve(c.surface.witness.args));
+  // Slow requests may legitimately renew between probes. Only the verifier's
+  // acknowledged renewal may change the expected expiry, never authority.
+  const sameState = actual => isDeepStrictEqual({ ...state, policy: { ...state.policy, expires_at: new Date(c.adoptedPolicy.exp * 1000).toISOString() } }, actual);
   c.add(`BASE-AGENT-007.7.renew.${name}`, response.status === status && body.code === code &&
-   isDeepStrictEqual(state, await c.personJson('/agents/api/state')) && isDeepStrictEqual(approvals, await c.personJson('/agents/api/approvals')) &&
+   sameState(await c.personJson('/agents/api/state')) && isDeepStrictEqual(approvals, await c.personJson('/agents/api/approvals')) &&
    !call.result?.isError && isDeepStrictEqual(before, call.result?.structuredContent), `${name} must refuse ${code} without changing policy, approvals or native state.`);
  }
 }
