@@ -18,13 +18,13 @@ async function coreFixture(t, capabilities) {
    surface.tools = surface.tools.filter(tool => !tool.name.endsWith('.events.list'));
    surface.journey = surface.journey.filter(step => !step.tool.endsWith('.events.list'));
   }
-  surface.resources = [];
+  if (!capabilities.includes('resources')) surface.resources = [];
  });
  await buildFixture(root); return root;
 }
 
 test('declared core and core plus events prove every offered check and refuse the rest through the production door', { timeout: 240000 }, async t => {
- for (const capabilities of [core, [...core, 'events']]) {
+ for (const capabilities of [core, [...core, 'events'], [...core, 'events', 'resources', 'subscriptions']]) {
   const root = await coreFixture(t, capabilities), result = await run(root);
   assert.equal(result.ok, true);
   assert.deepEqual(result.capabilities.declared, capabilities);
