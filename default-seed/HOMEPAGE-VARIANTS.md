@@ -20,9 +20,11 @@ integration as `@runeditrun/rer/deploy`.
 
 ## Rules for every seed
 
-- **The approved homepage is final.** Change only its primary call to action:
-  it reads `Run <Seed>` and links to `/run`. Do not redraw, reword or restyle
-  anything else, and keep the "100% free" hero line. The run site omits links
+- **Lead with the owner's product.** The hero says what the product does for
+  its owner. Keep "free" and open-source copy to a short footnote or secondary
+  line, never the hero line. Preserve the approved homepage's other copy and
+  design. Its primary call to action reads `Run <Seed>` and links to `/run`.
+  The run site omits links
   to instance-only routes (`/signin`, `/login`, `/sign-in`, `/setup`, `/app`,
   `/auth/*`), so render the approved page's header Sign in pill only on the
   installed instance (a prop, as Vector's and Oncall's headers already have).
@@ -148,11 +150,22 @@ Run page data in one `RunData` value (`src/site/run.ts` or
 | Field | Cradle | Uptime |
 | --- | --- | --- |
 | `name` | `Cradle` | `Uptime` |
+| `leadLine` (optional) | `Your records and business apps in one workspace.` | `Know when your services need attention.` |
 | `repository` | `https://github.com/just-every/run-cradle` | `https://github.com/just-every/run-uptime` |
 | `clone` | `npx -y @runeditrun/rer dev just-every/run-cradle` | `npx -y @runeditrun/rer dev just-every/run-uptime` |
 | `licence` | `MIT` | `MIT` |
 | `docs` | `true` once `/docs` is built | `true` |
 | `paths` | `{ product: "cradle" }` | `{ product: "uptime" }` |
+
+`leadLine` is a plain string: Base escapes it as text, uses it as the composed
+homepage's heading and repeats it below the `/run` heading. Lead with what the
+product does for its owner; "free" and open-source stay secondary. An approved
+custom homepage can read the same field in its own renderer. Omit `leadLine`
+to keep the existing homepage and Run page byte-for-byte, including the
+identity tagline as the composed homepage heading. This optional field needs
+no edition migration, consent flag or edit to existing seed data on
+`rer refresh-base`; the earlier `run-data-paths` and `run-data-pricing`
+migrations retain their existing requirements.
 
 The Run page shows the three-way chooser and one copyable command:
 `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>` for

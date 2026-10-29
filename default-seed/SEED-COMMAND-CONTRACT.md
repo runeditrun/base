@@ -638,6 +638,16 @@ not `false`, then the do-it-yourself walkthrough, which explains deployment
 using the actual declared resources and inputs; it does not store deployment
 credentials.
 
+`RunData.leadLine` is an optional plain string for the product's owner-facing
+lead. Base escapes it as text, uses it as the composed homepage heading and
+repeats it below the `/run` heading. The hero leads with what the product does
+for its owner; "free" and open-source are a short footnote or secondary line,
+never the hero line. Custom homepages may read the same field. When it is
+absent, both shared pages keep their existing HTML byte-for-byte. Existing
+seeds can `rer refresh-base` without adding the field or consenting to a new
+edition migration; the earlier `run-data-paths` and `run-data-pricing`
+migrations still apply when crossing their introductions.
+
 Base's shared `/run` chooser reads `RunData.paths`: `product` is the app listing
 id or `null` while the seed has no listing; optional `requirementsExtra` adds
 one requirements sentence; optional `assisted.open` and `managed.open` can each

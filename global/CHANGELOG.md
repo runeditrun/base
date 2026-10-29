@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Lead seed homepage heroes with what the product does for its owner, keeping free/open-source copy secondary. Optional plain-text `RunData.leadLine` supplies the composed homepage heading and the Run page introduction; omitting it preserves existing HTML and needs no seed migration.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.
