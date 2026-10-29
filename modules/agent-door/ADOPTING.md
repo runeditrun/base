@@ -612,12 +612,43 @@ session to issue clients, then their real credentials to create native records
 and retained operation receipts. No signer, writable database or production
 fixture route is supplied.
 
-Return `{values, clients}`. `values` is an object of named phase-local JSON
+Return `{values, clients, sponsors}` (each member is optional). `values` is an object of named phase-local JSON
 values. `clients` maps names to `{token, clientId, agent:{id,name,specialist}}`
 returned by the native credential lifecycle. The specialist must match the
 surface. Credentials and identities must belong to the signed-in owner and
 retain their actual native scope checks. Generate secret-shaped values at
 runtime and never log them.
+
+During `negative`, optionally return
+`sponsors: {inactive: {sub, email}, excluded: {sub, email}}`. Either kind may be
+omitted. These are Business subjects and their native email addresses, prepared
+through the seed's own person lifecycle: suspend the inactive person, and keep
+the excluded person outside the seed's allow-list. Return only those two identity
+fields; no token, signing key or token minter is passed to the fixture. Sponsor
+handles are replaced on every preparation, just like values and clients.
+
+If the Business subject must be registered before preparation, add that person
+to `verification.sponsors` with `negativeOnly: true` and its normal native
+initializer. The initializer receives the verifier-assigned `sub` and can retain
+`{sub,email}` for the phase fixture. These additional persons complete the same
+native bootstrap and Business binding, but do not run the successful
+cross-sponsor journey after suspension or exclusion. The first owner cannot be
+negative-only. Regular sponsors keep their cross-sponsor checks.
+
+The verifier itself signs otherwise valid access tokens for each declared
+person, using an unused agent identity for each probe so an earlier sponsor
+binding cannot supply the refusal. It also always probes an unknown subject and the current subject with
+a changed email. `BASE-AGENT-004.sponsor.unknown`, `.changed-email`, `.inactive`
+and `.excluded` require HTTP 401 or 403 with a typed door error and an unchanged
+native witness before and after each call. Undeclared optional states are
+reported as undeclared and run no point; they never count as a pass. Diagnostics
+name only the state and HTTP status, never fixture values, subjects or emails.
+
+Resolving a Business subject to a native person is only part of admission. The
+token's email must also match that person's current native email. A valid
+signature and a known subject do not establish that match. An implementation
+that accepts the changed-email probe fails this requirement even when its
+unknown, inactive and excluded sponsor checks pass.
 
 A journey step can select `client:"local"`; its MCP calls, proof challenges,
 approval retries, replay, resource reads and post-write event snapshots then use

@@ -6,17 +6,24 @@ const text = value => typeof value === 'string' && value.trim().length > 0;
 /** Each round gets new native state, never a previous round's consumed values. */
 export function phaseFixtures(c, prepare) {
  c.fixtureValues = {};
+ c.fixtureSponsors = {};
  c.clients = new Map();
  c.nativeAgents = new Set();
  c.fixtureAuditIds = new Set();
  c.prepare = async phase => {
   c.fixtureValues = {};
+  c.fixtureSponsors = {};
   c.clients.clear();
   if (!prepare) return;
   try {
    const before = new Set((await auditRows(c, { agents: [null], includeFixtures: true })).rows.map(row => row.id));
    const result = await prepare({ phase, tool: c.tool });
-   if (!object(result) || Object.keys(result).some(key => !['values', 'clients'].includes(key)) || !object(result.values ?? {}) || !object(result.clients ?? {})) throw new Error('Native phase preparation must return {values,clients}.');
+   if (!object(result) || Object.keys(result).some(key => !['values', 'clients', 'sponsors'].includes(key)) || !object(result.values ?? {}) || !object(result.clients ?? {}) || !object(result.sponsors ?? {})) throw new Error('Native phase preparation must return {values,clients,sponsors}.');
+   for (const [kind, sponsor] of Object.entries(result.sponsors ?? {})) {
+    if (!['inactive', 'excluded'].includes(kind) || !object(sponsor) || Object.keys(sponsor).sort().join(',') !== 'email,sub'
+     || !text(sponsor.sub) || !text(sponsor.email) || sponsor.email !== sponsor.email.trim().toLowerCase()
+     || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(sponsor.email)) throw new Error('Native fixture sponsors require a subject and canonical email for an inactive or excluded person.');
+   }
    for (const [label, client] of Object.entries(result.clients ?? {})) {
     if (!text(label) || !object(client) || Object.keys(client).sort().join(',') !== 'agent,clientId,token'
      || !text(client.token) || !text(client.clientId) || !object(client.agent) || !text(client.agent.id) || !text(client.agent.name)
@@ -26,6 +33,7 @@ export function phaseFixtures(c, prepare) {
     c.nativeAgents.add(client.agent.id);
    }
    c.fixtureValues = structuredClone(result.values ?? {});
+   c.fixtureSponsors = structuredClone(result.sponsors ?? {});
    const setup = await auditRows(c, { agents: [...c.clients.values()].map(client => client.agent.id), includeFixtures: true });
    for (const row of setup.rows) if (!before.has(row.id)) {
     const client = [...c.clients.values()].find(client => client.agent.id === row.agent?.id);
@@ -34,6 +42,7 @@ export function phaseFixtures(c, prepare) {
    }
   } catch {
    c.clients.clear();
+   c.fixtureSponsors = {};
    throw new Error('Native phase preparation failed; fixture values are not logged.');
   }
  };
