@@ -15,6 +15,7 @@ import { verificationSponsors } from './agent-sponsors.mjs';
 import { verificationWebhooks } from './agent-webhooks.mjs';
 
 function finish(result, report) {
+ if (result.capabilities) report(`Agent capabilities (${result.capabilities.mode}): declared=${result.capabilities.declared.join(',')}; refused=${result.capabilities.refused.join(',')}; unscoped=${result.capabilities.unscoped.join(',')}.`);
  for (const point of result.points) report(`${point.ok ? 'PASS' : 'FAIL'} ${point.id}${point.ok || !point.detail ? '' : `: ${point.detail}`}`);
  const failed = result.points.filter(point => !point.ok).map(point => point.id);
  report(`Agent door conformance: ${result.points.length - failed.length}/${result.points.length} points passed.`);

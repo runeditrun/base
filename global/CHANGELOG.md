@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Agent doors can declare the mandatory tools/policy/pause/audit/idempotency core plus events, resources, prompts and subscriptions. Discovery and conformance report declared, refused and unscoped families; omitted supported capabilities are hidden and return typed refusals. Core authorization and security checks remain mandatory, and absent declarations retain the legacy full requirements. Other lifecycle families remain explicitly unscoped with their existing checks intact.
+
 ## 0.2.86
 
 - Let verifier owner initializers and native journeys complete real email confirmation through a bounded captured-mail reader and supply per-run data to declared isolated provider edges. The controls stay outside production builds. Prove fresh agent-door/settings source copies typecheck with upstream tests omitted.
