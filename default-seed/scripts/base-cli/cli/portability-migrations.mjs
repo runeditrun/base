@@ -37,11 +37,15 @@ export async function appliedMigrations(root,db,binding,declaration,split) {
 
 // Ledger contents can contain private values. Report constant categories,
 // retaining the transfer's canonical compatibility and hash-matching policy.
-function constantRefusal(error) {
+function constantRefusal(error,files) {
  if(!(error instanceof PortabilityError))return error;
  const code=error.code.startsWith('migration_ledger:')?error.code.split(':').slice(0,2).join(':')
   :error.code==='schema_mismatch:uncertain_migrations'?'migration_ledger:uncertain':'migration_ledger:incompatible';
- return Object.assign(new PortabilityError(code,409),error.migration===undefined?{}:{migration:error.migration});
+ // Only checkout-owned names may accompany the constant category. A ledger
+ // entry with no matching file or declared alias can contain private values.
+ const name=error.code.split(':').slice(2).join(':');
+ const identity=['migration_ledger:unknown','migration_ledger:ambiguous','migration_ledger:conflict'].includes(code) && name && files.some(file=>file.name===name || file.aliases?.includes(name))?name:undefined;
+ return Object.assign(new PortabilityError(code,409),error.migration===undefined?{}:{migration:error.migration},identity?{identity}:{});
 }
 
 // For adapters with their own archive format: the entries of a migration ledger
@@ -59,7 +63,7 @@ export async function mapMigrationLedger({root,binding='DB',platformMigrations,e
   const mapped=entries.map(({name,sha256})=>({name:matchMigrationLedger([{name,sha256}],files,declaration)[0]??name,sha256}));
   insist(new Set(mapped.map(entry=>entry.name)).size===mapped.length,'migration_ledger:ambiguous',409);
   return mapped;
- } catch(error) { throw constantRefusal(error); }
+ } catch(error) { throw constantRefusal(error,files); }
 }
 
 // Older runners leave Wrangler's bookkeeping beside their authoritative hashed
@@ -89,7 +93,7 @@ export async function nativeMigrationPreflight({root,db,binding='DB',platformMig
  const declaration=platformMigrationDeclaration(platformMigrations);
  const tables=await all(db,`SELECT type,name FROM sqlite_master WHERE lower(name) IN (${ledgerNames.map(name=>`'${name}'`).join(',')})`);
  const legacyPair=tables.length===2 && ['_rer_deploy_migrations','d1_migrations'].every(name=>tables.some(row=>row.name===name));
- insist(tables.length<=1 || legacyPair,'migration_ledger:multiple',409);
+ if(tables.length>1 && !legacyPair)throw Object.assign(new PortabilityError('migration_ledger:multiple',409),tables.some(row=>row.name==='rer_migrations')?{identity:'rer_migrations'}:{});
  insist(tables.every(row=>row.type==='table' && ledgerNames.includes(row.name)),'migration_ledger:incompatible',409);
  const table=legacyPair?'_rer_deploy_migrations':tables[0]?.name;
  if(!table)return {nativeApply:true};
@@ -105,6 +109,6 @@ export async function nativeMigrationPreflight({root,db,binding='DB',platformMig
   nativeApply=table==='d1_migrations' && files.some(file=>!applied.includes(file.name));
   // The checkout file is named: it is the seed's own, never a ledger value.
   if(table!=='d1_migrations')for(const file of files)if(!applied.includes(file.name))throw Object.assign(new PortabilityError('migration_ledger:unapplied',409),{migration:file.name});
- } catch(error) { throw constantRefusal(error); }
+ } catch(error) { throw constantRefusal(error,files); }
  return {nativeApply};
 }

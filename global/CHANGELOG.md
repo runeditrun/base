@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Restore identity suffixes in migration-history refusal tokens for pending checkout files, mixed Platform ledgers and checkout-owned migration identities, retaining constant adapter error codes, exit statuses and recovery guidance. Deliberately leave `migration_ledger:unknown:initial-page.sql` unrestored when it has no checkout provenance: the privacy contract excludes unchecked ledger values from diagnostics.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.
