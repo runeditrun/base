@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.
 - Probe sponsor admission with verifier-signed access tokens for an unknown subject and a known subject with a changed email. Native negative-phase fixtures may declare `sponsors: {inactive: {sub,email}, excluded: {sub,email}}` for lifecycle-prepared persons. Each probe requires a typed HTTP 401/403 refusal and an unchanged native witness; omitted states are reported as undeclared without passing points. Fixtures receive no signing authority and failure diagnostics omit their values and identities. See `modules/agent-door/ADOPTING.md`.
@@ -18,7 +18,7 @@
 
 - Resource adapters now receive consent and operation identity; a resource that changes between check and read refuses `resource_changed`.
 
-- For the 0.2.90 seed refresh, relock run-uptime (workflow lines 98, 256) and run-happytohelp (47, 170): drop `github.run_attempt` from shared build artifact names, use `<seed>-verify-build-<sha>-<run_id>` for both upload and download, and add `overwrite: true` to the upload. Verify's workflow guard rejects attempt-qualified downloads and their shared uploads; apply the same patch to any seed with this pattern on its next refresh. See `export/VERIFY-WORKFLOW.md`.
+- For the 0.2.91 seed refresh, relock run-uptime (workflow lines 98, 256) and run-happytohelp (47, 170): drop `github.run_attempt` from shared build artifact names, use `<seed>-verify-build-<sha>-<run_id>` for both upload and download, and add `overwrite: true` to the upload. Verify's workflow guard rejects attempt-qualified downloads and their shared uploads; apply the same patch to any seed with this pattern on its next refresh. See `export/VERIFY-WORKFLOW.md`.
 
 ## 0.2.90
 
