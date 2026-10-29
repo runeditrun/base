@@ -3,6 +3,7 @@ import { capabilitySet, offers } from '../capabilities.mjs';
 import { errorCode } from './protocol.mjs';
 
 export function scopedSurface(surface) {
+ if (!surface || typeof surface !== 'object') return surface;
  const set = capabilitySet(surface.capabilities);
  if (set.mode === 'legacy' || !surface || typeof surface !== 'object') return surface;
  // Only the built-in event tool is optional here. Native tools, authorization,
