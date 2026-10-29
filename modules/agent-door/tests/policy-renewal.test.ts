@@ -29,7 +29,7 @@ const surface = {
 test('a long held conformance phase renews policy without changing approval evidence', async () => {
  const r = await runtime({ resourceScope: 'resources:read' })
  const log: any[] = [], completed: string[] = []
- let held = false, interval = 0
+ let held = false, interval = 0, heldStart = 0
  try {
   const result = await runAgentDoorConformance({
    fetch: async (url: string, init: any = {}) => {
@@ -38,13 +38,18 @@ test('a long held conformance phase renews policy without changing approval evid
      const payload = JSON.parse(Buffer.from(JSON.parse(init.body).policy.split('.')[1], 'base64url').toString())
      log.push({ path, payload })
      interval = (payload.exp - payload.iat) * 1000 / 6
-    } else log.push({ path })
+    } else log.push({ path, held, at: r.c.now })
     const response = await r.fetch(url, init)
     if (path === '/api/rer/agent-policy') log.at(-1).accepted = response.ok
+    if (held && path === '/mcp') {
+     const body = await response.clone().json()
+     log.at(-1).pending = body.result?._meta?.['com.runeditrun/approval']?.id
+    }
     if (held && path === '/mcp' && (await response.clone().json()).result?.resultType === 'input_required') await r.setNow(r.c.now + interval)
     return response
    }, origin: r.c.origin, surface, signer: r.c.signer, person: r.c.person, now: () => r.c.now,
    nativeStep: async ({ stage, phase, step }: any) => {
+    if (phase === 'held' && !heldStart) heldStart = r.c.now
     held = phase === 'held'
     if (held && stage === 'beforeStep') await r.setNow(r.c.now + interval)
     if (held && stage === 'afterStep') completed.push(step.id)
@@ -57,6 +62,7 @@ test('a long held conformance phase renews policy without changing approval evid
   const adoptions = log.filter(entry => entry.payload && entry.accepted)
   const renewals = adoptions.filter((entry, i) => i && entry.payload.seq === adoptions[i - 1].payload.seq)
   assert.ok(renewals.length > 0)
+  assert.ok(r.c.now - heldStart > interval * 6, 'The held phase must exceed an original envelope lifetime')
   for (const renewal of renewals) {
    const previous = adoptions[adoptions.indexOf(renewal) - 1].payload
    const { iat, exp, ...authority } = renewal.payload
@@ -67,6 +73,11 @@ test('a long held conformance phase renews policy without changing approval evid
    console.log(`RENEW seq=${authority.seq} revision=${authority.revision} iat=${oldIat}->${iat} before-exp=${oldExp} next=${log[log.indexOf(renewal) + 1]?.path}`)
   }
   assert.equal(result.points.filter((point: any) => point.id.startsWith('BASE-AGENT-007.7.adopt.')).length, new Set(adoptions.map(entry => entry.payload.seq)).size)
+  const pendingAcrossRenewal = log.find(entry => entry.held && entry.pending && renewals.some(renewal =>
+   log.indexOf(renewal) > log.indexOf(entry) && log.some(decision =>
+    decision.path === `/agents/api/approvals/${entry.pending}/approve` && log.indexOf(decision) > log.indexOf(renewal))))
+  assert.ok(pendingAcrossRenewal, 'A held approval must execute after its pending evidence crosses a renewal')
+  console.log(`HELD-RENEWAL approval=${pendingAcrossRenewal.pending} outcome=executed elapsed-ms=${r.c.now - heldStart}`)
   for (const id of ['send', 'access', 'erase']) assert.ok(result.points.some((point: any) => point.id === `BASE-AGENT-007.5.receipt.${id}` && point.ok))
   const identities = (await r.person('/agents/api/agents')).body.agents.filter((agent: any) => agent.id.startsWith('rer-conformance-'))
   assert.equal(identities.length, 1)
