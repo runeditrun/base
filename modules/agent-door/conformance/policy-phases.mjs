@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
-import { autonomousPolicy } from './crypto.mjs';
+import { webcrypto } from 'node:crypto';
+import { autonomousPolicy, policyEnvelope, signJws, seconds } from './crypto.mjs';
 import { errorCode } from './protocol.mjs';
 import { nativeStepHook } from './step-hooks.mjs';
 
@@ -29,6 +30,45 @@ export async function removalPhase(c) {
  await unsetPolicy(c);
  await c.adopt(autonomousPolicy());
  c.add('BASE-AGENT-007.2.unset-no-effect', isDeepStrictEqual(before, await c.witness()), 'Calls under the removed policy changed native state.');
+ await renewalRefusals(c);
+}
+async function renewalRefusals(c) {
+ const adopted = c.adoptedPolicy, now = seconds(c.now);
+ const state = await c.personJson('/agents/api/state'), approvals = await c.personJson('/agents/api/approvals'), before = await c.witness();
+ const sign = payload => signJws(c.signer.privateKey, c.signer.kid, 'rer-agent-policy+jwt', payload);
+ const later = { ...adopted, iat: adopted.iat + 1, exp: now + 300 };
+ const changed = autonomousPolicy(); changed.rules = [{ id: 'all', class: '*', do: 'blocked' }];
+ const foreign = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+ const altered = await policyEnvelope(c, changed, { seq: adopted.seq, revision: adopted.revision, iat: later.iat });
+ const revised = await policyEnvelope(c, adopted.document, { seq: adopted.seq, iat: later.iat });
+ const business = await policyEnvelope({ ...c, business: `${c.business}-other` }, adopted.document, { seq: adopted.seq, revision: adopted.revision, iat: later.iat });
+ const resigned = await policyEnvelope({ ...c, signer: { ...c.signer, privateKey: foreign.privateKey } }, adopted.document, { seq: adopted.seq, revision: adopted.revision, iat: later.iat });
+ // Use a fresh trusted revision signature to prove that even equivalent
+ // evidence cannot replace the exact adopted revision signature at equal seq.
+ const revisionClaims = JSON.parse(Buffer.from(adopted.revision_signature.split('.')[1], 'base64url').toString());
+ const freshSignature = await signJws(c.signer.privateKey, c.signer.kid, 'rer-agent-policy-revision+jwt', revisionClaims);
+ const cases = [
+  ['expired', await sign({ ...later, exp: now - 1 }), 'policy_invalid', 400],
+  ['untrusted', await signJws(foreign.privateKey, c.signer.kid, 'rer-agent-policy+jwt', later), 'policy_invalid', 400],
+  ['revision-mismatch', await sign({ ...later, document: changed }), 'policy_revision_invalid', 400],
+  ['equal-iat', await sign({ ...later, iat: adopted.iat }), 'policy_stale', 409],
+  ['earlier-iat', await sign({ ...later, iat: adopted.iat - 1 }), 'policy_stale', 409],
+  ['document', altered.policy, 'policy_stale', 409],
+  ['revision', revised.policy, 'policy_stale', 409],
+  ['business', business.policy, 'policy_stale', 409],
+  ['paused', await sign({ ...later, paused: !adopted.paused }), 'policy_stale', 409],
+  ['revoked', await sign({ ...later, revoked: { agents: [c.agentId], consents: [c.consent] } }), 'policy_stale', 409],
+  ['revision-signature', await sign({ ...later, revision_signature: freshSignature }), 'policy_stale', 409],
+  ['untrusted-revision', await sign({ ...later, revision_signature: resigned.payload.revision_signature }), 'policy_revision_invalid', 400],
+ ];
+ for (const [name, policy, code, status] of cases) {
+  const response = await c.request('/api/rer/agent-policy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ policy }) });
+  const body = await response.json();
+  const call = await c.tool(c.surface.witness.tool, c.resolve(c.surface.witness.args));
+  c.add(`BASE-AGENT-007.7.renew.${name}`, response.status === status && body.code === code &&
+   isDeepStrictEqual(state, await c.personJson('/agents/api/state')) && isDeepStrictEqual(approvals, await c.personJson('/agents/api/approvals')) &&
+   !call.result?.isError && isDeepStrictEqual(before, call.result?.structuredContent), `${name} must refuse ${code} without changing policy, approvals or native state.`);
+ }
 }
 export async function blockedPhases(c) {
  const nonstandard = [...new Set(c.surface.tools.flatMap(tool => tool.classes))].filter(cls => cls !== 'standard');
