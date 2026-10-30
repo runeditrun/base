@@ -190,3 +190,60 @@ test('a declared agent initializer binds each chosen ID through the person door 
   assert.equal(lines.join('\n').includes(hook.privateValue), false);
  }
 });
+
+test('additional sponsors confirm their own captured mail without reading another principal mailbox', { timeout: 120000 }, async t => {
+ const root = await fixtureSeed(t, 'native', { sponsors: true });
+ const path = join(root, 'agent-surface.json'), surface = JSON.parse(await readFile(path, 'utf8'));
+ await writeFile(join(root, 'mail-owner.mjs'), `
+ import initialize from './initializer.mjs';
+ export let mail;
+ export default async context => { mail = context.mail; return initialize(context); };
+ `);
+ await writeFile(join(root, 'mail-sponsor.mjs'), String.raw`
+ import assert from 'node:assert/strict';
+ import { confirmMail } from './confirm-mail.mjs';
+ export const mailboxes = [];
+ export default async context => {
+  const { mail } = context;
+  assert.deepEqual(Object.keys(mail), ['read']);
+  // Business sent both invitations before either additional initializer runs;
+  // the owner's native confirmation also already exists in this installation.
+  assert.equal(mail.read({ limit: 20 }).length, 1);
+  assert.throws(() => mail.read({ limit: 21 }));
+  assert.throws(() => mail.read({ maxAgeMs: 300001 }));
+  const invitation = new URL(mail.read({ limit: 1 })[0].text.match(/https:\/\/[^\s]+/)[0]);
+  const admitted = await context.request(context.origin + '/auth/confirm', { method: 'POST', redirect: 'manual',
+   headers: { Origin: context.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: invitation.searchParams.get('token') }) });
+  assert.equal(admitted.status, 303);
+  await admitted.body?.cancel();
+  const response = await confirmMail(context);
+  const messages = mail.read({ limit: 20 });
+  assert.equal(messages.length, 2);
+  assert.deepEqual(mail.read({ limit: 20, email: context.owner.email }), messages);
+  mailboxes.push({ mail, messages });
+  const cookie = response.headers.getSetCookie().map(value => value.split(';', 1)[0]).join('; ');
+  const linked = await context.request(context.origin + '/app/membership/link', { method: 'POST',
+   headers: { Origin: context.origin, Cookie: cookie, 'Content-Type': 'application/json' }, body: '{}' });
+  assert.equal(linked.status, 200);
+  await linked.body?.cancel();
+  return response;
+ };
+ `);
+ surface.verification.owner.initializer = 'mail-owner.mjs';
+ surface.verification.sponsors[1].initializer = 'mail-sponsor.mjs';
+ surface.verification.sponsors.push({ label: 'admin', role: 'admin', email: 'synthetic-admin@example.com', initializer: 'mail-sponsor.mjs' });
+ await writeFile(path, JSON.stringify(surface));
+ await buildFixture(root);
+ const result = await checkAgentDoor(root, { report: () => {} });
+ assert.equal(result.ok, true);
+ const cross = result.points.filter(point => point.id.startsWith('BASE-AGENT-004.cross-sponsor.'));
+ for (const label of ['member', 'admin']) assert.ok(cross.some(point => point.id === `BASE-AGENT-004.cross-sponsor.${label}.binding` && point.ok));
+ assert.ok(cross.every(point => point.ok));
+ const { mailboxes } = await import(new URL('mail-sponsor.mjs', 'file://' + root + '/'));
+ assert.equal(mailboxes.length, 2);
+ const [first, second] = mailboxes.map(({ messages }) => messages.map(message => message.text));
+ assert.ok(first.every(text => !second.includes(text)), 'Distinct sponsors must never receive each other\'s confirmation proofs');
+ const owner = await import(new URL('mail-owner.mjs', 'file://' + root + '/'));
+ for (const mail of [owner.mail, ...mailboxes.map(entry => entry.mail)]) assert.throws(() => mail.read(), /active run/);
+ t.diagnostic(`Native captured-mail sponsors: ${cross.length}/${cross.length} cross-sponsor points; isolated invitation and confirmation readers destroyed on close.`);
+});

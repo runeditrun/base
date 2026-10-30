@@ -67,7 +67,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  const publicKeys = { [kid]: { kty, crv, x, y, kid, alg: 'ES256', use: 'sig' } };
  const values = { issuer, installationId, appOrigin: HOSTED_ORIGIN, publicKeys: JSON.stringify(publicKeys), email, sub, token, sessionSecret: randomBytes(32).toString('hex') };
  const nativeBindings = await verificationBindings(root, native.bindings, values);
- const network = await createAgentConformanceNetwork(root, verification.network, { email });
+ const network = await createAgentConformanceNetwork(root, verification.network, { email, sponsorEmails: principals.slice(1).map(person => person.email) });
  let hosted, history;
  try {
  hosted = await serveHosted(root, { declaration, rpc: verification.rpc, workerEntrypoints: workerDriver ? [workerDriver.entrypoint] : [], outboundService: async request => {
@@ -132,7 +132,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
    try {
     response = await principal.initialize({ request, origin: hosted.origin, email: principal.email, sub: principal.sub,
      label: principal.label, displayName: principal.label, token, claim: { mode: 'signed', path, token: signedClaim },
-     owner: sponsors[0], database: hosted.database, mail: network.mail, fixtures: network.fixtures, returnTo: owner?.returnTo ?? '/',
+     owner: sponsors[0], database: hosted.database, mail: network.mailFor(principal.email), fixtures: network.fixtures, returnTo: owner?.returnTo ?? '/',
     });
    } catch { throw new RerError('agent_sponsor_bootstrap', 'An additional sponsor could not complete its native lifecycle through the disposable installation.', 1); }
    const session = response?.headers?.getSetCookie().map(value => value.split(';', 1)[0]).join('; ');
