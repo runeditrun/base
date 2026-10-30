@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdir,mkdtemp,rm,symlink,writeFile} from 'node:fs/promises';
+import {mkdir,mkdtemp,readFile,rm,symlink,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {execFile} from 'node:child_process';
@@ -82,4 +82,64 @@ test('hosted mail uses declared Managed credentials without concealing missing o
  declaration.secrets=[{binding:'MAIL_PROVIDER_API_KEY',verifyStandIn:'test-own-host-mail-key'}];
  await writeFile(join(root,'deploy.json'),JSON.stringify(declaration));
  assert.equal(JSON.parse((await check()).stdout).health,'identity');
+});
+
+test('hosted public-only mail reads delivery declarations, preserves real public values and leaves the build untouched',async t=>{
+ const root=await seed(t,true),entry=resolve(import.meta.dirname,'hosted-output.mjs');
+ const names=['MAIL_PROVIDER','MAIL_FROM','MAIL_RELAY_URL'];
+ const declaration={secrets:[{binding:'MAIL_API_KEY'}]};
+ await writeFile(join(root,'deploy.json'),JSON.stringify(declaration));
+ await writeFile(join(root,'rer-setup.json'),JSON.stringify({fields:[
+  {name:'MAIL_RELAY_URL',kind:'url',required:true,when:{field:'MAIL_PROVIDER',equals:'rer'}},
+  {name:'MAIL_FROM',kind:'email',required:false,presentations:[{when:{field:'MAIL_PROVIDER',nonEmpty:true},required:true}]},
+  {name:'MAIL_PROVIDER',kind:'select',required:true,default:'rer',options:[{value:'rer'},{value:'resend'}]},
+ ]}));
+ const mailWorker=(provider,from,relay)=>worker(true).replace("if(path==='/health')",`if(path==='/health'&&(!env.MAIL_API_KEY||env.MAIL_PROVIDER!==${JSON.stringify(provider)}||env.MAIL_FROM!==${JSON.stringify(from)}||env.MAIL_RELAY_URL!==${JSON.stringify(relay)}))return Response.json({ok:false},{status:503});
+ if(path==='/health')`);
+ await writeFile(join(root,'dist/server/index.js'),mailWorker('rer','owner@example.com','https://rer-hosted-check.invalid/'));
+ const check=()=>run(process.execPath,[entry,root]);
+ const absent=await check().then(()=>null,error=>error);
+ assert.match(absent?.stderr??'',/HTTP 503/,'setup fields alone cannot invent undeclared public bindings');
+ const sources=['rer-packaging.json','packaging.json','scripts/delivery/base/packaging.json','management/integration/deployment-spec.json'];
+ for(const path of sources){
+  const projection=path.startsWith('management/');
+  const spec=projection?{publicVariables:Object.fromEntries(names.map(name=>[name,'']))}:{publicVariableNames:names};
+  await mkdir(join(root,path,'..'),{recursive:true});
+  await writeFile(join(root,path),JSON.stringify(projection?spec:{artifact:{specInputs:spec}}));
+  const built=await readFile(join(root,'dist/server/index.js')),config=await readFile(join(root,'dist/server/wrangler.json'));
+  assert.equal(JSON.parse((await check()).stdout).health,'identity',path);
+  assert.deepEqual(await readFile(join(root,'dist/server/index.js')),built);
+  assert.deepEqual(await readFile(join(root,'dist/server/wrangler.json')),config);
+  await rm(join(root,path));
+ }
+ // An empty deploy placeholder cannot erase a real build value.
+ const values={MAIL_PROVIDER:'resend',MAIL_FROM:'built@example.com',MAIL_RELAY_URL:'https://real.example.invalid/relay'};
+ await writeFile(join(root,'dist/server/wrangler.json'),JSON.stringify({main:'index.js',compatibility_date:'2026-09-08',assets:{directory:'../client'},vars:values}));
+ declaration.vars=Object.fromEntries(names.map(name=>[name,'']));
+ await writeFile(join(root,'deploy.json'),JSON.stringify(declaration));
+ await writeFile(join(root,'dist/server/index.js'),mailWorker(...Object.values(values)));
+ assert.equal(JSON.parse((await check()).stdout).health,'identity');
+ // A configured deploy value retains its existing precedence over the build.
+ declaration.vars.MAIL_FROM='deployed@example.com';
+ await writeFile(join(root,'deploy.json'),JSON.stringify(declaration));
+ await writeFile(join(root,'dist/server/index.js'),mailWorker('resend',declaration.vars.MAIL_FROM,values.MAIL_RELAY_URL));
+ assert.equal(JSON.parse((await check()).stdout).health,'identity');
+});
+
+test('hosted verification fills required public inputs without enabling optional, private or undeclared inputs',async t=>{
+ const root=await seed(t,true),entry=resolve(import.meta.dirname,'hosted-output.mjs');
+ await writeFile(join(root,'deploy.json'),JSON.stringify({vars:{REGION:'',OPTIONAL_URL:'',ZERO:0,DISABLED:false}}));
+ await writeFile(join(root,'packaging.json'),JSON.stringify({artifact:{specInputs:{publicVariableNames:['MODE','CALLBACK','DISPLAY_NAME'],publicVariables:{DISPLAY_NAME:'Declared name'}}}}));
+ await writeFile(join(root,'rer-setup.json'),JSON.stringify({fields:[
+  {name:'CALLBACK',kind:'url',required:true,when:{field:'MODE',equals:'hosted'}},
+  {name:'REGION',kind:'text',required:true,default:'west'},
+  {name:'MODE',kind:'select',required:true,options:[{value:'hosted'}]},
+  {name:'DISPLAY_NAME',kind:'text',required:true,default:'Default name'},
+  {name:'OPTIONAL_URL',kind:'url',required:false},
+  {name:'UNDECLARED_REQUIRED',kind:'text',required:true},
+  {name:'PRIVATE_REQUIRED',kind:'secret',required:true},
+ ]}));
+ await writeFile(join(root,'dist/server/index.js'),worker(true).replace("if(path==='/health')",`if(path==='/health'&&(env.REGION!=='west'||env.MODE!=='hosted'||env.CALLBACK!=='https://rer-hosted-check.invalid/'||env.DISPLAY_NAME!=='Declared name'||env.ZERO!==0||env.DISABLED!==false||env.OPTIONAL_URL!==''||env.UNDECLARED_REQUIRED!==undefined||env.PRIVATE_REQUIRED!==undefined||env.MAIL_PROVIDER!==undefined))return Response.json({ok:false},{status:503});
+ if(path==='/health')`));
+ assert.equal(JSON.parse((await run(process.execPath,[entry,root])).stdout).health,'identity');
 });

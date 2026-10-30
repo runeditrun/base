@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Supply required declared public inputs only inside hosted-output verification, using setup defaults and disposable stand-ins when unset. Preserve configured public values and leave optional integrations unconfigured; deployment declarations and built artifacts are unchanged.
+
 - Give each additional Business sponsor verifier initializer its own captured-mail reader, with the owner's existing provider, size, count and age limits. Native invitation confirmation can complete without exposing another principal's mail.
 
 - Package deploy migrations from the seed's declared `DB.migrations_dir`, sharing the native archive lookup; undeclared seeds retain `migrations/core` and their existing package bytes.
