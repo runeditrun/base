@@ -10,9 +10,12 @@ MCP method names below use spaced slashes; wire names omit those spaces.
 Native subject erasure under BASE-DATA-003 overrides the personal fields and
 payload replay described in BASE-AGENT-009 and BASE-AGENT-012. Keep value-free
 decision fields and the existing audit sequence plus the native erasure
-tombstone; replay refuses without executing or echoing erased payload.
+tombstone; in-window replay refuses without executing or echoing erased payload.
 Installation-private keyed legacy replay aliases replace erased personal keys
-for the existing indefinite replay lifetime and never enter archives or exports.
+only until the call's replay horizon: the fixed 30-day `REPLAY_WINDOW_MS` after
+completion where no horizon exists. Delete aliases with their call at expiry.
+An old key after expiry is a new request under current authorization and cannot
+recover the erased value. Aliases never enter archives, exports or restore.
 The adoption guide defines the map, native transaction and restore custody.
 This clarification does not promote any clause judgment.
 
