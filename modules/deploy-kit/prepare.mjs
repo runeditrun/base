@@ -7,7 +7,7 @@ import { assetsIgnore, collectFiles, regularBytes, validateArtifact, MAX_ARTIFAC
 import { collectBuildModules } from './build-modules.mjs';
 import { refuseLocalEnvFiles, refuseLocalModels } from './local-only.mjs';
 import { readMigrationRewrites, withRewrites } from './migrations.mjs';
-import { migrationDirectory } from '../../cli/portability-migrations.mjs';
+import { migrationDirectory } from './migration-directory.mjs';
 
 export function assertCredentialFree(env) {
   for (const [key,value] of Object.entries(env)) if (value && /(?:TOKEN|SECRET|PASSWORD|API_KEY|PRIVATE_KEY|AUTHORIZATION|COOKIE|CREDENTIAL)/i.test(key)) throw new Error('prepare-credential-environment-forbidden');
