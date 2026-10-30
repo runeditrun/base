@@ -12,7 +12,7 @@ sourceRoots.push('modules/agent-door/capabilities.mjs', 'modules/agent-door/capa
 sourceRoots.push('edition-authoring/archive-source.mjs');
 sourceRoots.push('edition-authoring/copy-namespaces.mjs');
 sourceRoots.push('edition-authoring/module-packages.mjs');
-sourceRoots.push('foundation/runtime/contract-prose.mjs', 'foundation/runtime/contract-prose-patterns.mjs');
+sourceRoots.push('foundation/runtime/contract-prose.mjs', 'foundation/runtime/contract-prose-patterns.mjs', 'foundation/runtime/contract-anchor.mjs');
 export async function inventory(base, roots = sourceRoots) {
  const files = [];
  async function walk(path) {

@@ -32,7 +32,7 @@ async function installation(fixture) {
   const root = await mkdtemp(join(tmpdir(), 'contract-docs-'))
   await cp(join(fixtures, fixture), root, { recursive: true })
   await mkdir(join(root, 'src/base'), { recursive: true })
-  await Promise.all(['contract-docs.mjs', 'contract-prose.mjs', 'contract-prose-patterns.mjs', 'seed-contract.mjs'].map(file =>
+  await Promise.all(['contract-docs.mjs', 'contract-anchor.mjs', 'contract-prose.mjs', 'contract-prose-patterns.mjs', 'seed-contract.mjs'].map(file =>
     cp(join(import.meta.dirname, 'runtime', file), join(root, 'src/base', file))))
   git(root, 'init', '-q')
   git(root, 'add', '.')
@@ -98,6 +98,61 @@ async function generatedJourney(root) {
   succeeds(root, 'check')
   assert.equal(await read(root, 'ACCEPTANCE.md'), acceptance)
 }
+
+test('a committed anchor preserves generation without history and refuses unauthenticated source objects', async () => {
+  const root = await installation('standard')
+  const copies = await mkdtemp(join(tmpdir(), 'contract-anchor-'))
+  try {
+    const old = git(root, 'rev-parse', 'HEAD')
+    succeeds(root, 'coverage', 'init', '--old', old)
+    succeeds(root, 'write')
+    succeeds(root, 'check')
+    const expected = await snapshot(root)
+    succeeds(root, 'anchor', '--old', old)
+    const recordPath = 'docs/contract/ANCHOR.json', record = await read(root, recordPath)
+    git(root, 'add', '.')
+    git(root, 'commit', '-qm', 'Record portable anchor and current documents')
+    const shallow = join(copies, 'shallow'), bare = join(copies, 'snapshot')
+    git(root, 'clone', '-q', '--depth', '1', `file://${root}`, shallow)
+    await cp(shallow, bare, { recursive: true })
+    await rm(join(bare, '.git'), { recursive: true })
+    assert.notEqual(spawnSync('git', ['cat-file', '-e', old], { cwd: shallow }).status, 0, 'shallow fixture must lack the original')
+    for (const copy of [shallow, bare]) {
+      succeeds(copy, 'check')
+      succeeds(copy, 'write')
+      assert.deepEqual(await snapshot(copy), expected)
+      await rm(join(copy, recordPath))
+      refuses(copy, 'contract_anchor_missing', 'write')
+      refuses(copy, 'contract_anchor_missing', 'check')
+      await edit(copy, recordPath, record)
+    }
+    const original = JSON.parse(record)
+    const corruptions = [
+      value => { value.commit = git(root, 'rev-parse', 'HEAD') },
+      value => { value.objects[old].data = Buffer.from('forged commit').toString('base64') },
+      value => { Object.values(value.objects).find(object => object.type === 'tree').data = Buffer.from('forged tree').toString('base64') },
+      value => { Object.values(value.objects).find(object => object.type === 'blob').data = Buffer.from('forged historical answer').toString('base64') },
+      value => { delete value.objects[Object.keys(value.objects).find(id => value.objects[id].type === 'blob')] },
+    ]
+    for (const corrupt of corruptions) {
+      const value = structuredClone(original)
+      corrupt(value)
+      // Full history must not rescue a tampered record either.
+      for (const copy of [root, shallow, bare]) {
+        await edit(copy, recordPath, JSON.stringify(value))
+        refuses(copy, 'contract_anchor_invalid', 'write')
+        refuses(copy, 'contract_anchor_invalid', 'check')
+        assert.deepEqual(await snapshot(copy), expected, 'refusal must precede generated writes')
+      }
+    }
+    await rm(join(root, recordPath))
+    succeeds(root, 'write')
+    succeeds(root, 'check')
+    assert.deepEqual(await snapshot(root), expected, 'full history without a record keeps identical output')
+  } finally {
+    await Promise.all([root, copies].map(path => rm(path, { recursive: true, force: true })))
+  }
+})
 
 async function nonProductJourney() {
   const sources = [
