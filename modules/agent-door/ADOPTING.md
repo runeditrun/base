@@ -667,9 +667,15 @@ still own atomic revision checks at their effect boundary.
 
 ## MCP version compatibility
 
-The negotiated versions remain `2026-07-28` and `2025-11-25`. Both initialize
-and list the same registry; unsupported negotiation returns
-`UnsupportedProtocolVersion` (-32022). March `2025-03-26` is deliberately not
+The negotiated versions are `2026-07-28`, `2025-11-25` and `2025-06-18`. All
+initialize and list the same registry; unsupported negotiation returns
+`UnsupportedProtocolVersion` (-32022), with a plain-language message and the
+supported versions in error data. Authenticate initialize and later calls with
+a bearer token; a 401 resource-metadata challenge precedes protocol validation.
+Initialize accepts its body version without transport headers; subsequent
+stateless calls without the version header use `2025-06-18`. June and November
+use the legacy `approval_required` result rather than modern `input_required`.
+March `2025-03-26` is deliberately not
 advertised: its Streamable HTTP transport permits batched requests, which this
 door's single-message parser rejects, and its pre-June schema lacks structured
 results, output schemas, resource links and elicitation. March also predates the
