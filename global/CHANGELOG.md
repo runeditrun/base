@@ -2,6 +2,8 @@
 
 ## 0.2.94
 
+- Let archive-owning Workers verify legacy migration ledgers through optional seed-owned build evidence, using the library door's existing validation and restore guards.
+
 - Diagnose misbound application ports from declared bindings and socket ownership without sending HTTP health requests to auxiliary runtime listeners during startup.
 
 - Share the guarded disposable host writer with isolated, named insert-only history fixtures. Native phase preparation can age native history, run scheduled work and hold queue deliveries; atomic guards protect every agent-door table while owner initialization stays read-only.
