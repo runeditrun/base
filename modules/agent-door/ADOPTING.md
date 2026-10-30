@@ -189,6 +189,10 @@ A narrowing-only tool still declares `authority`, returning `widens: false`.
 A contradictory widening answer refuses as `narrowing_contract_violation`.
 Unlike ordinary tools' ignored extras, undeclared narrowing-tool arguments
 refuse as `invalid_arguments`, including attempts to replay a prior key.
+When a journey step's `inject` adds an undeclared narrowing argument, the
+injected replay must return `invalid_arguments` and leave the native witness
+unchanged. An injection containing only declared arguments retains the success
+expectation, as does an ordinary valid replay; neither repeats the native effect.
 Every such tool needs a normal journey step and a `narrowings` entry:
 
 ```json

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.94-dev.gb86657c5",
+  "cliVersion": "0.2.94",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2015,7 +2015,7 @@
     },
     "modules/agent-door/conformance/journey.mjs": {
       "source": "modules/agent-door/conformance/journey.mjs",
-      "sha256": "6b04714c746aeec401bed3277820e9c22219591bd0b5461fc23eb8a429da2b55"
+      "sha256": "f9e1d541831e07697ada515cc6fcd5c84ca63a22a3615c5326f1b4665b868c55"
     },
     "modules/agent-door/conformance/narrowing.d.mts": {
       "source": "modules/agent-door/conformance/narrowing.d.mts",

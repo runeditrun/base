@@ -29,10 +29,10 @@ CREATE TABLE fixture_records (id TEXT PRIMARY KEY, value TEXT NOT NULL, version 
 CREATE TABLE fixture_receipts (id TEXT PRIMARY KEY, record_id TEXT NOT NULL REFERENCES fixture_records(id), kind TEXT NOT NULL, status INTEGER NOT NULL, body TEXT NOT NULL, operator_id TEXT NOT NULL REFERENCES oa_operators(id), created_at INTEGER NOT NULL);
 `;
 
-export async function buildFixture(root) {
+export async function buildFixture(root, plugins = []) {
  const require = createRequire(join(base, 'default-seed/package.json'));
  return require('esbuild').build({ metafile: true, entryPoints: [join(import.meta.dirname, 'worker.mjs')], outfile: join(root, 'dist/server/index.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022', external: ['cloudflare:workers'],
-  plugins: [{ name: 'fixture-credentials', setup(build) {
+  plugins: [...plugins, { name: 'fixture-credentials', setup(build) {
    build.onResolve({ filter: /^\.\/credentials\.mjs$/ }, () => ({ path: join(root, 'credentials.mjs') }));
   } }],
  });
