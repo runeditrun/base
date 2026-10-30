@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Contract document generation can verify a committed historical anchor record in snapshots and shallow checkouts. Missing history without a record and tampered records still refuse; full-history checkouts need no record.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.

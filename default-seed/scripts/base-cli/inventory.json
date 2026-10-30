@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.91-dev.g88951629",
+  "cliVersion": "0.2.91-dev.g3fe95fdc",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -923,7 +923,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "796cb0cfe87dc5e093ebae67eaabab272c41c8f4bb335c18270869f5f11eeba6"
+      "sha256": "2902cb8213adc08570934b9901f1dd7370773783c2982ff901d85fd0b0195281"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1905,9 +1905,13 @@
       "source": "edition-authoring/workflow-scripts.mjs",
       "sha256": "d2a65622a919fb630c9759eb937edb2e06ab1ad7c18212389f6d509fb06db7f3"
     },
+    "foundation/runtime/contract-anchor.mjs": {
+      "source": "foundation/runtime/contract-anchor.mjs",
+      "sha256": "b63993a57cff119f3f1d4407963d2623abe18733fffb0f04de12f43bc503821d"
+    },
     "foundation/runtime/contract-docs.mjs": {
       "source": "foundation/runtime/contract-docs.mjs",
-      "sha256": "e43dc064aaedaff9309c5c52a42814784e761b82a618cf397cd91251177551e5"
+      "sha256": "f8fd9d71c6355b85dd3d58017786693abbe77a6111f2fe376ff97c821b66c778"
     },
     "foundation/runtime/contract-prose-patterns.mjs": {
       "source": "foundation/runtime/contract-prose-patterns.mjs",

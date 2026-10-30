@@ -24,7 +24,7 @@ async function installation(fixture) {
   const root = await mkdtemp(join(tmpdir(), 'contract-docs-'))
   await cp(join(fixtures, fixture), root, { recursive: true })
   await mkdir(join(root, 'src/base'), { recursive: true })
-  await Promise.all(['contract-docs.mjs', 'contract-prose.mjs', 'contract-prose-patterns.mjs', 'seed-contract.mjs'].map(file =>
+  await Promise.all(['contract-docs.mjs', 'contract-anchor.mjs', 'contract-prose.mjs', 'contract-prose-patterns.mjs', 'seed-contract.mjs'].map(file =>
     cp(join(import.meta.dirname, 'runtime', file), join(root, 'src/base', file))))
   git(root, 'init', '-q')
   git(root, 'add', '.')
