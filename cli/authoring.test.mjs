@@ -411,3 +411,13 @@ test('packed archive refresh preserves workflow ownership and delivers an interc
  const {archiveDeliveryJourney} = await import('./fixtures/authoring-archive.mjs');
  await archiveDeliveryJourney(t, {fixture, write, commit, git});
 });
+
+test('packed refresh lists all retained refusals and supports record-refresh-merge recovery', async t => {
+ const {retainedRecovery} = await import('./fixtures/authoring-module-closure.mjs');
+ await retainedRecovery(t, {fixture, write, commit, base});
+});
+
+test('packed refresh closes Penny-shaped deploy-kit copies without a CLI namespace', async t => {
+ const {deployKitRefresh} = await import('./fixtures/authoring-module-closure.mjs');
+ await deployKitRefresh(t, {fixture, write, commit, base});
+});

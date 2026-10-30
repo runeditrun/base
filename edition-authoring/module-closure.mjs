@@ -5,6 +5,7 @@ import {raw, safe, requirePhysical, testSource, freedEntries, toolFile} from './
 import {dependencies, resolve, external, bindings, lexicalExports} from './runtime-dependencies.mjs';
 import {relocateDependencies} from './module-edges.mjs';
 import {sharedNamespaces} from './copy-namespaces.mjs';
+import {fileURLToPath} from 'node:url';
 import {acknowledgementCommand} from './base-acknowledgements.mjs';
 import {checkModulePackages} from './module-packages.mjs';
 const code = name => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(name) && !testSource(name);
@@ -183,11 +184,21 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, b
       withheld.push({path: destination, originPath: addition.source, dependency: request.specifier});
     }
   }
-  const incoming = new Set();
+  const incoming = new Set(), newlyRequired = new Set();
   for (const item of queue) for (const request of requests(item.adapted ? local(item.target) : blob(item.entry), item.source, item.target)) {
     if (baseline.has(key(item.target, request))) continue;
     const {destination} = edge(item.source, item.target, request);
-    if (destination) incoming.add(destination);
+    if (destination) {
+      incoming.add(destination);
+      if (!item.adapted) {
+        const before = disk.has(item.target) ? local(item.target) : '';
+        const previous = dependencies(before, item.source);
+        const oldNames = bindings(before, request.types, item.source).get(request.specifier);
+        const names = bindings(blob(item.entry), request.types, item.source).get(request.specifier);
+        if (!previous.some(old => key(item.target, old) === key(item.target, request)) ||
+            [...names ?? []].some(name => !oldNames?.has(name))) newlyRequired.add(destination);
+      }
+    }
   }
   function exportsAt(target, types = false, seen = new Set()) {
     if (seen.has(target)) return new Set();
@@ -198,7 +209,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, b
     const result = lexicalExports(local(target), specifier => {
       const next = resolve(disk, target, specifier, {types});
       return next ? exportsAt(next, types, seen) : null;
-    }, types);
+    }, types, target);
     if (result === null) return null;
     const declaration = target.replace(/\.mjs$/, '.d.mts').replace(/\.js$/, '.d.ts');
     if (types && declaration !== target && disk.has(declaration)) {
@@ -208,6 +219,7 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, b
     }
     return result;
   }
+  const missingExports = new Map();
   const seen = new Set();
   for (let i = 0; i < queue.length; i++) {
     const item = queue[i], {plan, source, target, entry, adapted} = item;
@@ -215,8 +227,8 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, b
     seen.add(target);
     const bytes = adapted ? local(target) : blob(entry);
     const before = Object.hasOwn(plan.copy.files, target) && disk.has(target) ? local(target) : '';
-    const imports = bindings(bytes), oldBindings = bindings(before);
-    const typeImports = bindings(bytes, true), oldTypes = bindings(before, true);
+    const imports = bindings(bytes, false, source), oldBindings = bindings(before, false, source);
+    const typeImports = bindings(bytes, true, source), oldTypes = bindings(before, true, source);
     const edges = requests(bytes, source, target).map(request => edge(source, target, request));
     // lock.mjs reads the whole tool dynamically to identify it. Deliver that
     // same file set, including parser notices and modules outside its imports.
@@ -232,7 +244,12 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, b
     const declaration = source.replace(/\.mjs$/, '.d.mts').replace(/\.cjs$/, '.d.cts');
     if (declaration !== source && tree.has(declaration)) edges.push({dependency: declaration, destination: target.replace(/\.mjs$/, '.d.mts').replace(/\.cjs$/, '.d.cts')});
     const novel = directoryAdditions.has(target) && !required.has(target) && !incoming.has(target);
-    const preserved = request => baseline.has(key(target, request));
+    // An incoming importer can newly require a file which the seed has just
+    // restored and recorded at this target pin. Close that pristine Base file
+    // now; its unresolved siblings are the recovery refresh's deliveries.
+    // Older pins and acknowledged adaptations retain their historical edges.
+    const restored = !adapted && plan.copy.revision === revision && newlyRequired.has(target);
+    const preserved = request => !restored && baseline.has(key(target, request));
     let hold;
     for (const edge of edges) {
       const {specifier, dependency, destination, satisfied} = edge;
@@ -257,16 +274,9 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, b
         for (const [types, current, previous] of [[false, imports, oldBindings], [true, typeImports, oldTypes]]) {
           const exported = exportsAt(destination, types);
           for (const name of current.get(specifier) ?? []) if (exported && !exported.has(name) && !previous.get(specifier)?.has(name)) {
-            const comparison = destination + '.base';
-            const extract = baseArchive ? `cp ${quote(path.join(baseArchive, dependency))} ${quote(comparison)}` :
-              `git -C ${quote(base)} show ${quote(revision + ':' + dependency)} > ${quote(comparison)}`;
-            throw Error([
-              `Cannot refresh module ${target}: ${destination} does not export ${name} required by Base ${dependency} at ${revision}. No files were refreshed.`,
-              'Save the incoming dependency for comparison:', extract,
-              `Merge the required exports from ${quote(comparison)} into ${quote(destination)}, preserving seed edits.`,
-              ...(owner?.copy.adapted?.[destination] ? ['Review the reconciled bytes and mode, then acknowledge this adaptation:', acknowledgementCommand(root, destination, recordPath)] : []),
-              `Remove ${quote(comparison)} after reconciliation, then repeat refresh-base.`,
-            ].join('\n'));
+            const key = JSON.stringify([target, destination, name, types]);
+            missingExports.set(key, {target, destination, dependency, name,
+              ancestor: owner?.copy.adapted?.[destination] ?? owner?.copy.revision ?? plan.copy.revision});
           }
         }
       }
@@ -284,7 +294,43 @@ export function completeModuleCopies(root, plans, {tree, read, revision, base, b
     // stay seed-owned, while new delivered dependencies must be declared.
     modules.set(target, {source, bytes: '', dependencies: requests(bytes, source, target).map(request => edge(source, target, request).destination).filter(Boolean)});
   }
-  const packages = checkModulePackages(root, modules, packageRoots, tree);
+  const refusals = [...missingExports.values()].map(({target, destination, dependency, name}) =>
+    `Cannot refresh module ${target}: ${destination} does not export ${name} required by Base ${dependency} at ${revision}.`);
+  let packages;
+  try { packages = checkModulePackages(root, modules, packageRoots, tree); }
+  catch (error) { refusals.push(error.message); }
+  if (missingExports.size) {
+    refusals.push('No files were refreshed. Reconcile each retained dependency in this order:');
+    const retained = new Map([...missingExports.values()].map(item => [item.destination, item]));
+    for (const {destination, dependency, ancestor} of retained.values()) {
+      const comparison = destination + '.base', saved = destination + '.seed', original = destination + '.ancestor';
+      const extract = baseArchive ? `cp ${quote(path.join(baseArchive, dependency))} ${quote(comparison)}` :
+        `git -C ${quote(base)} show ${quote(revision + ':' + dependency)} > ${quote(comparison)}`;
+      const acquisition = baseArchive ? `--base-archive ${quote(baseArchive)}` : `--base ${quote(base)}`;
+      const record = recordPath === 'base-copies.json' ? '' : ` --record ${quote(recordPath)}`;
+      refusals.push(
+        `Save seed edits and the original Base version used as the merge ancestor for ${quote(destination)} (use unused backup paths):`,
+        `cp ${quote(destination)} ${quote(saved)}`,
+        ...(baseArchive ? ['Obtain the original Base version from the recorded pin for the merge ancestor.'] :
+          [`git -C ${quote(base)} show ${quote(ancestor + ':' + dependency)} > ${quote(original)}`]),
+        'Save the incoming dependency for comparison:', extract,
+        'Install and record the incoming Base file before refreshing:',
+        `cp ${quote(comparison)} ${quote(destination)}`,
+        `node ${quote(fileURLToPath(new URL('./cli.mjs', import.meta.url)))} record-base ${quote(destination)} ${quote(dependency)} ${quote(revision)} ${acquisition}${record}`,
+        "Add all named packages at Base's listed versions with the seed's package manager.",
+        `rer refresh-base --ref ${quote(revision)} ${acquisition}${record}`,
+        'After refresh delivers the new Base dependencies, merge the saved seed edits onto the new Base file; resolve any conflicts:',
+        `git merge-file ${quote(destination)} ${quote(original)} ${quote(saved)}`,
+        'If the seed source has no Base ancestor, reconcile its edits explicitly instead of guessing an ancestor.',
+        'Review the reconciled bytes and mode, then acknowledge this adaptation:',
+        acknowledgementCommand(root, destination, recordPath),
+        `rer refresh-base --ref ${quote(revision)} ${acquisition}${record}`,
+        `Remove ${quote(comparison)}, ${quote(original)} and ${quote(saved)} after reconciliation.`,
+      );
+    }
+  }
+  if (refusals.length) throw Error(refusals.join('\n'));
+
   for (const [target, item] of packages.withheld) {
     const {plan, source} = planned.get(target);
     plan.sources = plan.sources.filter(([name]) => name !== source);
