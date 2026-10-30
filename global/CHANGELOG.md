@@ -2,6 +2,8 @@
 
 ## 0.2.94
 
+- Contract document generation can verify a committed historical anchor record in snapshots and shallow checkouts. Missing history without a record and tampered records still refuse; full-history checkouts need no record.
+
 - Integrated inputs: hist-1/hist-3 (isolated proposal-history fixtures, including Worker and URL-resource isolation), injkey-1 (injection admission identity), migdir-2 (native migration directory packaging), sponsor-1 (recipient-scoped sponsor initialization mail), and hostedpub-1 (required public inputs in hosted verification).
 
 - Supply required declared public inputs only inside hosted-output verification, using setup defaults and disposable stand-ins when unset. Preserve configured public values and leave optional integrations unconfigured; deployment declarations and built artifacts are unchanged.
