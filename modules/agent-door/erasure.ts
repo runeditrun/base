@@ -92,7 +92,16 @@ function replacements(table: string, row: Row, tombstone: Tombstone): Row {
     const old = parse(row.event)
     return { uri: '', event: JSON.stringify({ id: row.id, at: old.at, ...retained(old, tombstone) }) }
   }
-  if (table === 'agent_door_usage') return { specialist: null, classes: '[]' }
+  if (table === 'agent_door_usage') return { classes: JSON.stringify((parse(row.classes) ?? []).map((item: any) => ({
+    class: item.class,
+    // Keep the non-personal accounting dimensions used by usage()/scopeMatches.
+    // Open text facts (kind, provider, step, setting, service) can name a person.
+    facts: { measure: item.facts.measure,
+      .../^[A-Z]{3}$/.test(item.facts.currency ?? '') ? { currency: item.facts.currency } : {},
+      ...['internal', 'known', 'new', 'public'].includes(item.facts.counterparty) ? { counterparty: item.facts.counterparty } : {},
+      ...['widens', 'narrows'].includes(item.facts.direction) ? { direction: item.facts.direction } : {},
+    },
+  }))) }
   if (table === 'agent_door_agents') return { name: '', specialist: null, sponsor: '', sponsor_name: '', revoked: 1, window: 0, requests: 0, tombstone: marker }
   throw new Error('agent_erasure_unsupported_table:' + table)
 }
