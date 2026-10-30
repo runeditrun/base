@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Diagnose misbound application ports from declared bindings and socket ownership without sending HTTP health requests to auxiliary runtime listeners during startup.
+
 ## 0.2.93
 
 - Integrated inputs: deploydry-2 (HappyToHelp dry-run hook dispatch and unchecked-provider receipt), ledgertok-2 (HappyToHelp ledger refusal identities), adoptdoc-1 (safe adoption examples), reslink-1 (native record-link conformance), copy-1 (product-led optional homepage copy), and handset-history-1 (historical claim context).

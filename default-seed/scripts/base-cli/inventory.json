@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.93-dev.g2ca56ac4",
+  "cliVersion": "0.2.93-dev.gedd3bd3d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "383a8207dc4f4616ebc74c441cd7db8d3cc34f826e980024368ede44ec3d1a65"
+      "sha256": "897888da4db4a825592f6a0f84482f3ea2b148a2b81bee04d302d849b1f7a936"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
