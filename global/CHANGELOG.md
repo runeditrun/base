@@ -2,6 +2,8 @@
 
 ## 0.2.94
 
+- Diagnose misbound application ports from declared bindings and socket ownership without sending HTTP health requests to auxiliary runtime listeners during startup.
+
 - Share the guarded disposable host writer with isolated, named insert-only history fixtures. Native phase preparation can age native history, run scheduled work and hold queue deliveries; atomic guards protect every agent-door table while owner initialization stays read-only.
 
 - Add an optional native company-policy decision hook to the shared agent door. Allow retains class policy; hold uses its signed-in, revision-bound approval flow; deny refuses before effects. Native decisions are audited, rechecked on retries and approval execution, and cannot bypass policy, Pause or native authority.
