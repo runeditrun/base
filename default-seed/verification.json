@@ -41,7 +41,7 @@
       "hosted": false,
       "commands": [
         "pnpm run build",
-        "node --test --test-concurrency=1 tests/e2e/import-archive.test.mjs"
+        "node --test --test-concurrency=1 tests/e2e/import-archive.test.mjs tests/e2e/agent-person-erasure.test.mjs"
       ]
     },
     {
