@@ -9,7 +9,10 @@ import { migrate } from '../modules/container/migrations.mjs';
 import { readMigrationRewrites, withRewrites } from '../modules/deploy-kit/migrations.mjs';
 import { RerError } from './errors.mjs';
 import { hostedMailCredentials } from './hosted-mail.mjs';
+import { deliveryDeclarationSources } from './delivery-declarations.mjs';
+import { sourcePath } from '../modules/delivery-producer/migrations.mjs';
 import { shared } from './shared.mjs';
+import { registerHistoryInstallation } from './agent-history-database.mjs';
 import { verificationRpc } from './agent-rpc.mjs';
 
 // Serve the production build the way rer deploy hosts it (assets behind the
@@ -43,8 +46,41 @@ async function miniflareFor(root) {
 const standIn = (item, field) => typeof item.verifyStandIn === 'string' && item.verifyStandIn ? item.verifyStandIn : field?.kind === 'email' ? 'owner@example.com' : typeof field?.default === 'string' && field.default ? field.default : randomBytes(24).toString('hex');
 const links = html => [...html.matchAll(/(?:src|href)=["'](\/[^"'#?\s]+)/g)].map(match => match[1].slice(1)).filter(path => !path.startsWith('/') && /\.[A-Za-z0-9]+$/.test(path));
 
+// Verification-only runtime bindings. Never write defaults back to the source
+// declaration or build: deploy and packaging must still require real inputs.
+async function hostedPublicVariables(root, config, declaration, manifest) {
+ const present = value => typeof value === 'string' ? Boolean(value.trim()) : value !== undefined && value !== null;
+ const vars = { ...declaration.vars }, names = new Set([...Object.keys(config.vars ?? {}), ...Object.keys(vars)]);
+ const defaults = source => { for (const [name, value] of Object.entries(source ?? {})) if (!present(vars[name])) vars[name] = value; };
+ defaults(config.vars);
+ for (const [candidate, select] of deliveryDeclarationSources) {
+  const path = await sourcePath(root, candidate, { optional: true });
+  if (!path) continue;
+  const spec = select(JSON.parse(await readFile(path, 'utf8')));
+  if (!spec) continue;
+  for (const name of spec.publicVariableNames ?? Object.keys(spec.publicVariables ?? {})) names.add(name);
+  defaults(spec.publicVariables);
+ }
+ const { setupConditionMatches } = await shared('schema/setup-validation.mjs');
+ const fields = (manifest.fields ?? []).filter(field => field.kind !== 'secret' && names.has(field.name));
+ // A required field may depend on another public input declared after it.
+ let changed = true;
+ while (changed) {
+  changed = false;
+  for (const field of fields) {
+   if (present(vars[field.name]) || field.when && !setupConditionMatches(field.when, vars)) continue;
+   const presentation = field.presentations?.find(item => setupConditionMatches(item.when, vars));
+   if (field.presentations && !presentation || !(presentation?.required ?? field.required)) continue;
+   vars[field.name] = field.default?.trim() ? field.default : field.kind === 'url' ? `${HOSTED_ORIGIN}/`
+    : field.kind === 'select' ? field.options?.find(option => option.value)?.value || standIn({}, field) : standIn({}, field);
+   changed = true;
+  }
+ }
+ return vars;
+}
+
 /** The build served as rer deploy hosts it, with declared vars, origin and
- * stand-in deploy/Managed mail secrets. `fetch(path, init)` uses the deployed origin. */
+ * required public inputs and deploy/Managed mail secret stand-ins. `fetch(path, init)` uses the deployed origin. */
 export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService, rpc, workerEntrypoints = [] } = {}) {
  const { loopbackFetch } = await shared('loopback-fetch.mjs');
  const build = join(root, 'dist/server'), client = join(root, 'dist/client');
@@ -70,9 +106,10 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
  for (const binding of await hostedMailCredentials(root)) {
   if (!Object.hasOwn(secrets, binding)) secrets[binding] = standIn({}, manifest.fields?.find(field => field.name === binding));
  }
+ const publicVariables = await hostedPublicVariables(root, config, declaration, manifest);
  const mf = new Miniflare(convertV4MiniflareOptions({ host: '127.0.0.1', port: 0, cf: false, workers: [{ name: 'ingress', modules: true, script: ingress, serviceBindings: { APP: 'app', ...nativeBindings } }, ...rpcServices.workers, {
   name: 'app', ...(outboundService ? { outboundService } : {}), modules, modulesRoot: build, compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
-  bindings: { ...config.vars, ...declaration.vars, ...secrets, ...(declaration.originVar ? { [declaration.originVar]: HOSTED_ORIGIN } : {}),
+  bindings: { ...publicVariables, ...secrets, ...(declaration.originVar ? { [declaration.originVar]: HOSTED_ORIGIN } : {}),
    RER_DEPLOY_SOURCE: identity.sourceSha, RER_DEPLOY_FINGERPRINT: identity.fingerprint, RER_VERSION: { id: identity.versionId, tag: '', timestamp: new Date().toISOString() }, ...bindings },
   d1Databases: Object.fromEntries((config.d1_databases ?? []).map(item => [item.binding, item.database_id ?? item.database_name])),
   r2Buckets: Object.fromEntries((config.r2_buckets ?? []).map(item => [item.binding, item.bucket_name])),
@@ -99,7 +136,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    await migrate(await mf.getD1Database(item.binding, 'app'), withRewrites(plan, await readMigrationRewrites(root), { partial: true }));
   }
  } catch (error) { await mf.dispose(); throw error; }
- return { client, identity, origin: HOSTED_ORIGIN,
+ const hosted = { client, identity, origin: HOSTED_ORIGIN,
   worker: async entrypoint => {
    if (!Object.hasOwn(nativeWorkers, entrypoint)) throw new RerError('agent_invoke_invalid', 'Verification can invoke only its declared native Worker entrypoint.', 1);
    return (await mf.getBindings('ingress'))[nativeWorkers[entrypoint]];
@@ -113,6 +150,8 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    } };
   }, close: () => mf.dispose(),
   fetch: (path, { headers, ...init } = {}) => loopbackFetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }) };
+ registerHistoryInstallation(hosted, mf, config.d1_databases ?? []);
+ return hosted;
 }
 
 export async function checkHostedOutput(root, options) {

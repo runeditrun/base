@@ -16,13 +16,21 @@ export function platformMigrationDeclaration(input={}) {
  return {prefix,dataOnly};
 }
 
+// Native archive/migration checks and deploy packaging use the same seed-owned
+// directory declaration. Only packaging supplies its historical fallback.
+export async function migrationDirectory(root,binding,{fallback}={}) {
+ let config;
+ try { config=parseJsonc(await readFile(join(root,'wrangler.jsonc'),'utf8')); }
+ catch(error) { if(error.code!=='ENOENT' || fallback===undefined)throw error; return join(root,fallback); }
+ const bindings=config.d1_databases?.filter(entry=>entry.binding===binding) ?? [];
+ insist(bindings.length===1 || bindings.length===0 && fallback!==undefined,'migration_ledger:binding',409);
+ return join(root,bindings[0]?.migrations_dir ?? fallback ?? 'migrations');
+}
+
 // Reproduce the runner's stored SQL text, then recover SQLite's statement
 // boundaries (migration-sql.mjs).
 export async function migrationInventory(root,binding,{prefix},split) {
- const config=parseJsonc(await readFile(join(root,'wrangler.jsonc'),'utf8'));
- const bindings=config.d1_databases?.filter(entry=>entry.binding===binding) ?? [];
- insist(bindings.length===1,'migration_ledger:binding',409);
- const directory=join(root,bindings[0].migrations_dir ?? 'migrations');
+ const directory=await migrationDirectory(root,binding);
  return Promise.all((await readdir(directory)).filter(name=>name.endsWith('.sql')).sort().map(async name=>{
   const bytes=await readFile(join(directory,name));
   return {name,...(split?{statements:migrationStatements(bytes.toString('utf8'),split)}:{}),sha256:createHash('sha256').update(bytes).digest('hex'),...(prefix===undefined?{}:{aliases:[prefix+name]})};

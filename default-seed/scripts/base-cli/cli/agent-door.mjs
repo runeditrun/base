@@ -15,6 +15,8 @@ import { verificationSponsors } from './agent-sponsors.mjs';
 import { verificationWebhooks } from './agent-webhooks.mjs';
 import { verificationInvoke, verificationJourney } from './agent-verifier.mjs';
 import { verificationBindings } from './agent-bindings.mjs';
+import { writeVerificationHistory } from './agent-history-database.mjs';
+import { verificationHistory } from './agent-history.mjs';
 import { journeyFixtures } from './agent-journey-fixtures.mjs';
 import { verificationAgentInitializer } from './agent-initializer.mjs';
 
@@ -65,8 +67,8 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  const publicKeys = { [kid]: { kty, crv, x, y, kid, alg: 'ES256', use: 'sig' } };
  const values = { issuer, installationId, appOrigin: HOSTED_ORIGIN, publicKeys: JSON.stringify(publicKeys), email, sub, token, sessionSecret: randomBytes(32).toString('hex') };
  const nativeBindings = await verificationBindings(root, native.bindings, values);
- const network = await createAgentConformanceNetwork(root, verification.network, { email });
- let hosted;
+ const network = await createAgentConformanceNetwork(root, verification.network, { email, sponsorEmails: principals.slice(1).map(person => person.email) });
+ let hosted, history;
  try {
  hosted = await serveHosted(root, { declaration, rpc: verification.rpc, workerEntrypoints: workerDriver ? [workerDriver.entrypoint] : [], outboundService: async request => {
   const copy = reviewers.observes(request) ? request.clone() : null, response = await network.fetch(request);
@@ -130,7 +132,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
    try {
     response = await principal.initialize({ request, origin: hosted.origin, email: principal.email, sub: principal.sub,
      label: principal.label, displayName: principal.label, token, claim: { mode: 'signed', path, token: signedClaim },
-     owner: sponsors[0], database: hosted.database, mail: network.mail, fixtures: network.fixtures, returnTo: owner?.returnTo ?? '/',
+     owner: sponsors[0], database: hosted.database, mail: network.mailFor(principal.email), fixtures: network.fixtures, returnTo: owner?.returnTo ?? '/',
     });
    } catch { throw new RerError('agent_sponsor_bootstrap', 'An additional sponsor could not complete its native lifecycle through the disposable installation.', 1); }
    const session = response?.headers?.getSetCookie().map(value => value.split(';', 1)[0]).join('; ');
@@ -140,15 +142,23 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   }
   const secrets = await network.provision(hosted);
   const webhooks = await verificationWebhooks(root, verification.webhooks, secrets);
+  history = await verificationHistory(root, verification.history);
   const journey = await verificationJourney(root, verification.journey, { request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures, database: hosted.database });
   const prepare = await journeyFixtures(root, verification.fixtures, { request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures, database: hosted.database });
+  const nativeStep = history ? async value => {
+   await history.run(value, (declaration, rows) => writeVerificationHistory(hosted, declaration, rows));
+   await journey.nativeStep?.(value);
+  } : journey.nativeStep;
   const result = await runAgentDoorConformance({ fetch: request, origin: hosted.origin, surface: declared.surface,
-   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors: sponsors.filter(person => !negativeOnly.has(person.label)), webhooks, business, prove, ...journey, prepare, invoke: workerDriver?.run(hosted),
+   signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors: sponsors.filter(person => !negativeOnly.has(person.label)), webhooks, business, prove, ...journey, nativeStep, prepare, invoke: workerDriver?.run(hosted),
    initializeAgent: initializeAgent && (({ agentId, person }) => initializeAgent({ agentId, person, request, origin: hosted.origin, mail: network.mail, fixtures: network.fixtures })),
   });
   const points = [...result.points, ...reviewers.points()];
   return finish({ ...result, points, ok: points.every(point => point.ok) }, report);
- } finally { reviewers.close(); try { await hosted?.close(); } finally { await network.close(); } }
+ } finally {
+  try { await history?.close(); }
+  finally { reviewers.close(); try { await hosted?.close(); } finally { await network.close(); } }
+ }
 }
 
 if (process.argv[1] && await realpath(new URL(import.meta.url)) === await realpath(process.argv[1])) {
