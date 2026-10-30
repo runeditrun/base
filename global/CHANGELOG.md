@@ -4,6 +4,33 @@
 
 - Diagnose misbound application ports from declared bindings and socket ownership without sending HTTP health requests to auxiliary runtime listeners during startup.
 
+## 0.2.93
+
+- Integrated inputs: deploydry-2 (HappyToHelp dry-run hook dispatch and unchecked-provider receipt), ledgertok-2 (HappyToHelp ledger refusal identities), adoptdoc-1 (safe adoption examples), reslink-1 (native record-link conformance), copy-1 (product-led optional homepage copy), and handset-history-1 (historical claim context).
+
+- Preserve Handset history screen, backing and time context during contract claim conversion; explicit clause links alone determine current product mappings and historical judgments remain unchanged.
+
+- Lead seed homepage heroes with what the product does for its owner, keeping free/open-source copy secondary. Optional plain-text `RunData.leadLine` supplies the composed homepage heading and the Run page introduction; omitting it preserves existing HTML and needs no seed migration.
+
+- Agent-door conformance requires a record-write resource fixture when a writable door offers resources. BASE-AGENT-003 acceptance 4 now rejects missing or foreign links and checks the written JSON state through the same door's resources/read; approval-gated reads still withhold content.
+
+- Reword agent-door verification path and binding examples, plus erasure column and OIDC method examples, to avoid credential-shaped quoted assignments while preserving their meaning.
+
+- Restore identity suffixes in migration-history refusal tokens for pending checkout files, mixed Platform ledgers and checkout-owned migration identities, retaining constant adapter error codes, exit statuses and recovery guidance. Deliberately leave `migration_ledger:unknown:initial-page.sql` unrestored when it has no checkout provenance: the privacy contract excludes unchecked ledger values from diagnostics.
+
+- Restore seed offline deploy hooks for `rer deploy --dry-run`. Hook and generic dry-run receipts include `providerChecked: false`, and local preflight keeps listing missing real-deploy inputs without contacting Cloudflare.
+- Preserve local plans and defer missing production owner inputs when running seed dry-run hooks. Legacy hooks using the deployment kit stay offline; real deployments retain their owner preflight refusals.
+
+## 0.2.92
+
+- Renew the verifier's adopted policy before requests without changing its authority or lifetime; equal-sequence adoption may change only issue and expiry times.
+
+- Inkwell transient-snapshot restore: restore fresh archives containing schema objects on policy-excluded transient tables absent from the destination, while retaining durable schema and original archive digest verification.
+
+- Agent tools may opt into `exposure: 'invoke'` for native worker admission, hidden from MCP discovery, calls, tool-list subscriptions and unshared OAuth scopes while retaining full invoke policy, identity, replay and audit checks.
+
+- Spool legacy archive restore: verify hashed legacy v2 ledgers through the Node library restore door before durable staging; admit migration data repeated by its surviving restore-commit trigger. Worker build-time evidence remains pending.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.

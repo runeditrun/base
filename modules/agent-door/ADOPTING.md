@@ -155,6 +155,22 @@ strict subset after the action and refuses a smuggled grant-adding argument
 without an effect. Output point names identify every narrowing tool. No tool
 is exempted from execution, policy, audit, schema or journey coverage.
 
+## Keep worker tools behind invoke
+
+Set `exposure: 'invoke'` on a tool definition to admit it only through this
+seed's `door.invoke`. Omitting the field preserves MCP discovery and calls;
+other values are rejected. Read-only tools may use the flag too. Invoke-only
+tools are hidden from MCP tool listings, tool-list subscription changes and OAuth
+`scopes_supported` (a scope shared with an exposed tool remains advertised).
+MCP calls receive the same `tool_not_found` response and audit treatment as an
+unknown name, without running the seed callback. Keep these tools out of the
+public agent-surface declaration.
+
+`invoke` still applies full admission: current person, agent and consent,
+scopes, Pause, policy, native continuation binding, idempotency and embedded
+audit. Their classes still contribute to policy questions and usage; saved
+approval and review flows can still resolve them.
+
 ## Hand off native human proof
 
 A native authentication requirement stays independent of company approval.
@@ -356,6 +372,40 @@ with a redacted diagnostic. A missing declaration does not claim queue coverage.
 
 ## Keep runtime and CLI evidence separate
 
+BASE-AGENT-003 acceptance 4 requires a record-writing fixture when the door
+offers resources and has mutating tools. Add `resource` to a create or update
+journey step, naming a declared native template and a nonempty JSON state subset:
+
+```json
+{
+  "id": "create",
+  "tool": "base.people.create",
+  "args": { "name": "Synthetic Base 1", "email": "synthetic-base-1@example.com" },
+  "expect": [{ "class": "standard" }],
+  "resource": {
+    "uriTemplate": "base://person/{id}",
+    "state": {
+      "id": { "$from": "create", "pointer": "/id" },
+      "name": "Synthetic Base 1",
+      "email": "synthetic-base-1@example.com"
+    }
+  }
+}
+```
+
+Use native written fields as well as the returned identifier, with more fixtures
+for other record writes. State references may use the current step's output or
+earlier outputs. `BASE-AGENT-003.4.fixture` fails an omitted fixture;
+`BASE-AGENT-003.4.links.<phase>.<step>` requires a returned link matching its
+template, scheme and authority (HTTP resources must use the installation origin).
+`BASE-AGENT-003.4.state.<phase>.<step>` reads that link through this door using
+the step's client and compares JSON content bearing the same URI with the expected
+state subset. Missing, stale, malformed and unrelated state fails. The existing
+resource policy checks still run for every returned link. Approval-gated reads
+remain withheld in the held phase; the autonomous phase proves their state.
+Deletion and tools without record effects need no invented resource fixture.
+These points prove the declared fixtures, not every possible record or write.
+
 The copied module is application runtime source pinned by `base-copies.json`.
 The edition's pinned `rer` CLI remains its command and authoring dependency.
 Updating one does not prove or update the other. CLI conformance runs as plain
@@ -401,7 +451,6 @@ Seeds with a native initializer or a different owner binding declare this in
     "owner": {
       "email": "synthetic-owner@example.com",
       "emailField": "SETUP_OPERATOR_EMAIL",
-      "tokenField": "H2H_SETUP_TOKEN",
       "bindings": {
         "RER_MANAGEMENT_ORIGIN": "issuer",
         "RER_INSTALLATION_ID": "installationId"
@@ -411,6 +460,9 @@ Seeds with a native initializer or a different owner binding declare this in
   }
 }
 ```
+
+For a native setup-token binding, set `verification.owner.tokenField` to its
+environment binding name, for example `H2H_SETUP_TOKEN`.
 
 All keys are optional. Email defaults to `synthetic-base-1@example.com`;
 
@@ -530,6 +582,8 @@ so promoting a seed admin does not confer Business approval authority.
 Business can revoke agents or consents in the signed envelope's optional
 `revoked` lists. Tokens require `consent`; affected pending approvals expire and
 execution rechecks revocation. Retain both these lists and historical attribution.
+The verifier renews before requests when less than 60 seconds remain, with the same 300-second lifetime.
+An equal-sequence refresh may change only `iat`/`exp`; all authority and the exact revision signature stay unchanged.
 
 ## Event visibility and native revisions
 
@@ -860,9 +914,10 @@ correctly. An omitted list or one sponsor runs no extra phase or points.
 
 ## Provision verification webhook secrets
 
-A seed that creates its own random installation HMAC keys can declare
-`verification.network.secretSource` as the path `tests/read-webhook-secrets.mjs`
-alongside its existing network module and origins. The contained test-only module
+A seed that creates its own random installation HMAC keys can set the
+`verification.network.secretSource` field to the path of a test-only module
+(for example `tests/read-webhook-secrets.mjs`) alongside its existing network
+module and origins. The contained test-only module
 exports `async function ({database})`, reads the fresh installation's own state
 and returns a nonempty map of uppercase binding names to string values. The
 isolated receiver receives that map as `env.secrets` in its `fetch(request,env)`.

@@ -401,3 +401,149 @@ test('pre-schemaObjects v2 owner backup restores through file and HTTP doors onl
   assert.equal((await completed.json()).schemaUnverified,undefined);await check(http);
   t.diagnostic('authenticated, confirmed HTTP restore: issues 0 -> 1, events 0 -> 1; same bytes and replay verification');
 });
+
+test('library restore verifies a carried legacy ledger before creating a durable import',async t=>{
+  const {database,bundle:exportBundle}=await import('./regression-helpers.mjs');
+  const {mkdtemp,writeFile,rm}=await import('node:fs/promises');
+  const {join}=await import('node:path');const {tmpdir}=await import('node:os');
+  const {sha256,canonicalJson}=await import('../hash.mjs');
+  const {rawSchemaIdentityOf}=await import('../schema-legacy.mjs');
+  const {splitStatements}=await import('../sql-text.mjs');
+  const rules={product:'synthetic-legacy-library'};
+  const files=[{name:'0001_initial.sql',sql:'CREATE TABLE z_parents(id TEXT PRIMARY KEY); CREATE TABLE a_children(id TEXT PRIMARY KEY,parent TEXT REFERENCES z_parents(id));'},
+    {name:'0002_added.sql',sql:"ALTER TABLE a_children ADD COLUMN state TEXT NOT NULL DEFAULT 'retained';"}];
+  for(const file of files)file.sha256=await sha256(file.sql);
+  const directory=await mkdtemp(join(tmpdir(),'legacy-library-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+  await writeFile(join(directory,'wrangler.jsonc'),'{\n// The checkout uses Wrangler JSONC.\n"d1_databases":[{"binding":"DB","migrations_dir":".",},],\n}');
+  for(const file of files)await writeFile(join(directory,file.name),file.sql);
+  const ledgerSQL='CREATE TABLE rer_migrations(name TEXT PRIMARY KEY,sha256 TEXT NOT NULL,applied_at TEXT NOT NULL)';
+  const source=await database(t,[...splitStatements(files[0].sql),ledgerSQL],rules);
+  await source.db.batch([source.db.prepare('INSERT INTO rer_migrations VALUES(?,?,?)').bind(files[0].name,files[0].sha256,new Date().toISOString()),source.db.prepare("INSERT INTO z_parents VALUES('parent')"),source.db.prepare("INSERT INTO a_children VALUES('child','parent')")]);
+  const original=await exportBundle(source.service),manifest=structuredClone(original.manifest);
+  delete manifest.schemaObjects;delete manifest.migrations;delete manifest.migrationLedger;
+  const ledger={name:'rer_migrations',sql:ledgerSQL,columns:(await source.db.prepare('PRAGMA table_info(rer_migrations)').all()).results.map(({name,type,notnull,pk})=>({name,type,notnull,pk})),dependencies:[],rowidAlias:null,count:1};
+  manifest.tables.push(ledger);manifest.tables.sort((a,b)=>a.name.localeCompare(b.name));manifest.schema=await rawSchemaIdentityOf(manifest.tables);
+  const items=rows(original);items.push({kind:'row',table:ledger.name,index:0,row:await source.db.prepare('SELECT * FROM rer_migrations').first()});items.sort((a,b)=>a.table.localeCompare(b.table));
+  // Separate ledger and parent parts ensure create cannot pre-read either.
+  manifest.partCount=items.length;
+  const seal=async(m,data)=>{const parts=await Promise.all(data.map((item,index)=>makePart(index,[item]))),binding=new ArchiveVerifier(m),content=new ContentVerifier(m);for(const p of parts){binding.add(p);p.items.forEach(item=>content.add(item));}return {manifest:m,parts,contentHash:content.digest(),closing:{archiveHash:binding.digest()}};};
+  const target=await database(t,[...files.flatMap(file=>splitStatements(file.sql)),ledgerSQL],rules);
+  await target.db.batch(files.map(file=>target.db.prepare('INSERT INTO rer_migrations VALUES(?,?,?)').bind(file.name,file.sha256,new Date().toISOString())));
+  const service=await createPortability({db:target.db,policy:rules,migrationRoot:directory});
+  const snapshot=async()=>canonicalJson((await target.db.batch(['SELECT * FROM a_children','SELECT * FROM z_parents','SELECT * FROM rer_migrations','SELECT * FROM rer_portability_jobs','SELECT * FROM rer_portability_state'].map(sql=>target.db.prepare(sql)))).map(r=>r.results));
+  for(const kind of ['hash','definition','nonprefix']){
+    const m=structuredClone(manifest),data=structuredClone(items),entry=data.find(item=>item.table===ledger.name);
+    if(kind==='hash')entry.row.sha256=await sha256(crypto.randomUUID());
+    if(kind==='definition'){m.tables.find(table=>table.name==='a_children').sql+=' /* changed */';m.tables.find(table=>table.name==='a_children').sql=m.tables.find(table=>table.name==='a_children').sql.replace('id TEXT','id INTEGER');m.schema=await rawSchemaIdentityOf(m.tables);}
+    if(kind==='nonprefix'){entry.row.name=files[1].name;entry.row.sha256=files[1].sha256;}
+    const bundle=await seal(m,data),before=await snapshot(),id=await service.imports.create(m);
+    for(const part of bundle.parts)await service.imports.uploadPart(id,part.index,part);
+    await assert.rejects(service.imports.finalize(id,{archiveHash:bundle.closing.archiveHash,contentHash:bundle.contentHash}),error=>/^(schema_mismatch|migration_ledger):/.test(error.code));
+    assert.equal(await snapshot(),before,'invalid history leaves destination rows and durable jobs unchanged');await service.imports.abort(id);
+  }
+  const bundle=await seal(manifest,items),result=await restore(service,bundle);
+  assert.equal(result.status.phase,'complete');assert.deepEqual((await target.db.prepare('SELECT * FROM a_children').all()).results,[{id:'child',parent:'parent',state:'retained'}]);
+  assert.equal((await target.db.prepare('SELECT COUNT(*) n FROM rer_migrations').first()).n,files.length);
+});
+
+test('fresh archives with absent policy-excluded snapshots retain durable schema verification',async t=>{
+  const {database,bundle}=await import('./regression-helpers.mjs');
+  const {migrationReplay}=await import('../migration-history.mjs');
+  const {importArchive}=await import('../files.mjs');
+  const {schemaIdentityOf}=await import('../schema-identity.mjs');
+  const {remakeArchive}=await import('../../../cli/fixtures/archive-records.mjs');
+  const {mkdtemp,writeFile,rm}=await import('node:fs/promises');
+  const {tmpdir}=await import('node:os');
+  const {join}=await import('node:path');
+  const policy={product:'snapshot-restore',excludeTables:['snapshot_%','private_cache'],buckets:{FILES:{}}};
+  const ddl=[
+    'CREATE TABLE notes(id TEXT PRIMARY KEY,title TEXT NOT NULL)',
+    'CREATE TABLE events(id TEXT PRIMARY KEY,note_id TEXT REFERENCES notes(id),body TEXT)',
+    'CREATE TABLE audit(note_id TEXT,action TEXT)',
+    'CREATE INDEX notes_title ON notes(title)',
+    'CREATE VIEW note_events AS SELECT notes.title,events.body FROM notes JOIN events ON events.note_id=notes.id',
+    "CREATE TRIGGER event_audit AFTER INSERT ON events BEGIN INSERT INTO audit VALUES(NEW.note_id,'created'); END",
+    'CREATE TABLE private_cache(key TEXT PRIMARY KEY,value TEXT)',
+    'CREATE INDEX cache_value ON private_cache(value)',
+  ];
+  const plan=[{name:'0001_documents.sql',statements:ddl}];
+  const target=async(t,{changes=[],destinationPolicy=policy,replay=false}={})=>{
+    const f=await database(t,[...ddl,'CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY,name TEXT,applied_at TEXT NOT NULL)',
+      "INSERT INTO d1_migrations VALUES(1,'0001_documents.sql','2026-10-01')",...changes],destinationPolicy);
+    if(replay)f.service=await createPortability({db:f.db,buckets:{FILES:f.bucket},policy:destinationPolicy,migrations:()=>migrationReplay(plan,destinationPolicy)});
+    return f;
+  };
+  const source=await target(t);
+  await source.db.batch([
+    "INSERT INTO notes VALUES('one','First'),('two','Second')",
+    "INSERT INTO events VALUES('event','one','Archived body')",
+    "INSERT INTO private_cache VALUES('local','excluded')",
+  ].map(sql=>source.db.prepare(sql)));
+  await source.bucket.put('document',Uint8Array.of(0,1,255));
+  const snapshot='snapshot_'+crypto.randomUUID().replaceAll('-',''),index=snapshot+'_title';
+  await source.db.batch([source.db.prepare(`CREATE TABLE ${snapshot} AS SELECT * FROM notes`),source.db.prepare(`CREATE INDEX ${index} ON ${snapshot}(title)`)]);
+  const original=await bundle(source.service);
+  assert.ok(original.manifest.excludedTables.includes(snapshot));
+  assert.ok(original.manifest.schemaObjects.some(o=>o.name===index && o.table===snapshot));
+  const directory=await mkdtemp(join(tmpdir(),'snapshot-restore-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+  const path=join(directory,'fresh.rer');await writeFile(path,original.records.map(JSON.stringify).join('\n')+'\n');
+  const quote=name=>'"'+name.replaceAll('"','""')+'"';
+  const state=async f=>{
+    const schema=(await f.db.prepare('SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name').all()).results;
+    const tables=schema.filter(o=>o.type==='table' && !o.name.startsWith('sqlite_') && !o.name.startsWith('_cf_'));
+    return {schema,rows:await Promise.all(tables.map(async o=>[o.name,(await f.db.prepare('SELECT * FROM '+quote(o.name)).all()).results]))};
+  };
+  const verify=async f=>{
+    for(const name of ['notes','events','audit'])assert.deepEqual((await f.db.prepare('SELECT * FROM '+name+' ORDER BY rowid').all()).results,(await source.db.prepare('SELECT * FROM '+name+' ORDER BY rowid').all()).results,name);
+    assert.equal((await f.db.prepare('SELECT count(*) AS n FROM private_cache').first()).n,0);
+    assert.equal(await f.db.prepare('SELECT name FROM sqlite_master WHERE name=? OR name=?').bind(snapshot,index).first(),null);
+    assert.deepEqual(new Uint8Array(await (await f.bucket.get('document')).arrayBuffer()),Uint8Array.of(0,1,255));
+  };
+  await t.test('in-process door without a replayer',async t=>{
+    const f=await target(t),id=await f.service.imports.create(original.manifest);
+    for(const part of original.parts)await f.service.imports.uploadPart(id,part.index,part);
+    const status=await f.service.imports.finalize(id,{contentHash:original.closing.contentHash,archiveHash:original.closing.archiveHash});
+    assert.equal(status.phase,'complete');assert.equal(status.schemaUnverified,undefined);await verify(f);
+    assert.deepEqual(original.manifest,original.records[0]);
+    t.diagnostic('in-process: complete; notes 0 -> 2, events 0 -> 1, audit 0 -> 1, objects 0 -> 1; snapshot absent; no acknowledgment or schemaUnverified');
+  });
+  await t.test('file door with migration replay',async t=>{
+    const f=await target(t,{replay:true}),receipt=await importArchive(f.service,path,[]);
+    assert.equal(receipt.schemaUnverified,undefined);
+    assert.deepEqual((await f.db.prepare("SELECT phase FROM rer_portability_jobs WHERE kind='import'").all()).results,[{phase:'complete'}]);await verify(f);
+    t.diagnostic('file: complete; notes 0 -> 2, events 0 -> 1, audit 0 -> 1, objects 0 -> 1; snapshot absent; no acknowledgment or schemaUnverified');
+  });
+  const refused=async(f,manifest)=>{
+    const before=await state(f);
+    await assert.rejects(f.service.imports.create(manifest),e=>e.code==='schema_mismatch');
+    assert.deepEqual(await state(f),before,'refusal preserves schema, ledger, jobs, lock and rows');
+    assert.equal((await f.bucket.list()).objects.length,0);
+  };
+  for(const [name,changes] of [
+    ['missing durable index',['DROP INDEX notes_title']],
+    ['changed durable index column',['DROP INDEX notes_title','CREATE INDEX notes_title ON notes(id)']],
+    ['changed durable index uniqueness',['DROP INDEX notes_title','CREATE UNIQUE INDEX notes_title ON notes(title)']],
+    ['changed durable index predicate',['DROP INDEX notes_title',"CREATE INDEX notes_title ON notes(title) WHERE title <> ''"]],
+    ['changed durable trigger',['DROP TRIGGER event_audit',"CREATE TRIGGER event_audit AFTER INSERT ON events BEGIN INSERT INTO audit VALUES(NEW.note_id,'altered'); END"]],
+    ['changed index on present excluded table',['DROP INDEX cache_value','CREATE INDEX cache_value ON private_cache(key)']],
+  ])await t.test(name,async t=>{await refused(await target(t,{changes}),original.manifest);t.diagnostic('schema_mismatch before writes; schema, ledger, jobs, lock and rows unchanged; bucket empty');});
+  for(const [name,change,destinationPolicy] of [
+    ['object table missing from archived exclusions',m=>{m.excludedTables=m.excludedTables.filter(n=>n!==snapshot);},policy],
+    ['object table not excluded by destination',()=>{},{...policy,excludeTables:['private_cache']}],
+    ['altered restorable object listed as excluded',m=>{m.excludedTables.push('notes');m.schemaObjects.find(o=>o.name==='notes_title').sql='CREATE INDEX notes_title ON notes(id)';},policy],
+  ])await t.test(name,async t=>{
+    const records=structuredClone(original.records);change(records[0]);
+    records[0].schema=await schemaIdentityOf(records[0].tables,records[0].schemaObjects);
+    const remade=await remakeArchive(records,{schema:records[0].schema});
+    await refused(await target(t,{destinationPolicy}),remade[0]);
+    t.diagnostic('valid remade digests: schema_mismatch before writes; bucket empty');
+  });
+  await t.test('malformed excluded-table inventory refuses before writes',async t=>{
+    const f=await target(t),before=await state(f);
+    for(const excludedTables of [null,'snapshot_%',[snapshot,1],[snapshot,snapshot]]) {
+      await assert.rejects(f.service.imports.create({...original.manifest,excludedTables}),e=>e.code==='manifest_inventory');
+      assert.deepEqual(await state(f),before);
+    }
+    assert.equal((await f.bucket.list()).objects.length,0);
+  });
+});
