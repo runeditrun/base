@@ -48,7 +48,7 @@ export async function refuseHistoryImports(root, source) {
   if (seen.has(name)) continue;
   seen.add(name);
   if (forbidden.has(physical.get(name))) throw productionHistory(name);
-  for (const request of dependencies(await readFile(join(root, name), 'utf8'), name).filter(request => !request.types)) {
+  for (const request of dependencies(await readFile(join(root, name), 'utf8'), name, {resources: true}).filter(request => !request.types)) {
    const candidates = [request.specifier];
    for (const [alias, targets] of Object.entries(paths)) {
     const [prefix, suffix = ''] = alias.split('*');
