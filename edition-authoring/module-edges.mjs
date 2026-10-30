@@ -22,9 +22,16 @@ function* nodes(root) {
 
 const parsed = new Map();
 
+// Authoring follows module imports. History isolation also follows URL resources
+// that bundlers can publish without importing them into the authoring tool.
+export function dependencies(source, filename = 'module.mjs', {resources = false} = {}) {
+  const result = edges(source, filename);
+  return resources ? result : result.filter(request => request.kind !== 'resource');
+}
+
 // Parsing, including erased TS edges and calls nested in templates/JSX, precedes
 // resolution. Every resulting edge uses the same virtual Node resolver.
-export function dependencies(source, filename = 'module.mjs') {
+function edges(source, filename) {
   let versions = parsed.get(filename);
   if (versions?.has(source)) return versions.get(source);
   const plugins = ['decorators-legacy', 'deprecatedImportAssert'];
@@ -87,7 +94,7 @@ export function dependencies(source, filename = 'module.mjs') {
       const base = unwrap(node.arguments[1]), meta = unwrap(base?.object);
       if (node.type === 'NewExpression' && callee?.type === 'Identifier' && callee.name === 'URL'
         && member(base) && property(base) === 'url' && meta?.type === 'MetaProperty'
-        && meta.meta.name === 'import' && meta.property.name === 'meta') add(argument, 'import');
+        && meta.meta.name === 'import' && meta.property.name === 'meta') add(argument, 'resource');
       if (member(callee) && property(callee) === 'bind' && requireFunction(callee.object)) { add(node.arguments[1], 'require'); continue; }
       if (member(callee) && callee.object?.type === 'Identifier' && callee.object.name === 'Reflect' && ['apply', 'construct'].includes(property(callee)) && requireFunction(node.arguments[0])) {
         add(node.arguments[property(callee) === 'apply' ? 2 : 1]?.elements?.[0], 'require'); continue;
