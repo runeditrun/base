@@ -68,7 +68,7 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
       }
     }
   } catch (cause) {
-    result = { ...result, outcome: 'refused', code: cause instanceof ToolRefusal ? cause.code : cause instanceof Error && ['decision_busy', 'approval_evidence_changed', 'consent_revoked'].includes(cause.message) ? cause.message : 'execution_failed' }
+    result = { ...result, outcome: 'refused', code: rt.options.companyPolicy && cause instanceof ToolRefusal && ['company_policy_invalid', 'company_policy_unavailable'].includes(cause.code) ? cause.code : cause instanceof Error && ['decision_busy', 'approval_evidence_changed', 'consent_revoked'].includes(cause.message) ? cause.message : 'execution_failed' }
   } finally { if (locked) await releaseDecision(rt, row.id) }
   if (result.outcome === 'done') result.receipt = { id: crypto.randomUUID(), decision_id: saved.decision_id, approval_id: id, prepared_by: preparedBy(saved.principal), approved_by: by }
   result.execution_id = row.id
