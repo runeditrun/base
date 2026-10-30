@@ -36,7 +36,7 @@ export function checkModulePackages(root, modules, roots, tree) {
     if (!manifests.has(reference)) manifests.set(reference, JSON.parse(tree.read(reference)));
     return version(manifests.get(reference), name);
   }
-  for (const [target, module] of modules) for (const request of dependencies(module.bytes, module.source)) {
+  for (const [target, module] of modules) for (const request of module.packageRequests ?? dependencies(module.bytes, module.source)) {
     const name = packageName(request.specifier);
     if (!name) continue;
     const scope = {};
