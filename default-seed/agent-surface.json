@@ -2,6 +2,7 @@
   "schema": "rer-agent-surface/1",
   "seed": "base",
   "specialist": "operations",
+  "verification": { "journey": "tests/e2e/agent-erasure.mjs" },
   "tools": [
     {
       "name": "base.access.invite",
