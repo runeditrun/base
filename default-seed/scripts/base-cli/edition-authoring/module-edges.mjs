@@ -82,6 +82,12 @@ export function dependencies(source, filename = 'module.mjs') {
     else if (node.type === 'ImportExpression') add(node.source, 'import');
     else if (call(node)) {
       let callee = unwrap(node.callee), argument = node.arguments[0];
+      // Vite emits literal import.meta.url resources, including the URL nested
+      // in Worker/SharedWorker constructors, without an import declaration.
+      const base = unwrap(node.arguments[1]), meta = unwrap(base?.object);
+      if (node.type === 'NewExpression' && callee?.type === 'Identifier' && callee.name === 'URL'
+        && member(base) && property(base) === 'url' && meta?.type === 'MetaProperty'
+        && meta.meta.name === 'import' && meta.property.name === 'meta') add(argument, 'import');
       if (member(callee) && property(callee) === 'bind' && requireFunction(callee.object)) { add(node.arguments[1], 'require'); continue; }
       if (member(callee) && callee.object?.type === 'Identifier' && callee.object.name === 'Reflect' && ['apply', 'construct'].includes(property(callee)) && requireFunction(node.arguments[0])) {
         add(node.arguments[property(callee) === 'apply' ? 2 : 1]?.elements?.[0], 'require'); continue;

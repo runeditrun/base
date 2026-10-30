@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.91-dev.gee8b14c1",
+  "cliVersion": "0.2.91-dev.g2ad22c6a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -403,11 +403,11 @@
     },
     "cli/agent-history-isolation.mjs": {
       "source": "cli/agent-history-isolation.mjs",
-      "sha256": "364cb4b9524b31b54c02224ff37fda62a94611a8ad1c398c92492c8d209d32fb"
+      "sha256": "5b2ee746de0b33db005f96b7ffc22d7b533d13aa8cd1aeadb702ef7660488525"
     },
     "cli/agent-history.mjs": {
       "source": "cli/agent-history.mjs",
-      "sha256": "a949337f17925bf8872599b09ae8cad41e42495e27f0c8493a938dafdfaa2455"
+      "sha256": "e172918d809dbf701aea89e6d176675fd0286ab680e689b1d380ae25368a6ca7"
     },
     "cli/agent-initializer.mjs": {
       "source": "cli/agent-initializer.mjs",
@@ -1375,7 +1375,7 @@
     },
     "edition-authoring/module-edges.mjs": {
       "source": "edition-authoring/module-edges.mjs",
-      "sha256": "78961972b44c158e75416629ae1149c419b0cafe2b2cb1336130bbeba2f6620a"
+      "sha256": "420998ec0ca2ef63ea83417361842585139688f22fdafff4c55af2dcc201b08e"
     },
     "edition-authoring/module-packages.mjs": {
       "source": "edition-authoring/module-packages.mjs",

@@ -33,7 +33,10 @@ export async function historyDeclaration(root, config) {
   const declaration = { module: config.module, steps: new Set(config.steps), statements };
   declarations.add(declaration);
   return declaration;
- } catch { throw historyInvalid(); }
+ } catch (error) {
+  if (error instanceof RerError && error.code === 'agent_history_invalid') throw error;
+  throw historyInvalid();
+ }
 }
 
 /** Only checkAgentDoor starts this isolated test Worker. No application binding,
