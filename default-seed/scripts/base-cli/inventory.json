@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.94-dev.gaebddd68",
+  "cliVersion": "0.2.94-dev.g10697260",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -475,7 +475,7 @@
     },
     "cli/authoring.mjs": {
       "source": "cli/authoring.mjs",
-      "sha256": "2ee79ca7f810ba61cff8d6147096ee5a9edf75589f1329ac72e40e6ed74efbaa"
+      "sha256": "d4afd2ab27e2046fd1333efe61af2d210932c5d3d8a4a79e00efb36f4e6913ed"
     },
     "cli/bounded.mjs": {
       "source": "cli/bounded.mjs",
@@ -771,7 +771,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "14bac6012fceb753aab6f387e7cc5946d574ca9e13df24baa3700e31320a18a2"
+      "sha256": "634eb37e0e688ae10355c87863343a2af7bdd05bd450829ddb65f94545b826f2"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -1091,7 +1091,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "40b35f1539e66c3f6c04fe9d1b02032cd81f82033cba9c85b8fd7090f948f51f"
+      "sha256": "3299cec064a2770870d52b577d10a3544ff19ff7d6d2227330215272bdf882d2"
     },
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",
@@ -1347,7 +1347,7 @@
     },
     "edition-authoring/archive-source.mjs": {
       "source": "edition-authoring/archive-source.mjs",
-      "sha256": "c59a6a97abfdf80b2874a461ba7800e8604a3141db4594a584d6a0cfedac5f46"
+      "sha256": "27ff7efbed5ef18dd5eaa2c03abe8c72a6f1a132105380b13448939bc1dde139"
     },
     "edition-authoring/base-acknowledgements.mjs": {
       "source": "edition-authoring/base-acknowledgements.mjs",
@@ -1355,11 +1355,11 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "4cac17e531310ab14df07139156c2b4fae5f7ab03097c7f8374c09a3d050dc8b"
+      "sha256": "abef957622ffa65fc34db24e46270773896deeac6f6635a2b071f97f1d4fa1e0"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
-      "sha256": "d4302ecd51794bbf9d92ea08c23fc1447f043088952c53689418c03e8750bb7f"
+      "sha256": "b60b229542574459e46f33f48412ab775d298b21ab8e6a8ecf5dad46efb5589f"
     },
     "edition-authoring/copy-checkout.mjs": {
       "source": "edition-authoring/copy-checkout.mjs",
@@ -1371,7 +1371,7 @@
     },
     "edition-authoring/edition-migrations.mjs": {
       "source": "edition-authoring/edition-migrations.mjs",
-      "sha256": "7e9837c9a373cf7f394a575230c9f386a289786a15cc9685e4f11911e9a84e88"
+      "sha256": "1fb7945a0c58ee8d28fb4868599cf904c2cd7057ca62622aa02390c33a5973bb"
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
