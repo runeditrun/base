@@ -36,13 +36,22 @@ application sign-in system.
 
 ## Wire and authority
 
-The door serves MCP `2026-07-28` and the `2025-11-25` initialize path. Modern
+The door serves MCP `2026-07-28`, `2025-11-25` and `2025-06-18`. Modern
 requests carry `params._meta` protocol version and client capabilities, plus
 `MCP-Protocol-Version`, `Mcp-Method`, and `Mcp-Name` for named calls. Encoded
 names use the UTF-8 Base64 sentinel `=?base64?...?=`. Lists have deterministic
 ordering, `ttlMs` and private cache scope. Roots, Sampling and Logging are not
 served. [MCP transport](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http)
 defines these wire fields.
+
+Every MCP POST, including initialize and discovery, requires a valid bearer
+token. Missing or invalid credentials return 401 with the resource-metadata
+challenge before protocol/header validation. Initialize can carry its version
+in `params.protocolVersion` without transport metadata. Later stateless calls
+without `MCP-Protocol-Version` use `2025-06-18`; clients using the modern wire
+format must send its version and metadata. Supplied method/name and protocol
+metadata must agree with the request. Unsupported-version errors retain their
+stable code and include a plain-language message listing the supported versions.
 
 Tools declare input and output schemas, scope, possible classes, contract clauses,
 server classification and their native action. Every mutating tool also declares a

@@ -108,7 +108,7 @@ export function createProtocol(context) {
    'MCP-Protocol-Version': version, 'Mcp-Method': method,
    ...(['tools/call', 'resources/read', 'prompts/get'].includes(method) && name ? { 'Mcp-Name': name } : {}),
    ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers,
-  }, body: JSON.stringify({ jsonrpc: '2.0', id, method, params: version === '2025-11-25' ? params : { ...params, _meta: { 'io.modelcontextprotocol/protocolVersion': version, 'io.modelcontextprotocol/clientCapabilities': { elicitation: { url: {} } }, 'io.modelcontextprotocol/clientInfo': { name: 'rer-agent-conformance', version: '1' }, ...params._meta } } }) });
+  }, body: JSON.stringify({ jsonrpc: '2.0', id, method, params: ['2025-06-18', '2025-11-25'].includes(version) ? params : { ...params, _meta: { 'io.modelcontextprotocol/protocolVersion': version, 'io.modelcontextprotocol/clientCapabilities': { elicitation: { url: {} } }, 'io.modelcontextprotocol/clientInfo': { name: 'rer-agent-conformance', version: '1' }, ...params._meta } } }) });
   const body = await responseBody(response), result = body.result, decision = result?._meta?.[DECISION] ?? body.error?.data?._meta?.[DECISION];
   const answer = { status: response.status, headers: response.headers, body, message: body, result, decision, principal };
   const erased = await erasedAnswer(context, answer, before, name);

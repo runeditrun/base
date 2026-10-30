@@ -2003,7 +2003,7 @@
     },
     "modules/agent-door/conformance/discovery.mjs": {
       "source": "modules/agent-door/conformance/discovery.mjs",
-      "sha256": "717c388ae1a8888659ac75fd4569fcabfe47d11419110cc5d14694281a42d484"
+      "sha256": "027d17955e99c80072501a5d921bb44420383bfe0a351ccbae412e8a8ad9c70d"
     },
     "modules/agent-door/conformance/erasure.mjs": {
       "source": "modules/agent-door/conformance/erasure.mjs",
@@ -2055,7 +2055,7 @@
     },
     "modules/agent-door/conformance/protocol.mjs": {
       "source": "modules/agent-door/conformance/protocol.mjs",
-      "sha256": "bad6b412aba3dab0842e325e6f763b0480f7b54b98fd62bb6aebeb1eea08f806"
+      "sha256": "55b1dbca5dae59d28d8695297fcc9affb833a63e385e217aba1a0113cab406b7"
     },
     "modules/agent-door/conformance/replay.mjs": {
       "source": "modules/agent-door/conformance/replay.mjs",
