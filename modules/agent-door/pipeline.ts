@@ -1,4 +1,4 @@
-import { captureFence, erasedReplay, erasedResult } from './erasure.ts'
+import { captureFence, erasedReplay, erasedResult, expireReplayCalls } from './erasure.ts'
 import { offers } from './capabilities.mjs'
 import type { CallResult, DecisionMeta, Principal, Runtime, ToolContext } from './types.ts'
 import { audit, newAudit, recordDecision, outcomeRow, recoverAudit, usage, usageToday, type Evidence, type AuditRow } from './audit.ts'
@@ -24,6 +24,7 @@ import { auditUnfinishedContinuation } from './continuation-audit.ts'
 
 export interface PipelineAnswer { result: CallResult; status?: number; scope?: string }
 export async function callTool(rt: Runtime, name: string, input: unknown, principal: Principal, door: ToolContext['door'], trace?: unknown, resourceTool?: ToolDefinition, requestState?: unknown, proofReference?: unknown, operationId?: string): Promise<PipelineAnswer> {
+  await expireReplayCalls(rt)
   const row = newAudit(rt, principal, name, door, trace)
   if (operationId !== undefined) row.operation_id = operationId
   if (name === 'resources/read') row.resource = String((input as { uri: string }).uri)

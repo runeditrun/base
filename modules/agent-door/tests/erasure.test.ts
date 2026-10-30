@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { runtime } from './runtime.mjs'
 import { autonomousPolicy } from '../conformance/crypto.mjs'
-import { agentErasureStatements, checkAgentArtifacts } from '../erasure.ts'
+import { REPLAY_WINDOW_MS, agentErasureStatements, checkAgentArtifacts } from '../erasure.ts'
 import { personAgentArtifacts } from '../../../default-seed/src/agent-door/erasure.ts'
 import { createErasure, defineErasure } from '../../erasure/index.mjs'
 import { createPortability } from '../../portability/index.mjs'
@@ -26,7 +26,7 @@ async function archive(portability: any) {
   do { state = await portability.exports.advance(id) } while (state.phase !== 'complete')
   return new Response(await portability.exports.download(id)).text()
 }
-test('native erasure keeps sequence and value-free tombstones; old keys never repeat an effect, including aged replay; archives exclude replay custody', async t => {
+test('native erasure keeps sequence and value-free tombstones; old keys refuse in-window and become new requests after expiry; archives exclude replay custody', async t => {
   const r = await fixture(t), subject = 'personal-subject-' + crypto.randomUUID(), peer = 'other-subject-' + crypto.randomUUID()
   const key = subject + '@example.test', args = { id: subject, value: subject, idempotency_key: key }
   const policy = autonomousPolicy(); policy.rules = [{ id: 'review', class: '*', do: 'review' }]
@@ -47,8 +47,11 @@ test('native erasure keeps sequence and value-free tombstones; old keys never re
   const dump = JSON.stringify(await tableRows('1'))
   assert.ok(!dump.includes(subject), 'every declared artifact column has lost the personal values and legacy key')
   assert.deepEqual((await r.db.prepare('SELECT * FROM agent_door_calls WHERE instr(outcome,?)>0').bind(peer).all()).results, peerRows)
-  for (const age of [0, 86400001, 30 * 86400000]) {
-    await r.setNow(Date.now() + age)
+  const completedAt = r.c.now
+  const expiresAt = await r.db.prepare('SELECT expires_at FROM agent_door_calls WHERE key=?').bind('erased:' + (await r.db.prepare('SELECT call_id FROM agent_door_replay_aliases').first('call_id'))).first<number>('expires_at')
+  assert.equal(expiresAt, completedAt + REPLAY_WINDOW_MS, 'erasure preserves the completion horizon')
+  for (const age of [0, 86400001, REPLAY_WINDOW_MS - 1]) {
+    await r.setNow(completedAt + age)
     await r.adopt(autonomousPolicy())
     const replay = await r.tool('records.write', args)
     assert.equal(code(replay), 'subject_erased')
@@ -62,13 +65,23 @@ test('native erasure keeps sequence and value-free tombstones; old keys never re
   assert.ok(!JSON.parse(after.split('\n')[0]).tables.some((table: any) => table.name === 'agent_door_replay_aliases'))
   assert.ok(!after.includes(key) && !after.includes(String(aliases[0].alias)))
 
+  await r.setNow(expiresAt! + 1)
+  const currentPolicy = autonomousPolicy(); currentPolicy.rules = [{ id: 'current', class: '*', do: 'blocked' }]
+  await r.adopt(currentPolicy)
+  const fresh = await r.tool('records.write', args)
+  assert.equal(code(fresh), 'policy_blocked', 'expired key enters current authorization as a new request')
+  assert.equal(await r.db.prepare('SELECT count(*) n FROM agent_door_replay_aliases').first('n'), 0, 'expiry deletes the alias')
+  assert.equal(await r.db.prepare("SELECT count(*) n FROM agent_door_calls WHERE key LIKE 'erased:%'").first('n'), 0, 'expiry deletes its call in the same transaction')
+  assert.equal(await r.db.prepare('SELECT count(*) n FROM test_records WHERE id=?').bind(subject).first('n'), 0, 'new request cannot recover the erased value')
+  assert.equal(await r.db.prepare("SELECT count(*) n FROM test_contexts WHERE kind='run' AND instr(audit,?)>0").bind(key).first('n'), 1)
+
   const lines = before.trim().split('\n').map(line => JSON.parse(line))
   await assert.rejects(async () => {
     const stale = await r.portability.imports.create(lines[0])
     for (const part of lines.filter(line => line.kind === 'part')) await r.portability.imports.uploadPart(stale, part.index, part)
     await r.portability.imports.finalize(stale, { archiveHash: lines.at(-1).archiveHash })
   }, /erasure_epoch/)
-  t.diagnostic('all mapped columns clear; audit sequence intact; replay effect=1 at now, 24h+1ms, 30d; concurrent capture=409; peer unchanged; alias/key absent from export; older archive refused')
+  t.diagnostic('all mapped columns clear; audit sequence intact; in-window replay effect=1 at now, 24h+1ms, horizon-1ms; horizon+1ms=new request/current policy_blocked, call+alias deleted, no recovered value; concurrent capture=409; peer unchanged; alias/key absent from export; older archive refused')
 })
 
 test('pending approval loses its inputs and marks, cannot execute after native erasure', async t => {

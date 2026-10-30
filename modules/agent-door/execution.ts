@@ -1,4 +1,4 @@
-import { captureFence } from './erasure.ts'
+import { REPLAY_WINDOW_MS, captureFence } from './erasure.ts'
 import type { ClassAndFacts, CallResult, NativeTarget, Principal, Runtime, ToolContext, ToolDefinition, UndoContext, ApprovalDisplaySummary } from './types.ts'
 import { validateSchema } from './json-schema.ts'
 import { ToolRefusal } from './errors.ts'
@@ -60,8 +60,8 @@ export async function runTool(rt: Runtime, tool: ToolDefinition, args: Record<st
   }
 }
 export async function saveCall(rt: Runtime, principal: Principal, key: string | null, result: CallResult) {
-  if (key !== null) await rt.options.db.prepare('UPDATE agent_door_calls SET state=?,outcome=? WHERE agent=? AND key=?')
-    .bind(result.outcome, JSON.stringify(result), principal.agent.id, key).run()
+  if (key !== null) await rt.options.db.prepare('UPDATE agent_door_calls SET state=?,outcome=?,expires_at=coalesce(expires_at,?) WHERE agent=? AND key=?')
+    .bind(result.outcome, JSON.stringify(result), result.outcome === 'pending' ? null : rt.now() + REPLAY_WINDOW_MS, principal.agent.id, key).run()
 }
 
 export const revoked = (state: Awaited<ReturnType<typeof policyState>>, principal: Pick<Principal, 'agent' | 'consent'>) => state.revoked.agents.includes(principal.agent.id) || !!principal.consent && state.revoked.consents.includes(principal.consent)

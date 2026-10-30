@@ -1,3 +1,4 @@
+import { expireReplayCalls } from '../../modules/agent-door/index.ts'
 import { withDemo } from '../../modules/demo/index.mjs'
 import { dependenciesResponse } from './core/platform/auth/dependencies.server'
 import { firstRunResponse } from '../../foundation/runtime/setup'
@@ -104,6 +105,7 @@ export default withDemo({
     const failures: unknown[] = []
     for (const job of [
       () => recordScheduledRun(checked, controller.cron),
+      () => expireReplayCalls({ options: { db: checked.DB }, now: Date.now }),
       async () => (await import('./core/features/policies/scheduled.server')).runScheduledPolicies(checked),
       async () => (await import('./core/features/people/routes')).resumePendingErasures(checked),
     ]) {

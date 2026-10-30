@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Give native subject erasure custody of mapped agent-door payloads, retaining value-free decisions and indefinite secret-keyed replay refusals while excluding replay aliases from archives.
+- Give native subject erasure custody of mapped agent-door payloads, retaining value-free decisions and secret-keyed replay refusals only within the fixed 30-day completion window while excluding replay aliases from archives.
 
 ## 0.2.94
 
