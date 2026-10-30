@@ -153,4 +153,35 @@ test('native person erasure redacts pending and approved agent proposals, retain
   t.diagnostic(`PROBE A native POST /api/people/:id/erasure -> HTTP 200 complete; 4 approvals retained, 3 redacted; live/archive/restore marker hits=0; pending+executed+key replays=subject_erased`)
   t.diagnostic(`PROBE B proposal ids/times/status/agent/decision receipts retained; audit rows=${auditBefore.length}; usage reservations=${usageBefore.length}; peer proposal and usage unchanged`)
   t.diagnostic('PROBE C older backup -> HTTP 400 erasure_epoch; clean restore succeeds; existing tombstone/concurrent-capture assertions run in module erasure suite')
+
+  // Short source identities must not select another person's proposal merely
+  // because its text, native id, timestamps or bookkeeping contain those bytes.
+  await c.adopt(held)
+  for (const source of ['1', 'source-12', 'source[*]?']) {
+    const subject = await owned('/api/people', { name: 'Source Identity', email: crypto.randomUUID() + '@example.test', details: { sourceUserId: source } })
+    assert.equal(subject.status, 201)
+    const peerArgs = { id: peerId, body: `Keep peer revision 21 and source-1234 and source[*]?extra`, idempotency_key: crypto.randomUUID() }
+    const proposal = await c.tool('base.people.note', peerArgs), proposalId = approvalId(proposal)
+    const peerView = await owned(`/agents/api/approvals/${proposalId}`)
+    // The same source as a delimited token still selects a linked proposal.
+    const linked = await c.tool('base.people.note', { id: peerId, body: `Discuss prefix${source}suffix then (${source})`, idempotency_key: crypto.randomUUID() })
+    const linkedId = approvalId(linked)
+    const peerRows = async () => ({
+      approval: await runtime.db.prepare('SELECT * FROM agent_door_approvals WHERE id=?').bind(proposalId).first(),
+      calls: await runtime.db.prepare('SELECT * FROM agent_door_calls WHERE decision_id=? ORDER BY rowid').bind(proposal.decision.id).all(),
+      audits: await runtime.db.prepare('SELECT * FROM agent_door_audit WHERE id=? ORDER BY sequence').bind(proposal.decision.id).all(),
+      usage: await runtime.db.prepare('SELECT * FROM agent_door_usage WHERE decision_id=? ORDER BY rowid').bind(proposal.decision.id).all(),
+    })
+    const stable = value => ({ ...value, calls: value.calls.results, audits: value.audits.results, usage: value.usage.results })
+    const beforePeer = stable(await peerRows())
+    const counts = async () => Promise.all(['agent_door_approvals', 'agent_door_audit', 'agent_door_usage'].map(table => runtime.db.prepare(`SELECT count(*) n FROM ${table}`).first('n')))
+    const beforeCounts = await counts()
+    const result = await owned(`/api/people/${subject.body.id}/erasure`, { confirmation: `erase ${subject.body.id}` })
+    assert.equal(result.status, 200, JSON.stringify(result.body))
+    assert.deepEqual(stable(await peerRows()), beforePeer, `source ${JSON.stringify(source)} preserves the peer's full proposal and audit content`)
+    assert.deepEqual(await owned(`/agents/api/approvals/${proposalId}`), peerView)
+    assert.deepEqual(await counts(), beforeCounts, 'proposal, audit and usage counts stay intact')
+    assert.equal((await owned(`/agents/api/approvals/${linkedId}`)).body.approval.code, 'subject_erased', 'whole source tokens still select linked proposals')
+    t.diagnostic(`PROBE ISOLATION source=${JSON.stringify(source)}: peer proposal/call/audit/usage byte-identical; counts=${beforeCounts.join('/')} unchanged; bounded source mention redacted`)
+  }
 })
