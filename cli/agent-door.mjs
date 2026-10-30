@@ -70,7 +70,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  const network = await createAgentConformanceNetwork(root, verification.network, { email, sponsorEmails: principals.slice(1).map(person => person.email) });
  let hosted, history;
  try {
- hosted = await serveHosted(root, { declaration, publicHosts: verification.publicHosts, rpc: verification.rpc, workerEntrypoints: workerDriver ? [workerDriver.entrypoint] : [], outboundService: async request => {
+ hosted = await serveHosted(root, { declaration, publicHosts: verification.publicHosts, fixturePreparation: true, rpc: verification.rpc, workerEntrypoints: workerDriver ? [workerDriver.entrypoint] : [], outboundService: async request => {
   const copy = reviewers.observes(request) ? request.clone() : null, response = await network.fetch(request);
   if (copy) await reviewers.capture(copy, response.clone());
   return response;
@@ -143,8 +143,8 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   const secrets = await network.provision(hosted);
   const webhooks = await verificationWebhooks(root, verification.webhooks, secrets);
   history = await verificationHistory(root, verification.history);
-  const journey = await verificationJourney(root, verification.journey, { request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures, database: hosted.database });
-  const prepare = await journeyFixtures(root, verification.fixtures, { request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures, database: hosted.database });
+  const journey = await verificationJourney(root, verification.journey, { request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures, ...await hosted.preparation() });
+  const prepare = await journeyFixtures(root, verification.fixtures, { request, origin: hosted.origin, email, cookie, mail: network.mail, fixtures: network.fixtures, ...await hosted.preparation() });
   const nativeStep = history ? async value => {
    await history.run(value, (declaration, rows) => writeVerificationHistory(hosted, declaration, rows));
    await journey.nativeStep?.(value);

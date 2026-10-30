@@ -28,6 +28,7 @@ const verify = root => checkAgentDoor(root, { report() {} }).catch(error => { if
 
 test('history stays outside production commands and production imports are refused', { timeout: 120000 }, async t => {
  const { root } = await seed(t), outcomes = [];
+ await writeFile(join(root, 'ambient.d.ts'), 'export const nativeVersion: string;');
  // A module incompatible with Node demonstrates that production validation
  // reads declarations without importing or executing the fixture.
  await writeFile(join(root, 'tests/history.mjs'), 'throw Error("must not execute outside verification"); export default {};');
@@ -51,7 +52,11 @@ test('history stays outside production commands and production imports are refus
  await symlink(join(root, 'native-history'), join(root, 'tests/alias-dir'));
  await writeFile(join(root, 'production.mjs'), "export {default} from './native-history/outside.mjs';");
  outcomes.push(await historyDeclaration(root, {...declaration(), module:'tests/alias-dir/outside.mjs'}).then(() => false, error => error.code === 'agent_history_invalid'));
- assert.deepEqual(outcomes, Array(9).fill(true));
+ for (const path of ['./tests/history.mjs', './runtime-tests/history.mjs']) {
+  await writeFile(join(root, 'production.mjs'), `new Worker(new URL(${JSON.stringify(path)}, import.meta.url), {type:'module'});`);
+  outcomes.push(await historyDeclaration(root, declaration()).then(() => false, error => error.code === 'agent_history_invalid'));
+ }
+ assert.deepEqual(outcomes, Array(11).fill(true));
 });
 
 test('production Workers and URL assets cannot reference verification history', { timeout: 120000 }, async t => {

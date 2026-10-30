@@ -12,9 +12,10 @@ import { hostedMailCredentials } from './hosted-mail.mjs';
 import { deliveryDeclarationSources } from './delivery-declarations.mjs';
 import { sourcePath } from '../modules/delivery-producer/migrations.mjs';
 import { shared } from './shared.mjs';
-import { registerHistoryInstallation } from './agent-history-database.mjs';
+import { registerHistoryInstallation, preparationDatabase } from './agent-history-database.mjs';
 import { verificationRpc } from './agent-rpc.mjs';
 import { hostedOrigins } from './hosted-hosts.mjs';
+import { FixtureDatabaseError } from '../modules/agent-door/conformance/fixtures.mjs';
 
 // Serve the production build the way rer deploy hosts it (assets behind the
 // Worker, deploy identity bound, a public https origin) on loopback, with no
@@ -82,7 +83,7 @@ async function hostedPublicVariables(root, config, declaration, manifest) {
 
 /** The build served as rer deploy hosts it, with declared vars, origin and
  * required public inputs and deploy/Managed mail secret stand-ins. `fetch(path, init)` uses the deployed origin. */
-export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService, rpc, workerEntrypoints = [], publicHosts } = {}) {
+export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService, rpc, workerEntrypoints = [], publicHosts, fixturePreparation = false } = {}) {
  const { loopbackFetch } = await shared('loopback-fetch.mjs');
  const build = join(root, 'dist/server'), client = join(root, 'dist/client');
  let config;
@@ -109,7 +110,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   if (!Object.hasOwn(secrets, binding)) secrets[binding] = standIn({}, manifest.fields?.find(field => field.name === binding));
  }
  const publicVariables = await hostedPublicVariables(root, config, declaration, manifest);
- const mf = new Miniflare(convertV4MiniflareOptions({ host: '127.0.0.1', port: 0, cf: false, workers: [{ name: 'ingress', modules: true, script: ingress, serviceBindings: { APP: 'app', ...nativeBindings } }, ...rpcServices.workers, {
+ const options = { host: '127.0.0.1', port: 0, cf: false, workers: [{ name: 'ingress', modules: true, script: ingress, serviceBindings: { APP: 'app', ...nativeBindings } }, ...rpcServices.workers, {
   name: 'app', ...(outboundService ? { outboundService } : {}), modules, modulesRoot: build, compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
   bindings: { ...publicVariables, ...secrets, ...(declaration.originVar ? { [declaration.originVar]: HOSTED_ORIGIN } : {}),
    RER_DEPLOY_SOURCE: identity.sourceSha, RER_DEPLOY_FINGERPRINT: identity.fingerprint, RER_VERSION: { id: identity.versionId, tag: '', timestamp: new Date().toISOString() }, ...bindings },
@@ -124,7 +125,24 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   serviceBindings: rpcServices.serviceBindings,
   durableObjects: Object.fromEntries((config.durable_objects?.bindings ?? []).filter(item => !item.script_name).map(item => [item.name, { className: item.class_name, useSQLite: true }])),
   ...(config.assets ? { assets: { directory: client, binding: config.assets.binding ?? 'ASSETS', routerConfig: { has_user_worker: true, invoke_user_worker_ahead_of_assets: RUN_WORKER_FIRST } } } : {}),
- }] }));
+ }] };
+ let preparation, held = false;
+ const waiting = new Set();
+ const release = () => { held = false; for (const resume of waiting) resume(); waiting.clear(); };
+ // Install the gate before owner hooks retain any D1 handles; replacing
+ // Miniflare options later would disconnect those existing handles.
+ if (fixturePreparation) {
+  const app = options.workers.find(worker => worker.name === 'app');
+  const wrapper = join(build, '__rer_preparation.mjs');
+  const native = './' + config.main;
+  app.modules = [{ type: 'ESModule', path: wrapper, contents:
+   `import app from ${JSON.stringify(native)};export * from ${JSON.stringify(native)};export default {...app,async queue(batch,env,ctx){await env.RER_PREPARATION_QUEUE_GATE.fetch('https://queue.invalid');return app.queue(batch,env,ctx)}}` }, ...modules];
+  app.serviceBindings = { ...app.serviceBindings, RER_PREPARATION_QUEUE_GATE: async () => {
+   if (held) await new Promise(resume => waiting.add(resume));
+   return new Response(null, { status: 204 });
+  } };
+ }
+ const mf = new Miniflare(convertV4MiniflareOptions(options));
  let loopback;
  try {
   loopback = await mf.ready;
@@ -138,11 +156,32 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    await migrate(await mf.getD1Database(item.binding, 'app'), withRewrites(plan, await readMigrationRewrites(root), { partial: true }));
   }
  } catch (error) { await mf.dispose(); throw error; }
+ const preparedDatabase = async binding => {
+  if (!(config.d1_databases ?? []).some(item => item.binding === binding)) throw new RerError('hosted_database_invalid', new FixtureDatabaseError().message, 1);
+  return preparationDatabase(await mf.getD1Database(binding, 'app'));
+ };
  const hosted = { client, identity, origin: HOSTED_ORIGIN, origins,
   worker: async entrypoint => {
    if (!Object.hasOwn(nativeWorkers, entrypoint)) throw new RerError('agent_invoke_invalid', 'Verification can invoke only its declared native Worker entrypoint.', 1);
    return (await mf.getBindings('ingress'))[nativeWorkers[entrypoint]];
   },
+  // Only the conformance call sites request these powers. Ordinary hosted
+  // checks and owner initialization keep their SELECT-only reader below.
+  preparation: async () => preparation ??= (async () => {
+   if (!fixturePreparation) throw new RerError('hosted_database_invalid', 'Native preparation requires a disposable conformance host.', 1);
+   return Object.freeze({
+    database: async binding => (await preparedDatabase(binding)).database,
+    scheduled: async ({ scheduledTime = Date.now() } = {}) => {
+     if (!Number.isFinite(scheduledTime)) throw new Error('Native scheduled preparation requires a finite Unix millisecond time.');
+     try {
+      const result = await (await mf.getWorker('app')).scheduled({ scheduledTime });
+      if (result.outcome !== 'ok') throw new Error();
+     }
+     catch { throw new Error('Native scheduled preparation failed; fixture values are not logged.'); }
+    },
+    queues: Object.freeze({ hold: () => { held = true; }, release }),
+   });
+  })(),
   database: async binding => {
    if (!(config.d1_databases ?? []).some(item => item.binding === binding)) throw new RerError('hosted_database_invalid', 'Verification can read only a declared disposable database binding.', 1);
    const db = await mf.getD1Database(binding, 'app');
@@ -150,12 +189,12 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
     if (typeof sql !== 'string' || !/^\s*SELECT\b/i.test(sql) || sql.includes(';')) throw new RerError('hosted_database_invalid', 'Verification state access is read-only SELECT.', 1);
     return db.prepare(sql);
    } };
-  }, close: () => mf.dispose(),
+  }, close: () => { release(); return mf.dispose(); },
   fetch: (path, { headers, origin = HOSTED_ORIGIN, ...init } = {}) => {
    if (!origins.includes(origin)) throw new RerError('agent_door_origin', 'Agent conformance request must use a declared hosted installation origin.', 1);
    return loopbackFetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${origin}/${path}` } });
   } };
- registerHistoryInstallation(hosted, mf, config.d1_databases ?? []);
+ if (fixturePreparation) registerHistoryInstallation(hosted, preparedDatabase);
  return hosted;
 }
 
