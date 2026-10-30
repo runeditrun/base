@@ -131,3 +131,12 @@ test('HTTP preserves typed authority refusals and distinguishes transient storag
   assert.doesNotMatch(JSON.stringify(body),/private/);
  }
 });
+
+test('constructor-issued refusals cross installed and copied runtimes without recognizing arbitrary errors',async()=>{
+ const {PortabilityError:Copied,portabilityErrorCode}=await import('../storage.mjs?copied-runtime');
+ const error=new Copied('schema_mismatch:legacy_evidence',409);
+ assert.ok(error instanceof PortabilityError);
+ assert.ok(new PortabilityError('schema_mismatch',409) instanceof Copied);
+ error.code='changed';assert.equal(portabilityErrorCode(error),'schema_mismatch:legacy_evidence');
+ for(const arbitrary of [new Error('unknown'),{code:'schema_mismatch',status:409},Object.create(PortabilityError.prototype)])assert.equal(arbitrary instanceof PortabilityError,false);
+});
