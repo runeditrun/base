@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, relative, isAbsolute } from 'node:path';
-import { parseContract } from '../foundation/runtime/seed-contract.mjs';
+import { parseContract, plainText } from '../foundation/runtime/seed-contract.mjs';
 import { RerError } from './errors.mjs';
 
 export const clausesHelp = `Usage: rer door clauses (--write | --check) [--cwd DIR]
@@ -10,6 +10,7 @@ export const clausesHelp = `Usage: rer door clauses (--write | --check) [--cwd D
 Synchronize BASE-AGENT-001 through BASE-AGENT-013 in CONTRACT.md.
 --write adds or updates Base's requirements, preserving existing status,
 evidence and gaps, then runs the seed's contract-docs write and check.
+It requires a Shared duties (Base) table and skips duties listed there.
 --check is read-only and names missing or stale clauses (exit 1).
 Seed-owned clauses and the judged revision stay unchanged. Newly added clauses
 start missing. Regenerate the seed's source lock last, before committing.
@@ -62,6 +63,29 @@ function headings(lines) {
   const match = !fence && /^(#{1,6}) ([^\r\n]+)/.exec(line);
   return match ? [{ index, level: match[1].length, title: match[2] }] : [];
  });
+}
+
+function sharedDuties(original) {
+ const lines = original.split(/\r?\n/), outline = headings(lines);
+ const cells = line => line?.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, '').split(/(?<!\\)\|/).map(cell => cell.trim());
+ const section = outline.find(item => item.level === 2 && item.title.trim() === 'Shared duties (Base)');
+ const end = section && (outline.find(item => item.index > section.index && item.level <= 2)?.index ?? lines.length);
+ let fence;
+ for (let i = (section?.index ?? lines.length) + 1; i < end; i++) {
+  const mark = /^\s*(`{3,}|~{3,})/.exec(lines[i])?.[1];
+  if (mark) { if (!fence) fence = mark[0]; else if (fence === mark[0]) fence = undefined; continue; }
+  if (fence) continue;
+  if (!lines[i].trimStart().startsWith('|')) continue;
+  const header = cells(lines[i]), divider = cells(lines[i + 1]);
+  if (plainText(header[0]) !== 'Base duty' || divider?.length !== header.length || !divider.every(cell => /^:?-{3,}:?$/.test(cell))) continue;
+  const duties = new Set();
+  for (let row = i + 2; row < end && lines[row].trimStart().startsWith('|'); row++) {
+   const id = plainText(cells(lines[row])[0]);
+   if (/^BASE-AGENT-\d{3}$/.test(id)) duties.add(id);
+  }
+  return duties;
+ }
+ fail('CONTRACT.md needs a Shared duties (Base) table with a Base duty column before --write. Add the table, then retry; no files were written.');
 }
 
 // contract-docs owns summary generation. Suppress only its three derived rows
@@ -139,7 +163,9 @@ export async function doorClausesCommand(args, env = process.env) {
   root = resolve(root);
   const file = resolve(root, 'CONTRACT.md');
   if (!existsSync(file)) fail('No CONTRACT.md found. Run rer door clauses from the seed root or pass --cwd DIR.');
-  const original = read(file), { text, changed } = synchronize(original, definitions(canonical(root)));
+  const original = read(file);
+  const inherited = mode === '--write' ? sharedDuties(original) : new Set();
+  const { text, changed } = synchronize(original, definitions(canonical(root)).filter(clause => !inherited.has(clause.id)));
   if (changed.length) console.log(`Agent clauses: ${changed.join(', ')}.`);
   if (mode === '--check' && changed.length) return 1;
   const commands = generator(root);
