@@ -57,13 +57,21 @@ export function importKitClosureCases({init, write, commit, run, ok, snapshotTre
       assert.match(refused.error, /does not export batchExecutions/);
       assert.deepEqual(snapshotTree(seed), before);
       // Extract incoming bytes without replacing the seed's adaptation.
-      const extract = archive ? refused.error.split('\n').find(line => line.startsWith('cp ')) : refused.error.match(/git -C .*? > '.*?\.base'/)?.[0];
+      const extract = archive ? refused.error.split('\n').find(line => line.startsWith('cp ') && line.endsWith(".base'")) : refused.error.match(/git -C .*? > '.*?\.base'/)?.[0];
       assert.ok(extract, 'refusal provides a Base extraction command');
       const extracted = spawnSync('sh', ['-c', extract], {cwd: seed, encoding: 'utf8'});
       assert.equal(extracted.status, 0, extracted.stderr);
       assert.equal(fs.readFileSync(path.join(seed, budget + '.base'), 'utf8'), oldBudget + batch);
       assert.equal(fs.readFileSync(path.join(seed, budget), 'utf8'), edited);
-      // The seed author reconciles its customization with the new export.
+      // Establish the incoming baseline, refresh its closure, then reconcile.
+      write(seed, budget + '.seed', edited);
+      write(seed, budget + '.ancestor', oldBudget);
+      write(seed, budget, oldBudget + batch);
+      ok(seed, 'record-base', budget, `${origin}/budget.ts`, next, archive ? '--base-archive' : '--base', source, ...flags);
+      ok(seed, ...refresh);
+      const merged = spawnSync('git', ['merge-file', budget, budget + '.ancestor', budget + '.seed'], {cwd: seed, encoding: 'utf8'});
+      assert.equal(merged.status, 1, 'adjacent upstream and seed edits need explicit conflict resolution');
+      assert.match(fs.readFileSync(path.join(seed, budget), 'utf8'), /^<<<<<<< /m);
       write(seed, budget, edited + batch);
       const unacknowledged = snapshotTree(seed);
       assert.equal(run(seed, ...refresh).status, 1, 'merged edits still require acknowledgement');
@@ -72,7 +80,7 @@ export function importKitClosureCases({init, write, commit, run, ok, snapshotTre
       assert.ok(acknowledge, 'reconciled adaptations need a runnable acknowledgement');
       const accepted = spawnSync('sh', ['-c', acknowledge], {cwd: seed, encoding: 'utf8'});
       assert.equal(accepted.status, 0, accepted.stderr);
-      fs.rmSync(path.join(seed, budget + '.base'));
+      for (const suffix of ['.base', '.ancestor', '.seed']) fs.rmSync(path.join(seed, budget + suffix));
       ok(seed, ...refresh);
       assert.equal(fs.readFileSync(path.join(seed, budget), 'utf8'), edited + batch);
       assert.equal(fs.readFileSync(path.join(seed, atomic), 'utf8'), newAtomic);

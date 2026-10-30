@@ -290,8 +290,11 @@ Every recorded code module is closed over relative imports and re-exports,
 including delivered workflow helpers and adapted modules (read from local bytes).
 A delivered `.mjs` also brings its Base declaration sibling. A dependency keeps
 its relative destination only when an existing copy mapping witnesses that
-namespace. Tracked unrecorded dependencies stay seed-owned and stop traversal;
-new imports from refreshed files must find their named, type and default exports.
+namespace. Tracked unrecorded dependencies stay seed-owned, and their local
+bytes are traversed as closure roots alongside acknowledged adaptations.
+Their Base dependencies must resolve at witnessed destinations or refresh
+refuses before writes; imports without a Base counterpart stay seed-owned.
+New imports from refreshed files must find their named, type and default exports.
 A JavaScript/TypeScript AST discovers imports, re-exports and literal runtime
 calls, including optional calls, templates and JSX. Runtime imports of every
 form resolve independently of declaration-only files;

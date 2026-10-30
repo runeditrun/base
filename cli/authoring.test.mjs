@@ -411,3 +411,11 @@ test('packed archive refresh preserves workflow ownership and delivers an interc
  const {archiveDeliveryJourney} = await import('./fixtures/authoring-archive.mjs');
  await archiveDeliveryJourney(t, {fixture, write, commit, git});
 });
+
+test('packed refresh closes retained module graphs and supports record-refresh-merge recovery', async t => {
+ const {retainedRecovery, retainedClosure, deployKitRefresh} = await import('./fixtures/authoring-module-closure.mjs');
+ const tools = {fixture, write, commit, base};
+ await retainedRecovery(t, tools);
+ for (const ownership of ['tracked', 'adapted']) await retainedClosure(t, tools, ownership);
+ await deployKitRefresh(t, tools);
+});
