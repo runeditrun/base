@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS agent_door_state (
 CREATE TABLE IF NOT EXISTS agent_door_agents (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, specialist TEXT, sponsor TEXT NOT NULL,
   sponsor_name TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0,
-  window INTEGER NOT NULL DEFAULT 0, requests INTEGER NOT NULL DEFAULT 0
+  window INTEGER NOT NULL DEFAULT 0, requests INTEGER NOT NULL DEFAULT 0, tombstone TEXT
 );
 CREATE TABLE IF NOT EXISTS agent_door_audit (
   sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, at TEXT NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS agent_door_audit (
 CREATE INDEX IF NOT EXISTS agent_door_audit_agent ON agent_door_audit(agent,sequence);
 CREATE TABLE IF NOT EXISTS agent_door_calls (
   agent TEXT NOT NULL, key TEXT NOT NULL, digest TEXT NOT NULL, decision_id TEXT NOT NULL,
-  created_at INTEGER NOT NULL, state TEXT NOT NULL, outcome TEXT, PRIMARY KEY(agent,key)
+  created_at INTEGER NOT NULL, state TEXT NOT NULL, outcome TEXT, expires_at INTEGER, PRIMARY KEY(agent,key)
 );
 CREATE TABLE IF NOT EXISTS agent_door_approvals (
   id TEXT PRIMARY KEY, state TEXT NOT NULL, saved TEXT NOT NULL, approvals TEXT NOT NULL DEFAULT '[]',
@@ -33,3 +33,5 @@ CREATE TABLE IF NOT EXISTS agent_door_usage (
   classes TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS agent_door_usage_day ON agent_door_usage(at);
+
+CREATE INDEX IF NOT EXISTS agent_door_calls_expiry ON agent_door_calls(expires_at);

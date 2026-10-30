@@ -89,6 +89,7 @@ export type CompanyPolicyInput = Immutable<{
 }>
 export type CompanyPolicyContext = Pick<ToolContext, 'db' | 'person' | 'agent' | 'consent' | 'scopes' | 'clientId' | 'operationId' | 'idempotencyKey' | 'seed' | 'origin' | 'now' | 'door'>
 export interface AgentDoorOptions {
+  erasure?: import("./erasure.ts").AgentErasureOptions
   seed: string; name: string; specialist: string; version?: string; db: D1Database; origin: string; trust: Trust | null
   capabilities?: readonly Capability[]
   tools: ToolDefinition[]; resources?: ResourceDefinition[]

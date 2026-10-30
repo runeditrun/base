@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.94-dev.gb86657c5",
+  "cliVersion": "0.2.94-dev.g37bc20c9",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1959,7 +1959,7 @@
     },
     "modules/agent-door/CLAUSES.md": {
       "source": "modules/agent-door/CLAUSES.md",
-      "sha256": "0568321ca8cc6c5ff5056d3e12868795aadfedd17c51aa693dd4517450a9e867"
+      "sha256": "0cae7c4f0bcb61d6814e9833a4284b5e35627187cddb6ff4d5c2948122cf8016"
     },
     "modules/agent-door/capabilities.d.mts": {
       "source": "modules/agent-door/capabilities.d.mts",
@@ -1979,7 +1979,7 @@
     },
     "modules/agent-door/conformance/audit.mjs": {
       "source": "modules/agent-door/conformance/audit.mjs",
-      "sha256": "77d720ebb0c8d2fdc8ef60f59cb24b36dc378e34f11ed0c5de0527235d1a8061"
+      "sha256": "9abd99e58ac1bfe2d9dda40394bf129dd841ace30bdd4820dd71ecc08f5a0dda"
     },
     "modules/agent-door/conformance/authority.d.mts": {
       "source": "modules/agent-door/conformance/authority.d.mts",
@@ -1996,6 +1996,10 @@
     "modules/agent-door/conformance/discovery.mjs": {
       "source": "modules/agent-door/conformance/discovery.mjs",
       "sha256": "717c388ae1a8888659ac75fd4569fcabfe47d11419110cc5d14694281a42d484"
+    },
+    "modules/agent-door/conformance/erasure.mjs": {
+      "source": "modules/agent-door/conformance/erasure.mjs",
+      "sha256": "1e33e00db3ba162c118ddfedc4802b3d073d82947603a1a02a4ae07adb8d8a02"
     },
     "modules/agent-door/conformance/fixtures.mjs": {
       "source": "modules/agent-door/conformance/fixtures.mjs",
@@ -2015,7 +2019,7 @@
     },
     "modules/agent-door/conformance/journey.mjs": {
       "source": "modules/agent-door/conformance/journey.mjs",
-      "sha256": "6b04714c746aeec401bed3277820e9c22219591bd0b5461fc23eb8a429da2b55"
+      "sha256": "8baae8a70347a142f8aee86d26a664b2a9771a0135d8a0815f65000e200f53fb"
     },
     "modules/agent-door/conformance/narrowing.d.mts": {
       "source": "modules/agent-door/conformance/narrowing.d.mts",
@@ -2039,11 +2043,11 @@
     },
     "modules/agent-door/conformance/policy-phases.mjs": {
       "source": "modules/agent-door/conformance/policy-phases.mjs",
-      "sha256": "8b18db81d0c8918033f7f0b7c3796edd22e45f77c8cf86fa375118b82af5503b"
+      "sha256": "2b528e03623e6afe716eb5f34e978b233c57a9dc8f13a05d4aaabb3da52d4191"
     },
     "modules/agent-door/conformance/protocol.mjs": {
       "source": "modules/agent-door/conformance/protocol.mjs",
-      "sha256": "38b571b5b7e578f15f5ae25113e70bf5e8c44e7c0579d45ecc148d080280996c"
+      "sha256": "bad6b412aba3dab0842e325e6f763b0480f7b54b98fd62bb6aebeb1eea08f806"
     },
     "modules/agent-door/conformance/replay.mjs": {
       "source": "modules/agent-door/conformance/replay.mjs",
@@ -2827,7 +2831,7 @@
     },
     "modules/erasure/cascade.mjs": {
       "source": "modules/erasure/cascade.mjs",
-      "sha256": "e100fec1eaaf6b54e110d9778bc96a78a6e9011b047bba6db42d1a9d81da75ac"
+      "sha256": "97d78d3a802de6975dd4619f16a307bacb35ea155a928d4038e9eed77498fbeb"
     },
     "modules/erasure/completion.mjs": {
       "source": "modules/erasure/completion.mjs",
@@ -2843,11 +2847,11 @@
     },
     "modules/erasure/index.d.mts": {
       "source": "modules/erasure/index.d.mts",
-      "sha256": "204f2236b0877cf4005a317bbc4d9bdaf727fbe060195ce06fb046492bf04040"
+      "sha256": "7a0ef533ffca11e14622495b67f1e5ef05955d563479843d5d09032b5e819124"
     },
     "modules/erasure/index.mjs": {
       "source": "modules/erasure/index.mjs",
-      "sha256": "3db675becd9f30683c24ce9b72b43c36210643af2493c7ee2a2db6ec53978d46"
+      "sha256": "05ac5ba1004b5b6a73552d88b3373233480eb47bec3ccde4e8c8aeadcca4df32"
     },
     "modules/erasure/order.mjs": {
       "source": "modules/erasure/order.mjs",
@@ -4599,7 +4603,7 @@
     },
     "modules/portability/bookkeeping.mjs": {
       "source": "modules/portability/bookkeeping.mjs",
-      "sha256": "463159369ea8d6a03ebe4308bf7282f0a003d6d32764873456a74001bec7a27d"
+      "sha256": "0f477ce1452845004eab4bb4f20fc51ae49ccbd5f9545fcbf9c15a5928cd8b29"
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",

@@ -10,7 +10,7 @@ export const platformTables=Object.freeze([
   'rer_mail_development_outbox','rer_ai_development_outbox',
   'rer_dependency_keys','rer_dependency_pending','rer_dependency_codes',
   'rer_command_receipts','rer_erasure_blobs','rer_erasure_guard',
-  'rer_erasure_scope','rer_erasure_rates','rer_demo',
+  'rer_erasure_scope','rer_erasure_rates','rer_demo','agent_door_replay_aliases',
 ]);
 export const identifier=value=>value.replace(/[A-Z]/g,letter=>letter.toLowerCase());
 export const matches=(table,pattern)=>pattern.endsWith('%') ? identifier(table).startsWith(identifier(pattern.slice(0,-1))) : identifier(table)===identifier(pattern);
