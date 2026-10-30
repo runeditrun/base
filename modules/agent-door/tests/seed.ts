@@ -106,6 +106,12 @@ export default {
     }
     if (config.sponsorSurface) tools.push(...sponsorTools(env.DB, auth))
     const door = createAgentDoor({ seed: config.seed, name: 'Synthetic Base', specialist: 'operations', origin: config.origin, db: env.DB, trust: JSON.parse(env.TRUST), now,
+      companyPolicy: config.companyPolicy ? { async decide(input, ctx) {
+        if (!Object.isFrozen(input) || !Object.isFrozen(input.args) || !Object.isFrozen(input.classes[0].facts) || !Object.isFrozen(input.policy) || !Object.isFrozen(ctx) || !Object.isFrozen(ctx.person) || !Object.isFrozen(ctx.scopes) || 'emit' in ctx || 'approvers' in ctx || 'idempotency_key' in input.args || !ctx.person.active) throw new Error('invalid native policy context')
+        const row = await env.DB.prepare('SELECT answer FROM test_company_policy WHERE tool=?').bind(input.tool).first<{ answer: string }>()
+        if (row?.answer === 'throw') throw new Error('private native diagnostic')
+        return row ? JSON.parse(row.answer) : { decision: 'allow', rule: 'native-default', revision: '1' }
+      } } : undefined,
       currentScopes: async principal => { const grant = await env.DB.prepare('SELECT scopes FROM test_grants WHERE agent=?').bind(principal.agent.id).first<{ scopes: string }>(); return grant ? JSON.parse(grant.scopes) : principal.scopes },
       tools: config.nativePeople ? tools.filter(tool => tool.name === 'base.people.create') : config.toolNames ? config.toolNames.map((name: string) => ({ ...tools[0], name })) : tools, limits: config.limits, people: operatorAuthPeople({ db: env.DB, allowList, session: request => auth.getSession(request) }),
       localCredentials: async request => request.headers.get('authorization') === `Bearer ${env.LOCAL_TOKEN}` ? { sponsor: { id: (await env.DB.prepare('SELECT claim_id FROM oa_bootstrap WHERE singleton=1').first<{claim_id:string}>())!.claim_id }, agent: { id: 'synthetic-base-local', name: 'Synthetic Local' }, scopes: ['records:read','records:write','events:read'] } : null,
