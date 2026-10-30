@@ -32,7 +32,11 @@ test('native erasure keeps sequence and value-free tombstones; old keys refuse i
   const policy = autonomousPolicy(); policy.rules = [{ id: 'review', class: '*', do: 'review' }]
   await r.adopt(policy)
   await r.tool('records.write', { id: peer, value: 'unrelated value', idempotency_key: crypto.randomUUID() })
-  assert.equal((await r.tool('records.write', args)).result.structuredContent.version, 1)
+  const written = await r.tool('records.write', args)
+  assert.equal(written.result.structuredContent.version, 1)
+  await r.db.prepare("UPDATE agent_door_usage SET classes=json_set(classes,'$[0].facts.kind',?) WHERE decision_id=?").bind(subject, written.result._meta['com.runeditrun/decision'].id).run()
+  const accounting = async () => (await r.db.prepare("SELECT decision_id,at,seed,specialist,agent,json_extract(classes,'$[0].class') AS class,json_extract(classes,'$[0].facts.measure') AS measure FROM agent_door_usage ORDER BY decision_id").all()).results
+  const usageBefore = await accounting()
   const tableRows = async (where: string) => Promise.all(personAgentArtifacts.artifacts.filter(item => item.match).map(async item => ({
     table: item.table, rows: (await r.db.prepare('SELECT * FROM "' + item.table + '" WHERE ' + where + ' ORDER BY rowid').all()).results,
   })))
@@ -46,6 +50,7 @@ test('native erasure keeps sequence and value-free tombstones; old keys refuse i
   assert.deepEqual((await r.db.prepare('SELECT sequence,id FROM agent_door_audit ORDER BY sequence').all()).results, auditBefore)
   const dump = JSON.stringify(await tableRows('1'))
   assert.ok(!dump.includes(subject), 'every declared artifact column has lost the personal values and legacy key')
+  assert.deepEqual(await accounting(), usageBefore, 'redaction clears personal facts without resetting usage measures or scope dimensions')
   assert.deepEqual((await r.db.prepare('SELECT * FROM agent_door_calls WHERE instr(outcome,?)>0').bind(peer).all()).results, peerRows)
   const completedAt = r.c.now
   const expiresAt = await r.db.prepare('SELECT expires_at FROM agent_door_calls WHERE key=?').bind('erased:' + (await r.db.prepare('SELECT call_id FROM agent_door_replay_aliases').first('call_id'))).first<number>('expires_at')

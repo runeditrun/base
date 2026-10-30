@@ -1474,10 +1474,12 @@ const map: AgentArtifactMap = { artifacts: [
 `default-seed/src/agent-door/erasure.ts` supplies the complete reference map.
 It declares personal custody in calls (`key`, `digest`, `outcome`), approvals
 (`saved`, `approvals`, `result`), audit (`row`, `evidence`), reviews (`saved`,
-`marked_by`), events (`uri`, `event`) and usage (`specialist`, `classes`).
-Native subject IDs and exact addresses select their linked decision, approval,
-review and event rows. Operators and installation policy are separate from the
-reference's customer subjects; a seed that erases operators must also map sponsor
+`marked_by`), events (`uri`, `event`) and usage's open text facts in `classes`.
+Usage retains numeric measures, currency, counterparty/direction categories and
+non-personal agent scope dimensions so erasure does not reset policy allowances.
+Native subject IDs, exact addresses and the imported `sourceUserId` select their
+linked decision, approval, review and event rows. Operators and installation
+policy are separate from the reference's customer subjects; a seed that erases operators must also map sponsor
 identity columns and policy person references. Do not select by a common name
 alone. Resolve native target IDs before admitting pending execution, including
 tools that return only a child row ID.

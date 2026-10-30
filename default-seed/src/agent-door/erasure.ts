@@ -5,7 +5,7 @@ import { portabilityPolicy } from '../core/platform/portability-policy.mjs'
 // The seed declares every table and column. ?1 is a JSON array of the native
 // erasure's exact subject identifiers and personal values, never caller SQL.
 const mentions = (columns: string[]) => 'EXISTS(SELECT 1 FROM json_each(?1) subject WHERE ' + columns.map(column => "instr(CAST(" + column + " AS TEXT),CAST(subject.value AS TEXT))>0").join(' OR ') + ')'
-const calls = mentions(['outcome']), approvals = mentions(['saved', 'approvals', 'result']), reviews = mentions(['saved', 'marked_by']), audits = mentions(['row', 'evidence'])
+const calls = mentions(['key', 'outcome']), approvals = mentions(['saved', 'approvals', 'result']), reviews = mentions(['saved', 'marked_by']), audits = mentions(['row', 'evidence'])
 const decisions = "SELECT decision_id FROM agent_door_calls WHERE " + calls + " UNION SELECT json_extract(saved,'$.decision_id') FROM agent_door_approvals WHERE " + approvals + " UNION SELECT json_extract(saved,'$.decision_id') FROM agent_door_reviews WHERE " + reviews + " UNION SELECT id FROM agent_door_audit WHERE " + audits + " UNION SELECT json_extract(details,'$.operationId') FROM audit_events WHERE (entity_type='person' AND entity_id IN (SELECT value FROM json_each(?1))) OR (entity_type='note' AND entity_id IN (SELECT id FROM person_notes WHERE person_id IN (SELECT value FROM json_each(?1))))"
 const match = (sql: string) => ({ sql, params: ['values'] })
 export const personAgentArtifacts: AgentArtifactMap = { artifacts: [
@@ -21,9 +21,13 @@ export const personAgentArtifacts: AgentArtifactMap = { artifacts: [
 ] }
 
 export async function erasePersonAgentArtifacts(db: D1Database, secret: string, subject: { id: string }, tombstone: { erasure_id: string; at: string }) {
-  const person = await db.prepare('SELECT id,email FROM people WHERE id=?').bind(subject.id).first<{ id: string; email: string }>()
+  const person = await db.prepare('SELECT id,email,details FROM people WHERE id=?').bind(subject.id).first<{ id: string; email: string; details: string }>()
   if (!person) return []
+  // Imported source IDs are exact identifiers too (the native import erasure
+  // uses the same one). Never broaden selection to a shared name or free text.
+  const sourceUserId = JSON.parse(person.details).sourceUserId
+  const values = [person.id, person.email, ...(typeof sourceUserId === 'string' && sourceUserId.length ? [sourceUserId] : [])]
   const portability = await createPortability({ db, buckets: {}, policy: { ...portabilityPolicy, buckets: {} } })
-  return agentErasureStatements({ db, secret, map: personAgentArtifacts, subject: { values: JSON.stringify(Object.values(person)) }, tombstone,
+  return agentErasureStatements({ db, secret, map: personAgentArtifacts, subject: { values: JSON.stringify(values) }, tombstone,
     checkpoint: async () => await portability.redactionStatements() })
 }
