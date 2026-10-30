@@ -485,8 +485,23 @@ Validate the integrated edition through its public doors: current sponsor and
 scope checks, all exposed tool effects, policy and review decisions, migrations,
 resources, audit, subscriptions and retained outcomes. Keep successful and
 failed outcome evidence for at least 24 hours. This module currently retains it
-indefinitely; adoption must not introduce earlier cleanup. Report the exact
-edition behavior verified, separately from Base module or CLI results.
+indefinitely; adoption must not introduce earlier cleanup. A verified native
+erasure takes precedence over this floor for personal payload only; the
+value-free existence and outcome of the call remain retained. This requirement
+does not by itself provide agent-record erasure custody: an adopting edition
+must keep its erasure and restore safeguards until that custody is implemented.
+
+The 24-hour evidence floor is not a replay expiry. Completed mutation claims
+currently have no age limit: the calls lookup does not use `created_at`, and a
+retry remains associated with its original outcome after 24 hours. Do not use
+`created_at + 24 hours` as an existing replay-window end. A legacy replay alias
+that is deleted at a finite deadline needs an explicit lifetime and post-expiry
+replay policy; discarding the last association otherwise admits the old key as
+new work. The permitted secret-keyed erasure alias does not establish such a
+deadline on its own.
+
+Report the exact edition behavior verified, separately from Base module or CLI
+results.
 
 ## Verification owner lifecycle
 

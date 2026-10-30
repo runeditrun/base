@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Clarify that the agent-door evidence floor yields to verified erasure for personal payload, and that current mutation replay claims have no finite expiry. Native agent-record erasure custody remains unimplemented.
+
 ## 0.2.94
 
 - Include the shared checkout-history validator in the documented portability runtime copy, preserving self-contained Worker and CLI adoption.
