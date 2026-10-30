@@ -152,6 +152,8 @@ export const commandAdapter = declare(localInstaller({ tools: [] }), { scheduled
  const hint = activate(advice.stdout);
  assert.ok(hint, installed.stdout);
  assert.equal(installed.stdout.match(/^Next, /gm)?.length, 1, `one next step, not two: ${installed.stdout}`);
+ assert.match(installed.stdout, /business setup --help/);
+ t.diagnostic(installed.stdout);
  const restart = installed.stdout.split('\n').find(line => line.startsWith('Next, ')).slice('Next, start an app: '.length);
  assert.equal(restart, `'${join(home, '.local/bin/rer')}' dev <owner>/<repo>`);
  assert.equal((await run('sh', ['-c', restart.replace(' dev <owner>/<repo>', ' --version')], env)).stdout.trim(), manifest.version, 'printed command works before PATH activation');

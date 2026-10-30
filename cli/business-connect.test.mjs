@@ -71,6 +71,46 @@ test('Business entry points expose setup before advanced commands and preserve t
  }
 });
 
+test('Business verb help explains each command without pairing or reading a session file', async t => {
+ const home = join(directory, 'verb-help-home');
+ for (const verb of ['setup', 'connect', 'token']) {
+  const result = await cli(home, ['business', verb, '--help']);
+  t.diagnostic(`rer business ${verb} --help\n${result.stdout}`);
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, new RegExp(`Usage: rer business ${verb}(?:\\s|$)`));
+  if (verb === 'setup') {
+   assert.match(result.stdout, /--session-file FILE[^\n]*signed-in session/i);
+   assert.match(result.stdout, /provision[^\n]*demo/i);
+  }
+ }
+ assert.deepEqual(await readdir(home), [], 'help creates no pairing or credentials');
+});
+
+test('Business check-ins report a carry file without claiming an unread app changed its settings', async t => {
+ const remote = await fixtureServer(t), home = join(directory, 'unread-carry-home');
+ const checkout = join(home, 'scratch-app'), registry = join(home, 'registry');
+ await mkdir(checkout, { recursive: true }); await mkdir(registry);
+ await writeFile(join(checkout, 'OPERATIONS.json'), JSON.stringify({ version: 2, seedContract: { profile: 'first-party' } }));
+ const settings = join(checkout, 'settings.json'), original = JSON.stringify({ name: 'Original app name' });
+ await writeFile(settings, original);
+ const owner = await identity(); t.after(() => owner.close());
+ await writeFile(join(registry, 'state.json'), JSON.stringify({ running: [{ checkout, mode: 'dev', owner: owner.info }] }));
+ const env = { RER_SERVERS_DIR: registry };
+ const paired = await connect(home, remote, { env });
+ for (const [command, result] of [
+  ['connect', paired],
+  ['next', await cli(home, ['business', 'next'], { env })],
+  ['run --once', await cli(home, ['business', 'run', '--once'], { env })],
+ ]) {
+  t.diagnostic(`rer business ${command}\n${result.stdout}`);
+  assert.equal(result.code, 0, result.stderr);
+  assert.doesNotMatch(result.stdout + result.stderr, /now show/i);
+  assert.ok(result.stdout.includes(join(checkout, '.rer/local/business.json')), result.stdout);
+  assert.equal(await readFile(settings, 'utf8'), original, 'the app does not read the carry file');
+  assert.equal(JSON.parse(await readFile(join(checkout, '.rer/local/business.json'), 'utf8')).name, remote.state.business.name);
+ }
+});
+
 // The fixture answers polls every second instead of the platform's five.
 async function fixtureServer(t) {
  const remote = await server(t);

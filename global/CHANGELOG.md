@@ -2,6 +2,10 @@
 
 ## 0.2.94
 
+- Business connect, next and run report the local Business name file written without claiming an app has already applied it.
+- Explain the signed-in session file in Business setup help, give connect and token their own usage, and show the Business help path after install.sh.
+- On occupied ports, suggest moving the checkout with `rer setup --port` and reserve server stop advice for this checkout's own registered server; omit kill commands for unmanaged processes.
+
 - Let archive-owning Workers verify legacy migration ledgers through optional seed-owned build evidence, using the library door's existing validation and restore guards.
 
 - Diagnose misbound application ports from declared bindings and socket ownership without sending HTTP health requests to auxiliary runtime listeners during startup.
@@ -16,7 +20,7 @@
 
 - Contract document generation can verify a committed historical anchor record in snapshots and shallow checkouts. Missing history without a record and tampered records still refuse; full-history checkouts need no record.
 
-- Integrated inputs: hist-1/hist-3 (isolated proposal-history fixtures, including Worker and URL-resource isolation), injkey-1 (injection admission identity), migdir-2 (native migration directory packaging), sponsor-1 (recipient-scoped sponsor initialization mail), and hostedpub-1 (required public inputs in hosted verification).
+- Integrated inputs: hist-1 (repaired by hist-3), injkey-1, migdir-2, sponsor-1, hostedpub-1, lamp-anchoredhist-1, lamp-dualhost-2, contaudit-2, hh-companypolicy-1, mango-fixtures-2, onboarding-probe-1, spool-workerlegacy-2, and ux57-cli-1.
 
 - Supply required declared public inputs only inside hosted-output verification, using setup defaults and disposable stand-ins when unset. Preserve configured public values and leave optional integrations unconfigured; deployment declarations and built artifacts are unchanged.
 

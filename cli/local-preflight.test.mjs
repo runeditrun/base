@@ -58,14 +58,14 @@ test('public lifecycle refuses legacy saved-origin listeners despite overrides a
  const {root,run}=await seed(t);const listen=cwd=>spawn(process.execPath,['-e',"const s=require('node:net').createServer().listen(0,'127.0.0.1',()=>console.log(s.address().port));setInterval(()=>{},1000)"],{cwd,stdio:['ignore','pipe','inherit']});
  const holder=listen(root);t.after(()=>holder.kill());
  const port=Number(String((await once(holder.stdout,'data'))[0]).trim());await writeFile(join(root,'.dev.vars'),`OWNER_EMAIL="original@example.test"\nAUTH_ORIGIN="http://127.0.0.1:${port}"\n`,{mode:0o600});
- for(const args of [['setup','--port','49731'],['dev','--port','49731'],['preview','--port','49731'],['reset','--yes']]){const result=await run(args);assert.equal(result.code,4,result.stdout);assert.match(result.stdout,new RegExp(`PID ${holder.pid}`));assert.match(result.stdout,/kill -TERM/);}
+ for(const args of [['setup','--port','49731'],['dev','--port','49731'],['preview','--port','49731'],['reset','--yes']]){const result=await run(args);assert.equal(result.code,4,result.stdout);assert.match(result.stdout,new RegExp(`PID ${holder.pid}`));assert.doesNotMatch(result.stdout,/kill\s+-/);}
  await writeFile(join(root,'.dev.vars'),'OWNER_EMAIL="original@example.test"\n',{mode:0o600});
  const explicit=await run(['setup','--port',String(port)]);assert.equal(explicit.code,4,explicit.stdout);assert.match(explicit.stdout,new RegExp(`PID ${holder.pid}`));
  holder.kill();await once(holder,'exit');
  // A listener running elsewhere only blocks the port: dev says how to move, reset still works.
  const foreign=listen(tmpdir());t.after(()=>foreign.kill());const taken=Number(String((await once(foreign.stdout,'data'))[0]).trim());
  await writeFile(join(root,'.dev.vars'),`OWNER_EMAIL="original@example.test"\nAUTH_ORIGIN="http://127.0.0.1:${taken}"\n`,{mode:0o600});
- const busy=await run(['dev']);assert.equal(busy.code,4,busy.stdout);assert.match(busy.stdout,new RegExp(`PID ${foreign.pid}`));assert.match(busy.stdout,/rer setup --port \d+/);
+ const busy=await run(['dev']);assert.equal(busy.code,4,busy.stdout);assert.match(busy.stdout,new RegExp(`PID ${foreign.pid}`));assert.match(busy.stdout,/rer setup --port \d+/);assert.doesNotMatch(busy.stdout,/kill\s+-|rer (?:dev|preview).*--stop/);t.diagnostic(`rer dev (unrelated listener PID ${foreign.pid})\n${busy.stdout}`);
  assert.equal((await run(['reset','--yes'])).code,0);
  foreign.kill();await once(foreign,'exit');
  await writeFile(join(root,'.dev.vars'),'OWNER_EMAIL="original@example.test"\n',{mode:0o600});
