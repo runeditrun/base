@@ -70,7 +70,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  const network = await createAgentConformanceNetwork(root, verification.network, { email, sponsorEmails: principals.slice(1).map(person => person.email) });
  let hosted, history;
  try {
- hosted = await serveHosted(root, { declaration, rpc: verification.rpc, workerEntrypoints: workerDriver ? [workerDriver.entrypoint] : [], outboundService: async request => {
+ hosted = await serveHosted(root, { declaration, publicHosts: verification.publicHosts, rpc: verification.rpc, workerEntrypoints: workerDriver ? [workerDriver.entrypoint] : [], outboundService: async request => {
   const copy = reviewers.observes(request) ? request.clone() : null, response = await network.fetch(request);
   if (copy) await reviewers.capture(copy, response.clone());
   return response;
@@ -88,9 +88,9 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  } });
   const request = (absolute, init = {}) => {
    const url = new URL(absolute);
-   if (url.origin !== hosted.origin) throw new RerError('agent_door_origin', 'Agent conformance request must use the fresh hosted installation origin.', 1);
+   if (url.username || url.password || !hosted.origins.includes(url.origin)) throw new RerError('agent_door_origin', 'Agent conformance request must use a declared hosted installation origin.', 1);
    const timeout = AbortSignal.timeout(30_000);
-   return hosted.fetch(url.href.slice(hosted.origin.length + 1), { ...init, signal: init.signal ? AbortSignal.any([init.signal, timeout]) : timeout, headers: Object.fromEntries(new Headers(init.headers)) });
+   return hosted.fetch(url.href.slice(url.origin.length + 1), { ...init, origin: url.origin, signal: init.signal ? AbortSignal.any([init.signal, timeout]) : timeout, headers: Object.fromEntries(new Headers(init.headers)) });
   };
   const path = claim?.mode === 'signed' ? claim.path ?? '/auth/owner-claim' : owner?.path ?? claim?.path ?? '/auth/bootstrap';
   const issued = seconds();
