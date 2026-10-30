@@ -1,3 +1,4 @@
+import { captureFence } from './erasure.ts'
 import type { ClassAndFacts, CallResult, NativeTarget, Principal, Runtime, ToolContext, ToolDefinition, UndoContext, ApprovalDisplaySummary } from './types.ts'
 import { validateSchema } from './json-schema.ts'
 import { ToolRefusal } from './errors.ts'
@@ -49,6 +50,7 @@ export async function runTool(rt: Runtime, tool: ToolDefinition, args: Record<st
     if (tool.scope && !principal.scopes.includes(tool.scope)) throw new ToolRefusal('insufficient_scope')
     principal = await nativeProof(rt, tool, args, principal, principal.nativeProof?.reference)
     if (await continuationItem(tool, args, context(rt, principal, door, [], approvers), principal.operationId) !== principal.continuationItemId) throw new ToolRefusal('operation_mismatch')
+    await captureFence(rt, tool.name, args, context(rt, principal, door, effects, approvers))
     const value = await tool.run(args, context(rt, principal, door, effects, approvers))
     if (!validateSchema(tool.outputSchema, value.result)) return { result: { ...result, outcome: 'refused', code: 'output_invalid' }, effects, undo: value.undo }
     return { result: { ...result, outcome: 'done', result: value.result, resources: value.resources, untrusted: tool.untrusted }, effects, undo: value.undo }

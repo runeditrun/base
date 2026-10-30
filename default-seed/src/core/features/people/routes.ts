@@ -119,10 +119,10 @@ async function eraseStep(bindings: Bindings, operator: ErasureOperator, id: stri
       await bindings.JOBS.send({ redact: id, chain })
       return { redaction: { jobsRedacted: result.jobsRedacted, jobsPending: result.jobsPending } }
     }
-    const opened = await (await peopleErasure(db, files)).start('person', { id })
+    const opened = await (await peopleErasure(db, files, bindings.SESSION_SECRET)).start('person', { id })
     return { receipt: await continueErasure(bindings, opened.id), journal: journalEntry(result) }
   }
-  const opened = await (await peopleErasure(db, files)).start('person', { id })
+  const opened = await (await peopleErasure(db, files, bindings.SESSION_SECRET)).start('person', { id })
   return { receipt: await continueErasure(bindings, opened.id) }
 }
 
@@ -141,7 +141,7 @@ export async function continueRedaction(bindings: Bindings, id: string, chain: s
 
 export async function continueErasure(bindings: Bindings, id: string) {
   if (!bindings.FILES) throw new Error('Missing Worker binding: FILES')
-  const erasure = await peopleErasure(bindings.DB, bindings.FILES)
+  const erasure = await peopleErasure(bindings.DB, bindings.FILES, bindings.SESSION_SECRET)
   const receipt = await erasure.run(id, { until: Date.now() + REQUEST_BUDGET_MS })
   if (receipt.phase !== 'complete') await bindings.JOBS.send({ erasure: id })
   return receipt
@@ -157,7 +157,7 @@ export async function resumePendingErasures(bindings: Bindings) {
   await bindings.DB.prepare('DELETE FROM person_erasure_redactions WHERE person_id NOT IN (SELECT id FROM people)').run()
   const requested = (await bindings.DB.prepare('SELECT person_id AS id FROM person_erasure_redactions ORDER BY updated_at LIMIT 5').all<{ id: string }>()).results
   for (const { id } of requested) {
-    if (await custodyRetired(bindings.DB, id)) { await (await peopleErasure(bindings.DB, bindings.FILES)).start('person', { id }); continue }
+    if (await custodyRetired(bindings.DB, id)) { await (await peopleErasure(bindings.DB, bindings.FILES, bindings.SESSION_SECRET)).start('person', { id }); continue }
     const chain = newUlid()
     await bindings.DB.prepare('UPDATE person_erasure_redactions SET chain=?,updated_at=? WHERE person_id=?').bind(chain, new Date().toISOString(), id).run()
     await continueRedaction(bindings, id, chain)
@@ -223,7 +223,7 @@ export function peopleRoutes() {
     return context.json(data)
   })
   app.get('/api/people/:id/erasure', async (context) => {
-    const erasure = await peopleErasure(context.env.DB, context.get('files'))
+    const erasure = await peopleErasure(context.env.DB, context.get('files'), context.env.SESSION_SECRET)
     return context.json(await erasure.preview('person', { id: context.req.param('id') }))
   })
   // Typed confirmation: the operator types `erase <id>` exactly.
@@ -237,7 +237,7 @@ export function peopleRoutes() {
     return context.json(result, 'receipt' in result && result.receipt?.phase === 'complete' ? 200 : 202)
   })
   app.get('/api/erasures/:id', async (context) => {
-    const erasure = await peopleErasure(context.env.DB, context.get('files'))
+    const erasure = await peopleErasure(context.env.DB, context.get('files'), context.env.SESSION_SECRET)
     return context.json({ receipt: await erasure.receipt(context.req.param('id')) })
   })
   app.post('/api/erasures/:id/resume', async (context) => {

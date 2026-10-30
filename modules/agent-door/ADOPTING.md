@@ -410,9 +410,7 @@ The shared `runAgentDoorConformance` journey can take an optional
 existing consent checks remain unchanged. Base's public-door fixture additionally
 proves native queue persistence, one-effect replay, execution-time revocation,
 immutable identity, scope narrowing and named approver continuity. These module
-proofs do not establish a seed's integrated queue behavior. Client-data custody
-and erasure remain outside this adoption proof until retained fields and fences
-are agreed. This change does not promote those claims or supply seed-side
+proofs do not establish a seed's integrated queue behavior. Client-data custody and erasure require the native map and transaction integration described below, plus the adopting seed's own public-door proof. The ordinary conformance journey alone does not prove that integration or supply seed-side
 `BASE-AGENT-010` contract citations.
 
 The CLI connects this boundary when `agent-surface.json` declares
@@ -488,8 +486,7 @@ of the shared policy source is also separate from copying it into an edition.
 Validate the integrated edition through its public doors: current sponsor and
 scope checks, all exposed tool effects, policy and review decisions, migrations,
 resources, audit, subscriptions and retained outcomes. Keep successful and
-failed outcome evidence for at least 24 hours. This module currently retains it
-indefinitely; adoption must not introduce earlier cleanup. Report the exact
+failed outcome evidence for at least 24 hours. Verified native subject erasure overrides this floor for personal payload only; the value-free existence and outcome remain. This module currently retains replay associations indefinitely; adoption must not introduce earlier cleanup. Report the exact
 edition behavior verified, separately from Base module or CLI results.
 
 ## Verification owner lifecycle
@@ -1170,7 +1167,7 @@ that person's authority.
 The door retains idempotent outcomes, pending approval arguments, review
 summaries, trace text, audit and events. Native client erasure must account for
 these stores; a native record deletion alone cannot remove retained content or
-prevent replay. No generic client-scoped erasure adapter is supplied yet.
+prevent replay. Use the native subject map and erasure transaction adapter below; each seed still owns its subject selection, native holds and public-door proof.
 Keep a native custody exception closed when these stores contain client data.
 An adoption must establish the native mapping from retained artifacts to
 clients, the permitted redaction of retained decision evidence, and the atomic
@@ -1423,3 +1420,96 @@ carry CORE security. A seed-native journey that mixes these duties with a timed
 or second-host scenario must be separated before that family can be scoped.
 Keep the corresponding seed contract clauses partial until independently proved;
 a subset declaration never promotes contract statuses.
+
+## Native subject erasure custody
+
+Verified native erasure wins over personal payload retention. Reuse the seed's
+BASE-DATA-003 operation, authorization, legal holds, transaction and restore
+checkpoint. The agent module creates no erasure journal or second subject lock.
+Non-person agent identities are not data subjects.
+
+Apply `schema/replay-aliases.sql` in a new numbered migration and add nullable
+`tombstone TEXT` to `agent_door_agents` (the fresh schema has that column).
+Never alter an applied migration. Adopt the matching portability runtime:
+`agent_door_replay_aliases` is mandatory installation bookkeeping, excluded even
+when an archive policy explicitly includes it. Seeds with their own archive
+inventory must classify it as installation-private and reject imported alias
+rows; never copy aliases or the installation secret into exports.
+
+Declare an `AgentArtifactMap` in product source. Every installed `agent_door_*`
+table must appear once, with its complete `columns` inventory and either a bound
+`match: {sql, params}` for this subject or an explicit `unrelated` reason.
+`params` names properties of the supplied native `subject` object.
+`checkAgentArtifacts(db, map)` is the adoption check: an undeclared table,
+missing table or unaccounted column refuses adoption and erasure. Run it in the
+seed's adoption/upgrade checks. SQL comes only from trusted product source.
+
+```ts
+const map: AgentArtifactMap = { artifacts: [
+  // Complete every other agent table too; see the reference's exact declaration.
+  { table: 'agent_door_calls',
+    columns: ['agent','key','digest','decision_id','created_at','state','outcome'],
+    match: { sql: "decision_id IN (SELECT id FROM agent_door_audit WHERE json_extract(row,'$.resource.id')=?)",
+      params: ['id'] } },
+] }
+```
+
+`default-seed/src/agent-door/erasure.ts` supplies the complete reference map.
+It declares personal custody in calls (`key`, `digest`, `outcome`), approvals
+(`saved`, `approvals`, `result`), audit (`row`, `evidence`), reviews (`saved`,
+`marked_by`), events (`uri`, `event`) and usage (`specialist`, `classes`).
+Native subject IDs and exact addresses select their linked decision, approval,
+review and event rows. Operators and installation policy are separate from the
+reference's customer subjects; a seed that erases operators must also map sponsor
+identity columns and policy person references. Do not select by a common name
+alone. Resolve native target IDs before admitting pending execution, including
+tools that return only a child row ID.
+
+Append `await agentErasureStatements({db,map,subject,secret,tombstone,checkpoint})`
+inside the existing erasure transaction. `tombstone` is
+`{erasure_id: nativeOperation.id, at: nativeOperation.requestedAt}`.
+`secret` is the installation's existing SESSION_SECRET-class private setting,
+outside the data store; supply the same setting to
+`createAgentDoor({erasure:{secret,fenced}, ...})`. Preserve its lookup lifecycle
+for the replay associations it protects. No secret store is added.
+`checkpoint()` returns the existing native portability redaction-checkpoint SQL.
+The outer erasure already invalidates transfers; include its normal invalidation
+exactly once. Selection and row snapshots are checked atomically before redaction
+or alias publication. A raced selection refuses the batch and requires a fresh
+native erasure step.
+
+The existing erasure `beforeStatements` hook now receives `operation: {id,at}`
+in both bounded execution and `nativeStatements`. This is the same native
+operation. Keep native holds before opening it. Selected rows are redacted in
+place. Arguments, results, subject IDs, names, contact details, free text, traces
+and confirming payload digests, including approval summary digests, are removed.
+What remains: row ID/sequence, pseudonymous agent ID, existing role/organisation
+IDs, tool/class enums, outcome/error/approval enums, approver roles, existing
+timestamps and `{erasure_id,at}`. Empty structural fields support existing readers.
+Audit integrity is its existing sequence and tombstone; no hash chain is added.
+
+The personal replay key is replaced by an opaque key derived from the call's
+decision ID. The sole retention exception is an installation-private
+HMAC-SHA-256 alias of the legacy key, scoped to its agent, under that existing
+private setting. Its lifetime is today's indefinite replay association, with
+no 24-hour expiry. A matching old key returns only `subject_erased` and the
+tombstone, never executes and never echoes payload. Current sponsor, scope,
+revocation and Pause admission still apply. Aliases are never exported/restored.
+The existing checkpoint refuses older archives that could resurrect original
+keys or payload. A future finite replay-window change must delete aliases then.
+
+`erasure.fenced(name,args,ctx)` reads the existing native subject/installation
+fence and refuses concurrent capture with HTTP 409
+`subject_erasure_in_progress`. Enforce that fence in every native effect
+transaction too. Cancel/hold pending work and approvals there. The reference uses
+its pending request/operation and numbered native note/file write triggers.
+Late audit, approval/review and event completion cannot overwrite a tombstone.
+After commit, native missing-record rules supply no erased payload.
+
+Retire deprecated `agent_retained_evidence_requires_review` functions, call sites
+and triggers in a new seed migration once custody is integrated; do not disable
+them with flags. Preserve independent legal/regulator holds, identity protections
+and restore checks. Prove each subject type through its public erasure/restore
+doors, scan every mapped column, replay the old key at now, 24 hours plus 1 ms
+and 30 days, and compare a peer's records byte for byte. Generic module tests
+alone do not qualify an adopting seed.

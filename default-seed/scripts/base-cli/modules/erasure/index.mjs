@@ -75,7 +75,7 @@ export function createErasure({ db, buckets = {}, portability, declarations }) {
       insist(!reason, 'held:' + reason, 409);
       const id = randomHex(16), label = newLabel(), now = new Date().toISOString(), deleted = {};
       const statements = [...await ctx.fence.transfers(), openStatement(db, d, { id, subject: plan.subject, label, planned: totals.deleted, blobs: totals.blobs, now }),
-        ...await scopeStatements(db, d, plan, id), ...await firstStatements(ctx, d, plan, label), ...await verificationStatements(db, d, plan, id, label), ...cleanupStatements(ctx, d, plan, label), ...await deletionStatements(ctx, d, plan, plan.order, id, deleted),
+        ...await scopeStatements(db, d, plan, id), ...await firstStatements(ctx, d, plan, label, { id, at: now }), ...await verificationStatements(db, d, plan, id, label), ...cleanupStatements(ctx, d, plan, label), ...await deletionStatements(ctx, d, plan, plan.order, id, deleted),
         ...await finalStatements(ctx, d, plan, id, label, now, deleted), progressStatement(db, id, 0, deleted), db.prepare('DELETE FROM rer_erasure_guard')];
       return { operationId: id, statements: statements.map(toD1Sql) };
     },
