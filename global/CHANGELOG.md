@@ -2,6 +2,8 @@
 
 ## 0.2.94
 
+- Add an optional native company-policy decision hook to the shared agent door. Allow retains class policy; hold uses its signed-in, revision-bound approval flow; deny refuses before effects. Native decisions are audited, rechecked on retries and approval execution, and cannot bypass policy, Pause or native authority.
+
 - Retain native continuation identity and current policy evidence in private audit when an identity-matched originating operation is still running; keep the operation_mismatch response and execution refusal unchanged.
 
 - Admit explicitly declared agent-verification public hosts from the selected deployment's hostname variables, preserving their URL and Host through disposable ingress while refusing undeclared hosts. One-host verification keeps its existing origin.

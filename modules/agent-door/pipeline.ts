@@ -4,6 +4,8 @@ import { audit, newAudit, recordDecision, outcomeRow, recoverAudit, usage, usage
 import { policyRefusal, policyState, setupUrl } from './policy-store.ts'
 import { classify, context, digest, runTool, saveCall, selfEscalation, summary, revoked } from './execution.ts'
 import { decide } from './policy/decide.ts'
+import { companyDecision, restrictDecision } from './company-policy.ts'
+import { canonical } from './policy/document.ts'
 import { durationSeconds } from './policy/document.ts'
 import { validateSchema } from './json-schema.ts'
 import { ToolRefusal } from './errors.ts'
@@ -130,17 +132,24 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     locked = await acquireDecision(rt, row.id)
     if (!locked) return refuse('decision_busy')
     const sums = await usage(rt, state.document!, principal)
-    const decision = decide({ document: state.document, revision: state.revision, call: { seed: rt.options.seed, specialist: principal.agent.specialist ?? null, agent: principal.agent.id, classes }, usageToday: usageToday(sums) })
+    let decision = decide({ document: state.document, revision: state.revision, call: { seed: rt.options.seed, specialist: principal.agent.specialist ?? null, agent: principal.agent.id, classes }, usageToday: usageToday(sums) })
     const meta: DecisionMeta = { id: row.id, disposition: decision.result, revision: state.revision,
       classes: decision.classes.map(item => ({ ...item, facts: classes.find(value => value.class === item.class)!.facts })) }
     result.decision = meta
     evidence = { document: state.document!, usage: sums, classes, result: decision.result, rules: decision.classes }
     if (decision.result === 'unset') return refuse('policy_unset', { unanswered: decision.unset, setup_url: setupUrl(rt, state) })
     if (decision.result === 'blocked') return refuse('policy_blocked', { class: decision.deciding!.class, rule: decision.deciding!.rule, revision: state.revision })
+    const company = await companyDecision(rt, name, args, classes, typeof row.resource === 'object' ? row.resource : null, decision, ctx)
+    if (company) {
+      decision = restrictDecision(decision, company)
+      meta.company_policy = company; meta.disposition = decision.result
+      evidence.company_policy = company; evidence.result = decision.result
+      if (company.decision === 'deny') return refuse('company_policy_denied', { rule: company.rule, revision: company.revision })
+    }
     principal = await nativeProof(rt, tool, args, principal, proofReference)
     if (previous?.outcome && cached) {
       // A newly required review or approval cannot be satisfied by an older receipt.
-      if (decision.result === 'approval' && (cached.decision?.disposition !== 'approval' || cached.decision.revision !== state.revision)) return refuse('approval_required')
+      if (decision.result === 'approval' && (cached.decision?.disposition !== 'approval' || cached.decision.revision !== state.revision || canonical(cached.decision.company_policy ?? null) !== canonical(company ?? null))) return refuse('approval_required')
       if (decision.result === 'review' && cached.decision?.disposition !== 'review') return refuse('review_required')
       if (cached.outcome === 'done' && cached.receipt) cached.receipt = { ...cached.receipt, decision: cached.decision,
         ...(cached.review ? { review: cached.review } : {}) }
@@ -165,7 +174,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       row.replay_of = previous.decision_id; row.outcome = 'replayed'
       return { result }
     }
-    const savedSummary = await summary(tool, args, ctx, target)
+    const savedSummary = { ...await summary(tool, args, ctx, target), ...(company ? { company_policy: company } : {}) }
     const summary_sha256 = await digest(savedSummary)
     recordDecision(row, meta)
     const claim = claimKey === null ? undefined : { key: claimKey, digest: requestDigest }
