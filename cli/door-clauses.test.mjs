@@ -20,15 +20,57 @@ test('door clauses syncs canonical requirements without changing seed clauses or
  cpSync(join(base, 'default-seed/OPERATIONS.json'), join(root, 'OPERATIONS.json'));
  writeFileSync(join(root, 'AGENTS.md'), 'Lander-Regenerate: node src/base/contract-docs.mjs write\nLander-Regenerate: node scripts/edition-authoring/cli.mjs lock\n');
  const file = join(root, 'CONTRACT.md'), read = name => readFileSync(join(root, name), 'utf8');
- // CRLF, Unicode, a seed-owned AGENT clause and a SURFACE clause all survive.
- let initial = read('CONTRACT.md').replace('## Field proof register', '#### AGENT-001 — Studio assistant\n\n*Tier:* Agent surface\n\n**Requirement.** The studio retains its own assistant.\n\n**Acceptance.**\n1. The assistant names its studio.\n\n## Field proof register') + '| `AGENT-001` | Studio assistant | target | missing | | Seed-owned gap — retain it. |\n';
- writeFileSync(file, initial.replaceAll('\n', '\r\n'));
+ const fixture = read('CONTRACT.md');
  const env = { ...process.env, RER_UPDATE_CHECK: '0' };
  const invoke = (entry, args) => {
   const result = spawnSync(process.execPath, [entry, ...args], { cwd: directory, env, encoding: 'utf8', timeout: 30000 });
   assert.ifError(result.error);
   return { ...result, output: result.stdout + result.stderr };
  };
+ await exportCLI(base, root);
+ const run = (...args) => invoke(join(base, 'global/rer.mjs'), ['door', 'clauses', '--cwd', root, ...args]);
+ const snapshot = () => ['CONTRACT.md', 'ACCEPTANCE.md', 'docs/CLAIMS.md'].map(read);
+ const prepare = text => {
+  writeFileSync(file, text.replaceAll('\n', '\r\n'));
+  // The real generator runs in the seed, as it does under door clauses.
+  const generated = spawnSync(process.execPath, ['src/base/contract-docs.mjs', 'write'], { cwd: root, env, encoding: 'utf8' });
+  assert.equal(generated.status, 0, generated.stdout + generated.stderr);
+ };
+ const ids = Array.from({ length: 13 }, (_, i) => `BASE-AGENT-${String(i + 1).padStart(3, '0')}`);
+ const table = listed => `## Shared duties (Base)\n\n| Base duty | Duty | Delta clauses | Base journey |\n| --- | --- | --- | --- |\n${listed.map((id, i) => `| ${i % 2 ? id : `\`${id}\``} | Shared agent duty | SURFACE-001 | not run |`).join('\n')}\n\n`;
+ const withTable = replacement => fixture.replace(/## Shared duties \(Base\)[\s\S]*?(?=## Published clauses)/, replacement);
+ for (const listed of [ids, ['BASE-AGENT-002', 'BASE-AGENT-010']]) {
+  // Mentions in prose, other columns and fenced examples do not list a duty.
+  const decoys = '```md\n' + table(ids) + '```\n\nBASE-AGENT-001 is mentioned here.\n\n';
+  prepare(withTable(decoys + table(listed).replace('| --- | --- | --- | --- |\n', '| --- | --- | --- | --- |\n| BASE-INPUT-001 | Validation | BASE-AGENT-001 | not run |\n')));
+  const before = snapshot(), counts = parseContract(before[0]).counts;
+  const checked = run('--check');
+  assert.equal(checked.status, 1, checked.output);
+  for (const id of ids) assert.ok(checked.output.includes(`${id} missing`), '--check retains its existing clause-based behavior');
+  assert.deepEqual(snapshot(), before, '--check never writes');
+  const written = run('--write');
+  assert.equal(written.status, 0, written.output);
+  const after = snapshot(), parsed = parseContract(after[0]);
+  assert.deepEqual(parsed.clauses.filter(clause => ids.includes(clause.id)).map(clause => clause.id), ids.filter(id => !listed.includes(id)));
+  assert.equal(parsed.counts.total, counts.total + 13 - listed.length);
+  assert.equal(parsed.counts.missing, counts.missing + 13 - listed.length);
+  if (listed.length === 13) assert.deepEqual(after, before, 'all listed duties leave every generated file byte-identical');
+  assert.equal(run('--write').status, 0);
+  assert.deepEqual(snapshot(), after, 'repeated writes are byte-identical');
+ }
+ for (const replacement of ['', '```md\n' + table(ids) + '```\n\n', '## Shared duties (Base)\n\nNo table yet.\n\n', table(ids).replace('| --- | --- | --- | --- |', 'not a divider')]) {
+  prepare(withTable(replacement));
+  const before = snapshot();
+  assert.equal(run('--check').status, 1, '--check still reports missing clauses without a table');
+  const refused = run('--write');
+  assert.equal(refused.status, 1, refused.output);
+  assert.match(refused.output, /Shared duties \(Base\) table/);
+  assert.deepEqual(snapshot(), before, 'missing table refuses before contract or generator writes');
+ }
+ // A present table without agent duties retains the original append/update
+ // journey. CRLF, Unicode, seed clauses and later judgments all survive.
+ let initial = withTable(table([])).replace('## Field proof register', '#### AGENT-001 — Studio assistant\n\n*Tier:* Agent surface\n\n**Requirement.** The studio retains its own assistant.\n\n**Acceptance.**\n1. The assistant names its studio.\n\n## Field proof register') + '| `AGENT-001` | Studio assistant | target | missing | | Seed-owned gap — retain it. |\n';
+ writeFileSync(file, initial.replaceAll('\n', '\r\n'));
  // Set up generated views using the same real generator used by the command.
  const prepared = spawnSync(process.execPath, ['src/base/contract-docs.mjs', 'write'], { cwd: root, env, encoding: 'utf8' });
  assert.equal(prepared.status, 0, prepared.stdout + prepared.stderr);
@@ -40,8 +82,6 @@ test('door clauses syncs canonical requirements without changing seed clauses or
  writeFileSync(join(root, copied), source);
  const record = { schemaVersion: 1, copies: [{ path: 'src/base/modules/agent-door', originPath: 'modules/agent-door', revision: 'a'.repeat(40), files: { [copied]: createHash('sha256').update(source).digest('hex') } }] };
  writeFileSync(join(root, 'base-copies.json'), JSON.stringify(record));
- await exportCLI(base, root);
- const run = (...args) => invoke(join(base, 'global/rer.mjs'), ['door', 'clauses', '--cwd', root, ...args]);
  const badFlags = run('--write', '--check');
  assert.equal(badFlags.status, 2, badFlags.output);
  const missing = run('--check');
@@ -67,7 +107,6 @@ test('door clauses syncs canonical requirements without changing seed clauses or
  assert.equal(unchanged(synced), unchanged(initial));
  assert.deepEqual(validateAgentSurface(surface, { contract: synced }).points.filter(point => !point.ok), []);
  { const checked = run('--check'); assert.equal(checked.status, 0, checked.output); }
- const snapshot = () => ['CONTRACT.md', 'ACCEPTANCE.md', 'docs/CLAIMS.md'].map(read);
  const stable = snapshot();
  assert.equal(run('--write').status, 0);
  assert.deepEqual(snapshot(), stable, 'second write leaves an empty diff');

@@ -1300,6 +1300,12 @@ names every missing or stale shared clause, and checks the generated documents
 when all clauses are current. `--write` inserts missing clauses in
 `### Agent surface (Base-delivered)` under Target clauses, before the seed's
 last `### Agent surface` area, and updates existing shared definitions in place.
+Writing requires a `## Shared duties (Base)` table with a `Base duty` column.
+Duties listed in that column are inherited and skipped, so listing all thirteen
+leaves the contract byte-identical. An unlisted duty is still synchronized as a
+clause. A missing table refuses before any files or generated views are written.
+The read-only `--check` continues to inspect clause definitions, including for
+duties listed in the table.
 It preserves all other contract bytes except the generator-owned summary rows.
 Existing shared Status, Evidence and Gap cells stay verbatim; canonical title
 updates change only the Title cell. New clauses have status `missing`, with a
