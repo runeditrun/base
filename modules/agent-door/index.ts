@@ -11,6 +11,8 @@ import { callTool } from './pipeline.ts'
 import { revoked } from './execution.ts'
 import { json } from './errors.ts'
 
+export { REPLAY_WINDOW_MS, expireReplayCalls, agentErasureStatements, checkAgentArtifacts } from './erasure.ts'
+export type { AgentArtifactMap, AgentArtifact, Tombstone } from './erasure.ts'
 export { CORE_CAPABILITIES, OPTIONAL_CAPABILITIES } from './capabilities.mjs'
 export type { Capability } from './capabilities.mjs'
 export { defineTool } from './registry.ts'

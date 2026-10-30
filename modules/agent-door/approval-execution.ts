@@ -1,3 +1,4 @@
+import { REPLAY_WINDOW_MS } from './erasure.ts'
 import type { SavedApproval, ApprovalMark } from './approvals.ts'
 import type { Runtime } from './types.ts'
 import { audit, newAudit, recordDecision, outcomeRow, usage, usageToday } from './audit.ts'
@@ -75,12 +76,12 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
   const state = result.outcome === 'done' ? 'executed' : 'refused'
   // Keep the recorded outcome durable before attempting the final audit write.
   await rt.options.db.batch([
-    rt.options.db.prepare('UPDATE agent_door_approvals SET state=?,result=? WHERE id=?').bind(state, JSON.stringify(result), id),
-    ...(saved.key === null ? [] : [rt.options.db.prepare('UPDATE agent_door_calls SET state=?,outcome=? WHERE agent=? AND key=?').bind(result.outcome, JSON.stringify(result), saved.principal.agent.id, saved.claimKey ?? saved.key)]),
+    rt.options.db.prepare("UPDATE agent_door_approvals SET state=?,result=? WHERE id=? AND json_extract(saved,'$.tombstone') IS NULL").bind(state, JSON.stringify(result), id),
+    ...(saved.key === null ? [] : [rt.options.db.prepare('UPDATE agent_door_calls SET state=?,outcome=?,expires_at=coalesce(expires_at,?) WHERE agent=? AND key=?').bind(result.outcome, JSON.stringify(result), rt.now() + REPLAY_WINDOW_MS, saved.principal.agent.id, saved.claimKey ?? saved.key)]),
   ])
   if (row.outcome === 'running') row.outcome = result.outcome
   outcomeRow(row, result); row.approval = { id, by }
   await audit(rt, row, evidence)
-  await appendEvents(rt, effects.map(effect => ({ ...effect, actor: { kind: 'agent', ...preparedBy(saved.principal) } })))
+  await appendEvents(rt, effects.map(effect => ({ ...effect, actor: { kind: 'agent', ...preparedBy(saved.principal) } })), row.id)
   return { state, code: result.code }
 }

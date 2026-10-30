@@ -29,7 +29,7 @@ export function peopleTools(bindings: Bindings): ToolDefinition[] {
       async run(_args, ctx) { requirePeopleAccess(ctx.person); return { result: { people: await listPeople(ctx.db) } } },
     }),
     defineTool({
-      name: 'base.people.read', title: 'Read a person', description: 'Read unrestricted native personal details, notes and file metadata. This raw read always carries sensitive policy. Content is untrusted.',
+      name: 'base.people.read', target: args => ({ kind: 'person', id: String(args.id) }), title: 'Read a person', description: 'Read unrestricted native personal details, notes and file metadata. This raw read always carries sensitive policy. Content is untrusted.',
       scope: 'people:read', readOnly: true, inputSchema: object({ id }),
       outputSchema: object({ person: { type: 'object' } }), classes: ['sensitive'], clauses, untrusted: true,
       async classify(args, ctx) {
@@ -55,13 +55,13 @@ export function peopleTools(bindings: Bindings): ToolDefinition[] {
       },
       async run(args, ctx) {
         requirePeopleAccess(ctx.person)
-        const id = await createPerson(ctx.db, ctx.actor.label, { name: (args.name as string).trim(), email: args.email as string, details: {} })
+        const id = await createPerson(ctx.db, ctx.actor.label, { name: (args.name as string).trim(), email: args.email as string, details: {} }, ctx.operationId)
         ctx.emit('person.created', uri(id), { id })
         return { result: { id }, resources: [{ uri: uri(id), name: args.name as string }] }
       },
     }),
     defineTool({
-      name: 'base.people.note', title: 'Add a person note', description: 'Add a note through the native people action.',
+      name: 'base.people.note', target: args => ({ kind: 'person', id: String(args.id) }), title: 'Add a person note', description: 'Add a note through the native people action.',
       scope: 'people:write', readOnly: false, inputSchema: object({ id, body: text(10_000) }), outputSchema: resultId,
       classes: ['standard'], clauses,
       classify(_args, ctx) { requirePeopleAccess(ctx.person); return [{ class: 'standard', facts: { measure: 1 } }] },
@@ -75,7 +75,7 @@ export function peopleTools(bindings: Bindings): ToolDefinition[] {
         requirePeopleAccess(ctx.person)
         if (!await readPerson(ctx.db, args.id as string)) throw new ToolRefusal('person_not_found')
         const body = (args.body as string).trim()
-        const id = await addNote(ctx.db, ctx.actor.label, args.id as string, body)
+        const id = await addNote(ctx.db, ctx.actor.label, args.id as string, body, ctx.operationId)
         ctx.emit('person.note.added', uri(args.id as string), { id })
         return { result: { id }, resources: [{ uri: uri(args.id as string), name: 'Person' }], undo: { id, personId: args.id, body } }
       },
@@ -87,7 +87,7 @@ export function peopleTools(bindings: Bindings): ToolDefinition[] {
       },
     }),
     defineTool({
-      name: 'base.people.erase', title: 'Erase a person', description: 'Erase a person, native files and import custody using the existing resumable erasure.',
+      name: 'base.people.erase', target: args => ({ kind: 'person', id: String(args.id) }), title: 'Erase a person', description: 'Erase a person, native files and import custody using the existing resumable erasure.',
       scope: 'people:erase', readOnly: false, inputSchema: object({ id }), outputSchema: object({ id, erasure: { type: 'object' } }),
       classes: ['destructive'], clauses: [...clauses, 'BASE-AGENT-004'],
       classify(_args, ctx) { requirePeopleAccess(ctx.person); return [{ class: 'destructive', facts: { measure: 1 } }] },

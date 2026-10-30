@@ -2,7 +2,9 @@
 // work, and the public tool consumes it into a visible record exactly once.
 import native from '../tests/fixtures/agent-door/worker.mjs';
 import { createAgentDoor as create, ToolRefusal } from '../../modules/agent-door/index.ts';
-export * from '../../modules/agent-door/index.ts';
+// This module is also a Worker entrypoint. Reexport only the functions the
+// application imports; workerd rejects value exports such as REPLAY_WINDOW_MS.
+export { ToolRefusal, defineTool, operatorAuthPeople } from '../../modules/agent-door/index.ts';
 
 export function createAgentDoor(options) {
  const db = options.db;
