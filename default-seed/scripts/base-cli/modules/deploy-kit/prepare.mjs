@@ -7,6 +7,7 @@ import { assetsIgnore, collectFiles, regularBytes, validateArtifact, MAX_ARTIFAC
 import { collectBuildModules } from './build-modules.mjs';
 import { refuseLocalEnvFiles, refuseLocalModels } from './local-only.mjs';
 import { readMigrationRewrites, withRewrites } from './migrations.mjs';
+import { migrationDirectory } from '../../cli/portability-migrations.mjs';
 
 export function assertCredentialFree(env) {
   for (const [key,value] of Object.entries(env)) if (value && /(?:TOKEN|SECRET|PASSWORD|API_KEY|PRIVATE_KEY|AUTHORIZATION|COOKIE|CREDENTIAL)/i.test(key)) throw new Error('prepare-credential-environment-forbidden');
@@ -28,10 +29,12 @@ export async function packageBuild({root,source,runIdentity,productDirectory = '
   const modules = await collectBuildModules(build,config,main);
   const ignored = assetsIgnore(await regularBytes(join(product,'dist/client/.assetsignore'),65536).then(String,error => { if (error.code === 'ENOENT') return ''; throw error; }));
   const assets = (await collectFiles(join(product,'dist/client'))).filter(file => !ignored(file.path));
+  const directory = await migrationDirectory(product,'DB',{fallback:'migrations/core'});
+  localPath(relative(product,directory));
   let migrations = [];
-  for (const name of (await readdir(join(product,'migrations/core'))).sort()) {
+  for (const name of (await readdir(directory)).sort()) {
     assert(/^[0-9]+_[a-zA-Z0-9_-]+\.sql$/.test(name),'unexpected-migration-file');
-    const sql = (await regularBytes(join(product,'migrations/core',name),512000)).toString('utf8'); migrations.push({binding:'DB',name,sql,sha256:hash(sql)});
+    const sql = (await regularBytes(join(directory,name),512000)).toString('utf8'); migrations.push({binding:'DB',name,sql,sha256:hash(sql)});
   }
   migrations = withRewrites(migrations, await readMigrationRewrites(product));
   const artifact = {version:1,source,run:runIdentity,main,modules,assets,migrations}; validateArtifact(artifact);

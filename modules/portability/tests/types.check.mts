@@ -1,6 +1,8 @@
 import { createPortability, createPortabilityHandler, readArchive, type ArchivePolicy, type Row, type SafetyChange } from '../index.mjs';
+import { workerMigrations, type MigrationEvidence } from '../worker-history.mjs';
 declare const db: D1Database;
 declare const bucket: R2Bucket;
+declare const evidence: MigrationEvidence;
 const policy:ArchivePolicy={
   product:'fixture',buckets:{FILES:{}},exportRow:(_table,row):Row=>row,
   importSafety:{connections:{status:['inactive'],token:[null]}},
@@ -17,4 +19,5 @@ for await(const record of readArchive(await service.exports.download(id)))if(rec
 const restored=await service.imports.finalize('target',{archiveHash:'verified-archive-hash'});
 const safetyChanges:SafetyChange[]=restored.safetyChanges??[];
 const changedRows:number=safetyChanges.reduce((total,change)=>total+change.rows,0);
-void [statements,handler,changedRows];
+const workerService=await createPortability({db,policy,migrations:()=>workerMigrations(db,policy,evidence)});
+void [statements,handler,changedRows,workerService];
