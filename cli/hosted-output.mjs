@@ -15,6 +15,7 @@ import { shared } from './shared.mjs';
 import { registerHistoryInstallation, preparationDatabase } from './agent-history-database.mjs';
 import { verificationRpc } from './agent-rpc.mjs';
 import { hostedOrigins } from './hosted-hosts.mjs';
+import { preparationProducers } from './hosted-queue-producers.mjs';
 import { FixtureDatabaseError } from '../modules/agent-door/conformance/fixtures.mjs';
 
 // Serve the production build the way rer deploy hosts it (assets behind the
@@ -126,7 +127,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   durableObjects: Object.fromEntries((config.durable_objects?.bindings ?? []).filter(item => !item.script_name).map(item => [item.name, { className: item.class_name, useSQLite: true }])),
   ...(config.assets ? { assets: { directory: client, binding: config.assets.binding ?? 'ASSETS', routerConfig: { has_user_worker: true, invoke_user_worker_ahead_of_assets: RUN_WORKER_FIRST } } } : {}),
  }] };
- let preparation, held = false;
+ let preparation, producers, held = false;
  const waiting = new Set();
  const release = () => { held = false; for (const resume of waiting) resume(); waiting.clear(); };
  // Install the gate before owner hooks retain any D1 handles; replacing
@@ -141,6 +142,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    if (held) await new Promise(resume => waiting.add(resume));
    return new Response(null, { status: 204 });
   } };
+  producers = preparationProducers(options, config);
  }
  const mf = new Miniflare(convertV4MiniflareOptions(options));
  let loopback;
@@ -179,7 +181,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
      }
      catch { throw new Error('Native scheduled preparation failed; fixture values are not logged.'); }
     },
-    queues: Object.freeze({ hold: () => { held = true; }, release }),
+    queues: Object.freeze({ hold: () => { held = true; }, release, ...producers(mf) }),
    });
   })(),
   database: async binding => {

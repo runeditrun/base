@@ -415,7 +415,7 @@
     },
     "cli/agent-journey-fixtures.mjs": {
       "source": "cli/agent-journey-fixtures.mjs",
-      "sha256": "64be3180eefb5370978994aa6a3de739101dcc58aa3a24799651223f88fdb9b1"
+      "sha256": "52fe8bae9767c665c1e370f598285269920e3b051097abe9fe2d0a437c2417d5"
     },
     "cli/agent-mail.mjs": {
       "source": "cli/agent-mail.mjs",
@@ -959,7 +959,11 @@
     },
     "cli/hosted-output.mjs": {
       "source": "cli/hosted-output.mjs",
-      "sha256": "accbf24f9689271ebac036df38d2a73e6c5083aa7c0271768d070193532054b8"
+      "sha256": "9b3351f899d5b4f7d2b5035a651a4b232e494a4da43df29acc262f44845d7f9e"
+    },
+    "cli/hosted-queue-producers.mjs": {
+      "source": "cli/hosted-queue-producers.mjs",
+      "sha256": "7f4ea272ec15db35ce8ad9921e88bd60bb50a91dbdaba4556e3e71177c482523"
     },
     "cli/human-error.mjs": {
       "source": "cli/human-error.mjs",
