@@ -199,17 +199,22 @@ test('recorded names in proposal or audit free text erase with word boundaries a
   await c.adopt(held)
   const portability = await createPortability({ db: runtime.db, buckets: { FILES: await runtime.mf.getR2Bucket('FILES') }, policy: portabilityPolicy })
   const retained = []
-  for (const name of ['Recorded Name ' + crypto.randomUUID(), 'a', 'Al', '1', 'Zoë', 'Name[*]?']) await t.test(JSON.stringify(name), async () => {
+  const colonCases = ['Al: please follow up tomorrow', 'Please follow up tomorrow:Al', 'Follow up:Al:tomorrow', 'Al: value; key:Al']
+  const cases = [
+    ...['Recorded Name ' + crypto.randomUUID(), 'a', 'Al', '1', 'Zoë', 'Name[*]?'].map(name => ({ name })),
+    ...colonCases.map(body => ({ name: 'Al', body })),
+  ]
+  for (const { name, body } of cases) await t.test(JSON.stringify(body ?? name), async () => {
     const target = await owned('/api/people', { name, email: crypto.randomUUID() + '@example.test', details: {} })
     const peer = await owned('/api/people', { name: name + 'son', email: crypto.randomUUID() + '@example.test', details: {} })
     assert.equal(target.status, 201); assert.equal(peer.status, 201)
     const make = body => c.tool('base.people.note', { id: peer.body.id, body, idempotency_key: crypto.randomUUID() })
     // The embedded hit comes first; punctuation and a JSON escape surround the
     // real name. Names are literals, including regexp/LIKE/GLOB metacharacters.
-    const args = { id: peer.body.id, body: `Keep prefix${name}suffix; discuss \"${name}\".`, idempotency_key: crypto.randomUUID() }
+    const args = { id: peer.body.id, body: body ?? `Keep prefix${name}suffix; discuss \"${name}\".`, idempotency_key: crypto.randomUUID() }
     const named = await c.tool('base.people.note', args), namedId = approvalId(named)
     const auditOnly = await make('Non-personal audit-only proposal'), auditId = approvalId(auditOnly)
-    await runtime.db.prepare("UPDATE agent_door_audit SET evidence=json_set(evidence,'$.recorded_name',?) WHERE id=?").bind(`Discuss (${name}).`, auditOnly.decision.id).run()
+    await runtime.db.prepare("UPDATE agent_door_audit SET evidence=json_set(evidence,'$.recorded_name',?) WHERE id=?").bind(body ?? `Discuss (${name}).`, auditOnly.decision.id).run()
     const peerProposal = await make(`Keep ${name}son and ordinary words: Alpine, data, policy/1, revision 21, version 1.0, source-1234, ${name}é.`), peerId = approvalId(peerProposal)
     await c.adopt(autonomousPolicy())
     const peerExecuted = await make('Keep the executed peer note and reservation')
@@ -238,7 +243,7 @@ test('recorded names in proposal or audit free text erase with word boundaries a
     assert.deepEqual(after.find(item => item.table === 'agent_door_audit').rows.map(row => [row.sequence, row.id, row.at, row.agent]), auditSequence)
     const stubs = after.find(item => item.table === 'agent_door_approvals').rows.filter(row => [namedId, auditId].includes(row.id))
     const redacted = stubs.filter(row => JSON.parse(row.saved).tombstone).length
-    t.diagnostic(`PROBE NAME ${JSON.stringify(name)}: personal proposal/audit payloads 2 -> ${2 - redacted}; peer byte-identical; counts ${counts.join('/')} -> ${after.map(item => item.rows.length).join('/')}`)
+    t.diagnostic(`PROBE NAME ${JSON.stringify(body ?? name)}: personal proposal/audit payloads 2 -> ${2 - redacted}; peer byte-identical; counts ${counts.join('/')} -> ${after.map(item => item.rows.length).join('/')}`)
     for (const row of stubs) {
       const old = JSON.parse(proposalRows.find(item => item.id === row.id).saved), saved = JSON.parse(row.saved)
       assert.ok(saved.tombstone, 'name-only content selects the existing redaction stub')
@@ -251,6 +256,10 @@ test('recorded names in proposal or audit free text erase with word boundaries a
     }
     const auditRows = after.find(item => item.table === 'agent_door_audit').rows.filter(row => [named.decision.id, auditOnly.decision.id].includes(row.id))
     assert.equal(auditRows.length, 2); assert.ok(auditRows.every(row => row.evidence === null && JSON.parse(row.row).tombstone))
+    if (body) {
+      assert.equal(JSON.stringify(after).includes(body), false, 'colon-delimited names are absent from live proposal and audit content')
+      assert.equal(JSON.stringify((await owned('/agents/api/audit')).body).includes(body), false, 'the public audit content is redacted too')
+    }
     const replay = await runtime.call('/mcp', { method: 'POST', headers: {
       authorization: `Bearer ${await accessToken(c)}`, 'mcp-protocol-version': '2026-07-28',
       'mcp-method': 'tools/call', 'mcp-name': 'base.people.note',
@@ -261,6 +270,7 @@ test('recorded names in proposal or audit free text erase with word boundaries a
     retained.push(...stubs)
   })
   const cleanArchive = await archive(portability)
+  for (const body of colonCases) assert.equal(cleanArchive.includes(body), false, 'colon-delimited names are absent from the export')
   const destination = await emittedRuntime({ noMail: true, files: true }); t.after(() => destination.close())
   const clean = await createPortability({ db: destination.db, buckets: { FILES: await destination.mf.getR2Bucket('FILES') }, policy: portabilityPolicy })
   await restore(clean, cleanArchive)
@@ -268,5 +278,7 @@ test('recorded names in proposal or audit free text erase with word boundaries a
   for (const row of retained) assert.deepEqual(restored.find(item => item.id === row.id), row, 'clean export/restore retains only the non-personal stub')
   const restoredAudits = (await destination.db.prepare('SELECT * FROM agent_door_audit WHERE evidence IS NULL').all()).results
   assert.equal(restoredAudits.filter(row => JSON.parse(row.row).tombstone).length, retained.length)
+  const restoredArchive = await archive(clean)
+  for (const body of colonCases) assert.equal(restoredArchive.includes(body), false, 'colon-delimited names are absent after clean restore')
   t.diagnostic(`PROBE NAME RESTORE: ${retained.length} non-personal proposal and audit stubs preserved; older archives HTTP 400 erasure_epoch`)
 })

@@ -10,11 +10,12 @@ const recordedName = "CASE WHEN subject.type='object' THEN json_extract(subject.
 const textValue = `coalesce((${sourceId}),(${recordedName}))`
 const tokenCharacter = "'[A-Za-z0-9_@.+/:-]'"
 // Preserve identifier/URI/version tokens. A sentence's final period delimits a
-// name, but the period within version 1.0 or another token does not. Non-ASCII
+// name, but the period within version 1.0 or another token does not. Colons
+// delimit recorded names while remaining part of source identifiers. Non-ASCII
 // letters also continue a name; Unicode spaces/punctuation delimit it.
 const boundary = (position: string, outward: number) => {
   const char = `substr(text,${position},1)`, next = `substr(text,(${position})+(${outward}),1)`
-  return `(${char} NOT GLOB ${tokenCharacter} OR ((${recordedName}) IS NOT NULL AND ${char}='.' AND ${next} NOT GLOB ${tokenCharacter}))
+  return `(${char} NOT GLOB ${tokenCharacter} OR ((${recordedName}) IS NOT NULL AND (${char}=':' OR (${char}='.' AND ${next} NOT GLOB ${tokenCharacter}))))
     AND NOT ((${recordedName}) IS NOT NULL AND coalesce(unicode(${char}),0)>127 AND ${char} NOT GLOB '[\u00a0\u2000-\u206f\u2e00-\u2e7f\u3000-\u303f]')`
 }
 // Check every literal occurrence, including one after an embedded occurrence.
