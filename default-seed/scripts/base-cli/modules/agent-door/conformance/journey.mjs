@@ -7,6 +7,7 @@ import { schemaErrors } from './schema.mjs';
 import { checkTarget } from './target.mjs';
 import { nativeStepHook } from './step-hooks.mjs';
 import { injectionArgs } from './injection.mjs';
+import { erasedStep } from './erasure.mjs';
 
 export function checkClasses(c, step, answer, phase) {
  const actual = answer.decision?.classes;
@@ -81,6 +82,11 @@ export async function runJourney(c, phase, { held = false, injections = false, r
     } else proof = await c.proof(step.tool, args, undefined, step.client);
    }
    let answer = await c.stepTool(step, args, proof);
+   if (answer.erasure) {
+    const value = await erasedStep(c, step, args, answer, phase, outputs);
+    await nativeStepHook(c, 'afterStep', phase, step, args, outputs, value);
+    continue;
+   }
    checkClasses(c, step, answer, phase);
    await checkTarget(c, step, outputs, answer, phase);
    const expectedDisposition = held ? needsApproval ? 'approval' : 'review' : 'autonomous';
@@ -95,6 +101,13 @@ export async function runJourney(c, phase, { held = false, injections = false, r
     await checkTarget(c, step, outputs, answer, phase, true);
     c.add(`BASE-AGENT-008.5.approver.${step.id}`, approved.ok, `Signed-in sponsor approval returned HTTP ${approved.status}.`);
     answer = await c.stepTool(step, args, { ...proof, requestState: answer.result.requestState });
+    if (answer.erasure) {
+     c.add(`BASE-AGENT-007.5.receipt.${step.id}.erased`, approved.erasure?.decision === 'approval' && isDeepStrictEqual(approved.erasure.tombstone, answer.erasure.tombstone)
+      && approved.body.approval.code === 'subject_erased' && isDeepStrictEqual(approved.body.approval.summary, {}) && approved.body.approval.summary_sha256 === '', 'An approved erasure must redact its exact saved approval and refuse payload replay with the matching tombstone.');
+     const value = await erasedStep(c, step, args, answer, phase, outputs);
+     await nativeStepHook(c, 'afterStep', phase, step, args, outputs, value);
+     continue;
+    }
     const receipt = answer.result?._meta?.['com.runeditrun/receipt'];
     // Older receipts carry only the original id; their current decision's
     // computed facts may change after the effect.
