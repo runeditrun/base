@@ -1,7 +1,7 @@
 # Penny agent erasure adoption
 
-`penny-map.ts` is the complete map used with the scratch snapshot of
-`just-every/run-penny` branch `cloud/sd-door-adopt-penny-1`. Its native subjects
+`penny-map.ts` is the complete map used with Penny's scratch snapshot on
+branch `refs/heads/cloud/sd-door-adopt-penny-1`. Its native subjects
 are customer records, not operators; operator erasure and restore custody keep
 their independent holds. `0106_agent_erasure_custody.sql` is additive after 0105.
 Do not change applied migrations.
