@@ -10,6 +10,7 @@ import { readMigrationRewrites, withRewrites } from '../modules/deploy-kit/migra
 import { RerError } from './errors.mjs';
 import { hostedMailCredentials } from './hosted-mail.mjs';
 import { shared } from './shared.mjs';
+import { registerHistoryInstallation, preparationDatabase } from './agent-history-database.mjs';
 import { verificationRpc } from './agent-rpc.mjs';
 import { FixtureDatabaseError } from '../modules/agent-door/conformance/fixtures.mjs';
 
@@ -104,7 +105,11 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    await migrate(await mf.getD1Database(item.binding, 'app'), withRewrites(plan, await readMigrationRewrites(root), { partial: true }));
   }
  } catch (error) { await mf.dispose(); throw error; }
- return { client, identity, origin: HOSTED_ORIGIN,
+ const preparedDatabase = async binding => {
+  if (!(config.d1_databases ?? []).some(item => item.binding === binding)) throw new RerError('hosted_database_invalid', new FixtureDatabaseError().message, 1);
+  return preparationDatabase(await mf.getD1Database(binding, 'app'));
+ };
+ const hosted = { client, identity, origin: HOSTED_ORIGIN,
   worker: async entrypoint => {
    if (!Object.hasOwn(nativeWorkers, entrypoint)) throw new RerError('agent_invoke_invalid', 'Verification can invoke only its declared native Worker entrypoint.', 1);
    return (await mf.getBindings('ingress'))[nativeWorkers[entrypoint]];
@@ -124,10 +129,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    await mf.setOptions(convertV4MiniflareOptions(options));
    loopback = await mf.ready;
    return Object.freeze({
-    database: async binding => {
-     if (!(config.d1_databases ?? []).some(item => item.binding === binding)) throw new RerError('hosted_database_invalid', new FixtureDatabaseError().message, 1);
-     return fixtureDatabase(await mf.getD1Database(binding, 'app'));
-    },
+    database: async binding => (await preparedDatabase(binding)).database,
     scheduled: async ({ scheduledTime = Date.now() } = {}) => {
      if (!Number.isFinite(scheduledTime)) throw new Error('Native scheduled preparation requires a finite Unix millisecond time.');
      try {
@@ -148,45 +150,8 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    } };
   }, close: () => { release(); return mf.dispose(); },
   fetch: (path, { headers, ...init } = {}) => loopbackFetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }) };
-}
-
-// Accept native DML, never schema/transaction commands. Every write runs in a
-// D1 atomic batch with guards on all protocol tables, including cascades and
-// native triggers. A refused write rolls back both its rows and these guards.
-function fixtureDatabase(db) {
- const refuse = () => { throw new RerError('hosted_database_invalid', new FixtureDatabaseError().message, 1); };
- const statement = (sql, values = []) => {
-  if (typeof sql !== 'string' || sql.includes(';')) return refuse();
-  const readOnly = /^\s*SELECT\b/i.test(sql);
-  const target = /^\s*(?:UPDATE\s+|INSERT\s+INTO\s+|DELETE\s+FROM\s+)([a-z_][a-z0-9_]*)\b/i.exec(sql)?.[1];
-  if (!readOnly && (!target || /^(?:agent_door_|sqlite_)/i.test(target))) return refuse();
-  const execute = async () => {
-   try {
-    const query = db.prepare(sql).bind(...values);
-    if (readOnly) return await query.all();
-    const table = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=? COLLATE NOCASE").bind(target).first();
-    if (!table) return refuse();
-    const protectedTables = (await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND lower(substr(name,1,11))='agent_door_'").all()).results;
-    const guards = protectedTables.flatMap(({ name }) => ['INSERT', 'UPDATE', 'DELETE'].map(event => ({
-     name: 'rer_fixture_' + randomBytes(16).toString('hex'), table: name.replaceAll('"', '""'), event,
-    })));
-    const results = await db.batch([
-     ...guards.map(guard => db.prepare(`CREATE TRIGGER "${guard.name}" BEFORE ${guard.event} ON "${guard.table}" BEGIN SELECT RAISE(ABORT, 'fixture protocol write refused'); END`)),
-     query,
-     ...guards.map(guard => db.prepare(`DROP TRIGGER "${guard.name}"`)),
-    ]);
-    return results[guards.length];
-   } catch { return refuse(); }
-  };
-  return Object.freeze({
-   bind: (...bound) => statement(sql, bound),
-   all: execute,
-   run: execute,
-   first: async column => { const row = (await execute()).results[0] ?? null; return column === undefined ? row : row?.[column] ?? null; },
-   raw: async () => (await execute()).results.map(row => Object.values(row)),
-  });
- };
- return Object.freeze({ prepare: sql => statement(sql) });
+ registerHistoryInstallation(hosted, preparedDatabase);
+ return hosted;
 }
 
 export async function checkHostedOutput(root, options) {
