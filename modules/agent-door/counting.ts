@@ -4,10 +4,21 @@ import type { ClassAndFacts, Principal, Runtime, PolicyState } from './types.ts'
 // Serialize only policy admission, never a native action or external request.
 // A lost admission lease cannot commit a usage reservation. Reservations are
 // visible before execution, so concurrent calls cannot both consume a cap.
-export async function acquireDecision(rt: Runtime, id: string): Promise<boolean> {
-  const result = await rt.options.db.prepare('UPDATE agent_door_state SET decision_lock=?,decision_until=? WHERE id=1 AND (decision_lock IS NULL OR decision_until<=?)')
-    .bind(id, rt.now() + 30000, rt.now()).run()
-  return !!result.meta.changes
+export async function acquireDecision(rt: Runtime, id: string): Promise<false | 'acquired' | 'waited'> {
+  // Bound contention by elapsed time and attempts, independently of the policy
+  // clock. Only failed acquisition is retried; an acquired lease is never renewed.
+  const deadline = Date.now() + 5000
+  for (let attempt = 0; attempt < 64; attempt++) {
+    if (attempt && Date.now() >= deadline) break
+    const now = rt.now()
+    const result = await rt.options.db.prepare('UPDATE agent_door_state SET decision_lock=?,decision_until=? WHERE id=1 AND (decision_lock IS NULL OR decision_until<=?)')
+      .bind(id, now + 30000, now).run()
+    if (result.meta.changes) return attempt ? 'waited' : 'acquired'
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) break
+    await new Promise(resolve => setTimeout(resolve, Math.min(10 * 2 ** Math.min(attempt, 4), 100, remaining)))
+  }
+  return false
 }
 export async function releaseDecision(rt: Runtime, id: string) {
   await rt.options.db.prepare('UPDATE agent_door_state SET decision_lock=NULL,decision_until=NULL WHERE id=1 AND decision_lock=?').bind(id).run()

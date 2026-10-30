@@ -134,7 +134,7 @@ A replay completes a non-final audit from the durable outcome; without an outcom
 it returns `call_in_progress` and runs nothing. Every attempt captures its key,
 traceparent and ignored argument names before early policy refusals. Native
 actions still own their transaction guards and recovery.
-Admission reservations prevent concurrent calls from exceeding daily policy sums; an admission lease cannot execute after it loses its fence. `decision_busy` and `call_in_progress` refuse overlapping admissions without an effect. An unexpected execution failure keeps the key claimed because the native action may have committed; the edition must reconcile that action before recovery. The module does not supply a generic long-job executor.
+Admission reservations prevent concurrent calls from exceeding daily policy sums; an admission lease cannot execute after it loses its fence. Contending calls wait at most five seconds for policy admission, then recheck current authority and policy before reserving usage or executing. `decision_busy` refuses exhausted admission and `call_in_progress` refuses an already claimed call without an effect. Only lock acquisition is retried; native actions are never retried. An unexpected execution failure keeps the key claimed because the native action may have committed; the edition must reconcile that action before recovery. The module does not supply a generic long-job executor.
 
 ## Errors and capacity
 

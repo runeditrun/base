@@ -2,7 +2,7 @@ import { offers } from './capabilities.mjs'
 import type { CallResult, DecisionMeta, Principal, Runtime, ToolContext } from './types.ts'
 import { audit, newAudit, recordDecision, outcomeRow, recoverAudit, usage, usageToday, type Evidence, type AuditRow } from './audit.ts'
 import { policyRefusal, policyState, setupUrl } from './policy-store.ts'
-import { classify, context, digest, runTool, saveCall, selfEscalation, summary, revoked } from './execution.ts'
+import { classify, context, digest, runTool, saveCall, selfEscalation, summary, revoked, livePrincipal } from './execution.ts'
 import { decide } from './policy/decide.ts'
 import { companyDecision, restrictDecision } from './company-policy.ts'
 import { canonical } from './policy/document.ts'
@@ -55,7 +55,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     principal = { ...current, operationId: row.operation_id, idempotencyKey: key }
     row.scopes = [...principal.scopes]
     if (tool.scope && !principal.scopes.includes(tool.scope)) { status = 403; scope = tool.scope; return refuse('insufficient_scope') }
-    const state = await policyState(rt)
+    let state = await policyState(rt)
     row.revision = state.revision
     if (principal.consent && state.revoked.consents.includes(principal.consent)) { if (door === 'mcp') { status = 401; return refuse('unauthenticated') }; return refuse('consent_revoked') }
     const agent = await rt.options.db.prepare('SELECT revoked,sponsor FROM agent_door_agents WHERE id=?').bind(principal.agent.id).first<{ revoked: number; sponsor: string }>()
@@ -83,7 +83,7 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     principal = { ...principal, continuationItemId: item }
     if (item !== undefined) row.continuation_item_id = item
     claimKey = key === null ? null : operationId === undefined ? key : operationKey(operationId, name, key, item)
-    const ctx = context(rt, principal, door, [], approvers)
+    let ctx = context(rt, principal, door, [], approvers)
     if (!tool.readOnly && !key) return refuse('idempotency_key_required')
     if (tool.widens === false && row.ignored_arguments.length) return refuse('invalid_arguments')
     if (tool.authority === 'none' && row.ignored_arguments.length) return refuse('undeclared_arguments')
@@ -128,9 +128,45 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
       return refuse('self_escalation')
     }
     const currentClasses = await classify(tool, args, ctx, original?.classes)
-    const classes = original?.classes ?? currentClasses
-    locked = await acquireDecision(rt, row.id)
+    let classes = original?.classes ?? currentClasses
+    const admission = await acquireDecision(rt, row.id)
+    locked = !!admission
     if (!locked) return refuse('decision_busy')
+    if (admission === 'waited') {
+      // Keep the early refusal/target order above. Waiting has acquired nothing
+      // until now: refresh admission evidence, without replaying native targets,
+      // continuation resolvers, or an action that may already have committed.
+      const current = await livePrincipal(rt, principal)
+      state = await policyState(rt)
+      row.revision = state.revision
+      if (principal.consent && state.revoked.consents.includes(principal.consent)) {
+        if (door === 'mcp') { status = 401; return refuse('unauthenticated') }
+        return refuse('consent_revoked')
+      }
+      const agent = await rt.options.db.prepare('SELECT revoked,sponsor FROM agent_door_agents WHERE id=?').bind(principal.agent.id).first<{ revoked: number; sponsor: string }>()
+      if (revoked(state, principal) || agent?.revoked || agent && agent.sponsor !== principal.person.id) { status = 401; return refuse('unauthenticated') }
+      if (!current) return refuse('sponsor_unavailable')
+      if (operationId !== undefined && principal.scopes.some(scope => !current.scopes.includes(scope))) return refuse('insufficient_scope')
+      principal = current
+      row.scopes = [...principal.scopes]
+      if (tool.scope && !principal.scopes.includes(tool.scope)) { status = 403; scope = tool.scope; return refuse('insufficient_scope') }
+      const refusal = policyRefusal(rt, state, tool.classes)
+      if (refusal) return refuse(refusal.code, refusal.fields)
+      ctx = context(rt, principal, door, [], approvers)
+      if (!previous && tool.revision && expected !== undefined) {
+        const current = await tool.revision(args, ctx)
+        if (expected !== current) return refuse('revision_conflict', { current_revision: current })
+      }
+      const authority = !completed && typeof tool.authority === 'function' ? await tool.authority(args, ctx) : null
+      if (tool.widens === false && authority?.widens) return refuse('narrowing_contract_violation')
+      if (selfEscalation(authority, principal)) return refuse('self_escalation')
+      const currentClasses = await classify(tool, args, ctx, original?.classes)
+      classes = original?.classes ?? currentClasses
+      if (key !== null && !previous) {
+        const claimed = await rt.options.db.prepare('SELECT digest FROM agent_door_calls WHERE agent=? AND key=?').bind(principal.agent.id, claimKey).first<{ digest: string }>()
+        if (claimed) return refuse(claimed.digest === requestDigest ? 'call_in_progress' : 'idempotency_conflict')
+      }
+    }
     const sums = await usage(rt, state.document!, principal)
     let decision = decide({ document: state.document, revision: state.revision, call: { seed: rt.options.seed, specialist: principal.agent.specialist ?? null, agent: principal.agent.id, classes }, usageToday: usageToday(sums) })
     const meta: DecisionMeta = { id: row.id, disposition: decision.result, revision: state.revision,
