@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Retain native continuation identity and current policy evidence in private audit when an identity-matched originating operation is still running; keep the operation_mismatch response and execution refusal unchanged.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.
