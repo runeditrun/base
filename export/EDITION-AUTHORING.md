@@ -63,6 +63,24 @@ refresh writes, naming both revisions, the remote and a complete one-line repair
 command. Offline refresh never fetches; incomplete ancestry gets the same repair
 guidance for use when online.
 
+When Git cloning is unavailable but authenticated `gh api` works, use:
+
+```sh
+rer refresh-base --ref FULL_40_HEX_BASE_COMMIT --from-api
+```
+
+This reads committed trees and verified blobs by immutable identity, completing
+truncated recursive trees through their child tree IDs. GitHub compare
+`INTRODUCED...REVISION` establishes ancestry only for `ahead` or `identical`;
+unknown or unavailable comparisons refuse before writes. Required edition edits
+still refuse without their named `--edition-migration ID` consents, and consent
+leaves the edition-owned edits owed. Repeating a refresh adds no new copies.
+The API source shares `record-base --from-api`'s authenticated reader and does
+not retry or run source scripts. Choose it separately from `--base`,
+`--base-archive` and `--offline`. Plain extracted directories still cannot
+establish migration ancestry. API workflow-template matching uses the requested
+snapshot, preserving unmatched seed-owned workflows.
+
 For offline use, supply `--offline --base CHECKOUT`. Without a checkout refresh
 refuses plainly; it cannot refresh from hashes alone. Offline Git reads use an isolated
 repository with the checkout’s object store and no remotes, including on Git 2.43.

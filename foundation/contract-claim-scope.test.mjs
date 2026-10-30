@@ -1,4 +1,5 @@
 import test from 'node:test'
+import {githubApiEdge} from '../edition-authoring/tests/github-api.mjs'
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
@@ -62,20 +63,12 @@ test('source claims survive conversion and Base copies record through the public
     const bytes = await readFile(join(base, 'README.md'))
     const object = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex')
     const response = {
-      [`commits/${revision}`]: { sha: revision, tree: { sha: tree } },
-      [`trees/${tree}?recursive=1`]: { sha: tree, truncated: false, tree: [{ path: 'README.md', type: 'blob', mode: '100644', sha: object }] },
-      [`blobs/${object}`]: { sha: object, encoding: 'base64', size: bytes.length, content: bytes.toString('base64') },
+      [`git/commits/${revision}`]: { sha: revision, tree: { sha: tree } },
+      [`git/trees/${tree}?recursive=1`]: { sha: tree, truncated: false, tree: [{ path: 'README.md', type: 'blob', mode: '100644', sha: object }] },
+      [`git/blobs/${object}`]: { sha: object, encoding: 'base64', size: bytes.length, content: bytes.toString('base64') },
     }
     const tools = join(root, 'tools')
-    await mkdir(tools)
-    await writeFile(join(tools, 'responses.json'), JSON.stringify(response))
-    await writeFile(join(tools, 'gh'), `#!/usr/bin/env node
-const fs = require('fs');
-const values = JSON.parse(fs.readFileSync(__dirname + '/responses.json', 'utf8'));
-const endpoint = process.argv[3]?.split('/git/')[1];
-if (!values[endpoint]) process.exit(1);
-process.stdout.write(JSON.stringify(values[endpoint]));
-`, { mode: 0o755 })
+    githubApiEdge(tools, response)
     const record = (...args) => spawnSync(process.execPath, [join(import.meta.dirname, '../edition-authoring/cli.mjs'), 'record-base', 'README.md', 'README.md', revision, ...args], {
       cwd: root, encoding: 'utf8', env: { ...process.env, PATH: tools + ':' + process.env.PATH },
     })

@@ -10,7 +10,7 @@ export function authoringCommand(options) {
    ...(options.editionMigration ? options.editionMigration.split(',').flatMap(id => ['--edition-migration', id]) : []),
    options.ref, '--record', options.record ?? 'base-copies.json',
    ...(options.base ? ['--base', resolve(options.cwd, options.base)] : []),
-   ...(options.baseArchive ? ['--base-archive', resolve(options.cwd, options.baseArchive)] : []), ...(options.offline ? ['--offline'] : []),
+   ...(options.baseArchive ? ['--base-archive', resolve(options.cwd, options.baseArchive)] : []), ...(options.offline ? ['--offline'] : []), ...(options.fromApi ? ['--from-api'] : []),
   ], 1));
  } catch (error) { throw refuse(error.message); }
 }
