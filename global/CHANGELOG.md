@@ -2,6 +2,8 @@
 
 ## 0.2.94
 
+- Include the shared checkout-history validator in the documented portability runtime copy, preserving self-contained Worker and CLI adoption.
+
 - Business connect, next and run report the local Business name file written without claiming an app has already applied it.
 - Explain the signed-in session file in Business setup help, give connect and token their own usage, and show the Business help path after install.sh.
 - On occupied ports, suggest moving the checkout with `rer setup --port` and reserve server stop advice for this checkout's own registered server; omit kill commands for unmanaged processes.
