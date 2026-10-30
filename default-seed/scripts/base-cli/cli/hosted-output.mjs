@@ -47,7 +47,7 @@ const links = html => [...html.matchAll(/(?:src|href)=["'](\/[^"'#?\s]+)/g)].map
 
 /** The build served as rer deploy hosts it, with declared vars, origin and
  * stand-in deploy/Managed mail secrets. `fetch(path, init)` uses the deployed origin. */
-export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService, rpc, workerEntrypoints = [] } = {}) {
+export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService, rpc, workerEntrypoints = [], fixturePreparation = false } = {}) {
  const { loopbackFetch } = await shared('loopback-fetch.mjs');
  const build = join(root, 'dist/server'), client = join(root, 'dist/client');
  let config;
@@ -88,10 +88,23 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   durableObjects: Object.fromEntries((config.durable_objects?.bindings ?? []).filter(item => !item.script_name).map(item => [item.name, { className: item.class_name, useSQLite: true }])),
   ...(config.assets ? { assets: { directory: client, binding: config.assets.binding ?? 'ASSETS', routerConfig: { has_user_worker: true, invoke_user_worker_ahead_of_assets: RUN_WORKER_FIRST } } } : {}),
  }] };
- const mf = new Miniflare(convertV4MiniflareOptions(options));
  let preparation, held = false;
  const waiting = new Set();
  const release = () => { held = false; for (const resume of waiting) resume(); waiting.clear(); };
+ // Install the gate before owner hooks retain any D1 handles; replacing
+ // Miniflare options later would disconnect those existing handles.
+ if (fixturePreparation) {
+  const app = options.workers.find(worker => worker.name === 'app');
+  const wrapper = join(build, '__rer_preparation.mjs');
+  const native = './' + config.main;
+  app.modules = [{ type: 'ESModule', path: wrapper, contents:
+   `import app from ${JSON.stringify(native)};export * from ${JSON.stringify(native)};export default {...app,async queue(batch,env,ctx){await env.RER_PREPARATION_QUEUE_GATE.fetch('https://queue.invalid');return app.queue(batch,env,ctx)}}` }, ...modules];
+  app.serviceBindings = { ...app.serviceBindings, RER_PREPARATION_QUEUE_GATE: async () => {
+   if (held) await new Promise(resume => waiting.add(resume));
+   return new Response(null, { status: 204 });
+  } };
+ }
+ const mf = new Miniflare(convertV4MiniflareOptions(options));
  let loopback;
  try {
   loopback = await mf.ready;
@@ -117,17 +130,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   // Only the conformance call sites request these powers. Ordinary hosted
   // checks and owner initialization keep their SELECT-only reader below.
   preparation: async () => preparation ??= (async () => {
-   const app = options.workers.find(worker => worker.name === 'app');
-   const wrapper = join(build, '__rer_preparation.mjs');
-   const native = './' + config.main;
-   app.modules = [{ type: 'ESModule', path: wrapper, contents:
-    `import app from ${JSON.stringify(native)};export * from ${JSON.stringify(native)};export default {...app,async queue(batch,env,ctx){await env.RER_PREPARATION_QUEUE_GATE.fetch('https://queue.invalid');return app.queue(batch,env,ctx)}}` }, ...modules];
-   app.serviceBindings = { ...app.serviceBindings, RER_PREPARATION_QUEUE_GATE: async () => {
-    if (held) await new Promise(resume => waiting.add(resume));
-    return new Response(null, { status: 204 });
-   } };
-   await mf.setOptions(convertV4MiniflareOptions(options));
-   loopback = await mf.ready;
+   if (!fixturePreparation) throw new RerError('hosted_database_invalid', 'Native preparation requires a disposable conformance host.', 1);
    return Object.freeze({
     database: async binding => (await preparedDatabase(binding)).database,
     scheduled: async ({ scheduledTime = Date.now() } = {}) => {
@@ -150,7 +153,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    } };
   }, close: () => { release(); return mf.dispose(); },
   fetch: (path, { headers, ...init } = {}) => loopbackFetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }) };
- registerHistoryInstallation(hosted, preparedDatabase);
+ if (fixturePreparation) registerHistoryInstallation(hosted, preparedDatabase);
  return hosted;
 }
 

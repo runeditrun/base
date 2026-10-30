@@ -70,7 +70,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  const network = await createAgentConformanceNetwork(root, verification.network, { email });
  let hosted, history;
  try {
- hosted = await serveHosted(root, { declaration, rpc: verification.rpc, workerEntrypoints: workerDriver ? [workerDriver.entrypoint] : [], outboundService: async request => {
+ hosted = await serveHosted(root, { declaration, fixturePreparation: true, rpc: verification.rpc, workerEntrypoints: workerDriver ? [workerDriver.entrypoint] : [], outboundService: async request => {
   const copy = reviewers.observes(request) ? request.clone() : null, response = await network.fetch(request);
   if (copy) await reviewers.capture(copy, response.clone());
   return response;
