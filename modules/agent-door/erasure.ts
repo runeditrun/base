@@ -1,6 +1,14 @@
 import type { CallResult, Runtime, ToolContext } from './types.ts'
 import { ToolRefusal } from './errors.ts'
 
+// The fixed replay window also bounds installation-private erasure aliases.
+export const REPLAY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+
+/** Call deletion and its alias-delete trigger execute in the same transaction. */
+export async function expireReplayCalls(rt: { options: { db: D1Database }; now(): number }) {
+  await rt.options.db.prepare('DELETE FROM agent_door_calls WHERE expires_at<=?').bind(rt.now()).run()
+}
+
 export interface Tombstone { erasure_id: string; at: string }
 type Cell = string | number | null
 type Row = Record<string, Cell>
@@ -31,8 +39,8 @@ export async function replayAlias(secret: string, key: string) {
 }
 export async function erasedReplay(rt: Runtime, agent: string, key: string, operationId?: string): Promise<CallResult | null> {
   if (!rt.options.erasure) return null
-  const row = await rt.options.db.prepare('SELECT tombstone FROM agent_door_replay_aliases WHERE agent=? AND alias=?')
-    .bind(agent, await replayAlias(rt.options.erasure.secret, key)).first<{ tombstone: string }>()
+  const row = await rt.options.db.prepare('SELECT aliases.tombstone FROM agent_door_replay_aliases aliases JOIN agent_door_calls calls ON calls.agent=aliases.agent AND calls.decision_id=aliases.call_id WHERE aliases.agent=? AND aliases.alias=? AND calls.expires_at>?')
+    .bind(agent, await replayAlias(rt.options.erasure.secret, key), rt.now()).first<{ tombstone: string }>()
   if (row) return erasedResult(JSON.parse(row.tombstone))
   if (operationId !== undefined) {
     const operation = await rt.options.db.prepare("SELECT json_extract(row,'$.tombstone') AS tombstone FROM agent_door_audit WHERE id=? AND agent=?").bind(operationId, agent).first<{ tombstone: string | null }>()
@@ -66,7 +74,7 @@ function retained(value: any, tombstone: Tombstone) {
 }
 function replacements(table: string, row: Row, tombstone: Tombstone): Row {
   const marker = JSON.stringify(tombstone), refusal = JSON.stringify(erasedResult(tombstone))
-  if (table === 'agent_door_calls') return { key: 'erased:' + row.decision_id, digest: '', state: outcome(String(row.state)), outcome: refusal }
+  if (table === 'agent_door_calls') return { key: 'erased:' + row.decision_id, digest: '', state: outcome(String(row.state)), outcome: refusal, expires_at: row.expires_at ?? Date.parse(tombstone.at) + REPLAY_WINDOW_MS }
   if (table === 'agent_door_audit') {
     const old = parse(row.row)
     return { classes: JSON.stringify(classNames(parse(row.classes))), row: JSON.stringify({ ...retained(old, tombstone), classes: classNames(old.classes).map(value => ({ class: value })), id: row.id, at: row.at,
@@ -128,6 +136,7 @@ export async function agentErasureStatements(input: {
     const set = replacements(item.table, row, tombstone)
     out.push(db.prepare('UPDATE ' + quote(item.table) + ' SET ' + Object.keys(set).map(column => quote(column) + '=?').join(',') + ' WHERE rowid=?')
       .bind(...Object.values(set), row._rowid!))
+    if (item.table === 'agent_door_calls') out.push(db.prepare('DELETE FROM agent_door_calls WHERE rowid=? AND expires_at<=?').bind(row._rowid!, Date.parse(tombstone.at)))
   }
   return out
 }

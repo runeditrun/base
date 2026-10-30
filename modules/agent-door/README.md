@@ -123,8 +123,19 @@ Undo is a reviewer act with `UndoContext.agent: null` and a person actor.
 
 Mutating tools require `idempotency_key`; `expected_revision` is optional for
 tools with native revision lookup. Same agent and key and arguments return the
-recorded outcome; changed arguments conflict. Recorded outcomes are retained
-indefinitely. Completed mutation retries still run the native classifier for current
+recorded outcome; changed arguments conflict. `REPLAY_WINDOW_MS` in `erasure.ts`
+is one fixed window of 30 days after completion, with no configuration or
+seed override. The call's `expires_at` is set once at completion and is never
+extended by replay or erasure. A call with a recorded horizon keeps that horizon.
+Incomplete erased calls complete as tombstones at erasure time. Upgraded legacy
+completed calls use their recorded start because no completion time was stored.
+Expired calls are purged on the next door call (or `expireReplayCalls` from the
+native scheduled cleanup); the database trigger deletes their private aliases
+in the same transaction. Expiry is enforced even before physical cleanup.
+After expiry an old key is a new request under current authorization, and can
+never recover the erased value. Within the window it returns only the value-free
+`subject_erased` tombstone, with no effect. Aliases and their secret never enter
+archives, exports or restore. Completed mutation retries still run the native classifier for current
 sponsor authority. Its optional third argument carries the original effect's
 classes and facts, so it can classify consumed preparation state after enforcing
 current access. Current policy admission uses the recorded effect, and the

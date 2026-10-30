@@ -482,7 +482,7 @@ of the shared policy source is also separate from copying it into an edition.
 Validate the integrated edition through its public doors: current sponsor and
 scope checks, all exposed tool effects, policy and review decisions, migrations,
 resources, audit, subscriptions and retained outcomes. Keep successful and
-failed outcome evidence for at least 24 hours. Verified native subject erasure overrides this floor for personal payload only; the value-free existence and outcome remain. This module currently retains replay associations indefinitely; adoption must not introduce earlier cleanup. Report the exact
+failed outcome evidence for at least 24 hours. Verified native subject erasure overrides this floor for personal payload only; the value-free existence and outcome remain. The fixed `REPLAY_WINDOW_MS` in `erasure.ts` bounds replay to 30 days after completion; erasure does not extend an existing horizon. Report the exact
 edition behavior verified, separately from Base module or CLI results.
 
 ## Verification owner lifecycle
@@ -1424,7 +1424,8 @@ BASE-DATA-003 operation, authorization, legal holds, transaction and restore
 checkpoint. The agent module creates no erasure journal or second subject lock.
 Non-person agent identities are not data subjects.
 
-Apply `schema/replay-aliases.sql` in a new numbered migration and add nullable
+Apply `schema/replay-aliases.sql` in a new numbered migration, add nullable
+`expires_at INTEGER` and its index to `agent_door_calls`, and add nullable
 `tombstone TEXT` to `agent_door_agents` (the fresh schema has that column).
 Never alter an applied migration. Adopt the matching portability runtime:
 `agent_door_replay_aliases` is mandatory installation bookkeeping, excluded even
@@ -1444,7 +1445,7 @@ seed's adoption/upgrade checks. SQL comes only from trusted product source.
 const map: AgentArtifactMap = { artifacts: [
   // Complete every other agent table too; see the reference's exact declaration.
   { table: 'agent_door_calls',
-    columns: ['agent','key','digest','decision_id','created_at','state','outcome'],
+    columns: ['agent','key','digest','decision_id','created_at','state','outcome','expires_at'],
     match: { sql: "decision_id IN (SELECT id FROM agent_door_audit WHERE json_extract(row,'$.resource.id')=?)",
       params: ['id'] } },
 ] }
@@ -1487,12 +1488,22 @@ Audit integrity is its existing sequence and tombstone; no hash chain is added.
 The personal replay key is replaced by an opaque key derived from the call's
 decision ID. The sole retention exception is an installation-private
 HMAC-SHA-256 alias of the legacy key, scoped to its agent, under that existing
-private setting. Its lifetime is today's indefinite replay association, with
-no 24-hour expiry. A matching old key returns only `subject_erased` and the
-tombstone, never executes and never echoes payload. Current sponsor, scope,
-revocation and Pause admission still apply. Aliases are never exported/restored.
-The existing checkpoint refuses older archives that could resurrect original
-keys or payload. A future finite replay-window change must delete aliases then.
+private setting. `REPLAY_WINDOW_MS` in `erasure.ts` fixes one replay window of
+30 days after call completion, with no knob or per-seed override. `expires_at`
+is set once at completion; preserve any existing call replay/retention horizon.
+Erasure never extends it. Incomplete calls complete as tombstones at erasure time.
+For legacy completed calls without a completion time, backfill from `created_at`
+(as in reference migration `0039_agent_replay_window.sql`) without extending
+retention at upgrade. Install the alias-delete trigger from the schema.
+`expireReplayCalls(rt)` purges expired calls on door admission; adopters also
+invoke it from their native scheduled cleanup for idle installations. The trigger
+deletes each call's aliases in the same transaction, including native cleanup.
+At the horizon a matching alias ceases to apply. An old key is a NEW request
+under current authorization, never a re-execution of the erased call or recovery
+of its value. In-window replay returns only `subject_erased` and the tombstone,
+never executes and never echoes payload. Current sponsor, scope, revocation and
+Pause admission still apply. Aliases are never exported/restored. The existing
+checkpoint refuses older archives that could resurrect original keys or payload.
 
 `erasure.fenced(name,args,ctx)` reads the existing native subject/installation
 fence and refuses concurrent capture with HTTP 409
@@ -1507,5 +1518,5 @@ and triggers in a new seed migration once custody is integrated; do not disable
 them with flags. Preserve independent legal/regulator holds, identity protections
 and restore checks. Prove each subject type through its public erasure/restore
 doors, scan every mapped column, replay the old key at now, 24 hours plus 1 ms
-and 30 days, and compare a peer's records byte for byte. Generic module tests
+and the replay horizon plus 1 ms (a new request), and compare a peer's records byte for byte. Generic module tests
 alone do not qualify an adopting seed.
