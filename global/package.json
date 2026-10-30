@@ -12,6 +12,14 @@
     "./deploy": "./cli/deploy.mjs",
     "./portability": "./cli/portability.mjs",
     "./portability-migrations": "./cli/portability-migrations.mjs",
+    "./portability-evidence": {
+      "types": "./cli/portability-evidence.d.mts",
+      "default": "./cli/portability-evidence.mjs"
+    },
+    "./modules/portability/worker-history": {
+      "types": "./modules/portability/worker-history.d.mts",
+      "default": "./modules/portability/worker-history.mjs"
+    },
     "./errors": "./cli/errors.mjs",
     "./jsonc": "./cli/jsonc.mjs",
     "./parse": "./cli/parse.mjs",
