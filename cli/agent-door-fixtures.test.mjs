@@ -61,8 +61,11 @@ test('phase fixtures and native step hooks share disposable state and redact dat
  surface.verification.journey = 'context-journey.mjs';
  surface.journey.find(step => step.id === 'create').args.value = { $fixture: 'record', pointer: '/value' };
  await writeFile(join(root, 'context-owner.mjs'), `
+import assert from 'node:assert/strict';
 export let ownerDatabase;
 export default async function ({ database, request, origin, claim, displayName, returnTo }) {
+ const db = await database('DB');
+ assert.throws(() => db.prepare('UPDATE fixture_records SET value=0'), { code: 'hosted_database_invalid' });
  ownerDatabase = database;
  return request(origin + claim.path, { method: 'POST', redirect: 'manual',
   headers: { Origin: origin, 'Content-Type': 'application/json' },
@@ -74,7 +77,7 @@ import assert from 'node:assert/strict';
 import { ownerDatabase } from './context-owner.mjs';
 export const values = new Map();
 export default async function ({ phase, database, now }) {
- assert.equal(database, ownerDatabase);
+ assert.notEqual(database, ownerDatabase);
  assert.ok(Number.isFinite(now));
  const db = await database('DB');
  assert.ok(await db.prepare("SELECT id FROM oa_operators WHERE role='owner'").first());
@@ -91,7 +94,7 @@ import { ownerDatabase } from './context-owner.mjs';
 import { values } from './context-fixtures.mjs';
 export default journey;
 export async function beforeStep({ database, now, phase, step, args }) {
- assert.equal(database, ownerDatabase);
+ assert.notEqual(database, ownerDatabase);
  assert.ok(Number.isFinite(now));
  const db = await database('DB');
  assert.ok(await db.prepare('SELECT COUNT(*) AS count FROM fixture_records').first());
@@ -243,4 +246,125 @@ export default async function({phase, request, origin, cookie}) {
  t.diagnostic(`Sponsor admission: ${JSON.stringify(native.points.filter(point => point.id.startsWith('BASE-AGENT-004.sponsor.')))}`);
  for (const kind of kinds) assert.ok(native.points.some(point => point.id === `BASE-AGENT-004.sponsor.${kind}` && point.ok), `Native sponsor admission must pass ${kind}`);
  t.diagnostic('Sponsor admission: bypassed adapter fails unknown, inactive and excluded while the door refuses changed-email; native adapter passes all four points.');
+});
+
+test('native aged delivery and scheduled work require contained fresh preparation', { timeout: 180000 }, async t => {
+ const root = await fixtureSeed(t, 'signed');
+ const { createRequire } = await import('node:module');
+ const require = createRequire(join(base, 'default-seed/package.json'));
+ const entry = join(base, 'cli/fixtures/timed-native.mjs');
+ await require('esbuild').build({ entryPoints: [entry], outfile: join(root, 'dist/server/index.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022', external: ['cloudflare:workers'], plugins: [{ name: 'native-history-seed', setup(build) {
+  build.onResolve({ filter: /agent-door\/index\.ts$/ }, args => args.importer.endsWith('/application.mjs') ? { path: entry } : undefined);
+  build.onResolve({ filter: /^\.\/credentials\.mjs$/ }, () => ({ path: join(root, 'credentials.mjs') }));
+ } }] });
+ await writeFile(join(root, 'dist/server/migrations/0099_history.sql'), `
+CREATE TABLE fixture_history_ready(receipt_id TEXT PRIMARY KEY REFERENCES fixture_receipts(id));
+CREATE TABLE fixture_history_probe(value TEXT);
+CREATE TRIGGER fixture_history_probe_guard AFTER INSERT ON fixture_history_probe BEGIN UPDATE agent_door_audit SET tool=NEW.value; END;
+`);
+ const surfaceFile = join(root, 'agent-surface.json'), surface = JSON.parse(await readFile(surfaceFile, 'utf8'));
+ surface.tools.push({ name: 'fixture.history.consume', scope: 'records:write', readOnly: false, classes: ['standard'], clauses: ['BASE-AGENT-013'] });
+ surface.journey.push({ id: 'aged-scheduled', tool: 'fixture.history.consume', args: { receiptId: { $fixture: 'delivery', pointer: '/id' } }, expect: [{ class: 'standard' }] });
+ surface.verification.owner.initializer = 'readonly-owner.mjs';
+ await writeFile(join(root, 'readonly-owner.mjs'), `
+import assert from 'node:assert/strict';
+export default async function ({ database, request, origin, claim, displayName, returnTo }) {
+ const db = await database('DB');
+ assert.throws(() => db.prepare('UPDATE fixture_receipts SET created_at=0'), { code: 'hosted_database_invalid' });
+ return request(origin + claim.path, { method: 'POST', redirect: 'manual', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: claim.token, displayName, returnTo }) });
+}
+`);
+ surface.verification.fixtures = { module: 'context-fixtures.mjs' };
+ surface.verification.journey = 'context-journey.mjs';
+ await writeFile(join(root, 'context-fixtures.mjs'), `
+import assert from 'node:assert/strict';
+export const deliveries = new Map();
+export default async function ({ phase, tool }) {
+ if (phase === 'initial') return { values: {} };
+ const created = await tool('fixture.records.create', { value: crypto.randomUUID(), idempotency_key: crypto.randomUUID() });
+ const delivered = await tool('fixture.records.deliver', { id: created.result.structuredContent.id, idempotency_key: crypto.randomUUID() });
+ const delivery = delivered.result.structuredContent;
+ assert.ok(delivery?.id);
+ assert.ok(![...deliveries.values()].includes(delivery.id));
+ deliveries.set(phase, delivery.id);
+ return { values: { delivery } };
+}
+`);
+ await writeFile(join(root, 'context-journey.mjs'), `
+import assert from 'node:assert/strict';
+import journey from './journey.mjs';
+import { deliveries } from './context-fixtures.mjs';
+export default journey;
+export async function beforeStep({ database, scheduled, now, phase, step, args }) {
+ if (step.id !== 'aged-scheduled') return;
+ assert.equal(args.receiptId, deliveries.get(phase));
+ const db = await database('DB');
+ assert.equal(await db.prepare('SELECT receipt_id FROM fixture_history_ready WHERE receipt_id=?').bind(args.receiptId).first(), null);
+ await db.prepare('UPDATE fixture_receipts SET created_at=? WHERE id=?').bind(now - 7200000, args.receiptId).run();
+ await scheduled({ scheduledTime: now });
+ assert.ok(await db.prepare('SELECT receipt_id FROM fixture_history_ready WHERE receipt_id=?').bind(args.receiptId).first());
+}
+export async function afterStep({ database, now, step, result }) {
+ if (step.id !== 'aged-scheduled') return;
+ assert.ok(Number.isFinite(now));
+ const db = await database('DB');
+ assert.ok(await db.prepare('SELECT id FROM fixture_records WHERE id=?').bind(result.id).first());
+}
+`);
+ await writeFile(surfaceFile, JSON.stringify(surface));
+ const report = [];
+ async function verify() {
+  try { return await checkAgentDoor(root, { report: line => report.push(line) }); }
+  catch (error) { if (error.agentDoor) return error.agentDoor; throw error; }
+ }
+ // The real rule fails without preparation, then succeeds through the same
+ // public tool and mandatory autonomous/held policy journeys.
+ const hookFile = join(root, 'context-journey.mjs'), preparedHook = await readFile(hookFile, 'utf8');
+ await writeFile(hookFile, 'export default async function () {}');
+ const absent = await verify();
+ assert.ok(absent.points.some(point => !point.ok && point.id.endsWith('.autonomous.aged-scheduled')));
+ // Use a distinct module URL so the native module loader sees the new hook.
+ await writeFile(join(root, 'prepared-journey.mjs'), preparedHook);
+ surface.verification.journey = 'prepared-journey.mjs';
+ await writeFile(surfaceFile, JSON.stringify(surface));
+ const prepared = await verify();
+ assert.equal(prepared.ok, true, JSON.stringify(prepared.points.filter(point => !point.ok)));
+ for (const phase of ['autonomous', 'held']) assert.ok(prepared.points.some(point => point.ok && point.id.endsWith(`.${phase}.aged-scheduled`)));
+ // Direct and trigger-mediated writes must roll back, retain no probe row,
+ // and return only a typed, redacted phase error.
+ await writeFile(join(root, 'forbidden-database.mjs'), `
+import assert from 'node:assert/strict';
+export default async function ({ database }) {
+ const db = await database('DB');
+ const before = (await db.prepare('SELECT * FROM agent_door_audit').all()).results;
+ for (const sql of ['UPDATE agent_door_audit SET tool=?', 'INSERT INTO fixture_history_probe(value) VALUES(?)']) {
+  await assert.rejects(async () => db.prepare(sql).bind('private_' + crypto.randomUUID()).run());
+ }
+ assert.deepEqual((await db.prepare('SELECT * FROM agent_door_audit').all()).results, before);
+ assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM fixture_history_probe').first()).n, 0);
+ await db.prepare('UPDATE agent_door_audit SET tool=?').bind('private_' + crypto.randomUUID()).run();
+}
+`);
+ surface.verification.fixtures = { module: 'forbidden-database.mjs' };
+ await writeFile(surfaceFile, JSON.stringify(surface));
+ report.length = 0;
+ const forbidden = await verify();
+ assert.ok(forbidden.points.some(point => !point.ok && point.id === 'BASE-AGENT-013.phase2' && point.detail?.startsWith('agent_fixtures_database_unavailable:')));
+ assert.doesNotMatch(report.join('\n'), /private_[a-f0-9-]+|UPDATE agent_door_audit|fixture_history_probe|operator_session=/);
+ await writeFile(join(root, 'forbidden-journey.mjs'), `
+export default async function () {}
+export async function beforeStep({ database }) {
+ const db = await database('DB');
+ await db.prepare('UPDATE agent_door_audit SET tool=?').bind('private_' + crypto.randomUUID()).run();
+}
+`);
+ surface.verification.fixtures = { module: 'context-fixtures.mjs' };
+ surface.verification.journey = 'forbidden-journey.mjs';
+ await writeFile(surfaceFile, JSON.stringify(surface));
+ report.length = 0;
+ const forbiddenStep = await verify();
+ assert.ok(forbiddenStep.points.some(point => !point.ok && point.id === 'BASE-AGENT-013.phase2' && point.detail?.startsWith('agent_fixtures_database_unavailable:')));
+ assert.doesNotMatch(report.join('\n'), /private_[a-f0-9-]+|UPDATE agent_door_audit|operator_session=/);
+
+ t.diagnostic(`native history: unprepared ${absent.points.filter(point => point.ok).length}/${absent.points.length}; prepared ${prepared.points.filter(point => point.ok).length}/${prepared.points.length}; direct/trigger protocol writes refused and rolled back.`);
 });

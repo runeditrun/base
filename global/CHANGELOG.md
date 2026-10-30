@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Share the guarded disposable host writer with isolated, named insert-only history fixtures. Refuse production reachability through imports, re-exports, aliases, symlinks and literal Worker URLs while retaining native phase preparation, scheduled work and queue holds.
+
+- Let disposable conformance fixtures age real native history, run the app’s scheduled handler, and hold queue deliveries through a tested step. Atomic write guards protect every agent-door table; owner initialization remains read-only and runtime clocks are unchanged.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.

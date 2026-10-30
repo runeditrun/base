@@ -609,33 +609,100 @@ Hooks cannot skip mandatory steps or alter the runner's arguments and outputs.
 Failed hooks fail the current phase with the same redacted diagnostic. A step
 that fails or yields no structured output does not receive `afterStep`.
 
-## Disposable history context
+## Disposable native preparation
 
-Phase preparation and native `beforeStep`/`afterStep` hooks receive the
-same `database(binding)` state reader as the owner initializer, plus `now`
-(the current verifier time in Unix milliseconds). For example:
+Phase fixtures and native `beforeStep`/`afterStep` hooks receive
+`database(binding)`, `now` (verifier Unix milliseconds),
+`scheduled({scheduledTime})`, and `queues.hold()`/`queues.release()`.
+The database supports SELECT and single native-table UPDATE, INSERT INTO and
+DELETE FROM statements through `prepare(sql).bind(...).run()/all()/first()`.
+Create real records through the app's doors; use writes only to age their
+native history. For example, after obtaining `db` and a real delivery ID:
 
 ```js
-export default async function ({ database, now }) {
- const db = await database('DB');
- const prior = await db.prepare('SELECT id FROM native_records WHERE created_at < ?')
-  .bind(now - 86_400_000).first();
- return { values: { prior } };
-}
+await db.prepare('UPDATE native_deliveries SET completed_at=? WHERE id=?').bind(now - 7_200_000, deliveryId).run();
+await scheduled({ scheduledTime: now });
 ```
 
-This context exists only in disposable conformance tooling; `rer dev` and
-`rer demo` do not receive it. Preparation runs afresh for each policy phase.
-Database refusals fail that phase with
-`agent_fixtures_database_unavailable`, without logging values, records or SQL.
-The reader remains SELECT-only, including for every `agent_door_*` table.
+`scheduled` runs the app Worker's own scheduled handler and waits for its
+work, without overriding its runtime clock. A queue hold delays entry into
+the app's real queue handler; release it in `afterStep` after native approval
+and the tested dispatch. Phase preparation releases any preceding hold;
+installation disposal also releases waiting deliveries. This allows a due
+approved step without rewriting approved content or approval evidence.
 
-Backdated writes are pending: `cli/hosted-output.mjs` currently rejects all
-non-SELECT statements. Enabling native history requires a separate, explicit
-conformance-only write capability at that boundary, with protection against
-direct and trigger-mediated writes to agent-door tables. Native HTTP calls must
-retain their genuine protocol receipts. A history hook must not change the
-runtime clock.
+Every write uses a disposable D1 transaction guarded against INSERT, UPDATE
+and DELETE on **all** `agent_door_*` tables, including native triggers and
+cascades. Schema, transaction and multiple statements are refused. Refusals
+fail the phase with `agent_fixtures_database_unavailable`; values, records
+and SQL are never included in diagnostics. Each policy phase prepares fresh
+values. These powers exist only in conformance tooling; the owner initializer
+retains its SELECT-only handle, and production, `rer dev` and `rer demo` do
+not receive them. `timedLifecycle` and `queuedLifecycle` remain **unscoped**
+capability names; this preparation boundary does not add lifecycle coverage.
+
+## Isolated declared native history
+
+A seed that needs pre-service history may separately declare a test-only
+`verification.history` module. It runs just before the named mandatory journey
+steps, under both `autonomous` and `held`, before native hooks and effect witnesses:
+
+```json
+{"verification":{"history":{
+  "module":"tests/history.mjs",
+  "steps":["learning"],
+  "statements":{"observation":{
+    "binding":"DB",
+    "sql":"INSERT INTO native_history(id,observed_at,value) VALUES (?,?,?)"
+  }}
+}}}
+```
+
+The Worker-compatible module default-exports `{async fetch(request) {...}}`.
+Its JSON request contains detached `{phase,step,args,outputs,now}`; it receives
+no cookies, credentials, database client or application bindings. For example:
+
+```js
+export default { async fetch(request) {
+ const { phase, now } = await request.json();
+ return Response.json([{statement:'observation',
+  values:[phase, now - 7 * 86_400_000, 12]}]);
+} };
+```
+
+Use the seed's native calculation code to construct genuine dated source rows,
+including the native forecast's pre-service timestamps, inputs and digest.
+Do not invent protocol receipts or successful proposal results. Declare steps
+before their history-dependent reads so the normal native digest, proposal,
+authority, policy and audit paths still run. The verifier never changes time.
+The seed's regular phase/step hooks may use the native person door to decide a
+previous round's open proposal; history tooling has no HTTP/person authority.
+
+Only `checkAgentDoor` (used by `rer verify` and focused conformance) starts this
+module. Like the network edge it runs in isolated workerd: contained `.mjs`/`.js`
+relative helpers, no Node imports, filesystem, application bindings or external
+network. The entry must live under `tests/`. Production commands (`build`, `dev`,
+`preview`, `deploy`) and conformance refuse runtime imports of its test modules
+from production source, including literal re-exports, TS path aliases, symlinks and literal Worker URL dependencies.
+Keep computed imports and custom loaders out of the production dependency graph.
+Shared native calculation helpers may still be used by production.
+
+Output is an array of `{statement,values}`, at most 1,000 rows / 2 MiB per call.
+Statements are named in the declaration, never supplied by module output. The
+only allowed SQL is `INSERT INTO table(columns) VALUES (...)`, with positional
+`?` parameters or fixed simple string/integer literals. No UPDATE, DELETE,
+upsert, query, expression, schema qualifier, comment or DDL is accepted. The
+verifier applies them only to declared bindings in its fresh, nonpersistent
+Miniflare database; no provider or existing installation database is opened.
+`agent_door_*`, `oa_*` and SQLite tables, views, virtual tables and every table
+with a trigger are refused, including triggers that could indirectly forge
+agent-door evidence. Rows are batched per database. Keep declarations narrow to
+native history, never account, session, policy, approval, audit or receipt state.
+Invalid declarations, output and writes fail with `agent_history_invalid` and
+redact SQL, rows and values. Owner initialization retains its SELECT-only `database(binding)` handle.
+Both preparation APIs use the same guarded disposable host writer; the isolated
+history declaration retains the stricter insert-only, trigger-free rules above.
+No declaration means no fixture Worker, writes or extra conformance points.
 
 ## Native clients and fresh phase fixtures
 
@@ -645,8 +712,8 @@ consumed by a previous policy round. Its default async function receives
 `{phase, request, origin, email, cookie, mail, fixtures, tool}`. The request
 function is restricted to the disposable installation; use the native owner
 session to issue clients, then their real credentials to create native records
-and retained operation receipts. No signer, writable database or production
-fixture route is supplied.
+and retained operation receipts. No signer or production fixture route is supplied; native writes use the
+guarded disposable preparation boundary above.
 
 Return `{values, clients, sponsors}` (each member is optional). `values` is an object of named phase-local JSON
 values. `clients` maps names to `{token, clientId, agent:{id,name,specialist}}`

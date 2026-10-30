@@ -20,6 +20,11 @@ import { withoutLocalSettings, refuseLocalEnvOutput } from './local-env.mjs';
 import { announceDoorRoute } from './door-mode.mjs';
 
 export async function runCommand(project, options, out) {
+ if (project.profile === 'first-party' && ['build', 'dev', 'preview', 'deploy'].includes(options.verb)) {
+  const { readAgentSurface } = await import('./agent-surface.mjs');
+  const surface = await readAgentSurface(project.root);
+  if (surface?.surface.verification?.history !== undefined) await (await import('./agent-history.mjs')).historyDeclaration(project.root, surface.surface.verification.history);
+ }
  if (options.verb === 'deploy' && !options.site && !options.demo) {
   const { validateDeployOptions } = await import('./deploy-command.mjs');
   validateDeployOptions(options);
