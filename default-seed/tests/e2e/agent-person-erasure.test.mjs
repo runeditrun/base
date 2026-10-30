@@ -25,9 +25,7 @@ async function restore(service, text) {
   return service.imports.finalize(id, { archiveHash: lines.at(-1).archiveHash })
 }
 
-// Real emitted Base Worker, native person erasure, signed agent proposals and D1.
-// Extend the existing built-Worker verification shard; no application test door.
-test('native person erasure redacts pending and approved agent proposals, retains receipts and isolates peers across replay and restore', { timeout: 180_000 }, async t => {
+async function fixture(t) {
   const keys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
   const issuer = 'https://agent-erasure.example.test', kid = 'agent-erasure', installationId = crypto.randomUUID(), ownerId = crypto.randomUUID()
   const runtime = await emittedRuntime({ noMail: true, files: true, bindings: {
@@ -52,6 +50,13 @@ test('native person erasure redacts pending and approved agent proposals, retain
     surface: JSON.parse(await readFile(new URL('../../agent-surface.json', import.meta.url), 'utf8')),
     signer: { issuer, kid, installationId, privateKey: keys.privateKey }, person: { sub: ownerId, email: owner, cookie },
     consent: crypto.randomUUID(), agentId: crypto.randomUUID(), business: 'agent-erasure-business', seq: 0, revision: 0, points: [] })
+  return { runtime, owned, c }
+}
+
+// Real emitted Base Worker, native person erasure, signed agent proposals and D1.
+// Extend the existing built-Worker verification shard; no application test door.
+test('native person erasure redacts pending and approved agent proposals, retains receipts and isolates peers across replay and restore', { timeout: 180_000 }, async t => {
+  const { runtime, owned, c } = await fixture(t)
   const marker = 'PersonalMarker' + crypto.randomUUID().replaceAll('-', '')
   const name = marker + ' Name', email = marker.toLowerCase() + '@example.test', sourceUserId = 'source-' + marker
   const target = await owned('/api/people', { name, email, details: { sourceUserId } })
@@ -184,4 +189,84 @@ test('native person erasure redacts pending and approved agent proposals, retain
     assert.equal((await owned(`/agents/api/approvals/${linkedId}`)).body.approval.code, 'subject_erased', 'whole source tokens still select linked proposals')
     t.diagnostic(`PROBE ISOLATION source=${JSON.stringify(source)}: peer proposal/call/audit/usage byte-identical; counts=${beforeCounts.join('/')} unchanged; bounded source mention redacted`)
   }
+})
+
+// Same native flow and verification registration. No identifier of the erased
+// person is present in these proposals: only the recorded people.name value.
+test('recorded names in proposal or audit free text erase with word boundaries and preserve peers', { timeout: 180_000 }, async t => {
+  const { runtime, owned, c } = await fixture(t)
+  const held = autonomousPolicy(); held.rules = [{ id: 'hold', class: '*', do: 'approval', approver: ['sponsor'], wait: 'PT1H' }]
+  await c.adopt(held)
+  const portability = await createPortability({ db: runtime.db, buckets: { FILES: await runtime.mf.getR2Bucket('FILES') }, policy: portabilityPolicy })
+  const retained = []
+  for (const name of ['Recorded Name ' + crypto.randomUUID(), 'a', 'Al', '1', 'Zoë', 'Name[*]?']) await t.test(JSON.stringify(name), async () => {
+    const target = await owned('/api/people', { name, email: crypto.randomUUID() + '@example.test', details: {} })
+    const peer = await owned('/api/people', { name: name + 'son', email: crypto.randomUUID() + '@example.test', details: {} })
+    assert.equal(target.status, 201); assert.equal(peer.status, 201)
+    const make = body => c.tool('base.people.note', { id: peer.body.id, body, idempotency_key: crypto.randomUUID() })
+    // The embedded hit comes first; punctuation and a JSON escape surround the
+    // real name. Names are literals, including regexp/LIKE/GLOB metacharacters.
+    const args = { id: peer.body.id, body: `Keep prefix${name}suffix; discuss \"${name}\".`, idempotency_key: crypto.randomUUID() }
+    const named = await c.tool('base.people.note', args), namedId = approvalId(named)
+    const auditOnly = await make('Non-personal audit-only proposal'), auditId = approvalId(auditOnly)
+    await runtime.db.prepare("UPDATE agent_door_audit SET evidence=json_set(evidence,'$.recorded_name',?) WHERE id=?").bind(`Discuss (${name}).`, auditOnly.decision.id).run()
+    const peerProposal = await make(`Keep ${name}son and ordinary words: Alpine, data, policy/1, revision 21, version 1.0, source-1234, ${name}é.`), peerId = approvalId(peerProposal)
+    await c.adopt(autonomousPolicy())
+    const peerExecuted = await make('Keep the executed peer note and reservation')
+    assert.equal(peerExecuted.result?.isError, false)
+    await c.adopt(held)
+    const peerDecisions = new Set([peerProposal.decision.id, peerExecuted.decision.id])
+    const snapshot = async () => {
+      const tables = ['agent_door_approvals', 'agent_door_calls', 'agent_door_audit', 'agent_door_usage']
+      return Promise.all(tables.map(async table => ({ table, rows: (await runtime.db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()).results })))
+    }
+    const before = await snapshot()
+    const peerRows = data => data.map(({ table, rows }) => ({ table, rows: rows.filter(row => table === 'agent_door_approvals' ? row.id === peerId : peerDecisions.has(row.decision_id ?? row.id)) }))
+    const peerBytes = JSON.stringify(peerRows(before))
+    const counts = before.map(({ rows }) => rows.length)
+    assert.ok(peerRows(before).find(item => item.table === 'agent_door_usage').rows.length > 0, 'the peer has a real usage reservation')
+    const auditSequence = before.find(item => item.table === 'agent_door_audit').rows.map(row => [row.sequence, row.id, row.at, row.agent])
+    const proposalRows = before.find(item => item.table === 'agent_door_approvals').rows.filter(row => [namedId, auditId].includes(row.id))
+    assert.ok(proposalRows.every(row => !row.saved.includes(target.body.id)), 'no native identifier links select the name-only proposals')
+    assert.equal(JSON.parse(proposalRows.find(row => row.id === auditId).saved).args.body, 'Non-personal audit-only proposal', 'the second proposal has no name in its free-text content')
+    const oldArchive = await archive(portability)
+    const result = await owned(`/api/people/${target.body.id}/erasure`, { confirmation: `erase ${target.body.id}` })
+    assert.equal(result.status, 200, JSON.stringify(result.body)); assert.equal(result.body.receipt.phase, 'complete')
+    const after = await snapshot()
+    assert.equal(JSON.stringify(peerRows(after)), peerBytes, 'peer proposal, call, audit content and usage reservations are byte-identical')
+    assert.deepEqual(after.map(({ rows }) => rows.length), counts, 'all proposal, call, audit and usage counts stay intact')
+    assert.deepEqual(after.find(item => item.table === 'agent_door_audit').rows.map(row => [row.sequence, row.id, row.at, row.agent]), auditSequence)
+    const stubs = after.find(item => item.table === 'agent_door_approvals').rows.filter(row => [namedId, auditId].includes(row.id))
+    const redacted = stubs.filter(row => JSON.parse(row.saved).tombstone).length
+    t.diagnostic(`PROBE NAME ${JSON.stringify(name)}: personal proposal/audit payloads 2 -> ${2 - redacted}; peer byte-identical; counts ${counts.join('/')} -> ${after.map(item => item.rows.length).join('/')}`)
+    for (const row of stubs) {
+      const old = JSON.parse(proposalRows.find(item => item.id === row.id).saved), saved = JSON.parse(row.saved)
+      assert.ok(saved.tombstone, 'name-only content selects the existing redaction stub')
+      assert.equal(saved.expires_at, old.expires_at); assert.equal(row.state, 'held')
+      assert.equal(saved.agent.id, old.principal.agent.id); assert.equal(saved.outcome, 'held')
+      assert.equal(saved.summary, undefined); assert.equal(saved.args, undefined)
+      const view = await owned(`/agents/api/approvals/${row.id}`)
+      assert.equal(view.body.approval.code, 'subject_erased'); assert.deepEqual(view.body.approval.summary, {})
+      assert.equal((await owned(`/agents/api/approvals/${row.id}/approve`, {})).status, 409)
+    }
+    const auditRows = after.find(item => item.table === 'agent_door_audit').rows.filter(row => [named.decision.id, auditOnly.decision.id].includes(row.id))
+    assert.equal(auditRows.length, 2); assert.ok(auditRows.every(row => row.evidence === null && JSON.parse(row.row).tombstone))
+    const replay = await runtime.call('/mcp', { method: 'POST', headers: {
+      authorization: `Bearer ${await accessToken(c)}`, 'mcp-protocol-version': '2026-07-28',
+      'mcp-method': 'tools/call', 'mcp-name': 'base.people.note',
+    }, input: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'base.people.note', arguments: args,
+      _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': { elicitation: { url: {} } } } } } })
+    assert.equal(errorCode(await replay.json()), 'subject_erased')
+    await assert.rejects(restore(portability, oldArchive), error => error.status === 400 && /erasure_epoch/.test(error.message))
+    retained.push(...stubs)
+  })
+  const cleanArchive = await archive(portability)
+  const destination = await emittedRuntime({ noMail: true, files: true }); t.after(() => destination.close())
+  const clean = await createPortability({ db: destination.db, buckets: { FILES: await destination.mf.getR2Bucket('FILES') }, policy: portabilityPolicy })
+  await restore(clean, cleanArchive)
+  const restored = (await destination.db.prepare('SELECT * FROM agent_door_approvals ORDER BY rowid').all()).results
+  for (const row of retained) assert.deepEqual(restored.find(item => item.id === row.id), row, 'clean export/restore retains only the non-personal stub')
+  const restoredAudits = (await destination.db.prepare('SELECT * FROM agent_door_audit WHERE evidence IS NULL').all()).results
+  assert.equal(restoredAudits.filter(row => JSON.parse(row.row).tombstone).length, retained.length)
+  t.diagnostic(`PROBE NAME RESTORE: ${retained.length} non-personal proposal and audit stubs preserved; older archives HTTP 400 erasure_epoch`)
 })
