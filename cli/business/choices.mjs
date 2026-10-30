@@ -1,8 +1,8 @@
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import { installService, removeService } from './service.mjs';
 import { installPermissions, removePermissions } from './permissions.mjs';
 import { saveState } from './state.mjs';
-import { carryLive } from './carry.mjs';
+import { carryCheckIn } from './carry.mjs';
 import { businessCommand } from './invocation.mjs';
 import { describe } from './errors.mjs';
 
@@ -55,7 +55,7 @@ export async function applyChoices(api, state, { reconnecting = false } = {}) {
  // nothing is decided yet. On a new computer this first request activates it.
  try { self = await api.get('/api/business/executors/self'); }
  catch (error) { if (![403, 404].includes(error.status)) throw error; }
- const carried = await carryLive(state, self);
+ const carried = await carryCheckIn(state, self);
  const decided = Object.fromEntries(names.map(name => [name, typeof self?.optIns?.[name] === 'boolean' ? self.optIns[name] : null]));
  // The agent this computer reported when it paired, as the owner's browser words its choices:
  // the Claude Code rules apply only to Claude Code. An unknown agent (no route yet) decides nothing.
@@ -89,9 +89,14 @@ export async function applyChoices(api, state, { reconnecting = false } = {}) {
  if (undecided.length) {
   once(`undecided:${undecided.join()}`, `The owner has not chosen yet:\n${undecided.map(name => `  - ${choices[name]}\n`).join('')}They choose on this computer's row in ${state.origin}/business/${encodeURIComponent(state.businessId)}/settings; the run and next commands apply the choices at their next check-in, ${reconnecting ? 'without pairing again' : 'so connect does not need to run again'}.\n`);
  }
- once('choices-next-step', `After choosing this computer's apps or settings in Business, run ${businessCommand('next')} to apply them and see the next task.\n`);
- if (carried) once(`carry:${JSON.stringify(carried)}`, carried.checkouts.length
-  ? carried.checkouts.map(checkout => `Wrote the Business name ${JSON.stringify(carried.name)} to ${join(checkout, '.rer/local/business.json')}; ${JSON.stringify(basename(checkout))} shows it after it reads that file.\n`).join('')
-  : `No local app carry files were written for ${JSON.stringify(carried.name)}.\n`);
+ once('choices-next-step', `After choosing this computer's permissions in Business, run ${businessCommand('next')} to apply them and see the next task.\n`);
+ if (carried) {
+  const count = carried.checkouts.length;
+  process.stdout.write(count
+   ? `Refreshed ${count} local app carry ${count === 1 ? 'file' : 'files'} for ${JSON.stringify(carried.name)}:\n${carried.checkouts.map(checkout => `  - ${join(checkout, '.rer/local/business.json')}\n`).join('')}Supporting apps apply these values when they read their carry file.\n`
+   : `No local app carry files changed for ${JSON.stringify(carried.name)}.\n`);
+  for (const checkout of carried.unchanged) process.stdout.write(`Already current: ${join(checkout, '.rer/local/business.json')}\n`);
+  if (carried.failed) process.stdout.write(`${carried.failed} local app carry ${carried.failed === 1 ? 'file could' : 'files could'} not be refreshed; see the carry warnings.\n`);
+ }
  return { applied: lines.length, serviceInstalled };
 }

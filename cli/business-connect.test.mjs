@@ -4,7 +4,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
 import { door } from './fixtures/business/door.mjs';
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile, symlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
@@ -86,28 +86,60 @@ test('Business verb help explains each command without pairing or reading a sess
  assert.deepEqual(await readdir(home), [], 'help creates no pairing or credentials');
 });
 
-test('Business check-ins report a carry file without claiming an unread app changed its settings', async t => {
+test('Business check-ins refresh stopped and live carry files, preserve app settings and report actual changes', async t => {
  const remote = await fixtureServer(t), home = join(directory, 'unread-carry-home');
- const checkout = join(home, 'scratch-app'), registry = join(home, 'registry');
- await mkdir(checkout, { recursive: true }); await mkdir(registry);
- await writeFile(join(checkout, 'OPERATIONS.json'), JSON.stringify({ version: 2, seedContract: { profile: 'first-party' } }));
- const settings = join(checkout, 'settings.json'), original = JSON.stringify({ name: 'Original app name' });
- await writeFile(settings, original);
+ const checkout = join(home, 'scratch-app'), live = join(home, 'live-app'), registry = join(home, 'registry');
+ const carryFile = root => join(root, '.rer/local/business.json');
+ for (const root of [checkout, live]) {
+  await mkdir(root, { recursive: true });
+  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, seedContract: { profile: 'first-party' } }));
+  await writeFile(join(root, 'settings.json'), JSON.stringify({ name: 'Owner app name', accent: '#123456' }));
+ }
+ await mkdir(registry);
+ const settings = await readFile(join(checkout, 'settings.json'), 'utf8');
  const owner = await identity(); t.after(() => owner.close());
- await writeFile(join(registry, 'state.json'), JSON.stringify({ running: [{ checkout, mode: 'dev', owner: owner.info }] }));
+ const register = roots => writeFile(join(registry, 'state.json'), JSON.stringify({ running: roots.map(checkout => ({ checkout, mode: 'dev', owner: owner.info })) }));
  const env = { RER_SERVERS_DIR: registry };
+ await register([checkout, live]);
+ const unpaired = await cli(home, ['business', 'next'], { env });
+ assert.equal(unpaired.code, 1);
+ for (const root of [checkout, live]) await assert.rejects(stat(carryFile(root)), { code: 'ENOENT' });
+ // connect and browser approval are the existing opt-in to carry; the three
+ // independent computer permissions do not decide Business profile sharing.
+ remote.state.optIns = { installPermissions: false, awakeConsent: false, installService: false };
  const paired = await connect(home, remote, { env });
- for (const [command, result] of [
-  ['connect', paired],
-  ['next', await cli(home, ['business', 'next'], { env })],
-  ['run --once', await cli(home, ['business', 'run', '--once'], { env })],
- ]) {
-  t.diagnostic(`rer business ${command}\n${result.stdout}`);
+ assert.ok(paired.stdout.includes('2 local app carry files'), paired.stdout);
+ await register([live]); // The first checkout is stopped, but custody remains in carried.json.
+ const first = await readFile(carryFile(checkout), 'utf8');
+ for (const args of [['next'], ['run', '--once']]) {
+  remote.state.business = { ...remote.state.business, name: `synthetic-base-${args[0]}`, brand_color: args[0] === 'next' ? '#AABBCC' : '#112233', logo_url: 'https://example.test/logo.png' };
+  const result = await cli(home, ['business', ...args], { env });
+  t.diagnostic(`rer business ${args.join(' ')}\n${result.stdout}`);
   assert.equal(result.code, 0, result.stderr);
+  assert.ok(result.stdout.includes('2 local app carry files'), result.stdout);
   assert.doesNotMatch(result.stdout + result.stderr, /now show/i);
-  assert.ok(result.stdout.includes(join(checkout, '.rer/local/business.json')), result.stdout);
-  assert.equal(await readFile(settings, 'utf8'), original, 'the app does not read the carry file');
-  assert.equal(JSON.parse(await readFile(join(checkout, '.rer/local/business.json'), 'utf8')).name, remote.state.business.name);
+  for (const root of [checkout, live]) {
+   assert.ok(result.stdout.includes(carryFile(root)), result.stdout);
+   const carried = JSON.parse(await readFile(carryFile(root), 'utf8'));
+   assert.deepEqual([carried.name, carried.accent, carried.logo_url], [remote.state.business.name, remote.state.business.brand_color.toLowerCase(), remote.state.business.logo_url]);
+   assert.equal(await readFile(join(root, 'settings.json'), 'utf8'), settings, 'app-owned and user-edited settings are preserved');
+   assert.equal((await stat(carryFile(root))).mode & 0o777, 0o600);
+  }
+ }
+ assert.notEqual(await readFile(carryFile(checkout), 'utf8'), first);
+ const current = new Map(await Promise.all([checkout, live].map(async root => [root, await readFile(carryFile(root), 'utf8')])));
+ for (const args of [['next'], ['run', '--once'], ['run', '--once']]) {
+  const result = await cli(home, ['business', ...args], { env });
+  assert.equal(result.code, 0, result.stderr);
+  assert.ok(result.stdout.includes('No local app carry files changed'), result.stdout);
+  assert.ok(!result.stdout.includes('Refreshed ') && !result.stdout.includes('Wrote '), result.stdout);
+  for (const root of [checkout, live]) assert.equal(await readFile(carryFile(root), 'utf8'), current.get(root), 'no-change check-ins preserve bytes and refreshed_at');
+ }
+ assert.equal((await cli(home, ['business', 'disconnect'], { env })).code, 0);
+ assert.equal((await cli(home, ['business', 'next'], { env })).code, 1);
+ for (const root of [checkout, live]) {
+  await assert.rejects(stat(carryFile(root)), { code: 'ENOENT' });
+  assert.equal(await readFile(join(root, 'settings.json'), 'utf8'), settings, 'opting out removes only carry');
  }
 });
 
@@ -467,6 +499,45 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
  remote.state.business = { id: 'biz', name: 'synthetic-base-2', legal_name: null, brand_color: '#264F45', logo_url: 'https://example.test/logo.png' };
  assert.equal((await cli(home, ['business','connect'], { env })).code, 0);
  const finalCarry = await proof(checkout);
+ // A recorded path alone is not authority: recheck eligibility, the fixed
+ // carry location, and this Business's generated document before refreshing.
+ await register([]);
+ const invalid = Object.fromEntries(['missing', 'removed-carry', 'foreign', 'unrelated', 'repurposed', 'unreadable', 'linked', 'linked-root'].map(name => [name, join(work, name)]));
+ for (const [name, root] of Object.entries(invalid)) {
+  if (['missing', 'linked-root'].includes(name)) continue;
+  await mkdir(join(root, '.rer/local'), { recursive: true });
+  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, seedContract: { profile: 'first-party' } }));
+  if (name !== 'removed-carry') await writeFile(carryFile(root), finalCarry);
+ }
+ const foreign = { ...JSON.parse(finalCarry), business_id: 'synthetic-foreign', business_url: remote.origin + '/business/synthetic-foreign' };
+ await writeFile(carryFile(invalid.foreign), JSON.stringify(foreign));
+ await writeFile(carryFile(invalid.unrelated), JSON.stringify({ name: 'Owner setting', accent: '#abcdef', custom: true }));
+ await writeFile(join(invalid.repurposed, 'OPERATIONS.json'), JSON.stringify({ version: 2 }));
+ await rm(join(invalid.unreadable, 'OPERATIONS.json')); await mkdir(join(invalid.unreadable, 'OPERATIONS.json'));
+ await rm(join(invalid.linked, '.rer'), { recursive: true }); await symlink(join(invalid.unrelated, '.rer'), join(invalid.linked, '.rer'), 'dir');
+ await symlink(invalid.unrelated, invalid['linked-root'], 'dir');
+ const kept = new Map(await Promise.all(['foreign', 'unrelated', 'repurposed', 'unreadable'].map(async name => [name, await readFile(carryFile(invalid[name]), 'utf8')])));
+ const custody = [checkout, ...Object.values(invalid), 'relative-path'];
+ await writeFile(join(stateDir, 'carried.json'), JSON.stringify(custody));
+ // name/accent inside this generated file are carry-owned under the existing
+ // writer semantics. Native app settings are asserted separately above.
+ await writeFile(carryFile(checkout), JSON.stringify({ ...JSON.parse(finalCarry), name: 'Edited carry cache', accent: '#aabbcc' }));
+ remote.state.business.name = 'synthetic-base-current';
+ const isolated = await cli(home, ['business', 'next'], { env });
+ assert.equal(isolated.code, 0, isolated.stderr);
+ assert.ok(isolated.stdout.includes('1 local app carry file for'), isolated.stdout);
+ assert.ok(isolated.stdout.includes(carryFile(checkout)), isolated.stdout);
+ assert.equal(JSON.parse(await readFile(carryFile(checkout), 'utf8')).name, remote.state.business.name);
+ assert.equal(JSON.parse(await readFile(carryFile(checkout), 'utf8')).accent, '#264f45');
+ for (const root of Object.values(invalid)) assert.ok(isolated.stderr.includes(JSON.stringify(root)), isolated.stderr);
+ assert.ok(isolated.stderr.includes('relative-path'), isolated.stderr);
+ for (const [name, bytes] of kept) assert.equal(await readFile(carryFile(invalid[name]), 'utf8'), bytes, `${name} is untouched`);
+ for (const name of ['missing', 'removed-carry']) await assert.rejects(stat(carryFile(invalid[name])), { code: 'ENOENT' });
+ const unchanged = await cli(home, ['business', 'run', '--once'], { env });
+ assert.equal(unchanged.code, 0, unchanged.stderr);
+ assert.ok(unchanged.stdout.includes('No local app carry files changed') && !unchanged.stdout.includes('Refreshed '), unchanged.stdout);
+ t.diagnostic('recorded stopped carry refreshed; missing/removed/foreign/unrelated/repurposed/unreadable/linked/relative paths refused independently; app and unrelated bytes preserved');
+ await writeFile(join(stateDir, 'carried.json'), JSON.stringify([checkout]));
  // One recorded checkout is no longer live. The other live checkout was never recorded.
  await mkdir(join(live, '.rer/local'), { recursive: true, mode: 0o700 });
  await writeFile(carryFile(live), finalCarry, { mode: 0o600 });
