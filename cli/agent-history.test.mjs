@@ -54,6 +54,29 @@ test('history stays outside production commands and production imports are refus
  assert.deepEqual(outcomes, Array(9).fill(true));
 });
 
+test('production Workers and URL assets cannot reference verification history', { timeout: 120000 }, async t => {
+ const { root } = await seed(t), outcomes = [];
+ await writeFile(join(root, 'native.mjs'), 'export default {};');
+ await writeFile(join(root, 'production.mjs'), `
+ // new Worker(new URL('./tests/history.mjs', import.meta.url))
+ const example = "new URL('./tests/history.mjs', import.meta.url)";
+ export const worker = new Worker(new URL('./native.mjs', import.meta.url), {type:'module'});
+ export const asset = new URL('./tests/history.mjs', 'https://example.com/');`);
+ outcomes.push(Boolean(await historyDeclaration(root, declaration())));
+ await writeFile(join(root, 'tests/bridge.mjs'), "new Worker(new URL('./history.mjs', import.meta.url), {type:'module'});");
+ for (const code of [
+  "new Worker(new URL('./tests/history.mjs', import.meta.url), {type:'module'});",
+  "new SharedWorker(new URL('./tests/history.mjs', import.meta.url), {type:'module'});",
+  "export const asset = new URL('./tests/history.mjs?raw#history', import.meta.url);",
+  "import './tests/bridge.mjs';",
+ ]) {
+  await writeFile(join(root, 'production.mjs'), code);
+  outcomes.push(await runCommand({ root, profile: 'first-party' }, { verb: 'build' }, {}).then(() => false,
+   error => error.code === 'agent_history_invalid' && error.message.includes('tests/history.mjs')));
+ }
+ assert.deepEqual(outcomes, Array(5).fill(true));
+});
+
 test('history inserts only into disposable declared databases and cannot forge protocol state', { timeout: 240000 }, async t => {
  const { root, file, surface } = await seed(t), outcomes = [];
  const phases = [];

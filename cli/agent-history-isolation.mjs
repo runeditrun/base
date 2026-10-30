@@ -4,9 +4,13 @@ import { join, relative, resolve } from 'node:path';
 import { testSource } from '../composition/git-source.mjs';
 import { dependencies } from '../edition-authoring/module-edges.mjs';
 import { resolve as resolveModule } from '../edition-authoring/module-resolution.mjs';
+import { RerError } from './errors.mjs';
+
+const productionHistory = (name, target = name) => new RerError('agent_history_invalid', `agent_history_invalid: Production file ${name} references verification-only history module ${target}.`, 1);
 
 // Check runtime import edges without executing test code. Scan source as well as
-// unbundled output, following literal imports/re-exports, TS paths and symlinks.
+// unbundled output, following literal imports/re-exports, import.meta.url
+// resources (including Workers), TS paths and symlinks.
 // Shared native helpers remain usable by production; only the fixture's tests/
 // modules are barred. An undeclared seed performs no additional scan.
 export async function refuseHistoryImports(root, source) {
@@ -43,8 +47,8 @@ export async function refuseHistoryImports(root, source) {
   const name = queue.shift();
   if (seen.has(name)) continue;
   seen.add(name);
-  if (forbidden.has(physical.get(name))) throw Error('History module is production source');
-  for (const request of dependencies(await readFile(join(root, name), 'utf8'), name).filter(request => !request.types)) {
+  if (forbidden.has(physical.get(name))) throw productionHistory(name);
+  for (const request of dependencies(await readFile(join(root, name), 'utf8'), name, {resources: true}).filter(request => !request.types)) {
    const candidates = [request.specifier];
    for (const [alias, targets] of Object.entries(paths)) {
     const [prefix, suffix = ''] = alias.split('*');
@@ -55,7 +59,7 @@ export async function refuseHistoryImports(root, source) {
    for (const specifier of candidates) {
     const target = resolveModule(tree, name, specifier, request);
     if (typeof target === 'string') {
-     if (forbidden.has(physical.get(target))) throw Error('History module is reachable from production');
+     if (forbidden.has(physical.get(target))) throw productionHistory(name, target);
      if (/\.[cm]?[jt]sx?$/.test(target)) queue.push(target);
     }
    }

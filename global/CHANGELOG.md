@@ -2,7 +2,7 @@
 
 ## 0.2.94
 
-- Integrated inputs: hist-1 (isolated proposal-history fixtures), injkey-1 (injection admission identity), migdir-2 (native migration directory packaging), sponsor-1 (recipient-scoped sponsor initialization mail), and hostedpub-1 (required public inputs in hosted verification).
+- Integrated inputs: hist-1/hist-3 (isolated proposal-history fixtures, including Worker and URL-resource isolation), injkey-1 (injection admission identity), migdir-2 (native migration directory packaging), sponsor-1 (recipient-scoped sponsor initialization mail), and hostedpub-1 (required public inputs in hosted verification).
 
 - Supply required declared public inputs only inside hosted-output verification, using setup defaults and disposable stand-ins when unset. Preserve configured public values and leave optional integrations unconfigured; deployment declarations and built artifacts are unchanged.
 
@@ -11,6 +11,8 @@
 - Package deploy migrations from the seed's declared `DB.migrations_dir`, sharing the native archive lookup; undeclared seeds retain `migrations/core` and their existing package bytes.
 
 - Reuse the original admission key when resolving agent-door injection arguments, so once-only native preparation is replayed without a second effect.
+
+- Follow literal import.meta.url resources, including Worker and SharedWorker URLs, when refusing production references to declared history fixtures; keep authoring module-import closure unchanged.
 
 - Let seeds declare an isolated, test-only history fixture before named agent-door journey steps. Only allowlisted INSERT statements reach fresh disposable databases; protected tables and target triggers are refused, production imports fail closed, and the normal state reader and clock remain unchanged.
 
