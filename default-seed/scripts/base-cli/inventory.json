@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.91-dev.g88951629",
+  "cliVersion": "0.2.91",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,7 +391,7 @@
     },
     "cli/agent-door.mjs": {
       "source": "cli/agent-door.mjs",
-      "sha256": "1dc5b77b9f6db1a91106291bebc01e3dd86672b0650aaf17ea461b86947791e3"
+      "sha256": "9491660f6cd82d92761e65e1126540ce421eeadf36b53afaf8bfbe13813786ad"
     },
     "cli/agent-fixtures.mjs": {
       "source": "cli/agent-fixtures.mjs",
@@ -403,7 +403,7 @@
     },
     "cli/agent-journey-fixtures.mjs": {
       "source": "cli/agent-journey-fixtures.mjs",
-      "sha256": "ed99c32c72d8a78bb01a586ee739f306ea077403b196c106995b1a1e2c440b45"
+      "sha256": "64be3180eefb5370978994aa6a3de739101dcc58aa3a24799651223f88fdb9b1"
     },
     "cli/agent-mail.mjs": {
       "source": "cli/agent-mail.mjs",
@@ -943,7 +943,7 @@
     },
     "cli/hosted-output.mjs": {
       "source": "cli/hosted-output.mjs",
-      "sha256": "e142523daaaabb76a46325fff06091199817d7992388a9336ac1ef68f761b1d1"
+      "sha256": "29948ce5929a2d03c2cda29c822b45f937cf179d31fccf03496e8bb03019fb5a"
     },
     "cli/human-error.mjs": {
       "source": "cli/human-error.mjs",
