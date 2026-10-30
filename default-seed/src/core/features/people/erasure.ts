@@ -1,3 +1,4 @@
+import { erasePersonAgentArtifacts } from '../../../agent-door/erasure'
 import { createErasure, defineErasure, toD1Sql } from '../../../../../modules/erasure/index.mjs'
 import { createPortability } from '../../../../../modules/portability/index.mjs'
 import { portabilityPolicy } from '../../platform/portability-policy.mjs'
@@ -24,9 +25,12 @@ export const personErasure = defineErasure({
   },
 })
 
-export async function peopleErasure(db: D1Database, files: R2Bucket) {
+export async function peopleErasure(db: D1Database, files: R2Bucket, secret?: string) {
   const portability = await createPortability({ db, buckets: { FILES: files }, policy: portabilityPolicy })
-  return createErasure({ db, buckets: { FILES: files }, portability, declarations: [personErasure] })
+  return createErasure({ db, buckets: { FILES: files }, portability, declarations: [secret ? defineErasure({ ...personErasure, async beforeStatements({ subject, operation }) {
+    if (!operation) throw new Error('erasure_operation_required')
+    return erasePersonAgentArtifacts(db, secret, { id: String(subject.id) }, { erasure_id: operation.id, at: operation.at })
+  } }) : personErasure] })
 }
 
 /** Portability's redaction checkpoint, as import-kit statements. The batch that

@@ -16,20 +16,20 @@ export async function personExists(db: D1Database, id: string) {
   return Boolean(await db.prepare('SELECT 1 FROM people WHERE id=?').bind(id).first())
 }
 
-export async function createPerson(db: D1Database, actor: string, input: PersonInput) {
+export async function createPerson(db: D1Database, actor: string, input: PersonInput, operationId?: string) {
   const id = newUlid()
   await db.batch([
     db.prepare('INSERT INTO people(id,name,email,details,created_at) VALUES(?,?,?,?,?)').bind(id, input.name, input.email, JSON.stringify(input.details), now()),
-    auditStatement(db, actor, 'person.created', 'person', id, { name: input.name, email: input.email }),
+    auditStatement(db, actor, 'person.created', 'person', id, { name: input.name, email: input.email, ...(operationId ? { operationId } : {}) }),
   ])
   return id
 }
 
-export async function addNote(db: D1Database, actor: string, personId: string, body: string) {
+export async function addNote(db: D1Database, actor: string, personId: string, body: string, operationId?: string) {
   const id = newUlid()
   await db.batch([
     db.prepare('INSERT INTO person_notes(id,person_id,body,created_at) VALUES(?,?,?,?)').bind(id, personId, body, now()),
-    auditStatement(db, actor, 'note.added', 'note', id, { excerpt: body.slice(0, 80) }),
+    auditStatement(db, actor, 'note.added', 'note', id, { excerpt: body.slice(0, 80), ...(operationId ? { operationId } : {}) }),
   ])
   return id
 }

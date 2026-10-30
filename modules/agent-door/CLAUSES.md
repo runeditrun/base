@@ -7,6 +7,15 @@ requirements proves no implementation. New Status rows start missing; later
 syncs retain the seed's status, evidence and gap, including a newer judgment.
 MCP method names below use spaced slashes; wire names omit those spaces.
 
+Native subject erasure under BASE-DATA-003 overrides the personal fields and
+payload replay described in BASE-AGENT-009 and BASE-AGENT-012. Keep value-free
+decision fields and the existing audit sequence plus the native erasure
+tombstone; replay refuses without executing or echoing erased payload.
+Installation-private keyed legacy replay aliases replace erased personal keys
+for the existing indefinite replay lifetime and never enter archives or exports.
+The adoption guide defines the map, native transaction and restore custody.
+This clarification does not promote any clause judgment.
+
 ## Target clauses
 
 ### Agent surface (Base-delivered)
