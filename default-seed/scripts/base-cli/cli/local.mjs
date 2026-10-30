@@ -128,5 +128,5 @@ export async function refuseLegacyProcess(project,{reset=false,verb='dev',operat
   }
   return {lockProof:true};
  }
- if(conflict)throw refuse(`A local process holds ${conflict.reason}: PID ${conflict.pid} (${conflict.command}). Stop it with kill -TERM ${conflict.pid}, then retry. Use rer dev --stop or rer preview --stop for a registered server.`);
+ if(conflict)throw refuse(`A local process holds ${conflict.reason}: PID ${conflict.pid} (${conflict.command}). Close the program holding it, then retry.`);
 }

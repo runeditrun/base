@@ -1,4 +1,4 @@
-import { basename } from 'node:path';
+import { basename, join } from 'node:path';
 import { installService, removeService } from './service.mjs';
 import { installPermissions, removePermissions } from './permissions.mjs';
 import { saveState } from './state.mjs';
@@ -91,7 +91,7 @@ export async function applyChoices(api, state, { reconnecting = false } = {}) {
  }
  once('choices-next-step', `After choosing this computer's apps or settings in Business, run ${businessCommand('next')} to apply them and see the next task.\n`);
  if (carried) once(`carry:${JSON.stringify(carried)}`, carried.checkouts.length
-  ? `Apps on this computer now show ${JSON.stringify(carried.name)}: ${carried.checkouts.map(checkout => JSON.stringify(basename(checkout))).join(', ')}.\n`
-  : `No apps on this computer were updated to show ${JSON.stringify(carried.name)}.\n`);
+  ? carried.checkouts.map(checkout => `Wrote the Business name ${JSON.stringify(carried.name)} to ${join(checkout, '.rer/local/business.json')}; ${JSON.stringify(basename(checkout))} shows it after it reads that file.\n`).join('')
+  : `No local app carry files were written for ${JSON.stringify(carried.name)}.\n`);
  return { applied: lines.length, serviceInstalled };
 }
