@@ -116,6 +116,8 @@ test('an admitted completion cannot overwrite a tombstone or append late persona
   const r = await fixture(t), id = 'racing-subject-' + crypto.randomUUID()
   await r.adopt(autonomousPolicy())
   await r.tool('records.write', { id, value: id, idempotency_key: id })
+  const nativeHorizon = r.c.now + 60_000
+  await r.db.prepare('UPDATE agent_door_calls SET expires_at=? WHERE key=?').bind(nativeHorizon, id).run()
   const original = await r.db.prepare('SELECT row,evidence FROM agent_door_audit ORDER BY sequence DESC LIMIT 1').first<any>()
   const originalRow = JSON.parse(original.row)
   const statements = await agentErasureStatements({ db: r.db, map: personAgentArtifacts, subject: { values: JSON.stringify([id]) }, secret: r.secret,
@@ -124,6 +126,7 @@ test('an admitted completion cannot overwrite a tombstone or append late persona
   await assert.rejects(r.db.batch(statements))
   assert.equal(await r.db.prepare('SELECT count(*) n FROM agent_door_replay_aliases').first('n'), 0, 'no partial alias publication')
   const opened = await r.erasure.start('record', { id }); await r.erasure.run(opened.id)
+  assert.equal(await r.db.prepare('SELECT expires_at FROM agent_door_calls WHERE decision_id=?').bind(originalRow.id).first('expires_at'), nativeHorizon, 'an existing shorter replay horizon survives erasure')
   const { audit } = await import('../audit.ts'), { appendEvents } = await import('../events.ts')
   const rt = { options: { db: r.db }, now: Date.now } as any
   await audit(rt, originalRow, JSON.parse(original.evidence))
