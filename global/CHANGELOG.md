@@ -2,6 +2,8 @@
 
 ## 0.2.94
 
+- Retain native continuation identity and current policy evidence in private audit when an identity-matched originating operation is still running; keep the operation_mismatch response and execution refusal unchanged.
+
 - Admit explicitly declared agent-verification public hosts from the selected deployment's hostname variables, preserving their URL and Host through disposable ingress while refusing undeclared hosts. One-host verification keeps its existing origin.
 
 - Contract document generation can verify a committed historical anchor record in snapshots and shallow checkouts. Missing history without a record and tampered records still refuse; full-history checkouts need no record.

@@ -16,7 +16,8 @@ import type { ToolDefinition } from './types.ts'
 import { nativeTarget } from './target.ts'
 import { nativeProof } from './native-proof.ts'
 import { narrowPrincipal } from './principal.ts'
-import { continuationItem, operationKey, resumeOperation } from './operation.ts'
+import { continuationItem, operationKey, resumeOperation, UnfinishedOperation } from './operation.ts'
+import { auditUnfinishedContinuation } from './continuation-audit.ts'
 
 export interface PipelineAnswer { result: CallResult; status?: number; scope?: string }
 export async function callTool(rt: Runtime, name: string, input: unknown, principal: Principal, door: ToolContext['door'], trace?: unknown, resourceTool?: ToolDefinition, requestState?: unknown, proofReference?: unknown, operationId?: string): Promise<PipelineAnswer> {
@@ -39,7 +40,12 @@ export async function callTool(rt: Runtime, name: string, input: unknown, princi
     row.ignored_arguments = Object.keys(raw ?? {}).filter(key => !Object.hasOwn(properties, key)).sort()
     const key = !tool.readOnly && typeof raw?.idempotency_key === 'string' && raw.idempotency_key.length > 0 && raw.idempotency_key.length <= 200 && !raw.idempotency_key.includes('\0') ? raw.idempotency_key : null
     row.idempotency_key = key
-    const operation = operationId === undefined ? undefined : await resumeOperation(rt, operationId, principal, key)
+    let operation: Awaited<ReturnType<typeof resumeOperation>> | undefined
+    try { operation = operationId === undefined ? undefined : await resumeOperation(rt, operationId, principal, key) }
+    catch (cause) {
+      if (cause instanceof UnfinishedOperation) evidence = await auditUnfinishedContinuation(rt, row, tool, declared, principal, door)
+      throw cause
+    }
     const approvers = operation?.approvers ?? []
     principal = operation?.principal ?? principal
     const current = await narrowPrincipal(rt, principal)
