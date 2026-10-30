@@ -1979,7 +1979,7 @@
     },
     "modules/agent-door/conformance/audit.mjs": {
       "source": "modules/agent-door/conformance/audit.mjs",
-      "sha256": "77d720ebb0c8d2fdc8ef60f59cb24b36dc378e34f11ed0c5de0527235d1a8061"
+      "sha256": "9abd99e58ac1bfe2d9dda40394bf129dd841ace30bdd4820dd71ecc08f5a0dda"
     },
     "modules/agent-door/conformance/authority.d.mts": {
       "source": "modules/agent-door/conformance/authority.d.mts",
@@ -1996,6 +1996,10 @@
     "modules/agent-door/conformance/discovery.mjs": {
       "source": "modules/agent-door/conformance/discovery.mjs",
       "sha256": "717c388ae1a8888659ac75fd4569fcabfe47d11419110cc5d14694281a42d484"
+    },
+    "modules/agent-door/conformance/erasure.mjs": {
+      "source": "modules/agent-door/conformance/erasure.mjs",
+      "sha256": "1e33e00db3ba162c118ddfedc4802b3d073d82947603a1a02a4ae07adb8d8a02"
     },
     "modules/agent-door/conformance/fixtures.mjs": {
       "source": "modules/agent-door/conformance/fixtures.mjs",
@@ -2015,7 +2019,7 @@
     },
     "modules/agent-door/conformance/journey.mjs": {
       "source": "modules/agent-door/conformance/journey.mjs",
-      "sha256": "f9e1d541831e07697ada515cc6fcd5c84ca63a22a3615c5326f1b4665b868c55"
+      "sha256": "21f3a8fa7929f5246dcc16d1c5640d3695032e190e2032bf3a7a90f60413b468"
     },
     "modules/agent-door/conformance/narrowing.d.mts": {
       "source": "modules/agent-door/conformance/narrowing.d.mts",
@@ -2039,11 +2043,11 @@
     },
     "modules/agent-door/conformance/policy-phases.mjs": {
       "source": "modules/agent-door/conformance/policy-phases.mjs",
-      "sha256": "8b18db81d0c8918033f7f0b7c3796edd22e45f77c8cf86fa375118b82af5503b"
+      "sha256": "2b528e03623e6afe716eb5f34e978b233c57a9dc8f13a05d4aaabb3da52d4191"
     },
     "modules/agent-door/conformance/protocol.mjs": {
       "source": "modules/agent-door/conformance/protocol.mjs",
-      "sha256": "38b571b5b7e578f15f5ae25113e70bf5e8c44e7c0579d45ecc148d080280996c"
+      "sha256": "bad6b412aba3dab0842e325e6f763b0480f7b54b98fd62bb6aebeb1eea08f806"
     },
     "modules/agent-door/conformance/replay.mjs": {
       "source": "modules/agent-door/conformance/replay.mjs",

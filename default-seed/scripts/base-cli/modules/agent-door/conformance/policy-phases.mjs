@@ -3,6 +3,7 @@ import { webcrypto } from 'node:crypto';
 import { autonomousPolicy, policyEnvelope, signJws, seconds } from './crypto.mjs';
 import { errorCode } from './protocol.mjs';
 import { nativeStepHook } from './step-hooks.mjs';
+import { erasedStep } from './erasure.mjs';
 
 export async function unsetPolicy(c, initial = false) {
  const listed = await c.mcp('tools/list');
@@ -90,6 +91,11 @@ export async function blockedPhases(c) {
     await c.adopt(autonomousPolicy());
    }
    const completed = await c.stepTool(step, args, await c.proof(step.tool, args, undefined, step.client));
+   if (completed.erasure) {
+    const value = await erasedStep(c, step, args, completed, `blocked:${cls}`, outputs);
+    await nativeStepHook(c, 'afterStep', `blocked:${cls}`, step, args, outputs, value);
+    continue;
+   }
    if (completed.result?.isError || completed.result?.structuredContent === undefined) throw new Error(`Could not prepare ${step.id} for the ${cls} blocked variant (${errorCode(completed) ?? completed.status})`);
    outputs.set(step.id, completed.result.structuredContent);
    await nativeStepHook(c, 'afterStep', `blocked:${cls}`, step, args, outputs, completed.result.structuredContent);
