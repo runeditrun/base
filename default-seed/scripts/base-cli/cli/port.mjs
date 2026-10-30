@@ -53,6 +53,5 @@ export async function busyPortMessage({ port, host, root, saved, env = process.e
  const who = holder.server
   ? `the ${holder.server.mode} server for ${holder.checkout} (PID ${holder.pid})`
   : `PID ${holder.pid} (${holder.command})${holder.cwd ? ` running in ${holder.cwd}` : ''}`;
- const stop = holder.server ? `\nOr stop that server first: ${stopInstruction(holder.server)}` : `\nOr stop it with: kill -TERM ${holder.pid}`;
- return `${kind} in use by ${who}.${move}${stop}`;
+ return `${kind} in use by ${who}.${move}`;
 }

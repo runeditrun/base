@@ -13,7 +13,20 @@ export async function setupCommand(args) {
 }
 
 async function setup(args){
- const usage='Usage: rer business setup --origin URL --session-file FILE --confirm-demo [--hosting managed|assisted|self_host] [--wait-seconds 0..240] [--json]';
+ const usage=`Usage: rer business setup --origin URL --session-file FILE --confirm-demo [--hosting managed|assisted|self_host] [--wait-seconds 0..240] [--json]
+Provision the synthetic Run your business demo through the platform's owner routes.
+Run again to resume; completed seeds are read without provisioning again.
+
+  --origin URL          Platform address to set up the demo on.
+  --session-file FILE   The signed-in session file Business setup reads: an owned,
+                        regular 0600 file containing rer_session=VALUE or
+                        __Host-rer_session=VALUE. Symlinks are refused.
+                        The session is sent only as the platform Cookie header.
+  --confirm-demo        Required confirmation to provision the synthetic demo.
+  --hosting MODE        managed (default), assisted or self_host.
+  --wait-seconds N      Provisioning wait, 0..240 seconds (default: 240).
+  --json                Print the platform JSON receipt (also the default).
+  --help, -h            Show this help without reading the session file.`;
  if(args.some(arg => ['--help', '-h'].includes(arg))){process.stdout.write(usage+'\n');return;}
  const options={};
  for(let i=0;i<args.length;i++){
