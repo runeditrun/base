@@ -764,6 +764,16 @@ and the tested dispatch. Phase preparation releases any preceding hold;
 installation disposal also releases waiting deliveries. This allows a due
 approved step without rewriting approved content or approval evidence.
 
+To exercise a native failed-producer path, call `await queues.fail('JOBS')` before
+dispatch, then `await queues.restore('JOBS')` to clear it. Both `send` and
+`sendBatch` reject before any message reaches the real queue. The name must
+be a producer binding declared in the built Wrangler configuration; undeclared
+bindings are refused, and other bindings keep working. `await queues.restore()`
+clears all producer faults. Phase fixture preparation also clears previous
+faults. Consumer `hold()`/`release()` remain independent: a hold delays
+consumption while normal producer sends still succeed. Fault controls exist
+only in this disposable harness and never modify the production build.
+
 Every write uses a disposable D1 transaction guarded against INSERT, UPDATE
 and DELETE on **all** `agent_door_*` tables, including native triggers and
 cascades. Schema, transaction and multiple statements are refused. Refusals

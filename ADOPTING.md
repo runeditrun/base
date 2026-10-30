@@ -12,6 +12,16 @@ errors still need the seed's own reviewed correction.
 
 Agent-door adopters must refresh `modules/agent-door/credentials.ts`: the door now refuses a Business token whose email is not its subject's current native email (the `email` `people.sponsor` returns), with the same 401 and no effect as an unknown or inactive sponsor.
 
+Disposable hosted conformance fixtures and native step hooks can call
+`await queues.fail('JOBS')` to reject that declared queue producer's `send` and
+`sendBatch` before enqueueing, then `await queues.restore('JOBS')` to resume normal
+sends (`await queues.restore()` clears all producer faults). Only producer binding
+names in the seed's built Wrangler configuration are accepted; undeclared
+names are refused. Phase fixture preparation clears previous faults, and each
+conformance installation is disposable. These controls are absent from
+production, dev and demo. Refresh the CLI copies, including
+`hosted-queue-producers.mjs`; see the [preparation guide](modules/agent-door/ADOPTING.md#disposable-native-preparation).
+
 Refresh `modules/agent-door/pipeline.ts` and `conformance/journey.mjs` together
 for completed mutation replay:
 
