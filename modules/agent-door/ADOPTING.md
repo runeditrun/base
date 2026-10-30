@@ -6,6 +6,61 @@ Keep the edition's existing interface and authorization decisions authoritative.
 
 A review-disposition call that completes must retain its linked review; a native refusal must audit `refused` with the returned code, open no review, and preserve any bracketing native witness.
 
+## Declare a native company-policy decision
+
+A seed may pass `companyPolicy: { decide }` to `createAgentDoor`. Omit it to keep
+existing behavior. This read-only server hook narrows the existing class-policy
+decision; it supplies no default dispositions and cannot bypass incomplete
+policy, Pause, scopes, native authority, proof, revocation or idempotency.
+HappyToHelp's computed action classes, Lamp AUTO-001's component/source rules,
+and Slate NOTIF-001's person-needed decisions use the same boundary.
+
+```ts
+companyPolicy: {
+  async decide({ tool, args, classes, target, policy }, ctx) {
+    return nativePolicyDecision(tool, args, classes, target, policy, ctx)
+  }
+}
+```
+
+The input contains the tool name, declared action arguments (without the door's
+idempotency/revision fields), server-computed classes/facts, resolved native
+target and the existing class-policy decision. Inputs and the identity context
+are immutable snapshots. Resolve current native rules with the sponsor and
+agent in `ctx`; caller flags and record text cannot supply policy authority.
+The hook must perform no effects. Return exactly one audit-safe answer:
+
+- `{ decision: 'allow', rule, revision }` retains the existing disposition.
+- `{ decision: 'hold', rule, revision, approvers, wait }` requires the existing
+  exact-revision approval flow. `approvers` uses the existing `sponsor`,
+  `role:owner`, `role:editor` or `person:<id>` references; `wait` uses the existing
+  fixed ISO duration range (one hour through thirty days). Existing policy
+  approvers remain required and the shorter wait wins.
+- `{ decision: 'deny', rule, revision }` refuses with `company_policy_denied`.
+
+`rule` and `revision` are nonempty, bounded, non-secret strings identifying the
+native rule and its revision. Unknown or malformed answers refuse with
+`company_policy_invalid`; a thrown hook refuses with
+`company_policy_unavailable`. No hook error text is returned or audited.
+Class policy that is unset or blocked stops the call before this hook.
+
+MCP, integration aliases and embedded calls share this evaluation before
+execution, including completed retries. Held calls return the existing
+`input_required` (or legacy `approval_required`), pending handle and signed-in
+approval URL. Approval execution evaluates again: changed native policy
+answers, facts, targets or summaries refuse `approval_evidence_changed` and
+require a new request. A previous approval cannot satisfy a newly held rule or
+revision. Rejected and expired holds retain the existing typed refusals.
+
+The result's decision and the existing audit row carry `company_policy` with
+the exact validated answer alongside the class-policy revision/rules. Pending
+approval summaries bind that answer into their existing summary hash; saved
+audit evidence retains it for replay comparison. The normal audit endpoint
+checks the combined disposition against both saved decisions. Rule identifiers
+must be redacted for the permitted audit audience; do not return private record
+content or credentials. This hook adds no routes, tables or policy engine and
+makes no claim that an adopting seed has satisfied BASE-AGENT-007.
+
 ## Copy committed runtime source
 
 Choose an immutable full Base commit containing the module. A released or

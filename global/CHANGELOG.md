@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add an optional native company-policy decision hook to the shared agent door. Allow retains class policy; hold uses its signed-in, revision-bound approval flow; deny refuses before effects. Native decisions are audited, rechecked on retries and approval execution, and cannot bypass policy, Pause or native authority.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.
