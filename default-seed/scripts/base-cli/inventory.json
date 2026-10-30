@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.94-dev.gb86657c5",
+  "cliVersion": "0.2.94-dev.gaa2702bf",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -379,7 +379,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "a23b01104e288a3cbfb37a9fbaf21a6698bf40fe0883e78d54b3c278dc6da300"
+      "sha256": "93e85c12e16a375448916da11ca266a3f62df57ae68d4433b78309d4008d2491"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -915,7 +915,7 @@
     },
     "cli/door-clauses.mjs": {
       "source": "cli/door-clauses.mjs",
-      "sha256": "63dd8c0ce91141605a9991e55a38e14393b7b8e64dbe1bb5edb4c08a9bb54afd"
+      "sha256": "3d745df05098b697a9fcd23096d5fe79e0eb5bbd832e2fa1c533f038bddc911c"
     },
     "cli/door-mode.mjs": {
       "source": "cli/door-mode.mjs",

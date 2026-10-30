@@ -592,6 +592,9 @@ or use its stored device credential.
 
 `rer door clauses --write` synchronizes Base's thirteen shared agent duties
 into a seed's `CONTRACT.md` and runs its contract-docs generator and check.
+It requires the seed's `Shared duties (Base)` table and skips duties listed
+in its `Base duty` column; only unlisted duties need clause synchronization.
+Without that table it refuses before writing any files.
 `rer door clauses --check` names missing or stale clauses and exits nonzero;
 `--cwd DIR` selects the seed root. Existing statuses, evidence and gaps survive,
 new clauses start missing, and seed-owned AGENT and SURFACE clauses stay intact.
