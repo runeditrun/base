@@ -10,8 +10,8 @@ import { credentialValues } from './redaction.mjs';
 import { dependencyEnvironment } from './dependency-environment.mjs';
 import { labels } from './adapter-labels.mjs';
 import { chooseOrigin, prepareSettings, readSettings } from './adapter-settings.mjs';
-import {listenerPorts,listenerOwnership,inspectionContext} from './process-diagnostics.mjs';
-import { appFetch, loopbackRequest } from './app-fetch.mjs';
+import {listenerPorts,listenerOwnership,processName,inspectionContext} from './process-diagnostics.mjs';
+import { appFetch } from './app-fetch.mjs';
 import { owner, signIn } from './adapter-auth.mjs';
 import { installerDevKey } from './dev-identity.mjs';
 import { assertArchiveFree } from './archive-output.mjs';
@@ -218,7 +218,10 @@ async function start(context, hooks) {
  let announcement,detectedMismatch;
  const mismatch=port=>({fatal:detectedMismatch=`the application listened on port ${port} but the CLI expected ${expectedPort}`});
  const announced=message=>{if(message?.type==='rer-listening')announcement=message;};
- if(runtimePortHandshake)child.on('message',announced);
+ child.on('message',announced);
+ // Only explicit application bindings are candidates for a port mismatch. A
+ // descendant's open socket alone says nothing about its protocol or purpose.
+ const declaredPorts=new Set([spawnOptions.env?.RER_RUNTIME_PORT,...args.flatMap((arg,index)=>arg==='--port'?[args[index+1]]:arg.startsWith('--port=')?[arg.slice(7)]:[])].filter(value=>/^\d+$/.test(String(value))).map(Number).filter(port=>port>0&&port<=65535));
  context.app = child;
  await onApp(child);
  const url = new URL(health, context.origin).href;
@@ -241,16 +244,25 @@ async function start(context, hooks) {
      context.setRuntimePort(port);context.runtimePort=port;expectedPort=port;
     }
    }
-   const result=await (ready??hooks.health??defaultHealth)(url,probeSignal,context);
+   let result;
+   try { result=await (ready??hooks.health??defaultHealth)(url,probeSignal,context); }
+   catch(error){if(probeSignal.aborted)throw error;result={ready:false,message:'Health probe failed'};}
    if(result===true||result?.ready===true)return result;
-   // Auxiliary runtime listeners are common. Only an owned listener serving the
-   // application's healthy response proves a mismatched application port.
-   const ports=await listenerPorts(child.pid,inspectionContext({signal:probeSignal,budgetMs:3000}));
-   if(!ports.includes(expectedPort))for(const port of ports){
-    try{
-     const reply=await loopbackRequest({port,path:health,headers:{host:new URL(url).host},signal:probeSignal,timeoutMs:1000});
-     if(reply.status===200&&JSON.parse(reply.body.toString()).status==='ok')return mismatch(port);
-    }catch(error){if(probeSignal.aborted)throw error;}
+   // Diagnose an explicit misbinding through socket custody, never HTTP. In
+   // particular, workerd's auxiliary RPC sockets must not receive /health while
+   // Vite is still starting. A runtime announcement can identify its application
+   // socket even when workerd itself serves it (the production target).
+   const candidates=[...declaredPorts].filter(port=>port!==expectedPort);
+   if(candidates.length){
+    const inspection=inspectionContext({signal:probeSignal,budgetMs:3000});
+    const ports=await listenerPorts(child.pid,inspection);
+    if(!ports.includes(expectedPort))for(const port of candidates.filter(port=>ports.includes(port))){
+     const ownership=await listenerOwnership(child.pid,port,'127.0.0.1',inspection);
+     if(ownership.status!=='owned')continue;
+     const name=await processName(ownership.pid,inspection);
+     if(/^workerd(?:[.-]|$)/i.test(name)&&!(announcement?.port===port&&announcement.requestedPort===port))continue;
+     return mismatch(port);
+    }
    }
    return result;
   }, { signal, timeoutMs: Math.min(timeoutMs??60000,60000), ...(softAfterMs ? { softAfterMs } : {}), ...(intervalMs ? { intervalMs } : {}) });
@@ -266,7 +278,7 @@ async function start(context, hooks) {
    store.report(message);const prior=approvedFailure(error);error=commandFailure(`${prior?.message??readinessLabel}\n${message}`,prior??{});
   }
   throw installationFailure('command_failed', { step: 'start', diagnostic: error });
- } finally { if(runtimePortHandshake)child.removeListener('message',announced); }
+ } finally { child.removeListener('message',announced); }
  // Another app can take the loopback port between the port check and the bind;
  // its /health would pass. Claim and sign in only against the process this
  // setup started.
