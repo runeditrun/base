@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Let seeds declare an isolated, test-only history fixture before named agent-door journey steps. Only allowlisted INSERT statements reach fresh disposable databases; protected tables and target triggers are refused, production imports fail closed, and the normal state reader and clock remain unchanged.
+
 ## 0.2.91
 
 - Security: the agent door refuses a Business access token whose email is no longer its subject's current native email, with the same HTTP 401 and no effect as an unknown or inactive sponsor, so a token no longer outlives a change of address.
