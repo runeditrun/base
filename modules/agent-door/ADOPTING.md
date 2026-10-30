@@ -1477,6 +1477,8 @@ It declares personal custody in calls (`key`, `digest`, `outcome`), approvals
 `marked_by`), events (`uri`, `event`) and usage's open text facts in `classes`.
 Usage retains numeric measures, currency, counterparty/direction categories and
 non-personal agent scope dimensions so erasure does not reset policy allowances.
+A native erasure notification keeps its event type and time without reintroducing
+the subject identifier after the transactional hook.
 Native subject IDs, exact addresses and the imported `sourceUserId` select their
 linked decision, approval, review and event rows. Operators and installation
 policy are separate from the reference's customer subjects; a seed that erases operators must also map sponsor
