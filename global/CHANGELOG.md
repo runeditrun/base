@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Give native subject erasure custody of mapped agent-door payloads, retaining value-free decisions and indefinite secret-keyed replay refusals while excluding replay aliases from archives.
+
 ## 0.2.94
 
 - Include the shared checkout-history validator in the documented portability runtime copy, preserving self-contained Worker and CLI adoption.

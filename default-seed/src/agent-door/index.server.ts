@@ -16,6 +16,13 @@ function trust(bindings: Bindings): Trust | null {
 export function baseAgentDoor(bindings: Bindings) {
   return createAgentDoor({
     seed: 'base', name: 'Base', specialist: 'operations', db: bindings.DB, origin: bindings.AUTH_ORIGIN, trust: trust(bindings),
+    erasure: { secret: bindings.SESSION_SECRET, async fenced(name, args) {
+      if (name === 'base.people.erase') return false
+      if (typeof args.id === 'string' && name.startsWith('base.people.')) {
+        return !!await bindings.DB.prepare("SELECT 1 FROM person_erasure_redactions WHERE person_id=? UNION ALL SELECT 1 FROM rer_erasure_operations WHERE entity='person' AND phase='deleting' AND json_extract(subject,'$.id')=?").bind(args.id, args.id).first()
+      }
+      return false
+    } },
     people: operatorAuthPeople({ db: bindings.DB, allowList: authConfig(bindings).allowList, session: request => operatorAuth(bindings).getSession(request) }),
     tools: [...peopleTools(bindings), ...accessTools(bindings)], resources: [personResource, operatorResource(bindings)],
     notTools: [

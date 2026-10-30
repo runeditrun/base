@@ -1959,7 +1959,7 @@
     },
     "modules/agent-door/CLAUSES.md": {
       "source": "modules/agent-door/CLAUSES.md",
-      "sha256": "0568321ca8cc6c5ff5056d3e12868795aadfedd17c51aa693dd4517450a9e867"
+      "sha256": "ed7faf1475ff0b682886fe083aebbab9343ef451b81739e0d62273b461daefc3"
     },
     "modules/agent-door/capabilities.d.mts": {
       "source": "modules/agent-door/capabilities.d.mts",
@@ -2827,7 +2827,7 @@
     },
     "modules/erasure/cascade.mjs": {
       "source": "modules/erasure/cascade.mjs",
-      "sha256": "e100fec1eaaf6b54e110d9778bc96a78a6e9011b047bba6db42d1a9d81da75ac"
+      "sha256": "97d78d3a802de6975dd4619f16a307bacb35ea155a928d4038e9eed77498fbeb"
     },
     "modules/erasure/completion.mjs": {
       "source": "modules/erasure/completion.mjs",
@@ -2843,11 +2843,11 @@
     },
     "modules/erasure/index.d.mts": {
       "source": "modules/erasure/index.d.mts",
-      "sha256": "204f2236b0877cf4005a317bbc4d9bdaf727fbe060195ce06fb046492bf04040"
+      "sha256": "7a0ef533ffca11e14622495b67f1e5ef05955d563479843d5d09032b5e819124"
     },
     "modules/erasure/index.mjs": {
       "source": "modules/erasure/index.mjs",
-      "sha256": "3db675becd9f30683c24ce9b72b43c36210643af2493c7ee2a2db6ec53978d46"
+      "sha256": "05ac5ba1004b5b6a73552d88b3373233480eb47bec3ccde4e8c8aeadcca4df32"
     },
     "modules/erasure/order.mjs": {
       "source": "modules/erasure/order.mjs",
@@ -4599,7 +4599,7 @@
     },
     "modules/portability/bookkeeping.mjs": {
       "source": "modules/portability/bookkeeping.mjs",
-      "sha256": "463159369ea8d6a03ebe4308bf7282f0a003d6d32764873456a74001bec7a27d"
+      "sha256": "0f477ce1452845004eab4bb4f20fc51ae49ccbd5f9545fcbf9c15a5928cd8b29"
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
