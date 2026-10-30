@@ -125,8 +125,13 @@ export async function runJourney(c, phase, { held = false, injections = false, r
    }
    if (injections && step.inject) {
     const injected = await injectionArgs(c, step, outputs, args);
+    const inputSchema = c.listed.get(step.tool)?.inputSchema ?? declared.inputSchema;
+    const undeclaredNarrowing = declared.widens === false && Object.keys(injected).some(key => key !== 'idempotency_key' && !Object.hasOwn(inputSchema?.properties ?? {}, key));
+    // A cached mutation still rejects undeclared narrowing input before replay.
+    const beforeInjection = undeclaredNarrowing ? await c.witness() : undefined;
     const checked = await c.stepTool(step, injected, proof);
-    c.add(`BASE-AGENT-005.5.${phase}.${step.id}`, isDeepStrictEqual(checked.decision?.classes, answer.decision?.classes) && checked.decision?.disposition === answer.decision?.disposition && !checked.result?.isError, `${step.tool} changed class, facts or decision for additional arguments.`);
+    if (undeclaredNarrowing) c.add(`BASE-AGENT-005.5.${phase}.${step.id}`, errorCode(checked) === 'invalid_arguments' && isDeepStrictEqual(beforeInjection, await c.witness()), `${step.tool} must refuse undeclared narrowing arguments as invalid_arguments without changing native state, including on replay.`);
+    else c.add(`BASE-AGENT-005.5.${phase}.${step.id}`, isDeepStrictEqual(checked.decision?.classes, answer.decision?.classes) && checked.decision?.disposition === answer.decision?.disposition && !checked.result?.isError, `${step.tool} changed class, facts or decision for additional arguments.`);
    }
    if (replay && !replayed && !c.surface.tools.find(tool => tool.name === step.tool)?.readOnly) {
     replayed = true;

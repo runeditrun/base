@@ -1383,7 +1383,7 @@
     },
     "edition-authoring/module-closure.mjs": {
       "source": "edition-authoring/module-closure.mjs",
-      "sha256": "dcbe0cc3e5cf367acd8943750e8a85a0eee9624004fdb80ea9521b432d0ff6b3"
+      "sha256": "010976b55998157d80eb3567e47d46545e7031dd5c2777519bb88754431bb43c"
     },
     "edition-authoring/module-edges.mjs": {
       "source": "edition-authoring/module-edges.mjs",
@@ -1391,7 +1391,7 @@
     },
     "edition-authoring/module-packages.mjs": {
       "source": "edition-authoring/module-packages.mjs",
-      "sha256": "8635a932bb30d2ca9f7700e606b8c3603e9e78a3a867d37b90fbeae8ade05fc5"
+      "sha256": "ecdf5b12dee847c1b97537aaca20aefb9677aac6ec38b29fab50d66fc16c046f"
     },
     "edition-authoring/module-resolution.mjs": {
       "source": "edition-authoring/module-resolution.mjs",
@@ -2015,7 +2015,7 @@
     },
     "modules/agent-door/conformance/journey.mjs": {
       "source": "modules/agent-door/conformance/journey.mjs",
-      "sha256": "6b04714c746aeec401bed3277820e9c22219591bd0b5461fc23eb8a429da2b55"
+      "sha256": "f9e1d541831e07697ada515cc6fcd5c84ca63a22a3615c5326f1b4665b868c55"
     },
     "modules/agent-door/conformance/narrowing.d.mts": {
       "source": "modules/agent-door/conformance/narrowing.d.mts",
