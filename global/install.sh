@@ -156,7 +156,10 @@ NODE
  if [ "$#" -gt 0 ]; then no_next=1; fi
  RER_INSTALL_CHANNEL=script RER_INSTALL_NO_NEXT=$no_next "$node_binary" "$work/stage/package/global/rer.mjs" cli install </dev/null \
   || fail "rer cli install failed; any previous install is still selected."
- if [ "$#" -eq 0 ]; then return; fi
+ if [ "$#" -eq 0 ]; then
+  printf 'For Business setup: %s business setup --help\n' "$HOME/.local/bin/rer"
+  return
+ fi
  # The command can tell the person how to run rer again from their own shell,
  # where ~/.local/bin may not be on PATH yet.
  RER_INVOKED_AS="$HOME/.local/bin/rer"

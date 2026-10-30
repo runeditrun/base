@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Business connect, next and run report the local Business name file written without claiming an app has already applied it.
+- Explain the signed-in session file in Business setup help, give connect and token their own usage, and show the Business help path after install.sh.
+- On occupied ports, suggest moving the checkout with `rer setup --port` and reserve server stop advice for this checkout's own registered server; omit kill commands for unmanaged processes.
+
 ## 0.2.93
 
 - Integrated inputs: deploydry-2 (HappyToHelp dry-run hook dispatch and unchecked-provider receipt), ledgertok-2 (HappyToHelp ledger refusal identities), adoptdoc-1 (safe adoption examples), reslink-1 (native record-link conformance), copy-1 (product-led optional homepage copy), and handset-history-1 (historical claim context).

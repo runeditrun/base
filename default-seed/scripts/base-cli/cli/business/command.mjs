@@ -45,8 +45,27 @@ State lives in $RER_BUSINESS_STATE_DIR when set, otherwise in ~/.rer/business.
 In an agent sandbox that writes only inside its working folder, use RER_BUSINESS_STATE_DIR="$PWD/.rer-business".
 `;
 
+const verbHelp = {
+ connect: `Usage: rer business connect [--code CODE] [--origin URL]
+Pair this computer with Business, waiting for the owner to approve the comparison
+number in their browser (up to the code's 10 minutes). Run again to resume.
+
+  --code CODE    Pairing code created in the Business browser.
+  --origin URL   Business platform address (default: https://app.runeditrun.com).
+Without a code, prints the path to create one or resumes this computer's pairing.
+Carries the Business name into local app files for supporting apps to read.
+Choose this computer's permissions and background service in the browser.
+`,
+ token: `Usage: rer business token
+Print an MCP Authorization header object for this computer's paired Business.
+Send this headersHelper output directly to the MCP client; it contains a credential.
+Requires an existing pairing: rer business connect.
+`,
+};
+
 export async function businessCommand(argv) {
  if (argv[0] === 'setup') return setupCommand(argv.slice(1));
+ if (Object.hasOwn(verbHelp, argv[0]) && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(verbHelp[argv[0]]); return 0; }
  if (!argv.length || argv[0] !== 'scan' && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(usage); return 0; }
  if (argv[0] === 'scan') return scanCommand(argv);
  try {

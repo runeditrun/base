@@ -120,7 +120,8 @@ test('a busy port held by another checkout names that checkout and the command t
   if(mode==='inconclusive')assert.doesNotMatch(message,/other-checkout|kill -TERM/);
   else {
    assert.ok(message.includes(checkout),message);
-   assert.ok(message.includes(`dev --cwd "${checkout}" --stop`),message);
+   if(mode==='own')assert.ok(message.includes(`dev --cwd "${checkout}" --stop`),message);
+   else assert.doesNotMatch(message,/--stop|kill\s+-/);
   }
   const port=Number(/rer setup --port (\d+)/.exec(message)[1]);
   assert.notEqual(port,holder.port);
