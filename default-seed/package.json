@@ -23,7 +23,7 @@
     "test:local-journey": "node scripts/base-onboarding/queued-entry.mjs test:local-journey -- sh -c \"node --test --test-concurrency=1 tests/local-journey/*.test.mjs\"",
     "test:operator-auth": "node scripts/base-onboarding/queued-entry.mjs test:operator-auth -- sh -c \"pnpm build && node --test tests/operator-auth/*.test.mjs\"",
     "test:private-response": "node scripts/base-onboarding/queued-entry.mjs test:private-response -- sh -c \"pnpm build && node --test tests/e2e/private-response.test.mjs tests/e2e/start-response-stream.test.mjs\"",
-    "test:built": "node scripts/base-onboarding/queued-entry.mjs test:built -- sh -c \"node --test tests/operator-auth/*.test.mjs && node --test tests/e2e/private-response.test.mjs tests/e2e/start-response-stream.test.mjs tests/e2e/import-archive.test.mjs && node tests/e2e/reference-runtime.mjs\"",
+    "test:built": "node scripts/base-onboarding/queued-entry.mjs test:built -- sh -c \"node --test tests/operator-auth/*.test.mjs && node --test tests/e2e/private-response.test.mjs tests/e2e/start-response-stream.test.mjs tests/e2e/import-archive.test.mjs tests/e2e/agent-person-erasure.test.mjs && node tests/e2e/reference-runtime.mjs\"",
     "verify:app": "node scripts/verify-app.mjs",
     "build:app": "node scripts/base-onboarding/queued-entry.mjs build:app -- sh -c \"vite build\"",
     "setup": "node scripts/rer.mjs setup",

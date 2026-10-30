@@ -475,7 +475,7 @@
     },
     "cli/authoring.mjs": {
       "source": "cli/authoring.mjs",
-      "sha256": "2ee79ca7f810ba61cff8d6147096ee5a9edf75589f1329ac72e40e6ed74efbaa"
+      "sha256": "d4afd2ab27e2046fd1333efe61af2d210932c5d3d8a4a79e00efb36f4e6913ed"
     },
     "cli/bounded.mjs": {
       "source": "cli/bounded.mjs",
@@ -775,7 +775,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "14bac6012fceb753aab6f387e7cc5946d574ca9e13df24baa3700e31320a18a2"
+      "sha256": "634eb37e0e688ae10355c87863343a2af7bdd05bd450829ddb65f94545b826f2"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -1095,7 +1095,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "40b35f1539e66c3f6c04fe9d1b02032cd81f82033cba9c85b8fd7090f948f51f"
+      "sha256": "3299cec064a2770870d52b577d10a3544ff19ff7d6d2227330215272bdf882d2"
     },
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",
@@ -1351,7 +1351,7 @@
     },
     "edition-authoring/archive-source.mjs": {
       "source": "edition-authoring/archive-source.mjs",
-      "sha256": "c59a6a97abfdf80b2874a461ba7800e8604a3141db4594a584d6a0cfedac5f46"
+      "sha256": "27ff7efbed5ef18dd5eaa2c03abe8c72a6f1a132105380b13448939bc1dde139"
     },
     "edition-authoring/base-acknowledgements.mjs": {
       "source": "edition-authoring/base-acknowledgements.mjs",
@@ -1359,11 +1359,11 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "4cac17e531310ab14df07139156c2b4fae5f7ab03097c7f8374c09a3d050dc8b"
+      "sha256": "abef957622ffa65fc34db24e46270773896deeac6f6635a2b071f97f1d4fa1e0"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
-      "sha256": "d4302ecd51794bbf9d92ea08c23fc1447f043088952c53689418c03e8750bb7f"
+      "sha256": "b60b229542574459e46f33f48412ab775d298b21ab8e6a8ecf5dad46efb5589f"
     },
     "edition-authoring/copy-checkout.mjs": {
       "source": "edition-authoring/copy-checkout.mjs",
@@ -1375,7 +1375,7 @@
     },
     "edition-authoring/edition-migrations.mjs": {
       "source": "edition-authoring/edition-migrations.mjs",
-      "sha256": "7e9837c9a373cf7f394a575230c9f386a289786a15cc9685e4f11911e9a84e88"
+      "sha256": "1fb7945a0c58ee8d28fb4868599cf904c2cd7057ca62622aa02390c33a5973bb"
     },
     "edition-authoring/files.mjs": {
       "source": "edition-authoring/files.mjs",
@@ -4611,7 +4611,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "4e650b646948e14470e29595f287dcf1192779786209c2dd8cace87a9768cede"
+      "sha256": "7de8ce3150b387774dce7534a7a6bebd90593b35a8ccfe9d791b3b59a6f77386"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",
@@ -4619,7 +4619,7 @@
     },
     "modules/portability/bookkeeping.mjs": {
       "source": "modules/portability/bookkeeping.mjs",
-      "sha256": "0f477ce1452845004eab4bb4f20fc51ae49ccbd5f9545fcbf9c15a5928cd8b29"
+      "sha256": "61f835ee6cd2bdc41df3b410ffa1f08ef1b58d62d59a02c979d5ec99514c825c"
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
@@ -4631,7 +4631,7 @@
     },
     "modules/portability/checkout-history.mjs": {
       "source": "modules/portability/checkout-history.mjs",
-      "sha256": "4d7fbca178e9393daf19307f92615d90cfcb38fcb5269cfc3316ddff20abe190"
+      "sha256": "d292ca748eebe910ceb6549c66f36786cb74aaf34e9c812c94313f7d75d125d9"
     },
     "modules/portability/cli-options.mjs": {
       "source": "modules/portability/cli-options.mjs",
@@ -4703,7 +4703,7 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "67b7729bd29e5adde061ab7b32e0951648bd05ac4940cfa0d86749924b8e6bfa"
+      "sha256": "26a83e6a01ad5e18a181d4076c808316121e81eac5b5d091d4473228eddc8b17"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
@@ -4811,7 +4811,7 @@
     },
     "modules/portability/storage.mjs": {
       "source": "modules/portability/storage.mjs",
-      "sha256": "33b0585d9c38658c647c5785231c87397cec26d4630c16eab2405db59d317355"
+      "sha256": "29f6ab8eb58010307856639cebf439229c1cd136f11eef1f6c2df92ff3d5eeef"
     },
     "modules/portability/transient-tables.mjs": {
       "source": "modules/portability/transient-tables.mjs",
@@ -4819,11 +4819,11 @@
     },
     "modules/portability/worker-history.d.mts": {
       "source": "modules/portability/worker-history.d.mts",
-      "sha256": "050cb830c5d901c116b7bf7df0642be4a42e562e3aeafff68f47430c061da935"
+      "sha256": "4a05fee1002eda72c26ac4b9c7eac1ef91d8cbb2ff51fc1082c76954d50f120e"
     },
     "modules/portability/worker-history.mjs": {
       "source": "modules/portability/worker-history.mjs",
-      "sha256": "dcefc7021209fb45f642a5accf67ee2d79504444ed9a1d3fee70a38d74663b2a"
+      "sha256": "8ef49e1a3d95350a7f324806ff4447bf7af4e39b1f2ab5c0677a086e772acded"
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",

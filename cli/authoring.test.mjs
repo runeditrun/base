@@ -410,6 +410,10 @@ test('packed refresh preserves literal workflow text and refreshes an acknowledg
 test('packed archive refresh preserves workflow ownership and delivers an interchangeable authoring tool', async t => {
  const {archiveDeliveryJourney} = await import('./fixtures/authoring-archive.mjs');
  await archiveDeliveryJourney(t, {fixture, write, commit, git});
+ await t.test('GitHub API archive migration parity', async t => {
+  const {apiArchiveJourney} = await import('./fixtures/authoring-api.mjs');
+  await apiArchiveJourney(t, {fixture, write, commit, git});
+ });
 });
 
 test('packed refresh closes retained module graphs and supports record-refresh-merge recovery', async t => {
