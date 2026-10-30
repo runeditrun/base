@@ -421,7 +421,7 @@ a contained seed module default-exporting an async function receiving
 `{mode, path, token}` with the signed credential when signed mode is declared;
 `token` is the private per-run setup token. Use `request(absoluteURL, init)` to
 drive the seed's real project/password, owner and member-linking lifecycle.
-It permits only the fresh hosted origin. Return the native final 303 `Response`
+It permits the fresh hosted origin and explicitly declared public hosts below. Return the native final 303 `Response`
 with its session cookies; then the runner posts the signed Business settings
 document and runs the journey. Never create an owner with direct SQL, substitute
 an auth adapter, or add a verification-only production route. Initializer code
@@ -595,6 +595,23 @@ the run's real agent credential and records calls for that audit; no signer or
 credential is passed to the module. The standard phases still run, and a failed
 native journey fails verification. Errors are redacted to a fixed diagnostic.
 Keep these modules in test tooling outside the production dependency graph.
+
+For a seed with another public hostname, declare its deployment variable in
+`agent-surface.json`, for example:
+
+```json
+{"verification":{"publicHosts":["STATUS_HOST"]}}
+```
+
+The deployment declaration selected by the command adapter must contain that
+variable in `vars`, for example `"STATUS_HOST":"status.rer-hosted-check.invalid"`.
+Each value must be a canonical lowercase hostname without a scheme, port, path
+or wildcard. Duplicate variable names and missing or malformed values refuse
+before installation. Hosts are admitted only by this explicit list; other
+deployment variables do not grant admission. With no list, only the original
+host is admitted. The supplied `request` keeps the admitted HTTPS URL and Host
+when forwarding to the same disposable production Worker. It never contacts
+the public network or grants the host access to the outbound provider adapter.
 
 The same journey module may export async `beforeStep` and `afterStep` functions.
 They run around each completed mandatory journey step in both `autonomous` and

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.91-dev.g88951629",
+  "cliVersion": "0.2.91",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,7 +391,7 @@
     },
     "cli/agent-door.mjs": {
       "source": "cli/agent-door.mjs",
-      "sha256": "1dc5b77b9f6db1a91106291bebc01e3dd86672b0650aaf17ea461b86947791e3"
+      "sha256": "15f091f6eaff8f2b7da3850df944c694f6a987cbf3cdcf255559136421a262a6"
     },
     "cli/agent-fixtures.mjs": {
       "source": "cli/agent-fixtures.mjs",
@@ -937,13 +937,17 @@
       "source": "cli/hosted-export.mjs",
       "sha256": "85f7a9f2fef863b73c7ecd83fc01312f62db05a26a43badf62bbb524eea568b4"
     },
+    "cli/hosted-hosts.mjs": {
+      "source": "cli/hosted-hosts.mjs",
+      "sha256": "4c778c5af01e57515c6c58c04b75bebc1b2794027f935973b0418099b98f6b08"
+    },
     "cli/hosted-mail.mjs": {
       "source": "cli/hosted-mail.mjs",
       "sha256": "dc27e87efb815260e2cdd8f61615cb0b7fd72006a9bc3ac20148f7a05baacd7f"
     },
     "cli/hosted-output.mjs": {
       "source": "cli/hosted-output.mjs",
-      "sha256": "e142523daaaabb76a46325fff06091199817d7992388a9336ac1ef68f761b1d1"
+      "sha256": "6c148514eb9475b015804f6e73ea711a093dafa604f0f55613ef0afa05e435db"
     },
     "cli/human-error.mjs": {
       "source": "cli/human-error.mjs",

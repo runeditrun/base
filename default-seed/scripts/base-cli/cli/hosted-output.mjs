@@ -11,6 +11,7 @@ import { RerError } from './errors.mjs';
 import { hostedMailCredentials } from './hosted-mail.mjs';
 import { shared } from './shared.mjs';
 import { verificationRpc } from './agent-rpc.mjs';
+import { hostedOrigins } from './hosted-hosts.mjs';
 
 // Serve the production build the way rer deploy hosts it (assets behind the
 // Worker, deploy identity bound, a public https origin) on loopback, with no
@@ -45,7 +46,7 @@ const links = html => [...html.matchAll(/(?:src|href)=["'](\/[^"'#?\s]+)/g)].map
 
 /** The build served as rer deploy hosts it, with declared vars, origin and
  * stand-in deploy/Managed mail secrets. `fetch(path, init)` uses the deployed origin. */
-export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService, rpc, workerEntrypoints = [] } = {}) {
+export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService, rpc, workerEntrypoints = [], publicHosts } = {}) {
  const { loopbackFetch } = await shared('loopback-fetch.mjs');
  const build = join(root, 'dist/server'), client = join(root, 'dist/client');
  let config;
@@ -54,6 +55,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
  let declaration;
  try { declaration = await read(join(root, declarationPath)); }
  catch { throw new RerError('hosted_output_missing', `No readable deploy declaration at ${declarationPath}. A seed whose deploy reads another file names it with the commandAdapter option deployDeclaration.`, 1); }
+ const origins = hostedOrigins(declaration, publicHosts, HOSTED_ORIGIN);
  const manifest = await optional(join(root, 'rer-setup.json'));
  const { Miniflare, convertV4MiniflareOptions = options => options } = await miniflareFor(root);
  const entry = join(build, config.main);
@@ -99,7 +101,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    await migrate(await mf.getD1Database(item.binding, 'app'), withRewrites(plan, await readMigrationRewrites(root), { partial: true }));
   }
  } catch (error) { await mf.dispose(); throw error; }
- return { client, identity, origin: HOSTED_ORIGIN,
+ return { client, identity, origin: HOSTED_ORIGIN, origins,
   worker: async entrypoint => {
    if (!Object.hasOwn(nativeWorkers, entrypoint)) throw new RerError('agent_invoke_invalid', 'Verification can invoke only its declared native Worker entrypoint.', 1);
    return (await mf.getBindings('ingress'))[nativeWorkers[entrypoint]];
@@ -112,7 +114,10 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
     return db.prepare(sql);
    } };
   }, close: () => mf.dispose(),
-  fetch: (path, { headers, ...init } = {}) => loopbackFetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${HOSTED_ORIGIN}/${path}` } }) };
+  fetch: (path, { headers, origin = HOSTED_ORIGIN, ...init } = {}) => {
+   if (!origins.includes(origin)) throw new RerError('agent_door_origin', 'Agent conformance request must use a declared hosted installation origin.', 1);
+   return loopbackFetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${origin}/${path}` } });
+  } };
 }
 
 export async function checkHostedOutput(root, options) {
