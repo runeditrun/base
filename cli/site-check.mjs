@@ -6,7 +6,6 @@ import { privateDataScanner, decodedText } from './site-data.mjs';
 import { javascriptContent, javascriptContext } from './site-references.mjs';
 import { javascriptStrings } from './site-syntax.mjs';
 import { markupReferences, markupStrings, htmlElements, cssStrings } from './site-markup.mjs';
-import { siteRuntime } from './site-runtime.mjs';
 import { refuse, RerError } from './errors.mjs';
 import { DEV_AI_MARKER, DEV_LAYER_MARKER } from './dev-identity.mjs';
 
@@ -67,8 +66,7 @@ export function servedFile(names, pathname) {
  * instance-only route, nothing fetched from another origin, no dev layer, and
  * none of the given private values (owner identity, secrets, the dev key).
  */
-export async function checkSite(folder, { privateValues = [], privateIdentities = [], root, runtime } = {}) {
- const route = siteRuntime(runtime)?.endpoint;
+export async function checkSite(folder, { privateValues = [], privateIdentities = [], root } = {}) {
  const all = await files(folder), names = new Set(all.keys());
  if (!names.has('index.html')) throw refuse('The run site has no index.html (its homepage).');
  if (!servedFile(names, '/run')) throw refuse('The run site has no /run page.');
@@ -114,7 +112,7 @@ export async function checkSite(folder, { privateValues = [], privateIdentities 
    // fragment already fixes the instance path even when its tail is runtime.
    const boundary = !reference.dynamic || /[?#]/.test(url) || pathPrefix.endsWith('/');
    if (INSTANCE_ROUTES.some(route => (pathname === route && boundary) || pathname.startsWith(route + '/'))) problems.push(`${site} links to ${pathname}, which exists only on an installed instance`);
-   else if (!reference.dynamic && !servedFile(names, safeDecode(pathname)) && pathname !== route) problems.push(`${site} links to ${pathname}, which the site does not have`);
+   else if (!reference.dynamic && !servedFile(names, safeDecode(pathname))) problems.push(`${site} links to ${pathname}, which the site does not have`);
   }
  }
  if (problems.length) throw refuse(`The run site has broken or out-of-site references: ${problems.slice(0, 8).join('; ')}${problems.length > 8 ? `; and ${problems.length - 8} more` : ''}.`);

@@ -1,0 +1,399 @@
+{
+  "seedHead": "80e19afca63791d1e77f47bde6b94d0cd0f10757",
+  "inputSha256": "aee05f90f742ad7f6b3cb7ad45b6fd70eb310a1b660e3ff190c3d5387df753b2",
+  "negativeInputSha256": "6d9196f036be1923b8ffa98030c15ae766670513d9dd9bf08bf943a3c9d98ffa",
+  "queries": [
+    {
+      "source": "prior",
+      "topic": "install",
+      "q": "how do I get uptime running on my laptop",
+      "relevant": [
+        "/docs/install#docs-title",
+        "/docs/install#what-you-need",
+        "/docs/install#clone-and-start",
+        "/docs/install#explicit-owner-setup",
+        "/docs/install#sign-in-and-finish-setup"
+      ],
+      "required": true,
+      "judgment": {
+        "gate": "B",
+        "additionalRelevant": [
+          "/docs/overview#where-to-go-next"
+        ],
+        "reason": "Links directly to installation on the reader's computer."
+      }
+    },
+    {
+      "source": "prior",
+      "topic": "add a monitor",
+      "q": "add a monitor for my website",
+      "relevant": [
+        "/docs/install#start-with-a-website",
+        "/docs/install#sign-in-and-finish-setup",
+        "/docs/monitors#docs-title",
+        "/docs/monitors#https",
+        "/docs/monitors#keyword"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "locations/runners",
+      "q": "check my site from several locations",
+      "relevant": [
+        "/docs/runner#one-runner-one-vantage",
+        "/docs/runner#independent-watches-and-runner-vantages",
+        "/docs/resilient-monitoring#docs-title",
+        "/docs/resilient-monitoring#runner-identity-and-assignments",
+        "/docs/limits#one-runner-is-one-vantage",
+        "/docs/monitors#where-each-check-runs"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "pass/fail criteria",
+      "q": "mark it down if the page is missing certain text",
+      "relevant": [
+        "/docs/monitors#keyword",
+        "/docs/monitors#https"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "notifications",
+      "q": "send me an email when the site goes down",
+      "relevant": [
+        "/docs/notifications#docs-title",
+        "/docs/notifications#add-a-destination",
+        "/docs/notifications#how-delivery-works",
+        "/docs/overview#notifications"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "archive/export",
+      "q": "back up all my data and restore it on a new server",
+      "relevant": [
+        "/docs/data#docs-title",
+        "/docs/data#export-and-restore",
+        "/docs/data#what-an-archive-includes",
+        "/docs/data#restore-rules",
+        "/docs/security#what-travels-in-an-archive"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "exact page title",
+      "q": "Slow-response alerts",
+      "relevant": [
+        "/docs/slow-responses#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "misspelling",
+      "q": "privat runer setup",
+      "relevant": [
+        "/docs/runner#docs-title",
+        "/docs/runner#start-it",
+        "/docs/runner#keep-it-under-a-supervisor"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "repin: setup",
+      "q": "how do I install Uptime",
+      "relevant": [
+        "/docs/install#clone-and-start",
+        "/docs/install#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "repin: core task",
+      "q": "send alerts to Slack",
+      "relevant": [
+        "/docs/notifications#add-a-destination",
+        "/docs/notifications#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "repin: pricing",
+      "q": "is Uptime free",
+      "relevant": [
+        "/docs/overview#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "repin: data/export",
+      "q": "export my monitoring data",
+      "relevant": [
+        "/docs/data#export-and-restore",
+        "/docs/data#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "repin: exact title",
+      "q": "Heartbeat jobs",
+      "relevant": [
+        "/docs/heartbeat-jobs#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "repin: misspelling",
+      "q": "how do I instal Uptime",
+      "relevant": [
+        "/docs/install#clone-and-start",
+        "/docs/install#docs-title",
+        "/docs/install#start-with-a-website"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "setup",
+      "q": "clone and start Uptime locally",
+      "relevant": [
+        "/docs/install#clone-and-start",
+        "/docs/install#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "cost",
+      "q": "does Uptime have a subscription price",
+      "relevant": [
+        "/docs/overview#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "export",
+      "q": "restore an archive on another computer",
+      "relevant": [
+        "/docs/data#export-and-restore",
+        "/docs/data#restore-rules"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "teammates",
+      "q": "can my colleagues have different roles",
+      "relevant": [
+        "/docs/security#who-can-reach-what",
+        "/docs/limits#channels-and-workflows-it-does-not-have"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "privacy",
+      "q": "where are notification credentials kept",
+      "relevant": [
+        "/docs/security#where-your-credentials-live"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "exact title",
+      "q": "Monitors and evidence",
+      "relevant": [
+        "/docs/monitors#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "misspelling",
+      "q": "notifcation destnation setup",
+      "relevant": [
+        "/docs/notifications#add-a-destination",
+        "/docs/notifications#docs-title"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "synonym",
+      "q": "watch my homepage from multiple vantage points",
+      "relevant": [
+        "/docs/runner#one-runner-one-vantage",
+        "/docs/runner#independent-watches-and-runner-vantages",
+        "/docs/resilient-monitoring#",
+        "/docs/monitors#where-each-check-runs",
+        "/docs/limits#one-runner-is-one-vantage"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "one word",
+      "q": "heartbeat",
+      "relevant": [
+        "/docs/heartbeat-jobs#",
+        "/docs/monitors#incoming-heartbeat",
+        "/docs/runner#heartbeat-evaluation"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "question",
+      "q": "Why does my monitor show Unknown?",
+      "relevant": [
+        "/docs/overview#what-unknown-means",
+        "/docs/monitors#what-each-state-means"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "security",
+      "q": "rotate the session secret",
+      "relevant": [
+        "/docs/security#rotating-the-session-secret"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "notifications",
+      "q": "send a test notification",
+      "relevant": [
+        "/docs/notifications#send-a-test",
+        "/docs/notifications#run-an-alert-drill"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "privacy",
+      "q": "erase a monitor and its evidence",
+      "relevant": [
+        "/docs/data#erase-a-record",
+        "/docs/security#erasure-and-audit"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "checks",
+      "q": "check a TLS certificate expiry",
+      "relevant": [
+        "/docs/monitors#tls-certificate"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "checks",
+      "q": "alert when an API JSON value is wrong",
+      "relevant": [
+        "/docs/monitors#json-values-and-latency"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "setup",
+      "q": "keep the private runner running after restart",
+      "relevant": [
+        "/docs/runner#keep-it-under-a-supervisor",
+        "/docs/runner#start-it"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "prior diagnostic",
+      "q": "keyword monitor",
+      "relevant": [
+        "/docs/monitors#keyword"
+      ],
+      "required": false
+    },
+    {
+      "source": "prior",
+      "topic": "prior diagnostic",
+      "q": "monitor from multiple locations",
+      "relevant": [
+        "/docs/runner#one-runner-one-vantage",
+        "/docs/runner#independent-watches-and-runner-vantages",
+        "/docs/resilient-monitoring#"
+      ],
+      "required": false
+    },
+    {
+      "source": "prior",
+      "topic": "prior diagnostic",
+      "q": "private runner setup",
+      "relevant": [
+        "/docs/runner#"
+      ],
+      "required": false
+    },
+    {
+      "source": "prior",
+      "topic": "prior diagnostic",
+      "q": "privte runner",
+      "relevant": [
+        "/docs/runner#"
+      ],
+      "required": false
+    },
+    {
+      "source": "prior",
+      "topic": "prior diagnostic",
+      "q": "privat runer",
+      "relevant": [
+        "/docs/runner#"
+      ],
+      "required": false
+    }
+  ],
+  "negativeAndHistorical": [
+    {
+      "q": "qzxv wplk",
+      "kind": "negative"
+    },
+    {
+      "q": "🧬🪸🧿🦷",
+      "kind": "negative"
+    },
+    {
+      "q": "zzqqxxvvv",
+      "kind": "negative"
+    },
+    {
+      "q": "！！！！！！",
+      "kind": "negative"
+    },
+    {
+      "q": "storage gauge total posted on Thursday at dawn",
+      "kind": "prior temporary-edit probe"
+    },
+    {
+      "q": "heron counts the database pages",
+      "kind": "prior temporary-edit probe"
+    }
+  ]
+}
