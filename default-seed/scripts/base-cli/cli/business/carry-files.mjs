@@ -1,10 +1,14 @@
 import { chmod, lstat, mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { loadState, stateDirectory } from './state.mjs';
 import { serversDirectory } from '../server-registry.mjs';
 import { alive } from '../../modules/job-queue/identity.mjs';
 import { checkoutFolders } from '../checkout-folders.mjs';
+import { exactVersion } from '../package-mode.mjs';
 
 const carryPath = checkout => join(checkout, '.rer/local/business.json');
 const registryPath = () => join(stateDirectory(), 'carried.json');
@@ -86,6 +90,31 @@ async function liveCheckouts() {
  return [...new Set(checkouts)];
 }
 
+// The PREPARED column of rer list: the checkout's own pinned describe says its
+// local setup finished, and a pinned rer package it declares is installed.
+// Portable: the entry is found as rer's dispatcher does, without global files.
+const bundledEntry = fileURLToPath(new URL('../../bin/rer.mjs', import.meta.url));
+async function pinnedEntry(checkout) {
+ const manifest = await readJson(join(checkout, 'package.json')).catch(() => null);
+ const declared = manifest?.devDependencies?.['@runeditrun/rer'] ?? manifest?.dependencies?.['@runeditrun/rer'];
+ const installed = declared && (await readJson(join(checkout, 'node_modules/@runeditrun/rer/package.json')).catch(() => null))?.version;
+ if (declared && !(installed && (installed === declared || !exactVersion.test(declared)))) return null;
+ if (declared) return join(checkout, 'node_modules/@runeditrun/rer/bin/rer.mjs');
+ const vendored = join(checkout, 'scripts/rer.mjs');
+ return await regular(vendored, false, true).catch(() => false) ? vendored : bundledEntry;
+}
+export async function prepared(checkout) {
+ try {
+  const entry = await pinnedEntry(checkout);
+  if (!entry) return false;
+  const { stdout } = await promisify(execFile)(process.execPath, [entry, 'describe', '--json'], { cwd: checkout, maxBuffer: 16 * 1024 * 1024, timeout: 30000 });
+  const local = JSON.parse(stdout)?.local;
+  if (typeof local?.prepared === 'boolean') return local.prepared;
+  // Older pins: set up when the primary private settings file holds anything.
+  return (await stat(join(checkout, local?.settings?.[0] ?? '.dev.vars'))).size > 0;
+ } catch { return false; }
+}
+
 export async function carryCheckouts(refused, state) {
  const checkouts = new Map();
  try { for (const checkout of await recordedCheckouts()) checkouts.set(checkout, { checkout, live: false }); }
@@ -96,8 +125,15 @@ export async function carryCheckouts(refused, state) {
  // rer list, both here and where this Business originally paired.
  for (const directory of new Set([process.cwd(), state?.workingFolder].filter(Boolean))) {
   try {
-   if (await regular(join(directory, 'OPERATIONS.json'), false, true)) checkouts.set(directory, { checkout: directory, live: true });
-   for (const checkout of await checkoutFolders(directory)) checkouts.set(checkout, { checkout, live: true });
+   const listed = [];
+   if (await regular(join(directory, 'OPERATIONS.json'), false, true)) listed.push(directory);
+   listed.push(...await checkoutFolders(directory));
+   for (const checkout of listed) {
+    // An installed checkout that is not set up is carried like any app that is
+    // not: named with its reason, never written to (unless it is running).
+    if (!checkouts.has(checkout) && await firstParty(checkout).catch(() => false) && !await prepared(checkout)) refused(Error('the checkout is not set up yet: run rer setup'), checkout);
+    else checkouts.set(checkout, { checkout, live: true });
+   }
   } catch (error) { refused(error, directory); }
  }
  return [...checkouts.values()];
