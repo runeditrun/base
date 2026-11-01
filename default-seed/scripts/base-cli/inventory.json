@@ -1271,7 +1271,7 @@
     },
     "cli/site-prepare.mjs": {
       "source": "cli/site-prepare.mjs",
-      "sha256": "0e38fd776c9e3e9c73eb2427ac1d3d348cd1d825b6798768161d142dc3abdbc7"
+      "sha256": "f92d098caa0e3d4ae2121489d1f41c4d6a18c3d3fb8a763a68ca10073687df52"
     },
     "cli/site-preview.mjs": {
       "source": "cli/site-preview.mjs",
@@ -1291,7 +1291,7 @@
     },
     "cli/site-runtime.mjs": {
       "source": "cli/site-runtime.mjs",
-      "sha256": "d8bb7d44794833994ae8560121b6ee49aa7c8b8df56a8d6efb231626173ddc80"
+      "sha256": "e044ceae83118c07c735c338e35585de76a4842d9c61a99a4826b2becf91998d"
     },
     "cli/site-syntax.mjs": {
       "source": "cli/site-syntax.mjs",
@@ -1299,7 +1299,7 @@
     },
     "cli/site.mjs": {
       "source": "cli/site.mjs",
-      "sha256": "70889a9daec0c7733d302ff56e1ff3f0375e470e8473952ad3e02583196a7bf6"
+      "sha256": "5cef0f1b9c1b1d2768a6794e6332ea60cd62c1882f2c0596b30937c1cc1aebd1"
     },
     "cli/sqlite-notice.mjs": {
       "source": "cli/sqlite-notice.mjs",
