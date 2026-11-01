@@ -1596,7 +1596,7 @@ exactly these fields:
 | Field | Value |
 | --- | --- |
 | `id` | The audit row id: stable across retries and re-reads. |
-| `tool` | The registry tool name, or `resources/read`; null when the call named no tool this seed registers (`tool_not_found`). |
+| `tool` | The registry tool name, or `"resources/read"` for a resource read; null when the call named no tool this seed registers (`tool_not_found`). |
 | `decision` | As recorded: `autonomous`, `review`, `approval`, `blocked`, `unset`, `paused`, `unavailable`, `self_escalation`, or `none` for a refusal before the policy decided. |
 | `outcome` | `running`, `done`, `refused`, `pending`, `failed` or `replayed`. |
 | `code` | For `refused` only: a documented code, otherwise `refused`. Null for every other outcome. |
