@@ -1,0 +1,419 @@
+{
+  "seedHead": "0b8deb070c9f4175f50f780d95602d0732880aff",
+  "inputSha256": "d304ac463d9098a8bfb7ca9e89f1e8c356b5e8610038d23c732731dad979e008",
+  "negativeInputSha256": "af797eb380e8e7c90da12cd20e6a8f77d3273f1ba1d57676db9469b4a196a4ee",
+  "queries": [
+    {
+      "source": "prior",
+      "topic": "email/inbox",
+      "q": "how do I connect my email inbox",
+      "relevant": [
+        "/docs/email#connect-gmail-or-microsoft-365",
+        "/docs/email#connect-imap-and-smtp",
+        "/docs/integrations#set-up-an-inbound-address"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "data export",
+      "q": "export my data",
+      "relevant": [
+        "/docs#export-conversations",
+        "/docs/updates-and-recovery#back-up-your-data",
+        "/docs/privacy#give-a-customer-a-copy-of-their-data"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "billing/costs",
+      "q": "what does it cost to run",
+      "relevant": [
+        "/docs#what-you-need-and-what-it-costs",
+        "/docs/operations#measure-local-usage-and-costs"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "teammates",
+      "q": "add a teammate",
+      "relevant": [
+        "/docs/account-security#roles"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "email/inbox",
+      "q": "why are incoming emails held instead of creating tickets",
+      "relevant": [
+        "/docs/changelog#046--2026-10-18",
+        "/docs/email#review-suspended-mail"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "data export",
+      "q": "where are my local backups stored",
+      "relevant": [
+        "/docs/operations#local-data-and-backups",
+        "/docs/updates-and-recovery#on-your-computer",
+        "/docs/updates-and-recovery#back-up-your-data"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "setup",
+      "q": "how do I install it on my mac",
+      "relevant": [
+        "/docs/install#install-happytohelp",
+        "/docs/install#run-it-locally",
+        "/docs#run-it-on-your-computer",
+        "/docs/run-locally#run-it-on-your-computer",
+        "/docs/operations#run-it-on-your-computer"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "setup",
+      "q": "deploy to my own cloudflare",
+      "relevant": [
+        "/docs#deploy-to-your-own-cloudflare-account",
+        "/docs/operations#deploy-to-your-cloudflare-account",
+        "/docs/install#deploy-and-inspect"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "email/inbox",
+      "q": "use my outlook mailbox for support",
+      "relevant": [
+        "/docs/email#connect-gmail-or-microsoft-365"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "email/inbox",
+      "q": "stop out of office replies creating tickets",
+      "relevant": [
+        "/docs/integrations#out-of-office-replies-bounces-and-other-automatic-mail",
+        "/docs/integrations#what-counts-as-automatic-mail"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "billing/costs",
+      "q": "put a limit on AI spending",
+      "relevant": [
+        "/docs/operations#limit-public-traffic-and-ai-spending",
+        "/docs/operations#cap-daily-ai-work",
+        "/docs/limits#daily-ai-ceilings",
+        "/docs/limits#request-limits-and-daily-ai-ceilings",
+        "/docs/limits#defaults"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "billing/costs",
+      "q": "is there a subscription fee",
+      "relevant": [
+        "/docs/integrations#no-payments-or-billing",
+        "/docs#what-you-need-and-what-it-costs"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "data export",
+      "q": "download a backup of all my conversations",
+      "relevant": [
+        "/docs#export-conversations",
+        "/docs/updates-and-recovery#back-up-your-data"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "teammates",
+      "q": "invite a colleague",
+      "relevant": [
+        "/docs/account-security#roles"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "teammates",
+      "q": "make someone an admin",
+      "relevant": [
+        "/docs/account-security#roles",
+        "/docs/account-security#custom-roles"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "privacy",
+      "q": "delete a customer's personal information",
+      "relevant": [
+        "/docs/privacy#erase-a-contacts-personal-data",
+        "/docs/operations#contact-erasure",
+        "/docs/privacy#what-is-removed"
+      ],
+      "required": true,
+      "judgment": {
+        "gate": "A",
+        "additionalRelevant": [
+          "/docs/privacy#the-short-version"
+        ],
+        "reason": "Explicitly directs the reader to Erase personal data."
+      }
+    },
+    {
+      "source": "prior",
+      "topic": "privacy",
+      "q": "what data is sent to third parties",
+      "relevant": [
+        "/docs/privacy#what-is-sent-to-outside-services"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "exact page title",
+      "q": "Inbound email recovery",
+      "relevant": [
+        "/docs/inbound-email-recovery#inbound-email-recovery"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "exact page title",
+      "q": "Customer satisfaction surveys",
+      "relevant": [
+        "/docs/customer-satisfaction#customer-satisfaction-surveys"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "misspelling",
+      "q": "two factr authentcation",
+      "relevant": [
+        "/docs/account-security#two-factor-sign-in",
+        "/docs/account-security#turn-it-on",
+        "/docs/account-security#account-security"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "misspelling",
+      "q": "imprt tickets from zendsk",
+      "relevant": [
+        "/docs/moving-in#zendesk",
+        "/docs/moving-in#move-in-your-support-history"
+      ],
+      "required": true
+    },
+    {
+      "source": "prior",
+      "topic": "setup",
+      "q": "set opening hours",
+      "relevant": [
+        "/docs/away#set-your-hours",
+        "/docs/workflows#business-hours"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "setup",
+      "q": "start HappyToHelp on a laptop",
+      "relevant": [
+        "/docs#run-it-on-your-computer",
+        "/docs/install#",
+        "/docs/run-locally#",
+        "/docs/operations#run-it-on-your-computer"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "cost",
+      "q": "where can I see token usage and costs",
+      "relevant": [
+        "/docs/operations#measure-local-usage-and-costs"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "export",
+      "q": "can I give a customer their conversation history",
+      "relevant": [
+        "/docs/privacy#give-a-customer-a-copy-of-their-data",
+        "/docs#export-conversations"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "teammates",
+      "q": "change a team member to administrator",
+      "relevant": [
+        "/docs/account-security#roles",
+        "/docs/account-security#custom-roles"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "privacy",
+      "q": "erase a contacts personal data",
+      "relevant": [
+        "/docs/privacy#erase-a-contacts-personal-data",
+        "/docs/operations#contact-erasure"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "exact title",
+      "q": "When your team is away",
+      "relevant": [
+        "/docs/away#when-your-team-is-away"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "misspelling",
+      "q": "custmer satisfacton surveys",
+      "relevant": [
+        "/docs/customer-satisfaction#"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "synonym",
+      "q": "prevent vacation autoresponders opening cases",
+      "relevant": [
+        "/docs/integrations#out-of-office-replies-bounces-and-other-automatic-mail",
+        "/docs/integrations#what-counts-as-automatic-mail",
+        "/docs/operations#how-automatic-email-is-handled"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "one word",
+      "q": "snooze",
+      "relevant": [
+        "/docs/workflows#snooze-and-scheduled-replies",
+        "/docs/tickets#"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "question",
+      "q": "How do I require two factor sign in for everyone?",
+      "relevant": [
+        "/docs/account-security#require-it-for-your-team",
+        "/docs/account-security#two-factor-sign-in"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "security",
+      "q": "recover access when the owner loses their password",
+      "relevant": [
+        "/docs/account-security#owner-recovery",
+        "/docs/operations#sign-up-and-password-recovery"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "workflow",
+      "q": "schedule a reply for later",
+      "relevant": [
+        "/docs/workflows#snooze-and-scheduled-replies"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "privacy",
+      "q": "how long is customer data retained",
+      "relevant": [
+        "/docs/privacy#how-long-data-is-kept"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "setup",
+      "q": "connect an IMAP mailbox",
+      "relevant": [
+        "/docs/email#connect-imap-and-smtp"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "billing",
+      "q": "set a daily AI ceiling",
+      "relevant": [
+        "/docs/limits#daily-ai-ceilings",
+        "/docs/operations#cap-daily-ai-work",
+        "/docs/limits#defaults"
+      ],
+      "required": true
+    },
+    {
+      "source": "new",
+      "topic": "security",
+      "q": "view the security log",
+      "relevant": [
+        "/docs/account-security#security-log"
+      ],
+      "required": true
+    }
+  ],
+  "negativeAndHistorical": [
+    {
+      "q": "qzxv wplk",
+      "kind": "negative"
+    },
+    {
+      "q": "🧬🪸🧿🦷",
+      "kind": "negative"
+    },
+    {
+      "q": "zzqqxxvvv",
+      "kind": "negative"
+    },
+    {
+      "q": "！！！！！！",
+      "kind": "negative"
+    },
+    {
+      "q": "what should I do during an internet outage",
+      "kind": "prior temporary-edit probe"
+    }
+  ]
+}
