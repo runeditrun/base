@@ -20,6 +20,9 @@ import { verificationHistory } from './agent-history.mjs';
 import { journeyFixtures } from './agent-journey-fixtures.mjs';
 import { verificationAgentInitializer } from './agent-initializer.mjs';
 
+// Unpairing re-serves the installation without the Business trust it was paired with.
+const pairedBindings = ['RER_OWNER_CLAIM_ISSUER', 'RER_OWNER_CLAIM_INSTALLATION_ID', 'RER_OWNER_CLAIM_APP_ORIGIN', 'RER_OWNER_CLAIM_PUBLIC_KEYS', 'RER_BUSINESS_TRUST'];
+
 function finish(result, report) {
  if (result.capabilities) report(`Agent capabilities (${result.capabilities.mode}): declared=${result.capabilities.declared.join(',')}; refused=${result.capabilities.refused.join(',')}; unscoped=${result.capabilities.unscoped.join(',')}.`);
  for (const point of result.points) report(`${point.ok ? 'PASS' : 'FAIL'} ${point.id}${point.ok || !point.detail ? '' : `: ${point.detail}`}`);
@@ -152,6 +155,7 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   const result = await runAgentDoorConformance({ fetch: request, origin: hosted.origin, surface: declared.surface,
    signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: sponsors[0], sponsors: sponsors.filter(person => !negativeOnly.has(person.label)), webhooks, business, prove, ...journey, nativeStep, prepare, invoke: workerDriver?.run(hosted),
    initializeAgent: initializeAgent && (({ agentId, person }) => initializeAgent({ agentId, person, request, origin: hosted.origin, mail: network.mail, fixtures: network.fixtures })),
+   unpair: () => hosted.rebind(pairedBindings),
   });
   const points = [...result.points, ...reviewers.points()];
   return finish({ ...result, points, ok: points.every(point => point.ok) }, report);
