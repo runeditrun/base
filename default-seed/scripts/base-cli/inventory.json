@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.95-dev.g8c746b4d",
+  "cliVersion": "0.2.95-dev.g8806fa90",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -181,7 +181,7 @@
     },
     "operator-migrations.mjs": {
       "source": "onboarding/operator-migrations.mjs",
-      "sha256": "16eff9dd3e677d255980e803fb38a777c19098dcd013dd9813e3ae4302ba33e6"
+      "sha256": "c3d574a85c7164887b1fbcc861cfa6e3f4a867048347b00ee880fe7ed25ca2f0"
     },
     "operator-prerequisites.mjs": {
       "source": "onboarding/operator-prerequisites.mjs",
@@ -379,7 +379,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "93e85c12e16a375448916da11ca266a3f62df57ae68d4433b78309d4008d2491"
+      "sha256": "a3ea84a1d2e83db289d42aa1a4935254cb1547a1eb4363626cf09d53458f9ec2"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -495,11 +495,11 @@
     },
     "cli/business/carry-files.mjs": {
       "source": "cli/business/carry-files.mjs",
-      "sha256": "e281419e48555adf55b7529709057ba40ad6b9f44bc5e9c1fcc140da7e3605b4"
+      "sha256": "acf8729478c05eec13ef3b94ffa224d4ef1b72857aafaae069f479d481161ebc"
     },
     "cli/business/carry.mjs": {
       "source": "cli/business/carry.mjs",
-      "sha256": "a6a3f101f60bcaa63229632872d9cef2bb3bc0a790f74ef561bfc2ac8e6f0cbe"
+      "sha256": "c90d3bd7333ab2c3280d5e62b130cecece081b6540a2b387f4d1f3a47a73b686"
     },
     "cli/business/catchup-task.mjs": {
       "source": "cli/business/catchup-task.mjs",
@@ -507,7 +507,7 @@
     },
     "cli/business/choices.mjs": {
       "source": "cli/business/choices.mjs",
-      "sha256": "4ffad65f57510942668c44903e85e3efc1ab1ba3ee651e086d2464545512deb5"
+      "sha256": "ea4caeb46fa630f1ef2e99e728013fdab8037b2982352d6b9e2479c59873e383"
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
@@ -696,6 +696,10 @@
     "cli/checkout-folders.mjs": {
       "source": "cli/checkout-folders.mjs",
       "sha256": "65308ebad5f5202325a031f9ea67a4354bf94832c23d9e89858ba34f50602e31"
+    },
+    "cli/checkout-preparation.mjs": {
+      "source": "cli/checkout-preparation.mjs",
+      "sha256": "bdcbd2465d5f8636eb62cbb16674dc0d5710275e7d55b00b652c24d4826ff1dc"
     },
     "cli/companion/api.mjs": {
       "source": "cli/companion/api.mjs",
@@ -923,7 +927,7 @@
     },
     "cli/door-clauses.mjs": {
       "source": "cli/door-clauses.mjs",
-      "sha256": "3d745df05098b697a9fcd23096d5fe79e0eb5bbd832e2fa1c533f038bddc911c"
+      "sha256": "7bf909f81d48ea061cf04cc0d23e7c8acc2cb46252f619159cd0a59b222b0e3f"
     },
     "cli/door-mode.mjs": {
       "source": "cli/door-mode.mjs",
