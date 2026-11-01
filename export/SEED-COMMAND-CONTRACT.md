@@ -400,7 +400,12 @@ No search binding is created or provisioned. HappyToHelp's copy path is
 `src/vendor/base/modules/site/docs-search`, Uptime's is
 `src/base/modules/site/docs-search`, and Lamp's is `src/base/site/docs-search`.
 HappyToHelp/Uptime declare it in `src/site/docs-search.config.mjs`; Lamp uses
-`scripts/installer/local.mjs`. Regenerate/check `sources.lock.json` through
+`scripts/installer/local.mjs`. Replace the seed's retained AI docs tests (those
+calling `/docs/search`, reading `docs-search-vectors.json` or expecting
+embeddings or an `AI` binding) with the same questions asked through the
+static index and copied client. Stage the copy with its deletions
+(`git add -A COPY_PATH`) and those tests before locking: `lock` hashes only
+the files in Git's index. Regenerate/check `sources.lock.json` through
 the authoring CLI, then run the seed's retained docs tests, `rer build --site`
 and `rer deploy --site --dry-run`. A release and these three adoptions are
 separate from the Base branch change; this does not claim all seeds adopted.

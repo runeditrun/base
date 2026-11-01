@@ -82,7 +82,12 @@ export async function buildSite(project, store, signal) {
   let runtime;
   if (site.runtime) {
    try { runtime = await buildSiteRuntime(project, site.runtime, `${staging}.corpus.json`, staging); }
-   catch (error) { if (error instanceof RerError) throw error; throw new RerError('site_search_failed', 'Docs search index build failed; publication stopped. Check the on-site heading source and index size budget.', 1); }
+   catch (error) {
+    if (error instanceof RerError) throw error;
+    const size = error.indexSize;
+    throw new RerError('site_search_failed', size ? `Docs search index exceeds its size budget (${size.bytes}/${size.budget.bytes} bytes; ${size.gzipBytes}/${size.budget.gzipBytes} gzip bytes); publication stopped.`
+     : 'Docs search index build failed; publication stopped. Check the on-site heading source and index size budget.', 1);
+   }
    const corpus = await contained(project.root, site.runtime.corpus, {optional:true});
    await mkdir(dirname(corpus), {recursive:true});
    await cp(`${staging}.corpus.json`, corpus);

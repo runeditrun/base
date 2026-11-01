@@ -34,7 +34,8 @@ export function buildSearchIndex(pages, { previous } = {}) {
   const index = { version: indexVersion, sourceHash, engine: engine.toJSON() };
   const bytes = JSON.stringify(index);
   const counts = { total: documents.length, reused: 0, reindexed: 0, bytes: Buffer.byteLength(bytes), gzipBytes: gzipSync(bytes).length };
-  if (counts.bytes > sizeBudget.bytes || counts.gzipBytes > sizeBudget.gzipBytes) throw Error(`Docs search index exceeds budget (${counts.bytes}/${sizeBudget.bytes} bytes; ${counts.gzipBytes}/${sizeBudget.gzipBytes} gzip bytes).`);
+  if (counts.bytes > sizeBudget.bytes || counts.gzipBytes > sizeBudget.gzipBytes) throw Object.assign(Error(`Docs search index exceeds budget (${counts.bytes}/${sizeBudget.bytes} bytes; ${counts.gzipBytes}/${sizeBudget.gzipBytes} gzip bytes).`),
+    { indexSize: { bytes: counts.bytes, gzipBytes: counts.gzipBytes, budget: sizeBudget } });
   const old = new Map(Object.values(previous?.version === indexVersion ? previous.engine.storedFields : {}).map(row => [row.href, row.hash]));
   counts.reused = documents.filter(row => old.get(row.href) === row.hash).length;
   counts.reindexed = counts.total - counts.reused;
