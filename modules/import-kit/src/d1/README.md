@@ -90,9 +90,7 @@ SELECT-only batches at the smaller of the caller limit and 2 MiB. Each batch
 checks the same monotonic custody revisions, including tombstone changes;
 the original plan revision is captured before decoding. This requires the
 additive custody-state schema. Ordinary reads without a transport policy retain
-one atomic fence when it fits the 32 MiB D1 RPC ceiling; larger kit custody
-fences use the same revision-held SELECT-only batches, capped at 2 MiB.
-`readD1PersistedImport` keeps one complete
+their existing atomic admission. `readD1PersistedImport` keeps one complete
 atomic native snapshot capped at 2 MiB even when its caller omits a limit. It
 reads each destination job's `ik_d1_custody_states` revision (the same additive
 schema) before any custody and fences those revisions instead of resending
@@ -887,6 +885,7 @@ comparison still covers every original byte, field, position and scoped count.
 Without an explicit transport policy, preserved undo checks kit-only
 preconditions larger than 2 MiB in bounded SELECT batches under monotonic
 custody revisions, then fences those same revisions before any mutation.
+Report reads use the same kit-only checks and final revision fence.
 The existing custody-state schema is required for that large-snapshot path.
 Native observations, indivisible reversal groups, report postconditions and
 all native, attribution, disposition and progress writes remain together in
