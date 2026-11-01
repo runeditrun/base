@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.95-dev.g87299e72",
+  "cliVersion": "0.2.95-dev.gf9299a84",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2923,7 +2923,7 @@
     },
     "modules/import-kit/src/d1/README.md": {
       "source": "modules/import-kit/src/d1/README.md",
-      "sha256": "10d3e3917d8b6c7b9cfb499e69fedd18009b71f48b60e1b113ca277e0323bb2d"
+      "sha256": "c36dac709ff24f73745e5c1d8b1c16b3bde77815a3288b0aba4f536c6eddf8c3"
     },
     "modules/import-kit/src/d1/apply-effects.ts": {
       "source": "modules/import-kit/src/d1/apply-effects.ts",
@@ -2963,7 +2963,7 @@
     },
     "modules/import-kit/src/d1/database.ts": {
       "source": "modules/import-kit/src/d1/database.ts",
-      "sha256": "003189b6667e8819839f476e2d70261296d18f0c1241d66011613240e3b1c59e"
+      "sha256": "8551fc65186feffbfcd65662f0ce7caa3625efb1b1c5309f4870a7b552b57fd7"
     },
     "modules/import-kit/src/d1/entry-locator.ts": {
       "source": "modules/import-kit/src/d1/entry-locator.ts",
@@ -3455,7 +3455,7 @@
     },
     "modules/import-kit/src/d1/undo-report.ts": {
       "source": "modules/import-kit/src/d1/undo-report.ts",
-      "sha256": "2cb8e87b505fc70cd6e3327bf376bafceedd0db6883b51a479ef7a0a250a13d2"
+      "sha256": "2574c975dd9493b281494da6c135f1c08fe7ce7f9460a54937e7a4e9d68c25d7"
     },
     "modules/import-kit/src/d1/undo-snapshot.ts": {
       "source": "modules/import-kit/src/d1/undo-snapshot.ts",
