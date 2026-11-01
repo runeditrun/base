@@ -1,14 +1,36 @@
 # Changelog
 
-## Unreleased
+## 0.2.96
 
-- Add the signed Business decision pull at `/api/rer/agent-decisions`, with
-  bounded public audit projections, erasure-aware feed triggers and default-seed
-  migration 0040. Business stop and pairing checks refuse with empty 404s.
-  Adoption carries migration, route and artifact map together; hosted agent
-  conformance now verifies the relay. This ships dark until Business pulls.
+### Business stop
 
-- End every Business-derived authority in the agent door when Business is stopped (signed `detached:true` or the owner's stop): no Business access token is admitted for any subject, calls a Business token held for approval or left waiting for admission are refused as `sponsor_unavailable` without a native effect, and `person:` and `role:` approver and reviewer refs match nobody. Seed credentials, native sessions, embedded invocation, `sponsor` refs and the subject mapping are unchanged, so signed policy naming Business people is still adopted and its Pause and revoked lists apply. `PeopleAdapter` gains an optional `businessStopped()` that custom adapters should implement; `Principal` records its admission `source`. Agent conformance proves `BASE-AGENT-004.6` on the seed side (`004.6.seed-*`) and, when the driver can unpair, `BASE-AGENT-004.7`; `rer verify` unpairs by re-serving the same installation without its owner-claim and Business trust bindings.
+- A stopped or detached Business (signed `detached:true` or the owner's stop) ends every Business-derived authority in the agent door. No Business access token is admitted for any subject, and calls a Business token held for approval or left waiting for admission are refused as `sponsor_unavailable` without a native effect, so approvals held before the stop do not execute after it. `person:` and `role:` approver and reviewer refs match nobody. Seed credentials, native sessions, embedded invocation, `sponsor` refs and the subject mapping are unchanged, so signed policy naming Business people is still adopted and its Pause and revoked lists apply.
+- `PeopleAdapter` gains an optional `businessStopped()` that custom adapters should implement; `Principal` records its admission `source`. Agent conformance proves `BASE-AGENT-004.6` on the seed side (`004.6.seed-*`) and, when the driver can unpair, `BASE-AGENT-004.7`; `rer verify` unpairs by re-serving the same installation without its owner-claim and Business trust bindings.
+
+### Business carry and scan
+
+- `rer business` connect, next and run carry the Business profile into the first-party checkouts that `rer list` shows in the current or original pairing folder, including stopped apps, as well as running and previously carried apps. A checkout that `rer list` shows as not set up is not written to; it is named with its reason, and a folder with no apps gets a next step.
+- A scan that failed on this computer is told apart from a wait for the owner's consent: run and next point to **Retry** on **Your tools** instead of asking for consent again, and report an allowed scan that is still running or finished.
+- Commands that Business output suggests echo how `rer` was invoked: the installed `rer`, `npx -y @runeditrun/rer`, or the launcher path `install.sh` ran.
+- Each Business on an origin keeps its own device credential, so a second Business no longer overwrites the first and disconnect revokes each one. An older per-origin credential is found through its original pairing record and revoked once.
+- The carry summary prints once for an unchanged result instead of repeating at each check-in of a long-running `rer business run`; skipped-checkout reasons print with it.
+
+### Setup output
+
+- `rer setup` prints the local D1 migrations it applied once, from the durable ledger, instead of repeating Wrangler's full migration table after each migration.
+
+### Shared duties clause check
+
+- `rer door clauses --check` skips the same inherited duties as `--write` when the seed's `## Shared duties (Base)` table lists them, and names only missing or stale unlisted clauses. Without that table it still checks all thirteen duties. `--write` still requires the table.
+- Contract-document coverage treats a generated view headed by a seed's `scripts/contract-docs` generator as generated.
+
+### Run page
+
+- The "Run it yourself" path on the /run page is badged "On your computer" instead of "100% free".
+
+### Seed-door decision relay
+
+- Add the signed Business decision pull at `/api/rer/agent-decisions`, with bounded public audit projections, erasure-aware feed triggers and default-seed migration 0040. Business stop and pairing checks refuse with empty 404s. Adoption carries migration, route and artifact map together; hosted agent conformance now verifies the relay (`BASE-AGENT-009.relay`). This ships dark: nothing changes until the Business pulls.
 
 ## 0.2.95
 
