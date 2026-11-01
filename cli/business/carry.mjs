@@ -31,7 +31,7 @@ function warning(origin, error, checkout) {
   : error.name === 'TimeoutError' || error.name === 'AbortError' ? 'the server did not answer within 5 seconds'
   : error.message?.startsWith('Could not reach the Business server at ') ? 'the server is unreachable'
   : error.message === 'credential unavailable' ? 'the Business credential is unavailable in OS credential storage'
-  : localCause(error) ?? (['the response names another Business', 'the Business profile is invalid', 'the checkout is not first-party', 'the carry path is linked or not a regular file', 'the existing file is not a carry for this paired Business', 'the carry registry is invalid'].includes(error.message) ? error.message : 'the Business profile could not be refreshed');
+  : localCause(error) ?? (['the response names another Business', 'the Business profile is invalid', 'the checkout is not first-party', 'the carry path is linked or not a regular file', 'the existing file is not a carry for this paired Business', 'the carry registry is invalid', 'the checkout is not set up yet: run rer setup'].includes(error.message) ? error.message : 'the Business profile could not be refreshed');
  const step = error.code === 'ENOENT' ? ' Open the app with rer dev --cwd FOLDER, then run business next again.' : '';
  process.stderr.write(`Business carry at ${origin}${checkout ? ` for ${JSON.stringify(checkout)}` : ''}: ${reason}; keeping any local carry.${step}\n`);
 }

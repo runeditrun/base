@@ -106,6 +106,10 @@ test('Business check-ins carry listed prepared and live apps, preserve settings 
  const skipped = join(home, 'independent-app');
  await mkdir(skipped);
  await writeFile(join(skipped, 'OPERATIONS.json'), JSON.stringify({ version: 2, commands: {} }));
+ const unprepared = join(home, 'unprepared-app');
+ await mkdir(join(unprepared, 'scripts'), { recursive: true });
+ await writeFile(join(unprepared, 'OPERATIONS.json'), JSON.stringify({ version: 2, seedContract: { profile: 'first-party' } }));
+ await writeFile(join(unprepared, 'scripts/rer.mjs'), `process.stdout.write(JSON.stringify({ local: { prepared: false } }));`);
  const listed = await cli(home, ['list', '--json'], { env });
  assert.equal(listed.code, 0, listed.stderr);
  assert.ok(JSON.parse(listed.stdout).checkouts.some(app => app.path === checkout && app.profile === 'first-party' && app.launchable && app.prepared));
@@ -118,6 +122,8 @@ test('Business check-ins carry listed prepared and live apps, preserve settings 
  const paired = await connect(home, remote, { env });
  assert.ok(paired.stdout.includes('2 local app carry files'), paired.stdout);
  assert.ok(paired.stderr.includes(JSON.stringify(skipped)) && paired.stderr.includes('not first-party'), paired.stderr);
+ assert.ok(paired.stderr.includes(JSON.stringify(unprepared)) && paired.stderr.includes('not set up yet: run rer setup'), paired.stderr);
+ await assert.rejects(stat(carryFile(unprepared)), { code: 'ENOENT' });
  t.diagnostic(`listed stopped checkout received carry; skipped ${skipped}: not first-party`);
  await register([live]); // The first checkout is stopped, but custody remains in carried.json.
  const first = await readFile(carryFile(checkout), 'utf8');
