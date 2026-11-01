@@ -1,6 +1,6 @@
 import { Api } from './api.mjs';
 import { createCredentialStore } from './keychain.mjs';
-import { credentialHandle, loadState } from './state.mjs';
+import { deviceCredentialHandle, loadState } from './state.mjs';
 import { localCause } from './errors.mjs';
 import { carryCheckouts, firstParty, writeCarry } from './carry-files.mjs';
 export { removeCarries } from './carry-files.mjs';
@@ -32,24 +32,28 @@ function warning(origin, error, checkout) {
   : error.message?.startsWith('Could not reach the Business server at ') ? 'the server is unreachable'
   : error.message === 'credential unavailable' ? 'the Business credential is unavailable in OS credential storage'
   : localCause(error) ?? (['the response names another Business', 'the Business profile is invalid', 'the checkout is not first-party', 'the carry path is linked or not a regular file', 'the existing file is not a carry for this paired Business', 'the carry registry is invalid'].includes(error.message) ? error.message : 'the Business profile could not be refreshed');
- process.stderr.write(`Business carry at ${origin}${checkout ? ` for ${JSON.stringify(checkout)}` : ''}: ${reason}; keeping the local carry.\n`);
+ const step = error.code === 'ENOENT' ? ' Open the app with rer dev --cwd FOLDER, then run business next again.' : '';
+ process.stderr.write(`Business carry at ${origin}${checkout ? ` for ${JSON.stringify(checkout)}` : ''}: ${reason}; keeping any local carry.${step}\n`);
 }
 
 export async function carryCheckIn(state, self) {
  try {
   if (!state?.origin || !state.businessId || !state.executorId || state.revoked) return;
   const carry = buildCarry(state, self);
-  if (!carry) return;
   const checkouts = [], unchanged = [];
   let failed = 0;
   const refused = (error, checkout) => { failed++; warning(state.origin, error, checkout); };
-  for (const { checkout, live } of await carryCheckouts(refused)) {
+  for (const { checkout, live } of await carryCheckouts(refused, state)) {
    try {
+    if (!carry) {
+     process.stderr.write(`Business carry skipped for ${JSON.stringify(checkout)}: the server did not provide this Business's profile; retry business next after the server supports profile sharing.\n`);
+     failed++; continue;
+    }
     const changed = await writeCarry(checkout, carry, { existingOnly: !live });
     (changed ? checkouts : unchanged).push(checkout);
    } catch (error) { refused(error, checkout); }
   }
-  return { name: carry.name, checkouts, unchanged, failed };
+  return { name: carry?.name ?? state.businessId, checkouts, unchanged, failed };
  } catch (error) { warning(state.origin, error); }
 }
 
@@ -71,7 +75,7 @@ export async function refreshCheckout(checkout) {
   if (!await firstParty(checkout)) return;
   state = await loadState();
   if (!state?.origin || !state.businessId || !state.executorId || state.revoked) return;
-  const credential = await createCredentialStore().get(credentialHandle(state.origin));
+  const credential = await createCredentialStore().get(deviceCredentialHandle(state));
   if (!credential) throw Error('credential unavailable');
   await refreshCarry(new Api(state.origin, credential), state, { checkout });
  } catch (error) { warning(state?.origin ?? 'the paired origin', error); }

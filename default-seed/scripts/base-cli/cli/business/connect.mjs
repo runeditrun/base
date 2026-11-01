@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { Api, originUrl, identifier, pause } from './api.mjs';
-import { loadState, saveState, credentialHandle, loadPending, savePending, clearPending, checkStateWritable } from './state.mjs';
+import { loadState, saveState, credentialHandle, deviceCredentialHandle, loadPending, savePending, clearPending, checkStateWritable } from './state.mjs';
 import { createCredentialStore } from './keychain.mjs';
 import { applyChoices } from './choices.mjs';
 import { rerCommand, businessCommand } from './invocation.mjs';
@@ -30,7 +30,7 @@ export async function connect({ code, origin } = {}) {
  if (stored) {
   if (stored.revoked) throw Error(`This computer was ${revokedText(stored)}\nThen connect with a new code from ${stored.origin}/business.`);
   if (stored.origin !== origin) throw Error(`This computer is already connected to Business at ${stored.origin}. Run ${rerCommand()} business disconnect before connecting it elsewhere.`);
-  const credential = await createCredentialStore().get(credentialHandle(origin));
+  const credential = await createCredentialStore().get(deviceCredentialHandle(stored));
   if (!credential) throw Error(`This computer's Business credential is missing from OS credential storage. Run ${rerCommand()} business disconnect, then connect again with a new code from ${origin}/business.`);
   await connected(new Api(origin, credential), stored, { reconnecting: true });
   return;
@@ -41,8 +41,8 @@ export async function connect({ code, origin } = {}) {
  // Refuse before redeeming the one-use code or collecting an approval when this
  // session cannot keep the pairing or store the device credential.
  await checkStateWritable();
- const store = createCredentialStore(), handle = credentialHandle(origin);
- try { await store.get(handle); await store.check(); }
+ const store = createCredentialStore();
+ try { await store.check(); }
  catch (error) {
   const outside = error.sandboxRefused ? ` Approve this command outside the sandbox: ${rerCommand()} business connect${code ? ` --code ${code}` : ''} --origin ${origin}. Every other business command runs inside the sandbox.` : '';
   throw Error(`${error.message}${outside} ${pending ? 'The saved pairing was kept; run connect again once this is fixed.' : nothingSent}`);
@@ -87,7 +87,8 @@ export async function connect({ code, origin } = {}) {
    if (result?.status === 'paired') {
     if (typeof result.device_credential !== 'string') throw Error('Business server returned an invalid device credential.');
     const folder = workingFolder();
-    const state = { version: 1, origin, businessId: identifier(result.business_id), executorId: identifier(result.executor_id), vendorHandles: [], awakeConsent: false, ...(folder ? { workingFolder: folder } : {}) };
+    const state = { version: 1, credentialVersion: 2, origin, businessId: identifier(result.business_id), executorId: identifier(result.executor_id), vendorHandles: [], awakeConsent: false, ...(folder ? { workingFolder: folder } : {}) };
+    const handle = credentialHandle(origin, state.businessId);
     // No authenticated request (including activation) before both durable writes.
     await store.set(handle, result.device_credential);
     try { await saveState(state); } catch (error) { await store.delete(handle); throw error; }

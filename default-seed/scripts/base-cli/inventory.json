@@ -495,11 +495,11 @@
     },
     "cli/business/carry-files.mjs": {
       "source": "cli/business/carry-files.mjs",
-      "sha256": "7b842cecd0805eb911451adbd961b42e99798b62637075b0ccaf71797ee9a564"
+      "sha256": "3135c118d0a8a883224e8b7bd57b413d7620793ac96e80d1b1d51e6d434736d7"
     },
     "cli/business/carry.mjs": {
       "source": "cli/business/carry.mjs",
-      "sha256": "7f4e5a08b477f3d19aa44bc93ef72ae6be1f9b98537d579a08b19bb658c83d0f"
+      "sha256": "f55e068329bed112dd3054844a063819ca1c213b66727821262f901c94263363"
     },
     "cli/business/catchup-task.mjs": {
       "source": "cli/business/catchup-task.mjs",
@@ -507,7 +507,7 @@
     },
     "cli/business/choices.mjs": {
       "source": "cli/business/choices.mjs",
-      "sha256": "27b05e7d5e58f197ec8fc47084ecd6826ad3856fc925b54546f57b3eb93d1ed0"
+      "sha256": "4ffad65f57510942668c44903e85e3efc1ab1ba3ee651e086d2464545512deb5"
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
@@ -519,7 +519,7 @@
     },
     "cli/business/connect.mjs": {
       "source": "cli/business/connect.mjs",
-      "sha256": "fbc5f2860d1ac74b29ae8a024ebeef38fc3ee4aecdcea8a694a4dd725b1be4fe"
+      "sha256": "7cdeaff29357e5eca75a809b521331b6d32b5f8f534c0ffce19c36456c565491"
     },
     "cli/business/detector.mjs": {
       "source": "cli/business/detector.mjs",
@@ -551,7 +551,7 @@
     },
     "cli/business/invocation.mjs": {
       "source": "cli/business/invocation.mjs",
-      "sha256": "7e48ff9ba33927c3f86313b91b57d7fa2743503f192eedb9083c75a95eaffe9a"
+      "sha256": "00169074fa38e2e45311ae9c1f3049c900aebbcb99bb880fc426754da7b62aab"
     },
     "cli/business/keychain.mjs": {
       "source": "cli/business/keychain.mjs",
@@ -563,7 +563,7 @@
     },
     "cli/business/local-commands.mjs": {
       "source": "cli/business/local-commands.mjs",
-      "sha256": "571c4ff445b0ccb83a07d92777cd410f87aa30e57c97c6f836020ce25c6bcf4f"
+      "sha256": "8dd259a8fe2915b92663f0d95ad8fbd23468cec92dac187ccdb9034bcbbf791f"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
@@ -611,7 +611,7 @@
     },
     "cli/business/questions.mjs": {
       "source": "cli/business/questions.mjs",
-      "sha256": "6efc37fecb2144fbba97c93e2246f0ce95cc622f3bd7805b8ba989ccbeb1bbda"
+      "sha256": "9abd0dffcbf38bfadcd63c446b9cad50d5d564a3fd5329e2d4e45e35ffeb20aa"
     },
     "cli/business/repository.mjs": {
       "source": "cli/business/repository.mjs",
@@ -643,7 +643,7 @@
     },
     "cli/business/state.mjs": {
       "source": "cli/business/state.mjs",
-      "sha256": "e02e30b25e6b38e4769b9dcee68b7abec01dc05adb99008cc46d2d5d13e254f8"
+      "sha256": "aaecebbe98fd53d8b20a98d73656fc560ff69a5f8d83699e5aba839beb99cfbf"
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
@@ -692,6 +692,10 @@
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",
       "sha256": "28d90e72bf971865543149dba83e7cff81f738af8e54208b848b8e08a36377f8"
+    },
+    "cli/checkout-folders.mjs": {
+      "source": "cli/checkout-folders.mjs",
+      "sha256": "65308ebad5f5202325a031f9ea67a4354bf94832c23d9e89858ba34f50602e31"
     },
     "cli/companion/api.mjs": {
       "source": "cli/companion/api.mjs",
@@ -1943,7 +1947,7 @@
     },
     "foundation/runtime/contract-docs.mjs": {
       "source": "foundation/runtime/contract-docs.mjs",
-      "sha256": "9df82c57404ec33c5807973e25dda23514dde977c5d9de7ff025386ebf21a75c"
+      "sha256": "0c4e8fc36eb2e327c8744c59f3d8be2bba2070794558a4e6cbdf68e210637b96"
     },
     "foundation/runtime/contract-prose-patterns.mjs": {
       "source": "foundation/runtime/contract-prose-patterns.mjs",

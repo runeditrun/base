@@ -43,7 +43,10 @@ export const ownerLink = state => `${state.origin}/business/${encodeURIComponent
 // folder scan has finished, that is the owner's scan permission for the folder
 // connect ran in; afterwards it is the owner's next step in the browser.
 export function waitingFor(state) {
+ if (state.localScan?.state === 'failed') return `This computer's scan failed. The owner can press Retry on Your tools: ${ownerLink(state)}/tools`;
+ if (state.localScan?.state === 'done') return `Waiting for the next task. Nothing needs this computer until the owner moves the plan forward: ${ownerLink(state)}`;
  if (!state.discovered) {
+  if (state.localScan?.allowed) return `Waiting for this computer's allowed scan to run. Check its progress on Your tools: ${ownerLink(state)}/tools`;
   const folder = state.workingFolder ?? process.cwd();
   return `Waiting for the owner to allow scanning ${folder} (names only). They allow it on Your tools: ${ownerLink(state)}/tools`;
  }
@@ -143,7 +146,7 @@ export async function next() {
   return;
  }
  const { toolId, vendorId, vendors } = classification(item);
- process.stdout.write(`Agent: ${id}\nTool: ${toolId}\nSuggested vendor: ${vendorId}\nVendors: ${vendors.join(' | ')}\nSuggest how this tool is used. The owner confirms in the browser.\nUsage: ${classifications.join(' | ')}\nRun: rer business answer ${id} <vendor_id|none> <usage> [confidence]\n`);
+ process.stdout.write(`Agent: ${id}\nTool: ${toolId}\nSuggested vendor: ${vendorId}\nVendors: ${vendors.join(' | ')}\nSuggest how this tool is used. The owner confirms in the browser.\nUsage: ${classifications.join(' | ')}\nRun: ${businessCommand(`answer ${id} <vendor_id|none> <usage> [confidence]`)}\n`);
 }
 
 export async function answer(id, vendorId, choice, rawConfidence = '1') {
