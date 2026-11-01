@@ -1,8 +1,38 @@
 # Changelog
 
-## Unreleased
+## 0.2.95
 
-- Give native subject erasure custody of mapped agent-door payloads, retaining value-free decisions and secret-keyed replay refusals only within the fixed 30-day completion window while excluding replay aliases from archives.
+### Native agent erasure and safe replay
+
+- Native subject erasure now covers mapped agent-door payloads together with the subject, including identifier-linked proposals and recorded-name and colon mentions. Value-free decision custody and secret-keyed replay refusal aliases are retained only for the fixed 30-day completion window, and replay aliases are excluded from archives.
+- Known limit, accepted 30 Oct 2026: a numeric-only recorded name such as `1` also redacts unrelated text such as `1:30 PM`. Erasure fails closed rather than leaving the name behind.
+- Adopters append the custody and window schema in their own new migrations (Base's reference migrations are `0038_agent_erasure_custody.sql` and `0039_agent_replay_window.sql`), map every installed agent table and column into their existing native erasure transaction, reuse the installation secret and fence, and schedule `expireReplayCalls`. Recipe: `modules/agent-door/ADOPTING.md`. Seed acceptance is not promoted automatically.
+
+### MCP clients and native admission
+
+- The agent door accepts the June 2025 MCP protocol alongside November 2025 and July 2026. It authenticates before validating the protocol, accepts a body-only `initialize`, and treats headerless stateless requests as June 2025. Modern clients keep consistent version, method and name metadata.
+- Concurrent native admissions wait for the bounded policy slot and recheck current authority and policy before any effect.
+- Narrowing injection conformance requires `invalid_arguments`. Declared disposable queue producers can be failed and restored before enqueue. Refresh the complete shared door and conformance dependency set. Sources: `modules/agent-door/README.md`, `modules/agent-door/ADOPTING.md`, `cli/hosted-queue-producers.mjs`.
+
+### Spool native-Wrangler history restore
+
+- Optional seed-owned build evidence now supports a plain `d1_migrations` ledger only when its names select an exact ordered file prefix whose replay reproduces the complete live schema. Unknown, gapped or reordered history and schema drift refuse before any restore write. Archive history still needs its own authenticated proof, and no historical hashes are invented or backfilled.
+- Adopt `legacyMigrationEvidence()` from `@runeditrun/rer/portability-evidence` in existing Vite plugins, import `virtual:rer-legacy-migration-evidence` in the archive server adapter, and pass `migrations: () => workerMigrations(db, policy, evidence)` to `createPortability`. Retain the reviewed applied migration files, refresh helpers and copied portability runtime together, and retain one service through the initial upload. Recipe: `modules/portability/README.md`. This is Base support; Spool's published-package restore proof is reported separately.
+
+### Source refresh and recovery
+
+- `rer refresh-base` closes the dependencies imported by retained seed modules, includes the deploy-kit JSONC and migration-directory helpers, and refuses undeclared retained dependencies before any write.
+- Refresh from a full immutable commit SHA, an extracted `--base-archive DIR`, or authenticated `--from-api` reads. A tag name is not accepted as `--ref`; resolve it first with `git rev-parse 'rer-v0.2.95^{commit}'`. Archive source identity is caller-supplied and cannot prove missing historical ancestry; API reads use checked immutable objects. See `edition-authoring/ADOPTING.md` and `edition-authoring/README.md`.
+
+### Shared duties clause handling
+
+- `rer door clauses --write` requires a `## Shared duties (Base)` table with a `Base duty` column and skips the inherited duties listed there, preserving existing status, evidence, gap and judgment. Read-only `--check` still inspects clause definitions, including listed duties.
+- Review the generated contract views and regenerate the seed's source lock last. A seed's rows have not passed merely because Base delivered the duties. Commands and behavior: `modules/agent-door/ADOPTING.md`.
+
+### Previously carried local checkouts
+
+- Business check-in refreshes the existing carry in stopped checkouts as well as live ones, keeping the identity and private-file checks and the prior carry when a refresh is refused. Update the installed CLI and use the existing supervisor check-in; there is no new connect authority and no claim that an app has applied the carry.
+- Follow-up: N-07's four minor follow-ups remain later work and are not part of this release.
 
 ## 0.2.94
 
