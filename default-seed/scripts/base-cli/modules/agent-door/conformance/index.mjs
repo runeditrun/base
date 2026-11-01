@@ -7,7 +7,8 @@ import { createProtocol } from './protocol.mjs';
 import { autonomousPolicy, heldPolicy } from './crypto.mjs';
 import { discoverDoor, listedDoor } from './discovery.mjs';
 import { runJourney } from './journey.mjs';
-import { unsetPolicy, removalPhase, blockedPhases, pausePhase, consentRevocationPhase } from './policy-phases.mjs';
+import { unsetPolicy, removalPhase, blockedPhases, pausePhase, consentRevocationPhase, agentRevocationPhase } from './policy-phases.mjs';
+import { unpairPhase } from './unpair.mjs';
 import { negativePhase } from './negative.mjs';
 import { replayAdmissionPhase } from './replay.mjs';
 import { webhookPhase } from './webhooks.mjs';
@@ -19,7 +20,7 @@ import { invocationPhase } from './invocation.mjs';
 export { validateAgentSurface } from './surface.mjs';
 
 /** Run against a fresh, real installation using its HTTP and person doors. */
-export async function runAgentDoorConformance({ fetch, invoke, origin, surface, signer, person, sponsors = [person], webhooks, business = 'rer-agent-conformance', consent = randomUUID(), now, prove, nativeJourney, nativeStep, prepare, initializeAgent }) {
+export async function runAgentDoorConformance({ fetch, invoke, origin, surface, signer, person, sponsors = [person], webhooks, business = 'rer-agent-conformance', consent = randomUUID(), now, prove, nativeJourney, nativeStep, prepare, initializeAgent, unpair }) {
  const validation = validateAgentSurface(surface), points = [...validation.points];
  if (!validation.ok) return { ok: false, points };
  const capabilities = capabilitySet(surface.capabilities);
@@ -42,6 +43,7 @@ export async function runAgentDoorConformance({ fetch, invoke, origin, surface, 
  await c.phase('BASE-AGENT-011.phase5', () => pausePhase(c));
  await c.phase('BASE-AGENT-004.phase6', () => negativePhase(c));
  await c.phase('BASE-AGENT-004.consent', () => consentRevocationPhase(c));
+ await c.phase('BASE-AGENT-004.6.seed', () => agentRevocationPhase(c, initializeAgent));
  if (invoke) await c.phase('BASE-AGENT-012.invocation', () => invocationPhase(c, invoke));
  if (nativeJourney) await c.phase('BASE-AGENT-013.native-journey', async () => { await nativeJourney({ tool: c.tool }); c.add('BASE-AGENT-013.native-journey', true); });
  if (surface.tools.some(tool => tool.authority === 'none')) await c.phase('BASE-AGENT-005.no-subject', () => recordSecurityPhase(c));
@@ -51,5 +53,6 @@ export async function runAgentDoorConformance({ fetch, invoke, origin, surface, 
  if (capabilities.mode === 'declared' && offers(surface.capabilities, 'subscriptions')) await c.phase('BASE-AGENT-subset.subscriptions', () => subscriptionPhase(c));
  await c.phase('BASE-AGENT-009.phase7', () => auditPhase(c));
  if (sponsors.length > 1) await c.phase('BASE-AGENT-004.cross-sponsor', () => crossSponsorPhase(c, sponsors, initializeAgent));
+ if (unpair) await c.phase('BASE-AGENT-004.7', () => unpairPhase(c, unpair, sponsors));
  return { ok: points.every(point => point.ok), points, capabilities };
 }

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.94-dev.g93d234fc",
+  "cliVersion": "0.2.94-dev.g41ac174e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,7 +391,7 @@
     },
     "cli/agent-door.mjs": {
       "source": "cli/agent-door.mjs",
-      "sha256": "8eea3b343d63ec98b676a13a13f5ab1f6f8c515ef3ed63aab99ebc0d7ef94337"
+      "sha256": "b9e32a9f3512c50ead107e9def95421db5c298210111d0cffec87fbedd516aaf"
     },
     "cli/agent-fixtures.mjs": {
       "source": "cli/agent-fixtures.mjs",
@@ -963,7 +963,7 @@
     },
     "cli/hosted-output.mjs": {
       "source": "cli/hosted-output.mjs",
-      "sha256": "9b3351f899d5b4f7d2b5035a651a4b232e494a4da43df29acc262f44845d7f9e"
+      "sha256": "635eb643e1e2d1b4ef11c517c49e33eef8f9e67649e2ec0f7f31dfec987d2d5d"
     },
     "cli/hosted-queue-producers.mjs": {
       "source": "cli/hosted-queue-producers.mjs",
@@ -2015,7 +2015,7 @@
     },
     "modules/agent-door/conformance/index.mjs": {
       "source": "modules/agent-door/conformance/index.mjs",
-      "sha256": "88d622c1ae17bcfc457dc62302ace87f61565a828322f588e592ce5678843aaf"
+      "sha256": "db62e0239beb49cd9bc9ec5a7d6c94b7e757c7ffa4f0705881c43633e135d0dd"
     },
     "modules/agent-door/conformance/injection.mjs": {
       "source": "modules/agent-door/conformance/injection.mjs",
@@ -2051,7 +2051,7 @@
     },
     "modules/agent-door/conformance/policy-phases.mjs": {
       "source": "modules/agent-door/conformance/policy-phases.mjs",
-      "sha256": "2b528e03623e6afe716eb5f34e978b233c57a9dc8f13a05d4aaabb3da52d4191"
+      "sha256": "143cab8fb590e754bb544fbff411432e5501004bef876ab656cfa49b3c300adc"
     },
     "modules/agent-door/conformance/protocol.mjs": {
       "source": "modules/agent-door/conformance/protocol.mjs",
@@ -2100,6 +2100,10 @@
     "modules/agent-door/conformance/tool-name.mjs": {
       "source": "modules/agent-door/conformance/tool-name.mjs",
       "sha256": "2bedd64a69b1e2a7dc02f7218cdda66e541a955b1a0cfc289d15d96630e616e8"
+    },
+    "modules/agent-door/conformance/unpair.mjs": {
+      "source": "modules/agent-door/conformance/unpair.mjs",
+      "sha256": "b95cf1cbc6f45d7e303ab0c2d96c7a91e3a111d8a7afdedc8c0926bff97d3872"
     },
     "modules/agent-door/conformance/webhooks.mjs": {
       "source": "modules/agent-door/conformance/webhooks.mjs",
