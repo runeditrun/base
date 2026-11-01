@@ -114,7 +114,21 @@ name, specialist, database, tool registry and people adapter.
 Import `createAgentDoor` from the copied `index.ts` production entry, not an
 internal implementation file or the test-only conformance signer. Route its
 `handle` before ordinary app authentication redirects so MCP credentials and
-signed policy adoption reach their own checks. Retain the edition's native
+signed policy adoption reach their own checks. Also route
+`POST /api/rer/agent-decisions` to the same `handle` before app authentication.
+The relay migration, route and erasure-map declaration must land in the same
+seed commit. Copy the relay DDL from `schema/agent-door.sql` into a new numbered
+migration and backfill existing MCP audits with consent to the current
+envelope Business, as in `default-seed/migrations/core/0040_agent_door_relay.sql`.
+Do not alter an applied migration. The Business drops pre-join history; this
+backfill cannot reconstruct older pairing authority. Declare
+`agent_door_relay(sequence,decision_id,business)` as `unrelated` in each native
+artifact map: it holds only decision ids and the installation Business id.
+Record the Business-held projections as an external custody store, purged by
+tombstone pulls and the authority/stop/unreachable rules in the
+[relay wire](README.md#business-decision-relay-w-r1w-r5).
+`BASE-AGENT-009.relay` runs after the audit phase against the hosted build and
+refuses a missing route or one accepting a foreign signature. Retain the edition's native
 person session and Origin and CSRF controls. The [route and capacity reference](README.md)
 lists the owned paths and defaults; these are request capacities, not company
 policy limits.

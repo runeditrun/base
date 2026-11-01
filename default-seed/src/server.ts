@@ -34,7 +34,7 @@ export default withDemo({
     if (asset) return asset
     bindings = requireBindings(bindings)
     const agentPath = new URL(request.url).pathname
-    if (agentPath === '/mcp' || agentPath === '/agents' || agentPath.startsWith('/agents/') || agentPath === '/api/rer/agent-policy' || agentPath.startsWith('/.well-known/oauth-protected-resource')) {
+    if (agentPath === '/mcp' || agentPath === '/agents' || agentPath.startsWith('/agents/') || agentPath === '/api/rer/agent-decisions' || agentPath === '/api/rer/agent-policy' || agentPath.startsWith('/.well-known/oauth-protected-resource')) {
       const agentResponse = await baseAgentDoor(bindings).handle(request)
       if (agentResponse) return rejectedResponse(request, agentResponse)
     }

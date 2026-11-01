@@ -129,6 +129,12 @@ export default {
       const saved = JSON.parse(job.saved)
       return Response.json(await door.invoke('synthetic.queue.execute', { id: input.id, ...input.args, idempotency_key: saved.idempotencyKey }, { ...saved, ...input.override }))
     }
+    if (path === '/__stop') {
+      const person = await doorPerson(auth, request)
+      if (!person) return new Response(null, { status: 401 })
+      await settings.stop(person.id)
+      return Response.json({ ok: true })
+    }
     if (path === '/__embedded') {
       const person = await doorPerson(auth, request)
       if (!person) return new Response(null, { status: 401 })

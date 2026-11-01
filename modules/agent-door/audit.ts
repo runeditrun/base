@@ -18,6 +18,7 @@ export interface AuditRow {
   decision: string; outcome: 'running' | 'done' | 'refused' | 'pending' | 'failed' | 'replayed'; code: string | null
   approval: { id: string; by: string[] } | null; review: { id: string; by: string | null } | null
   idempotency_key: string | null; trace: string | null; ignored_arguments: string[]; replay_of: string | null
+  resources?: string[]; resource_count?: number
   classification_refusal?: string
 }
 export interface Evidence { company_policy?: CompanyPolicyDecision; document: PolicyDocument; usage: Record<string, number>; classes: ClassAndFacts[]; result: string; rules: unknown }
@@ -45,6 +46,10 @@ export async function audit(rt: Runtime, row: AuditRow, evidence?: Evidence) {
 export function outcomeRow(row: AuditRow, result: import('./types.ts').CallResult) {
   if (result.decision) recordDecision(row, result.decision)
   if (row.outcome !== 'replayed' && row.outcome !== 'failed') row.outcome = result.code === 'output_invalid' || result.code === 'execution_failed' ? 'failed' : result.outcome
+  if (row.outcome === 'done' && result.resources) {
+    row.resources = result.resources.map(link => link.uri).filter(uri => typeof uri === 'string')
+    row.resource_count = row.resources.length
+  }
   row.code = result.code ?? null
   row.approval = result.approval ? { id: result.approval.id, by: (result.receipt?.approved_by as string[]) ?? [] } : null
   row.review = result.review ? { id: result.review.id, by: null } : null
