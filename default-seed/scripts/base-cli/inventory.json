@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.94-dev.g8fbac082",
+  "cliVersion": "0.2.94-dev.g6ea19447",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -939,7 +939,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "2902cb8213adc08570934b9901f1dd7370773783c2982ff901d85fd0b0195281"
+      "sha256": "b9831d17d031a9041a7a5afbb8e6d14ae6f2be5b3ede3ceeddbc726db230c40f"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1997,6 +1997,10 @@
       "source": "modules/agent-door/conformance/authority.mjs",
       "sha256": "5a65a157a288507bb884105abbab65a0876b066f742a8474b33528333c9c0a73"
     },
+    "modules/agent-door/conformance/business.mjs": {
+      "source": "modules/agent-door/conformance/business.mjs",
+      "sha256": "f3164b64b8dcd380353979a5d6f061eec8b6903f046ddbcdef12e526c465e067"
+    },
     "modules/agent-door/conformance/crypto.mjs": {
       "source": "modules/agent-door/conformance/crypto.mjs",
       "sha256": "fea7829f3d31512f99649a657ecd641b554c158abd6caf99be1d4e9d357225ad"
@@ -2007,7 +2011,7 @@
     },
     "modules/agent-door/conformance/erasure.mjs": {
       "source": "modules/agent-door/conformance/erasure.mjs",
-      "sha256": "1e33e00db3ba162c118ddfedc4802b3d073d82947603a1a02a4ae07adb8d8a02"
+      "sha256": "3d470058d51e15298ca2aececa1579d949909c35b99e9cdf4382be56b4093ec7"
     },
     "modules/agent-door/conformance/fixtures.mjs": {
       "source": "modules/agent-door/conformance/fixtures.mjs",
@@ -2015,7 +2019,7 @@
     },
     "modules/agent-door/conformance/index.mjs": {
       "source": "modules/agent-door/conformance/index.mjs",
-      "sha256": "88d622c1ae17bcfc457dc62302ace87f61565a828322f588e592ce5678843aaf"
+      "sha256": "f28c3b9e71062ee4a812122390b58f43267bea5da9e31acb8f6ba2e65e57df7b"
     },
     "modules/agent-door/conformance/injection.mjs": {
       "source": "modules/agent-door/conformance/injection.mjs",
@@ -2028,6 +2032,10 @@
     "modules/agent-door/conformance/journey.mjs": {
       "source": "modules/agent-door/conformance/journey.mjs",
       "sha256": "21f3a8fa7929f5246dcc16d1c5640d3695032e190e2032bf3a7a90f60413b468"
+    },
+    "modules/agent-door/conformance/links.mjs": {
+      "source": "modules/agent-door/conformance/links.mjs",
+      "sha256": "7258bcdc49bca360b11f311611e56de46270cc915a64b2cbb098de87d5da1025"
     },
     "modules/agent-door/conformance/narrowing.d.mts": {
       "source": "modules/agent-door/conformance/narrowing.d.mts",
@@ -2087,7 +2095,7 @@
     },
     "modules/agent-door/conformance/surface.mjs": {
       "source": "modules/agent-door/conformance/surface.mjs",
-      "sha256": "40cac36fdd04ef9fca8ffec84ee61c71c546f9e583d26b39b9d65d76d2cae1bb"
+      "sha256": "068bea943197e8256ab2fd63617a23ffdbfba60c7ce5927fd8cd4fc5e19bcab3"
     },
     "modules/agent-door/conformance/target.mjs": {
       "source": "modules/agent-door/conformance/target.mjs",
@@ -2104,6 +2112,18 @@
     "modules/agent-door/conformance/webhooks.mjs": {
       "source": "modules/agent-door/conformance/webhooks.mjs",
       "sha256": "0ab018eacc5568b8f4e9c6302ed1ca28c01221cad943723136ff96544bf2a7ee"
+    },
+    "modules/agent-door/refusal-codes.d.mts": {
+      "source": "modules/agent-door/refusal-codes.d.mts",
+      "sha256": "7c95d30dc261862939926a4cfff858b7cd96fa2f8b5d839454171150d3e5a3af"
+    },
+    "modules/agent-door/refusal-codes.mjs": {
+      "source": "modules/agent-door/refusal-codes.mjs",
+      "sha256": "358d1f3cb4d709d0c62a38bcff656bf2b1d6a0e34d6103aaa2cc5fcbfbcbefa8"
+    },
+    "modules/agent-door/schema/door-decisions.schema.json": {
+      "source": "modules/agent-door/schema/door-decisions.schema.json",
+      "sha256": "bc25600f9714b8eb92fbe65682018d58b8677ce31c7cb2069d9ed54f6c90c27a"
     },
     "modules/ai/LICENSE": {
       "source": "modules/ai/LICENSE",

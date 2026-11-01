@@ -26,7 +26,7 @@ export async function migrate(db, filename) {
   // connections per start, which exhausts the ephemeral port range under load.
   await db.batch(splitSql(sql).map((statement) => db.prepare(statement)))
 }
-export async function emittedRuntime({ prior = false, noMail = false, oidc = false, devKey, demo = false, demoHost = demo, hostname = '127.0.0.1', bindings = {}, files = false } = {}) {
+export async function emittedRuntime({ prior = false, noMail = false, oidc = false, devKey, demo = false, demoHost = demo, hostname = '127.0.0.1', bindings = {}, files = false, outbound } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'default-auth-emitted-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   // Mail flows exercise production HTTPS; explicit local runtimes suppress mail.
@@ -97,6 +97,9 @@ export async function emittedRuntime({ prior = false, noMail = false, oidc = fal
     outboundService: async (request) => {
       networkRequests.push({ origin: new URL(request.url).origin, path: new URL(request.url).pathname })
       if (provider && new URL(request.url).origin === provider.issuer) return provider.fetch(request)
+      // A journey may hold or fail the paid edge; its answer, if any, replaces the capture.
+      const edge = await outbound?.(request.clone())
+      if (edge) return edge
       if (request.url !== 'https://api.resend.com/emails') throw new Error('Unexpected test network destination')
       mails.push(await request.json())
       return Response.json({ id: `test-receipt-${mails.length}` })

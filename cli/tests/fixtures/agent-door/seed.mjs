@@ -14,6 +14,7 @@ const productionSchemas = [
  'modules/business-settings/schema/0001_business_settings.sql',
  'modules/business-settings/schema/0002_business_people.sql',
  'modules/agent-door/schema/agent-door.sql',
+ 'modules/agent-door/schema/door-decisions.sql',
 ];
 const nativeSchema = `
 CREATE TABLE fixture_jobs (id TEXT PRIMARY KEY, input TEXT NOT NULL, result TEXT);

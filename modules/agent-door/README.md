@@ -6,11 +6,13 @@ runtime entry is `index.ts`; [ADOPTING.md](ADOPTING.md) describes edition wiring
 The module ships no company dispositions and does not issue OAuth credentials.
 
 `createAgentDoor(options)` returns `handle(request)`, `invoke(name,args,who)` for
-embedded agents, and `emit(event)` for native person actions. `handle` returns
+embedded agents, `emit(event)` for native person actions, and `open(request, {gate, signIn})`
+for the Business link destination (BASE-AGENT-015). `handle` returns
 `null` outside its routes; the edition keeps its existing router. Public exports
 also include `defineTool`, `ToolRefusal`, `operatorAuthPeople` and runtime types.
-Keep this code out of browser bundles. Apply `schema/agent-door.sql` through a
-new numbered edition migration before using the database-backed runtime. The policy singleton is
+Keep this code out of browser bundles. Apply `schema/agent-door.sql`, then
+`schema/door-decisions.sql`, through new numbered edition migrations before
+using the database-backed runtime. The policy singleton is
 created only by an adopted policy or a person changing a setting, so a fresh
 or reset installation remains empty for archive restore.
 
@@ -21,7 +23,9 @@ or reset installation remains empty for archive restore.
 | `POST /mcp` | Discovery, tools, resources, prompts and subscription streams. `paths` can add aliases; the token audience remains the canonical `/mcp` URI. |
 | `/.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp` | Canonical MCP resource, trusted authorization server and scopes. |
 | `POST /api/rer/agent-policy` | Signed Business policy envelope; body `{"policy":"<JWS>"}`. |
-| `GET /agents` and `GET /agents/approvals/:id` | Signed-in Agents page and exact pending action. |
+| `GET /api/rer/agent-decisions` | The paired Business's decision read (BASE-AGENT-014): `?after=&limit=`, a `rer-agent-decisions+jwt` owner-claim credential, [`schema/door-decisions.schema.json`](schema/door-decisions.schema.json). |
+| `GET /app/open` | Link destination (BASE-AGENT-015) through `open`; the seed mounts it before its setup redirect. `?resource=` a declared record URI or `?audit=` a decision id. |
+| `GET /agents`, `GET /agents/approvals/:id` and `GET /agents/audit/:id` | Signed-in Agents page, exact pending action and one audit row's own page. |
 | `GET /agents/api/state`, `/agents/api/audit`, `/agents/api/agents` | Private person-session state, audit and agent inventory reads. |
 | `POST /agents/api/agents/:id/revoke` | Owner revocation of a recorded agent. |
 | `GET` / `PUT /agents/api/policy` | Standalone owner policy read and complete-document confirmation; PUT body `{"document":{...}}`. Paired policy is managed by Business. |
@@ -177,6 +181,19 @@ The tool error metadata has this shape:
 {"_meta":{"com.runeditrun/error":{"code":"policy_unset"}}}
 ```
 
+The decision read shows these door codes as themselves, beside the native codes
+a seed declares in `refusalCodes`; any other refusal reads `refused`:
+`agents_paused`, `approval_evidence_changed`, `approval_expired`, `approval_rejected`,
+`approval_required`, `budget_exhausted`, `call_in_progress`, `capability_not_declared`,
+`company_policy_denied`, `company_policy_invalid`, `company_policy_unavailable`,
+`consent_revoked`, `decision_busy`, `idempotency_conflict`, `idempotency_key_required`,
+`insufficient_scope`, `invalid_arguments`, `narrowing_contract_violation`,
+`native_proof_required`, `operation_mismatch`, `policy_blocked`, `policy_unavailable`,
+`policy_unset`, `resource_changed`, `resource_unavailable`, `review_required`,
+`revision_conflict`, `self_escalation`, `sponsor_unavailable`, `subject_erased`,
+`subject_erasure_in_progress`, `target_invalid`, `tool_not_found`, `unauthenticated`
+and `undeclared_arguments` (`DOOR_REFUSAL_CODES`).
+
 Stable tool refusal codes are `policy_unset` (with `unanswered` and `setup_url`), `policy_unavailable`, `policy_blocked` (class, rule and revision), `approval_required` (legacy clients), `approval_rejected`, `approval_expired`, `approval_evidence_changed`, `self_escalation`, `agents_paused`, `idempotency_key_required`, `idempotency_conflict`, `revision_conflict` (with `current_revision`), `invalid_arguments` and `output_invalid`. Native `ToolRefusal` codes pass through unchanged. Person, local policy and adoption JSON refusals use `{ "code": "..." }`.
 Local policy returns `policy_document_invalid` with `path`, `policy_incomplete` with `problems`, or `policy_managed_by_business`.
 
@@ -202,6 +219,9 @@ Pause and policy are rechecked while streaming. SSE has no transport replay.
 `validateAgentSurface` for real installations. It drives the HTTP door with a
 test-only signer and signed-in person, declared native witnesses and an Agent
 surface, under autonomous, held, blocked, unset and paused policy phases.
+With `"business": {"decisions": true}` in the surface it also runs the
+BASE-AGENT-014 points as an official-schema fake Business; `conformance/links.mjs`
+gives a seed's own link journey the BASE-AGENT-015 checks.
 Stable `BASE-AGENT-xxx.n` point prefixes identify the checks it implements.
 They are not evidence that every clause or every adopting edition has passed.
 Module tests under `tests/`, this reusable journey and an edition's integrated

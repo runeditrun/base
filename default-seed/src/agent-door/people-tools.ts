@@ -126,4 +126,11 @@ export const personResource: ResourceDefinition = {
     const person = await readPerson(ctx.db, decodeURIComponent(match[1]))
     return person ? { json: person, untrusted: true } : null
   },
+  // BASE-AGENT-015: the person's own page, for the same owners and admins as /app/people.
+  async page(uri, person, db) {
+    const match = /^base:\/\/person\/([^/?#]+)$/.exec(uri)
+    if (!match || !person.active || !['owner', 'admin'].includes(person.role)) return null
+    const id = decodeURIComponent(match[1])
+    return await readPerson(db, id) ? `/app/people/${encodeURIComponent(id)}` : null
+  },
 }

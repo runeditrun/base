@@ -78,6 +78,8 @@ export interface ResourceDefinition {
   uriTemplate: string; name: string; description?: string; mimeType?: string; scope?: string; classes: ClassId[]
   classify(record: { json?: unknown; text?: string }, ctx: ResourceContext): ClassAndFacts[] | Promise<ClassAndFacts[]>
   read(uri: string, ctx: ResourceContext): Promise<{ json?: unknown; text?: string; untrusted?: boolean } | null>
+  /** BASE-AGENT-015: this record's own page when the signed-in person can open it now (BASE-ROLE-001), else null; missing and forbidden both return null. */
+  page?(uri: string, person: Person, db: D1Database): string | null | Promise<string | null>
 }
 export type CompanyPolicyDecision =
   | { decision: 'allow'; rule: string; revision: string }
@@ -96,6 +98,8 @@ export interface AgentDoorOptions {
   prompts?: Array<{ name: string; title?: string; description: string; clauses?: string[]; messages(args: Record<string, string>): unknown[] }>
   notTools?: Array<{ clauses: string[]; reason: 'device' | 'screen' | 'connector' | 'import-door' | 'installation' }>
   people: PeopleAdapter
+  /** Native refusal codes the seed documents for agents (its /docs/agents error codes); the Business projection shows any other native code as `refused`. */
+  refusalCodes?: readonly string[]
   localCredentials?(request: Request): Promise<{ sponsor: { id: string }; agent: Agent; scopes: string[]; clientId?: string } | null>
   nativeProof?: {
     handoff(input: { kind: string; tool: string; principal: Principal }): string | Promise<string>
@@ -117,6 +121,8 @@ export interface AgentDoor {
   handle(request: Request): Promise<Response | null>
   invoke(name: string, args: Record<string, unknown>, who: InvocationIdentity, proofReference?: string): Promise<CallResult>
   emit(event: { type: string; uri: string; person: Person; data?: Record<string, unknown> }): Promise<void>
+  /** BASE-AGENT-015 destination: answers GET /app/open for the seed's router. */
+  open(request: Request, options?: import('./links.ts').OpenOptions): Promise<Response>
 }
 export interface PolicyState {
   business: string | null; seq: number | null; revision: number | null; paused: boolean; localPaused: boolean

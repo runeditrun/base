@@ -10,6 +10,8 @@ import { admit } from './admission.ts'
 import { callTool } from './pipeline.ts'
 import { revoked } from './execution.ts'
 import { json } from './errors.ts'
+import { decisionRead } from './decisions.ts'
+import { openLink } from './links.ts'
 
 export { REPLAY_WINDOW_MS, expireReplayCalls, agentErasureStatements, checkAgentArtifacts } from './erasure.ts'
 export type { AgentArtifactMap, AgentArtifact, Tombstone } from './erasure.ts'
@@ -18,12 +20,16 @@ export type { Capability } from './capabilities.mjs'
 export { defineTool } from './registry.ts'
 export { ToolRefusal } from './errors.ts'
 export { operatorAuthPeople } from './operator-people.ts'
+export { DOOR_REFUSAL_CODES } from './refusal-codes.mjs'
+export { OPEN_PATH } from './links.ts'
+export type { OpenGate, OpenOptions } from './links.ts'
 export type * from './types.ts'
 export type { ClassId, ClassFacts } from './policy/catalogue.ts'
 
 export function createAgentDoor(options: AgentDoorOptions): AgentDoor {
   if (options.companyPolicy !== undefined && (!options.companyPolicy || typeof options.companyPolicy.decide !== 'function')) throw new TypeError('Invalid company policy hook')
   capabilitySet(options.capabilities)
+  if (options.refusalCodes !== undefined && (!Array.isArray(options.refusalCodes) || options.refusalCodes.some(code => typeof code !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/.test(code)))) throw new TypeError('Invalid documented refusal codes')
   options = { ...options, ...(options.capabilities === undefined ? {} : { capabilities: [...options.capabilities] }) }
   if (options.capabilities !== undefined) {
     if (!options.tools.length) throw new TypeError('Declared tools must offer at least one tool')
@@ -46,9 +52,10 @@ export function createAgentDoor(options: AgentDoorOptions): AgentDoor {
         }
         return response
       }
+      if (path === '/api/rer/agent-decisions') return decisionRead(rt, request)
       if (path === '/mcp' || options.paths?.includes(path)) return mcp(rt, request)
       if (path.startsWith('/agents/api/')) return personDoor(rt, request)
-      if (path === '/agents' || /^\/agents\/approvals\/[^/]+$/.test(path)) {
+      if (path === '/agents' || /^\/agents\/(?:approvals|audit)\/[^/]+$/.test(path)) {
         if (request.method !== 'GET') return new Response(null, { status: 405 })
         const person = request.headers.has('authorization') ? null : await options.people.session(request)
         return agentPage(rt, request, person?.active ? person : null)
@@ -63,6 +70,9 @@ export function createAgentDoor(options: AgentDoorOptions): AgentDoor {
       const capacity = await admit(rt, principal)
       if (capacity !== null) return { outcome: 'refused', code: capacity === 'revoked' ? 'unauthenticated' : 'rate_limited', decision: null }
       return (await callTool(rt, name, args, principal, 'embedded', undefined, undefined, undefined, proofReference, who.operationId)).result
+    },
+    open(request, options) {
+      return openLink(rt, request, options)
     },
     async emit(event) {
       await appendEvents(rt, [{ type: event.type, uri: event.uri, actor: { kind: 'person', person: { id: event.person.id, name: event.person.name } }, data: event.data }])

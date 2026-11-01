@@ -24,6 +24,15 @@ export function validateAgentSurface(surface, { contract } = {}) {
  add('resources', Array.isArray(surface.resources), 'Agent surface must declare resources.');
  for (const uri of Array.isArray(surface.resources) ? surface.resources : []) add(`resource.${String(uri)}`, text(uri), 'Resource template must be a URI string.');
  add('journey', Array.isArray(surface.journey) && surface.journey.length > 0, 'Agent surface must declare its journey.');
+ if (surface.business !== undefined) {
+  const business = surface.business, codes = business?.refusalCodes;
+  const failure = business?.failure;
+  add('business', object(business) && Object.keys(business).every(key => ['decisions', 'links', 'refusalCodes', 'failure'].includes(key))
+   && [business.decisions, business.links].every(value => value === undefined || typeof value === 'boolean')
+   && (codes === undefined || Array.isArray(codes) && codes.every(code => typeof code === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(code)))
+   && (failure === undefined || object(failure) && Object.keys(failure).sort().join() === 'args,tool' && surface.tools?.some(tool => tool?.name === failure.tool) && object(failure.args)),
+   'business declares decisions and links (BASE-AGENT-014, -015) as booleans, refusalCodes as the native codes /docs/agents documents, and an optional failure {tool,args} call its fixtures make fail.');
+ }
  const escalation = (id, ok, detail) => points.push({ id: `BASE-AGENT-005.surface.${id}`, ok: Boolean(ok), ...(!ok ? { detail } : {}) });
  escalation('escalations', surface.escalations === undefined || Array.isArray(surface.escalations), 'Agent surface must declare its escalations.');
  const tools = new Map(), steps = new Set(), coverage = new Map();

@@ -28,6 +28,13 @@ export function operatorResource(bindings: Bindings): ResourceDefinition {
       const operator = (await native(bindings, ctx).list()).find(operator => operator.id === id)
       return operator ? { json: operator, untrusted: true } : null
     },
+    // BASE-AGENT-015: the teammate's own page, for owners and admins.
+    async page(uri, person, db) {
+      const match = /^base:\/\/operator\/([^/?#]+)$/.exec(uri)
+      if (!match || !person.active || !['owner', 'admin'].includes(person.role)) return null
+      const id = decodeURIComponent(match[1])
+      return await readOperator(db, id) ? `/app/operators/${encodeURIComponent(id)}` : null
+    },
   }
 }
 async function roleTarget(args: Record<string, unknown>, ctx: ToolContext) {

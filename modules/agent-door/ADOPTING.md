@@ -1265,16 +1265,17 @@ unexpected row remains a distinct failure without shifting later comparisons.
 ## Contract clauses
 
 [`CLAUSES.md`](CLAUSES.md) is the single canonical source for
-`BASE-AGENT-001` through `BASE-AGENT-013`: transport, tools, resources,
+`BASE-AGENT-001` through `BASE-AGENT-015`: transport, tools, resources,
 identity, authority, classes, policy, attribution, audit, events, limits and
-Pause, idempotency, and the manifest and conformance journey. Its requirement
+Pause, idempotency, the manifest and conformance journey, the paired Business's
+decision read and links from Business. Its requirement
 text and numbered acceptance points preserve the shared duties previously
 printed in `export/BASELINE.md`. Copying a duty never proves its implementation.
 The baseline keeps the implementation coverage and outstanding gaps separately.
 
 The static surface validator checks every clause ID named by tools and
 `notTools` against the seed contract. The built-in `events.list` tool cites
-`BASE-AGENT-010`; conformance point prefixes cover all thirteen shared duties.
+`BASE-AGENT-010`; conformance point prefixes cover all fifteen shared duties.
 There is no fixed shared set of `AGENT-*` or `SURFACE-*` IDs: those remain the
 seed's own specialist jobs and deltas. The sync never creates or changes them.
 
@@ -1318,7 +1319,7 @@ when all clauses are current. `--write` inserts missing clauses in
 `### Agent surface (Base-delivered)` under Target clauses, before the seed's
 last `### Agent surface` area, and updates existing shared definitions in place.
 Writing requires a `## Shared duties (Base)` table with a `Base duty` column.
-Duties listed in that column are inherited and skipped, so listing all thirteen
+Duties listed in that column are inherited and skipped, so listing all fifteen
 leaves the contract byte-identical. An unlisted duty is still synchronized as a
 clause. A missing table refuses before any files or generated views are written.
 The read-only `--check` continues to inspect clause definitions, including for
@@ -1663,3 +1664,37 @@ as another person admits no one without native sign-in and current access.
 A handoff reference, if one is ever added, must be bound to its audience,
 Business, installation and intended person, single-use, valid for at most 15
 minutes, and free of authority.
+
+### Wire the decision read and the destination
+
+These steps adopt both clauses in an edition. They change no Status row; judge
+BASE-AGENT-014 and BASE-AGENT-015 through the edition's own doors.
+
+1. Apply `schema/door-decisions.sql` in a new numbered migration. Every audit
+   write now also writes its projection in the same batch, so the door needs
+   this table before its next call. Calls recorded before it are not projected.
+2. Declare `agent_door_decisions` (`change`, `id`, `pairing`, `projection`) in
+   the native erasure map as unrelated: it holds no subject values, which is
+   why an erased subject's decisions keep reading the same.
+3. Route `/api/rer/agent-decisions` to `handle`, like `/api/rer/agent-policy`.
+   Pass `refusalCodes` to `createAgentDoor` with the native codes the seed's
+   `/docs/agents` documents; every other native code reads `refused`.
+4. Give each declared resource a `page(uri, person, db)` that returns the
+   record's own page when this signed-in person can open it now
+   (BASE-ROLE-001), and null otherwise; missing and forbidden both return null.
+   Audit rows open on the door's `/agents/audit/<id>` page for people who can
+   audit, as on the Agents page.
+5. Route `GET /app/open` (`OPEN_PATH`) to `door.open(request, { gate, signIn })`
+   before the generic `/app` setup redirect. `gate(person, request)` is the
+   seed's own setup or first-run gate: return a redirect into setup that keeps
+   the link, or the seed's setup-required page, or null once setup is complete.
+   Base's `foundation/runtime/setup.ts` supplies `firstRunGate`, and `/setup`
+   keeps a local `/app` `returnTo` through its form. `signIn(returnTo)` names a
+   native sign-in other than `/signin?returnTo=`.
+6. Declare `"business": { "decisions": true, "links": true }` in
+   `agent-surface.json`; add `refusalCodes` to match step 3, and an optional
+   `failure: {tool, args}` call that the seed's fixtures make fail. Conformance
+   then runs the BASE-AGENT-014 points, with the verifier as the official-schema
+   fake Business. The seed's link journey uses `conformance/links.mjs` with its
+   own sign-in, setup and second person, as Base's
+   `default-seed/tests/e2e/business-links.mjs` does at 1440 and 390.

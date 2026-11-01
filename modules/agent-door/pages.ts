@@ -173,6 +173,21 @@ async function approvalPage(rt: Runtime, request: Request, person: Person, id: s
   return shell(rt, name, content + zone)
 }
 
+/** One audit row's own page (BASE-AGENT-015 audit links): for people who can audit, like the Agents page. */
+async function auditRowPage(rt: Runtime, person: Person, id: string): Promise<Response> {
+  const role = businessRole(rt.options.people, person)
+  const record = role === 'owner' || role === 'editor' ? await rt.options.db.prepare('SELECT row FROM agent_door_audit WHERE id=?').bind(id).first<{ row: string }>() : null
+  if (!record) return shell(rt, 'Agent action', '<h1>Not found</h1><p>It does not exist, or it is not yours to see.</p><a href="/agents">Open Agents</a>', 404)
+  const row = JSON.parse(record.row) as AuditRow
+  const by = row.tombstone ? 'Erased record' : `${row.agent.name} for ${row.sponsor.name}`
+  const classes = row.classes.map(item => 'facts' in item && item.facts ? factsSentence(item) : className(item.class))
+  const content = `<h1>${escape(actionName(rt, row.tool, row.tombstone ? undefined : row.resource))}</h1><p class="lead">${escape(by)}</p><section aria-label="Agent action" data-audit-id="${escape(row.id)}" data-audit-outcome="${escape(row.outcome)}"><dl class="fields">`
+    + `<div><dt>Handled</dt><dd>${escape(decisionName(row.decision))}</dd></div><div><dt>Result</dt><dd>${escape(activityOutcome(row.decision, row.outcome, row.code))}</dd></div>`
+    + `<div><dt>When</dt><dd>${time(row.at)}</dd></div><div><dt>Kind of action</dt><dd>${classes.length ? escape(classes.join('; ')) : 'Not classified'}</dd></div>`
+    + `<div><dt>Policy version</dt><dd>${escape(row.revision ?? 'Not set')}</dd></div><div class="id"><dt>Action</dt><dd>${escape(row.id)}</dd></div></dl></section><a href="/agents">Open Agents</a>`
+  return shell(rt, 'Agent action', content + zone)
+}
+
 /** Server-rendered person door. Visibility is delegated to the same JSON APIs. */
 export async function agentPage(rt: Runtime, request: Request, person: Person | null): Promise<Response> {
   if (request.method !== 'GET' && request.method !== 'HEAD') return shell(rt, 'Agents', '<h1>Method not allowed</h1>', 405)
@@ -182,11 +197,14 @@ export async function agentPage(rt: Runtime, request: Request, person: Person | 
   let response: Response
   if (path === '/agents' || path === '/agents/') response = await dashboard(rt, read, person)
   else {
-    const match = /^\/agents\/approvals\/([^/]+)\/?$/.exec(path)
-    if (!match) return shell(rt, 'Agents', '<h1>Not found</h1><a href="/agents">Open Agents</a>', 404)
-    let id: string
-    try { id = decodeURIComponent(match[1]) } catch { return shell(rt, 'Approval', '<h1>Not found</h1><p>This approval link is broken.</p><a href="/agents">Open Agents</a>', 400) }
-    response = await approvalPage(rt, read, person, id)
+    const row = /^\/agents\/audit\/([0-9a-f-]{36})\/?$/.exec(path), match = /^\/agents\/approvals\/([^/]+)\/?$/.exec(path)
+    if (row) response = await auditRowPage(rt, person, row[1])
+    else if (!match) return shell(rt, 'Agents', '<h1>Not found</h1><a href="/agents">Open Agents</a>', 404)
+    else {
+      let id: string
+      try { id = decodeURIComponent(match[1]) } catch { return shell(rt, 'Approval', '<h1>Not found</h1><p>This approval link is broken.</p><a href="/agents">Open Agents</a>', 400) }
+      response = await approvalPage(rt, read, person, id)
+    }
   }
   return request.method === 'HEAD' ? new Response(null, { status: response.status, headers: response.headers }) : response
 }

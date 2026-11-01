@@ -49,6 +49,7 @@ export const personAgentArtifacts: AgentArtifactMap = { artifacts: [
   { table: 'agent_door_events', columns: ['sequence','id','uri','event'], match: match(mentions('agent_door_events', ['uri','event']) + ' OR json_extract(event,\'$.decision_id\') IN (' + decisions + ')') },
   { table: 'agent_door_usage', columns: ['decision_id','at','seed','specialist','agent','classes'], match: match('decision_id IN (' + decisions + ')') },
   { table: 'agent_door_replay_aliases', columns: ['agent','alias','call_id','tombstone'], unrelated: 'Installation-private, value-free replay aliases; excluded from archives and exports.' },
+  { table: 'agent_door_decisions', columns: ['change','id','pairing','projection'], unrelated: 'Value-free Business decision projections (BASE-AGENT-014): ids, tool names, decisions, codes and times; no arguments, targets, record text or names.' },
 ] }
 
 export async function erasePersonAgentArtifacts(db: D1Database, secret: string, subject: { id: string }, tombstone: { erasure_id: string; at: string }) {
