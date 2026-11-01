@@ -1,7 +1,7 @@
 import './search.css';
 
 /** Static markup; the standalone site's client enhances each instance. */
-export function SearchField({ id, endpoint = '/docs/search' }: { id: string; endpoint?: string }) {
+export function SearchField({ id, endpoint = '/docs-search-index.json' }: { id: string; endpoint?: string }) {
   return <div className="docs-search" data-docs-search data-endpoint={endpoint}>
     <label className="docs-search-label" htmlFor={id}>Search docs</label>
     <div className="docs-search-field">

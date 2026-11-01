@@ -1,19 +1,15 @@
-// The only executable site extension: Base's build-coupled docs search.
-import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import { invalid } from './errors.mjs';
 import { contained } from './project.mjs';
-import { model, pooling, searchChunks } from '../modules/site/docs-search/index-build.mjs';
+import { buildSearchArtifacts } from '../modules/site/docs-search/artifacts.mjs';
 
-const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+// Retained adapter key; this is a static build extension, with assets only.
 export function siteRuntime(value) {
  if (value === undefined) return;
  if (!value || Object.keys(value).sort().join() !== 'bindings,corpus,endpoint,module,type' || value.type !== 'docs-search' || value.module !== 'docs-search'
-  || JSON.stringify(value.bindings) !== '["ASSETS","AI"]' || value.endpoint !== '/docs/search'
-  || !/^\.rer\/(?:[a-z0-9_-]+\/)+corpus\.json$/.test(value.corpus ?? '')) throw invalid('Run site runtime must declare { type: "docs-search", module: "docs-search", bindings: ["ASSETS", "AI"], endpoint: "/docs/search", corpus: ".rer/docs-search/corpus.json" }.');
+  || JSON.stringify(value.bindings) !== '["ASSETS"]' || value.endpoint !== '/docs-search-index.json'
+  || !/^\.rer\/(?:[a-z0-9_-]+\/)+corpus\.json$/.test(value.corpus ?? '')) throw invalid('Run site search must declare { type: "docs-search", module: "docs-search", bindings: ["ASSETS"], endpoint: "/docs-search-index.json", corpus: ".rer/docs-search/corpus.json" }.');
  return value;
 }
 
@@ -35,21 +31,27 @@ export function searchCorpus(pages, searchPages) {
  return searchPages;
 }
 
-export async function buildSiteRuntime(project, declaration, corpus, assets, { prepare = false, domain, compatibilityDate, store, signal } = {}) {
- const pages = JSON.parse(await readFile(corpus, 'utf8'));
- const chunks = searchChunks(pages), corpusHash = digest(chunks.map(chunk => chunk.hash).join('\n'));
- if (prepare) {
-  const output = await contained(project.root, dirname(declaration.corpus), { optional: true });
-  await store.run('Preparing docs search', process.execPath, [fileURLToPath(new URL('./site-prepare.mjs', import.meta.url)), corpus, assets, output, declaration.endpoint, compatibilityDate, domain], {cwd:project.root, signal, heavy:false});
+export async function buildSiteRuntime(project, declaration, corpus, assets) {
+ const output = await contained(project.root, dirname(declaration.corpus), { optional: true });
+ await mkdir(output, { recursive: true });
+ const built = await buildSearchArtifacts({ corpus, assets, output });
+ const identity = `${built.index.version}:${built.index.sourceHash}:${built.assetHash}`;
+ async function stamp(folder) {
+  for (const item of await readdir(folder, { withFileTypes: true })) {
+   const path = join(folder, item.name);
+   if (item.isDirectory()) await stamp(path);
+   else if (item.name.endsWith('.html')) {
+    const html = await readFile(path, 'utf8');
+    if (html.includes('data-docs-search')) {
+     if (!/<\/head>/i.test(html)) throw invalid('A docs search page requires a head for its index identity.');
+     await writeFile(path, html.replace(/<\/head>/i, `<meta name="docs-search-index" content="${identity}"></head>`));
+    }
+   }
+  }
  }
- const { build } = createRequire(join(project.root, 'package.json'))('esbuild');
- const worker = fileURLToPath(new URL('../modules/site/docs-search/worker.ts', import.meta.url));
- const contract = { endpoint: declaration.endpoint, corpusHash, model, pooling };
- const bundled = await build({ absWorkingDir: dirname(worker), stdin: { contents: `import {createSearchWorker} from ${JSON.stringify(worker)};export default createSearchWorker(${JSON.stringify(contract)});`,
-  resolveDir: dirname(worker), sourcefile: 'site-search-entry.ts', loader: 'ts' }, bundle: true, format: 'esm', platform: 'browser', target: 'es2022', write: false });
- const source = bundled.outputFiles[0].text;
- return { type: declaration.type, module: declaration.module, endpoint: declaration.endpoint, bindings: declaration.bindings, model, pooling, corpusHash, source };
+ await stamp(assets);
+ return { type: declaration.type, module: declaration.module, endpoint: declaration.endpoint, bindings: ['ASSETS'],
+  indexVersion: built.index.version, corpusHash: built.index.sourceHash, assetHash: built.assetHash, ...built.counts };
 }
 
-export const runtimeSummary = runtime => runtime && ({ type: runtime.type, module: runtime.module, endpoint: runtime.endpoint, bindings: runtime.bindings,
- model: runtime.model, pooling: runtime.pooling, corpusHash: runtime.corpusHash, moduleDigest: digest(runtime.source) });
+export const runtimeSummary = runtime => runtime && ({ ...runtime });
