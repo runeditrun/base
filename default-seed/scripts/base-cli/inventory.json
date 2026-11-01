@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.95-dev.gcc0f48cd",
+  "cliVersion": "0.2.95-dev.g87299e72",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2923,7 +2923,7 @@
     },
     "modules/import-kit/src/d1/README.md": {
       "source": "modules/import-kit/src/d1/README.md",
-      "sha256": "c3b4cf6387d435b6b8df992f7556acb4f68b897f0fea42caec8522cb9cd826a0"
+      "sha256": "10d3e3917d8b6c7b9cfb499e69fedd18009b71f48b60e1b113ca277e0323bb2d"
     },
     "modules/import-kit/src/d1/apply-effects.ts": {
       "source": "modules/import-kit/src/d1/apply-effects.ts",
@@ -2963,7 +2963,7 @@
     },
     "modules/import-kit/src/d1/database.ts": {
       "source": "modules/import-kit/src/d1/database.ts",
-      "sha256": "8551fc65186feffbfcd65662f0ce7caa3625efb1b1c5309f4870a7b552b57fd7"
+      "sha256": "003189b6667e8819839f476e2d70261296d18f0c1241d66011613240e3b1c59e"
     },
     "modules/import-kit/src/d1/entry-locator.ts": {
       "source": "modules/import-kit/src/d1/entry-locator.ts",
@@ -3215,7 +3215,7 @@
     },
     "modules/import-kit/src/d1/preserved-reverse.ts": {
       "source": "modules/import-kit/src/d1/preserved-reverse.ts",
-      "sha256": "72ea2770b1d7cddb292f50bb2715d02c2edef94be118a1724367545822732170"
+      "sha256": "51276d8dd14440179d558baf84ea24d7c08280068797bf7a08421aee7725f86c"
     },
     "modules/import-kit/src/d1/provenance-set.ts": {
       "source": "modules/import-kit/src/d1/provenance-set.ts",
@@ -3235,7 +3235,7 @@
     },
     "modules/import-kit/src/d1/read-fence.ts": {
       "source": "modules/import-kit/src/d1/read-fence.ts",
-      "sha256": "e77cf651e56af1d6d37c78ac68ae339b7a5e98049dad2e3f501b602b01b203b3"
+      "sha256": "c543f370cfbe0c8fb9bbc61007f38f1d0c4db32253f7fc8d4a99d9296815e871"
     },
     "modules/import-kit/src/d1/read-results.ts": {
       "source": "modules/import-kit/src/d1/read-results.ts",
@@ -3311,7 +3311,7 @@
     },
     "modules/import-kit/src/d1/reverse.ts": {
       "source": "modules/import-kit/src/d1/reverse.ts",
-      "sha256": "e179031882f2de156f8680c77d5e51dff14c825611732598670c6efd88f9d7a7"
+      "sha256": "83562029701f8cede3de139637d2985ece3535e1322105d542b2ae0f200de78a"
     },
     "modules/import-kit/src/d1/reviewed-source.ts": {
       "source": "modules/import-kit/src/d1/reviewed-source.ts",
@@ -3319,7 +3319,11 @@
     },
     "modules/import-kit/src/d1/sets.ts": {
       "source": "modules/import-kit/src/d1/sets.ts",
-      "sha256": "a8852934880a015c3f9a58dd062ce078256ae40d039294de7d86ec5dc4aa1b9e"
+      "sha256": "684734c78e7704d1eac0ea006b2c4e10122f4f7bea2e24780ba4224f4ceb2dd1"
+    },
+    "modules/import-kit/src/d1/snapshot-text.ts": {
+      "source": "modules/import-kit/src/d1/snapshot-text.ts",
+      "sha256": "897102ef7d40325dba49573c2b53be45a19d18d0c81d07244015f2bb87d6e84c"
     },
     "modules/import-kit/src/d1/staged-creation.ts": {
       "source": "modules/import-kit/src/d1/staged-creation.ts",

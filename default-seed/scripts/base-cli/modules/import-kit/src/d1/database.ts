@@ -8,6 +8,7 @@ import { d1NativeStagingSchema } from './native-staging-schema.ts';
 import { d1CustodyStateSchema, d1CustodyStateReplaceSchema } from './custody-state-schema.ts';
 import { d1ReversalFenceSchema } from './reversal-fence-schema.ts';
 import { batchBytes } from './transport.ts';
+import { RPC_LIMIT } from '../../../d1-transport/index.mjs';
 import { batchExecutions, D1RequestLimitError, packGuards, remaining } from './budget.ts';
 import { d1ErasureSchema } from './erasure-schema.ts';
 import { d1RetirementSchema } from './retirement-schema.ts';
@@ -140,9 +141,9 @@ export async function readAtomic(context: D1ImportContext, guards: D1Sql[], scop
   const packed = packGuards([authority(context, action), ...checks, authority(context, action)], true);
   const limit = context.maxBatchBytes;
   if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1)) throw new Error('INVALID_TRANSPORT_LIMIT');
-  if (limit !== undefined && !withinBatchBytes({...context,maxBatchBytes:Math.min(limit,2*1024*1024)}, packed)) {
+  if (!withinBatchBytes({...context,maxBatchBytes:limit === undefined ? RPC_LIMIT : Math.min(limit,2*1024*1024)}, packed)) {
     if (!scope) throw new Error('IMPORT_D1_TRANSPORT_LIMIT');
-    await readBoundedGuards(context, checks, scope, Math.min(limit,2*1024*1024), action);
+    await readBoundedGuards(context, checks, scope, Math.min(limit ?? RPC_LIMIT,2*1024*1024), action);
     return;
   }
   if (batchExecutions(context, packed.length) > remaining(context)) throw new D1RequestLimitError();

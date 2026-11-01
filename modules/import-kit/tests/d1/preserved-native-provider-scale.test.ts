@@ -3,9 +3,13 @@ import { effectCount } from './scale-size.ts';
 import assert from 'node:assert/strict';
 import { providerScale } from './preserved-provider-scale-fixture.ts';
 import { nativeSetTargets } from './preserved-native-set.ts';
-import { canonicalJson, sha256, readD1ImportUndoReport, readD1ImportOriginals, readD1PersistedImport, resumeD1Import, undoD1Import } from '../../src/d1/index.ts';
+import { canonicalJson, sha256, ImportSizeLimitError, readD1ImportUndoReport, readD1ImportOriginals, readD1PersistedImport, resumeD1Import, undoD1Import } from '../../src/d1/index.ts';
+import { decodeProvenance } from '../../src/storage/provenance.ts';
+import { nativeSetGuards } from '../../src/d1/native-set.ts';
+import { packGuards } from '../../src/d1/budget.ts';
+import { batchBytes } from '../../src/d1/transport.ts';
 
-test('real D1: public first undo fences all present native effects and full export remains exact', async t => {
+test('real D1: public first undo fences all native effects and export enforces its exact snapshot limit', async t => {
   const r = await providerScale(t, 0), db = r.db(), custody = await r.custody();
   // Every native effect starts unchanged. The late value edit preserves its
   // revision, so only an exact complete snapshot can reject this first batch.
@@ -27,7 +31,18 @@ test('real D1: public first undo fences all present native effects and full expo
   const report = await r.meter().request('first-disposition-after-reopen', () => readD1ImportUndoReport(r.job.id, r.context()));
   assert.equal(report.cursor, 2); assert.equal(report.total, 2);
   assert.equal(report.dispositions[0].reason, 'edited'); assert.equal(report.dispositions[1].disposition, 'reversed');
-  const exported = await r.meter().request('full-native-persisted-export', () => readD1PersistedImport(r.context()));
+  const nativeDb = r.db(), nativeRows = await nativeSetTargets.list(nativeDb, r.context().destination);
+  const nativeBytes = batchBytes(packGuards(nativeSetGuards(nativeSetTargets, nativeRows, r.context().destination).map(entry => entry.guard), true));
+  const exportLimit = 2 * 1024 * 1024;
+  const exportRequest = () => r.meter().request('full-native-persisted-export', () => readD1PersistedImport(r.context()));
+  let exported;
+  // The API promises one atomic native fence capped at 2 MiB. When even
+  // the native predicates exceed it, require the named refusal and still
+  // independently check every durable native/provenance value below.
+  if (nativeBytes > exportLimit) {
+    await assert.rejects(exportRequest, error => error instanceof ImportSizeLimitError && error.message === 'IMPORT_D1_TRANSPORT_LIMIT' && canonicalJson(error.targetKinds) === canonicalJson(['link', 'record']));
+    exported = { rows: nativeRows, provenance: (await nativeDb.prepare('SELECT * FROM ik_provenance WHERE job_id=? AND reversed=0').bind(r.job.id).all()).results.map(decodeProvenance) };
+  } else exported = await exportRequest();
   assert.equal(exported.rows.length, effectCount - 1); assert.equal(exported.provenance.length, effectCount - 1);
   const removed = report.dispositions[1];
   assert.ok(exported.rows.every(row => row.targetKind !== removed.targetKind || row.targetId !== removed.targetId));
