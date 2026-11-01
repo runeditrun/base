@@ -173,9 +173,10 @@ test('a declared agent initializer binds each chosen ID through the person door 
  finally { globalThis.fetch = originalFetch; }
  const hook = await import(new URL('agent-initializer.mjs', 'file://' + root + '/'));
  assert.equal(result.ok, true);
- assert.equal(hook.agents.length, surface.verification.sponsors.length);
+ // One chosen agent per sponsor, plus the owner's throwaway agent that the seed-side revocation point revokes.
+ assert.equal(hook.agents.length, surface.verification.sponsors.length + 1);
  assert.equal(new Set(hook.agents.map(agent => agent.agentId)).size, hook.agents.length);
- assert.deepEqual(hook.agents.map(agent => agent.email), ['synthetic-base-1@example.com', 'synthetic-member@example.com']);
+ assert.deepEqual(hook.agents.map(agent => agent.email), ['synthetic-base-1@example.com', 'synthetic-base-1@example.com', 'synthetic-member@example.com']);
  assert.ok(requests.indexOf('/app/native-proof') < requests.indexOf('/mcp'));
  const audits = result.points.filter(point => point.id.startsWith('BASE-AGENT-009.1.') || point.id === 'BASE-AGENT-007.7.differs-from-policy' || point.id.includes('cross-sponsor'));
  assert.ok(audits.length > 0 && audits.every(point => point.ok));

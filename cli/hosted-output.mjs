@@ -191,7 +191,16 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
     if (typeof sql !== 'string' || !/^\s*SELECT\b/i.test(sql) || sql.includes(';')) throw new RerError('hosted_database_invalid', 'Verification state access is read-only SELECT.', 1);
     return db.prepare(sql);
    } };
-  }, close: () => { release(); return mf.dispose(); },
+  },
+  // The same installation again without the named bindings: its Worker restarts, its storage and other bindings stay.
+  // Handles taken before it (preparation, history) end; take any later ones from the hosted object again.
+  rebind: async names => {
+   const app = options.workers.find(worker => worker.name === 'app');
+   for (const name of names) delete app.bindings[name];
+   await mf.setOptions(convertV4MiniflareOptions(options));
+   loopback = await mf.ready;
+  },
+  close: () => { release(); return mf.dispose(); },
   fetch: (path, { headers, origin = HOSTED_ORIGIN, ...init } = {}) => {
    if (!origins.includes(origin)) throw new RerError('agent_door_origin', 'Agent conformance request must use a declared hosted installation origin.', 1);
    return loopbackFetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${origin}/${path}` } });

@@ -130,7 +130,12 @@ email never selects a local account. Implement `people.person(id)` to re-read
 native ids for approval execution, Undo, embedded agents and subscriptions.
 Expose `businessMember(person)` from the same mapping for paired policy refs:
 Business owner is owner, Business team admin is editor, member has no policy
-role. The native role may differ. Local credentials return `sponsor: { id }`,
+role. The native role may differ. A custom adapter must also expose
+`businessStopped()`, true once Business is stopped or detached: the door then
+admits no Business token, refuses calls held or waiting from one, and matches no
+`person:` or `role:` ref, while `sponsor()` keeps resolving subjects so signed
+policy naming Business people is still adopted. An adapter without it keeps the
+earlier behavior and is never stopped. Local credentials return `sponsor: { id }`,
 read by `people.person`, rather than an address. Sponsorship is resolved from
 current native people on each request; an unknown or inactive sponsor cannot
 act. A saved token never replaces this account check. Keep native permissions,
@@ -143,6 +148,10 @@ installation ID, application origin (`appOrigin`) and public key ring. Keep that
 origin aligned with the edition's canonical origin. Do not create another key
 ring for agent access. Business credentials use the existing ring; local
 credentials come only from the edition's explicit `localCredentials` adapter.
+Build that trust from the `RER_OWNER_CLAIM_*` bindings and pass `null` when they
+are absent: `rer verify` ends with `BASE-AGENT-004.7`, re-serving the same
+installation without those bindings and `RER_BUSINESS_TRUST`, and the door must
+then refuse Business tokens while owner sessions and native clients keep working.
 With `trust: null`, an independently operated installation can use that local
 adapter under its owner's configuration. A recognizable Business credential
 that fails validation is refused; it cannot become a local credential.
