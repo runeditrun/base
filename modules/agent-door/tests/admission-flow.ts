@@ -3,6 +3,20 @@ import type { TestContext } from 'node:test'
 import { autonomousPolicy } from '../conformance/crypto.mjs'
 import { admissionRuntime, errorCode, input } from './admission.fixture.ts'
 
+// Admission waits at most five seconds, then refuses decision_busy without an
+// effect. A starved runner can exhaust that wait, so the call is sent again with
+// renewed evidence (a refused approval is spent). A refusal before the full wait
+// still fails, and the caller's counts still prove one effect and reservation.
+async function untilAdmitted(first: any, send: (evidence: any) => Promise<any>, busy: (reply: any) => boolean, renew: () => Promise<any> | any) {
+ for (let evidence = first, tries = 0; ; tries++) {
+  const started = Date.now(), reply = await send(evidence)
+  if (!busy(reply)) return reply
+  assert.ok(Date.now() - started >= 5000, 'decision_busy must wait out the bounded admission first')
+  assert.ok(tries < 20, 'admission must clear once contention ends')
+  evidence = await renew()
+ }
+}
+
 const held = () => ({ ...autonomousPolicy(), rules: [{ id: 'held', class: '*', do: 'approval', approver: ['sponsor'], wait: 'PT1H' }] })
 
 export async function admissionFlow(t: TestContext) {
@@ -16,18 +30,23 @@ export async function admissionFlow(t: TestContext) {
    return (await r.person(`/agents/api/approvals/${id}`)).body.approval
   }
   const approve = (view: any) => f.person(`/agents/api/approvals/${view.id}/approve`, { revision: view.revision, summary_sha256: view.summary_sha256 })
-  for (const width of [4, 8]) for (const door of ['create', 'resource', 'approval', 'resource-approval']) {
+  const resourceApproval = async () => {
+   const reply = await read()
+   return (await r.person(`/agents/api/approvals/${(reply.result?._meta?.['com.runeditrun/approval'] ?? reply.error?.data?.approval).id}`)).body.approval
+  }
+  // Each door's evidence, and how its execution is sent in parallel.
+  const doors: Record<string, [() => Promise<any> | any, (evidence: any) => Promise<any>]> = {
+   create: [input, evidence => f.create(evidence)], resource: [() => undefined, read],
+   approval: [pendingApproval, approve], 'resource-approval': [resourceApproval, approve],
+  }
+  for (const width of [4, 8]) for (const door of Object.keys(doors)) {
    await r.adopt(door.includes('approval') ? held() : autonomousPolicy())
    const before = await f.counts()
+   const [prepare, send] = doors[door]
+   const busy = (reply: any) => (door.includes('approval') ? reply.approval?.code : errorCode(reply)) === 'decision_busy'
    const calls = []
    // Prepare evidence serially; the execution door itself is parallel.
-   for (let i = 0; i < width; i++) {
-    if (door === 'approval') { const view = await pendingApproval(); calls.push(() => approve(view)) }
-    else if (door === 'resource-approval') {
-     const reply = await read(), view = (await r.person(`/agents/api/approvals/${(reply.result?._meta?.['com.runeditrun/approval'] ?? reply.error?.data?.approval).id}`)).body.approval
-     calls.push(() => approve(view))
-    } else calls.push(door === 'create' ? () => f.create() : read)
-   }
+   for (let i = 0; i < width; i++) { const evidence = await prepare(); calls.push(() => untilAdmitted(evidence, send, busy, prepare)) }
    const replies = await Promise.all(calls.map(call => call()))
    for (const reply of replies) {
     if (door.includes('approval')) assert.equal(reply.approval.state, 'executed', JSON.stringify(reply))
@@ -40,7 +59,7 @@ export async function admissionFlow(t: TestContext) {
   }
   await r.adopt()
   const key = input(), beforeReplay = await f.counts()
-  const replays = await Promise.all(Array.from({ length: 8 }, () => f.create(key)))
+  const replays = await Promise.all(Array.from({ length: 8 }, () => untilAdmitted(key, f.create, reply => errorCode(reply) === 'decision_busy', () => key)))
   for (const reply of replays) assert.ok(!errorCode(reply) || errorCode(reply) === 'call_in_progress', JSON.stringify(reply))
   assert.equal(errorCode(await f.create(key)), undefined)
   const afterReplay = await f.counts()
