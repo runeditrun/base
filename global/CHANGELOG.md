@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- End every Business-derived authority in the agent door when Business is stopped (signed `detached:true` or the owner's stop): no Business access token is admitted for any subject, calls a Business token held for approval or left waiting for admission are refused as `sponsor_unavailable` without a native effect, and `person:` and `role:` approver and reviewer refs match nobody. Seed credentials, native sessions, embedded invocation, `sponsor` refs and the subject mapping are unchanged, so signed policy naming Business people is still adopted and its Pause and revoked lists apply. `PeopleAdapter` gains an optional `businessStopped()` that custom adapters should implement; `Principal` records its admission `source`. Agent conformance proves `BASE-AGENT-004.6` on the seed side (`004.6.seed-*`) and, when the driver can unpair, `BASE-AGENT-004.7`; `rer verify` unpairs by re-serving the same installation without its owner-claim and Business trust bindings.
+
 - Give native subject erasure custody of mapped agent-door payloads, retaining value-free decisions and secret-keyed replay refusals only within the fixed 30-day completion window while excluding replay aliases from archives.
 
 ## 0.2.94

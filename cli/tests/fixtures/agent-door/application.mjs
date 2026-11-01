@@ -202,7 +202,7 @@ function securityTools(db, records) {
 }
 
 export async function application(env) {
-    const origin = env.RER_OWNER_CLAIM_APP_ORIGIN, nativeMode = ['native', 'native-reviewer'].includes(env.OWNER_MODE);
+    const origin = env.RER_OWNER_CLAIM_APP_ORIGIN ?? env.AUTH_ORIGIN, nativeMode = ['native', 'native-reviewer'].includes(env.OWNER_MODE);
     if (!['signed', 'native', 'native-reviewer', 'setup-token'].includes(env.OWNER_MODE)) return new Response('Invalid owner configuration', { status: 503 });
     await env.DB.prepare('INSERT INTO fixture_installation(id,secret) VALUES(1,?) ON CONFLICT(id) DO NOTHING').bind(crypto.randomUUID() + crypto.randomUUID()).run();
     const config = { origin, OWNER_EMAIL: nativeMode ? env.SETUP_OPERATOR_EMAIL : env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, SETUP_TOKEN: env.SETUP_TOKEN,
@@ -214,10 +214,11 @@ export async function application(env) {
     const settings = createBusinessSettings({ db: env.DB, trust: env.RER_BUSINESS_TRUST,
       business: { settings: 1, values: ['display_name'], team: { roles: { admin: 'admin', member: 'member' } } }, team: teamAuth.businessTeam });
     const auth = createOperatorAuth({ db: env.DB, config, clientIp, mailSender, businessSettings: settings });
-    const trust = { issuer: env.OWNER_MODE === 'signed' ? env.RER_MANAGEMENT_ORIGIN : env.RER_OWNER_CLAIM_ISSUER,
+    // An unpaired installation carries no Business trust.
+    const trust = env.RER_OWNER_CLAIM_PUBLIC_KEYS ? { issuer: env.OWNER_MODE === 'signed' ? env.RER_MANAGEMENT_ORIGIN : env.RER_OWNER_CLAIM_ISSUER,
       installationId: env.OWNER_MODE === 'signed' ? env.RER_INSTALLATION_ID : env.RER_OWNER_CLAIM_INSTALLATION_ID,
-      appOrigin: origin, publicKeys: JSON.parse(env.RER_OWNER_CLAIM_PUBLIC_KEYS) };
-    if (!trust.issuer || !trust.installationId) return new Response('Native owner bindings required', { status: 503 });
+      appOrigin: origin, publicKeys: JSON.parse(env.RER_OWNER_CLAIM_PUBLIC_KEYS) } : null;
+    if (trust && (!trust.issuer || !trust.installationId)) return new Response('Native owner bindings required', { status: 503 });
     const records = nativeRecords(env.DB, nativeMode, env.LIFECYCLE_PROOF);
     const people = memberPeople(operatorAuthPeople({ db: env.DB, session: incoming => auth.getSession(incoming) }), env.DB, nativeMode, env.SKIP_SPONSOR_CHECK);
     const phaseClients = env.PHASE_FIXTURES ? createPhaseClients({ db: env.DB, records, ToolRefusal }) : null;

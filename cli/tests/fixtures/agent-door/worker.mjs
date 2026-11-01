@@ -33,7 +33,7 @@ export default {
       await records.receipt(record, { id: record.operator_id }, 'inbound', response.status, result, input.deliveryId);
       return response;
     }
-    if (path === '/auth/owner-claim' && env.OWNER_MODE === 'signed') return createOwnerClaimHandler({ db: env.DB, authConfig: config, clientIp, ...trust, expectedEmail: config.OWNER_EMAIL })(request);
+    if (path === '/auth/owner-claim' && env.OWNER_MODE === 'signed' && trust) return createOwnerClaimHandler({ db: env.DB, authConfig: config, clientIp, ...trust, expectedEmail: config.OWNER_EMAIL })(request);
     if (path === '/auth/bootstrap' && env.OWNER_MODE === 'signed') return new Response('Not found', { status: 404 });
     try {
       if (path === '/auth/reviewer-confirm') {

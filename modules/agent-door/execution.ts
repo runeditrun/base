@@ -32,7 +32,10 @@ export async function classify(tool: ToolDefinition, args: Record<string, unknow
 }
 export const digest = async (value: unknown) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical(value)))), byte => byte.toString(16).padStart(2, '0')).join('')
 export const sameFacts = (a: ClassAndFacts[], b: ClassAndFacts[]) => canonical([...a].sort((x, y) => x.class.localeCompare(y.class))) === canonical([...b].sort((x, y) => x.class.localeCompare(y.class)))
+/** A Business-admitted principal ends with the Business that admitted it, wherever its call was held. */
+export const businessEnded = async (rt: Runtime, principal: Pick<Principal, 'source'>) => principal.source === 'business' && !!await rt.options.people.businessStopped?.()
 export async function livePrincipal(rt: Runtime, saved: Principal): Promise<Principal | null> {
+  if (await businessEnded(rt, saved)) return null
   const person = await rt.options.people.person(saved.person.id)
   const agent = await rt.options.db.prepare('SELECT revoked FROM agent_door_agents WHERE id=?').bind(saved.agent.id).first<{ revoked: number }>()
   const state = await policyState(rt)
@@ -42,6 +45,7 @@ export async function livePrincipal(rt: Runtime, saved: Principal): Promise<Prin
 export async function runTool(rt: Runtime, tool: ToolDefinition, args: Record<string, unknown>, principal: Principal, result: CallResult, door: ToolContext['door'], approvers: ToolContext['approvers'] = [], usageId = result.decision!.id): Promise<{ result: CallResult; effects: Effect[]; undo?: unknown }> {
   const effects: Effect[] = []
   try {
+    if (await businessEnded(rt, principal)) throw new ToolRefusal('sponsor_unavailable')
     const current = await narrowPrincipal(rt, principal)
     // Preserve the admission snapshot exactly; a removed grant requires fresh work.
     if (principal.scopes.some(scope => !current.scopes.includes(scope))) throw new ToolRefusal('insufficient_scope')
