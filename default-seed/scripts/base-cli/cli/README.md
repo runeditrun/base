@@ -595,7 +595,8 @@ into a seed's `CONTRACT.md` and runs its contract-docs generator and check.
 It requires the seed's `Shared duties (Base)` table and skips duties listed
 in its `Base duty` column; only unlisted duties need clause synchronization.
 Without that table it refuses before writing any files.
-`rer door clauses --check` names missing or stale clauses and exits nonzero;
+`rer door clauses --check` skips the same listed duties, names missing or stale
+unlisted clauses and exits nonzero; without a table it checks all thirteen duties.
 `--cwd DIR` selects the seed root. Existing statuses, evidence and gaps survive,
 new clauses start missing, and seed-owned AGENT and SURFACE clauses stay intact.
 Run the edition's source-lock command last. See

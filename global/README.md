@@ -25,7 +25,8 @@ contract document generation and checking. `rer door clauses --check` reports
 missing or stale requirements without writing; use `--cwd DIR` to select a seed.
 Writing requires a `Shared duties (Base)` table and skips duties listed in its
 `Base duty` column. Unlisted duties are synchronized as clauses; a missing table
-refuses the write. The read-only check still inspects clause definitions.
+refuses the write. The read-only check skips the same listed duties; without a
+table it checks all thirteen clause definitions.
 The CLI can sync a contract before runtime adoption; regenerate the seed's source lock last.
 See [agent door adoption](https://github.com/runeditrun/base/blob/main/modules/agent-door/ADOPTING.md#contract-clauses).
 

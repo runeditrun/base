@@ -4,10 +4,9 @@ import { execFile } from 'node:child_process';
 import { realpath, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { descriptorProfile, dispatcher, pinnedPackage } from './checkout.mjs';
+import { descriptorProfile } from './checkout.mjs';
 import { liveServers } from './registry.mjs';
-import { describeCheckout, setupNeeded } from './launch/facts.mjs';
-import { launchPath, setupState } from './launch/state.mjs';
+import { checkoutPreparation } from '../cli/checkout-preparation.mjs';
 import { checkoutFolders } from '../cli/checkout-folders.mjs';
 
 const run = promisify(execFile);
@@ -28,12 +27,10 @@ async function entry(path, running) {
  if (!result.launchable) result.reason = reasons[facts.profile] ?? `OPERATIONS.json is version ${facts.version ?? '(none)'}, which rer does not run`;
  result.prepared = null;
  if (profile === 'first-party') {
-  // Set up: saved settings, and no setup a launch started left unfinished. A
-  // checkout whose pinned rer package is not installed yet has never been
-  // launched: rer dev installs it first.
-  if (pinnedPackage(path)?.ready === false) result.prepared = false;
-  else try { result.prepared = !await setupNeeded(path, await describeCheckout(path, dispatcher(path).entry, process.env), await setupState.read(launchPath(path))); }
-  catch (failure) { result.launchable = false; result.reason = `rer describe fails here: ${failure.message.split('\n')[0]}`; }
+  const status = await checkoutPreparation(path);
+  result.prepared = status.prepared;
+  if (status.reason) result.reason = status.reason;
+  if (status.prepared === null) result.launchable = false;
  }
  result.url = running.get(path) ?? null;
  result.changedAt = new Date(await changed(path)).toISOString();

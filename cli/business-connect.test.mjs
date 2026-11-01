@@ -2,6 +2,7 @@ import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
 import { door } from './fixtures/business/door.mjs';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile, symlink } from 'node:fs/promises';
@@ -110,9 +111,24 @@ test('Business check-ins carry listed prepared and live apps, preserve settings 
  await mkdir(join(unprepared, 'scripts'), { recursive: true });
  await writeFile(join(unprepared, 'OPERATIONS.json'), JSON.stringify({ version: 2, seedContract: { profile: 'first-party' } }));
  await writeFile(join(unprepared, 'scripts/rer.mjs'), `process.stdout.write(JSON.stringify({ local: { prepared: false } }));`);
+ const interrupted = join(home, 'interrupted-app'), broken = join(home, 'broken-app');
+ for (const root of [interrupted, broken]) {
+  await mkdir(join(root, 'scripts'), { recursive: true });
+  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, seedContract: { profile: 'first-party' } }));
+ }
+ await writeFile(join(interrupted, 'scripts/rer.mjs'), `process.stdout.write(JSON.stringify({ local: { prepared: true } }));`);
+ const launch = join(registry, 'launches', `interrupted-app-${createHash('sha256').update(interrupted).digest('hex').slice(0, 12)}`);
+ await mkdir(launch, { recursive: true });
+ await writeFile(join(launch, 'setup.json'), JSON.stringify({ state: 'running', at: Date.now() }));
+ await register([live, interrupted]); // A live registry entry cannot finish setup.
+ await writeFile(join(broken, 'scripts/rer.mjs'), `console.error('synthetic describe cause'); process.exit(7);`);
  const listed = await cli(home, ['list', '--json'], { env });
  assert.equal(listed.code, 0, listed.stderr);
  assert.ok(JSON.parse(listed.stdout).checkouts.some(app => app.path === checkout && app.profile === 'first-party' && app.launchable && app.prepared));
+ const apps = JSON.parse(listed.stdout).checkouts;
+ assert.equal(apps.find(app => app.path === interrupted).prepared, false);
+ const cause = apps.find(app => app.path === broken).reason;
+ assert.match(cause, /rer describe fails here: synthetic describe cause/);
  const unpaired = await cli(home, ['business', 'next'], { env });
  assert.equal(unpaired.code, 1);
  for (const root of [checkout, live]) await assert.rejects(stat(carryFile(root)), { code: 'ENOENT' });
@@ -124,6 +140,10 @@ test('Business check-ins carry listed prepared and live apps, preserve settings 
  assert.ok(paired.stderr.includes(JSON.stringify(skipped)) && paired.stderr.includes('not first-party'), paired.stderr);
  assert.ok(paired.stderr.includes(JSON.stringify(unprepared)) && paired.stderr.includes('not set up yet: run rer setup'), paired.stderr);
  await assert.rejects(stat(carryFile(unprepared)), { code: 'ENOENT' });
+ for (const root of [interrupted, broken]) await assert.rejects(stat(carryFile(root)), { code: 'ENOENT' });
+ assert.ok(paired.stderr.includes(JSON.stringify(interrupted)) && paired.stderr.includes('not set up yet'), paired.stderr);
+ assert.ok(paired.stderr.includes(cause), paired.stderr);
+ t.diagnostic(`interrupted-app: list prepared=false; carry skipped (not set up); broken-app: ${cause} in list and carry`);
  t.diagnostic(`listed stopped checkout received carry; skipped ${skipped}: not first-party`);
  await register([live]); // The first checkout is stopped, but custody remains in carried.json.
  const first = await readFile(carryFile(checkout), 'utf8');
@@ -196,16 +216,18 @@ test('Business next echoes the installed launcher or npx invocation and open cho
  assert.equal(result.stdout.match(/The owner has not chosen yet:/g)?.length, 1);
  assert.equal(npx.stdout.match(/The owner has not chosen yet:/g)?.length, 1);
  // The undecided set changes between check-ins in the same long-running command.
- let checks = 0;
+ let checks = 0, runner;
  remote.state.onSelf = async () => {
   remote.state.optIns = ++checks === 1 ? {} : { awakeConsent: false };
+  if (checks === 2) setTimeout(() => runner.kill('SIGTERM'), 250);
  };
- let stopped = false;
- const running = await cli(home, ['business', 'run'], { onOutput: (out, child) => {
-  if (checks >= 2 && !stopped) { stopped = true; child.kill('SIGTERM'); }
- } });
+ const running = await cli(home, ['business', 'run'], { onSpawn: child => { runner = child; } });
  assert.equal(running.code, 0, running.stderr);
  assert.equal(running.stdout.match(/The owner has not chosen yet:/g)?.length, 1);
+ assert.equal(checks, 2);
+ assert.equal(running.stdout.match(/No local app carry files changed/g)?.length, 1);
+ assert.equal(running.stdout.match(/No local apps were found/g)?.length, 1);
+ t.diagnostic('unchanged empty carry set: 2 check-ins; 1 summary; 1 no-local-apps line');
  t.diagnostic('installed: rer business next; npx: npx -y @runeditrun/rer business next; changing open choices printed once');
 });
 
@@ -560,6 +582,8 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
  const owner = await identity(); t.after(() => owner.close());
  for (const root of [checkout, live]) {
   await mkdir(root); await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, seedContract: { profile: 'first-party' } }));
+  await mkdir(join(root, 'scripts'));
+  await writeFile(join(root, 'scripts/rer.mjs'), `process.stdout.write(JSON.stringify({ local: { prepared: true } }));`);
  }
  await mkdir(registry);
  const register = roots => writeFile(join(registry, 'state.json'), JSON.stringify({ running: roots.map(checkout => ({ checkout, mode: 'dev', owner: owner.info })) }));
@@ -616,6 +640,8 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
   if (['missing', 'linked-root'].includes(name)) continue;
   await mkdir(join(root, '.rer/local'), { recursive: true });
   await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, seedContract: { profile: 'first-party' } }));
+  await mkdir(join(root, 'scripts'));
+  await writeFile(join(root, 'scripts/rer.mjs'), `process.stdout.write(JSON.stringify({ local: { prepared: true } }));`);
   if (name !== 'removed-carry') await writeFile(carryFile(root), finalCarry);
  }
  const foreign = { ...JSON.parse(finalCarry), business_id: 'synthetic-foreign', business_url: remote.origin + '/business/synthetic-foreign' };
@@ -639,6 +665,9 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
  assert.equal(JSON.parse(await readFile(carryFile(checkout), 'utf8')).name, remote.state.business.name);
  assert.equal(JSON.parse(await readFile(carryFile(checkout), 'utf8')).accent, '#264f45');
  for (const root of Object.values(invalid)) assert.ok(isolated.stderr.includes(JSON.stringify(root)), isolated.stderr);
+ assert.ok(isolated.stderr.includes('the existing file is not a carry for this paired Business'), isolated.stderr);
+ assert.ok(isolated.stderr.includes('the carry path is linked or not a regular file'), isolated.stderr);
+ assert.ok(!isolated.stderr.includes('rer describe fails here'), 'custody refusals reach the carry writer after preparation succeeds');
  assert.ok(isolated.stderr.includes('relative-path'), isolated.stderr);
  for (const [name, bytes] of kept) assert.equal(await readFile(carryFile(invalid[name]), 'utf8'), bytes, `${name} is untouched`);
  for (const name of ['missing', 'removed-carry']) await assert.rejects(stat(carryFile(invalid[name])), { code: 'ENOENT' });

@@ -6,6 +6,7 @@ import { carryCheckouts, firstParty, writeCarry } from './carry-files.mjs';
 export { removeCarries } from './carry-files.mjs';
 
 const launched = Symbol.for('rer.business.carry.launched');
+const summaries = new Map();
 
 export function buildCarry(state, self) {
  const business = self?.business;
@@ -25,35 +26,45 @@ export function buildCarry(state, self) {
   logo_url: logo };
 }
 
-function warning(origin, error, checkout) {
+function warning(origin, error, checkout, report = true) {
  // Do not echo server text, response fields or transport messages: they can contain credentials.
  const reason = error.status ? `the server refused the request (HTTP ${error.status})`
   : error.name === 'TimeoutError' || error.name === 'AbortError' ? 'the server did not answer within 5 seconds'
   : error.message?.startsWith('Could not reach the Business server at ') ? 'the server is unreachable'
   : error.message === 'credential unavailable' ? 'the Business credential is unavailable in OS credential storage'
+  : error.preparation ? error.message
   : localCause(error) ?? (['the response names another Business', 'the Business profile is invalid', 'the checkout is not first-party', 'the carry path is linked or not a regular file', 'the existing file is not a carry for this paired Business', 'the carry registry is invalid', 'the checkout is not set up yet: run rer setup'].includes(error.message) ? error.message : 'the Business profile could not be refreshed');
  const step = error.code === 'ENOENT' ? ' Open the app with rer dev --cwd FOLDER, then run business next again.' : '';
- process.stderr.write(`Business carry at ${origin}${checkout ? ` for ${JSON.stringify(checkout)}` : ''}: ${reason}; keeping any local carry.${step}\n`);
+ const text = `Business carry at ${origin}${checkout ? ` for ${JSON.stringify(checkout)}` : ''}: ${reason}; keeping any local carry.${step}\n`;
+ if (report) process.stderr.write(text);
+ return text;
 }
 
-export async function carryCheckIn(state, self) {
+export async function carryCheckIn(state, self, { summarize = false } = {}) {
  try {
   if (!state?.origin || !state.businessId || !state.executorId || state.revoked) return;
   const carry = buildCarry(state, self);
-  const checkouts = [], unchanged = [];
+  const checkouts = [], unchanged = [], skipped = [];
   let failed = 0;
-  const refused = (error, checkout) => { failed++; warning(state.origin, error, checkout); };
+  const refused = (error, checkout) => { failed++; skipped.push({ checkout, warning: warning(state.origin, error, checkout, false) }); };
   for (const { checkout, live } of await carryCheckouts(refused, state)) {
    try {
     if (!carry) {
-     process.stderr.write(`Business carry skipped for ${JSON.stringify(checkout)}: the server did not provide this Business's profile; retry business next after the server supports profile sharing.\n`);
+     skipped.push({ checkout, warning: `Business carry skipped for ${JSON.stringify(checkout)}: the server did not provide this Business's profile; retry business next after the server supports profile sharing.\n` });
      failed++; continue;
     }
     const changed = await writeCarry(checkout, carry, { existingOnly: !live });
     (changed ? checkouts : unchanged).push(checkout);
    } catch (error) { refused(error, checkout); }
   }
-  return { name: carry?.name ?? state.businessId, checkouts, unchanged, failed };
+  // Changed/unchanged writes describe the same carried set. Sorting keeps
+  // filesystem and registry order from repeating a long-running run's report.
+  const signature = JSON.stringify({ carried: [...checkouts, ...unchanged].sort(), skipped: skipped.map(item => item.warning).sort() });
+  const key = JSON.stringify([state.origin, state.businessId, state.executorId]);
+  const summaryChanged = !summarize || summaries.get(key) !== signature;
+  if (summarize) summaries.set(key, signature);
+  if (summaryChanged) for (const item of skipped) process.stderr.write(item.warning);
+  return { name: carry?.name ?? state.businessId, checkouts, unchanged, failed, summaryChanged };
  } catch (error) { warning(state.origin, error); }
 }
 

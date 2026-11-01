@@ -65,7 +65,7 @@ function headings(lines) {
  });
 }
 
-function sharedDuties(original) {
+function sharedDuties(original, required) {
  const lines = original.split(/\r?\n/), outline = headings(lines);
  const cells = line => line?.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, '').split(/(?<!\\)\|/).map(cell => cell.trim());
  const section = outline.find(item => item.level === 2 && item.title.trim() === 'Shared duties (Base)');
@@ -85,6 +85,7 @@ function sharedDuties(original) {
   }
   return duties;
  }
+ if (!required) return new Set();
  fail('CONTRACT.md needs a Shared duties (Base) table with a Base duty column before --write. Add the table, then retry; no files were written.');
 }
 
@@ -164,7 +165,7 @@ export async function doorClausesCommand(args, env = process.env) {
   const file = resolve(root, 'CONTRACT.md');
   if (!existsSync(file)) fail('No CONTRACT.md found. Run rer door clauses from the seed root or pass --cwd DIR.');
   const original = read(file);
-  const inherited = mode === '--write' ? sharedDuties(original) : new Set();
+  const inherited = sharedDuties(original, mode === '--write');
   const { text, changed } = synchronize(original, definitions(canonical(root)).filter(clause => !inherited.has(clause.id)));
   if (changed.length) console.log(`Agent clauses: ${changed.join(', ')}.`);
   if (mode === '--check' && changed.length) return 1;
