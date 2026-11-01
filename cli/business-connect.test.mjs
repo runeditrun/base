@@ -640,6 +640,8 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
   if (['missing', 'linked-root'].includes(name)) continue;
   await mkdir(join(root, '.rer/local'), { recursive: true });
   await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, seedContract: { profile: 'first-party' } }));
+  await mkdir(join(root, 'scripts'));
+  await writeFile(join(root, 'scripts/rer.mjs'), `process.stdout.write(JSON.stringify({ local: { prepared: true } }));`);
   if (name !== 'removed-carry') await writeFile(carryFile(root), finalCarry);
  }
  const foreign = { ...JSON.parse(finalCarry), business_id: 'synthetic-foreign', business_url: remote.origin + '/business/synthetic-foreign' };
@@ -663,6 +665,9 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
  assert.equal(JSON.parse(await readFile(carryFile(checkout), 'utf8')).name, remote.state.business.name);
  assert.equal(JSON.parse(await readFile(carryFile(checkout), 'utf8')).accent, '#264f45');
  for (const root of Object.values(invalid)) assert.ok(isolated.stderr.includes(JSON.stringify(root)), isolated.stderr);
+ assert.ok(isolated.stderr.includes('the existing file is not a carry for this paired Business'), isolated.stderr);
+ assert.ok(isolated.stderr.includes('the carry path is linked or not a regular file'), isolated.stderr);
+ assert.ok(!isolated.stderr.includes('rer describe fails here'), 'custody refusals reach the carry writer after preparation succeeds');
  assert.ok(isolated.stderr.includes('relative-path'), isolated.stderr);
  for (const [name, bytes] of kept) assert.equal(await readFile(carryFile(invalid[name]), 'utf8'), bytes, `${name} is untouched`);
  for (const name of ['missing', 'removed-carry']) await assert.rejects(stat(carryFile(invalid[name])), { code: 'ENOENT' });
