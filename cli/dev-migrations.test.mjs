@@ -15,10 +15,20 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  const installed = f.launch(['scripts/rer.mjs', 'install', '--json'], process.execPath, { PLAYWRIGHT_BROWSERS_PATH: browsers });
  assert.equal(await installed.done, 0, installed.stderrText.slice(-2000));
  assert.deepEqual(await readdir(browsers), [], 'install downloads no browser');
+ // A long source history must not redraw Wrangler's migration table for each
+ // file; the final durable ledger still supplies every applied migration name.
+ const history = Array.from({ length: 80 }, (_, i) => `${String(8000 + i)}_history.sql`);
+ for (const [i, name] of history.entries()) await writeFile(join(f.root, 'migrations/core', name), `CREATE TABLE history_${i}(value TEXT);\n`);
  // Setup ends by naming what a hosted deploy will still need, from deploy.json.
  const setupReady = events(await f.run(['setup', '--owner-email', 'migration-owner@example.test', '--non-interactive', '--json'])).find(event => event.event === 'setup-ready');
  assert.ok(setupReady?.neededForDeploy?.some(item => item.includes('CLOUDFLARE_API_TOKEN')), JSON.stringify(setupReady));
  assert.ok(setupReady.neededForDeploy.some(item => item.includes('MAIL_API_KEY (or RESEND_API_KEY)')), JSON.stringify(setupReady));
+ const setupLog = await readFile(join(f.root, '.seed/installer/install.log'), 'utf8');
+ assert.ok((setupLog.match(/Migrations to be applied:/g) ?? []).length <= 1);
+ assert.ok((setupLog.match(/│ name[^\n]*status/g) ?? []).length <= 1);
+ const applied = setupLog.split('\n').find(line => line.startsWith('Applied local migrations:'));
+ for (const name of history) assert.ok(applied?.includes(name), `setup names ${name}`);
+ t.diagnostic(`setup history: ${history.length} synthetic migrations; 0 repeated tables; all applied names present`);
  await f.sql("CREATE TABLE saved_before_upgrade(value TEXT); INSERT INTO saved_before_upgrade VALUES('owner content')");
  const path = join(f.root, 'migrations/core/9998_local_upgrade.sql');
  // Simulate git pull after setup: the old build cannot know this migration.

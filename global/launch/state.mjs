@@ -9,16 +9,13 @@
 //   server.json   that server's PID and start time, and the process rer spawned
 //   stop.json     when rer dev --stop last ran: a launch requested before it stops
 //   pin-install.json  the process installing the checkout's pinned rer package
-import { createHash } from 'node:crypto';
 import { appendFile, link, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import { processInfo } from '../../modules/job-queue/processes.mjs';
 import { serversDirectory } from '../registry.mjs';
 
-export function launchPath(checkout, env = process.env) {
- const name = basename(checkout).toLowerCase().replace(/[^a-z0-9-]+/g, '-').slice(0, 40) || 'checkout';
- return join(serversDirectory(env), 'launches', `${name}-${createHash('sha256').update(checkout).digest('hex').slice(0, 12)}`);
-}
+import { launchPath } from '../../cli/checkout-preparation.mjs';
+export { launchPath };
 
 export async function launchDirectory(checkout, env = process.env) {
  const directory = launchPath(checkout, env);

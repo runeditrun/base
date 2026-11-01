@@ -39,8 +39,12 @@ export async function migrateOperator(context, database) {
  await writePrivateFile(path, JSON.stringify({ name: config.name, compatibility_date: config.compatibility_date,
   d1_databases: [{ ...binding, migrations_dir: inventory, migrations_pattern: `${inventory}/*.sql` }] }));
  try {
+  // Wrangler redraws the full history after every migration. Keep warnings and
+  // errors, then name the migrations actually applied from the durable ledger.
+  const pending = names.filter(name => !before.has(name));
+  if (pending.length) store.report(`Applying ${pending.length} local migrations.`);
   await context.run(labels.migrate, 'pnpm', ['exec', 'wrangler', 'd1', 'migrations', 'apply', database,
-   '--local', '--persist-to', state, '--config', path], { step: 'setup' });
+   '--local', '--persist-to', state, '--config', path], { step: 'setup', env: { ...process.env, WRANGLER_LOG: 'warn' } });
   const after = await appliedNames(state, table);
   const applied = names.filter(name => !before.has(name) && after.has(name));
   if (applied.length) store.report(`Applied local migrations: ${applied.join(', ')}`);

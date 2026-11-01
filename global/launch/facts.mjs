@@ -40,35 +40,7 @@ export async function needsInstall(root, last) {
  return false;
 }
 
-// A checkout is set up when its pin's describe says so (`local.prepared`, from
-// rer-cli-2); for older pins, when its primary private settings file holds
-// anything. The pin's describe names it (`local.settings`, where the pin has it).
-export async function hasSettings(root, described) {
- if (typeof described?.local?.prepared === 'boolean') return described.local.prepared;
- const primary = described?.local?.settings?.[0] ?? '.dev.vars';
- try { return (await stat(join(root, primary))).size > 0; } catch (error) { if (error.code === 'ENOENT') return false; throw error; }
-}
-
-// Every pin's setup saves its answers file only once it has finished, so a
-// file newer than this launcher's record of its own attempt (its start for
-// 'running', its end for 'failed') is a setup that finished after it.
-async function finishedSince(root, described, at) {
- const saved = await mtime(join(root, described?.local?.installerState ?? '.seed/installer', 'setup-answers.json'));
- return saved !== undefined && typeof at === 'number' && saved > at;
-}
-
-// Setup runs on a checkout with no saved settings ('fresh'). When a setup this
-// launcher started did not finish ('running' after a kill, or 'failed') and no
-// setup has finished since, it runs again ('resume') and keeps what the earlier
-// attempt saved. A checkout set up any other way is never set up again.
-// A checkout that is not prepared but already holds an owner (a setting a newer
-// manifest added is missing) resumes too, so the saved owner and origin are
-// kept; one without a saved owner gets the local owner ('fresh').
-export async function setupNeeded(root, described, last) {
- if (!await hasSettings(root, described)) return described?.local?.ownerSaved === true ? 'resume' : 'fresh';
- if (!last || last.state === 'done') return undefined;
- return await finishedSince(root, described, last.at) ? undefined : 'resume';
-}
+export { hasSettings, setupNeeded } from '../../cli/checkout-preparation.mjs';
 
 // Only a positive listener observation justifies saying another process took it.
 export async function portTaken(port) {

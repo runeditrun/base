@@ -58,7 +58,7 @@ export async function applyChoices(api, state, { reconnecting = false } = {}) {
  // Use the server's per-computer scan state, rather than interpreting every
  // unfinished scan as missing consent. Do not persist paths from the response.
  state.localScan = self?.local_scan ? { allowed: self.local_scan.allowed === true, state: self.local_scan.state } : undefined;
- const carried = await carryCheckIn(state, self);
+ const carried = await carryCheckIn(state, self, { summarize: true });
  const decided = Object.fromEntries(names.map(name => [name, typeof self?.optIns?.[name] === 'boolean' ? self.optIns[name] : null]));
  // The agent this computer reported when it paired, as the owner's browser words its choices:
  // the Claude Code rules apply only to Claude Code. An unknown agent (no route yet) decides nothing.
@@ -93,7 +93,7 @@ export async function applyChoices(api, state, { reconnecting = false } = {}) {
   once('undecided', `The owner has not chosen yet:\n${undecided.map(name => `  - ${choices[name]}\n`).join('')}They choose on this computer's row in ${state.origin}/business/${encodeURIComponent(state.businessId)}/settings; the run and next commands apply the choices at their next check-in, ${reconnecting ? 'without pairing again' : 'so connect does not need to run again'}.\n`);
  }
  once('choices-next-step', `After choosing this computer's permissions in Business, run ${businessCommand('next')} to apply them and see the next task.\n`);
- if (carried) {
+ if (carried?.summaryChanged) {
   const count = carried.checkouts.length;
   process.stdout.write(count
    ? `Refreshed ${count} local app carry ${count === 1 ? 'file' : 'files'} for ${JSON.stringify(carried.name)}:\n${carried.checkouts.map(checkout => `  - ${join(checkout, '.rer/local/business.json')}\n`).join('')}Supporting apps apply these values when they read their carry file.\n`

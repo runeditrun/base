@@ -45,8 +45,9 @@ test('door clauses syncs canonical requirements without changing seed clauses or
   prepare(withTable(decoys + table(listed).replace('| --- | --- | --- | --- |\n', '| --- | --- | --- | --- |\n| BASE-INPUT-001 | Validation | BASE-AGENT-001 | not run |\n')));
   const before = snapshot(), counts = parseContract(before[0]).counts;
   const checked = run('--check');
-  assert.equal(checked.status, 1, checked.output);
-  for (const id of ids) assert.ok(checked.output.includes(`${id} missing`), '--check retains its existing clause-based behavior');
+  assert.equal(checked.status, listed.length === 13 ? 0 : 1, checked.output);
+  for (const id of ids) assert.equal(checked.output.includes(`${id} missing`), !listed.includes(id), '--check skips exactly the inherited duties');
+  t.diagnostic(`Shared duties: ${listed.length} listed; --check exit ${checked.status}; ${13 - listed.length} missing.`);
   assert.deepEqual(snapshot(), before, '--check never writes');
   const written = run('--write');
   assert.equal(written.status, 0, written.output);
@@ -56,12 +57,15 @@ test('door clauses syncs canonical requirements without changing seed clauses or
   assert.equal(parsed.counts.missing, counts.missing + 13 - listed.length);
   if (listed.length === 13) assert.deepEqual(after, before, 'all listed duties leave every generated file byte-identical');
   assert.equal(run('--write').status, 0);
+  assert.equal(run('--check').status, 0);
   assert.deepEqual(snapshot(), after, 'repeated writes are byte-identical');
  }
  for (const replacement of ['', '```md\n' + table(ids) + '```\n\n', '## Shared duties (Base)\n\nNo table yet.\n\n', table(ids).replace('| --- | --- | --- | --- |', 'not a divider')]) {
   prepare(withTable(replacement));
   const before = snapshot();
-  assert.equal(run('--check').status, 1, '--check still reports missing clauses without a table');
+  const checked = run('--check');
+  assert.equal(checked.status, 1, '--check still reports missing clauses without a table');
+  for (const id of ids) assert.ok(checked.output.includes(`${id} missing`));
   const refused = run('--write');
   assert.equal(refused.status, 1, refused.output);
   assert.match(refused.output, /Shared duties \(Base\) table/);
