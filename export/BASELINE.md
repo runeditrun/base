@@ -216,3 +216,9 @@ remains separate from a seed's own Status judgments.
 
 - **BASE-AGENT-013 — Manifest, docs and the conformance journey.** [Canonical clause](../modules/agent-door/CLAUSES.md).
   Base conformance journey: `BASE-AGENT-013.surface`, `.phase2`, `.phase3` and `.4` prove static declarations and fixture journeys under autonomous and held policies. The reference browser journey covers both person pages at 1440 and 390. Planned: full Core-clause tier coverage, per-role UI-action parity and the stranger-specialist journey; a prompt listing does not prove the latter.
+
+- **BASE-AGENT-014 — The paired Business reads every door decision.** [Canonical clause](../modules/agent-door/CLAUSES.md).
+  Base conformance journey: planned (a paired Business reads a fixture week; paused and unset refusals; strangers, unpairing, markers and erasure).
+
+- **BASE-AGENT-015 — Links from Business open the seed's own pages.** [Canonical clause](../modules/agent-door/CLAUSES.md).
+  Base conformance journey: planned (destination through sign-in and setup; identical denials; borrowed credentials and replays).

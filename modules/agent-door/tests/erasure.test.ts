@@ -133,7 +133,7 @@ test('an admitted completion cannot overwrite a tombstone or append late persona
   const opened = await r.erasure.start('record', { id }); await r.erasure.run(opened.id)
   assert.equal(await r.db.prepare('SELECT expires_at FROM agent_door_calls WHERE decision_id=?').bind(originalRow.id).first('expires_at'), nativeHorizon, 'an existing shorter replay horizon survives erasure')
   const { audit } = await import('../audit.ts'), { appendEvents } = await import('../events.ts')
-  const rt = { options: { db: r.db }, now: Date.now } as any
+  const rt = { options: { db: r.db, seed: 'synthetic', trust: null }, tools: [], now: Date.now } as any
   await audit(rt, originalRow, JSON.parse(original.evidence))
   await audit(rt, { ...originalRow, id: crypto.randomUUID(), decision_id: originalRow.id }, JSON.parse(original.evidence))
   await appendEvents(rt, [{ type: 'record.saved', uri: 'synthetic://record/' + id, actor: { kind: 'business' }, data: { personal: id } }], originalRow.id)

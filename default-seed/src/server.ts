@@ -1,7 +1,8 @@
-import { expireReplayCalls } from '../../modules/agent-door/index.ts'
+import { expireReplayCalls, OPEN_PATH } from '../../modules/agent-door/index.ts'
 import { withDemo } from '../../modules/demo/index.mjs'
 import { dependenciesResponse } from './core/platform/auth/dependencies.server'
-import { firstRunResponse } from '../../foundation/runtime/setup'
+import { firstRunGate, firstRunResponse } from '../../foundation/runtime/setup'
+import { recordPageResponse } from './core/features/records/pages.server'
 import { operatorAuth } from './core/platform/auth/session.server'
 import { z } from 'zod'
 import { authResponse, signInResponse } from './core/app/auth-http.server'
@@ -34,7 +35,7 @@ export default withDemo({
     if (asset) return asset
     bindings = requireBindings(bindings)
     const agentPath = new URL(request.url).pathname
-    if (agentPath === '/mcp' || agentPath === '/agents' || agentPath.startsWith('/agents/') || agentPath === '/api/rer/agent-policy' || agentPath.startsWith('/.well-known/oauth-protected-resource')) {
+    if (agentPath === '/mcp' || agentPath === '/agents' || agentPath.startsWith('/agents/') || agentPath === '/api/rer/agent-policy' || agentPath === '/api/rer/agent-decisions' || agentPath.startsWith('/.well-known/oauth-protected-resource')) {
       const agentResponse = await baseAgentDoor(bindings).handle(request)
       if (agentResponse) return rejectedResponse(request, agentResponse)
     }
@@ -65,10 +66,15 @@ export default withDemo({
       const page = await signInResponse(request, bindings, waitUntil)
       if (page) return page
     }
+    const setupTheme = () => ({ theme: { ...theme, businessSettings: businessSettings(bindings) } })
+    // BASE-AGENT-015: links from Business keep their destination through sign-in and setup.
+    if (path === OPEN_PATH && new URL(request.url).origin === bindings.AUTH_ORIGIN) return rejectedResponse(request, await baseAgentDoor(bindings).open(request, { gate: firstRunGate(bindings, setupTheme()) }))
     if (path === '/setup' || path === '/app' || path.startsWith('/app/')) {
-      const setup = await firstRunResponse(request, bindings, operatorAuth(bindings), { theme: { ...theme, businessSettings: businessSettings(bindings) } })
+      const setup = await firstRunResponse(request, bindings, operatorAuth(bindings), setupTheme())
       if (setup) return setup
     }
+    const record = await recordPageResponse(request, bindings)
+    if (record) return record
     if (path === '/app/import') {
       const imports = await importPageResponse(request, bindings)
       if (imports) return imports

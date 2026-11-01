@@ -36,7 +36,7 @@ test('door clauses syncs canonical requirements without changing seed clauses or
   const generated = spawnSync(process.execPath, ['src/base/contract-docs.mjs', 'write'], { cwd: root, env, encoding: 'utf8' });
   assert.equal(generated.status, 0, generated.stdout + generated.stderr);
  };
- const ids = Array.from({ length: 13 }, (_, i) => `BASE-AGENT-${String(i + 1).padStart(3, '0')}`);
+ const ids = Array.from({ length: 15 }, (_, i) => `BASE-AGENT-${String(i + 1).padStart(3, '0')}`);
  const table = listed => `## Shared duties (Base)\n\n| Base duty | Duty | Delta clauses | Base journey |\n| --- | --- | --- | --- |\n${listed.map((id, i) => `| ${i % 2 ? id : `\`${id}\``} | Shared agent duty | SURFACE-001 | not run |`).join('\n')}\n\n`;
  const withTable = replacement => fixture.replace(/## Shared duties \(Base\)[\s\S]*?(?=## Published clauses)/, replacement);
  for (const listed of [ids, ['BASE-AGENT-002', 'BASE-AGENT-010']]) {
@@ -52,9 +52,9 @@ test('door clauses syncs canonical requirements without changing seed clauses or
   assert.equal(written.status, 0, written.output);
   const after = snapshot(), parsed = parseContract(after[0]);
   assert.deepEqual(parsed.clauses.filter(clause => ids.includes(clause.id)).map(clause => clause.id), ids.filter(id => !listed.includes(id)));
-  assert.equal(parsed.counts.total, counts.total + 13 - listed.length);
-  assert.equal(parsed.counts.missing, counts.missing + 13 - listed.length);
-  if (listed.length === 13) assert.deepEqual(after, before, 'all listed duties leave every generated file byte-identical');
+  assert.equal(parsed.counts.total, counts.total + 15 - listed.length);
+  assert.equal(parsed.counts.missing, counts.missing + 15 - listed.length);
+  if (listed.length === 15) assert.deepEqual(after, before, 'all listed duties leave every generated file byte-identical');
   assert.equal(run('--write').status, 0);
   assert.deepEqual(snapshot(), after, 'repeated writes are byte-identical');
  }
@@ -86,7 +86,7 @@ test('door clauses syncs canonical requirements without changing seed clauses or
  assert.equal(badFlags.status, 2, badFlags.output);
  const missing = run('--check');
  assert.equal(missing.status, 1, missing.output);
- for (let n = 1; n <= 13; n++) assert.match(missing.output, new RegExp(`BASE-AGENT-${String(n).padStart(3, '0')} missing`));
+ for (let n = 1; n <= 15; n++) assert.match(missing.output, new RegExp(`BASE-AGENT-${String(n).padStart(3, '0')} missing`));
  assert.equal(read('CONTRACT.md'), initial, 'check changes no contract bytes');
  const surface = JSON.parse(readFileSync(join(base, 'default-seed/agent-surface.json'), 'utf8'));
  const absent = validateAgentSurface(surface, { contract: initial }).points.filter(point => !point.ok && point.detail?.includes('absent from CONTRACT.md'));
@@ -94,8 +94,8 @@ test('door clauses syncs canonical requirements without changing seed clauses or
  const written = run('--write');
  assert.equal(written.status, 0, written.output);
  const synced = read('CONTRACT.md'), after = parseContract(synced);
- assert.equal(after.counts.total, before.counts.total + 13);
- assert.equal(after.counts.missing, before.counts.missing + 13);
+ assert.equal(after.counts.total, before.counts.total + 15);
+ assert.equal(after.counts.missing, before.counts.missing + 15);
  assert.equal(after.commit, before.commit);
  for (const clause of seedClauses) {
   const actual = after.clauses.find(item => item.id === clause.id);

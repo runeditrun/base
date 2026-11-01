@@ -195,7 +195,7 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
  } finally { await local.close() }
  const fresh=await runtime({resourceScope:'resources:read'})
  try {
-  const surface={escalations:[{id:'self',tool:'synthetic.access.change',args:{id:{$sponsor:'id'}}}],schema:'rer-agent-surface/1',seed:'synthetic',specialist:'operations',tools:[
+  const surface={escalations:[{id:'self',tool:'synthetic.access.change',args:{id:{$sponsor:'id'}}}],business:{decisions:true,failure:{tool:'synthetic.records.write',args:{id:'synthetic-base-1',value:'synthetic-base-invalid'}}},schema:'rer-agent-surface/1',seed:'synthetic',specialist:'operations',tools:[
    {name:'synthetic.records.list',scope:'records:read',readOnly:true,classes:['standard'],clauses:['BASE-AGENT-002']},
    {name:'synthetic.records.write',scope:'records:write',readOnly:false,classes:['standard'],clauses:['BASE-AGENT-002']},
    {name:'synthetic.records.erase',scope:'records:write',readOnly:false,classes:['destructive'],clauses:['BASE-AGENT-006']},
@@ -208,7 +208,7 @@ test('credentials, pause, embedded calls, subscriptions and the generic conforma
     {id:'access',tool:'synthetic.access.change',args:{id:'synthetic-base-other'},expect:[{class:'access'}]},
     {id:'erase',tool:'synthetic.records.erase',args:{id:'synthetic-base-1'},expect:[{class:'destructive'}]},
     {id:'events',tool:'synthetic.events.list',args:{},expect:[{class:'standard'}]}]}
-  const result=await runAgentDoorConformance({fetch:fresh.fetch,origin:fresh.c.origin,surface,signer:fresh.c.signer,person:fresh.c.person,now:()=>fresh.c.now,
+  const result=await runAgentDoorConformance({fetch:fresh.fetch,origin:fresh.c.origin,surface,signer:fresh.c.signer,person:fresh.c.person,now:()=>fresh.c.now,localCredential:fresh.localToken,
    invoke: async (name: string, args: Record<string, unknown>, who: any) => (await fresh.person('/__embedded',{name,args,agent:who.agent,consent:who.consent,scopes:who.scopes})).body })
   assert.deepEqual(result.points.filter((p:any)=>!p.ok),[])
  } finally { await fresh.close() }

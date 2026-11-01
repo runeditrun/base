@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { auditRows } from './audit-rows.mjs';
 import { classIds, errorCode } from './protocol.mjs';
+import { decisionSnapshot } from './business.mjs';
 
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = value => typeof value === 'string' && value.trim().length > 0;
@@ -23,6 +24,7 @@ export async function beforeDestruction(c, name) {
  c.erasureEvidence ??= new Map(); c.erasureReviews ??= new Map();
  for (const row of snapshot.rows) if (!row.tombstone) c.erasureEvidence.set(row.id, structuredClone(row));
  for (const review of reviews.reviews) if (review.code !== 'subject_erased' && !review.tombstone) c.erasureReviews.set(review.id, structuredClone(review));
+ if (c.surface.business?.decisions) await decisionSnapshot(c);
  return new Set(snapshot.rows.map(row => row.id));
 }
 

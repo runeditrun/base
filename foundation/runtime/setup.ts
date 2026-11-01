@@ -17,6 +17,21 @@ export async function needsFirstRun(bindings: SetupBindings, session: Session): 
 
 const redirect = (location: string) => new Response(null, { status: 303, headers: { ...securityHeaders(), location } })
 const escape = (value: string) => value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!))
+// A destination kept through setup (BASE-AGENT-015): only a local /app path, with
+// encoded slash, backslash and control tricks refused at every decoding depth.
+export function setupReturn(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 2048 || !/^\/app(?:[/?]|$)/.test(value) || /[\\\x00-\x20\x7f]/.test(value)) return null
+  let decoded = value
+  for (let depth = 0; depth < 4; depth++) {
+    let next: string
+    try { next = decodeURIComponent(decoded) } catch { return null }
+    if (next.startsWith('//') || /[\\\x00-\x1f\x7f]/.test(next)) return null
+    if (next === decoded) break
+    decoded = next
+  }
+  return value
+}
+const withReturn = (path: string, returnTo: string | null) => returnTo ? `${path}?returnTo=${encodeURIComponent(returnTo)}` : path
 
 // This HTTP form works without JavaScript. Authentication is checked at the
 // mutation itself, independently of document or client-side route guards.
@@ -42,17 +57,31 @@ export async function firstRunResponse(request: Request, bindings: SetupBindings
         catch (error) { const { code, status } = error as { code?: unknown; status?: unknown }; if (typeof code === 'string' && typeof status === 'number' && status < 500) return failure(code, status); throw error }
       }
       await bindings.DB.prepare('INSERT INTO oa_first_run (singleton, completed_by, completed_at) VALUES (1, ?, ?) ON CONFLICT(singleton) DO NOTHING').bind(session.operator.id, Date.now()).run()
-      return redirect('/app')
+      return redirect(setupReturn(form.get('returnTo')) ?? '/app')
     }
-    if (!session) return redirect('/signin?returnTo=%2Fsetup')
-    if (!await needsFirstRun(bindings, session)) return redirect('/app')
+    const returnTo = setupReturn(url.searchParams.get('returnTo'))
+    if (!session) return redirect(withReturn('/signin', withReturn('/setup', returnTo)))
+    if (!await needsFirstRun(bindings, session)) return redirect(returnTo ?? '/app')
     const local = /^(?:localhost|127\.0\.0\.1|\[::1\]|(?:[a-z0-9-]+\.)+localhost)$/.test(url.hostname)
     const frame = await themeFrame(options.theme)
-    const body = `<!doctype html><html lang="en"${frame.htmlClass}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Finish setup</title>${fontHead}${frame.head}</head><body><main>${frame.brand}<h1>Finish setup</h1><p>Review the owner of this installation before opening the app.${auth.changeDisplayName ? ' You can correct your name here now, or later in settings.' : ''}</p>${auth.changeDisplayName ? '' : `<dl><dt>Name</dt><dd>${escape(session.operator.displayName)}</dd></dl>`}<dl><dt>Email</dt><dd>${escape(session.operator.email)}</dd></dl>${local ? '<p>This account lives on this computer and needs no email verification.</p>' : ''}<form method="post" action="/setup">${auth.changeDisplayName ? `<label>Your name <input name="displayName" required maxlength="120" autocomplete="name" value="${escape(session.operator.displayName)}"></label>` : ''}<p><label><input type="checkbox" name="confirm" value="yes" required> I confirm this owner account is ready to use.</label></p><button type="submit">Finish setup</button></form></main></body></html>`
+    const body = `<!doctype html><html lang="en"${frame.htmlClass}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Finish setup</title>${fontHead}${frame.head}</head><body><main>${frame.brand}<h1>Finish setup</h1><p>Review the owner of this installation before opening the app.${auth.changeDisplayName ? ' You can correct your name here now, or later in settings.' : ''}</p>${auth.changeDisplayName ? '' : `<dl><dt>Name</dt><dd>${escape(session.operator.displayName)}</dd></dl>`}<dl><dt>Email</dt><dd>${escape(session.operator.email)}</dd></dl>${local ? '<p>This account lives on this computer and needs no email verification.</p>' : ''}<form method="post" action="/setup">${returnTo ? `<input type="hidden" name="returnTo" value="${escape(returnTo)}">` : ''}${auth.changeDisplayName ? `<label>Your name <input name="displayName" required maxlength="120" autocomplete="name" value="${escape(session.operator.displayName)}"></label>` : ''}<p><label><input type="checkbox" name="confirm" value="yes" required> I confirm this owner account is ready to use.</label></p><button type="submit">Finish setup</button></form></main></body></html>`
     // Native form POSTs need their origin for the unchanged CSRF check above.
     // no-referrer would serialize that navigation's Origin header as null.
     return new Response(request.method === 'HEAD' ? null : body, { headers: { ...securityHeaders(), 'content-security-policy': securityHeaders()['content-security-policy'] + '; ' + frame.policy, 'referrer-policy': 'strict-origin', 'content-type': 'text/html; charset=utf-8' } })
   } catch {
     return rejectedResponse(request, failure('setup_unavailable', 503))
+  }
+}
+
+// BASE-AGENT-015 gate for the shared link destination: the owner goes to setup
+// with the link kept; anyone else sees that setup is required, with no record detail.
+export function firstRunGate(bindings: SetupBindings, options: { theme?: FrameTheme } = {}) {
+  return async (person: { role: string }, request: Request): Promise<Response | null> => {
+    if (await bindings.DB.prepare('SELECT singleton FROM oa_first_run WHERE singleton = 1').first()) return null
+    const url = new URL(request.url)
+    if (person.role === 'owner') return redirect(withReturn('/setup', setupReturn(url.pathname + url.search)))
+    const frame = await themeFrame(options.theme)
+    const body = `<!doctype html><html lang="en"${frame.htmlClass}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Setup is required</title>${fontHead}${frame.head}</head><body><main data-setup-required>${frame.brand}<h1>Setup is required</h1><p>The owner of this installation has not finished setup yet. Ask them to finish it, then open this link again.</p></main></body></html>`
+    return new Response(request.method === 'HEAD' ? null : body, { headers: { ...securityHeaders(), 'content-security-policy': securityHeaders()['content-security-policy'] + '; ' + frame.policy, 'content-type': 'text/html; charset=utf-8' } })
   }
 }

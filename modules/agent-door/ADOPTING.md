@@ -1265,16 +1265,17 @@ unexpected row remains a distinct failure without shifting later comparisons.
 ## Contract clauses
 
 [`CLAUSES.md`](CLAUSES.md) is the single canonical source for
-`BASE-AGENT-001` through `BASE-AGENT-013`: transport, tools, resources,
+`BASE-AGENT-001` through `BASE-AGENT-015`: transport, tools, resources,
 identity, authority, classes, policy, attribution, audit, events, limits and
-Pause, idempotency, and the manifest and conformance journey. Its requirement
+Pause, idempotency, the manifest and conformance journey, the paired Business's
+decision read and links from Business. Its requirement
 text and numbered acceptance points preserve the shared duties previously
 printed in `export/BASELINE.md`. Copying a duty never proves its implementation.
 The baseline keeps the implementation coverage and outstanding gaps separately.
 
 The static surface validator checks every clause ID named by tools and
 `notTools` against the seed contract. The built-in `events.list` tool cites
-`BASE-AGENT-010`; conformance point prefixes cover all thirteen shared duties.
+`BASE-AGENT-010`; conformance point prefixes cover all fifteen shared duties.
 There is no fixed shared set of `AGENT-*` or `SURFACE-*` IDs: those remain the
 seed's own specialist jobs and deltas. The sync never creates or changes them.
 
@@ -1318,7 +1319,7 @@ when all clauses are current. `--write` inserts missing clauses in
 `### Agent surface (Base-delivered)` under Target clauses, before the seed's
 last `### Agent surface` area, and updates existing shared definitions in place.
 Writing requires a `## Shared duties (Base)` table with a `Base duty` column.
-Duties listed in that column are inherited and skipped, so listing all thirteen
+Duties listed in that column are inherited and skipped, so listing all fifteen
 leaves the contract byte-identical. An unlisted duty is still synchronized as a
 clause. A missing table refuses before any files or generated views are written.
 The read-only `--check` continues to inspect clause definitions, including for
@@ -1550,3 +1551,150 @@ and restore checks. Prove each subject type through its public erasure/restore
 doors, scan every mapped column, replay the old key at now, 24 hours plus 1 ms
 and the replay horizon plus 1 ms (a new request), and compare a peer's records byte for byte. Generic module tests
 alone do not qualify an adopting seed.
+
+## Business decision reads and record links
+
+This is the wire agreement for BASE-AGENT-014 and BASE-AGENT-015. The schema
+[`schema/door-decisions.schema.json`](schema/door-decisions.schema.json) gives
+the read body, its refusal body, the read credential and both link shapes.
+Business pulls; the installation never pushes and opens no outbound flow.
+There is no handoff token: a link conveys no authority.
+
+### The decision read (BASE-AGENT-014)
+
+`GET <appOrigin>/api/rer/agent-decisions?after=<cursor>&limit=<n>`, with the
+credential only in `Authorization: Bearer`. `appOrigin` is the application
+origin of the installation's owner-claim trust, the same origin that receives
+`POST /api/rer/agent-policy`. `after` is a `cursor` from an earlier read; omit
+it to read from the start. `limit` is 1 to 200 (default 200). Any other,
+repeated or malformed parameter returns 400 `invalid_request`.
+
+The credential is a compact ES256 JWS signed with a key of the installation's
+existing owner-claim ring. Its protected header is exactly
+`{"alg":"ES256","typ":"rer-agent-decisions+jwt","kid":"<kid>"}`. Its claims are
+exactly `iss` (the trusted issuer), `aud` (`appOrigin`), `sub` (the
+installation id), `business` (the Business id), `iat` and `exp`; `exp - iat` is
+at most 300 seconds and `iat` may lead the installation's clock by at most 30
+seconds. Replaying a credential inside its lifetime only reads again.
+
+The pairing is the trust (issuer and installation id) together with the
+Business named by the policy envelope the installation adopted under that
+trust. Only that Business reads, and it reads only the calls recorded during
+its pairing. Calls before the first envelope, while unpaired, or under another
+trust or Business are never read. One 401 body, `{"code":"unauthenticated"}`
+with `WWW-Authenticate: Bearer`, answers a missing, malformed, untrusted or
+expired credential, an MCP access token, another Business, another
+installation's credential and an installation with no envelope yet. With no
+owner-claim trust the route answers 404 `not_found`: after unpairing the former
+Business reads nothing more. Deliver a policy envelope before the first read.
+Calls audited before an installation adopted the release carrying this read
+are not projected.
+
+A 200 body is `{"decisions":[...],"cursor":"<cursor>"}`. Each decision has
+exactly these fields:
+
+| Field | Value |
+| --- | --- |
+| `id` | The audit row id: stable across retries and re-reads. |
+| `tool` | The registry tool name, or `"resources/read"` for a resource read; null when the call named no tool this seed registers (`tool_not_found`). |
+| `decision` | As recorded: `autonomous`, `review`, `approval`, `blocked`, `unset`, `paused`, `unavailable`, `self_escalation`, or `none` for a refusal before the policy decided. |
+| `outcome` | `running`, `done`, `refused`, `pending`, `failed` or `replayed`. |
+| `code` | For `refused` only: a documented code, otherwise `refused`. Null for every other outcome. |
+| `revision` | The policy revision the call was decided under, or null; never Business's current revision. |
+| `at` | The decision's own time (UTC, milliseconds). |
+| `consent` | The consent id when the call used an access token the paired Business issued; null for embedded agents and the seed's own credentials. |
+
+Decisions arrive in the order they were recorded or last changed. When a
+call's projection changes (a `running` call finishes, for example), it arrives
+again under the same `id` at a later position; keep the latest per `id`. The
+cursor is durable installation state, so reads resume across restarts of
+either side with no gap, and re-reading from an older cursor is harmless. A
+page shorter than `limit` means the reader has caught up.
+
+Documented codes are Base's shared door codes (the module README lists them)
+and the native codes the seed declares for its `/docs/agents`; any other code
+reads `refused`. Business words `agents_paused`, `policy_unset`,
+`policy_blocked`, `self_escalation`, `approval_rejected`, `approval_expired`,
+`company_policy_denied`, `budget_exhausted`, `insufficient_scope` and
+`consent_revoked` in plain language, shows other documented codes as
+themselves, and never shows an unknown value as success. Routing (Business,
+installation, seed) comes from the authenticated read, never from a decision.
+Attribution joins `consent` to Business's own token-issuance record. Nothing
+else leaves the audit: no arguments, targets, record URIs, class facts, record
+content, idempotency keys, traces, rule ids, approver or reviewer ids, sponsor
+names, messages, secrets or credentials. The projection is value-free, so a
+subject's erasure (BASE-DATA-003) leaves that subject's decisions reading the
+same.
+
+### Record and audit links (BASE-AGENT-015)
+
+Business composes every link from the installation's custody (its `appOrigin`)
+and a reference; the installation never supplies a URL. There is one Base
+destination, `<appOrigin>/app/open`, with exactly one query parameter:
+
+- a record: `resource=<encodeURIComponent(resource URI)>`, where the URI is a
+  declared record resource (`resources / templates / list`, BASE-AGENT-003),
+  such as a tool's `resource_link`; each template variable is 1 to 128
+  characters from `A-Z a-z 0-9 . _ ~ -`, and never `.` or `..`;
+- an audit row: `audit=<id>`, a decision `id` from the read above.
+
+The seed alone maps the reference to its own page, at the request:
+
+1. A malformed link is refused with the not-available page (404) and no
+   redirect, signed in or not. That covers a missing, extra or repeated
+   parameter, an absolute or other-origin URL, a path, encoded traversal and an
+   undeclared type.
+2. Signed out, the link answers 303 to the seed's native sign-in (in Base's
+   reference, `/signin?returnTo=<encoded /app/open link>`). Sign-in, including
+   a magic link confirmed later in another browser, returns to the link.
+3. When the installation still needs setup, its owner gets 303 to setup (in
+   Base's reference, `/setup?returnTo=<encoded /app/open link>`); setup stays
+   explicit, keeps the link and returns to it once complete. Anyone else sees
+   that setup is required, with no record detail.
+4. With current access (BASE-ROLE-001), checked at this request, the link
+   answers 303 to the record's or row's own page.
+5. A missing, deleted, out-of-access or other-installation reference gets the
+   same not-available page (404, identical bytes) as item 1.
+
+The destination reads only the seed's native session. It ignores
+`Authorization` headers, Business cookies and anything else in the request,
+and never sets a cookie: no Business cookie, MCP token or deployment credential
+becomes a seed session or grant. Replaying a link, using it later, or using it
+as another person admits no one without native sign-in and current access.
+A handoff reference, if one is ever added, must be bound to its audience,
+Business, installation and intended person, single-use, valid for at most 15
+minutes, and free of authority.
+
+### Wire the decision read and the destination
+
+These steps adopt both clauses in an edition. They change no Status row; judge
+BASE-AGENT-014 and BASE-AGENT-015 through the edition's own doors.
+
+1. Apply `schema/door-decisions.sql` in a new numbered migration. Every audit
+   write now also writes its projection in the same batch, so the door needs
+   this table before its next call. Calls recorded before it are not projected.
+2. Declare `agent_door_decisions` (`change`, `id`, `pairing`, `projection`) in
+   the native erasure map as unrelated: it holds no subject values, which is
+   why an erased subject's decisions keep reading the same.
+3. Route `/api/rer/agent-decisions` to `handle`, like `/api/rer/agent-policy`.
+   Pass `refusalCodes` to `createAgentDoor` with the native codes the seed's
+   `/docs/agents` documents; every other native code reads `refused`.
+4. Give each declared resource a `page(uri, person, db)` that returns the
+   record's own page when this signed-in person can open it now
+   (BASE-ROLE-001), and null otherwise; missing and forbidden both return null.
+   Audit rows open on the door's `/agents/audit/<id>` page for people who can
+   audit, as on the Agents page.
+5. Route `GET /app/open` (`OPEN_PATH`) to `door.open(request, { gate, signIn })`
+   before the generic `/app` setup redirect. `gate(person, request)` is the
+   seed's own setup or first-run gate: return a redirect into setup that keeps
+   the link, or the seed's setup-required page, or null once setup is complete.
+   Base's `foundation/runtime/setup.ts` supplies `firstRunGate`, and `/setup`
+   keeps a local `/app` `returnTo` through its form. `signIn(returnTo)` names a
+   native sign-in other than `/signin?returnTo=`.
+6. Declare `"business": { "decisions": true, "links": true }` in
+   `agent-surface.json`; add `refusalCodes` to match step 3, and an optional
+   `failure: {tool, args}` call that the seed's fixtures make fail. Conformance
+   then runs the BASE-AGENT-014 points, with the verifier as the official-schema
+   fake Business. The seed's link journey uses `conformance/links.mjs` with its
+   own sign-in, setup and second person, as Base's
+   `default-seed/tests/e2e/business-links.mjs` does at 1440 and 390.

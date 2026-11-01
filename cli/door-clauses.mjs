@@ -7,7 +7,7 @@ import { RerError } from './errors.mjs';
 
 export const clausesHelp = `Usage: rer door clauses (--write | --check) [--cwd DIR]
 
-Synchronize BASE-AGENT-001 through BASE-AGENT-013 in CONTRACT.md.
+Synchronize BASE-AGENT-001 through BASE-AGENT-015 in CONTRACT.md.
 --write adds or updates Base's requirements, preserving existing status,
 evidence and gaps, then runs the seed's contract-docs write and check.
 It requires a Shared duties (Base) table and skips duties listed there.
@@ -50,8 +50,8 @@ function definitions(source) {
   const points = [...(acceptance ?? '').matchAll(/^(\d+)\. /gm)];
   if (!points.length || points.length > 8 || points.some((point, index) => Number(point[1]) !== index + 1)) fail(`${clause.id} needs one to eight consecutive acceptance points in its canonical source.`);
  }
- const ids = Array.from({ length: 13 }, (_, i) => `BASE-AGENT-${String(i + 1).padStart(3, '0')}`);
- if (result.map(item => item.id).join() !== ids.join() || result.some(item => !item.row)) fail('Canonical agent clauses must define BASE-AGENT-001 through 013 with initial Status rows.');
+ const ids = Array.from({ length: 15 }, (_, i) => `BASE-AGENT-${String(i + 1).padStart(3, '0')}`);
+ if (result.map(item => item.id).join() !== ids.join() || result.some(item => !item.row)) fail('Canonical agent clauses must define BASE-AGENT-001 through 015 with initial Status rows.');
  return result;
 }
 

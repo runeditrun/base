@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://runeditrun.com/schemas/agent-door/door-decisions-v1.schema.json",
+  "title": "Door decisions read by the paired Business",
+  "description": "Wire agreement for BASE-AGENT-014 (the paired Business reads every door decision) and BASE-AGENT-015 (links from Business open the seed's own pages). The root is the 200 body of GET <appOrigin>/api/rer/agent-decisions. modules/agent-door/ADOPTING.md, 'Business decision reads and record links', is the normative text.",
+  "$ref": "#/$defs/page",
+  "$defs": {
+    "page": {
+      "description": "One read. Decisions are in cursor order. Fewer than the requested limit means the reader has caught up.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisions", "cursor"],
+      "properties": {
+        "decisions": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/decision" } },
+        "cursor": { "$ref": "#/$defs/cursor" }
+      }
+    },
+    "cursor": {
+      "description": "Position after the last decision returned, or the request's own position when none was returned. Opaque to Business: store it and send it back as `after`.",
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]{0,15})$"
+    },
+    "decision": {
+      "description": "The public projection of one audited door call. Nothing else leaves the audit.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tool", "decision", "outcome", "code", "revision", "at", "consent"],
+      "properties": {
+        "id": {
+          "description": "The seed's audit row id. Stable across retries and re-reads; a later change of the same call arrives under the same id.",
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "tool": {
+          "description": "The registry tool name, or resources/read. Null only when the call named no tool this seed registers (code tool_not_found).",
+          "anyOf": [
+            { "const": "resources/read" },
+            { "type": "string", "maxLength": 128, "pattern": "^[a-z][a-z0-9-]*\\.[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)*$" },
+            { "type": "null" }
+          ]
+        },
+        "decision": {
+          "description": "As the seed recorded it; none when the call was refused before the policy decided.",
+          "enum": ["autonomous", "review", "approval", "blocked", "unset", "paused", "unavailable", "self_escalation", "none"]
+        },
+        "outcome": {
+          "description": "May change later under the same id.",
+          "enum": ["running", "done", "refused", "pending", "failed", "replayed"]
+        },
+        "code": {
+          "description": "For a refused call: the refusal code when the seed documents it (Base's shared door codes, or a code the seed declares for /docs/agents), otherwise refused. Null for every other outcome.",
+          "type": ["string", "null"],
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "revision": {
+          "description": "The policy revision the call was decided under, or null. Never filled in from Business's current revision.",
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "at": {
+          "description": "The decision's own time, UTC.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+        },
+        "consent": {
+          "description": "The consent id of the access token the paired Business issued for the call; null for embedded agents and the seed's own credentials.",
+          "type": ["string", "null"],
+          "minLength": 1
+        }
+      },
+      "if": { "required": ["outcome"], "properties": { "outcome": { "const": "refused" } } },
+      "then": { "properties": { "code": { "type": "string" } } },
+      "else": { "properties": { "code": { "type": "null" } } }
+    },
+    "refusal": {
+      "description": "Body of every non-200 answer from the decision read: 401 unauthenticated (one body for every refused credential), 404 not_found (the installation holds no owner-claim trust), 400 invalid_request, 405 method_not_allowed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": { "code": { "enum": ["unauthenticated", "not_found", "invalid_request", "method_not_allowed"] } }
+    },
+    "credentialHeader": {
+      "description": "Protected header of the read credential, a compact ES256 JWS sent only as Authorization: Bearer.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alg", "typ", "kid"],
+      "properties": {
+        "alg": { "const": "ES256" },
+        "typ": { "const": "rer-agent-decisions+jwt" },
+        "kid": { "description": "A key id in the installation's owner-claim public-key ring.", "type": "string", "minLength": 1 }
+      }
+    },
+    "credentialClaims": {
+      "description": "Claims of the read credential. exp - iat is at most 300 seconds; iat may lead the installation's clock by at most 30 seconds.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["iss", "aud", "sub", "business", "iat", "exp"],
+      "properties": {
+        "iss": { "description": "The owner-claim issuer the installation trusts.", "type": "string", "minLength": 1 },
+        "aud": { "description": "The installation's application origin, as in its owner-claim trust.", "type": "string", "format": "uri" },
+        "sub": { "description": "The installation id.", "type": "string", "minLength": 1 },
+        "business": { "description": "The Business id. Equals the business of the policy envelope the installation adopted under this trust.", "type": "string", "minLength": 1 },
+        "iat": { "type": "integer", "minimum": 0 },
+        "exp": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "recordLink": {
+      "description": "BASE-AGENT-015 link to a declared record resource: the installation's application origin, the Base destination /app/open, and exactly one resource parameter holding the percent-encoded resource URI (encodeURIComponent).",
+      "type": "string",
+      "pattern": "^https?://[^/?#]+/app/open\\?resource=[A-Za-z0-9%._~-]+$"
+    },
+    "auditLink": {
+      "description": "BASE-AGENT-015 link to an audit row: the installation's application origin, /app/open and exactly one audit parameter holding a decision id.",
+      "type": "string",
+      "pattern": "^https?://[^/?#]+/app/open\\?audit=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}
