@@ -1,6 +1,6 @@
 # Base-delivered agent clauses
 
-This is the canonical acceptance text for BASE-AGENT-001 through BASE-AGENT-013.
+This is the canonical acceptance text for BASE-AGENT-001 through BASE-AGENT-015.
 `rer door clauses --write` synchronizes these clauses into a seed's CONTRACT.md.
 The seed owns its SURFACE- and AGENT- clauses and its judgments: adding these
 requirements proves no implementation. New Status rows start missing; later
@@ -208,6 +208,36 @@ This clarification does not promote any clause judgment.
 4. Every acceptance point runs under both policies, every decision matches the policy in force, and under all autonomous no call waits for a person or is refused by policy.
 5. A stranger agent given only the seed URL completes the specialist journey through MCP.
 
+#### BASE-AGENT-014 — The paired Business reads every door decision
+
+*Tier:* Agent surface · *From:* new
+
+**Requirement.** Extending BASE-AGENT-009's "Business shows the same across seeds", the Business that owns the installation's pairing, and only it, reads the public projection of every audited call in audit order from a cursor: the audit id, the tool, the recorded decision (autonomous, review, approval, blocked, unset, paused, unavailable, self_escalation, or none when refused before the policy decided), the outcome and its later changes, the refusal code if `/docs/agents` documents it and otherwise `refused`, the policy revision or none, the decision time, and the consent id when that Business issued the call's token. Nothing else leaves the audit. Reads authenticate with the owner-claim trust the installation already holds for that Business (BASE-AGENT-004), and BASE-DATA-003 erasure holds in every read.
+
+**Acceptance.**
+1. A fixture week of done, review, pending, blocked, unset, paused, self-escalation, scope-refused, replayed and failed calls reads back as one projection per audit row, equal to the row in every projected field.
+2. A call refused while agents are paused reads `paused` with `agents_paused`, and one before policy setup reads `unset` with `policy_unset`, each with its own revision or none, whatever Pause or the policy says when it is read.
+3. Reading from a cursor returns the same ids in order with no gap across a restart; a running call reads as running, and its later outcome reads under the same id.
+4. With unique markers in a fixture's arguments, targets, record text and class facts, no projection contains a marker, and a refusal code `/docs/agents` does not list reads `refused`.
+5. A call under a token the paired Business issued carries that consent id; an embedded agent's call and a call under the seed's own credential carry none.
+6. Another Business, another installation's credential, an agent token or no credential reads nothing; after unpairing the former Business reads nothing more, and a newly paired Business reads nothing from before its pairing.
+7. After a subject's erasure, that subject's calls still read with the same value-free fields, and no erased value appears in any read.
+
+#### BASE-AGENT-015 — Links from Business open the seed's own pages
+
+*Tier:* Agent surface · *From:* new
+
+**Requirement.** Each declared record resource (BASE-AGENT-003) and each audit row (BASE-AGENT-009) opens from a link, such as one the paired Business composes, through one Base-defined destination on the seed's own origin. The link carries only the reference, which the seed alone maps to its page. The destination survives native sign-in (BASE-ACCESS-001) and the installation's required setup, and opens only after the seed checks the signed-in person's current access at that request (BASE-ROLE-001); missing and forbidden read the same. Nothing from Business becomes a seed session or grant. A handoff reference, if one is added, is bound to its audience, Business, installation and intended person, is single-use and valid for at most 15 minutes, and conveys no authority.
+
+**Acceptance.**
+1. For each declared record type and an audit row, a signed-in person with access who follows the link reaches that record's or row's own page, and two references reach two pages.
+2. A signed-out person completes native sign-in, including a magic link confirmed later, and lands on the intended page in the browser that confirms it, not the app root.
+3. An owner whose installation still needs setup sees setup, completes it and lands on the intended page; a person who cannot complete setup sees that setup is required and no record detail.
+4. Missing, deleted, out-of-access and other-installation references give the same response before and after sign-in, with no name, field or existence signal; access removed after a link was made is refused when it is opened.
+5. An absolute, other-origin, path, encoded-traversal or undeclared-type reference is refused without a redirect, and no continuation leaves the seed's origin.
+6. A Business session cookie, an MCP token or a deployment credential sent with the link creates no seed session and grants nothing.
+7. A replayed link or handoff reference, one used after 15 minutes, and one used by another person or for another installation, Business or audience admits no one and opens nothing without native sign-in and current access.
+
 ## Status
 
 | Clause | Title | Kind | Status | Evidence | Gap |
@@ -225,3 +255,5 @@ This clarification does not promote any clause judgment.
 | `BASE-AGENT-011` | Limits are policy, and Pause stops everything | target | missing | | Not yet judged through this seed's own doors. |
 | `BASE-AGENT-012` | Writes are idempotent and conflict-safe | target | missing | | Not yet judged through this seed's own doors. |
 | `BASE-AGENT-013` | Manifest, docs and the conformance journey | target | missing | | Not yet judged through this seed's own doors. |
+| `BASE-AGENT-014` | The paired Business reads every door decision | target | missing | | Not yet judged through this seed's own doors. |
+| `BASE-AGENT-015` | Links from Business open the seed's own pages | target | missing | | Not yet judged through this seed's own doors. |

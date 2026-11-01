@@ -512,7 +512,7 @@ function convert(old, acceptanceOld, claimMapPath) {
       if (areaNames.has(name)) name = `${area} (${title.toLowerCase()})`
       areaNames.add(name)
       output.push(`### ${name}`)
-      if (area === 'Agent surface') output.push('Inherits BASE-AGENT-001 to BASE-AGENT-013. The company\'s policy decides every call.', '| Tool | Core clauses | Classes this call can carry |\n| --- | --- | --- |')
+      if (area === 'Agent surface') output.push('Inherits BASE-AGENT-001 to BASE-AGENT-015. The company\'s policy decides every call.', '| Tool | Core clauses | Classes this call can carry |\n| --- | --- | --- |')
       for (const clause of selected.filter(clause => clause.area === area)) {
         output.push(`#### ${clause.id} — ${clause.title}`)
         if (kind !== 'published') output.push('*Tier:* Core')

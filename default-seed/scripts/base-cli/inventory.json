@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.94-dev.g93d234fc",
+  "cliVersion": "0.2.94-dev.g8fbac082",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -919,7 +919,7 @@
     },
     "cli/door-clauses.mjs": {
       "source": "cli/door-clauses.mjs",
-      "sha256": "3d745df05098b697a9fcd23096d5fe79e0eb5bbd832e2fa1c533f038bddc911c"
+      "sha256": "12432c3be1e03254510059d4379970e571043a2b7a83dd8e5d4fab8a9bbc33a6"
     },
     "cli/door-mode.mjs": {
       "source": "cli/door-mode.mjs",
@@ -1943,7 +1943,7 @@
     },
     "foundation/runtime/contract-docs.mjs": {
       "source": "foundation/runtime/contract-docs.mjs",
-      "sha256": "9df82c57404ec33c5807973e25dda23514dde977c5d9de7ff025386ebf21a75c"
+      "sha256": "0f55b0c794b51e59739e6f6c2a53a1a921fed06cd8420094ce1218d2954a57a3"
     },
     "foundation/runtime/contract-prose-patterns.mjs": {
       "source": "foundation/runtime/contract-prose-patterns.mjs",
@@ -1967,7 +1967,7 @@
     },
     "modules/agent-door/CLAUSES.md": {
       "source": "modules/agent-door/CLAUSES.md",
-      "sha256": "0cae7c4f0bcb61d6814e9833a4284b5e35627187cddb6ff4d5c2948122cf8016"
+      "sha256": "9db4fd90412202ac40bbfea9cd7705c96a85438de18494af544db4296ef4b915"
     },
     "modules/agent-door/capabilities.d.mts": {
       "source": "modules/agent-door/capabilities.d.mts",
