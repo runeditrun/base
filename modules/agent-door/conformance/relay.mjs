@@ -35,7 +35,8 @@ export async function relayPhase(c) {
   page = await response.json();
  }
  const audit = (await auditRows(c, {agents:[null], includeFixtures:true})).rows;
- const expected = audit.filter(row => row.door === 'mcp' && row.consent != null || row.tombstone && projections.some(item => item.id === row.id));
+ const expected = audit.filter(row => !c.unattributedAuditIds?.has(row.id) && (row.door === 'mcp' && row.consent != null || row.tombstone && projections.some(item => item.id === row.id)));
+ c.add('BASE-AGENT-009.relay.unattributed', projections.every(row => !c.unattributedAuditIds?.has(row.id)), 'Calls before the first adopted envelope must stay out of the Business feed.');
  const reviews = new Map((expected.some(row => row.review) ? (await c.personJson('/agents/api/reviews')).reviews : []).map(row => [row.id,row]));
  c.add('BASE-AGENT-009.relay.count', projections.length > 0 && projections.length === expected.length && new Set(projections.map(row => row.id)).size === projections.length, 'Exactly one projection must exist per Business MCP audit, including erased decisions.');
  for (const row of expected) {

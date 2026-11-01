@@ -32,11 +32,14 @@ async function decide(r: any, id: string, action = 'approve') {
 }
 
 test('R1 public Business writes and reads project exactly 17 public fields, including refusals', async t => {
- const r = await fixture(t); await r.adopt()
+ const r = await fixture(t)
+ const beforeEnvelope = await write(r)
+ await r.adopt()
  const call = await write(r,'relay-private-id','never-forward-this@example.test'), id = decision(call)
  const page = (await pull(r)).body, row = page.decisions[0]
  assert.equal(page.decisions.length,1); assert.equal(Object.keys(row).sort().join(),keys)
- const audit = (await r.person('/agents/api/audit')).body.rows[0]
+ assert.ok(!page.decisions.some((item: any) => item.id === decision(beforeEnvelope)))
+ const audit = (await r.person('/agents/api/audit')).body.rows.find((item: any) => item.id === id)
  assert.deepEqual(row,{id,seq:row.seq,at:audit.at,tool:'synthetic.records.write',disposition:'autonomous',outcome:'done',code:null,revision:r.c.revision,classes:['standard'],agent:r.c.agentId,consent:r.c.consent,execution_of:null,replay_of:null,approval:null,review:null,resources:['synthetic://record/relay-private-id'],resource_count:1})
  assert.deepEqual(audit.resources,row.resources); assert.equal(audit.resource_count,1)
  for (const secret of ['never-forward-this@example.test',r.c.person.email,r.c.person.sub,'Synthetic Person','Agent door conformance','facts','evidence','idempotency_key','sponsor']) assert.ok(!JSON.stringify(page).includes(secret),secret)
