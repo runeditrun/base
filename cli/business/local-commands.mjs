@@ -1,6 +1,6 @@
 import { writeFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { loadState, loadPending, saveState, stateDirectory, removeStateDirectory, removeWorkFiles, credentialHandle, liveSupervisor } from './state.mjs';
+import { loadState, loadPending, saveState, stateDirectory, removeStateDirectory, removeWorkFiles, deviceCredentialHandle, liveSupervisor } from './state.mjs';
 import { createCredentialStore, readSecret } from './keychain.mjs';
 import { removeService, serviceStatus } from './service.mjs';
 import { removePermissions, permissionsAdded } from './permissions.mjs';
@@ -17,7 +17,7 @@ export async function paired() {
  const state = await loadState();
  if (!state?.origin || !state.businessId || !state.executorId) throw Error(`This computer is not paired. Run ${rerCommand()} business connect --code CODE.`);
  if (state.revoked) throw Error(`This computer was ${revokedText(state)}`);
- const credential = await createCredentialStore().get(credentialHandle(state.origin));
+ const credential = await createCredentialStore().get(deviceCredentialHandle(state));
  if (!credential) throw Error(`This computer's Business credential is missing from OS credential storage. Run ${rerCommand()} business disconnect, then connect again with a new code from ${state.origin}/business.`);
  return { state, credential };
 }
@@ -42,7 +42,7 @@ export async function forgetLocally(state, { stopRun = true } = {}) {
  await attempt('permissions', () => removePermissions());
  const vendorKeys = [];
  for (const handle of store ? state.vendorHandles ?? [] : []) if (await attempt('vendorKeys', () => store.delete(handle))) vendorKeys.push(handle);
- const refused = store ? await attempt('credential', () => store.delete(credentialHandle(state.origin))) : undefined;
+ const refused = store ? await attempt('credential', () => store.delete(deviceCredentialHandle(state))) : undefined;
  await removeCarries();
  if (!leftovers.length) { await removeStateDirectory(); return []; }
  const unique = [...new Set(leftovers)];
@@ -58,7 +58,7 @@ export async function forgetLocally(state, { stopRun = true } = {}) {
 export async function revokedByServer(state) {
  const leftovers = [];
  let cause;
- try { await createCredentialStore().delete(credentialHandle(state.origin)); }
+ try { await createCredentialStore().delete(deviceCredentialHandle(state)); }
  catch (error) { leftovers.push('credential'); cause = error.sandboxRefused ? `macOS Keychain refused to remove it inside this agent sandbox (security exited with status ${error.osStatus ?? 'unknown'}).` : describe(error); }
  if (state.vendorHandles?.length) leftovers.push('vendorKeys');
  if ((await serviceStatus()).installed) leftovers.push('service');
@@ -112,7 +112,7 @@ export async function disconnect() {
  const state = await loadState();
  const origin = state?.origin ?? (await loadPending())?.origin;
  const page = origin && (state?.businessId ? `${origin}/business/${encodeURIComponent(state.businessId)}/settings` : `${origin}/business`);
- const credential = state?.origin ? await createCredentialStore().get(credentialHandle(state.origin)) : null;
+ const credential = state?.origin ? await createCredentialStore().get(deviceCredentialHandle(state)) : null;
  const revocation = credential ? await revoke(state.origin, credential) : 'not_sent';
  // Until the server confirms, the device stays connected: keep its credential
  // and everything else so disconnect can run again after browser revocation.
@@ -139,7 +139,7 @@ export async function status({ json = false } = {}) {
  if (!state) {
   process.stdout.write(json ? JSON.stringify({ paired: false, service: 'not_installed', current_task: null, checkpoint: null }) + '\n' : 'Business: not paired.\nService: not installed.\nTask: none.\nCheckpoint: none.\n'); return;
  }
- const stored = !state.revoked && state.origin && await createCredentialStore().get(credentialHandle(state.origin));
+ const stored = !state.revoked && state.origin && await createCredentialStore().get(deviceCredentialHandle(state));
  const service = await serviceStatus();
  const active = state.revoked ? null : (await loadProgress()).current;
  if (json) {

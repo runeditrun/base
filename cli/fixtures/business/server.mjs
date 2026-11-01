@@ -11,10 +11,10 @@ const version = '2025-11-25';
 const later = seconds => new Date(Date.now() + seconds * 1000).toISOString();
 
 /** Network edge from platform b64ab7f5: executors/{pairing,tokens,tasks,mcp}.ts. */
-export async function server(t) {
+export async function server(t, { businessId = 'biz' } = {}) {
  const state = { approved: false, requests: [], tasks: [], released: null, checkpoint: {}, uploads: [], phase: 'ready', fence: 0, grants: new Map(), claims: new Map() };
- state.business = { id: 'biz', name: 'synthetic-base-1', legal_name: null, brand_color: '#264F45', logo_url: null };
- const device = 'bz_device_fixture-credential';
+ state.business = { id: businessId, name: 'synthetic-base-1', legal_name: null, brand_color: '#264F45', logo_url: null };
+ const device = `bz_device_fixture-credential-${businessId}`;
  const tokens = new Map(), tasks = taskStore(state);
  let redeemed = false, issued = false, tokenSequence = 0, origin, pairingExpires = 0;
  function requireDevice(request) {
@@ -49,7 +49,7 @@ export async function server(t) {
    requireValue(redeemed && !issued && body.pairing_token === 'fixture-pairing-poll' && Date.now() < pairingExpires, 401, 'Pairing expired or used');
    if (!state.approved) return [{ status: 'authorization_pending', interval: state.pollSeconds ?? 5 }, 202];
    issued = true;
-   return [{ status: 'paired', device_credential: device, executor_id: 'executor1', business_id: 'biz', idle_expires_at: later(30 * 24 * 3600) }, 200];
+   return [{ status: 'paired', device_credential: device, executor_id: 'executor1', business_id: businessId, idle_expires_at: later(30 * 24 * 3600) }, 200];
   }
   closed(body, ['code', 'device_name', 'working_folder', 'os', 'agent_kind', 'capabilities']);
   requireValue(typeof body.code === 'string' && body.code.length <= 100);
@@ -138,7 +138,7 @@ export async function server(t) {
     state.active = true;
     if (state.selfMissing) return send({}, 403);
     // The platform's computer projection: the device as it reported itself, and the owner's choices.
-    if (request.method === 'GET') return send({ business: state.business, device: { agent_kind: { value: state.agentKind, source: 'device_reported' } }, optIns: state.optIns ?? { installPermissions: null, awakeConsent: null, installService: null } });
+    if (request.method === 'GET') return send({ business: state.business, local_scan: state.localScan, device: { agent_kind: { value: state.agentKind, source: 'device_reported' } }, optIns: state.optIns ?? { installPermissions: null, awakeConsent: null, installService: null } });
     requireValue(request.method === 'DELETE', 405);
     if (state.revokeRefused) return send({}, 503);
     state.revoked = true; return send({ revoked: true });

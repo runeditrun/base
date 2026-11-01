@@ -55,6 +55,9 @@ export async function applyChoices(api, state, { reconnecting = false } = {}) {
  // nothing is decided yet. On a new computer this first request activates it.
  try { self = await api.get('/api/business/executors/self'); }
  catch (error) { if (![403, 404].includes(error.status)) throw error; }
+ // Use the server's per-computer scan state, rather than interpreting every
+ // unfinished scan as missing consent. Do not persist paths from the response.
+ state.localScan = self?.local_scan ? { allowed: self.local_scan.allowed === true, state: self.local_scan.state } : undefined;
  const carried = await carryCheckIn(state, self);
  const decided = Object.fromEntries(names.map(name => [name, typeof self?.optIns?.[name] === 'boolean' ? self.optIns[name] : null]));
  // The agent this computer reported when it paired, as the owner's browser words its choices:
@@ -87,7 +90,7 @@ export async function applyChoices(api, state, { reconnecting = false } = {}) {
  }
  const undecided = names.filter(name => decided[name] === null && !inapplicable[name]);
  if (undecided.length) {
-  once(`undecided:${undecided.join()}`, `The owner has not chosen yet:\n${undecided.map(name => `  - ${choices[name]}\n`).join('')}They choose on this computer's row in ${state.origin}/business/${encodeURIComponent(state.businessId)}/settings; the run and next commands apply the choices at their next check-in, ${reconnecting ? 'without pairing again' : 'so connect does not need to run again'}.\n`);
+  once('undecided', `The owner has not chosen yet:\n${undecided.map(name => `  - ${choices[name]}\n`).join('')}They choose on this computer's row in ${state.origin}/business/${encodeURIComponent(state.businessId)}/settings; the run and next commands apply the choices at their next check-in, ${reconnecting ? 'without pairing again' : 'so connect does not need to run again'}.\n`);
  }
  once('choices-next-step', `After choosing this computer's permissions in Business, run ${businessCommand('next')} to apply them and see the next task.\n`);
  if (carried) {
@@ -97,6 +100,7 @@ export async function applyChoices(api, state, { reconnecting = false } = {}) {
    : `No local app carry files changed for ${JSON.stringify(carried.name)}.\n`);
   for (const checkout of carried.unchanged) process.stdout.write(`Already current: ${join(checkout, '.rer/local/business.json')}\n`);
   if (carried.failed) process.stdout.write(`${carried.failed} local app carry ${carried.failed === 1 ? 'file could' : 'files could'} not be refreshed; see the carry warnings.\n`);
+  if (!count && !carried.unchanged.length && !carried.failed) process.stdout.write(`No local apps were found. Run ${businessCommand('next')} in the folder where rer list shows your apps.\n`);
  }
  return { applied: lines.length, serviceInstalled };
 }

@@ -1,13 +1,14 @@
 // rer list [DIR] [--json]: the immediate subfolders of DIR that hold an
 // OPERATIONS.json, newest change first, with what rer dev can do for each.
 import { execFile } from 'node:child_process';
-import { readdir, realpath, stat } from 'node:fs/promises';
+import { realpath, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { descriptorProfile, dispatcher, pinnedPackage } from './checkout.mjs';
 import { liveServers } from './registry.mjs';
 import { describeCheckout, setupNeeded } from './launch/facts.mjs';
 import { launchPath, setupState } from './launch/state.mjs';
+import { checkoutFolders } from '../cli/checkout-folders.mjs';
 
 const run = promisify(execFile);
 const reasons = {
@@ -45,11 +46,7 @@ export async function listCommand(args) {
  let directory;
  try { directory = await realpath(resolve(positional[0] ?? '.')); } catch { process.stderr.write(`rer list: ${resolve(positional[0] ?? '.')} is not a folder.\n`); return 3; }
  const running = new Map((await liveServers()).map(record => [record.checkout, record.url]));
- const folders = [];
- for (const item of await readdir(directory, { withFileTypes: true })) {
-  const path = join(directory, item.name);
-  try { if ((await stat(path)).isDirectory() && (await stat(join(path, 'OPERATIONS.json'))).isFile()) folders.push(await realpath(path)); } catch {}
- }
+ const folders = await checkoutFolders(directory);
  const checkouts = [];
  for (let i = 0; i < folders.length; i += 4) checkouts.push(...await Promise.all(folders.slice(i, i + 4).map(path => entry(path, running))));
  checkouts.sort((a, b) => b.changedAt.localeCompare(a.changedAt) || a.name.localeCompare(b.name));

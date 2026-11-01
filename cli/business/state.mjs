@@ -15,7 +15,10 @@ export function stateDirectory() {
  if (chosen.includes('\0')) throw Error('RER_BUSINESS_STATE_DIR must name a folder.');
  return resolve(chosen);
 }
-export const credentialHandle = origin => `device:${createHash('sha256').update(origin).digest('hex')}`;
+export const credentialHandle = (origin, businessId) => `device:${createHash('sha256').update(businessId ? JSON.stringify([origin, businessId]) : origin).digest('hex')}`;
+// Old pairing records still own the per-origin key, which disconnect revokes
+// and removes once. New pairings never read or overwrite that legacy key.
+export const deviceCredentialHandle = state => credentialHandle(state.origin, state.credentialVersion === 2 ? state.businessId : undefined);
 
 async function loadJson(name) {
  const path = join(stateDirectory(), name);

@@ -557,7 +557,10 @@ a headers helper. That output is a short-lived credential: connect it directly
 to the MCP client and do not paste it into an agent transcript.
 
 `rer business status` shows local pairing, service state and progress without
-printing checkpoints or vendor data. `rer business disconnect` revokes this
+printing checkpoints or vendor data. Device credentials are stored separately
+for each Business on an origin; disconnect also finds an older per-origin
+credential through its original pairing record and revokes it once.
+`rer business disconnect` revokes this
 device through device-authenticated `DELETE /api/business/executors/self` before
 removing its service, device and vendor credentials, state and introduced Claude
 rules, preserving preexisting settings and unrelated edits. It says "Device
@@ -583,7 +586,14 @@ an explicit error. Revocation stops the supervisor on its next 401; it then
 removes the device credential if it may and `status` says revoked. While it
 waits, `run` says what for: the owner's permission to scan the folder connect
 ran in (with the Your tools link) until this computer's scan is done, then the
-owner's next step. It removes `run.lock` on every exit, including Ctrl-C,
+owner's next step.
+If the server reports that this computer's scan failed, run and next instead
+point the owner to **Retry** on **Your tools**, without asking for consent again.
+Connect, next and run carry the Business profile into first-party checkouts
+shown by `rer list` in the current or original pairing folder, including stopped
+apps, as well as running and previously carried apps. Each skipped checkout
+is named with its cause; a folder with no apps gets a next step.
+It removes `run.lock` on every exit, including Ctrl-C,
 SIGTERM and a closed terminal (SIGHUP); a lock whose process is gone, or that
 has not been refreshed for two minutes, is cleared on the next start.
 

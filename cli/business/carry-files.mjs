@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { loadState, stateDirectory } from './state.mjs';
 import { serversDirectory } from '../server-registry.mjs';
 import { alive } from '../../modules/job-queue/identity.mjs';
+import { checkoutFolders } from '../checkout-folders.mjs';
 
 const carryPath = checkout => join(checkout, '.rer/local/business.json');
 const registryPath = () => join(stateDirectory(), 'carried.json');
@@ -85,12 +86,20 @@ async function liveCheckouts() {
  return [...new Set(checkouts)];
 }
 
-export async function carryCheckouts(refused) {
+export async function carryCheckouts(refused, state) {
  const checkouts = new Map();
  try { for (const checkout of await recordedCheckouts()) checkouts.set(checkout, { checkout, live: false }); }
  catch (error) { refused(error); }
  try { for (const checkout of await liveCheckouts()) checkouts.set(checkout, { checkout, live: true }); }
  catch (error) { refused(error); }
+ // Include prepared/stopped checkouts, using the same immediate-folder door as
+ // rer list, both here and where this Business originally paired.
+ for (const directory of new Set([process.cwd(), state?.workingFolder].filter(Boolean))) {
+  try {
+   if (await regular(join(directory, 'OPERATIONS.json'), false, true)) checkouts.set(directory, { checkout: directory, live: true });
+   for (const checkout of await checkoutFolders(directory)) checkouts.set(checkout, { checkout, live: true });
+  } catch (error) { refused(error, directory); }
+ }
  return [...checkouts.values()];
 }
 

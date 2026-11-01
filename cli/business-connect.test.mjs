@@ -31,12 +31,12 @@ after(() => directory && rm(directory, { recursive: true, force: true }));
 
 // npx: the command as the platform's prompt gives it, in its own process group
 // as a terminal starts it, so a signal to the group reaches npx and rer alike.
-async function cli(home, args, { terminal = false, npx = false, input = '', columns = 120, onSpawn, onOutput, env: extra = {}, path = process.env.PATH } = {}) {
+async function cli(home, args, { terminal = false, npx = false, installed = false, input = '', columns = 120, onSpawn, onOutput, env: extra = {}, path = process.env.PATH } = {}) {
  await mkdir(home, { recursive: true });
  const env = { PATH: path, HOME: home, RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${fileURLToPath(new URL('./fixtures/business/register.mjs', import.meta.url))}`, TEST_COLUMNS: String(columns), ...extra };
  return new Promise((resolveRun, reject) => {
-  const command = terminal ? 'python3' : npx ? 'npx' : process.execPath;
-  const parameters = terminal ? [join(fixture, 'terminal.py'), process.execPath, launcher, ...args] : npx ? ['-y', '@runeditrun/rer', ...args] : [launcher, ...args];
+  const command = terminal ? 'python3' : npx ? 'npx' : installed ? join(home, '.local/bin/rer') : process.execPath;
+  const parameters = terminal ? [join(fixture, 'terminal.py'), process.execPath, launcher, ...args] : npx ? ['-y', '@runeditrun/rer', ...args] : installed ? args : [launcher, ...args];
   const child = spawn(command, parameters, { cwd: home, env, stdio: ['pipe','pipe','pipe'], detached: npx });
   onSpawn?.(child);
   let stdout = '', stderr = '';
@@ -86,7 +86,7 @@ test('Business verb help explains each command without pairing or reading a sess
  assert.deepEqual(await readdir(home), [], 'help creates no pairing or credentials');
 });
 
-test('Business check-ins refresh stopped and live carry files, preserve app settings and report actual changes', async t => {
+test('Business check-ins carry listed prepared and live apps, preserve settings and explain skipped apps', async t => {
  const remote = await fixtureServer(t), home = join(directory, 'unread-carry-home');
  const checkout = join(home, 'scratch-app'), live = join(home, 'live-app'), registry = join(home, 'registry');
  const carryFile = root => join(root, '.rer/local/business.json');
@@ -94,13 +94,21 @@ test('Business check-ins refresh stopped and live carry files, preserve app sett
   await mkdir(root, { recursive: true });
   await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, seedContract: { profile: 'first-party' } }));
   await writeFile(join(root, 'settings.json'), JSON.stringify({ name: 'Owner app name', accent: '#123456' }));
+  await mkdir(join(root, 'scripts'));
+  await writeFile(join(root, 'scripts/rer.mjs'), `process.stdout.write(JSON.stringify({ local: { prepared: true } }));`);
  }
  await mkdir(registry);
  const settings = await readFile(join(checkout, 'settings.json'), 'utf8');
  const owner = await identity(); t.after(() => owner.close());
  const register = roots => writeFile(join(registry, 'state.json'), JSON.stringify({ running: roots.map(checkout => ({ checkout, mode: 'dev', owner: owner.info })) }));
  const env = { RER_SERVERS_DIR: registry };
- await register([checkout, live]);
+ await register([live]); // scratch-app is prepared on disk, never started or carried.
+ const skipped = join(home, 'independent-app');
+ await mkdir(skipped);
+ await writeFile(join(skipped, 'OPERATIONS.json'), JSON.stringify({ version: 2, commands: {} }));
+ const listed = await cli(home, ['list', '--json'], { env });
+ assert.equal(listed.code, 0, listed.stderr);
+ assert.ok(JSON.parse(listed.stdout).checkouts.some(app => app.path === checkout && app.profile === 'first-party' && app.launchable && app.prepared));
  const unpaired = await cli(home, ['business', 'next'], { env });
  assert.equal(unpaired.code, 1);
  for (const root of [checkout, live]) await assert.rejects(stat(carryFile(root)), { code: 'ENOENT' });
@@ -109,6 +117,8 @@ test('Business check-ins refresh stopped and live carry files, preserve app sett
  remote.state.optIns = { installPermissions: false, awakeConsent: false, installService: false };
  const paired = await connect(home, remote, { env });
  assert.ok(paired.stdout.includes('2 local app carry files'), paired.stdout);
+ assert.ok(paired.stderr.includes(JSON.stringify(skipped)) && paired.stderr.includes('not first-party'), paired.stderr);
+ t.diagnostic(`listed stopped checkout received carry; skipped ${skipped}: not first-party`);
  await register([live]); // The first checkout is stopped, but custody remains in carried.json.
  const first = await readFile(carryFile(checkout), 'utf8');
  for (const args of [['next'], ['run', '--once']]) {
@@ -141,6 +151,99 @@ test('Business check-ins refresh stopped and live carry files, preserve app sett
   await assert.rejects(stat(carryFile(root)), { code: 'ENOENT' });
   assert.equal(await readFile(join(root, 'settings.json'), 'utf8'), settings, 'opting out removes only carry');
  }
+});
+
+test('failed scans name Retry while consent-pending scans still ask for permission', async t => {
+ const remote = await fixtureServer(t), home = join(directory, 'scan-state-home');
+ await connect(home, remote);
+ for (const verb of [['next'], ['run', '--once']]) {
+  remote.state.localScan = { allowed: false, paths: [], state: 'blocked' };
+  const pending = await cli(home, ['business', ...verb]);
+  assert.equal(pending.code, 0, pending.stderr);
+  assert.match(pending.stdout, /Waiting for the owner to allow scanning/);
+  assert.doesNotMatch(pending.stdout, /Retry/);
+  remote.state.localScan = { allowed: true, paths: [home], state: 'failed' };
+  const failed = await cli(home, ['business', ...verb]);
+  assert.equal(failed.code, 0, failed.stderr);
+  assert.match(failed.stdout, /scan failed/);
+  assert.match(failed.stdout, /Retry on Your tools/);
+  assert.doesNotMatch(failed.stdout, /They allow it/);
+  t.diagnostic(`${verb.join(' ')}: consent pending asks for permission; failed scan names Retry on Your tools`);
+ }
+});
+
+test('Business next echoes the installed launcher or npx invocation and open choices appear once per run', async t => {
+ const remote = await fixtureServer(t), home = join(directory, 'echo-home');
+ await connect(home, remote);
+ const installed = await cli(home, ['cli', 'install']);
+ assert.equal(installed.code, 0, installed.stderr);
+ const bin = join(home, '.local/bin');
+ const result = await cli(home, ['business', 'next'], { installed: true, path: `${bin}:${process.env.PATH}` });
+ assert.equal(result.code, 0, result.stderr);
+ assert.match(result.stdout, /run rer business next/);
+ assert.doesNotMatch(result.stdout, /npx -y/);
+ const registry = await localRegistry(); t.after(registry.close);
+ registry.publish(packed.version, packed.bytes);
+ const npx = await cli(home, ['business', 'next'], { npx: true, path: `${bin}:${process.env.PATH}`, env: { 'npm_config_@runeditrun:registry': `${registry.url}/`, npm_config_cache: join(home, 'npm-cache'), npm_config_audit: 'false', npm_config_fund: 'false' } });
+ assert.equal(npx.code, 0, npx.stderr);
+ assert.match(npx.stdout, /run npx -y @runeditrun\/rer business next/);
+ assert.equal(result.stdout.match(/The owner has not chosen yet:/g)?.length, 1);
+ assert.equal(npx.stdout.match(/The owner has not chosen yet:/g)?.length, 1);
+ // The undecided set changes between check-ins in the same long-running command.
+ let checks = 0;
+ remote.state.onSelf = async () => {
+  remote.state.optIns = ++checks === 1 ? {} : { awakeConsent: false };
+ };
+ let stopped = false;
+ const running = await cli(home, ['business', 'run'], { onOutput: (out, child) => {
+  if (checks >= 2 && !stopped) { stopped = true; child.kill('SIGTERM'); }
+ } });
+ assert.equal(running.code, 0, running.stderr);
+ assert.equal(running.stdout.match(/The owner has not chosen yet:/g)?.length, 1);
+ t.diagnostic('installed: rer business next; npx: npx -y @runeditrun/rer business next; changing open choices printed once');
+});
+
+test('two Businesses on one origin revoke independently in either order and legacy origin keys revoke once', async t => {
+ const remotes = await Promise.all(['one', 'two'].map(businessId => server(t, { businessId })));
+ for (const remote of remotes) { remote.state.pollSeconds = 1; remote.state.optIns = { installPermissions: false, awakeConsent: false, installService: false }; }
+ let selected = remotes[0];
+ const proxy = createServer(async (req, res) => {
+  const remote = remotes.find(remote => req.headers.authorization === `Bearer ${remote.device}`) ?? selected;
+  let body = ''; for await (const chunk of req) body += chunk;
+  const response = await fetch(remote.origin + req.url, { method: req.method, headers: { 'content-type': 'application/json', ...(req.headers.authorization ? { authorization: req.headers.authorization } : {}) }, ...(body ? { body } : {}) });
+  res.writeHead(response.status, { 'content-type': 'application/json' }); res.end(await response.text());
+ });
+ await new Promise(resolve => proxy.listen(0, '127.0.0.1', resolve));
+ t.after(() => new Promise(resolve => { proxy.close(resolve); proxy.closeAllConnections(); }));
+ const origin = `http://127.0.0.1:${proxy.address().port}`;
+ for (const order of [[0, 1], [1, 0]]) {
+  const home = join(directory, `two-business-${order.join('')}`), envs = remotes.map((_, i) => ({ RER_BUSINESS_STATE_DIR: join(home, `business-${i}`) }));
+  for (const [i, remote] of remotes.entries()) {
+   selected = remote;
+   const paired = await connectWhile(home, ['--code', 'ABCD-1234', '--origin', origin], () => approve(remote), { env: envs[i] });
+   assert.equal(paired.code, 0, paired.stderr);
+  }
+  assert.equal(Object.keys(JSON.parse(await readFile(join(home, 'fake-keychain.json'), 'utf8'))).length, 2);
+  for (const i of order) {
+   const revoked = await cli(home, ['business', 'disconnect'], { env: envs[i] });
+   assert.equal(revoked.code, 0, revoked.stderr);
+   assert.match(revoked.stdout, /Device revoked/);
+  }
+  await assert.rejects(stat(join(home, 'fake-keychain.json')), { code: 'ENOENT' });
+  t.diagnostic(`two Businesses on one origin: disconnect order ${order.join(',')}: Device revoked twice`);
+ }
+ const home = join(directory, 'legacy-key-home'); selected = remotes[0];
+ const paired = await connectWhile(home, ['--code', 'ABCD-1234', '--origin', origin], () => approve(selected));
+ assert.equal(paired.code, 0, paired.stderr);
+ const { credentialHandle } = await import('./business/state.mjs');
+ const path = join(home, '.rer/business/state.json'), state = JSON.parse(await readFile(path, 'utf8'));
+ delete state.credentialVersion; await writeFile(path, JSON.stringify(state));
+ await writeFile(join(home, 'fake-keychain.json'), JSON.stringify({ [credentialHandle(origin)]: selected.device }));
+ const revoked = await cli(home, ['business', 'disconnect']);
+ assert.equal(revoked.code, 0, revoked.stderr); assert.match(revoked.stdout, /Device revoked/);
+ const again = await cli(home, ['business', 'disconnect']);
+ assert.equal(again.code, 0, again.stderr); assert.match(again.stdout, /Nothing was revoked/);
+ t.diagnostic('legacy per-origin key: Device revoked once; a repeat revokes nothing');
 });
 
 // The fixture answers polls every second instead of the platform's five.

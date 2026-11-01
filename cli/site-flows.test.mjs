@@ -457,7 +457,7 @@ test('built chooser keeps self first and carries each paid plan through the shar
  await writeFile(f.pages, pages.replace('import { runPageHtml,', 'import { PATHS, runPageHtml,').replace('pages: [', `pages: [{ path: '/pricing', html: '<!doctype html><body>' + encodeURIComponent(JSON.stringify({ assisted: PATHS.assisted.price(run), managed: PATHS.managed.price(run), note: PATHS.priceNote(run) })) + '</body>' },`));
  const preview = await sitePreview(join(f.root, 'dist/site'), {ports:[0]}), browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']});
  try {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   for (const [mode, product, managed] of [['request', 'errors-workbench', true], ['app', 'errors-workbench', true], ['app', 'errors-workbench', false], ['app', null, true]]) {
    const pricing = { assisted: `assisted-${mode}-${product} <&>`, managed: `managed-${mode}-${managed} <&>`, note: `note-${mode} <&>` };
    await writeFile(data, original.replaceAll("runeditrun/base", 'just-every/run-spool').replace("product: null", `product: ${JSON.stringify(product)}, managed: { open: ${managed} }`).replace('pricing: runPricing', `pricing: ${JSON.stringify(pricing)}`));
@@ -465,6 +465,7 @@ test('built chooser keeps self first and carries each paid plan through the shar
    const result = await f.build();
    assert.equal(result.code, 0, result.stdout + result.stderr);
    await page.goto(preview.url + '/run');
+   assert.doesNotMatch(await page.locator('.self .badge').textContent(), /100% free/i, 'the local-run badge leads with where the product runs');
    for (const plan of ['assisted', 'managed']) assert.equal(await page.locator(`.${plan} .price`).textContent(), `${pricing[plan]} · ${pricing.note}`, 'the built chooser reads and escapes RunData pricing');
    assert.deepEqual(await page.locator('.chooser section[aria-labelledby]').evaluateAll(sections => sections.filter(s => !s.closest('.paste-panel')).map(s => s.getAttribute('aria-labelledby'))), ['self', 'assisted', 'managed']);
    assert.equal(await page.locator('button').count(), 1);

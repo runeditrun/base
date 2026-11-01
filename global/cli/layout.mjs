@@ -32,6 +32,9 @@ if [ -z "$node" ]; then
  echo "rer: Node is missing. Run: curl -fsSL https://runeditrun.com/install.sh | sh" >&2
  exit 127
 fi
+RER_INVOKED_AS=rer
+if [ "$(command -v rer 2>/dev/null || true)" != "$0" ]; then RER_INVOKED_AS="$0"; fi
+export RER_INVOKED_AS
 exec "$node" "$root/current/global/rer.mjs" "$@"
 `;
 }

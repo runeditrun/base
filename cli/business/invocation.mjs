@@ -1,6 +1,5 @@
 import { accessSync, statSync, constants } from 'node:fs';
 import { delimiter, join, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 const npx = 'npx -y @runeditrun/rer';
 const word = value => /^[A-Za-z0-9_./~:@%+=,-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
@@ -19,7 +18,9 @@ function onPath(path = '') {
 // An npx run leaves nothing installed; install.sh says which launcher it ran
 // (RER_INVOKED_AS), since it adds that launcher to PATH only for itself.
 export function rerCommand(env = process.env) {
- if (fileURLToPath(import.meta.url).split(sep).includes('_npx')) return npx;
+ // The running entry identifies the invocation even when its dispatcher was
+ // delegated to a checkout's pinned copy in another package/cache directory.
+ if ((process.argv[1] ?? '').split(sep).includes('_npx')) return npx;
  if (env.RER_INVOKED_AS) return word(env.RER_INVOKED_AS);
  return onPath(env.PATH) ? 'rer' : npx;
 }

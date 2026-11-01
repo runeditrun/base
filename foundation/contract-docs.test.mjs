@@ -387,3 +387,24 @@ test('contract docs convert handwritten contracts and keep generated documents a
     await Promise.all(roots.map(root => rm(root, { recursive: true, force: true })))
   }
 })
+
+
+test('coverage check treats current and scripts-prefixed generator markers as generated views', async () => {
+  const root = await installation('standard')
+  try {
+    succeeds(root, 'write')
+    await edit(root, 'CHANGELOG.md', '# Synthetic conversion record\n')
+    const views = await Promise.all(['ACCEPTANCE.md', 'docs/CLAIMS.md'].map(file => read(root, file)))
+    for (const marker of ['contract-docs.', 'scripts/contract-docs.']) {
+      for (const [i, file] of ['ACCEPTANCE.md', 'docs/CLAIMS.md'].entries()) {
+        await edit(root, file, views[i].replace('by contract-docs.', `by ${marker}`))
+      }
+      git(root, 'add', '.')
+      git(root, 'commit', '-qm', `Synthetic generated views: ${marker}`)
+      succeeds(root, 'coverage', 'init', '--old', 'HEAD')
+      const coverage = JSON.parse(await read(root, 'docs/contract/COVERAGE.json'))
+      assert.ok(!coverage.fragments.some(fragment => ['ACCEPTANCE.md', 'docs/CLAIMS.md'].includes(fragment.file)), marker)
+      succeeds(root, 'coverage', 'check', '--old', 'HEAD')
+    }
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
