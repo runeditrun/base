@@ -14,6 +14,10 @@
 - Concurrent native admissions wait for the bounded policy slot and recheck current authority and policy before any effect.
 - Narrowing injection conformance requires `invalid_arguments`. Declared disposable queue producers can be failed and restored before enqueue. Refresh the complete shared door and conformance dependency set. Sources: `modules/agent-door/README.md`, `modules/agent-door/ADOPTING.md`, `cli/hosted-queue-producers.mjs`.
 
+### Preserved data import and undo
+
+- Large preserved-data undo and undo-report resume operations (tens of thousands of effects) now complete within the D1 transport limit with their atomic guarantees unchanged. The complete atomic snapshot for `readD1PersistedImport` exports retains its existing 2 MiB transport cap; oversized exports still refuse with `ImportSizeLimitError` naming `targetKinds`.
+
 ### Spool native-Wrangler history restore
 
 - Optional seed-owned build evidence now supports a plain `d1_migrations` ledger only when its names select an exact ordered file prefix whose replay reproduces the complete live schema. Unknown, gapped or reordered history and schema drift refuse before any restore write. Archive history still needs its own authenticated proof, and no historical hashes are invented or backfilled.
