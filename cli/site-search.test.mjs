@@ -36,7 +36,7 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  const provider = siteProvider({ domain:'run-search.example.test' });
  t.after(() => provider.close());
  await writeFile(join(root, 'deploy-site.json'), JSON.stringify({version:1,domain:'run-search.example.test'}));
- let requests = 0, embeddings = 0, previous, failure = false, embeddingFailure = false;
+ let requests = 0, embeddings = 0, indexFetches = 0, previous, failure = false, embeddingFailure = false, noDns = false;
  const vector = Array.from({length:768}, (_,i) => i === 0 ? 1 : 0);
  const edge = createServer(async (req, res) => {
   try {
@@ -44,8 +44,10 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
    const destination = req.headers['x-test-destination'];
    const chunks=[]; for await (const chunk of req) chunks.push(chunk); const body = Buffer.concat(chunks);
    let response;
-   if (destination === 'https://run-search.example.test/docs-search-vectors.json') response = failure ? new Response('Unavailable', {status:503}) : previous ? Response.json(previous) : new Response(null, {status:404});
-   else if (destination.includes('/ai/run/')) {
+   if (destination === 'https://run-search.example.test/docs-search-vectors.json') {
+    indexFetches++;
+    response = noDns ? new Response(null, {status:502,headers:{'x-test-network-error':'ENOTFOUND'}}) : failure ? new Response('Unavailable', {status:503}) : previous ? Response.json(previous) : new Response(null, {status:404});
+   } else if (destination.includes('/ai/run/')) {
     embeddings++;
     const input = JSON.parse(body.toString());
     response = failure || embeddingFailure ? new Response('Unavailable', {status:503}) : Response.json({success:true,result:{shape:[input.text.length,768],data:input.text.map(()=>vector)}});
@@ -74,9 +76,17 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  }
  assert.equal(requests,0,'build and dry run make zero network requests');
  await assert.rejects(readFile(join(root,'dist/site/docs-search-vectors.json')),{code:'ENOENT'});
+ // First deploy on a fresh zone: no site Worker yet and the domain does not resolve, so no previous index is read.
+ noDns = true;
  let deployed = await command('deploy');
  assert.equal(deployed.code,0,deployed.stdout+deployed.stderr);
+ assert.equal(indexFetches,0,'a first deploy never fetches the previous index');
  assert.ok(embeddings>0,'a first index uses Workers AI');
+ noDns = false;
+ await rm(join(root,'.rer/docs-search'),{recursive:true});
+ deployed = await command('deploy');
+ assert.equal(deployed.code,0,deployed.stdout+deployed.stderr);
+ assert.equal(indexFetches,1,'a later deploy reads the previous index');
  for (const line of deployed.stdout.trim().split('\n')) JSON.parse(line);
  previous = JSON.parse(await readFile(join(root,'dist/site/docs-search-vectors.json'),'utf8'));
  const calls = embeddings;
@@ -122,7 +132,14 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  deployed=await command('deploy');
  assert.notEqual(deployed.code,0,'a failed previous-index fetch refuses publication');
  assert.equal(provider.state.writes.length,writes); assert.equal(provider.state.version.id,version);
- failure=false; previous=undefined;
+ failure=false;
+ // Same site Worker, unresolvable domain: a network failure still stops publication.
+ noDns=true;
+ deployed=await command('deploy');
+ assert.notEqual(deployed.code,0,'an unreachable previous index refuses publication');
+ assert.match(deployed.stdout+deployed.stderr,/ENOTFOUND/);
+ assert.equal(provider.state.writes.length,writes); assert.equal(provider.state.version.id,version);
+ noDns=false; previous=undefined;
  await rm(join(root,'.rer/docs-search'),{recursive:true});
  // The REST embedding edge fails after the successful first-index 404.
  embeddingFailure=true;

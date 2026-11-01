@@ -52,7 +52,7 @@ async function privateValues(project) {
 }
 
 /** Render the run site into its declared folder, check it and replace the previous build. */
-export async function buildSite(project, store, signal, { prepare = false, deployment } = {}) {
+export async function buildSite(project, store, signal, { prepare = false, deployment, firstDeploy = false } = {}) {
  const site = declaredSite(project);
  await contained(project.root, site.entry);
  if (site.config) await contained(project.root, site.config);
@@ -82,7 +82,7 @@ export async function buildSite(project, store, signal, { prepare = false, deplo
   let checked = await checkSite(staging, checkOptions);
   let runtime;
   if (site.runtime) {
-   try { runtime = await buildSiteRuntime(project, site.runtime, `${staging}.corpus.json`, staging, { prepare, domain:deployment?.domain, compatibilityDate:deployment?.compatibilityDate, store, signal }); }
+   try { runtime = await buildSiteRuntime(project, site.runtime, `${staging}.corpus.json`, staging, { prepare, domain:deployment?.domain, firstDeploy, compatibilityDate:deployment?.compatibilityDate, store, signal }); }
    catch (error) { if (error instanceof RerError) throw error; throw new RerError('site_search_failed', 'Docs search preparation failed; publication stopped. Check the previous artifact and Workers AI availability.', 1); }
    if (prepare) checked = await checkSite(staging, checkOptions);
    const corpus = await contained(project.root, site.runtime.corpus, {optional:true});
@@ -110,7 +110,12 @@ export async function siteCommand(project, options, store, signal, out) {
  if (prepare && declaredSite(project).runtime && ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'].some(name => !process.env[name]?.trim())) throw missing('CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required, with the run site token permissions in the deploy-kit README.');
  const declaration = declaredSite(project);
  const deployment = prepare && declaration.runtime ? await siteDeployment(project, options, '/') : undefined;
- const built = await buildSite(project, store, signal, {prepare, deployment});
+ // A site Worker the provider does not have yet means a first deploy: the domain serves no previous search index.
+ const firstDeploy = deployment ? await withProviderRefusal(async () => {
+  const { ownedSiteVersion } = await import('../modules/deploy-kit/site-readback.mjs');
+  return !await ownedSiteVersion(await siteApi(), deployment.worker);
+ }) : false;
+ const built = await buildSite(project, store, signal, {prepare, deployment, firstDeploy});
  if (!options.json && built.references.unresolved.length) {
   out.human(`Run site references: ${built.references.unresolved.length} runtime resource target(s) could not be resolved statically:`);
   for (const {asset, kind} of built.references.unresolved) out.human(`  ${asset}: ${kind}`);
@@ -142,24 +147,33 @@ export async function siteCommand(project, options, store, signal, out) {
   store.report('deploy --site: dry run complete; no deployment occurred and no provider request was made.');
   return { dryRun: true, deployed: false, site: summary };
  }
- const names = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'];
- if (names.some(name => !process.env[name]?.trim())) throw missing('CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required, with the run site token permissions in the deploy-kit README.');
+ if (providerNames.some(name => !process.env[name]?.trim())) throw missing('CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required, with the run site token permissions in the deploy-kit README.');
  if (!options.json) for (const line of human) out.human(line);
- const { cloudflare } = await import('../modules/deploy-kit/provider.mjs');
  const { siteDeploy, siteReadbackSummary } = await import('../modules/deploy-kit/site.mjs');
  const environment = options.environment ?? 'production';
- try {
-  const api = cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
+ return withProviderRefusal(async () => {
   // The receipt is for the person; ownership is read from the provider, so a fresh checkout deploys too.
-  const result = await siteDeploy({ api, plan, files, receiptPath: join(project.root, '.rer', 'deploy', `site-${environment}.json`) });
+  const result = await siteDeploy({ api: await siteApi(), plan, files, receiptPath: join(project.root, '.rer', 'deploy', `site-${environment}.json`) });
   return { dryRun: false, deployed: true, origin: result.origin, site: summary };
- } catch (error) {
+ }, siteReadbackSummary);
+}
+
+const providerNames = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'];
+async function siteApi() {
+ const { cloudflare } = await import('../modules/deploy-kit/provider.mjs');
+ return cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
+}
+
+/** Run one provider step of the site deploy; its failure is a redacted, classified refusal. */
+async function withProviderRefusal(step, readback = () => '') {
+ try { return await step(); }
+ catch (error) {
   if (error instanceof RerError) throw error;
   const { createRedaction } = await shared('redaction.mjs');
   const redaction = createRedaction();
-  redaction.addSecrets(names.map(name => process.env[name]));
+  redaction.addSecrets(providerNames.map(name => process.env[name]));
   const diagnostic = deployDiagnostic(error,redaction.redact), provider = providerFailure(error,redaction.redact);
-  throw new RerError('deploy_refused', redaction.redact(`Run site deploy stopped: ${/^[a-z0-9-]{1,80}$/.test(error.message) ? error.message : 'site-deploy-failed'}${error.resource ? ` (${error.resource})` : ''}.${provider ? ` ${provider}.` : ''}${siteReadbackSummary(error)}`), 1, {step:diagnostic?.step, ...(diagnostic ? {siteDeploy:diagnostic} : {})});
+  throw new RerError('deploy_refused', redaction.redact(`Run site deploy stopped: ${/^[a-z0-9-]{1,80}$/.test(error.message) ? error.message : 'site-deploy-failed'}${error.resource ? ` (${error.resource})` : ''}.${provider ? ` ${provider}.` : ''}${readback(error)}`), 1, {step:diagnostic?.step, ...(diagnostic ? {siteDeploy:diagnostic} : {})});
  }
 }
 
