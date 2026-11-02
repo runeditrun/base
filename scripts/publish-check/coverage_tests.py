@@ -244,16 +244,26 @@ class HygieneTests(RepositoryFixture, unittest.TestCase):
 
     def test_local_directory_in_code_span_is_a_path_but_a_real_repository_is_not(self):
         self.write('GUIDE.md', '`rer deploy` uploads `dist/client` and reads `src/base/x.ts`, `docs/a` and `scripts/b`.')
+        paths = ('src/domain/x.mjs', 'src/domain', 'custom/evidence.mjs', 'custom/domain/x.mjs', 'tools/check.py')
+        self.write('CONTRACT.md', '| Clause | Evidence |\n| --- | --- |\n' + '\n'.join(
+            '| C-1 | Source: ' + markup + path + markup + ' |'
+            for path in paths for markup in ('', '`')))
+        self.write('OTHER.md', 'Upstream: `src/domain/x.mjs`\nSource: `custom/domain/x.mjs`\n')
         self.commit()
         with resolving('missing') as asked:
             self.assertEqual(self.report()['status'], 'PASS')
             self.assertEqual(asked, set())
             self.write('GUIDE.md', 'Uploads `dist/client`. Clone `acme-org/real-app` first.')
             self.write('PROSE.md', 'Fork from github: acme-org/other-app, then build.')
+            self.write('REPOSITORIES.md', 'Source: acme-org/absent-app\nSource: acme-org/absent-app.git\nSource: https://github.com/src/domain\n')
+            self.write('DECLARED.md', 'Source repository: `src/domain`\nRepository: `custom/evidence.mjs`\n')
+            self.write('ROUTES.md', 'Source: `src/domain/tree/main`\n')
+            self.write('FILE-ROUTE.md', '`acme-org/absent-app/blob/main/check.py`\n')
             self.commit()
             report = self.report()
         self.assertEqual({(finding['path'], finding['rule']) for finding in report['findings']},
-                         {('GUIDE.md', 'hygiene.github-missing'), ('PROSE.md', 'hygiene.github-missing')})
+                         {(path, 'hygiene.github-missing') for path in (
+                             'GUIDE.md', 'PROSE.md', 'REPOSITORIES.md', 'DECLARED.md', 'ROUTES.md', 'FILE-ROUTE.md')})
 
     def test_intended_public_references_do_not_allow_other_private_or_missing_repositories(self):
         from publication_config import intended_public_repositories
