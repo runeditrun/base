@@ -282,6 +282,13 @@ holds any of them. On a fresh destination, pass the latest archive as
 `--journal FILE`. An old archive restored into a brand-new store without that
 journal cannot be recognised.
 
+For each relayed agent decision, the Business holds only the 17-key public
+projection, including raw resource URIs for records the decision touched.
+Only the owner of the Business can read this copy. Erasing the record purges
+its live projection through the next tombstone pull; unpairing, re-pairing or
+stopping this seed purges its Business-held copy. The seed keeps no additional
+copy beyond its own audit and the bounded relay feed (one row per decision).
+
 Erasing a person also erases them from import custody (migrations
 `0018_import_kit.sql`, `0019_people_imports.sql`,
 `0020_import_erasure_append_only.sql`, `0021_import_preparation_steps.sql`,

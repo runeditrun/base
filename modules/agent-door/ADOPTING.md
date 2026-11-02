@@ -124,9 +124,15 @@ Do not alter an applied migration. The Business drops pre-join history; this
 backfill cannot reconstruct older pairing authority. Declare
 `agent_door_relay(sequence,decision_id,business)` as `unrelated` in each native
 artifact map: it holds only decision ids and the installation Business id.
-Record the Business-held projections as an external custody store, purged by
-tombstone pulls and the authority/stop/unreachable rules in the
-[relay wire](README.md#business-decision-relay-w-r1w-r5).
+Record an external custody store for the Business: per relayed decision it
+holds only the 17-key public projection, including raw resource URIs for records
+the decision touched, readable only by the owner of the Business. Record erasure
+purges the live projection through a tombstone pull; unpairing, re-pairing or
+stopping the seed purges that installation's Business copy. Apply the remaining
+authority and unreachable purge rules in the
+[relay wire](README.md#business-decision-relay-w-r1w-r5). The seed keeps no
+additional copy beyond its own audit and the bounded relay feed (one row per
+decision).
 `BASE-AGENT-009.relay` runs after the audit phase against the hosted build and
 refuses a missing route or one accepting a foreign signature. Retain the edition's native
 person session and Origin and CSRF controls. The [route and capacity reference](README.md)

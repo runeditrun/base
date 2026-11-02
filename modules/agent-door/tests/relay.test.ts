@@ -1,4 +1,7 @@
 import test from 'node:test'
+import { readFile } from 'node:fs/promises'
+import { relayDecisions } from '../relay.ts'
+import { relayFeed, relayReader } from './fixtures/relay-pages.mjs'
 import assert from 'node:assert/strict'
 import { webcrypto } from 'node:crypto'
 import { runtime } from './runtime.mjs'
@@ -203,4 +206,50 @@ test('R12 relay conformance passes the public door and rejects unrouting or fore
   else assert.ok(failed.some((point:any)=>point.id===`BASE-AGENT-009.relay.${mode==='unrouted'?'route':'foreign'}`),JSON.stringify(failed))
   t.diagnostic(`R12 ${mode}: ${failed.length?'rejected':'passed'}`)
  }
+})
+
+test('R11 pages match frozen original bytes at limits 200 and 7 with linear sizing cost', async t => {
+ const frozen = JSON.parse(await readFile(new URL('./fixtures/relay-pages.json', import.meta.url), 'utf8'))
+ let fullPageSizingBytes = 0, compared = 0
+ for (const sample of frozen.cases) {
+  const records = relayFeed(sample.kind), read = await relayReader(relayDecisions, records)
+  const ids: string[] = []
+  let after = 0
+  for (let i = 0; i < sample.pages.length; i++) {
+   const input = i === sample.pages.length - 1 ? after + 100 : after
+   let serializedBytes = 0
+   const stringify = JSON.stringify
+   const spy = t.mock.method(JSON, 'stringify', (value: any, replacer: any, space: any) => {
+    const raw = stringify(value, replacer, space)
+    if (raw && value && (Array.isArray(value.decisions) || typeof value.seq === 'number')) serializedBytes += Buffer.byteLength(raw)
+    return raw
+   })
+   let raw: string
+   try { raw = await read(input, sample.limit) } finally { spy.mock.restore() }
+   // Compare the full response bytes, then both object directions for all wire fields.
+   assert.equal(raw, sample.pages[i], sample.kind + '/' + sample.limit + '/' + input)
+   const page = JSON.parse(raw!), expected = JSON.parse(sample.pages[i])
+   assert.deepEqual(page, expected); assert.deepEqual(expected, page)
+   assert.ok(Buffer.byteLength(raw!) <= 65536)
+   assert.ok(page.decisions.length <= sample.limit)
+   if (i < sample.pages.length - 2) {
+    assert.ok(page.decisions.length > 0)
+    for (const row of page.decisions) { assert.ok(row.seq > after); after = row.seq; ids.push(row.id) }
+    assert.equal(page.cursor, after)
+    assert.equal(page.more, after < page.head)
+   } else {
+    assert.deepEqual(page.decisions, [])
+    assert.equal(page.cursor, input); assert.equal(page.more, false)
+   }
+   if (sample.kind === 'compact' && sample.limit === 200 && i === 0) {
+    assert.equal(page.decisions.length, 200); fullPageSizingBytes = serializedBytes
+   }
+   if (sample.kind === 'large' && sample.limit === 200 && i === 0) assert.equal(Buffer.byteLength(raw!), 65536)
+   compared++
+  }
+  assert.deepEqual(ids, records.map(row => JSON.parse(row.row).id))
+  assert.equal(new Set(ids).size, 205)
+ }
+ assert.ok(fullPageSizingBytes < frozen.fullPageSizingBytes / 20)
+ t.diagnostic(`Frozen original pages: ${compared} byte-identical in both directions; full 200-entry sizing: ${frozen.fullPageSizingBytes} -> ${fullPageSizingBytes} serialized bytes`)
 })
