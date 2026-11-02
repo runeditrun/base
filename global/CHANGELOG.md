@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Erasing an operator can now retire policy references without changing the signed policy. Existing approvals keep waiting, later deliveries keep the door live, and Agents shows when a replacement is needed.
+
 ## 0.2.96
 
 ### Business stop

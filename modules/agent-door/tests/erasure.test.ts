@@ -140,3 +140,146 @@ test('an admitted completion cannot overwrite a tombstone or append late persona
   assert.ok(!JSON.stringify((await r.db.prepare('SELECT * FROM agent_door_audit').all()).results).includes(id))
   assert.ok(!JSON.stringify((await r.db.prepare('SELECT * FROM agent_door_events').all()).results).includes(id))
 })
+
+test('operator retirement keeps paired and local peer approvals pending, accepts refreshes, and survives archives', async t => {
+  const { operatorPolicyRefs, createAgentDoor, operatorAuthPeople } = await import('../index.ts')
+  const { pennyAgentArtifacts } = await import('../adoption/penny/penny-map.ts')
+  for (const paired of [true, false]) {
+    const r = await runtime({ paired, erasure: true }); t.after(() => r.close())
+    const email = 'synthetic-retired@example.test', businessId = 'synthetic-retired-member'
+    assert.equal((await r.settings({ team: [{ id: businessId, email, name: 'Synthetic Retired', role: 'admin', invite: 0 }] })).status, 200)
+    await r.signIn(email)
+    const operator = await r.db.prepare('SELECT operator_id FROM bs_team WHERE business_id=?').bind(businessId).first<string>('operator_id')
+    const owner = await r.db.prepare("SELECT id FROM oa_operators WHERE role='owner'").first<string>('id')
+    const refs = await operatorPolicyRefs(r.db, operator!)
+    assert.deepEqual(refs.sort(), ['person:' + operator, 'person:' + businessId].sort())
+    assert.deepEqual(await operatorPolicyRefs(r.db, owner!), ['person:' + owner])
+    const ref = 'person:' + (paired ? businessId : operator)
+    const policy = { ...autonomousPolicy(), rules: [{ id: 'review', class: 'standard', do: 'review' }, { id: 'hold', class: '*', do: 'approval', approver: [ref], wait: 'PT1H' }], reviewers: [ref, 'role:owner'] }
+    const deliver = async (document: any, options: any = {}) => {
+      if (paired) return r.adopt(document, options)
+      const response = await r.fetch('/agents/api/policy', { method: 'PUT', headers: { cookie: r.c.person.cookie, origin: r.c.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ document }) })
+      return { status: response.status, body: await response.json() }
+    }
+    const reviewedPolicy = policy
+    assert.equal((await deliver(reviewedPolicy)).status, 200)
+    const completedArgs = { id: 'synthetic-reviewed-peer', value: 'peer value', idempotency_key: 'synthetic-reviewed-peer' }
+    const completed = await r.tool('records.write', completedArgs, paired ? {} : { token: r.localToken })
+    assert.equal(completed.result.isError, false)
+    const reviewId = completed.result._meta['com.runeditrun/review'].id
+    let begin!: () => void, finish!: () => void
+    const started = new Promise<void>(resolve => { begin = resolve }), gate = new Promise<void>(resolve => { finish = resolve })
+    t.after(() => finish())
+    const embeddedDoor = createAgentDoor({ seed: 'synthetic', name: 'Synthetic', specialist: 'operations', origin: r.c.origin, db: r.db,
+      ...(paired ? { trust: { issuer: r.c.signer.issuer, installationId: r.c.signer.installationId, appOrigin: r.c.origin, publicKeys: { [r.c.signer.kid]: await crypto.subtle.exportKey('jwk', r.c.ring.publicKey) } } } : {}),
+      people: operatorAuthPeople({ db: r.db, session: async () => null }), tools: [{
+        name: 'synthetic.retirement.finish', title: 'Finish admitted work', description: 'Synthetic in-flight completion.', scope: 'records:write', readOnly: false,
+        inputSchema: { type: 'object', additionalProperties: false }, outputSchema: { type: 'object' }, classes: ['standard'], clauses: ['BASE-AGENT-005'],
+        classify: () => [{ class: 'standard', facts: { measure: 1 } }], summary: () => ({ target: { id: 'synthetic-inflight' } }),
+        async run(_args, ctx) { begin(); await gate; ctx.emit('synthetic.finished', 'synthetic://safe', { ref }); return { result: { ref }, undo: { ref } } },
+      }] })
+    const inFlight = embeddedDoor.invoke('synthetic.retirement.finish', { idempotency_key: 'synthetic-inflight' }, {
+      person: { id: owner!, email: r.c.person.email, name: 'Synthetic Person', role: 'owner', active: true }, agent: { id: 'synthetic-inflight-agent', name: 'Synthetic Inflight' }, scopes: ['records:write'],
+    })
+    await Promise.race([started, inFlight.then(result => { throw new Error('in-flight admission refused: ' + JSON.stringify(result)) })])
+    assert.equal((await deliver(policy)).status, 200)
+    await r.db.prepare("INSERT INTO test_records VALUES('synthetic-peer-record','safe peer value',1,'internal')").run()
+    const call = (key: string) => r.tool('records.erase', { id: 'synthetic-peer-record', idempotency_key: key }, paired ? {} : { token: r.localToken })
+    const waiting = await call('synthetic-peer-held')
+    const approvalId = waiting.result._meta['com.runeditrun/approval'].id
+    const auditBefore = (await r.person('/agents/api/audit')).body
+    const envelopeBefore = await r.db.prepare('SELECT envelope FROM agent_door_state').first('envelope')
+    const localRevision = await r.db.prepare('SELECT local_revision FROM agent_door_state').first('local_revision')
+    const portability = await createPortability({ db: r.db, policy: { product: 'operator-retirement-test', buckets: {}, excludeTables: ['test_contexts', 'test_callbacks'] } })
+    const before = await archive(portability)
+    // This operator has no own decisions. Only policy mentions in peer decisions
+    // exist: selecting them as subject rows would incorrectly tombstone the peer.
+    const map = { artifacts: personAgentArtifacts.artifacts.map(item => item.table === 'agent_door_state'
+      ? { table: item.table, columns: item.columns, retire: { refs: 'refs' } }
+      : item.match ? { table: item.table, columns: item.columns, match: { sql: '0', params: [] } } : item) }
+    await checkAgentArtifacts(r.db, pennyAgentArtifacts)
+    const tombstone = { erasure_id: crypto.randomUUID(), at: new Date(r.c.now).toISOString() }
+    const compile = (subject: any, artifactMap: any = map) => agentErasureStatements({ db: r.db, map: artifactMap, subject, secret: r.secret, tombstone, checkpoint: () => portability.redactionStatements() })
+    for (const malformed of ['{}', '["role:owner"]', '["person:a:b"]', '["person:has space"]', '[1]', JSON.stringify(Array(201).fill('person:a'))]) {
+      await assert.rejects(compile({ refs: malformed }), /agent_erasure_policy_ref/)
+    }
+    await assert.rejects(compile({}), /agent_erasure_subject_value:refs/)
+    const invalidMap = { artifacts: map.artifacts.map(item => item.table === 'agent_door_state' ? { ...item, unrelated: 'invalid second declaration' } : item) }
+    await assert.rejects(compile({ refs: '[]' }, invalidMap), /agent_erasure_undeclared_table:agent_door_state/)
+    const wrongTable = { artifacts: map.artifacts.map(item => item.table === 'agent_door_agents' ? { table: item.table, columns: item.columns, retire: { refs: 'refs' } } : item) }
+    await assert.rejects(compile({ refs: '[]' }, wrongTable), /agent_erasure_undeclared_table:agent_door_agents/)
+    await r.db.batch(await compile({ refs: '[]' }))
+    assert.equal(await r.db.prepare('SELECT count(*) n FROM agent_door_retired_refs').first('n'), 0)
+    const statements = await compile({ refs: JSON.stringify(refs) })
+    await r.db.batch([...statements,
+      r.db.prepare('DELETE FROM oa_sessions WHERE operator_id=?').bind(operator),
+      r.db.prepare('DELETE FROM oa_tokens WHERE operator_id=? OR issuer_id=?').bind(operator, operator),
+      r.db.prepare('DELETE FROM bs_team WHERE operator_id=?').bind(operator),
+      r.db.prepare('DELETE FROM oa_operators WHERE id=?').bind(operator),
+    ])
+    const marker = 'person:erased:' + tombstone.erasure_id
+    assert.equal(await r.db.prepare('SELECT envelope FROM agent_door_state').first('envelope'), envelopeBefore)
+    assert.equal(await r.db.prepare('SELECT local_revision FROM agent_door_state').first('local_revision'), localRevision)
+    const view = (await r.person('/agents/api/approvals/' + approvalId)).body.approval
+    assert.equal(view.state, 'pending'); assert.equal(view.code, null); assert.deepEqual(view.approvers, [marker])
+    assert.deepEqual((await r.person('/agents/api/audit')).body, auditBefore)
+    finish()
+    assert.equal((await inFlight).outcome, 'done')
+    const replayed = await r.tool('records.write', completedArgs, paired ? {} : { token: r.localToken })
+    assert.deepEqual(replayed.result.structuredContent, completed.result.structuredContent, 'completed peer payload replays unchanged')
+    assert.equal((await r.person('/agents/api/reviews/' + reviewId + '/undo', {})).body.review.state, 'undone', 'remaining owner reviewer can Undo')
+    assert.equal((await r.person('/agents/api/state')).body.policy.pending_retirement, 1)
+    const page = await r.fetch('/agents', { headers: { cookie: r.c.person.cookie } })
+    assert.match(await page.text(), /data-policy-retirement/)
+    const dump = JSON.stringify(await Promise.all(personAgentArtifacts.artifacts.filter(item => item.table !== 'agent_door_state').map(async item => (await r.db.prepare('SELECT * FROM "' + item.table + '"').all()).results)))
+    for (const raw of refs.concat([operator!, email])) assert.ok(!dump.includes(raw), raw)
+    if (paired) {
+      const seq = r.c.seq, revision = r.c.revision
+      await r.setNow(r.c.now + 1000)
+      assert.equal((await deliver(policy, { seq, revision })).status, 200, 'same-sequence refresh retains immutable authority')
+      await r.setNow(r.c.now + 301_000)
+      assert.equal((await deliver(policy)).status, 200, 'new delivery naming a retired person remains live')
+      const unresolved = await deliver({ ...policy, reviewers: ['person:synthetic-unmapped'] })
+      assert.equal(unresolved.status, 400); assert.equal(unresolved.body.code, 'policy_refs_unresolved')
+    } else {
+      const local = (await r.person('/agents/api/policy')).body
+      assert.equal(local.complete, false); assert.deepEqual(local.document.rules[1].approver, [marker]); assert.deepEqual(local.document.reviewers, [marker, 'role:owner'])
+    }
+    const late = await call('synthetic-peer-late')
+    const lateId = late.result._meta['com.runeditrun/approval'].id
+    const lateView = (await r.person('/agents/api/approvals/' + lateId)).body.approval
+    assert.deepEqual(lateView.approvers, [marker]); assert.equal(lateView.state, 'pending')
+    assert.equal((await r.person('/agents/api/approvals/' + lateId + '/approve', { revision: lateView.revision, summary_sha256: lateView.summary_sha256 })).status, 403)
+    const embedded = await r.person('/__embedded', { name: 'synthetic.records.erase', args: { id: 'synthetic-peer-record', idempotency_key: 'synthetic-embedded' }, scopes: ['records:write'] })
+    assert.equal(embedded.body.outcome, 'pending')
+    const after = await archive(portability)
+    assert.ok(JSON.parse(after.split('\n')[0]).tables.some((table: any) => table.name === 'agent_door_retired_refs'))
+    const archivedAgentRows = after.trim().split('\n').map(line => JSON.parse(line)).filter(line => line.kind === 'part').flatMap(part => part.items).filter(item => item.table?.startsWith('agent_door_'))
+    assert.ok(!JSON.stringify(archivedAgentRows).includes(email), 'agent archive rows contain no retired contact')
+    if (paired) {
+      const destination = await runtime({ erasure: true, ring: r.c.ring }); t.after(() => destination.close())
+      const lines = after.trim().split('\n').map(line => JSON.parse(line))
+      const lastOwner = await destination.db.prepare("SELECT sql FROM sqlite_schema WHERE type='trigger' AND name='oa_preserve_last_owner_delete'").first<string>('sql')
+      await destination.db.batch([
+        destination.db.prepare('PRAGMA defer_foreign_keys=ON'), destination.db.prepare('DROP TRIGGER oa_preserve_last_owner_delete'),
+        ...lines[0].tables.map((table: any) => destination.db.prepare('DELETE FROM "' + table.name + '"')),
+        destination.db.prepare(lastOwner!),
+      ])
+      const restored = await createPortability({ db: destination.db, policy: { product: 'operator-retirement-test', buckets: {}, excludeTables: ['test_contexts', 'test_callbacks'] } })
+      const id = await restored.imports.create(lines[0])
+      for (const part of lines.filter(line => line.kind === 'part')) await restored.imports.uploadPart(id, part.index, part)
+      assert.equal((await restored.imports.finalize(id, { archiveHash: lines.at(-1).archiveHash })).phase, 'complete')
+      assert.equal((await destination.adopt(policy, { seq: r.c.seq + 1, revision: r.c.revision + 1 })).status, 200, 'restored suppression permits signed delivery still naming the erased person')
+    }
+    const old = before.trim().split('\n').map(line => JSON.parse(line))
+    await assert.rejects(async () => {
+      const id = await portability.imports.create(old[0])
+      for (const part of old.filter(line => line.kind === 'part')) await portability.imports.uploadPart(id, part.index, part)
+      await portability.imports.finalize(id, { archiveHash: old.at(-1).archiveHash })
+    }, /erasure_epoch/)
+    assert.equal((await deliver(autonomousPolicy())).status, 200)
+    assert.equal((await r.person('/agents/api/state')).body.policy.pending_retirement, 0)
+    assert.ok(!JSON.stringify((await r.db.prepare('SELECT * FROM agent_door_state').all()).results).includes(ref))
+    t.diagnostic(`${paired ? 'paired' : 'local'}: declaration/subject refusals; native batch; envelope/revision unchanged; peer audit unchanged/differs=0; pending marker; refresh/liveness; in-flight audit/review/call/event retired; completed peer replay and owner Undo; late MCP and embedded copies retired; checkpoint and archive restore custody; release=0`)
+  }
+})

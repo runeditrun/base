@@ -8,6 +8,7 @@ const calls = mentions(['key', 'outcome']), approvals = mentions(['saved', 'appr
 const decisions = "SELECT decision_id FROM agent_door_calls WHERE " + calls + " UNION SELECT json_extract(saved,'$.decision_id') FROM agent_door_approvals WHERE " + approvals + " UNION SELECT json_extract(saved,'$.decision_id') FROM agent_door_reviews WHERE " + reviews + " UNION SELECT id FROM agent_door_audit WHERE " + audits + " UNION SELECT door_operation_id FROM audit_entries WHERE entity_id IN (SELECT value FROM json_each(?1)) OR " + mentions(['details_json'])
 const match = (sql: string) => ({ sql, params: ['values'] })
 export const pennyAgentArtifacts: AgentArtifactMap = { artifacts: [
+  { table: 'agent_door_retired_refs', columns: ['digest','marker'], unrelated: 'Value-free suppression digests and erasure markers preserve retirement across restore.' },
   { table: 'agent_door_relay', columns: ['sequence','decision_id','business'], unrelated: 'Value-free decision ids and installation Business id only; projections are computed from the erasure-aware audit.' },
   { table: 'agent_door_state', columns: ['id','envelope','local_document','local_revision','local_paused','decision_lock','decision_until'], unrelated: 'Installation policy and admission leases; Penny customer subjects are not policy principals.' },
   { table: 'agent_door_agents', columns: ['id','name','specialist','sponsor','sponsor_name','revoked','window','requests','tombstone'], unrelated: 'Non-person agent identities and native operator sponsors; Penny customer subjects are not operators.' },

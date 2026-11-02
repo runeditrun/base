@@ -17,6 +17,8 @@ const section = doc.split('## Refreshing a copy older than 0.2.96\n')[1]?.split(
 assert.ok(section, 'ADOPTING has the older-copy refresh section')
 const olderSql = section.match(/<!-- schema-upgrade:0\.2\.93:begin -->\n```sql\n([\s\S]*?)\n```\n<!-- schema-upgrade:0\.2\.93:end -->/)?.[1]
 assert.ok(olderSql, 'the tested delta comes directly from the documented SQL block')
+const retiredSql = section.match(/<!-- schema-upgrade:retired-refs:begin -->\n```sql\n([\s\S]*?)\n```\n<!-- schema-upgrade:retired-refs:end -->/)?.[1]
+assert.ok(retiredSql, 'the retirement delta comes directly from the documented SQL block')
 const relaySql = await read('../../../default-seed/migrations/core/0040_agent_door_relay.sql')
 const apply = async (db: D1Database, sql: string) => {
  if (sql.trim()) for (const statement of split(sql)) await db.prepare(statement).run()
@@ -34,6 +36,7 @@ async function frozen(file: string, blob: string) {
 }
 const oldSchema = await frozen('schema-0.2.93/agent-door.sql', '47d4cc8153f902cb1cded1c3dc9c48048844207f')
 const middleSchema = await frozen('schema-0.2.95/agent-door.sql', 'c4553879efdb8b2f7e2a606c72ba685ca01d7f05')
+const latestSchema = await frozen('schema-0.2.96/agent-door.sql', 'cc3a2e490aed16c0f03684bb473081a17a069ca4')
 const aliases = await frozen('schema-0.2.95/replay-aliases.sql', 'ee9dedac04d70e355b2a988eebf73cfe62275114')
 const normalize = (sql: string) => sql.replace(/\s+/g, ' ').trim()
 async function inventory(db: D1Database) {
@@ -53,6 +56,7 @@ async function inventory(db: D1Database) {
 for (const [start, schema, delta] of [
  ['0.2.93 / 0.2.94', oldSchema, olderSql],
  ['0.2.95', middleSchema + aliases, ''],
+ ['0.2.96', latestSchema + aliases, ''],
 ] as const) test(`documented ${start} deltas plus relay equal an empty database's current schema`, async t => {
  const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, script: 'export default {}', compatibilityDate: '2026-09-01', d1Databases: { OLD: 'old', FRESH: 'fresh' } }))
  t.after(() => mf.dispose())
@@ -60,7 +64,10 @@ for (const [start, schema, delta] of [
  await apply(db, schema)
  await apply(fresh, await read('../schema/agent-door.sql'))
  await apply(fresh, await read('../schema/replay-aliases.sql'))
- for (const version of start.split(' / ')) assert.match(section, new RegExp(`\\| ${version.replaceAll('.', '\\.')} \\| ${delta ? 'The (?:same )?older-schema SQL below, then the relay SQL' : 'Only the relay SQL'}`))
+ for (const version of start.split(' / ')) {
+  const row = section.split('\n').find(line => line.startsWith('| ' + version + ' |'))
+  assert.ok(row?.includes('retirement SQL below'), 'each documented upgrade includes retirement custody')
+ }
  const before = await inventory(db)
  const createdAt = 1000
  for (const state of ['done', 'refused', 'running', 'pending']) {
@@ -74,10 +81,11 @@ for (const [start, schema, delta] of [
  await db.prepare('INSERT INTO agent_door_audit(id,at,agent,classes,row) VALUES(?,?,?,?,?)')
   .bind('synthetic-decision', '2026-11-02T00:00:00.000Z', 'synthetic-agent', '[]', JSON.stringify({ door: 'mcp', consent: 'synthetic-consent' })).run()
  await apply(db, delta)
- await apply(db, relaySql)
+ if (start !== '0.2.96') await apply(db, relaySql)
+ await apply(db, retiredSql)
  const after = await inventory(db)
  assert.deepEqual(after, await inventory(fresh), 'tables, PRAGMA columns, indexes and trigger definitions must all match')
- assert.equal(after.filter(object => object.type === 'table').length, 10)
+ assert.equal(after.filter(object => object.type === 'table').length, 11)
  assert.equal(after.filter(object => object.type === 'index').length, 7)
  assert.equal(after.filter(object => object.type === 'trigger').length, 5)
  assert.equal(await db.prepare('SELECT name FROM agent_door_agents').first('name'), 'Synthetic Agent')
@@ -86,7 +94,7 @@ for (const [start, schema, delta] of [
   { key: 'refused', expires_at: createdAt + REPLAY_WINDOW_MS }, { key: 'running', expires_at: null },
  ])
  assert.deepEqual((await db.prepare('SELECT decision_id,business FROM agent_door_relay').all()).results, [{ decision_id: 'synthetic-decision', business: 'synthetic-business' }])
- t.diagnostic(`${start}: tables/indexes/triggers ${['table','index','trigger'].map(type => before.filter(object => object.type === type).length).join('/')} -> 10/7/5; existing rows preserved`)
+ t.diagnostic(`${start}: tables/indexes/triggers ${['table','index','trigger'].map(type => before.filter(object => object.type === type).length).join('/')} -> 11/7/5; existing rows preserved`)
 })
 
 test('0.2.93 plus relay alone returns 500 on tool admission and fails relay.count; documented deltas repair it', async t => {
@@ -111,6 +119,7 @@ test('0.2.93 plus relay alone returns 500 on tool admission and fails relay.coun
  }
  assert.ok((await conformance()).some((point: { id: string }) => point.id === 'BASE-AGENT-009.relay.count'))
  await apply(r.db, olderSql)
+ await apply(r.db, retiredSql)
  const written = await r.tool('records.write', { id: 'synthetic-upgrade', value: 'synthetic-value', idempotency_key: 'synthetic-upgrade' })
  assert.equal(written.status, 200)
  assert.equal(written.result.isError, false)

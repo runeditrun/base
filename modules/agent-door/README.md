@@ -120,7 +120,16 @@ where `revision` can be null. Resources also contribute declared classes. A
 Business rule with `max_per_day` must name a `seed`; unscoped daily limits are
 refused as `policy_document_invalid` with the rule's `.seed` path, because this
 installation cannot reserve company-wide usage. A named `person:` ref must
-resolve to an active mapped Business person at adoption. Paired approver and
+resolve to an active mapped Business person at adoption or have a recorded retirement.
+Retired references match nobody and never remove a required approval. The signed
+envelope remains verbatim until Business delivers a policy without the reference;
+only the value-free suppression digest/marker persists across archive restore.
+Unsigned local policy and stored copies use the erasure marker, including late
+writes. Operator erasure uses `retire: { refs }` and `operatorPolicyRefs` in the
+native batch; see ADOPTING.md for selectors and retention reporting.
+`GET /agents/api/state` reports `policy.pending_retirement`, the number of
+distinct retired approver/reviewer references still in force. The Agents page
+shows a replacement notice with the Business policy link or local editor. Paired approver and
 reviewer refs use Business member ids and roles, independent of native roles. Invalid input leaves the last valid state intact.
 Expired adopted policy refuses agent work; unpairing uses the retained local
 document, or leaves policy unset. Adoption delivery and the paired computer's

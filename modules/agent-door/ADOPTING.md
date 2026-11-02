@@ -103,14 +103,15 @@ adaptations and copy verification.
 
 The tagged schemas in `rer-v0.2.93` and `rer-v0.2.94` are identical.
 `rer-v0.2.95` adds erasure/replay custody (reference migrations `0038` and
-`0039`); `rer-v0.2.96` adds the relay (`0040`). These are all changes under
-`modules/agent-door/schema/` across those releases:
+`0039`); `rer-v0.2.96` adds the relay (`0040`). The current source additionally needs policy-reference suppression (`0041`).
+These are the additive upgrades to the current schema:
 
-| Starting Base release | Additive SQL needed for 0.2.96 |
+| Starting Base release | Additive SQL needed for current source |
 | --- | --- |
-| 0.2.93 | The older-schema SQL below, then the relay SQL. |
-| 0.2.94 | The same older-schema SQL below, then the relay SQL. |
-| 0.2.95 | Only the relay SQL; both columns, the expiry index and replay-alias objects already exist. |
+| 0.2.93 | The older-schema SQL below, then the relay SQL and retirement SQL below. |
+| 0.2.94 | The same older-schema SQL below, then the relay SQL and retirement SQL below. |
+| 0.2.95 | The relay SQL and retirement SQL below; both columns, the expiry index and replay-alias objects already exist. |
+| 0.2.96 | Only the retirement SQL below; relay and replay custody already exist. |
 
 Write only the deltas the seed's applied schema lacks. SQLite has no
 `ADD COLUMN IF NOT EXISTS`: check `PRAGMA table_info(agent_door_agents)` and
@@ -146,7 +147,18 @@ the table, two indexes, four triggers and one-time audit backfill. Do not replay
 the seed's existing migrations. Relay DDL alone does not add the older columns:
 current tool admission reads `agent_door_calls.expires_at`, so an older schema
 returns 500 before producing decisions and fails `BASE-AGENT-009.relay.count`.
-The frozen-schema upgrade test executes this SQL block and that relay file.
+Append the retirement SQL below for every starting release in the table. It is
+also the complete upgrade from 0.2.96 (reference migration `0041_agent_retired_refs.sql`):
+
+<!-- schema-upgrade:retired-refs:begin -->
+```sql
+CREATE TABLE agent_door_retired_refs (digest TEXT PRIMARY KEY, marker TEXT NOT NULL);
+```
+<!-- schema-upgrade:retired-refs:end -->
+
+The frozen-schema upgrade test executes these SQL blocks and the relay file,
+comparing all objects against the schema applied fresh. The suppression table
+travels in installation archives; do not add it to portability exclusions.
 
 ## Wire the edition
 
@@ -1565,11 +1577,36 @@ non-personal agent scope dimensions so erasure does not reset policy allowances.
 A native erasure notification keeps its event type and time without reintroducing
 the subject identifier after the transactional hook.
 Native subject IDs, exact addresses and the imported `sourceUserId` select their
-linked decision, approval, review and event rows. Operators and installation
-policy are separate from the reference's customer subjects; a seed that erases operators must also map sponsor
-identity columns and policy person references. Do not select by a common name
-alone. Resolve native target IDs before admitting pending execution, including
-tools that return only a child row ID.
+linked decision, approval, review and event rows. Do not select by a common
+name alone. Resolve native target IDs before admitting pending execution,
+including tools that return only a child row ID.
+
+**Operator subjects.** Select the operator's own rows by native id and exact
+contacts, never by a policy reference or Business id: those appear in every
+decision's policy evidence. Boundary-checked mentions must skip `person:`
+references. Map sponsor identity columns separately, and declare
+`agent_door_state` with `retire: { refs: 'policyRefs' }`, supplying
+`subject.policyRefs = JSON.stringify(await operatorPolicyRefs(db, operatorId))`.
+Import `operatorPolicyRefs` from the module's `index.ts`; it returns native and
+mapped Business references, excluding the owner's Business identity. Owner
+erasure is outside this recipe. Put `agentErasureStatements` inside the same
+native erasure batch, including its portability checkpoint even for retirement
+alone. Retirement replaces exact references in unsigned local policy and stored
+copies with `person:erased:<erasure_id>`, which matches nobody. Required approvals
+stay pending until expiry; retirement never drops an approver or changes the
+local revision. Later writes apply the same suppression.
+
+Report two retained items under BASE-DATA-006: the verbatim signed envelope,
+which the seed cannot edit or re-sign, until the Business delivers a policy
+without the reference; and the value-free, domain-separated SHA-256 suppression
+digest and erasure marker, retained to honour erasure across later delivery and
+archive restore. Never store a raw retired reference outside
+`agent_door_state.envelope`. Equal-sequence refreshes and later revisions can
+still name the retired person without darkening the door. The state field
+`policy.pending_retirement` counts distinct retired approver/reviewer references;
+the Agents page links to Business policy when paired, or the local editor.
+The count clears when policy no longer names the reference or marker. In local
+policy the marker remains until the owner chooses a replacement.
 
 Append `await agentErasureStatements({db,map,subject,secret,tombstone,checkpoint})`
 inside the existing erasure transaction. `tombstone` is
@@ -1595,7 +1632,7 @@ timestamps and `{erasure_id,at}`. Empty structural fields support existing reade
 Audit integrity is its existing sequence and tombstone; no hash chain is added.
 
 The personal replay key is replaced by an opaque key derived from the call's
-decision ID. The sole retention exception is an installation-private
+decision ID. For replay custody, the retention exception is an installation-private
 HMAC-SHA-256 alias of the legacy key, scoped to its agent, under that existing
 private setting. `REPLAY_WINDOW_MS` in `erasure.ts` fixes one replay window of
 30 days after call completion, with no knob or per-seed override. `expires_at`
@@ -1627,5 +1664,5 @@ and triggers in a new seed migration once custody is integrated; do not disable
 them with flags. Preserve independent legal/regulator holds, identity protections
 and restore checks. Prove each subject type through its public erasure/restore
 doors, scan every mapped column, replay the old key at now, 24 hours plus 1 ms
-and the replay horizon plus 1 ms (a new request), and compare a peer's records byte for byte. Generic module tests
+and the replay horizon plus 1 ms (a new request), and compare a peer's records byte for byte except references retired to the erasure's marker. Generic module tests
 alone do not qualify an adopting seed.
