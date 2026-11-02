@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.96-dev.gf5fe12e3",
+  "cliVersion": "0.2.96-dev.g52c21461",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1975,7 +1975,7 @@
     },
     "modules/agent-door/CLAUSES.md": {
       "source": "modules/agent-door/CLAUSES.md",
-      "sha256": "0cae7c4f0bcb61d6814e9833a4284b5e35627187cddb6ff4d5c2948122cf8016"
+      "sha256": "ff30ac96f6113acccb8e382e340521c82bd13befdee0ed0114025735f1d2d4d6"
     },
     "modules/agent-door/capabilities.d.mts": {
       "source": "modules/agent-door/capabilities.d.mts",
