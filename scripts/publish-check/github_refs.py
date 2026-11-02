@@ -31,6 +31,7 @@ SPONSORS_URL = re.compile(URL_BOUNDARY + r'(?a:https?://|(?<!:)//)' + USERINFO +
                           r'(?a:(?:www\.)?github\.com)' + PORT +
                           r'''/(?-i:sponsors)/(?a:[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)/?(?=[?#\s"'`<>)]|$)''', re.I)
 FILE_SUFFIX = re.compile(r'(?i)\.(?:xml|json|ya?ml|toml|[cm]?[jt]sx?|md|txt|html|css|sql|png|jpe?g|svg|zip|csv|pdf|docx|xlsx|rer)$')
+FILE_EXTENSION = re.compile(r'(?i)/[^/]+\.(?!git$)[a-z][a-z0-9]*$')
 DEPENDENCY = re.compile(r'(?i)\bgithub:(' + PAIR + r')(?![A-Za-z0-9_./-])')
 ACTION = re.compile(r'''(?im)^\s*(?:-\s*)?uses\s*:\s*["']?(''' + PAIR + r''')(?:/[A-Za-z0-9_./-]+)?@[^\s"']+''')
 REPOSITORY_FIELD = re.compile(r'''(?im)(?<![\w$])["'`]?(?:repository|repo|github|sourceRepository)["'`]?\s*[:=]\s*["'`]?(''' + PAIR + r''')(?![A-Za-z0-9_./-])''')
@@ -42,6 +43,7 @@ DECLARED_SHORTHAND = re.compile(r'''(?im)(?<![\w$])["'`]?(?:url|fullURL)["'`]?\s
 REPOSITORY_ROUTE = re.compile(r'/(?:tree|blob|issues|pull|pulls|commit|commits|releases|actions|wiki|discussions|compare|tags)(?:/|$)')
 SHORTHAND = PAIR + r'(?:[/?#][^\s`<>]*)?'
 REPOSITORY_CONTEXT = r'github|repository|repo|source|upstream|downstream|fork(?:ed)?(?:\s+(?:from|of|into))?|clone(?:d)?(?:\s+from)?|gh\s+repo\s+(?:clone|view|fork)'
+REPOSITORY_DECLARATION = re.compile(r'(?i)\b(?:github|repository|repo|gh|fork(?:ed)?|clone(?:d)?)\b')
 MARKUP = r'[`*_~\[\]]*'
 MARKDOWN_REFERENCE = re.compile(r'`(?P<code>' + SHORTHAND + r')`|(?<![A-Za-z])(?P<label>(?i:' + REPOSITORY_CONTEXT + r'))(?:\s+(?:repository|repo))?' + MARKUP + r'(?P<separator>\s*[:=|]\s*|\s+)(?P<markup>' + MARKUP + r')\s*(?P<reference>' + SHORTHAND + r')(?![A-Za-z0-9_./-])')
 
@@ -143,8 +145,17 @@ def reference_sets(text, path, local_paths=frozenset(), project_identity=None):
                 value = value[:-len(emphasis.group())]
             repository = '/'.join(value.split('/')[:2])
             suffix = value[len(repository):]
-            if not explicit and (value in local_paths or repository in local_paths or FILE_SUFFIX.search(repository)
-                                 or repository.split('/')[0] in LOCAL_DIRECTORIES):
+            local_path = (value in local_paths or repository in local_paths or FILE_SUFFIX.search(repository)
+                          or repository.split('/')[0] in LOCAL_DIRECTORIES)
+            if not explicit and local_path:
+                continue
+            # A generic evidence label does not turn a path into an owner/repo.
+            # Repository declarations, commands and GitHub routes still do,
+            # even when their spelling coincides with a local path.
+            repository_declaration = (match['reference'] is None or REPOSITORY_DECLARATION.search(
+                markdown[match.start():match.start('reference')]))
+            if (explicit and not repository_declaration and not REPOSITORY_ROUTE.match(suffix)
+                    and (local_path or FILE_EXTENSION.search(value))):
                 continue
             # A plain multi-segment path is ambiguous; GitHub's repository
             # routes, a labeled field or a GitHub command disambiguate it.
