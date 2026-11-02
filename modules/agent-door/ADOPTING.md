@@ -99,6 +99,55 @@ with its existing authoring command after staging intentional changes. See the
 [edition authoring guide](../../export/EDITION-AUTHORING.md) for offline refresh,
 adaptations and copy verification.
 
+## Refreshing a copy older than 0.2.96
+
+The tagged schemas in `rer-v0.2.93` and `rer-v0.2.94` are identical.
+`rer-v0.2.95` adds erasure/replay custody (reference migrations `0038` and
+`0039`); `rer-v0.2.96` adds the relay (`0040`). These are all changes under
+`modules/agent-door/schema/` across those releases:
+
+| Starting Base release | Additive SQL needed for 0.2.96 |
+| --- | --- |
+| 0.2.93 | The older-schema SQL below, then the relay SQL. |
+| 0.2.94 | The same older-schema SQL below, then the relay SQL. |
+| 0.2.95 | Only the relay SQL; both columns, the expiry index and replay-alias objects already exist. |
+
+Write only the deltas the seed's applied schema lacks. SQLite has no
+`ADD COLUMN IF NOT EXISTS`: check `PRAGMA table_info(agent_door_agents)` and
+`PRAGMA table_info(agent_door_calls)` first (and `sqlite_schema` for indexes,
+tables and triggers). Put the missing deltas in **ONE new numbered migration**
+ahead of the relay DDL in that migration; never edit an applied migration.
+The older-schema SQL is:
+
+<!-- schema-upgrade:0.2.93:begin -->
+```sql
+ALTER TABLE agent_door_agents ADD COLUMN tombstone TEXT;
+ALTER TABLE agent_door_calls ADD COLUMN expires_at INTEGER;
+-- Backfill only legacy completed calls, using their start, never upgrade time.
+UPDATE agent_door_calls SET expires_at=created_at + 30*24*60*60*1000
+WHERE state NOT IN ('running','pending') AND expires_at IS NULL;
+CREATE INDEX IF NOT EXISTS agent_door_calls_expiry ON agent_door_calls(expires_at);
+CREATE TABLE IF NOT EXISTS agent_door_replay_aliases (
+  agent TEXT NOT NULL, alias TEXT NOT NULL, call_id TEXT NOT NULL, tombstone TEXT NOT NULL,
+  PRIMARY KEY(agent,alias)
+);
+CREATE TRIGGER IF NOT EXISTS agent_door_delete_replay_aliases AFTER DELETE ON agent_door_calls
+BEGIN
+  DELETE FROM agent_door_replay_aliases WHERE agent=OLD.agent AND call_id=OLD.decision_id;
+END;
+CREATE INDEX IF NOT EXISTS agent_door_replay_aliases_call ON agent_door_replay_aliases(agent,call_id);
+```
+<!-- schema-upgrade:0.2.93:end -->
+
+The replay-alias objects above are exactly [schema/replay-aliases.sql](schema/replay-aliases.sql).
+For the relay SQL, append the exact contents of
+[`0040_agent_door_relay.sql`](../../default-seed/migrations/core/0040_agent_door_relay.sql):
+the table, two indexes, four triggers and one-time audit backfill. Do not replay
+the seed's existing migrations. Relay DDL alone does not add the older columns:
+current tool admission reads `agent_door_calls.expires_at`, so an older schema
+returns 500 before producing decisions and fails `BASE-AGENT-009.relay.count`.
+The frozen-schema upgrade test executes this SQL block and that relay file.
+
 ## Wire the edition
 
 Use explicit `.ts` extensions in runtime imports so the copied source can also
@@ -117,8 +166,9 @@ internal implementation file or the test-only conformance signer. Route its
 signed policy adoption reach their own checks. Also route
 `POST /api/rer/agent-decisions` to the same `handle` before app authentication.
 The relay migration, route and erasure-map declaration must land in the same
-seed commit. Copy the relay DDL from `schema/agent-door.sql` into a new numbered
-migration and backfill existing MCP audits with consent to the current
+seed commit. For an older applied schema, first follow
+[Refreshing a copy older than 0.2.96](#refreshing-a-copy-older-than-0296).
+Copy the relay DDL from `schema/agent-door.sql` into a new numbered migration and backfill existing MCP audits with consent to the current
 envelope Business, as in `default-seed/migrations/core/0040_agent_door_relay.sql`.
 Do not alter an applied migration. The Business drops pre-join history; this
 backfill cannot reconstruct older pairing authority. Declare
