@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Agent-door conformance accepts completed native continuation replays linked to their original work, while rejecting changed identities, item keys, effect facts or policy evidence.
+
 ## 0.2.96
 
 ### Business stop
