@@ -133,6 +133,11 @@ line; a table's repository label must occupy its whole cell. A repository word i
 nearby prose or a preceding heading/cell does not declare an unrelated token or
 local path. Stated references to missing repositories still fail, including URLs
 and declarations whose spelling coincides with a local file.
+Generic evidence labels retain path-shaped values: `Source: src/domain/x.mjs`
+names a local path. A source label followed by an owner and repository name
+still states a repository.
+Known local directories and file suffixes distinguish paths; explicit repository
+labels, commands, GitHub URLs and repository routes retain their repository meaning.
 
 POSIX home prefixes retain their canonical case (`/Users/` and `/home/`); Windows
 home paths are case insensitive. Lowercase application URLs such as `/users/profile`
