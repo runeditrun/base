@@ -66,7 +66,10 @@ for (const [start, schema, delta] of [
  await apply(fresh, await read('../schema/replay-aliases.sql'))
  for (const version of start.split(' / ')) {
   const row = section.split('\n').find(line => line.startsWith('| ' + version + ' |'))
-  assert.ok(row?.includes('retirement SQL below'), 'each documented upgrade includes retirement custody')
+  assert.ok(row, 'each starting release has a documented upgrade')
+  const expected = delta ? 'The (?:same )?older-schema SQL below, then the relay SQL and retirement SQL below'
+   : start === '0.2.96' ? 'Only the retirement SQL below' : 'The relay SQL and retirement SQL below'
+  assert.match(row, new RegExp(`\\| ${version.replaceAll('.', '\\.')} \\| ${expected}`), 'the documented row must prescribe every delta actually executed below')
  }
  const before = await inventory(db)
  const createdAt = 1000
