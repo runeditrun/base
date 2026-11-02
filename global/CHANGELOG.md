@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Agent-door conformance accepts completed native continuation replays linked to their original work, while rejecting changed identities, item keys, effect facts or policy evidence.
 - Erasing an operator can now retire policy references without changing the signed policy. Existing approvals keep waiting, later deliveries keep the door live, and Agents shows when a replacement is needed.
 
 ## 0.2.96
