@@ -108,10 +108,11 @@ export async function executeApproval(rt: Runtime, id: string, saved: SavedAppro
   if (result.outcome === 'done') result.receipt = { id: crypto.randomUUID(), decision_id: saved.decision_id, approval_id: id, prepared_by: preparedBy(saved.principal), approved_by: by }
   result.execution_id = row.id
   const state = result.outcome === 'done' ? 'executed' : 'refused'
+  const stored = await retire(rt.options.db, result)
   // Keep the recorded outcome durable before attempting the final audit write.
   await rt.options.db.batch([
-    rt.options.db.prepare("UPDATE agent_door_approvals SET state=?,result=? WHERE id=? AND json_extract(saved,'$.tombstone') IS NULL").bind(state, await retire(rt.options.db, result), id),
-    ...(saved.key === null ? [] : [rt.options.db.prepare('UPDATE agent_door_calls SET state=?,outcome=?,expires_at=coalesce(expires_at,?) WHERE agent=? AND key=?').bind(result.outcome, await retire(rt.options.db, result), rt.now() + REPLAY_WINDOW_MS, saved.principal.agent.id, saved.claimKey ?? saved.key)]),
+    rt.options.db.prepare(`UPDATE agent_door_approvals SET state=?,result=${stored.sql} WHERE id=? AND json_extract(saved,'$.tombstone') IS NULL`).bind(state, stored.value, id),
+    ...(saved.key === null ? [] : [rt.options.db.prepare(`UPDATE agent_door_calls SET state=?,outcome=${stored.sql},expires_at=coalesce(expires_at,?) WHERE agent=? AND key=?`).bind(result.outcome, stored.value, rt.now() + REPLAY_WINDOW_MS, saved.principal.agent.id, saved.claimKey ?? saved.key)]),
   ])
   if (row.outcome === 'running') row.outcome = result.outcome
   outcomeRow(row, result); row.approval = { id, by }

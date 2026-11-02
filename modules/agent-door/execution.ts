@@ -65,8 +65,10 @@ export async function runTool(rt: Runtime, tool: ToolDefinition, args: Record<st
   }
 }
 export async function saveCall(rt: Runtime, principal: Principal, key: string | null, result: CallResult) {
-  if (key !== null) await rt.options.db.prepare('UPDATE agent_door_calls SET state=?,outcome=?,expires_at=coalesce(expires_at,?) WHERE agent=? AND key=?')
-    .bind(result.outcome, await retire(rt.options.db, result), result.outcome === 'pending' ? null : rt.now() + REPLAY_WINDOW_MS, principal.agent.id, key).run()
+  if (key === null) return
+  const stored = await retire(rt.options.db, result)
+  await rt.options.db.prepare(`UPDATE agent_door_calls SET state=?,outcome=${stored.sql},expires_at=coalesce(expires_at,?) WHERE agent=? AND key=?`)
+    .bind(result.outcome, stored.value, result.outcome === 'pending' ? null : rt.now() + REPLAY_WINDOW_MS, principal.agent.id, key).run()
 }
 
 export const revoked = (state: Awaited<ReturnType<typeof policyState>>, principal: Pick<Principal, 'agent' | 'consent'>) => state.revoked.agents.includes(principal.agent.id) || !!principal.consent && state.revoked.consents.includes(principal.consent)

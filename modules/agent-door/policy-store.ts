@@ -89,6 +89,7 @@ export async function localPolicy(rt: Runtime, request: Request): Promise<Respon
   if (document.spend && 'caps' in document.spend) return error('spend_caps_not_enforced', 409)
   const problems = completeness(document, declaredClasses(rt))
   if (problems.length) return error('policy_incomplete', 409, { problems })
-  const row = await rt.options.db.prepare('INSERT INTO agent_door_state(id,local_document,local_revision) VALUES(1,?,1) ON CONFLICT(id) DO UPDATE SET local_document=excluded.local_document,local_revision=agent_door_state.local_revision+1 RETURNING local_revision').bind(await retire(rt.options.db, document)).first<{ local_revision: number }>()
+  const stored = await retire(rt.options.db, document)
+  const row = await rt.options.db.prepare(`INSERT INTO agent_door_state(id,local_document,local_revision) VALUES(1,${stored.sql},1) ON CONFLICT(id) DO UPDATE SET local_document=excluded.local_document,local_revision=agent_door_state.local_revision+1 RETURNING local_revision`).bind(stored.value).first<{ local_revision: number }>()
   return json({ revision: row!.local_revision, complete: true })
 }
