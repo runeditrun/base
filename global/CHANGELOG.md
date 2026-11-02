@@ -1,9 +1,26 @@
 # Changelog
 
-## Unreleased
+## 0.2.97
 
-- Agent-door conformance accepts completed native continuation replays linked to their original work, while rejecting changed identities, item keys, effect facts or policy evidence.
-- Erasing an operator can now retire policy references without changing the signed policy. Existing approvals keep waiting, later deliveries keep the door live, and Agents shows when a replacement is needed.
+### Seed-door decision relay
+
+- The relay's page sizing work is now bounded: each page is sized from the decisions it holds without rebuilding the whole page for every candidate, and page edges, cursor and `more` stay identical to before.
+- Business custody is documented where adopters read it. For each relayed decision the Business holds only the 17-key public projection, including raw resource URIs for records the decision touched, readable only by the owner of the Business. Erasing the record purges the live projection through the next tombstone pull; unpairing, re-pairing or stopping the seed purges that installation's Business copy. The seed keeps no additional copy beyond its own audit and the bounded relay feed (one row per decision). Adopters record this external custody store in their erasure reporting.
+
+### Upgrading a seed that already adopted the agent door
+
+- `modules/agent-door/ADOPTING.md` has a documented upgrade path for a copy at an earlier schema, from `rer-v0.2.93`, `rer-v0.2.94`, `rer-v0.2.95` or `rer-v0.2.96`: a table of the additive SQL each starting release needs, checked with `PRAGMA table_info` before it is written, and put in one new numbered migration. A seed that applied only the relay migration on an older schema fails `BASE-AGENT-009.relay.count`, because tool admission reads `agent_door_calls.expires_at`. A frozen-schema upgrade test executes the documented SQL against the tagged 0.2.93, 0.2.95 and 0.2.96 schemas and compares the result with the schema applied fresh.
+
+### Conformance
+
+- Agent-door conformance accepts completed native continuation replays linked to their original work. Before, a replayed delivery step was refused, which kept seeds with native delivery steps failing `rer verify`. A replay must link an earlier completed original with the same agent, sponsor, consent, client, operation, tool, native item, public key, classes and target; changed identities, item keys, effect facts or policy evidence are still rejected. Its current policy is checked independently, and erased evidence still needs the verifier's pre-erasure snapshot.
+
+### Erasing an operator
+
+- Erasing an operator now retires the policy person references to them instead of editing the signed policy. Each exact reference in unsigned local policy and in stored copies becomes the marker `person:erased:<erasure_id>`, which matches nobody; a concurrent write by a peer can never store the raw reference. Required approvals stay pending until they expire, and retirement never drops an approver or changes the local revision.
+- The one signed Business policy envelope is kept as delivered, because the seed cannot edit or re-sign it, only until the Business delivers a policy that no longer names the reference. The seed also keeps a value-free, domain-separated SHA-256 suppression digest and the erasure marker so the retirement holds across later deliveries and archive restore; no name, email or phone is stored. Later deliveries that still name the retired person do not darken the door. Report both retained items under `BASE-DATA-006`.
+- Agents shows a replacement notice when a retired approver or reviewer is still in force (`policy.pending_retirement` in `GET /agents/api/state`), linking to the Business policy when paired or to the local editor. The Business must deliver a policy without the reference; in local policy the marker stays until the owner chooses a replacement.
+- Seeds that refresh to 0.2.97 and erase operators must land migration `0041_agent_retired_refs.sql` (the `agent_door_retired_refs` table; it travels in installation archives, so do not add it to portability exclusions), list that table in the native artifact map as the reference seed does, declare `agent_door_state` with `retire: { refs: 'policyRefs' }`, pass `subject.policyRefs` from `operatorPolicyRefs`, and put `agentErasureStatements` in the same native erasure batch. Recipe: `modules/agent-door/ADOPTING.md`.
 
 ## 0.2.96
 
