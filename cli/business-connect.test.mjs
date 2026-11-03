@@ -591,6 +591,11 @@ test('connect starts and resumes device approval, respects poll intervals and pr
  assert.equal((await approve(remote)).status, 200);
  delete remote.state.pairingSeconds;
  await delay(1100);
+ const collecting = await readPending(), collectionStarts = starts(remote);
+ const legacyWhileCollecting = await cli(home, ['business', 'connect', '--code', 'ABCD-1234', '--origin', remote.origin]);
+ assert.equal(legacyWhileCollecting.code, 1);
+ assert.equal((await readPending()).device_code, collecting.device_code, 'another flow cannot discard a live collection window');
+ assert.equal(starts(remote), collectionStarts);
  assert.equal((await cli(home, ['business', 'connect', ...args])).code, 0);
  assert.equal((await cli(home, ['business', 'disconnect'])).code, 0);
 
