@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.97-dev.g12acc5df",
+  "cliVersion": "0.2.97-dev.g197188e3",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4595,7 +4595,7 @@
     },
     "modules/owner-claim/README.md": {
       "source": "modules/owner-claim/README.md",
-      "sha256": "ab3ead07f6a21347c4f084c48acbdd5d62ee9abc711982cc09ffb1c53f239459"
+      "sha256": "f447d301b0217b642c66af28119dd86dddb02626fd750ff3da3896b75dbe84e1"
     },
     "modules/owner-claim/idp.mjs": {
       "source": "modules/owner-claim/idp.mjs",
@@ -4603,11 +4603,11 @@
     },
     "modules/owner-claim/index.d.mts": {
       "source": "modules/owner-claim/index.d.mts",
-      "sha256": "33fc8d1b756cb2c0a4317ea4dbc29ae704dd137f76993278859d98ae5e9ad184"
+      "sha256": "388b1995697b8f31747bbc0974fe22044b2c00e7b6a3277f38ca0894e0f120d2"
     },
     "modules/owner-claim/index.mjs": {
       "source": "modules/owner-claim/index.mjs",
-      "sha256": "71e4b0f9f967981146dd1daa5f6b14ab30f577adac4901c8e3d47bb8a5a76991"
+      "sha256": "14c2614d1a640864ce7a7ed0ab123edc434ed8bbb65f95e5183c03ffebdca3e6"
     },
     "modules/owner-claim/page.mjs": {
       "source": "modules/owner-claim/page.mjs",

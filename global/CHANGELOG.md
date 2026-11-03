@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep owner sessions and other auth routes available after setup-token retirement; the owner-claim route answers 409 `claim_unavailable` for every method.
 - Redact local dev sign-in keys from every captured launch log and event, including repository setup output, and keep mixed text and JSON capture in order while preserving the private link delivered to the caller.
 
 ## 0.2.97
