@@ -1,4 +1,3 @@
-import { createWriteStream } from 'node:fs';
 import { realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse } from '../../cli/parse.mjs';
@@ -9,6 +8,7 @@ import { checkoutRepository, runCommand } from './repository.mjs';
 import { ownRoot } from '../package-info.mjs';
 import { prepare } from '../launch/prepare.mjs';
 import { launchDirectory } from '../launch/state.mjs';
+import { captureFile } from '../launch/capture.mjs';
 
 export async function repoCommand(request) {
  const { verb, directory, args } = request;
@@ -22,7 +22,7 @@ export async function repoCommand(request) {
  if (verb === 'setup') {
   await (await import('../../cli/business/carry.mjs')).refreshCheckout(root);
   const state = await launchDirectory(root), children = new Set(), controller = new AbortController();
-  const log = createWriteStream(join(state, 'launch.log'), { flags: 'a', mode: 0o600 });
+  const log = await captureFile(root, join(state, 'launch.log'));
   const handlers = new Map(['SIGINT', 'SIGTERM'].map(signal => [signal, () => { controller.abort(); for (const child of children) child.kill(signal); }]));
   for (const [signal, handler] of handlers) process.on(signal, handler);
   try {
@@ -31,7 +31,7 @@ export async function repoCommand(request) {
    await result.release?.();
   } finally {
    for (const [signal, handler] of handlers) process.off(signal, handler);
-   log.end();
+   await log.close();
   }
  } else {
   if (verb === 'dev' && !args.includes('--json')) process.stdout.write(`Restart: ${next('dev')}\n`);

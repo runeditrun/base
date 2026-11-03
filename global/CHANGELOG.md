@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Redact local dev sign-in keys from every captured launch log and event while preserving the private link delivered to the caller.
+- Redact local dev sign-in keys from every captured launch log and event, including repository setup output, and keep mixed text and JSON capture in order while preserving the private link delivered to the caller.
 
 ## 0.2.97
 

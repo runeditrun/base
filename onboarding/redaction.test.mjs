@@ -1,3 +1,7 @@
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { captureFile } from '../global/launch/capture.mjs';
 import { generateKeyPairSync } from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -130,4 +134,21 @@ test('deploy secret binding recovery commands remain usable while values remain 
   assert.match(result, /--set-secret SESSION_SECRET/);
   absent(result, ['synthetic-private-value']);
  }
+});
+
+test('capture keeps text tails and redacted JSON lines in write order', async t => {
+ const root = await mkdtemp(join(tmpdir(), 'rer-capture-order-')), path = join(root, 'launch.log');
+ t.after(() => rm(root, { recursive: true, force: true }));
+ // A possible wrapped key prefix holds the final digit and newline.
+ const key = '7SyntheticCaptureSentinel_AaBbCcDdEeFfGgHhIiJjKk';
+ await mkdir(join(root, '.rer/local'), { recursive: true });
+ await writeFile(join(root, '.rer/local/dev-key.env'), `RER_DEV_KEY=${key}\n`);
+ const log = await captureFile(root, path);
+ log.write('Listening on port 8787\n');
+ log.line(JSON.stringify({ event: 'ready', opaque: key, url: 'http://localhost/#rer-dev=synthetic-capture-key' }));
+ log.line('AFTER_MARKER');
+ await log.close();
+ const output = await readFile(path, 'utf8');
+ t.diagnostic('F2 capture output: ' + JSON.stringify(output));
+ assert.equal(output, 'Listening on port 8787\n' + JSON.stringify({ event: 'ready', opaque: '[REDACTED]', url: 'http://localhost/#rer-dev=[REDACTED]' }) + '\nAFTER_MARKER\n');
 });
