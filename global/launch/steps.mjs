@@ -44,7 +44,7 @@ export async function runVerb(entry, args, { root, env, note, log, children, sig
 // output is parsed in memory; only redacted bytes reach either captured log.
 export async function startServer(entry, args, { root, env, logPath, children, signal, note = () => {} }) {
  signal?.throwIfAborted();
- const capture = await captureFile(root, logPath, env);
+ const capture = await captureFile(root, logPath);
  let child;
  try { child = spawn(process.execPath, [entry, 'dev', ...args, '--json'], { cwd: root, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }); }
  catch (error) { await capture.close(); throw error; }

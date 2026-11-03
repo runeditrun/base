@@ -1,12 +1,11 @@
 import { open } from 'node:fs/promises';
 import { readDevKey } from '../../cli/dev-identity.mjs';
-import { createRedaction, credentialValues } from '../../onboarding/redaction.mjs';
+import { createRedaction } from '../../onboarding/redaction.mjs';
 
 // The generated key is not in the launcher's environment. Setup may create it
 // after capture begins, so register it before each queued write until it exists.
-export function launchRedaction(root, env = process.env) {
+export function launchRedaction(root) {
  const redaction = createRedaction({ wrappedSecrets: true });
- redaction.addSecrets(credentialValues(env));
  let key;
  const clean = value => typeof value === 'string' ? redaction.redact(value)
   : Array.isArray(value) ? value.map(clean)
@@ -19,8 +18,8 @@ export function launchRedaction(root, env = process.env) {
 
 // Both server streams and preparation output pass here before reaching disk.
 // JSON is redacted by value, preserving parseable progress events.
-export async function captureFile(root, path, env = process.env) {
- const redaction = launchRedaction(root, env), file = await open(path, 'a', 0o600);
+export async function captureFile(root, path) {
+ const redaction = launchRedaction(root), file = await open(path, 'a', 0o600);
  let queued = Promise.resolve(), writes = Promise.resolve();
  const append = text => { writes = writes.then(() => file.appendFile(text)); void writes.catch(() => {}); };
  const stream = redaction.stream(append);
