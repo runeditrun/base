@@ -13,6 +13,7 @@ import { appendFile, link, mkdir, readFile, readdir, realpath, rm, writeFile } f
 import { join } from 'node:path';
 import { processInfo } from '../../modules/job-queue/processes.mjs';
 import { serversDirectory } from '../registry.mjs';
+import { launchRedaction } from './capture.mjs';
 
 import { launchPath } from '../../cli/checkout-preparation.mjs';
 export { launchPath };
@@ -115,9 +116,10 @@ export async function releaseLaunch(directory, token) {
  if (holder?.token === token) await rm(join(directory, 'worker.json'), { force: true });
 }
 
-export function eventLog(directory, token) {
+export function eventLog(directory, token, root = process.cwd()) {
  const path = join(directory, `events-${token}.jsonl`);
- return { path, write: event => appendFile(path, JSON.stringify({ at: Date.now(), ...event }) + '\n', { mode: 0o600 }) };
+ const redaction = launchRedaction(root);
+ return { path, async write(event) { await redaction.refresh(); await appendFile(path, JSON.stringify(redaction.clean({ at: Date.now(), ...event })) + '\n', { mode: 0o600 }); } };
 }
 
 // { state: 'running' | 'done' | 'failed', ... } for the last install or setup

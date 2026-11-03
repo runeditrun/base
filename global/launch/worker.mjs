@@ -6,7 +6,6 @@
 // claimed the launch, the stop request it reads right after claiming. Either
 // way no further step starts, the running one is signalled, and the launch
 // reports that it was stopped instead of ready.
-import { createWriteStream } from 'node:fs';
 import { realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { processInfo } from '../../modules/job-queue/processes.mjs';
@@ -15,9 +14,10 @@ import { LaunchFailure, workerFailure } from './failure.mjs';
 import { prepare } from './prepare.mjs';
 import { claimLaunch, eventLog, launchDirectory, liveWorker, releaseLaunch, serverRecord, stopRequest } from './state.mjs';
 import { startServer } from './steps.mjs';
+import { captureFile } from './capture.mjs';
 
 const [root, token, argsJSON, requestedAtText, mode] = process.argv.slice(2), args = JSON.parse(argsJSON), requestedAt = Number(requestedAtText), doorStart = mode === 'door-start';
-const checkout = await realpath(root), directory = await launchDirectory(checkout), events = eventLog(directory, token);
+const checkout = await realpath(root), directory = await launchDirectory(checkout), events = eventLog(directory, token, root);
 // Listening before the claim: a stop may signal this worker as soon as it is the holder.
 const children = new Set(), stopping = new AbortController();
 const stop = () => { stopping.abort(); for (const child of children) child.kill('SIGTERM'); };
@@ -27,8 +27,9 @@ if (!await claimLaunch(directory, token)) {
  const holder = await liveWorker(directory);
  await events.write({ event: 'redirect', token: holder?.token });
 } else {
- const logFile = createWriteStream(join(directory, 'launch.log'), { flags: 'a', mode: 0o600 });
+ const logFile = await captureFile(root, join(directory, 'launch.log'));
  const log = text => logFile.write(text + '\n');
+ let started;
  try {
   if (await stopRequest.covers(directory, requestedAt)) stop();
   stopping.signal.throwIfAborted();
@@ -37,7 +38,6 @@ if (!await claimLaunch(directory, token)) {
   // A server rer started logs to server.log; asking a running one for its
   // ready lines goes to reuse.log, and names server.log only when rer started it.
   const serverLog = join(directory, 'server.log');
-  let started;
   try { started = await startServer(prepared.entry, args, { root, env: { ...process.env, ...prepared.added }, logPath: prepared.own ? join(directory, 'reuse.log') : serverLog, children, signal: stopping.signal, note: message => events.write({ event: 'phase', phase: 'note', message }) }); }
   finally { await prepared.release?.(); }
   const record = (await liveServers(process.env)).find(item => item.checkout === checkout);
@@ -45,7 +45,7 @@ if (!await claimLaunch(directory, token)) {
   // The server's PID, and the process rer spawned for it (the same one unless
   // the pin re-runs itself under its own Node), each with its start time.
   const identity = async id => ({ pid: id, start: (await processInfo(id))?.start });
-  if (!prepared.own) await serverRecord.write(directory, { ...await identity(pid), spawned: await identity(started.pid) });
+  if (!prepared.own) await serverRecord.write(directory, { ...await identity(pid), spawned: await identity(process.pid) });
   const ours = !prepared.own || (await serverRecord.read(directory))?.pid === pid;
   // A stop that arrived while the server came up finds it registered and
   // stops it; this launch reports the stop rather than a server about to end.
@@ -57,6 +57,9 @@ if (!await claimLaunch(directory, token)) {
   await events.write({ event: 'failed', exitCode: failure.exitCode, message: failure.message, error: failure.event });
  } finally {
   await releaseLaunch(directory, token);
-  logFile.end();
+  await logFile.close();
  }
+ // Release preparation custody at ready, but continue redacting output until
+ // the registered server exits. Repeated launches can prepare independently.
+ await started?.closed;
 }

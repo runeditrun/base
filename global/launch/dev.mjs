@@ -5,7 +5,7 @@
 // --detach and --foreground override the choice.
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { createWriteStream, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { open, realpath, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -24,6 +24,7 @@ import { shellQuote } from '../../cli/node-runtime-cache.mjs';
 import { showBudget } from '../../cli/run-transfers.mjs';
 import { stopLaunch } from './stop.mjs';
 import { launchDirectory, liveWorker } from './state.mjs';
+import { captureFile } from './capture.mjs';
 
 const workerPath = fileURLToPath(new URL('./worker.mjs', import.meta.url));
 
@@ -82,13 +83,13 @@ async function foreground(target, devArgs, directory, out, doorStart) {
   const code = await follow(directory, holder.token, out, { quiet: true });
   if (code !== 0) return code;
  }
- const log = createWriteStream(join(directory, 'launch.log'), { flags: 'a', mode: 0o600 });
+ const log = await captureFile(target.root, join(directory, 'launch.log'));
  let prepared;
  // The same progress lines as a detached launch while install or setup runs.
  const heartbeat = setInterval(() => out.heartbeat(), 1000);
  try { prepared = await prepare({ root: target.root, args: devArgs, env: process.env, report: fields => out.phase(fields), directory, log: text => log.write(text + '\n'), children: new Set(), doorStart }); }
  catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; out.failure(failure); return failure.exitCode; }
- finally { clearInterval(heartbeat); log.end(); }
+ finally { clearInterval(heartbeat); await log.close(); }
  Object.assign(process.env, prepared.added);
  return delegateDev(target);
 }

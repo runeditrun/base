@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Redact local dev sign-in keys from every captured launch log and event while preserving the private link delivered to the caller.
+
 ## 0.2.97
 
 ### Seed-door decision relay

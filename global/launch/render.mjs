@@ -3,6 +3,8 @@ import { humanError } from '../../cli/human-error.mjs';
 // seconds (a `progress` event with --json), then the dispatcher's ready lines.
 import { readySummary } from '../../cli/ready-summary.mjs';
 import { launchSummary } from '../../cli/run-transfers.mjs';
+import { contained } from '../../cli/project.mjs';
+import { shared } from '../../cli/shared.mjs';
 
 const elapsed = ms => { const s = Math.round(ms / 1000); return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`; };
 const quiet = 20000;
@@ -26,6 +28,13 @@ export function printer({ json, stopHint, keyless = false, root }) {
   // The dispatcher's ready event, as its own human ready lines.
   async ready(ready, { log, pid }) {
    if (keyless) { const { openUrl, ...rest } = ready; ready = rest; }
+   else if (root && ready.openUrl && new URLSearchParams(new URL(ready.openUrl).hash.slice(1)).get('rer-dev') === '[REDACTED]') {
+    // The journal never transports the credential. Only the caller's final
+    // handoff reads the private link the dispatcher saved inside .rer/local.
+    const { readPrivateFile } = await shared('private-files.mjs');
+    const openUrl = (await readPrivateFile(await contained(root, '.rer/local/open-url', { privateFile: true }))).trim();
+    ready = { ...ready, openUrl, ...(ready.ownerOpenUrl ? { ownerOpenUrl: openUrl } : {}) };
+   }
    if (json) { event('server', { pid, log }); process.stdout.write(JSON.stringify(ready) + '\n'); return; }
    const out = root
     ? [...readySummary(ready), ...await launchSummary(root), '', 'Details for tools and troubleshooting:', `RER_READY ${ready.url}`]

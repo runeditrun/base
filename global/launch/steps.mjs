@@ -1,11 +1,9 @@
 // Run the pinned dispatcher's public verbs as children, reading its --json
 // events: install and setup to completion, and dev until its `ready` event.
 import { spawn } from 'node:child_process';
-import { createReadStream } from 'node:fs';
-import { open, stat } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
-import { setTimeout as delay } from 'node:timers/promises';
 import { LaunchFailure } from './failure.mjs';
+import { captureFile } from './capture.mjs';
 
 function events(line) { try { const value = JSON.parse(line); return value && typeof value === 'object' ? value : undefined; } catch { return undefined; } }
 
@@ -42,54 +40,35 @@ export async function runVerb(entry, args, { root, env, note, log, children, sig
  if (code !== 0) throw failureFrom(code, error, output);
 }
 
-// Follow a growing log file from an offset, line by line.
-async function follow(path, from, onLine, stopped) {
- let offset = from, rest = '';
- while (!stopped()) {
-  const size = (await stat(path)).size;
-  if (size > offset) {
-   const handle = await open(path, 'r');
-   try {
-    const { buffer, bytesRead } = await handle.read({ buffer: Buffer.alloc(size - offset), position: offset });
-    offset += bytesRead; rest += buffer.subarray(0, bytesRead).toString('utf8');
-   } finally { await handle.close(); }
-   const parts = rest.split('\n'); rest = parts.pop();
-   for (const line of parts) if (onLine(line)) return;
-  }
-  await delay(200);
- }
-}
-
-// Start `dev` detached into its own process group with its output in a private
-// log, and return its ready event once it prints one. The server outlives this
-// process and stops on rer dev --stop or its idle timeout.
+// Keep the worker as the capture owner for the server's whole lifetime. Raw
+// output is parsed in memory; only redacted bytes reach either captured log.
 export async function startServer(entry, args, { root, env, logPath, children, signal, note = () => {} }) {
  signal?.throwIfAborted();
- const handle = await open(logPath, 'a', 0o600), from = (await handle.stat()).size;
- let child, exit, spawnError;
- // Listening before anything is awaited: a spawn that fails reports it on the next tick.
- try {
-  child = spawn(process.execPath, [entry, 'dev', ...args, '--json'], { cwd: root, env, detached: true, stdio: ['ignore', handle.fd, handle.fd] });
-  child.once('error', failure => { spawnError = failure; exit ??= 1; });
-  child.once('exit', (code, name) => { exit = code ?? (name ? 128 : 1); });
- } finally { await handle.close(); }
+ const capture = await captureFile(root, logPath, env);
+ let child;
+ try { child = spawn(process.execPath, [entry, 'dev', ...args, '--json'], { cwd: root, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }); }
+ catch (error) { await capture.close(); throw error; }
  own(children, child, signal);
- let ready, error, output = '';
- await follow(logPath, from, line => {
+ let ready, error, output = '', spawnError, resolveReady;
+ const announced = new Promise(resolve => { resolveReady = resolve; });
+ const lines = createInterface({ input: child.stdout });
+ lines.on('line', line => {
   const event = events(line);
-  if (event?.event === 'ready') { ready = event; return true; }
+  capture.line(line);
+  if (event?.event === 'ready') { ready = event; resolveReady(); }
   if (event?.event === 'error') error = event;
-  // rer dev --door / --direct: where the checkout moved.
   if (event?.event === 'moved') note(`moved this checkout from ${event.from} to ${event.to}; its data is kept`);
   if (!event) output = (output + line + '\n').slice(-8192);
-  return false;
- }, () => exit !== undefined);
- if (!ready) {
-  // Read whatever the exiting dispatcher wrote last.
-  for await (const line of createInterface({ input: createReadStream(logPath, { start: from }) })) { const event = events(line); if (event?.event === 'ready') ready = event; if (event?.event === 'error') error = event; }
- }
- children.delete(child);
+ });
+ child.stderr.on('data', data => { output = (output + data).slice(-8192); capture.write(data); });
+ child.once('error', failure => { spawnError = failure; });
+ const closed = new Promise((resolve, reject) => child.once('close', async (code, name) => {
+  children.delete(child);
+  try { await capture.close(); resolve(code ?? (name ? 128 : 1)); } catch (error) { reject(error); }
+ }));
+ // A write failure must also reach the worker after it has announced readiness.
+ void closed.catch(() => {});
+ const exit = await Promise.race([announced, closed]);
  if (!ready) throw failureFrom(exit, error, spawnError ? `rer could not run in ${root}: ${spawnError.code ?? spawnError.message}.` : output);
- child.unref();
- return { ready, pid: child.pid, reused: exit === 0 };
+ return { ready, pid: child.pid, closed };
 }

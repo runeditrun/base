@@ -134,6 +134,18 @@ test('an installed rer launches the package-mode default-seed reference with one
  assert.ok(parseEnv(retained).OWNER_PASSWORD, 'failed setup saved its generated owner password');
  assert.deepEqual(localData(root).owners, [], 'failed setup has not claimed an owner');
  await rm(join(root, 'fail-before-owner'));
+ // A test credential, never an owner's key. The real runtime and browser use
+ // it, while adapter diagnostics exercise each captured output representation.
+ const devKey = 'RerCaptureSentinel_AaBbCcDdEeFfGgHhIiJjKkLlMmNn';
+ await writeFile(join(root, '.rer/local/dev-key.env'), `RER_DEV_KEY=${devKey}\n`);
+ const adapterPath = join(root, 'scripts/installer/local.mjs');
+ const escapedKey = [...devKey].map(character => '%' + character.charCodeAt(0).toString(16)).join('');
+ await writeFile(adapterPath, await readFile(adapterPath, 'utf8') + `
+if (process.argv[2] === 'dev' && !process.argv.includes('--stop')) {
+ process.stdout.write(JSON.stringify({ event: 'capture-fixture', opaque: ${JSON.stringify(devKey)}, url: ${JSON.stringify('http://127.0.0.1/#rer-dev=' + devKey)}, query: ${JSON.stringify('http://127.0.0.1/?rer-dev=' + devKey)}, encoded: ${JSON.stringify(escapedKey)} }) + '\\n');
+ process.stderr.write(${JSON.stringify(devKey.slice(0, 19) + '\n  ' + devKey.slice(19) + '\n')});
+}
+`);
  // Not a terminal: the one command prepares, starts, prints and returns.
  const launched = await fromRepo(['--port', String(port)]);
  assert.equal(launched.code, 0, 'rer dev resumes the saved owner claim: ' + launched.stderr + launched.stdout);
@@ -148,6 +160,7 @@ test('an installed rer launches the package-mode default-seed reference with one
  const serverLog = launched.stdout.match(/^Server log \(private\): (.+)$/m)[1];
  for (const text of [interrupted.stdout, interrupted.stderr, launched.stdout, launched.stderr, await readFile(serverLog, 'utf8'), await readFile(join(serverLog, '../launch.log'), 'utf8')]) assert.ok(!text.includes(settings.OWNER_PASSWORD), 'the generated value is never printed or logged');
  const lines = Object.fromEntries(launched.stdout.split('\n').filter(line => /^RER_[A-Z_]+ /.test(line)).map(line => [line.split(' ')[0], line.slice(line.indexOf(' ') + 1)]));
+ assert.ok(lines.RER_OPEN.includes(devKey), 'the private link still reaches the caller');
  assert.equal(lines.RER_READY, url);
  assert.equal(lines.RER_SIGNED_IN, 'owner@seed-with-spaces.test');
  assert.equal((await fetch(url + '/health')).status, 200, 'the server keeps running after rer dev returns');
@@ -157,6 +170,13 @@ test('an installed rer launches the package-mode default-seed reference with one
  const repeated = await run(rer, ['dev'], { cwd: root, env });
  assert.equal(repeated.code, 0, repeated.stderr + repeated.stdout);
  assert.ok(repeated.stdout.split('\n').includes(`RER_SITE ${lines.RER_SITE}`), 'a repeated rer dev reprints RER_SITE');
+ assert.ok(repeated.stdout.includes(lines.RER_OPEN), 'reuse still delivers the private link');
+ for (const name of await readdir(dirname(serverLog))) {
+  const text = await readFile(join(dirname(serverLog), name), 'utf8');
+  assert.ok(!text.replace(/\s/g, '').includes(devKey), 'no captured file contains the dev key, including wrapped output');
+  assert.ok(!text.includes(escapedKey), 'no captured file contains the URL-encoded dev key');
+  if (name.startsWith('events-')) for (const line of text.trim().split('\n')) JSON.parse(line);
+ }
 
  const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--use-mock-keychain', '--password-store=basic', ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? ['--no-sandbox'] : [])] });
  try {
