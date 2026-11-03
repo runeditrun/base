@@ -25,6 +25,9 @@ const nothingSent = 'Nothing was sent, so the pairing code still works.';
  */
 export async function connect(options = {}) {
  const pending = await loadPending();
+ // Approval can outlive the original code deadline. A legacy command must
+ // not discard a device pairing that is still within its collection window.
+ if (pending?.flow === 'device' && options.code !== undefined && Date.parse(pending.keep_until) > Date.now()) throw Error('Business is already waiting for a device pairing. Resume that command, or run business disconnect before using another code.');
  if (options.business !== undefined || pending?.flow === 'device' && options.code === undefined) return connectDevice(options);
  return connectLegacy(options);
 }

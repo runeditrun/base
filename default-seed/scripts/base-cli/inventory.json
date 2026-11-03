@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.97-dev.g12acc5df",
+  "cliVersion": "0.2.97-dev.g9f59667d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -523,7 +523,7 @@
     },
     "cli/business/connect.mjs": {
       "source": "cli/business/connect.mjs",
-      "sha256": "71da63b1048dc0f8af671d3e700891ae44be1710e52763987ef07c1e8362a497"
+      "sha256": "9fd400ff6a78d58f211e0bd046fa6308cea368bb7ed4719a33c55fcf6579caba"
     },
     "cli/business/detector.mjs": {
       "source": "cli/business/detector.mjs",
