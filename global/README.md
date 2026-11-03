@@ -460,33 +460,49 @@ or use its stored device credential.
 
 ## Business device commands
 
-`rer business connect --code ABCD-1234 [--origin https://app.runeditrun.com]`
-redeems a browser-created code, prints a six-digit confirmation number for
-approval in the browser that created it, and waits in the foreground until the
-owner approves or refuses there or the code expires (ten minutes). It exits 0
-only once the computer is active: the credential is stored and the server has
-seen the computer. A refusal or expiry exits 1 with the server's reason.
-Interrupting it (Ctrl-C, or an agent's tool timeout) keeps the redeemed pairing:
-run `rer business connect` again to resume the same pairing and number; a new
-server pairing is never started until the old one is refused, expired or
-disconnected. The waiting line names the command that works from the agent's
-own shell: `rer` when it is on PATH, the launcher install.sh wrote, or
-`npx -y @runeditrun/rer` after an npx run. Pending tokens are kept until the
-code's expiry plus the ten minutes the server allows after an approval, so an
-approval near the code's end can still be collected.
+`rer business connect --business ID [--origin https://app.runeditrun.com] [--timeout 30]`
+starts a pairing on this computer and prints two fixed lines first:
 
-State lives in `$RER_BUSINESS_STATE_DIR` when it is set, and in `~/.rer/business`
-otherwise. `RER_STATE_DIR` is `rer demo`'s variable and Business never reads it.
-Connect also sends the computer's plain name (its host name's first word group,
-without the login name, at most 64 characters) and the folder it runs in, so the
-browser can show which computer this is and prefill the scan folder.
-Before redeeming the code (or collecting an approval), connect proves
-it can write that folder and that OS credential storage accepts a write; if
-either fails it stops, names the folder or the cause, and the code still works.
-Device credentials stay in macOS Keychain or Linux Secret Service; there is no
+```text
+Code: WDJB-MJHT
+Approve at: https://app.runeditrun.com/business/ID/pair#WDJB-MJHT
+```
+
+Take the Business ID and origin from the Business Connect page's prompt. Show
+the owner both lines exactly as printed. The owner opens the link signed in as
+an owner of that Business, checks the code against this computer and approves
+there. No code or confirmation number needs to come back through chat. The
+code travels in the link's fragment, so it is not sent in a request URL.
+
+Connect never prompts or requires a TTY. It checks state-folder writes and OS
+credential storage before starting, then polls at the server's interval,
+including any increased interval after `slow_down`. Without `--timeout`, it
+waits until the pairing ends. `--timeout` accepts an integer from 0 to 900;
+when the wait ends first, exit 75 means still waiting. Run the same command
+again: it prints the same code and link and resumes the saved pairing.
+Ctrl-C and SIGTERM also keep it, exiting 130 and 143. Exit 0 means the credential
+was stored and the server has seen the connected computer; exit 1 means refusal,
+expiry, an already-used pairing or another failure, and exit 2 means bad usage.
+Network failures keep the pairing for retry. Terminal server refusals remove it.
+Pairings are kept through the original deadline plus the ten-minute collection
+window, so an approval near the code's end can still be collected.
+
+State lives in `$RER_BUSINESS_STATE_DIR` when set, otherwise `~/.rer/business`.
+`RER_STATE_DIR` belongs to `rer demo` and Business never reads it. The short-lived
+device code and displayed code are kept only in private `pairing.json` (0600),
+removed when pairing ends. Device credentials remain in macOS Keychain or Linux
+Secret Service under the existing per-origin, per-Business account; there is no
 plaintext credential store. Linux needs `secret-tool` and an unlocked desktop
-Secret Service session. Every failure names its cause: the server's reason, the
-local system cause, or what to change.
+Secret Service session. Connect refuses a state folder already connected to a
+different origin or Business: disconnect first or use a separate
+`RER_BUSINESS_STATE_DIR`. It reports this computer's plain name, working folder,
+agent and OS (including WSL) for the owner to recognise.
+
+For older Business pages, `rer business connect --code ABCD-1234 --origin URL`
+keeps the browser-created code and six-digit confirmation-number flow unchanged
+in 0.2.98. It cannot be combined with `--business` or `--timeout`. Removal is
+planned for 0.2.99 after the production rollback target uses device pairing.
+The install.sh form still passes either connect command through unchanged.
 
 The owner chooses three things on the computer's row in the browser: "Add rules
 so Claude Code never reads your secret files" (Claude Code user Read deny
@@ -508,12 +524,12 @@ pairing state are stored, so a storage failure cannot activate the computer.
 A service installed with `RER_BUSINESS_STATE_DIR` set keeps that folder. Background
 services use absolute Node and CLI paths. No model process is started.
 
-An agent can run `npx -y @runeditrun/rer business connect --code ABCD-1234 --origin URL`
+An agent can run `npx -y @runeditrun/rer business connect --business ID --origin URL --timeout 30`
 directly, without a global installation. In Codex's workspace-write sandbox,
 allow network access, set `RER_BUSINESS_STATE_DIR="$PWD/.rer-business"` so state stays
 inside the working folder, and put npm's cache there too with
 `npm_config_cache="$PWD/.rer/npm"`. macOS refuses Keychain writes from inside
-that sandbox, so connect stops before redeeming and asks for this one command to
+that sandbox, so connect stops before starting and asks for this one command to
 run outside the sandbox (in Codex, approve running that command outside the
 sandbox when it asks); later commands
 only read the credential and run inside the sandbox. Do not install a

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Business pairing starts on the computer: `rer business connect --business ID` prints a code and an approve link, waits for browser approval and resumes the same pairing after a timeout or interruption. `--timeout` exits 75 while waiting; credentials still use OS credential storage. Older `--code` prompts keep working unchanged in this release.
+
 ## 0.2.97
 
 ### Seed-door decision relay

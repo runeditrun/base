@@ -1,4 +1,14 @@
 import { hostname, userInfo } from 'node:os';
+import { readFileSync } from 'node:fs';
+
+export function operatingSystem() {
+ if (process.platform === 'darwin') return 'macos';
+ if (process.platform === 'win32') return 'windows';
+ if (process.platform !== 'linux') return 'other';
+ if (process.env.WSL_DISTRO_NAME) return 'wsl';
+ try { if (/microsoft/i.test(readFileSync('/proc/sys/kernel/osrelease', 'utf8'))) return 'wsl'; } catch { /* Ordinary Linux without procfs. */ }
+ return 'linux';
+}
 
 /** A plain name for this computer, from its host name: the first label only,
  * words instead of dashes, the login name removed, at most 64 characters, and

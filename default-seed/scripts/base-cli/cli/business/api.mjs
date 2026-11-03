@@ -14,15 +14,15 @@ export function originUrl(value = 'https://app.runeditrun.com') {
 // The server's own reason travels with its status: platform errors answer
 // {error, requestId}. It is shown as one bounded line of text, never as markup.
 export class ApiError extends Error {
- constructor(status, reason = null, requestId = null) {
+ constructor(status, reason = null, requestId = null, code = null) {
   const said = reason ? ` The server said: ${reason}${/[.!?]$/.test(reason) ? '' : '.'}` : '';
   const reference = requestId ? ` Reference ${requestId}.` : '';
   super((status === 401 ? 'Business pairing was revoked or expired. Reconnect in your browser.' : `Business server refused the request (HTTP ${status}).`) + said + reference);
-  this.status = status; this.reason = reason; this.requestId = requestId;
+  this.status = status; this.reason = reason; this.requestId = requestId; this.code = code;
  }
 }
 
-async function refusal(response) {
+async function refusal(response, quiet = false) {
  let text = '';
  try { text = (await response.text()).slice(0, 4096); } catch { /* The status alone is the reason. */ }
  let body = null;
@@ -30,7 +30,10 @@ async function refusal(response) {
  const line = value => typeof value === 'string' && value.trim() ? redact(value).replace(/\s+/g, ' ').trim().slice(0, 300) : null;
  const reason = body && typeof body === 'object' ? line(body.error) ?? line(body.message) : /^\s*</.test(text) ? null : line(text);
  const requestId = body && typeof body === 'object' && typeof body.requestId === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(body.requestId) ? body.requestId : null;
- return new ApiError(response.status, reason, requestId);
+ const code = typeof body?.code === 'string' && /^[a-z][a-z0-9_]{0,79}$/.test(body.code) ? body.code : null;
+ // Pairing responses can echo secrets, including the short user code. Only
+ // the bounded machine code is needed by that flow, never server prose.
+ return new ApiError(response.status, quiet ? null : reason, quiet ? null : requestId, code);
 }
 
 const network = {
@@ -62,12 +65,12 @@ export class Api {
    || !Number.isFinite(Date.parse(result.expires_at)) || Date.parse(result.expires_at) <= Date.now()) throw Error('Business server returned an invalid scoped bearer.');
   return result;
  }
- async post(path, body, { token = this.credential, signal, timeout = 30_000, headers = {} } = {}) {
-  return this.request('POST', path, body, { token, signal, timeout, headers });
+ async post(path, body, { token = this.credential, signal, timeout = 30_000, headers = {}, withStatus = false, quiet = false } = {}) {
+  return this.request('POST', path, body, { token, signal, timeout, headers, withStatus, quiet });
  }
  async get(path) { return this.request('GET', path); }
  async delete(path) { return this.request('DELETE', path); }
- async request(method, path, body, { token = this.credential, signal, timeout = 30_000, headers = {} } = {}) {
+ async request(method, path, body, { token = this.credential, signal, timeout = 30_000, headers = {}, withStatus = false, quiet = false } = {}) {
   if (!path.startsWith('/api/business/') || path.includes('..') || path.includes('?') || path.includes('#')) throw Error('Invalid Business route.');
   let response;
   try {
@@ -77,7 +80,7 @@ export class Api {
     ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout),
    });
   } catch (error) { if (signal?.aborted) throw signal.reason; throw unreachable(this.origin, error); }
-  if (!response.ok) throw await refusal(response);
+  if (!response.ok) throw await refusal(response, quiet);
   // Successful bodies are untrusted: callers validate them and print only fields they template.
   if (response.status === 202 && response.headers.get('content-length') === '0' || response.status === 204) return null;
   const text = await response.text();
@@ -85,7 +88,8 @@ export class Api {
   if (text.length > 2_000_000) throw Error('Business response exceeded the limit.');
   let result;
   try { result = JSON.parse(text); } catch { throw Error('Business server returned an invalid response.'); }
-  return result && Object.hasOwn(result, 'data') ? result.data : result;
+  const value = result && Object.hasOwn(result, 'data') ? result.data : result;
+  return withStatus ? { status: response.status, body: value } : value;
  }
 }
 

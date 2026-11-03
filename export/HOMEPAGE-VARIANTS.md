@@ -333,8 +333,10 @@ lead `Setting up several tools?`, action `Set up your business once`, and href
 `https://app.runeditrun.com/business`. Today that hosted door requires sign-in;
 it is not an anonymous local Business setup. When the Business journey publishes
 at that same address, the chooser needs no destination change. The working CLI
-pairing command is `rer business connect --code CODE`; obtain the code in the
-hosted Business journey and approve the pairing there.
+pairing command is `rer business connect --business ID --timeout 30`; take the
+Business ID from the hosted Connect prompt. The computer prints a code and an
+approve link; open that link signed in as the Business owner, compare the code
+and approve there. Exit 75 means run the same command again to keep waiting.
 
 The primary local recipe is `startLine(run)`, derived from the repository in
 `RunData.clone`, not from setup form fields in `rer-setup.json`. Use this same
