@@ -9,7 +9,7 @@ export function launchRedaction(root) {
  let key;
  const clean = value => typeof value === 'string' ? redaction.redact(value)
   : Array.isArray(value) ? value.map(clean)
-  : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([name, item]) => [name, clean(item)])) : value;
+  : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([name, item]) => [redaction.redact(name), clean(item)])) : value;
  return {
   ...redaction, clean,
   async refresh() { if (!key) { key = await readDevKey(root); if (key) redaction.addSecrets([key]); } },

@@ -144,7 +144,7 @@ test('an installed rer launches the package-mode default-seed reference with one
  const escapedKey = [...devKey].map(character => '%' + character.charCodeAt(0).toString(16)).join('');
  await writeFile(adapterPath, await readFile(adapterPath, 'utf8') + `
 if (process.argv[2] === 'dev' && !process.argv.includes('--stop')) {
- process.stdout.write(JSON.stringify({ event: 'capture-fixture', opaque: ${JSON.stringify(devKey)}, url: ${JSON.stringify('http://127.0.0.1/#rer-dev=' + devKey)}, query: ${JSON.stringify('http://127.0.0.1/?rer-dev=' + devKey)}, encoded: ${JSON.stringify(escapedKey)} }) + '\\n');
+ process.stdout.write(JSON.stringify({ event: 'capture-fixture', [${JSON.stringify(devKey)}]: 'private field name', opaque: ${JSON.stringify(devKey)}, url: ${JSON.stringify('http://127.0.0.1/#rer-dev=' + devKey)}, query: ${JSON.stringify('http://127.0.0.1/?rer-dev=' + devKey)}, encoded: ${JSON.stringify(escapedKey)} }) + '\\n');
  process.stderr.write(${JSON.stringify(devKey.slice(0, 19) + '\n  ' + devKey.slice(19) + '\n')});
 }
 `);
