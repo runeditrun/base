@@ -105,7 +105,9 @@ test('an installed rer launches the package-mode default-seed reference with one
  // Turn the real exported app into a local bare remote. The public repository
  // form must clone it from outside a checkout, then reuse that clone on resume.
  const remote = join(directory, 'reference.git'), repo = pathToFileURL(remote).href;
- for (const args of [['init'], ['add', '--', '.', ':!node_modules'], ['-c', 'user.name=Journey', '-c', 'user.email=journey@example.test', 'commit', '-m', 'Reference fixture']]) {
+ // This disposable source is removed immediately after its bare clone; no
+ // background Git maintenance may still be writing into its object directory.
+ for (const args of [['init'], ['config', 'gc.auto', '0'], ['config', 'maintenance.auto', 'false'], ['add', '--', '.', ':!node_modules'], ['-c', 'user.name=Journey', '-c', 'user.email=journey@example.test', 'commit', '-m', 'Reference fixture']]) {
   const result = await run('git', args, { cwd: root, env });
   assert.equal(result.code, 0, result.stderr);
  }
