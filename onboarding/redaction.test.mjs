@@ -142,7 +142,7 @@ test('capture keeps text tails and redacted JSON lines in write order', async t 
  // A possible wrapped key prefix holds the final digit and newline.
  const key = '7SyntheticCaptureSentinel_AaBbCcDdEeFfGgHhIiJjKk';
  await mkdir(join(root, '.rer/local'), { recursive: true });
- await writeFile(join(root, '.rer/local/dev-key.env'), `RER_DEV_KEY=${key}\n`);
+ await writeFile(join(root, '.rer/local/dev-key.env'), `RER_DEV_KEY=${key}\n`, { mode: 0o600 });
  const log = await captureFile(root, path);
  log.write('Listening on port 8787\n');
  log.line(JSON.stringify({ event: 'ready', opaque: key, url: 'http://localhost/#rer-dev=synthetic-capture-key' }));

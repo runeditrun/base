@@ -134,7 +134,7 @@ test('an installed rer launches the package-mode default-seed reference with one
  // it, while adapter diagnostics exercise each captured output representation.
  const devKey = 'RerCaptureSentinel_AaBbCcDdEeFfGgHhIiJjKkLlMmNn';
  await mkdir(join(root, '.rer/local'), { recursive: true });
- await writeFile(join(root, '.rer/local/dev-key.env'), `RER_DEV_KEY=${devKey}\n`);
+ await writeFile(join(root, '.rer/local/dev-key.env'), `RER_DEV_KEY=${devKey}\n`, { mode: 0o600 });
  const adapterPath = join(root, 'scripts/installer/local.mjs');
  const escapedKey = [...devKey].map(character => '%' + character.charCodeAt(0).toString(16)).join('');
  await writeFile(adapterPath, `if (process.argv[2] === 'setup') process.stdout.write(${JSON.stringify('SETUP_CAPTURE_MARKER ' + devKey + '\n')});\n` + await readFile(adapterPath, 'utf8') + `
