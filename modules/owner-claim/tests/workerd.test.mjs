@@ -51,7 +51,8 @@ test('real workerd + D1: GET and every invalid claim have zero durable writes; v
   assert.equal(success.status, 303, await success.text());
   assert.equal(success.headers.get('location'), '/app/welcome');
   assert.match(success.headers.get('set-cookie'), /^__Host-operator_session=.*; Path=\/; HttpOnly; SameSite=Lax;/);
-  const session = await app.call('/auth/session', { cookie: success.headers.get('set-cookie').split(';')[0] });
+  const cookie = success.headers.get('set-cookie').split(';')[0];
+  const session = await app.call('/auth/session', { cookie });
   assert.equal(session.status, 200);
   const authenticated = await session.json();
   assert.equal(authenticated.operator.email, 'owner@example.com');
@@ -68,9 +69,38 @@ test('real workerd + D1: GET and every invalid claim have zero durable writes; v
   assert.ok(state.oa_limits.every(row => row.count === 1));
   assert.ok(!JSON.stringify(state).includes(valid));
   await noWrites(app, () => app.call(undefined, { method: 'POST', input: { token: valid } }), 409);
-  await app.restart();
+  await app.restart({ SETUP_TOKEN: undefined });
   const fresh = await mint();
-  await noWrites(app, () => app.call(undefined, { method: 'POST', input: { token: fresh } }), 409);
+  const stranger = await testKeys();
+  const retired = [];
+  for (const [name, path, options, status] of [
+    ['owner GET /app', '/app', { cookie }, 200],
+    ['owner GET /auth/session', '/auth/session', { cookie }, 200],
+    ['stranger GET /auth/session', '/auth/session', {}, 401],
+    ['stranger POST /auth/bootstrap', '/auth/bootstrap', { method: 'POST', input: { token: 'wrong', displayName: 'Stranger' } }, 403],
+    ['stranger GET /auth/bootstrap', '/auth/bootstrap', {}, 405],
+    ['GET /auth/owner-claim', '/auth/owner-claim', {}, 409],
+    ['trusted POST /auth/owner-claim', '/auth/owner-claim', { method: 'POST', input: { token: fresh } }, 409],
+    ['stranger POST /auth/owner-claim', '/auth/owner-claim', { method: 'POST', input: { token: await signClaim(stranger.privateKey) } }, 409],
+  ]) {
+    const before = await app.snapshot();
+    const response = await app.call(path, options);
+    retired.push({ name, path, status, response, before, after: await app.snapshot() });
+    t.diagnostic(`token retired: ${name} -> ${response.status}`);
+  }
+  for (const { name, path, status, response, before, after } of retired) {
+    assert.equal(response.status, status, `${name}: ${await response.clone().text()}`);
+    if (path === '/auth/owner-claim') {
+      assert.deepEqual(await response.json(), { error: 'claim_unavailable' });
+      assert.deepEqual(after, before, `${name}: all auth, claim and audit rows unchanged`);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.equal(response.headers.get('set-cookie'), null);
+    }
+  }
+  assert.equal(await retired[0].response.text(), 'Signed in');
+  const owner = await retired[1].response.json();
+  assert.equal(owner.operator.email, 'owner@example.com');
+  assert.equal(owner.operator.role, 'owner');
 });
 test('parallel claims commit exactly one owner, session, ledger and client rate increment', async t => {
   const app = await runtime(keys.publicKey); t.after(() => app.close());

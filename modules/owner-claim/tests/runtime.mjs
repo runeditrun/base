@@ -45,7 +45,7 @@ export async function runtime(publicKey, overrides = {}, claimOverrides = {}, op
         for (const table of [...tables, 'test_writes']) result[table] = (await db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()).results;
         return result;
       },
-      async restart() { await mf.dispose(); mf = initialize(); await mf.ready; db = await mf.getD1Database('DB'); },
+      async restart(authOverrides = {}) { await mf.dispose(); Object.assign(config.authConfig, authOverrides); mf = initialize(); await mf.ready; db = await mf.getD1Database('DB'); },
       async close() { await mf.dispose(); await rm(directory, { recursive: true, force: true }); },
     };
   } catch (error) { await mf.dispose(); await rm(directory, { recursive: true, force: true }); throw error; }
