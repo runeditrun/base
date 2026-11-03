@@ -28,7 +28,7 @@ export async function captureFile(root, path) {
   write(text) { queue(() => stream.write(text)); },
   line(text) {
    let event; try { event = JSON.parse(text); } catch {}
-   if (event && typeof event === 'object') queue(() => append(JSON.stringify(redaction.clean(event)) + '\n'));
+   if (event && typeof event === 'object') queue(() => stream.write(JSON.stringify(redaction.clean(event)) + '\n'));
    else queue(() => stream.write(text + '\n'));
   },
   async close() { try { await queued; stream.end(); await writes; } finally { await file.close(); } },

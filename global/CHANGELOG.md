@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Redact local dev sign-in keys from every captured launch log and event while preserving the private link delivered to the caller.
+- Redact local dev sign-in keys from every captured launch log and event, including repository setup output, and keep mixed text and JSON capture in order while preserving the private link delivered to the caller.
 - Business pairing starts on the computer: `rer business connect --business ID` prints a code and an approve link, waits for browser approval and resumes the same pairing after a timeout or interruption. `--timeout` exits 75 while waiting; credentials still use OS credential storage. Older `--code` prompts keep working unchanged in this release.
 
 ## 0.2.97

@@ -14,7 +14,7 @@ import '../../modules/container/adapters/d1-workerd-preload.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, statSync } from 'node:fs';
-import { access, cp, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { DatabaseSync } from '../../modules/container/adapters/d1-sqlite.mjs';
 import { parseEnv } from 'node:util';
 import { createRequire } from 'node:module';
@@ -26,6 +26,7 @@ import { packageReference } from '../../scripts/rer-package/reference.mjs';
 import { isolatedQueue } from '../../cli/fixtures/queue.mjs';
 import { freePort, run, sweep } from './harness.mjs';
 import { requireSavedOwnerInput } from './resume-owner.mjs';
+import { launchPath } from '../launch/state.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
 const { chromium } = createRequire(join(base, 'default-seed/package.json'))('@playwright/test');
@@ -129,25 +130,35 @@ test('an installed rer launches the package-mode default-seed reference with one
  password.localDefault = { generate: 'hex' };
  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
  await requireSavedOwnerInput(root);
- const interrupted = await fromRepo(['--port', String(port)]);
- assert.equal(interrupted.code, 1, 'the first setup fails before claiming the owner');
- await access(join(root, 'owner-hook-reached')).catch(error => { t.diagnostic(interrupted.stderr); throw error; });
- const retained = await readFile(join(root, '.dev.vars'), 'utf8');
- assert.ok(parseEnv(retained).OWNER_PASSWORD, 'failed setup saved its generated owner password');
- assert.deepEqual(localData(root).owners, [], 'failed setup has not claimed an owner');
- await rm(join(root, 'fail-before-owner'));
  // A test credential, never an owner's key. The real runtime and browser use
  // it, while adapter diagnostics exercise each captured output representation.
  const devKey = 'RerCaptureSentinel_AaBbCcDdEeFfGgHhIiJjKkLlMmNn';
- await writeFile(join(root, '.rer/local/dev-key.env'), `RER_DEV_KEY=${devKey}\n`);
+ await mkdir(join(root, '.rer/local'), { recursive: true });
+ await writeFile(join(root, '.rer/local/dev-key.env'), `RER_DEV_KEY=${devKey}\n`, { mode: 0o600 });
  const adapterPath = join(root, 'scripts/installer/local.mjs');
  const escapedKey = [...devKey].map(character => '%' + character.charCodeAt(0).toString(16)).join('');
- await writeFile(adapterPath, await readFile(adapterPath, 'utf8') + `
+ await writeFile(adapterPath, `if (process.argv[2] === 'setup') process.stdout.write(${JSON.stringify('SETUP_CAPTURE_MARKER ' + devKey + '\n')});\n` + await readFile(adapterPath, 'utf8') + `
 if (process.argv[2] === 'dev' && !process.argv.includes('--stop')) {
  process.stdout.write(JSON.stringify({ event: 'capture-fixture', [${JSON.stringify(devKey)}]: 'private field name', opaque: ${JSON.stringify(devKey)}, url: ${JSON.stringify('http://127.0.0.1/#rer-dev=' + devKey)}, query: ${JSON.stringify('http://127.0.0.1/?rer-dev=' + devKey)}, encoded: ${JSON.stringify(escapedKey)} }) + '\\n');
  process.stderr.write(${JSON.stringify(devKey.slice(0, 19) + '\n  ' + devKey.slice(19) + '\n')});
 }
 `);
+ // Exercise repository setup's own capture writer, including its failure close.
+ const repoSetup = await run(rer, ['setup', repo, '--dir', root, '--port', String(port), '--non-interactive'], { cwd: directory, env });
+ assert.equal(repoSetup.code, 1, 'repository setup reaches the interrupted owner hook');
+ const setupLog = await readFile(join(launchPath(root, env), 'launch.log'), 'utf8');
+ const occurrences = setupLog.split(devKey).length - 1;
+ t.diagnostic(`F1 repository setup launch.log sentinel occurrences: ${occurrences}`);
+ assert.match(setupLog, /SETUP_CAPTURE_MARKER/);
+ assert.equal(occurrences, 0, 'repository setup redacts the child dev key before launch.log');
+ assert.match(setupLog, /SETUP_CAPTURE_MARKER \[REDACTED\]/);
+ const interrupted = await fromRepo(['--port', String(port)]);
+ assert.equal(interrupted.code, 1, 'dev setup fails before claiming the owner');
+ await access(join(root, 'owner-hook-reached')).catch(error => { t.diagnostic(interrupted.stderr); throw error; });
+ const retained = await readFile(join(root, '.dev.vars'), 'utf8');
+ assert.ok(parseEnv(retained).OWNER_PASSWORD, 'failed setup saved its generated owner password');
+ assert.deepEqual(localData(root).owners, [], 'failed setup has not claimed an owner');
+ await rm(join(root, 'fail-before-owner'));
  // Not a terminal: the one command prepares, starts, prints and returns.
  const launched = await fromRepo(['--port', String(port)]);
  assert.equal(launched.code, 0, 'rer dev resumes the saved owner claim: ' + launched.stderr + launched.stdout);
