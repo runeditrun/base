@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.97-dev.g2675e7f8",
+  "cliVersion": "0.2.97-dev.g197188e3",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -271,9 +271,13 @@
       "source": "onboarding/redaction-jwt.mjs",
       "sha256": "a2149ea07ab9ad718a730ced41c2268564c664d35840d26d2fc00031817cd922"
     },
+    "redaction-wrapped.mjs": {
+      "source": "onboarding/redaction-wrapped.mjs",
+      "sha256": "b656a9c61c476291d006c73844f17d9cd80997635e2581ef71042d905d683e5d"
+    },
     "redaction.mjs": {
       "source": "onboarding/redaction.mjs",
-      "sha256": "56a77c2149626eaa3a69764f25b21421ce0be22ce8a11540350ee9f391e77e1a"
+      "sha256": "2a828e150c41296eb75f28c0c5cb9f7dc39e8b4506b2e3d5104943c332647d54"
     },
     "schema/SETUP.schema.json": {
       "source": "onboarding/schema/SETUP.schema.json",

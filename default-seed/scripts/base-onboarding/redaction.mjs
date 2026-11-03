@@ -1,5 +1,6 @@
 import { StringDecoder } from 'node:string_decoder';
 import { jwtRanges, jwtHold } from './redaction-jwt.mjs';
+import { compactSecretText } from './redaction-wrapped.mjs';
 
 const MASK = '[REDACTED]';
 const PEM_BEGIN = /-----BEGIN [A-Z0-9 ]{0,64}PRIVATE KEY(?: BLOCK)?-----/g;
@@ -13,6 +14,7 @@ const CREDENTIAL_NAME = new RegExp(`(?:^|[_.-])(?:${CREDENTIAL_WORD})s?(?:$|[_.-
 // Base's maintained Node 22 runtime. These names require a real case boundary.
 const CAMEL_CREDENTIAL_NAME = /[A-Za-z0-9](?:Token|Secret|Credential|Key|Pat|Dsn|Auth|Pass|Passwd|Password|Pwd|Signature|Sig|Cookie)s?(?:$|[_.-]|[A-Z0-9])/;
 const FIELD_NAME = '(?:api[_-]?key|access[_-]?token|auth[_-]?token|token|password|secret|signature|sig|key|pat|dsn|auth|pass)';
+const DEV_FIELD = '(?<![A-Za-z0-9])rer-dev';
 // A field name may follow `_` or `-` (DB_PASSWORD, client_secret, x-api-key),
 // but not a letter or digit inside an ordinary word.
 const FIELD = '(?<![A-Za-z0-9])' + FIELD_NAME;
@@ -34,6 +36,7 @@ const NOT_FLAG = '(?!(?:' + FLAG_WORDS + ')(?:[\\s"\'<>;&,)\\]}]|$))';
 const DOUBLE_QUOTED = /"(?:\\[^\r\n]|[^"\\\r\n])*(?:\\(?=[\r\n]|$))?/.source;
 const SINGLE_QUOTED = /'(?:\\[^\r\n]|[^'\\\r\n])*(?:\\(?=[\r\n]|$))?/.source;
 const PRIVATE_VALUE = `(?:${DOUBLE_QUOTED}(?:"|(?=[\\r\\n]|$))|${SINGLE_QUOTED}(?:'|(?=[\\r\\n]|$))|[^\\s"'<>;&]+)`;
+const DEV_KEY_PATTERN = new RegExp(DEV_FIELD + '["\']?\\s*[=:]\\s*(' + PRIVATE_VALUE + ')', 'gi');
 const FIELD_VALUE = '["\']?\\s*[=:]\\s*' + NOT_FLAG + PRIVATE_VALUE;
 // These deploy flags take a binding name, never the secret value. Explicitly
 // registered private bytes remain redacted by the exact-value pass.
@@ -80,7 +83,7 @@ const privateAssignment = match => !AMBIGUOUS_FIELD.test(match[1]) || match[2].r
 // stream, has nothing more to arrive, so a trailing bare field name, dash run
 // or plain host:port is ordinary diagnostic text there.
 const PREFIX_TAIL = '["\']?\\s*(?:[=:]\\s*)?["\']?$';
-const FIELD_PREFIX = new RegExp('(?:\\b(?:Bearer|Basic)|' + FIELD + ')' + PREFIX_TAIL, 'i');
+const FIELD_PREFIX = new RegExp('(?:\\b(?:Bearer|Basic)|' + FIELD + '|' + DEV_FIELD + ')' + PREFIX_TAIL, 'i');
 const CAMEL_PREFIX = new RegExp(CAMEL_CONTEXT + PREFIX_TAIL);
 const CLI_PREFIX_HOLD = new RegExp(CLI_PREFIX + FIELD_NAME + '\\s+$', 'i');
 // Keep a quoted value's opening field until its closing quote arrives, even
@@ -145,7 +148,7 @@ function controlCleaner() {
 const cleanText = text => controlCleaner().write(String(text));
 
 // Keep every value for this session, even after its credential scope is cleared.
-export function createRedaction({mask = MASK} = {}) {
+export function createRedaction({mask = MASK, wrappedSecrets = false} = {}) {
  const secrets = new Set();
  let longest = 1;
  // Each known value is registered with the encodings and parts a tool may print
@@ -175,6 +178,7 @@ export function createRedaction({mask = MASK} = {}) {
  const ranges = text => {
   const assignments = [...text.matchAll(CAMEL_PATTERN), ...text.matchAll(CLI_PATTERN)].filter(privateAssignment);
   const found = [...text.matchAll(PATTERNS), ...assignments].map(match => [match.index, match.index + match[0].length]);
+  for (const match of text.matchAll(DEV_KEY_PATTERN)) found.push([match.index + match[0].length - match[1].length, match.index + match[0].length]);
   found.push(...jwtRanges(text));
   for (const begin of text.matchAll(PEM_BEGIN)) {
    const end = [...text.slice(begin.index + begin[0].length).matchAll(PEM_END)][0];
@@ -184,6 +188,7 @@ export function createRedaction({mask = MASK} = {}) {
    let from = 0, at;
    while ((at = text.indexOf(secret, from)) >= 0) { found.push([at, at + secret.length]); from = at + 1; }
   }
+  if (wrappedSecrets) found.push(...compactSecretText(text).ranges(secrets));
   return found.sort((a,b) => a[0]-b[0]);
  };
  const replace = text => {
@@ -200,6 +205,7 @@ export function createRedaction({mask = MASK} = {}) {
  // unterminated private-key block stays held there.
  const incompleteStart = (text, minimumPrefix=1, complete=false) => {
   let cutoff = text.length;
+  if (wrappedSecrets) cutoff = Math.min(cutoff, compactSecretText(text).prefix(secrets, minimumPrefix));
   for (const secret of secrets) {
    // The earliest start whose remaining text begins this secret is its longest held prefix.
    for (let at=Math.max(0,text.length-secret.length+1); at<=text.length-minimumPrefix; at++) {
