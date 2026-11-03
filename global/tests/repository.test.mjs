@@ -92,10 +92,10 @@ test('rer install <repo> then rer setup stop at their phases offline, reuse the 
 import { readFile, writeFile } from 'node:fs/promises';
 if (process.argv.includes('setup')) await writeFile('carry-observed.json', await readFile('.rer/local/business.json', 'utf8').catch(error => { if (error.code === 'ENOENT') return 'null'; throw error; }));
 `);
- const pairing = run(rer, ['business', 'connect', '--code', 'ABCD-1234', '--origin', platform.origin], { cwd: directory, env });
+ const pairing = run(rer, ['business', 'connect', '--business', 'biz', '--origin', platform.origin], { cwd: directory, env });
  const until = Date.now() + 10000;
- while (!platform.state.requests.some(item => item.body.code) && Date.now() < until) await delay(25);
- assert.equal((await fetch(platform.origin + '/api/business/biz/pairings/pair1/approve', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmed: true, confirmation_number: '246810' }) })).status, 200);
+ while (!platform.state.requests.some(item => item.route === '/api/business/executors/device-pairings') && Date.now() < until) await delay(25);
+ assert.equal((await fetch(platform.origin + '/api/business/biz/device-pairings/pair1/approve', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ user_code: platform.state.devicePairing.user_code }) })).status, 200);
  const paired = await pairing; assert.equal(paired.code, 0, paired.stderr);
  assert.ok(!await exists(carry), 'connect has no carry to write without a live checkout');
  const selfReads = () => platform.state.requests.filter(item => item.route === '/api/business/executors/self' && item.method === 'GET').length;

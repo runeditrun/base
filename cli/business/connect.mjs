@@ -6,7 +6,7 @@ import { createCredentialStore } from './keychain.mjs';
 import { applyChoices } from './choices.mjs';
 import { rerCommand, businessCommand } from './invocation.mjs';
 import { Stopped } from './errors.mjs';
-import { agentKind, deviceName, workingFolder } from './device.mjs';
+import { agentKind, deviceName, workingFolder, operatingSystem } from './device.mjs';
 import { revokedText } from './local-commands.mjs';
 
 // Approval moves the server's pairing expiry to ten minutes after approval, and
@@ -23,7 +23,15 @@ const nothingSent = 'Nothing was sent, so the pairing code still works.';
  * approves or refuses in the browser, or the code expires. Exit 0 means the
  * computer is active: its credential is stored and the server has seen it.
  */
-export async function connect({ code, origin } = {}) {
+export async function connect(options = {}) {
+ const pending = await loadPending();
+ if (options.business !== undefined || pending?.flow === 'device' && options.code === undefined) return connectDevice(options);
+ return connectLegacy(options);
+}
+
+// Compatibility with browser-created codes is retained through 0.2.98 and
+// removed in 0.2.99, once the production rollback target uses device pairing.
+async function connectLegacy({ code, origin } = {}) {
  const stored = await loadState();
  let pending = await loadPending();
  origin = originUrl(origin ?? stored?.origin ?? pending?.origin);
@@ -37,7 +45,7 @@ export async function connect({ code, origin } = {}) {
  }
  if (pending && Date.parse(pending.expires_at) <= Date.now()) { await clearPending(); pending = null; }
  if (pending && (pending.origin !== origin || code && pending.code !== code)) throw Error(`Business is already waiting for approval of another code${pending.origin === origin ? '' : ` at ${pending.origin}`}. Run ${rerCommand()} business connect to resume it, or ${rerCommand()} business disconnect to drop it before using another code.`);
- if (!pending && !code) throw Error(`Set up your business: Business shares your business name, logo and brand colour with apps that support it. Open ${origin}/business; sign up free there if you have no account. Choose what to share there. Back in this terminal, run this same command again with --code followed by the code you copied from that page.`);
+ if (!pending && !code) throw Error(`Set up your business: open ${origin}/business and take the prompt from the Business Connect page. It names the Business to join with --business.`);
  // Refuse before redeeming the one-use code or collecting an approval when this
  // session cannot keep the pairing or store the device credential.
  await checkStateWritable();
@@ -112,6 +120,119 @@ export async function connect({ code, origin } = {}) {
  } finally {
   process.off('SIGINT', onInterrupt); process.off('SIGTERM', onTerminate);
  }
+}
+
+const shortCode = /^[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/;
+const intervalValid = value => Number.isInteger(value) && value >= 1 && value <= 60;
+const secretValid = (value, prefix) => typeof value === 'string' && value.startsWith(prefix) && /^[A-Za-z0-9_-]+$/.test(value) && value.length > prefix.length && value.length <= 512;
+const timestampValid = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
+const pairingRoute = '/api/business/executors/device-pairings';
+const terminalPairing = new Map([
+ ['pairing_denied', [410, 'refused in the browser']],
+ ['pairing_expired', [410, 'expired']],
+ ['pairing_used', [410, 'already used']],
+ ['pairing_unknown', [401, 'unknown']],
+ ['business_paused', [409, 'paused because the Business is paused']],
+]);
+
+function validateDevicePairing(value, origin, businessId) {
+ const uri = `${origin}/business/${encodeURIComponent(businessId)}/pair`;
+ if (!value || !secretValid(value.device_code, 'bz_pairing_') || !shortCode.test(value.user_code)
+  || value.verification_uri !== uri || value.business_id !== businessId
+  || value.verification_uri_complete !== undefined && value.verification_uri_complete !== `${uri}#${value.user_code}`
+  || !intervalValid(value.interval) || !timestampValid(value.expires_at)) throw Error('Business server returned an invalid device pairing response.');
+}
+
+async function connectDevice({ business, origin, timeout } = {}) {
+ const stored = await loadState();
+ let pending = await loadPending();
+ origin = originUrl(origin ?? stored?.origin ?? pending?.origin);
+ business = identifier(business ?? pending?.businessId);
+ if (stored) {
+  if (stored.revoked) throw Error(`This computer was ${revokedText(stored)}`);
+  if (stored.origin !== origin || stored.businessId !== business) throw Error(`This state folder is connected to Business ${identifier(stored.businessId)} at ${originUrl(stored.origin)}. Run disconnect, or use another RER_BUSINESS_STATE_DIR.`);
+  const credential = await createCredentialStore().get(deviceCredentialHandle(stored));
+  if (!credential) throw Error('This computer\'s Business credential is missing from OS credential storage. Run disconnect, then connect again.');
+  return connected(new Api(origin, credential), stored, { reconnecting: true });
+ }
+ if (pending && Date.parse(pending.flow === 'device' ? pending.keep_until : pending.expires_at) <= Date.now()) { await clearPending(); pending = null; }
+ if (pending && (pending.flow !== 'device' || pending.origin !== origin || pending.businessId !== business)) throw Error('Business is already waiting for another pairing. Resume that command, or run business disconnect before joining another Business.');
+ if (pending) {
+  validateDevicePairing({ ...pending, business_id: pending.businessId }, origin, business);
+  if (!timestampValid(pending.keep_until) || Date.parse(pending.keep_until) > Date.parse(pending.expires_at) + approvalWindow) throw Error('The saved Business pairing is invalid. Run business disconnect, then connect again.');
+ }
+ // Both probes precede even the unauthenticated start. Keychain / Secret
+ // Service handling and the device credential's account are unchanged.
+ await checkStateWritable();
+ const store = createCredentialStore();
+ const resume = `${rerCommand()} business connect --business ${business} --origin ${origin}${timeout === undefined ? '' : ` --timeout ${timeout}`}`;
+ try { await store.check(); }
+ catch (error) {
+  const outside = error.sandboxRefused ? ` Approve this command outside the sandbox: ${resume}. Every other business command runs inside the sandbox.` : '';
+  throw Error(`${error.message}${outside} ${pending ? 'The saved pairing was kept.' : 'Nothing was sent; no pairing was started.'}`);
+ }
+ const stop = new AbortController();
+ const interrupt = () => stop.abort('SIGINT'), terminate = () => stop.abort('SIGTERM');
+ process.on('SIGINT', interrupt); process.on('SIGTERM', terminate);
+ let timer;
+ try {
+  const api = new Api(origin);
+  if (!pending) {
+   const name = deviceName(), folder = workingFolder();
+   const response = await api.post(pairingRoute, {
+    business_id: business, os: operatingSystem(), agent_kind: agentKind(), capabilities,
+    ...(name ? { device_name: name } : {}), ...(folder ? { working_folder: folder } : {}),
+   }, { signal: stop.signal, withStatus: true, quiet: true });
+   const result = response?.body;
+   validateDevicePairing(result, origin, business);
+   if (response.status !== 201 || !Number.isInteger(result.expires_in) || result.expires_in < 1 || result.expires_in > 900
+    || Date.parse(result.expires_at) <= Date.now() || Date.parse(result.expires_at) > Date.now() + 900_000) throw Error('Business server returned an invalid device pairing lifetime.');
+   pending = { flow: 'device', origin, businessId: business, device_code: result.device_code, user_code: result.user_code,
+    verification_uri: result.verification_uri, interval: result.interval, expires_at: result.expires_at,
+    keep_until: new Date(Date.parse(result.expires_at) + approvalWindow).toISOString(), next_poll_at: Date.now() + result.interval * 1000 };
+   await savePending(pending);
+  }
+  // One write puts the fixed lines first, even without a TTY. Never echo the
+  // code elsewhere in prose or errors; the fragment is not sent to a server.
+  process.stdout.write(`Code: ${pending.user_code}\nApprove at: ${pending.verification_uri}#${pending.user_code}\nOpen the link signed in as an owner, check the code, then approve.\nWaiting until ${clock(pending.expires_at)}. Keep this command running.\nRun this same command again to keep waiting (same code).\n`);
+  if (timeout !== undefined) timer = setTimeout(() => stop.abort('timeout'), timeout * 1000);
+  while (!stop.signal.aborted) {
+   if (Date.now() >= Date.parse(pending.keep_until)) { await clearPending(); throw Error('Business pairing expired (pairing_expired). Run connect again.'); }
+   await pause(Math.max(0, (pending.next_poll_at ?? Date.now() + pending.interval * 1000) - Date.now()), stop.signal);
+   const response = await api.post(`${pairingRoute}/poll`, { device_code: pending.device_code }, { signal: stop.signal, withStatus: true, quiet: true });
+   const result = response?.body;
+   if (response?.status === 200 && result?.status === 'paired') {
+    // The one successful response is consumed even when a local write fails.
+    try {
+     if (!secretValid(result.device_credential, 'bz_device_') || result.business_id !== business || !timestampValid(result.idle_expires_at)) throw Error('Business server returned an invalid device credential.');
+     const folder = workingFolder();
+     const state = { version: 1, credentialVersion: 2, origin, businessId: business, executorId: identifier(result.executor_id), vendorHandles: [], awakeConsent: false, ...(folder ? { workingFolder: folder } : {}) };
+     const handle = credentialHandle(origin, business);
+     await store.set(handle, result.device_credential);
+     try { await saveState(state); } catch (error) { await store.delete(handle); throw error; }
+     await clearPending();
+     process.stdout.write('Approved. Device credential stored in OS credential storage.\n');
+     return await connected(new Api(origin, result.device_credential), state);
+    } finally { await clearPending(); }
+   }
+   if (response?.status !== 202 || !['authorization_pending', 'slow_down'].includes(result?.status)
+    || !intervalValid(result.interval) || result.interval < pending.interval || !timestampValid(result.expires_at)
+    || result.status === 'slow_down' && result.interval < Math.min(60, pending.interval + 5)) throw Error('Business server returned an invalid device pairing status.');
+   pending = { ...pending, interval: result.interval, next_poll_at: Date.now() + result.interval * 1000 };
+   await savePending(pending);
+  }
+ } catch (error) {
+  if (!stop.signal.aborted) {
+   const ended = terminalPairing.get(error.code);
+   if (ended && error.status === ended[0]) { await clearPending(); throw Error(`Business pairing ${ended[1]} (${error.code}). Run connect again.`); }
+   throw error;
+  }
+ } finally {
+  clearTimeout(timer);
+  process.off('SIGINT', interrupt); process.off('SIGTERM', terminate);
+ }
+ if (stop.signal.reason === 'timeout') throw new Stopped(`Still waiting for approval until ${clock(pending.expires_at)}. Run this same command again to keep waiting (same code).`, 75);
+ throw new Stopped(`Stopped waiting for approval. The pairing is saved: run ${resume} to resume it.`, stop.signal.reason === 'SIGTERM' ? 143 : 130);
 }
 
 // The first device-authenticated request activates the computer and applies
