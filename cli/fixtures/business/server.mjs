@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { actionBody, closed, eventId, identifier, integer, object, requireValue, usage } from './contract.mjs';
 import { taskStore } from './task-state.mjs';
+import { randomUUID } from 'node:crypto';
 
 export const classificationSchema = {
  type: 'object', additionalProperties: false, required: ['vendor_id', 'usage', 'confidence'],
@@ -17,6 +18,45 @@ export async function server(t, { businessId = 'biz' } = {}) {
  const device = `bz_device_fixture-credential-${businessId}`;
  const tokens = new Map(), tasks = taskStore(state);
  let redeemed = false, issued = false, tokenSequence = 0, origin, pairingExpires = 0;
+ const pairings = new Map();
+ const deviceRefusal = (status, code) => [{ error: state.refusalText ?? 'Fixture device pairing refused', code }, status];
+ function startDevice(body, request) {
+  requireValue(!request.headers.authorization && !request.headers.cookie);
+  closed(body, ['business_id', 'os', 'agent_kind', 'capabilities', 'device_name', 'working_folder', 'policy_signing_keys']);
+  if (body.business_id !== businessId) return deviceRefusal(404, 'pairing_business_unknown');
+  requireValue(['macos', 'linux', 'wsl', 'windows', 'other'].includes(body.os) && ['codex', 'claude', 'other'].includes(body.agent_kind));
+  requireValue(Array.isArray(body.capabilities) && body.capabilities.every(value => typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,100}$/.test(value)));
+  requireValue(body.device_name === undefined || typeof body.device_name === 'string' && body.device_name.length <= 200 && !/[\x00-\x1f\x7f]/.test(body.device_name));
+  requireValue(body.working_folder === undefined || typeof body.working_folder === 'string' && body.working_folder.length <= 1000 && !/[\x00-\x1f\x7f]/.test(body.working_folder) && body.working_folder.startsWith('/'));
+  const seconds = state.pairingSeconds ?? 600;
+  const pairing = { id: `pair${pairings.size + 1}`, device_code: `bz_pairing_${randomUUID()}${randomUUID()}`, user_code: 'WDJB-MJHT',
+   interval: state.pollSeconds ?? 5, expires: Date.now() + seconds * 1000, approved: false, denied: false, consumed: false, lastPoll: 0 };
+  pairings.set(pairing.device_code, pairing); state.devicePairing = pairing;
+  issued = false; state.active = false; state.revoked = false; state.agentKind = body.agent_kind;
+  return [{ device_code: pairing.device_code, user_code: pairing.user_code, verification_uri: `${origin}/business/${businessId}/pair`,
+   expires_in: seconds, expires_at: new Date(pairing.expires).toISOString(), interval: pairing.interval, business_id: businessId,
+   ...state.startPatch }, state.startStatus ?? 201];
+ }
+ function pollDevice(body, request) {
+  requireValue(!request.headers.authorization && !request.headers.cookie);
+  closed(body, ['device_code']); requireValue(typeof body.device_code === 'string');
+  const pairing = pairings.get(body.device_code);
+  if (!pairing) return deviceRefusal(401, 'pairing_unknown');
+  if (pairing.consumed) return deviceRefusal(410, 'pairing_used');
+  if (pairing.denied || state.denyPairing) return deviceRefusal(410, 'pairing_denied');
+  if (pairing.expires <= Date.now() || state.expirePairing) return deviceRefusal(410, 'pairing_expired');
+  if (state.pollRefusal) return deviceRefusal(...state.pollRefusal);
+  const now = Date.now();
+  if (state.slowDown || now < pairing.lastPoll + pairing.interval * 1000) {
+   state.slowDown = false; pairing.interval = Math.min(60, pairing.interval + 5); pairing.lastPoll = now;
+   return [{ status: 'slow_down', interval: pairing.interval, expires_at: new Date(pairing.expires).toISOString() }, 202];
+  }
+  pairing.lastPoll = now;
+  if (!pairing.approved) return [{ status: 'authorization_pending', interval: pairing.interval, expires_at: new Date(pairing.expires).toISOString(), ...state.pollPatch }, state.pollStatus ?? 202];
+  if (state.paused) return deviceRefusal(409, 'business_paused');
+  pairing.consumed = true; issued = true; state.credentialIssues = (state.credentialIssues ?? 0) + 1;
+  return [{ status: 'paired', device_credential: device, executor_id: 'executor1', business_id: businessId, idle_expires_at: later(30 * 24 * 3600), ...state.pairedPatch }, state.pairedStatus ?? 200];
+ }
  function requireDevice(request) {
   requireValue(issued && !state.revoked && request.headers.authorization === `Bearer ${device}`, 401);
  }
@@ -144,6 +184,26 @@ export async function server(t, { businessId = 'biz' } = {}) {
     state.revoked = true; return send({ revoked: true });
    }
    requireValue(request.method === 'POST', 405);
+   if (route === '/api/business/executors/device-pairings') {
+    requireValue(Buffer.byteLength(raw) <= 16 * 1024, 413);
+    await state.onStart?.();
+    return send(...startDevice(body, request));
+   }
+   if (route === '/api/business/executors/device-pairings/poll') return send(...pollDevice(body, request));
+   // Fixture-only owner doors; the platform separately proves browser auth.
+   const owner = new RegExp(`^/api/business/${businessId}/device-pairings/(pair[0-9]+)/(approve|deny)$`).exec(route);
+   if (owner) {
+    closed(body, ['user_code']);
+    const pairing = [...pairings.values()].find(value => value.id === owner[1]);
+    if (!pairing || body.user_code !== pairing.user_code) return send(...deviceRefusal(404, 'pairing_not_found'));
+    if (pairing.consumed || pairing.denied || owner[2] === 'approve' && pairing.approved || pairing.expires <= Date.now()) return send(...deviceRefusal(409, 'pairing_not_pending'));
+    if (owner[2] === 'approve') {
+     if (state.paused) return send(...deviceRefusal(409, 'business_paused'));
+     pairing.approved = true; pairing.expires = Date.now() + 600_000;
+     return send({ pairing_id: pairing.id, status: 'approved', collect_by: new Date(pairing.expires).toISOString() });
+    }
+    pairing.denied = true; return send({ pairing_id: pairing.id, status: 'denied' });
+   }
    if (route === '/api/business/biz/pairings/pair1/approve') {
     closed(body, ['confirmation_number', 'confirmed']);
     requireValue(redeemed && !issued && Date.now() < pairingExpires && body.confirmation_number === '246810' && body.confirmed === true, 403);
