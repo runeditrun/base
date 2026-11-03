@@ -5,6 +5,7 @@ import { vendorKey, disconnect, status } from './local-commands.mjs';
 import { next, answer, token } from './questions.mjs';
 import { run } from './supervisor.mjs';
 import { describe } from './errors.mjs';
+import { identifier, originUrl } from './api.mjs';
 
 const usage = `Set up your business: rer business connect
 Business keeps your business name, logo and brand colour together for the apps
@@ -16,9 +17,9 @@ Advanced commands (Usage: rer business VERB)
                                  --hosting managed|assisted|self_host (default: managed)
                                  --wait-seconds 0..240 (default: 240); --json
   scan [DIR...] [--json]          Names-only local discovery
-  connect [--code CODE] [--origin URL]
-                                 Pair this computer, waiting until the owner approves in the browser
-                                 (up to the code's 10 minutes); run it again to resume
+  connect --business ID [--origin URL] [--timeout SECONDS]
+                                 Print a code and link for the owner to approve in a signed-in browser
+                                 Older Business pages: connect --code CODE [--origin URL]
                                  Connect carries the Business name into local apps
   run [--once]                   Work this computer's tasks: the folder scan the owner allows, then
                                  vendor exports into each app's import door (a preview the owner
@@ -46,15 +47,16 @@ In an agent sandbox that writes only inside its working folder, use RER_BUSINESS
 `;
 
 const verbHelp = {
- connect: `Usage: rer business connect [--code CODE] [--origin URL]
-Pair this computer with Business, waiting for the owner to approve the comparison
-number in their browser (up to the code's 10 minutes). Run again to resume.
-
-  --code CODE    Pairing code created in the Business browser.
-  --origin URL   Business platform address (default: https://app.runeditrun.com).
-Without a code, prints the path to create one or resumes this computer's pairing.
-Carries the Business name into local app files for supporting apps to read.
-Choose this computer's permissions and background service in the browser.
+ connect: `Usage: rer business connect --business ID [--origin URL] [--timeout SECONDS]
+Pair this computer with a Business. Prints a code and a link: the owner opens the
+link in a signed-in browser, checks the code and approves. Waits for that (up to
+the code's 10 minutes), then keeps the credential in OS credential storage.
+  --business ID      The Business to join; the Connect prompt names it.
+  --origin URL       Business platform address (default: https://app.runeditrun.com).
+  --timeout SECONDS  Wait at most this long, then exit 75 with the pairing kept;
+                     run the same command again to keep waiting (same code).
+  --code CODE        Older Business pages: redeem a code made in the browser.
+Exits 0 connected, 1 ended (refused, expired or failed), 2 usage, 75 still waiting.
 `,
  token: `Usage: rer business token
 Print an MCP Authorization header object for this computer's paired Business.
@@ -74,10 +76,19 @@ export async function businessCommand(argv) {
    const options = {};
    for (let index = 0; index < args.length; index += 2) {
     const name = args[index];
-    if (!['--code', '--origin'].includes(name) || !args[index + 1] || args[index + 1].startsWith('--') || Object.hasOwn(options, name.slice(2))) return invalid();
+    if (!['--code', '--origin', '--business', '--timeout'].includes(name) || !args[index + 1] || args[index + 1].startsWith('--') || Object.hasOwn(options, name.slice(2))) return invalid();
     options[name.slice(2)] = args[index + 1];
    }
    if (options.code !== undefined && !/^[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/.test(options.code)) return invalid();
+   if (options.code !== undefined && (options.business !== undefined || options.timeout !== undefined)) return invalid();
+   if (options.timeout !== undefined) {
+    if (!/^\d{1,3}$/.test(options.timeout) || Number(options.timeout) > 900) return invalid();
+    options.timeout = Number(options.timeout);
+   }
+   try {
+    if (options.business !== undefined) identifier(options.business);
+    if (options.origin !== undefined && options.code === undefined) originUrl(options.origin);
+   } catch { return invalid(); }
    await connect(options);
   } else if (verb === 'vendor-key' && args.length === 2) await vendorKey(...args);
   else if (verb === 'answer' && [3, 4].includes(args.length)) await answer(...args);
