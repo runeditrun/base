@@ -1,10 +1,24 @@
 # Changelog
 
-## Unreleased
+## 0.2.98
 
-- Redact local dev sign-in keys from every captured launch log and event, including repository setup output, and keep mixed text and JSON capture in order while preserving the private link delivered to the caller.
-- Business pairing starts on the computer: `rer business connect --business ID` prints a code and an approve link, waits for browser approval and resumes the same pairing after a timeout or interruption. `--timeout` exits 75 while waiting; credentials still use OS credential storage. Older `--code` prompts keep working unchanged in this release.
-- Keep owner sessions and other auth routes available after setup-token retirement; the owner-claim route answers 409 `claim_unavailable` for every method.
+### Connecting a computer to a Business
+
+- `rer business connect` now pairs like a TV. Run `rer business connect --business ID [--origin URL] [--timeout SECONDS]`: the computer starts the pairing and prints two fixed lines first, `Code: WDJB-MJHT` and `Approve at: <origin>/business/ID/pair#WDJB-MJHT`. Show the owner both lines. The owner opens the link signed in as an owner of that Business, checks the code and approves there; the computer polls and receives its credential once. Nothing is pasted back into an agent chat, and the code travels in the link's fragment, so it is not sent in a request URL.
+- The command never prompts and needs no terminal. It checks that it can write its state folder and that OS credential storage accepts a write before it starts. Credentials stay in macOS Keychain or Linux Secret Service as before. A state folder already connected to a different origin or Business is refused: disconnect first or use a separate `RER_BUSINESS_STATE_DIR`.
+- Exit code 75 means still waiting: `--timeout` (0 to 900 seconds) ran out before the owner approved and the pairing is kept. Run the same command again: it prints the same code and link and resumes the saved pairing. Without `--timeout` it waits until the pairing ends. Exit 0 means the credential is stored and the server has seen the computer; 1 means the pairing was refused, expired, already used or failed; 2 means bad usage; Ctrl-C and SIGTERM keep the pairing and exit 130 and 143.
+- `rer business connect --code CODE` (the browser-created code with a six-digit confirmation number) works unchanged in this release. It cannot be combined with `--business` or `--timeout`.
+
+### The private dev sign-in key in captured logs
+
+- `rer dev` no longer writes the owner's private dev sign-in key (`rer-dev=<key>`) into rer's captured files: `server.log`, `reuse.log`, `launch.log` and the launch events. Every launch capture writer goes through the shared redaction, including keys in JSON field names and values, keys wrapped across lines and URL-encoded keys. The detached capture owner now stays alive with the server so its output stays redacted for the server's whole run. The private sign-in link is still delivered to the caller, read from `.rer/local` only at hand-off.
+- `rer setup <owner/repo>` writes its `launch.log` through the same redaction, also when setup fails.
+- Captured output that mixes text and JSON progress lines is written in order: JSON events are no longer glued onto a held text tail.
+
+### Owner claim after setup
+
+- A seed whose hidden setup token has been retired no longer loses sign-in. Before, the owner-claim module answered 503 `invalid_configuration` for every route once the setup token was gone, so seeds that build the claim handler on every request (such as Lamp, Balm, Cabin, Lanyard and Willow) answered errors on owner sessions and all other auth routes after setup. Now owner sessions and the other auth routes keep working, and only `/auth/owner-claim` answers 409 `claim_unavailable`, for every method. Origin, email and database checks, signature checks and claim replay protection are unchanged.
+- A refreshing seed refreshes to 0.2.98 to receive this; it needs no seed code edit for this part. `modules/owner-claim/README.md` now says the handler is safe to construct per request.
 
 ## 0.2.97
 
