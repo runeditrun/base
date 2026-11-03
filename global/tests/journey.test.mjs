@@ -14,7 +14,7 @@ import '../../modules/container/adapters/d1-workerd-preload.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, statSync } from 'node:fs';
-import { access, cp, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { access, cp, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { DatabaseSync } from '../../modules/container/adapters/d1-sqlite.mjs';
 import { parseEnv } from 'node:util';
 import { createRequire } from 'node:module';
