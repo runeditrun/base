@@ -89,8 +89,8 @@ function destination(task, grant) {
 function adapterInputs(vendor, task) {
  const inputs = exportInputs(vendor, task);
  if (inputs) return inputs;
- const needs = vendor === 'calendly' ? 'an import door that takes its folder of files' : `${inputNeeds[vendor]}, which this task does not carry yet`;
- throw new ExportWaiting(`Business vendor export for ${vendorNames[vendor]} needs ${needs}. Task released as paused.`, 'configuration_required');
+ const needs = vendor === 'calendly' ? 'an import door that takes its folder of files' : inputNeeds[vendor];
+ throw new ExportWaiting(`Waiting for the owner to confirm ${needs} in Business.`, 'configuration_required');
 }
 
 /** One RER-signed import grant for one door request. `review` asks for a
