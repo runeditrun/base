@@ -60,7 +60,7 @@ export async function run({ once = false } = {}) {
  let progress, stopCarry, said = '', held = null, summaries = [];
  const say = text => { if (text !== said) { said = text; process.stdout.write(text + '\n'); } };
  // An agent step that waits is said in its own words, never as "Nothing yet".
- const waits = () => [...new Set([...ownerWaits.values(), ...summaries.filter(task => parked.has(task.task_id)).map(task => parked.get(task.task_id).message), ...agentWaiting(summaries)])];
+ const waits = () => [...new Set([...ownerWaits.values()].map(wait => wait.message).concat(summaries.filter(task => parked.has(task.task_id)).map(task => parked.get(task.task_id).message), agentWaiting(summaries)))];
  // With no agent step waiting, a move's owner step (freeze, rollback, cancellation) is named with its link.
  const idle = () => { const owner = ownerWaiting(summaries, state); return owner.length ? owner.join('\n') : waitingFor(state); };
  try {
@@ -78,6 +78,9 @@ export async function run({ once = false } = {}) {
    }
    if (!progress.pendingClaim) {
     summaries = await nextQuestions(api, stop.signal);
+    // next_question omits completed tasks, but also omits exports still waiting
+    // for their inputs. A catch-up disappears when Business has applied it.
+    for (const [id, wait] of ownerWaits) if (wait.catchup && !summaries.some(task => task.task_id === id)) ownerWaits.delete(id);
     for (const task of summaries) if (['ready', 'leased', 'done', 'failed', 'canceled'].includes(task.state)) ownerWaits.delete(task.task_id);
     const handles = (await loadState())?.vendorHandles ?? [];
     for (const [id, wait] of parked) if (wait.keyMissing && handles.includes(vendorHandle(wait.keyMissing))) parked.delete(id);
@@ -97,7 +100,7 @@ export async function run({ once = false } = {}) {
    catch (error) {
     const waiting = ownerWait(error, state);
     if (!waiting) throw error;
-    ownerWaits.set(progress.pendingClaim.task_id, waiting); say(waiting);
+    ownerWaits.set(progress.pendingClaim.task_id, { message: waiting, catchup: error.code === 'business_catchup_approval_required' }); say(waiting);
     progress = {}; await saveProgress(progress);
     held = null;
     if (once) return;
@@ -162,7 +165,7 @@ export async function run({ once = false } = {}) {
    if (failure) {
     const waiting = ownerWait(failure, state);
     if (waiting && !stop.signal.aborted) {
-     ownerWaits.set(claimed.task.id, waiting); say(waiting); held = null;
+     ownerWaits.set(claimed.task.id, { message: waiting, catchup: failure.code === 'business_catchup_approval_required' }); say(waiting); held = null;
      if (once) return;
      await pause(checkIn, stop.signal); continue;
     }

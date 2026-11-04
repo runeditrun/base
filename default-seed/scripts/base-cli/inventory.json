@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.98-dev.gd0835641",
+  "cliVersion": "0.2.98-dev.g9350793f",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -651,7 +651,7 @@
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
-      "sha256": "5b2630888479d22665e6c0cc8fced7842ed66b195e83fd67d1099593560c95cb"
+      "sha256": "2765000bcb47cc825e5e7772e6792d2ee05f391c32ea22952f54903fd5892275"
     },
     "cli/business/vendor-door.mjs": {
       "source": "cli/business/vendor-door.mjs",
