@@ -1,3 +1,4 @@
+import timers from 'node:timers/promises';
 import { providerPages, providerListShape } from './pagination.mjs';
 import { deleteR2Object } from './r2-object-transport.mjs';
 import { isR2ObjectDelete } from './r2-objects.mjs';
@@ -40,7 +41,7 @@ const redactValues = (text, values) => values.filter(Boolean).flatMap(value=>[va
   return at >= 0 && secret.startsWith(value.slice(at)) ? value.slice(0,at)+'[REDACTED]' : value;
 },text);
 /** Only this fixed origin and the explicitly selected account ever receive the token. */
-export function cloudflare({ accountId, token, fetch: request = globalThis.fetch, objectDelete = deleteR2Object, timeoutMs = 30000, maxRequests = 500, removal = false, budgetMigrations = false, requestSignal = () => undefined }) {
+export function cloudflare({ accountId, token, fetch: request = globalThis.fetch, objectDelete = deleteR2Object, timeoutMs = 30000, maxRequests = 500, removal = false, budgetMigrations = false, requestSignal = () => undefined, settleLists = false }) {
   assert(hexId(accountId), 'invalid-cloudflare-account-id');
   assert(typeof token === 'string' && token.trim() && !/[\r\n]/.test(token), 'invalid-cloudflare-api-token');
   // Capture an outer deadline once per operation, before transport retries.
@@ -137,7 +138,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
       throw error;
     }
   }
-  async function collect(path, options) {
+  async function collectOnce(path, options) {
     let result, rows = [];
     for await (const page of providerPages(envelope, path, options)) {
       result ??= page.data.result;
@@ -145,6 +146,21 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
       assert(rows.length <= 10000, 'provider-list-too-large');
     }
     return options?.field ? {...result,[options.field]:rows} : rows;
+  }
+  // Site deploy opts in here: both request/zoneRequest and list must discard
+  // every page of an inconsistent snapshot. Only this read is replayed; owner
+  // and teardown callers retain their existing settling policies and defaults.
+  async function collect(path, options) {
+    if (!settleLists) return collectOnce(path, options);
+    const signal = deadlineSignal(options?.signal);
+    for (let attempt = 1; ; attempt++) {
+      signal?.throwIfAborted();
+      try { return await collectOnce(path, options); }
+      catch (error) {
+        if (attempt === 3 || !['provider-partial-list','provider-pagination-changed'].includes(error.message)) throw error;
+        await timers.setTimeout(20000, undefined, {signal});
+      }
+    }
   }
   async function list(path, options = {}) {
     const shape = {...providerListShape(path),...options};

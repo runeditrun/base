@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `rer deploy --site` now retries a changing or partial Cloudflare list from page one up to three times, waiting 20 seconds between failed reads. It discards incomplete snapshots, never replays deploy writes, preserves other refusals and stops waiting on cancellation.
+
 ## 0.2.99
 
 ### Agents wait for the owner instead of failing

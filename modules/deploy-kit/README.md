@@ -207,6 +207,16 @@ No zone ruleset is read or written. Every request now invokes the Worker: one pa
 
 A read-only preflight reads the zone (it must be in this account, else `site-zone-missing`), the Worker and the zone's Custom Domains, and refuses before any write: `resource-name-collision` for a Worker of the name whose live version the kit did not upload, or for a hostname attached to another service (or to a Worker that is not the kit's); `owned-resource-replaced` for a kit Worker whose latest deployment is not the kit's upload (a dashboard rollback or a split deployment). It then uploads the assets and the site Worker, checks that the new version is live, turns workers.dev off, attaches each missing hostname, and reads the Worker and both domains back. Both post-upload Worker checks share a 90-second upload window: missing visibility or the exact preflight version waits with backoff until the upload response's version serves alone as newest with its expected fingerprint. A foreign version, changed fingerprint or split deployment refuses immediately. A timeout names the last serving/newest versions and fingerprint. A repeat attaches nothing new. `.rer/deploy/site-<environment>.json` receives a receipt for the person; it is never read. Provider propagation cases are tested against the fake Cloudflare API in `tests/site-provider.mjs`, where every zone ruleset path answers 403.
 
+Site deploy retries only `provider-partial-list` and `provider-pagination-changed`
+from read-only list collection: three total attempts, with 20 seconds between
+failed reads. Each attempt discards the incomplete snapshot and restarts at page
+one, retaining the original filters; pages from different attempts are never
+combined. This covers zone, Custom Domain and Worker version/deployment lists,
+including post-upload readback. It never retries the whole deploy or replays a
+write. Other refusals stop immediately; persistent inconsistency keeps the final
+original refusal and its GET diagnostic. Cancellation stops the wait and prevents
+the next read. Owner-mode and teardown settling defaults are unchanged.
+
 A seed can opt into docs search through its command adapter's `site.runtime`:
 
 ```ts
