@@ -1610,7 +1610,7 @@ test('run waits for platform owner steps without releasing a lease, resumes afte
   }
   remote.state.tasks = [task(`biz:owner-wait:continuous:${catchup}`, catchup)]; remote.state.ownerWait = code;
   const claims = claimCount(), releases = releaseCount();
-  let sawWait = false, ownerActed = false, runner, claimedBeforeAnswer;
+  let sawWait = false, ownerActed = false, stopSent = false, runner, claimedBeforeAnswer;
   remote.state.onSelf = async () => {
    if (!sawWait || ownerActed) return;
    ownerActed = true; claimedBeforeAnswer = claimCount() - claims;
@@ -1620,7 +1620,7 @@ test('run waits for platform owner steps without releasing a lease, resumes afte
   };
   const continuous = await cli(home, ['business', 'run'], { env: vendorEnv, onSpawn: child => { runner = child; }, onOutput: (stdout, child) => {
    if (ownerStep.test(stdout)) sawWait = true;
-   if (!catchup && stdout.includes('Import preview ready')) child.kill('SIGTERM');
+   if (!catchup && !stopSent && stdout.includes('Import preview ready')) { stopSent = true; child.kill('SIGTERM'); }
   } });
   remote.state.onSelf = null;
   assert.equal(continuous.code, 0, continuous.stderr);
