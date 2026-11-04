@@ -35,12 +35,12 @@ export function searchCorpus(pages, searchPages) {
  return searchPages;
 }
 
-export async function buildSiteRuntime(project, declaration, corpus, assets, { prepare = false, domain, compatibilityDate, store, signal } = {}) {
+export async function buildSiteRuntime(project, declaration, corpus, assets, { prepare = false, domain, firstDeploy = false, compatibilityDate, store, signal } = {}) {
  const pages = JSON.parse(await readFile(corpus, 'utf8'));
  const chunks = searchChunks(pages), corpusHash = digest(chunks.map(chunk => chunk.hash).join('\n'));
  if (prepare) {
   const output = await contained(project.root, dirname(declaration.corpus), { optional: true });
-  await store.run('Preparing docs search', process.execPath, [fileURLToPath(new URL('./site-prepare.mjs', import.meta.url)), corpus, assets, output, declaration.endpoint, compatibilityDate, domain], {cwd:project.root, signal, heavy:false});
+  await store.run('Preparing docs search', process.execPath, [fileURLToPath(new URL('./site-prepare.mjs', import.meta.url)), corpus, assets, output, declaration.endpoint, compatibilityDate, firstDeploy ? '' : domain], {cwd:project.root, signal, heavy:false});
  }
  const { build } = createRequire(join(project.root, 'package.json'))('esbuild');
  const worker = fileURLToPath(new URL('../modules/site/docs-search/worker.ts', import.meta.url));
