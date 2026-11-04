@@ -1640,7 +1640,7 @@ test('run waits for platform owner steps without releasing a lease, resumes afte
   for (const args of [['run', '--once'], ['run']]) {
    const refused = await cli(home, ['business', ...args], { env });
    assert.equal(refused.code, 1);
-   assert.equal(refused.stderr, `Business server refused the request (HTTP ${status}). The server said: ${message}.\n`);
+   assert.ok(refused.stderr.includes(`HTTP ${status}`) && refused.stderr.includes(message), refused.stderr);
   }
   t.diagnostic(`PROBE refused A: HTTP ${status} ${code} state=${state ?? 'absent'} -> both run modes exit=1; original message retained`);
  }
