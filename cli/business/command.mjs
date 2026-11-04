@@ -93,8 +93,9 @@ export async function businessCommand(argv) {
    }
    try {
     if (options.business !== undefined) identifier(options.business);
+    if (options.origin !== undefined && options.business !== undefined) originUrl(options.origin);
    } catch { return invalid(); }
-   if (options.origin !== undefined && options.code === undefined) originUrl(options.origin);
+   if (options.origin !== undefined && options.code === undefined && options.business === undefined) originUrl(options.origin);
    await connect(options);
   } else if (verb === 'vendor-key' && args.length === 2) await vendorKey(...args);
   else if (verb === 'answer' && [3, 4].includes(args.length)) await answer(...args);
