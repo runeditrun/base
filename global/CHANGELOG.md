@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Legacy MCP tool calls held for approval now return their generated `requestState` alongside `approval_required`, so retrying an approved read resumes the original operation without asking for a second approval.
 - `rer deploy --site` now retries a changing or partial Cloudflare list from page one up to three times, waiting 20 seconds between failed reads. It discards incomplete snapshots, never replays deploy writes, preserves other refusals and stops waiting on cancellation.
 
 ## 0.2.99

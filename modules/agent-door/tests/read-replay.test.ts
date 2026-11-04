@@ -57,6 +57,98 @@ for (const required of [false, true]) test(`approved aggregate read replay reche
   } finally { await r.close() }
 })
 
+for (const [version, method] of [
+  ['2025-11-25', 'tools/call'], ['2026-07-28', 'tools/call'], ['2025-11-25', 'resources/read'],
+]) test(`held read resumes its original operation after native approval (${version} ${method})`, async t => {
+  const r = await runtime()
+  try {
+    const record = { id: 'held-read', value: 'protected', version: 1, exposure: 'internal' }
+    await r.db.prepare('INSERT INTO test_records VALUES(?,?,?,?)').bind(...Object.values(record)).run()
+    const records = (await r.db.prepare('SELECT * FROM test_records ORDER BY id').all()).results
+    const read = (state?: string) => r.mcp(method, {
+      ...(method === 'tools/call' ? { name: 'synthetic.records.list', arguments: {} } : { uri: 'synthetic://record/held-read' }),
+      ...(state ? { requestState: state } : {}),
+    }, { version })
+    const dataOf = (reply: any) => method === 'tools/call' ? reply.result : reply.error.data
+    const contentOf = (reply: any) => method === 'tools/call' ? reply.result.structuredContent : JSON.parse(reply.result.contents[0].text)
+    const expected = method === 'tools/call' ? { records, sent: [] } : record
+    const counts = async () => Object.fromEntries(await Promise.all(
+      ['agent_door_approvals', 'agent_door_calls', 'test_jobs', 'test_effects', 'test_sent'].map(async table =>
+        [table, (await r.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first()).n]),
+    ))
+    assert.equal((await r.adopt()).status, 200)
+    const immediate = await read()
+    assert.equal(immediate.status, 200)
+    assert.deepEqual(contentOf(immediate), expected)
+    assert.equal(immediate.result.requestState, undefined)
+    if (method === 'tools/call') assert.equal(immediate.result.isError, false)
+    const before = await counts()
+    const policy = autonomousPolicy()
+    policy.rules = [{ id: 'all', class: '*', do: 'approval', approver: ['sponsor'], wait: 'PT1H' }]
+    assert.equal((await r.adopt(policy)).status, 200)
+    const held = await read(), data = dataOf(held), state = data.requestState
+    assert.equal(held.status, 200)
+    assert.equal(typeof state, 'string')
+    const approval = data.approval ?? data._meta['com.runeditrun/approval'] ?? data._meta['com.runeditrun/error'].approval
+    const saved = JSON.parse((await r.db.prepare('SELECT saved FROM agent_door_approvals WHERE id=?').bind(approval.id).first()).saved)
+    assert.equal(state, saved.result.requestState)
+    if (method === 'tools/call') {
+      assert.equal(held.result.resultType, version === '2026-07-28' ? 'input_required' : 'complete')
+      assert.equal(held.result.structuredContent, undefined)
+      if (version === '2025-11-25') {
+        assert.equal(held.result.isError, true)
+        assert.equal(code(held), 'approval_required')
+        assert.deepEqual(held.result.content, [{ type: 'text', text: '{"code":"approval_required"}' }])
+      }
+    } else {
+      assert.equal(held.error.data.code, 'approval_required')
+      assert.equal(held.result, undefined)
+    }
+    // A retry before approval must remain held and disclose no native payload.
+    const unapproved = await read(state)
+    assert.equal(dataOf(unapproved).requestState, state)
+    assert.equal(unapproved.result?.structuredContent, undefined)
+    assert.equal(unapproved.result?.contents, undefined)
+    const view = (await r.person(`/agents/api/approvals/${approval.id}`)).body.approval
+    const approved = await r.person(`/agents/api/approvals/${approval.id}/approve`, { revision: view.revision, summary_sha256: view.summary_sha256 })
+    assert.equal(approved.status, 200)
+    assert.equal(approved.body.approval.state, 'executed')
+    assert.equal(approved.body.approval.approvals.length, 1)
+    const complete = await read(state)
+    assert.equal(complete.status, 200)
+    assert.equal(complete.result.resultType, 'complete')
+    assert.deepEqual(contentOf(complete), expected)
+    assert.deepEqual(contentOf(await read(state)), expected)
+    if (method === 'resources/read') assert.equal(complete.result.contents[0]._meta['com.runeditrun/untrusted'], true)
+    else assert.equal(complete.result.isError, false)
+    const audit = (await r.person('/agents/api/audit')).body
+    const operation = saved.principal.operationId
+    const continuationRows = audit.rows.filter((row: any) => row.id === saved.decision_id || row.decision_id === saved.decision_id || row.replay_of === saved.decision_id)
+    assert.ok(continuationRows.length >= 3)
+    assert.ok(continuationRows.every((row: any) => row.operation_id === operation))
+    assert.equal(audit.rows.at(-1).operation_id, operation)
+    assert.equal(audit.differs_from_policy, 0)
+    const after = await counts()
+    assert.deepEqual(after, { ...before, agent_door_approvals: before.agent_door_approvals + 1 })
+    assert.deepEqual((await r.db.prepare('SELECT * FROM test_records ORDER BY id').all()).results, records)
+    t.diagnostic(JSON.stringify({ version, method, operation, resumedOperation: audit.rows.at(-1).operation_id, generatedStateMatches: state === saved.result.requestState, before, after, approvals: approved.body.approval.approvals.length }))
+    // A previously approved continuation cannot override a current policy refusal.
+    assert.equal((await r.adopt({ ...autonomousPolicy(), rules: [{ id: 'blocked', class: '*', do: 'blocked' }] })).status, 200)
+    for (const blocked of [await read(state), await read()]) {
+      assert.equal(code(blocked) ?? blocked.error?.data?.code, 'policy_blocked')
+      assert.equal(blocked.result?.structuredContent, undefined)
+      assert.equal(blocked.result?.contents, undefined)
+      assert.equal(blocked.result?.requestState, undefined)
+      if (method === 'tools/call') {
+        assert.equal(blocked.result.isError, true)
+        assert.equal(JSON.stringify(blocked.result.content).includes(record.value), false)
+      }
+    }
+    assert.deepEqual(await counts(), after)
+    assert.equal((await r.person('/agents/api/audit')).body.differs_from_policy, 0)
+  } finally { await r.close() }
+})
+
 test('approved mutation replay retains one native effect and the recorded outcome', async () => {
   const r = await runtime()
   try {
