@@ -122,7 +122,7 @@ export async function next() {
  if (!item) {
   // Nothing to answer here; say whether run has work, or what it waits for.
   const work = tasks.find(task => Object.hasOwn(runWork, task.kind) && task.state === 'ready');
-  if (work) { process.stdout.write(`Ready for run: ${runWork[work.kind]}. Start it with: ${businessCommand('run')}\n`); return; }
+  if (work) { process.stdout.write(`Ready for run: ${runWork[work.kind]}. Start it with: ${businessCommand('run --once')}\n`); return; }
   process.stdout.write(`${waitingFor(state)}\nNothing yet.\n`); return;
  }
  const id = identifier(item.task_id);
@@ -142,7 +142,7 @@ export async function next() {
    + (vendor && !keyed(vendor) ? `Vendor key: none; ${name} is read from its public page, with no key.\n`
     : stored ? `Vendor key: the owner's read-only ${name} key is stored in this computer's OS credential storage. To replace it, ${keyStep(vendor)}\n`
     : `Vendor key: ${keyStep(vendor)}${vendor ? '' : `\n  where <vendor> is the tool this step reads: ${Object.keys(vendorNames).filter(keyed).join(' | ')}`}\n`)
-   + `Then run: ${businessCommand('run')}\n`);
+   + `Then run: ${businessCommand('run --once')}\n`);
   return;
  }
  const { toolId, vendorId, vendors } = classification(item);

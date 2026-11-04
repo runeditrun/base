@@ -74,7 +74,7 @@ test('Business entry points expose setup before advanced commands and preserve t
 
 test('Business verb help explains each command without pairing or reading a session file', async t => {
  const home = join(directory, 'verb-help-home');
- for (const verb of ['setup', 'connect', 'token']) {
+ for (const verb of ['setup', 'connect', 'run', 'token']) {
   const result = await cli(home, ['business', verb, '--help']);
   t.diagnostic(`rer business ${verb} --help\n${result.stdout}`);
   assert.equal(result.code, 0, result.stderr);
@@ -84,6 +84,10 @@ test('Business verb help explains each command without pairing or reading a sess
    assert.match(result.stdout, /provision[^\n]*demo/i);
   }
  }
+ const badOrigin = await cli(home, ['business', 'connect', '--origin', 'http://example.test']);
+ assert.equal(badOrigin.code, 1);
+ assert.match(badOrigin.stderr, /origin must be an HTTPS origin.*HTTP is allowed only on loopback/);
+ assert.ok(!badOrigin.stderr.includes('Advanced commands'));
  assert.deepEqual(await readdir(home), [], 'help creates no pairing or credentials');
 });
 
@@ -597,6 +601,27 @@ test('connect starts and resumes device approval, respects poll intervals and pr
  assert.equal(stateRefused.code, 1); assert.equal(starts(remote), beforeBlocked);
  assert.match(stateRefused.stderr, /Business cannot save its state/);
 
+ // Overlapping starts share one pending pairing, even before the first start
+ // response arrives. The lock ends after the save, so both commands can wait.
+ const concurrent = await fixtureServer(t), concurrentHome = join(directory, 'concurrent-pairing-home');
+ let started, release;
+ const atStart = new Promise(resolve => { started = resolve; });
+ const startResponse = new Promise(resolve => { release = resolve; });
+ concurrent.state.onStart = async () => { started(); await startResponse; };
+ const concurrentArgs = ['business', 'connect', '--business', 'biz', '--origin', concurrent.origin, '--timeout', '0'];
+ const firstRun = cli(concurrentHome, concurrentArgs);
+ await Promise.race([atStart, firstRun.then(result => assert.fail(`connect ended before starting: ${result.stderr}`))]);
+ let spawned;
+ const secondSpawned = new Promise(resolve => { spawned = resolve; });
+ const secondRun = cli(concurrentHome, concurrentArgs, { onSpawn: spawned });
+ await secondSpawned; await delay(300); release();
+ const concurrentRuns = await Promise.all([firstRun, secondRun]);
+ assert.deepEqual(concurrentRuns.map(result => result.code), [75, 75]);
+ assert.equal(starts(concurrent), 1, 'concurrent connects start only one pairing');
+ assert.equal(concurrentRuns[0].stdout.split('\n').slice(0, 2).join('\n'), concurrentRuns[1].stdout.split('\n').slice(0, 2).join('\n'), 'both runs show the same owner code and link');
+ await assert.rejects(stat(join(concurrentHome, '.rer/business/pairing.lock')), { code: 'ENOENT' });
+ assert.equal((await cli(concurrentHome, ['business', 'disconnect'])).code, 0);
+
  const before = starts(remote), issuesBefore = remote.state.credentialIssues ?? 0;
  const waitingRun = await cli(home, ['business', 'connect', ...args, '--timeout', '1']);
  assert.equal(waitingRun.code, 75, waitingRun.stderr);
@@ -716,7 +741,7 @@ test('connect starts and resumes device approval, respects poll intervals and pr
  assert.equal((await cli(home, ['business', 'disconnect'])).code, 0);
 
  // Malformed or off-origin links are never saved or printed.
- for (const patch of [{ device_code: 'invalid' }, { user_code: 'AAAA-0000' }, { verification_uri: 'https://other.test/business/biz/pair' }, { verification_uri_complete: remote.origin + '/business/biz/pair?code=WDJB-MJHT' }, { business_id: 'other' }, { expires_in: 901 }, { interval: 0 }, { expires_at: 'invalid' }]) {
+ for (const patch of [{ device_code: 'invalid' }, { user_code: 'AAAA-0000' }, { user_code: ['WDJB-MJHT'] }, { verification_uri: 'https://other.test/business/biz/pair' }, { verification_uri_complete: remote.origin + '/business/biz/pair?code=WDJB-MJHT' }, { business_id: 'other' }, { expires_in: 901 }, { interval: 0 }, { expires_at: 'invalid' }]) {
   remote.state.startPatch = patch;
   const invalid = await cli(home, ['business', 'connect', ...args, '--timeout', '0']);
   assert.equal(invalid.code, 1); assert.equal(invalid.stdout, ''); await absent();
@@ -1109,7 +1134,7 @@ test('inside an agent sandbox run and next apply the owner\'s choices for its ag
  remote.state.tasks = [{ task_id: 'sandbox-discover', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
  // next has nothing to answer, and says run has work and how to start it.
  const ready = await cli(home, ['business','next'], { env }), escaped = stateDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
- assert.match(ready.stdout, new RegExp(`Ready for run: this computer's names-only scan of the folders the owner allowed\\. Start it with: RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business run\n$`), 'an agent step waits, so next never says Nothing yet');
+ assert.match(ready.stdout, new RegExp(`Ready for run: this computer's names-only scan of the folders the owner allowed\\. Start it with: RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business run --once\n$`), 'an agent step waits, so next never says Nothing yet');
  const scanned = await cli(home, ['business','run','--once'], { env });
  assert.equal(scanned.code, 0, scanned.stderr); assert.equal(remote.state.phase, 'done');
  assert.ok(scanned.stdout.includes('Scanning this computer\'s allowed folders for tool names') && scanned.stdout.includes('discover.local completed'), scanned.stdout);
@@ -1214,7 +1239,7 @@ test('an agent exports a vendor into its app\'s import door: next names the owne
  const outputs = [];
  const next = await cli(home, ['business','next'], { env }); outputs.push(next);
  assert.equal(next.code, 0, next.stderr);
- assert.match(next.stdout, new RegExp(`(?:^|\\n)Agent: biz:seed:uptime:export:tool1\\n[\\s\\S]*ask the owner to type this in their own terminal[\\s\\S]*\\n  RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business vendor-key add uptimerobot\\nThen run: RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business run\\n$`), next.stdout);
+ assert.match(next.stdout, new RegExp(`(?:^|\\n)Agent: biz:seed:uptime:export:tool1\\n[\\s\\S]*ask the owner to type this in their own terminal[\\s\\S]*\\n  RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business vendor-key add uptimerobot\\nThen run: RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business run --once\\n$`), next.stdout);
  assert.ok(!next.stdout.includes('Nothing yet') && !next.stdout.includes('untrusted-run-command-canary'), next.stdout);
 
  // Without the owner's key, run hands the task back as paused and names the owner's command, not "Nothing yet".
@@ -1315,12 +1340,12 @@ test('an agent exports Sentry, PagerDuty and Sorry with the non-secret inputs it
   { vendor: 'sorry', name: 'Sorry', host: 'status.fixture-sorry.example', records: 30 + 30, inputs: { page: { host: 'status.fixture-sorry.example' } } },
  ];
 
- // A Sentry export whose task does not carry its organization yet waits for Business, released as paused.
+ // A legacy leased task still reports configuration_required; its words name the owner step.
  remote.state.exportVendor = 'sentry';
  remote.state.tasks = [{ task_id: 'biz:spool:export:sentry-early', kind: 'export.vendor', state: 'ready', runner: 'executor', fence: 0, title: 'Export Sentry history' }];
  const early = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(early);
  assert.equal(early.code, 1, early.stdout);
- assert.ok(early.stderr.includes('Sentry organization and export window, which this task does not carry yet') && !early.stdout.includes('Nothing yet'), early.stderr);
+ assert.ok((/Waiting for the owner to confirm .*Sentry organization and export window.* in Business\./).test(early.stderr) && !early.stdout.includes('Nothing yet'), early.stderr);
  assert.equal(remote.state.released.reason, 'paused');
  assert.ok(remote.state.requests.some(entry => entry.route === '/api/business/tasks/biz%3Aspool%3Aexport%3Asentry-early/events' && entry.body.event?.payload.question === 'configuration_required'));
  assert.equal(seed.state.requests.length, 0, 'nothing reaches the door without the inputs');
@@ -1345,7 +1370,7 @@ test('an agent exports Sentry, PagerDuty and Sorry with the non-secret inputs it
   remote.state.tasks = [{ task_id: id, kind: 'export.vendor', state: 'ready', runner: 'executor', fence: 0, title: `Export ${move.name} history`, export_inputs: move.inputs }];
   const next = await cli(home, ['business','next'], { env }); outputs.push(next);
   assert.equal(next.code, 0, next.stderr);
-  assert.ok((`\n${next.stdout}`).includes(`\nAgent: ${id}\n`) && /\nThen run: .*business run\n$/.test(next.stdout) && !next.stdout.includes('Nothing yet'), next.stdout);
+  assert.ok((`\n${next.stdout}`).includes(`\nAgent: ${id}\n`) && /\nThen run: .*business run --once\n$/.test(next.stdout) && !next.stdout.includes('Nothing yet'), next.stdout);
   if (move.vendor === 'sorry') assert.ok(next.stdout.includes('Vendor key: none; Sorry is read from its public page') && !next.stdout.includes('vendor-key'), next.stdout);
   else {
    assert.ok(next.stdout.includes(`business vendor-key add ${move.vendor}\n`), next.stdout);
@@ -1487,7 +1512,7 @@ test('an agent catches up and archives a vendor through its app\'s import door, 
  remote.state.tasks = [remote.state.tasks[0], { task_id: 'biz:tool1:catchup1', kind: 'catchup.vendor', state: 'ready', runner: 'executor', fence: 0, title: 'Bring over recent UptimeRobot changes' }];
  const catchupNext = await cli(home, ['business','next'], { env }); outputs.push(catchupNext);
  assert.ok((`\n${catchupNext.stdout}`).includes('\nAgent: biz:tool1:catchup1\n') && catchupNext.stdout.includes('catch-up') && catchupNext.stdout.includes("read-only UptimeRobot key is stored")
-  && /\nThen run: .*business run\n$/.test(catchupNext.stdout), catchupNext.stdout);
+  && /\nThen run: .*business run --once\n$/.test(catchupNext.stdout), catchupNext.stdout);
  const bounded = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(bounded);
  assert.equal(bounded.code, 0, bounded.stderr);
  const [standing] = seed.state.plans;
@@ -1526,7 +1551,7 @@ test('an agent catches up and archives a vendor through its app\'s import door, 
  // The archive: the final export kept by the door and test-restored, by this computer and again by Business.
  remote.state.tasks = [{ task_id: 'biz:tool1:archive', kind: 'switchoff.archive', state: 'ready', runner: 'executor', fence: 0, title: 'Archive UptimeRobot before switching it off' }];
  const archiveNext = await cli(home, ['business','next'], { env }); outputs.push(archiveNext);
- assert.ok((`\n${archiveNext.stdout}`).includes('\nAgent: biz:tool1:archive\n') && archiveNext.stdout.includes('archive') && /\nThen run: .*business run\n$/.test(archiveNext.stdout), archiveNext.stdout);
+ assert.ok((`\n${archiveNext.stdout}`).includes('\nAgent: biz:tool1:archive\n') && archiveNext.stdout.includes('archive') && /\nThen run: .*business run --once\n$/.test(archiveNext.stdout), archiveNext.stdout);
  const doorBefore = seed.state.requests.length;
  const archived = await cli(home, ['business','run','--once'], { env: vendorEnv }); outputs.push(archived);
  assert.equal(archived.code, 0, archived.stderr);
@@ -1552,4 +1577,75 @@ test('an agent catches up and archives a vendor through its app\'s import door, 
   assert.ok(!(await readFile(join(stateDir, name), 'utf8')).includes(key), `${name} holds no key`);
  }
  assert.equal((await cli(home, ['business','disconnect'], { env })).code, 0);
+});
+
+test('run waits for platform owner steps without releasing a lease, resumes after the owner acts, and still fails other refusals', async t => {
+ const remote = await fixtureServer(t), seed = await door(t), home = join(directory, 'owner-wait-home'), stateDir = join(home, '.rer-business');
+ const env = { RER_BUSINESS_STATE_DIR: stateDir };
+ const vendorEnv = { ...env, NODE_OPTIONS: `--import=${join(fixture, 'register.mjs')} --import=${join(fixture, 'vendor-edge.mjs')}` };
+ await connect(home, remote, { env });
+ remote.state.optIns = { installPermissions: false, awakeConsent: false, installService: false };
+ remote.state.door = seed; seed.state.stateDir = stateDir;
+ seed.state.baselines.set('uptimerobot', []);
+ assert.equal((await cli(home, ['business', 'vendor-key', 'add', 'uptimerobot'], { terminal: true, input: 'synthetic-wait-key\n', env })).code, 0);
+ const task = (id, catchup = false) => ({ task_id: id, kind: catchup ? 'catchup.vendor' : 'export.vendor', state: 'ready', runner: 'executor', fence: 0,
+  title: catchup ? 'Bring over recent UptimeRobot changes' : 'Export Sorry history', ...(catchup ? {} : { export_inputs: { page: { host: 'status.fixture-sorry.example' } } }) });
+ const claimCount = () => remote.state.requests.filter(request => request.route === '/api/business/executors/claim').length;
+ const releaseCount = () => remote.state.requests.filter(request => request.route.endsWith('/release')).length;
+ for (const catchup of [false, true]) {
+  const code = catchup ? 'business_catchup_approval_required' : 'business_export_inputs_required';
+  remote.state.exportVendor = catchup ? 'uptimerobot' : 'sorry';
+  const ownerStep = catchup ? /Waiting for the owner to approve this catch-up in Business:/ : /Waiting for the owner to confirm the address in Business:/;
+  for (const columns of [180, 48]) {
+   remote.state.tasks = [task(`biz:owner-wait:${catchup}:${columns}`, catchup)]; remote.state.ownerWait = code;
+   const releases = releaseCount();
+   const once = await cli(home, ['business', 'run', '--once'], { env: vendorEnv, columns });
+   assert.equal(once.code, 0, once.stderr); assert.equal(once.stderr, '');
+   assert.match(once.stdout, ownerStep);
+   assert.ok(once.stdout.includes(catchup ? 'This catch-up is outside the tool’s catch-up grant.' : 'Waiting for the owner to confirm the address in Business.'), once.stdout);
+   assert.ok(once.stdout.includes(`${remote.origin}/business/biz${catchup ? '/moves/tool1' : ''}`));
+   assert.equal(releaseCount(), releases, 'the platform already holds the task for the owner');
+   assert.deepEqual(JSON.parse(await readFile(join(stateDir, 'progress.json'), 'utf8')), {}, 'no stale claim is retried');
+   t.diagnostic(`PROBE once-${columns} A: ${code} -> exit=${once.code}; ${once.stdout.split('\n').filter(line => ownerStep.test(line)).join('')}; releases=0`);
+  }
+  remote.state.tasks = [task(`biz:owner-wait:continuous:${catchup}`, catchup)]; remote.state.ownerWait = code;
+  const claims = claimCount(), releases = releaseCount();
+  let sawWait = false, ownerActed = false, runner, claimedBeforeAnswer;
+  remote.state.onSelf = async () => {
+   if (!sawWait || ownerActed) return;
+   ownerActed = true; claimedBeforeAnswer = claimCount() - claims;
+   remote.state.ownerWait = null;
+   remote.state.tasks[0].state = remote.state.phase = catchup ? 'done' : 'ready';
+   if (catchup) setTimeout(() => runner.kill('SIGTERM'), 250);
+  };
+  const continuous = await cli(home, ['business', 'run'], { env: vendorEnv, onSpawn: child => { runner = child; }, onOutput: (stdout, child) => {
+   if (ownerStep.test(stdout)) sawWait = true;
+   if (!catchup && stdout.includes('Import preview ready')) child.kill('SIGTERM');
+  } });
+  remote.state.onSelf = null;
+  assert.equal(continuous.code, 0, continuous.stderr);
+  assert.ok(sawWait && ownerActed, 'the same process survives until the owner acts at the next check-in');
+  assert.equal(claimedBeforeAnswer, 1, 'the wait sleeps rather than repeatedly claiming');
+  assert.equal(continuous.stdout.split('\n').filter(line => ownerStep.test(line)).length, 1, 'unchanged owner step stays quiet');
+  assert.equal(releaseCount(), releases, 'neither waiting path releases as paused or failed');
+  assert.equal(remote.state.phase, 'done', 'the owner or resumed export finishes the task');
+  t.diagnostic(`PROBE continuous A: ${code} -> owner step printed once; alive until owner answer; task done; exit=${continuous.code}`);
+ }
+ // A matching code with the wrong status, or export without the contract state,
+ // is still a failure. Ordinary 403/500 retain the server's original reason.
+ for (const [status, code, state] of [[403, 'business_catchup_approval_required'], [500, 'business_export_inputs_required', 'waiting_for_owner'], [409, 'business_export_inputs_required'], [409, 'another_conflict', 'waiting_for_owner']]) {
+  remote.state.tasks = [task(`biz:refused:${status}:${code}`)];
+  const message = `original refusal ${status}`;
+  remote.state.claimRefusal = [{ error: message, code, ...(state ? { state } : {}) }, status];
+  for (const args of [['run', '--once'], ['run']]) {
+   const refused = await cli(home, ['business', ...args], { env });
+   assert.equal(refused.code, 1);
+   assert.equal(refused.stderr, `Business server refused the request (HTTP ${status}). The server said: ${message}.\n`);
+  }
+  t.diagnostic(`PROBE refused A: HTTP ${status} ${code} state=${state ?? 'absent'} -> both run modes exit=1; original message retained`);
+ }
+ remote.state.claimRefusal = null;
+ const ended = await deviceOwner(remote, 'approve');
+ assert.equal(ended.status, 409);
+ assert.equal((await ended.json()).status, 'connected');
 });

@@ -14,11 +14,12 @@ export function originUrl(value = 'https://app.runeditrun.com') {
 // The server's own reason travels with its status: platform errors answer
 // {error, requestId}. It is shown as one bounded line of text, never as markup.
 export class ApiError extends Error {
- constructor(status, reason = null, requestId = null, code = null) {
+ constructor(status, reason = null, requestId = null, code = null, { state, link } = {}) {
   const said = reason ? ` The server said: ${reason}${/[.!?]$/.test(reason) ? '' : '.'}` : '';
   const reference = requestId ? ` Reference ${requestId}.` : '';
   super((status === 401 ? 'Business pairing was revoked or expired. Reconnect in your browser.' : `Business server refused the request (HTTP ${status}).`) + said + reference);
   this.status = status; this.reason = reason; this.requestId = requestId; this.code = code;
+  this.state = state; this.link = link;
  }
 }
 
@@ -33,7 +34,8 @@ async function refusal(response, quiet = false) {
  const code = typeof body?.code === 'string' && /^[a-z][a-z0-9_]{0,79}$/.test(body.code) ? body.code : null;
  // Pairing responses can echo secrets, including the short user code. Only
  // the bounded machine code is needed by that flow, never server prose.
- return new ApiError(response.status, quiet ? null : reason, quiet ? null : requestId, code);
+ return new ApiError(response.status, quiet ? null : reason, quiet ? null : requestId, code,
+  quiet ? {} : { state: body?.state === 'waiting_for_owner' ? body.state : undefined, link: line(body?.link) });
 }
 
 const network = {

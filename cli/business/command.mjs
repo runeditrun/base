@@ -47,6 +47,12 @@ In an agent sandbox that writes only inside its working folder, use RER_BUSINESS
 `;
 
 const verbHelp = {
+ run: `Usage: rer business run [--once]
+Work this computer's tasks and check in every 25 seconds until stopped.
+When Business needs the owner's catch-up approval or export details,
+print the owner step and keep waiting between check-ins. --once returns then.
+Exits 0 completed, idle or waiting for the owner; 1 failed; 2 usage.
+`,
  connect: `Usage: rer business connect --business ID [--origin URL] [--timeout SECONDS]
 Pair this computer with a Business. Prints a code and a link: the owner opens the
 link in a signed-in browser, checks the code and approves. Waits for that (up to
@@ -87,8 +93,8 @@ export async function businessCommand(argv) {
    }
    try {
     if (options.business !== undefined) identifier(options.business);
-    if (options.origin !== undefined && options.code === undefined) originUrl(options.origin);
    } catch { return invalid(); }
+   if (options.origin !== undefined && options.code === undefined) originUrl(options.origin);
    await connect(options);
   } else if (verb === 'vendor-key' && args.length === 2) await vendorKey(...args);
   else if (verb === 'answer' && [3, 4].includes(args.length)) await answer(...args);

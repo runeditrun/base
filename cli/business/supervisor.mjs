@@ -22,6 +22,24 @@ const kinds = new Set(['discover.local', ...Object.keys(vendorWork)]);
 export function supportsTaskKind(kind) { return kinds.has(kind); }
 const checkIn = 25_000;
 
+// Only these platform refusals hand work to the owner. Catch-up completion
+// has already surrendered its lease; an export-input wait never claims one.
+function ownerWait(error, state) {
+ if (error.status !== 409) return null;
+ const catchup = error.code === 'business_catchup_approval_required';
+ if (!catchup && !(error.code === 'business_export_inputs_required' && error.state === 'waiting_for_owner')) return null;
+ let link = ownerLink(state);
+ if (catchup && typeof error.link === 'string') {
+  try {
+   const url = new URL(error.link, state.origin);
+   if (url.origin === state.origin && !url.username && !url.password && !url.search && !url.hash
+    && url.pathname.startsWith(new URL(link).pathname + '/moves/')) link = url.href;
+  } catch { /* The Business page is where the owner can find this step. */ }
+ }
+ const step = catchup ? 'approve this catch-up' : /\baddress\b/.test(error.reason ?? '') ? 'confirm the address' : 'confirm the export details';
+ return `${error.reason ? error.reason + '\n' : ''}Waiting for the owner to ${step} in Business: ${link}`;
+}
+
 /** Work this computer's tasks. It says what it is doing and what it waits
  * for, applies the owner's choices at every check-in, and removes run.lock on
  * every exit, including Ctrl-C, SIGTERM and a closed terminal (SIGHUP). */
@@ -29,7 +47,7 @@ export async function run({ once = false } = {}) {
  const { state, credential } = await paired(), api = new Api(state.origin, credential), directory = stateDirectory();
  // Tasks this run handed back as paused, with what each waits for. An export
  // waiting only for the owner's vendor key is picked up again once it is stored.
- const parked = new Map(), unlock = await lockSupervisor(), stop = new AbortController();
+ const parked = new Map(), ownerWaits = new Map(), unlock = await lockSupervisor(), stop = new AbortController();
  // A terminal's Ctrl-C reaches npx and this process together, and npx then
  // forwards another SIGINT, which can arrive at any moment until this process
  // has exited. So the handlers stay for the rest of the process: a repeated
@@ -42,7 +60,7 @@ export async function run({ once = false } = {}) {
  let progress, stopCarry, said = '', held = null, summaries = [];
  const say = text => { if (text !== said) { said = text; process.stdout.write(text + '\n'); } };
  // An agent step that waits is said in its own words, never as "Nothing yet".
- const waits = () => [...new Set([...summaries.filter(task => parked.has(task.task_id)).map(task => parked.get(task.task_id).message), ...agentWaiting(summaries)])];
+ const waits = () => [...new Set([...ownerWaits.values(), ...summaries.filter(task => parked.has(task.task_id)).map(task => parked.get(task.task_id).message), ...agentWaiting(summaries)])];
  // With no agent step waiting, a move's owner step (freeze, rollback, cancellation) is named with its link.
  const idle = () => { const owner = ownerWaiting(summaries, state); return owner.length ? owner.join('\n') : waitingFor(state); };
  try {
@@ -60,6 +78,7 @@ export async function run({ once = false } = {}) {
    }
    if (!progress.pendingClaim) {
     summaries = await nextQuestions(api, stop.signal);
+    for (const task of summaries) if (['ready', 'leased', 'done', 'failed', 'canceled'].includes(task.state)) ownerWaits.delete(task.task_id);
     const handles = (await loadState())?.vendorHandles ?? [];
     for (const [id, wait] of parked) if (wait.keyMissing && handles.includes(vendorHandle(wait.keyMissing))) parked.delete(id);
     const selected = summaries.find(task => kinds.has(task.kind) && ['ready','leased'].includes(task.state) && !parked.has(task.task_id));
@@ -76,9 +95,12 @@ export async function run({ once = false } = {}) {
    let claimed;
    try { claimed = await api.post('/api/business/executors/claim', { ...progress.pendingClaim, wait_seconds: 25 }, { signal: stop.signal }); }
    catch (error) {
-    if (error.status !== 409) throw error;
+    const waiting = ownerWait(error, state);
+    if (!waiting) throw error;
+    ownerWaits.set(progress.pendingClaim.task_id, waiting); say(waiting);
     progress = {}; await saveProgress(progress);
-    if (once) throw error;
+    held = null;
+    if (once) return;
     await pause(checkIn, stop.signal); continue;
    }
    if (!claimed.task || claimed.task.state !== 'leased' || claimed.task.fence !== claimed.fence || Date.parse(claimed.lease_expires_at) <= Date.now()) {
@@ -130,14 +152,20 @@ export async function run({ once = false } = {}) {
     }
    } catch (error) { failure = lease.signal.aborted ? lease.signal.reason : error; }
    finally {
-    if (!finished && failure?.status !== 401) {
+    if (!finished && failure?.status !== 401 && !ownerWait(failure ?? {}, state)) {
      try { await lease.release(stop.signal.aborted ? 'handover' : parked.has(claimed.task.id) ? 'paused' : 'failed'); released = true; }
      catch (error) { if (error.status === 401) failure = error; }
     }
     await lease.close();
-    if (finished || released) { progress = {}; await saveProgress(progress); }
+    if (finished || released || ownerWait(failure ?? {}, state)) { progress = {}; await saveProgress(progress); }
    }
    if (failure) {
+    const waiting = ownerWait(failure, state);
+    if (waiting && !stop.signal.aborted) {
+     ownerWaits.set(claimed.task.id, waiting); say(waiting); held = null;
+     if (once) return;
+     await pause(checkIn, stop.signal); continue;
+    }
     if (failure.status === 401 || once || !parked.has(claimed.task.id)) throw failure;
     process.stderr.write(failure.message + '\n');
    }

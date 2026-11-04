@@ -3,6 +3,7 @@ import { readFileSync, unlinkSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import { localCause } from './errors.mjs';
 
 // RER_BUSINESS_STATE_DIR names the folder itself, for agent sandboxes that may write only
@@ -61,7 +62,7 @@ async function saveJson(name, value) {
  * Folders made only for the check are removed again, so a refused connect
  * leaves nothing behind.
  */
-export async function checkStateWritable() {
+export async function checkStateWritable({ codeExists = true } = {}) {
  const directory = stateDirectory(), probe = join(directory, `${randomUUID()}.tmp`), created = [];
  for (let path = directory; path !== dirname(path); path = dirname(path)) {
   try { await lstat(path); break; } catch (error) { if (error.code !== 'ENOENT') break; created.push(path); }
@@ -77,7 +78,7 @@ export async function checkStateWritable() {
   const fix = chosenStateDirectory()
    ? 'Allow writes to that folder in this session, or set RER_BUSINESS_STATE_DIR to a folder this session can write'
    : 'Allow writes to that folder, or set RER_BUSINESS_STATE_DIR to a folder this session can write (in Codex, one inside the working folder, such as RER_BUSINESS_STATE_DIR="$PWD/.rer-business")';
-  throw Error(`Business cannot save its state in ${directory}: ${localCause(error) ?? error.message}. Nothing was sent, so the pairing code still works. ${fix}, then run connect again.`);
+  throw Error(`Business cannot save its state in ${directory}: ${localCause(error) ?? error.message}. ${codeExists ? 'Nothing was sent, so the pairing code still works.' : 'Nothing was sent.'} ${fix}, then run connect again.`);
  } finally {
   for (const path of created) await rmdir(path).catch(() => {});
  }
@@ -85,7 +86,7 @@ export async function checkStateWritable() {
 
 // Files this CLI writes in its state folder. A folder named by RER_BUSINESS_STATE_DIR
 // may hold other things, so only these are removed from it.
-const owned = /^(?:(?:state|pairing|progress|permissions|service|carried)\.json|run\.lock|disconnect|service(?:-error)?\.log|discovery-[A-Za-z0-9_.:-]+\.(?:json|tmp)|export-[0-9a-f]{32}\.bundle|.*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.tmp(?:\.check)?)$/;
+const owned = /^(?:(?:state|pairing|progress|permissions|service|carried)\.json|(?:run|pairing)\.lock|disconnect|service(?:-error)?\.log|discovery-[A-Za-z0-9_.:-]+\.(?:json|tmp)|export-[0-9a-f]{32}\.bundle|.*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.tmp(?:\.check)?)$/;
 /** After a revocation whose local cleanup was refused, keep only what a later
  * disconnect needs to finish: the state and the receipts of what remains. */
 export async function removeWorkFiles(keep = ['state.json', 'permissions.json', 'service.json']) {
@@ -152,4 +153,45 @@ export async function lockSupervisor() {
   }
  }
  throw Error('Could not acquire Business supervisor lock.');
+}
+
+/** Serialize the pending read, start and save. Contenders wait, then resume
+ * the saved pairing; the lock never covers the foreground approval wait. */
+export async function lockPairing(signal) {
+ const directory = stateDirectory(), path = join(directory, 'pairing.lock'), created = [];
+ for (let parent = directory; parent !== dirname(parent); parent = dirname(parent)) {
+  try { await lstat(parent); break; } catch (error) { if (error.code !== 'ENOENT') break; created.push(parent); }
+ }
+ const cleanDirectories = async () => { for (const parent of created) await rmdir(parent).catch(() => {}); };
+ let file;
+ try {
+  while (true) {
+   signal?.throwIfAborted();
+   await mkdir(directory, { recursive: true, mode: 0o700 });
+   try { file = await open(path, 'wx', 0o600); }
+   catch (error) {
+    if (error.code === 'ENOENT') continue; // A failed starter removed its empty folder.
+    if (error.code !== 'EEXIST') throw error;
+    if (await liveSupervisor(path)) await delay(50, undefined, { signal });
+    else await unlink(path).catch(error => { if (error.code !== 'ENOENT') throw error; });
+    continue;
+   }
+   try { await file.writeFile(String(process.pid)); } finally { await file.close(); }
+   const refresh = setInterval(() => { const now = new Date(); utimes(path, now, now).catch(() => {}); }, 30_000);
+   refresh.unref();
+   const exit = () => { try { if (readFileSync(path, 'utf8') === String(process.pid)) unlinkSync(path); } catch { /* Already gone. */ } };
+   process.once('exit', exit);
+   let released = false;
+   return async () => {
+    if (released) return;
+    released = true;
+    clearInterval(refresh); process.off('exit', exit); exit();
+    await cleanDirectories();
+   };
+  }
+ } catch (error) {
+  if (file) await unlink(path).catch(() => {});
+  await cleanDirectories();
+  throw error;
+ }
 }

@@ -20,6 +20,18 @@ export async function server(t, { businessId = 'biz' } = {}) {
  let redeemed = false, issued = false, tokenSequence = 0, origin, pairingExpires = 0;
  const pairings = new Map();
  const deviceRefusal = (status, code) => [{ error: state.refusalText ?? 'Fixture device pairing refused', code }, status];
+ // Platform catchups.ts hands the completed lease to the owner; export input
+ // waits in executors/tasks.ts refuse the claim before there is a lease.
+ function ownerWait(code, id) {
+  const task = state.tasks.find(task => task.task_id === id);
+  if (code === 'business_catchup_approval_required') {
+   task.state = state.phase = 'needs_input'; state.fence++;
+   return [{ error: 'This catch-up is outside the tool’s catch-up grant. It waits for the owner’s approval on the move’s page.', code,
+    plan_id: 'plan1', fingerprint: 'fixture-fingerprint', link: `/business/${businessId}/moves/tool1` }, 409];
+  }
+  task.state = state.phase = 'waiting_for_owner'; state.fence++;
+  return [{ error: 'Waiting for the owner to confirm the address in Business.', code, state: 'waiting_for_owner', question_task_id: 'question1' }, 409];
+ }
  function startDevice(body, request) {
   requireValue(!request.headers.authorization && !request.headers.cookie);
   closed(body, ['business_id', 'os', 'agent_kind', 'capabilities', 'device_name', 'working_folder', 'policy_signing_keys']);
@@ -196,7 +208,10 @@ export async function server(t, { businessId = 'biz' } = {}) {
     closed(body, ['user_code']);
     const pairing = [...pairings.values()].find(value => value.id === owner[1]);
     if (!pairing || body.user_code !== pairing.user_code) return send(...deviceRefusal(404, 'pairing_not_found'));
-    if (pairing.consumed || pairing.denied || owner[2] === 'approve' && pairing.approved || pairing.expires <= Date.now()) return send(...deviceRefusal(409, 'pairing_not_pending'));
+    if (pairing.consumed || pairing.denied || owner[2] === 'approve' && pairing.approved || pairing.expires <= Date.now()) {
+     const status = pairing.consumed ? 'connected' : pairing.denied ? 'denied' : pairing.expires <= Date.now() ? 'expired' : pairing.approved ? 'approved' : 'pending';
+     return send({ error: 'This pairing is no longer waiting for approval', code: 'pairing_not_pending', status }, 409);
+    }
     if (owner[2] === 'approve') {
      if (state.paused) return send(...deviceRefusal(409, 'business_paused'));
      pairing.approved = true; pairing.expires = Date.now() + 600_000;
@@ -216,7 +231,12 @@ export async function server(t, { businessId = 'biz' } = {}) {
    }
    if (route === '/api/business/executors/token') return send(mint(request, body));
    if (route === '/api/business/mcp') return mcp(request, body, send);
-   if (route === '/api/business/executors/claim') { requireDevice(request); return send(tasks.claim(body)); }
+   if (route === '/api/business/executors/claim') {
+    requireDevice(request);
+    if (state.claimRefusal) return send(...state.claimRefusal);
+    if (state.ownerWait === 'business_export_inputs_required') return send(...ownerWait(state.ownerWait, body.task_id));
+    return send(tasks.claim(body));
+   }
    const granting = /^\/api\/business\/tasks\/([^/]+)\/import-grants$/.exec(route);
    if (granting) {
     if (request.headers.authorization === `Bearer ${device}`) { requireDevice(request); requireValue(false, 403); }
@@ -227,6 +247,8 @@ export async function server(t, { businessId = 'biz' } = {}) {
    if (match) {
     if (request.headers.authorization === `Bearer ${device}`) { requireDevice(request); requireValue(false, 403); }
     const id = decodeURIComponent(match[1]); bearer(request, 'tasks', id);
+    if (match[2] === 'complete' && state.ownerWait === 'business_catchup_approval_required') return send(...ownerWait(state.ownerWait, id));
+    if (state.taskRefusal?.action === match[2]) return send(state.taskRefusal.body, state.taskRefusal.status);
     return send(tasks.action(id, match[2], body));
    }
    return send({}, 404);

@@ -501,7 +501,7 @@ agent and OS (including WSL) for the owner to recognise.
 For older Business pages, `rer business connect --code ABCD-1234 --origin URL`
 keeps the browser-created code and six-digit confirmation-number flow unchanged
 in 0.2.98. It cannot be combined with `--business` or `--timeout`. Removal is
-planned for 0.2.99 after the production rollback target uses device pairing.
+planned for a later release after the production rollback target uses device pairing.
 The install.sh form still passes either connect command through unchanged.
 
 The owner chooses three things on the computer's row in the browser: "Add rules

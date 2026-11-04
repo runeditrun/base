@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { Api, originUrl, identifier, pause } from './api.mjs';
-import { loadState, saveState, credentialHandle, deviceCredentialHandle, loadPending, savePending, clearPending, checkStateWritable } from './state.mjs';
+import { loadState, saveState, credentialHandle, deviceCredentialHandle, loadPending, savePending, clearPending, checkStateWritable, lockPairing } from './state.mjs';
 import { createCredentialStore } from './keychain.mjs';
 import { applyChoices } from './choices.mjs';
 import { rerCommand, businessCommand } from './invocation.mjs';
@@ -24,16 +24,17 @@ const nothingSent = 'Nothing was sent, so the pairing code still works.';
  * computer is active: its credential is stored and the server has seen it.
  */
 export async function connect(options = {}) {
+ if (options.business !== undefined) return connectDevice(options);
  const pending = await loadPending();
  // Approval can outlive the original code deadline. A legacy command must
  // not discard a device pairing that is still within its collection window.
  if (pending?.flow === 'device' && options.code !== undefined && Date.parse(pending.keep_until) > Date.now()) throw Error('Business is already waiting for a device pairing. Resume that command, or run business disconnect before using another code.');
- if (options.business !== undefined || pending?.flow === 'device' && options.code === undefined) return connectDevice(options);
+ if (pending?.flow === 'device' && options.code === undefined) return connectDevice(options);
  return connectLegacy(options);
 }
 
-// Compatibility with browser-created codes is retained through 0.2.98 and
-// removed in 0.2.99, once the production rollback target uses device pairing.
+// Removal of the browser-created --code flow is planned for a later release,
+// once the production rollback target uses device pairing.
 async function connectLegacy({ code, origin } = {}) {
  const stored = await loadState();
  let pending = await loadPending();
@@ -140,45 +141,47 @@ const terminalPairing = new Map([
 
 function validateDevicePairing(value, origin, businessId) {
  const uri = `${origin}/business/${encodeURIComponent(businessId)}/pair`;
- if (!value || !secretValid(value.device_code, 'bz_pairing_') || !shortCode.test(value.user_code)
+ if (!value || !secretValid(value.device_code, 'bz_pairing_') || typeof value.user_code !== 'string' || !shortCode.test(value.user_code)
   || value.verification_uri !== uri || value.business_id !== businessId
   || value.verification_uri_complete !== undefined && value.verification_uri_complete !== `${uri}#${value.user_code}`
   || !intervalValid(value.interval) || !timestampValid(value.expires_at)) throw Error('Business server returned an invalid device pairing response.');
 }
 
 async function connectDevice({ business, origin, timeout } = {}) {
- const stored = await loadState();
- let pending = await loadPending();
- origin = originUrl(origin ?? stored?.origin ?? pending?.origin);
- business = identifier(business ?? pending?.businessId);
- if (stored) {
-  if (stored.revoked) throw Error(`This computer was ${revokedText(stored)}`);
-  if (stored.origin !== origin || stored.businessId !== business) throw Error(`This state folder is connected to Business ${identifier(stored.businessId)} at ${originUrl(stored.origin)}. Run disconnect, or use another RER_BUSINESS_STATE_DIR.`);
-  const credential = await createCredentialStore().get(deviceCredentialHandle(stored));
-  if (!credential) throw Error('This computer\'s Business credential is missing from OS credential storage. Run disconnect, then connect again.');
-  return connected(new Api(origin, credential), stored, { reconnecting: true });
- }
- if (pending && Date.parse(pending.flow === 'device' ? pending.keep_until : pending.expires_at) <= Date.now()) { await clearPending(); pending = null; }
- if (pending && (pending.flow !== 'device' || pending.origin !== origin || pending.businessId !== business)) throw Error('Business is already waiting for another pairing. Resume that command, or run business disconnect before joining another Business.');
- if (pending) {
-  validateDevicePairing({ ...pending, business_id: pending.businessId }, origin, business);
-  if (!timestampValid(pending.keep_until) || Date.parse(pending.keep_until) > Date.parse(pending.expires_at) + approvalWindow) throw Error('The saved Business pairing is invalid. Run business disconnect, then connect again.');
- }
- // Both probes precede even the unauthenticated start. Keychain / Secret
- // Service handling and the device credential's account are unchanged.
- await checkStateWritable();
- const store = createCredentialStore();
- const resume = `${rerCommand()} business connect --business ${business} --origin ${origin}${timeout === undefined ? '' : ` --timeout ${timeout}`}`;
- try { await store.check(); }
- catch (error) {
-  const outside = error.sandboxRefused ? ` Approve this command outside the sandbox: ${resume}. Every other business command runs inside the sandbox.` : '';
-  throw Error(`${error.message}${outside} ${pending ? 'The saved pairing was kept.' : 'Nothing was sent; no pairing was started.'}`);
- }
  const stop = new AbortController();
  const interrupt = () => stop.abort('SIGINT'), terminate = () => stop.abort('SIGTERM');
  process.on('SIGINT', interrupt); process.on('SIGTERM', terminate);
- let timer;
+ let pending, resume, timer, unlock;
  try {
+  await checkStateWritable({ codeExists: false });
+  unlock = await lockPairing(stop.signal);
+  const stored = await loadState();
+  pending = await loadPending();
+  origin = originUrl(origin ?? stored?.origin ?? pending?.origin);
+  business = identifier(business ?? pending?.businessId);
+  if (stored) {
+   if (stored.revoked) throw Error(`This computer was ${revokedText(stored)}`);
+   if (stored.origin !== origin || stored.businessId !== business) throw Error(`This state folder is connected to Business ${identifier(stored.businessId)} at ${originUrl(stored.origin)}. Run disconnect, or use another RER_BUSINESS_STATE_DIR.`);
+   const credential = await createCredentialStore().get(deviceCredentialHandle(stored));
+   if (!credential) throw Error('This computer\'s Business credential is missing from OS credential storage. Run disconnect, then connect again.');
+   await unlock(); unlock = undefined;
+   return await connected(new Api(origin, credential), stored, { reconnecting: true });
+  }
+  if (pending && Date.parse(pending.flow === 'device' ? pending.keep_until : pending.expires_at) <= Date.now()) { await clearPending(); pending = null; }
+  if (pending && (pending.flow !== 'device' || pending.origin !== origin || pending.businessId !== business)) throw Error('Business is already waiting for another pairing. Resume that command, or run business disconnect before joining another Business.');
+  if (pending) {
+   validateDevicePairing({ ...pending, business_id: pending.businessId }, origin, business);
+   if (!timestampValid(pending.keep_until) || Date.parse(pending.keep_until) > Date.parse(pending.expires_at) + approvalWindow) throw Error('The saved Business pairing is invalid. Run business disconnect, then connect again.');
+  }
+  // Both probes precede even the unauthenticated start. Keychain / Secret
+  // Service handling and the device credential's account are unchanged.
+  const store = createCredentialStore();
+  resume = `${rerCommand()} business connect --business ${business} --origin ${origin}${timeout === undefined ? '' : ` --timeout ${timeout}`}`;
+  try { await store.check(); }
+  catch (error) {
+   const outside = error.sandboxRefused ? ` Approve this command outside the sandbox: ${resume}. Every other business command runs inside the sandbox.` : '';
+   throw Error(`${error.message}${outside} ${pending ? 'The saved pairing was kept.' : 'Nothing was sent; no pairing was started.'}`);
+  }
   const api = new Api(origin);
   if (!pending) {
    const name = deviceName(), folder = workingFolder();
@@ -195,6 +198,7 @@ async function connectDevice({ business, origin, timeout } = {}) {
     keep_until: new Date(Date.parse(result.expires_at) + approvalWindow).toISOString(), next_poll_at: Date.now() + result.interval * 1000 };
    await savePending(pending);
   }
+  await unlock(); unlock = undefined;
   // One write puts the fixed lines first, even without a TTY. Never echo the
   // code elsewhere in prose or errors; the fragment is not sent to a server.
   process.stdout.write(`Code: ${pending.user_code}\nApprove at: ${pending.verification_uri}#${pending.user_code}\nOpen the link signed in as an owner, check the code, then approve.\nWaiting until ${clock(pending.expires_at)}. Keep this command running.\nRun this same command again to keep waiting (same code).\n`);
@@ -233,7 +237,9 @@ async function connectDevice({ business, origin, timeout } = {}) {
  } finally {
   clearTimeout(timer);
   process.off('SIGINT', interrupt); process.off('SIGTERM', terminate);
+  await unlock?.();
  }
+ if (!pending) throw new Stopped('Stopped before starting a Business pairing. Run connect again.', stop.signal.reason === 'SIGTERM' ? 143 : 130);
  if (stop.signal.reason === 'timeout') throw new Stopped(`Still waiting for approval until ${clock(pending.expires_at)}. Run this same command again to keep waiting (same code).`, 75);
  throw new Stopped(`Stopped waiting for approval. The pairing is saved: run ${resume} to resume it.`, stop.signal.reason === 'SIGTERM' ? 143 : 130);
 }

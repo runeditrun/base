@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `rer business run` waits when Business asks for the owner's catch-up approval or export details. It prints the owner step, keeps checking between sleeps, and `--once` exits 0; other server errors still fail.
+- Missing vendor export inputs now name what the owner needs to confirm in Business and say the run is waiting.
+- Business pairing rejects non-string codes, serializes pairing creation, names state-folder and origin failures accurately, and keeps fixture refusal status faithful; legacy code removal is planned for a later release. `business next` suggests `run --once`.
+
 ## 0.2.98
 
 ### Connecting a computer to a Business
