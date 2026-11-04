@@ -1616,7 +1616,7 @@ test('run waits for platform owner steps without releasing a lease, resumes afte
    ownerActed = true; claimedBeforeAnswer = claimCount() - claims;
    remote.state.ownerWait = null;
    remote.state.tasks[0].state = remote.state.phase = catchup ? 'done' : 'ready';
-   if (catchup) setTimeout(() => runner.kill('SIGTERM'), 250);
+   if (catchup) { remote.state.tasks = []; setTimeout(() => runner.kill('SIGTERM'), 250); }
   };
   const continuous = await cli(home, ['business', 'run'], { env: vendorEnv, onSpawn: child => { runner = child; }, onOutput: (stdout, child) => {
    if (ownerStep.test(stdout)) sawWait = true;
@@ -1629,6 +1629,7 @@ test('run waits for platform owner steps without releasing a lease, resumes afte
   assert.equal(continuous.stdout.split('\n').filter(line => ownerStep.test(line)).length, 1, 'unchanged owner step stays quiet');
   assert.equal(releaseCount(), releases, 'neither waiting path releases as paused or failed');
   assert.equal(remote.state.phase, 'done', 'the owner or resumed export finishes the task');
+  if (catchup) assert.ok(continuous.stdout.includes('Waiting for the owner to allow scanning'), 'a completed catch-up no longer asks for approval');
   t.diagnostic(`PROBE continuous A: ${code} -> owner step printed once; alive until owner answer; task done; exit=${continuous.code}`);
  }
  // A matching code with the wrong status, or export without the contract state,
