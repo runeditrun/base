@@ -1,7 +1,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { createServer } from 'node:http';
+import { createServer, Server } from 'node:http';
 import { createHash } from 'node:crypto';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
 import { door } from './fixtures/business/door.mjs';
@@ -1357,6 +1357,7 @@ test('an agent exports Sentry, PagerDuty and Sorry with the non-secret inputs it
   assert.equal(paused.code, 1);
   assert.equal(remote.state.released.reason, 'paused');
   assert.ok(remote.state.requests.some(entry => entry.route === `/api/business/tasks/${encodeURIComponent(taskId)}/events` && entry.body.event?.payload.question === 'configuration_required'));
+  if (vendor === 'calendly') assert.ok(/Waiting for the owner[^\n]*folder of files[^\n]*shared with Business/.test(paused.stderr), paused.stderr);
   assert.equal(seed.state.requests.length, 0, 'missing leased inputs and the unsupported folder layout stay outside the door');
  }
 
@@ -1632,18 +1633,84 @@ test('run waits for platform owner steps without releasing a lease, resumes afte
   if (catchup) assert.ok(continuous.stdout.includes('Waiting for the owner to allow scanning'), 'a completed catch-up no longer asks for approval');
   t.diagnostic(`PROBE continuous A: ${code} -> owner step printed once; alive until owner answer; task done; exit=${continuous.code}`);
  }
- // A matching code with the wrong status, or export without the contract state,
- // is still a failure. Ordinary 403/500 retain the server's original reason.
- for (const [status, code, state] of [[403, 'business_catchup_approval_required'], [500, 'business_export_inputs_required', 'waiting_for_owner'], [409, 'business_export_inputs_required'], [409, 'another_conflict', 'waiting_for_owner']]) {
+ // The task's catalogue vendor determines the owner step even when Business
+ // rewords its message. An unknown task keeps that message without guessing.
+ for (const [title, step] of [['Export Sorry history', 'confirm the address'], ['Export Sentry history', 'confirm the export details'], ['Export NewTool history', null]]) {
+  remote.state.tasks = [{ ...task('biz:reworded'), title }];
+  const message = title === 'Export Sorry history' ? 'Please review the missing inputs on the move page.' : 'Please check the address recorded on the move page.';
+  remote.state.claimRefusal = [{ error: message, code: 'business_export_inputs_required', state: 'waiting_for_owner' }, 409];
+  const reworded = await cli(home, ['business', 'run', '--once'], { env });
+  assert.equal(reworded.code, 0, reworded.stderr);
+  assert.ok(reworded.stdout.includes(message) && reworded.stdout.includes(`${remote.origin}/business/biz`), reworded.stdout);
+  if (step) assert.ok(reworded.stdout.includes(step), reworded.stdout);
+  else assert.ok(!/confirm the (address|export details)/.test(reworded.stdout), reworded.stdout);
+ }
+ remote.state.claimRefusal = null;
+
+ // Once the owner cancels an export, next_question no longer lists it. The
+ // same process must move from that wait to the current idle step.
+ remote.state.tasks = [task('biz:cancelled-export')]; remote.state.ownerWait = 'business_export_inputs_required';
+ let waited = false, cancelled = false, cancellationStopped = false;
+ remote.state.onSelf = async () => {
+  if (waited) { remote.state.tasks = []; remote.state.ownerWait = null; cancelled = true; }
+ };
+ const cancelledRun = await cli(home, ['business', 'run'], { env, onOutput: (stdout, child) => {
+  if (stdout.includes('confirm the address in Business:')) waited = true;
+  if (waited && !cancellationStopped && stdout.includes('Waiting for the owner to allow scanning')) { cancellationStopped = true; child.kill('SIGTERM'); }
+ } });
+ remote.state.onSelf = null;
+ assert.equal(cancelledRun.code, 0, cancelledRun.stderr);
+ assert.ok(waited && cancelled && cancelledRun.stdout.includes('Waiting for the owner to allow scanning'), cancelledRun.stdout);
+ assert.ok(cancelledRun.stdout.lastIndexOf('allow scanning') > cancelledRun.stdout.lastIndexOf('confirm the address'), cancelledRun.stdout);
+ t.diagnostic('PROBE cancelled export: owner wait -> current idle step at the next check-in');
+
+ // Only the network edge is overridden for a genuinely malformed body.
+ let rawClaim = null;
+ const emit = Server.prototype.emit;
+ t.mock.method(Server.prototype, 'emit', function (event, request, response) {
+  if (event === 'request' && rawClaim !== null && request.socket.localPort === Number(new URL(remote.origin).port) && request.url === '/api/business/executors/claim') {
+   let body = '';
+   request.on('data', chunk => { body += chunk; });
+   request.on('end', () => {
+    remote.state.requests.push({ route: request.url, body: JSON.parse(body) });
+    response.writeHead(409, { 'content-type': 'application/json' }); response.end(rawClaim);
+   });
+   return true;
+  }
+  return emit.apply(this, arguments);
+ });
+ // Wrong-status owner codes still fail. Every non-waiting claim 409 fails
+ // once, but clears progress and retries at the next continuous check-in.
+ for (const [status, code, state, raw] of [[403, 'business_catchup_approval_required'], [500, 'business_export_inputs_required', 'waiting_for_owner'],
+  [409, 'business_export_inputs_required'], [409, 'another_conflict', 'waiting_for_owner'], [409, 'business_catchup_grant_ended'], [409, 'business_paused'], [409], [409, undefined, undefined, '{"error":']]) {
   remote.state.tasks = [task(`biz:refused:${status}:${code}`)];
-  const message = `original refusal ${status}`;
+  const message = raw ?? `original refusal ${status}`;
   remote.state.claimRefusal = [{ error: message, code, ...(state ? { state } : {}) }, status];
-  for (const args of [['run', '--once'], ['run']]) {
+  rawClaim = raw ?? null;
+  for (const args of status === 409 ? [['run', '--once']] : [['run', '--once'], ['run']]) {
    const refused = await cli(home, ['business', ...args], { env });
    assert.equal(refused.code, 1);
    assert.ok(refused.stderr.includes(`HTTP ${status}`) && refused.stderr.includes(message), refused.stderr);
   }
-  t.diagnostic(`PROBE refused A: HTTP ${status} ${code} state=${state ?? 'absent'} -> both run modes exit=1; original message retained`);
+  if (status === 409) {
+   assert.deepEqual(JSON.parse(await readFile(join(stateDir, 'progress.json'), 'utf8')), {}, 'once clears a refused claim');
+   const claims = claimCount(); let retryChecked = false, runner, stopTimer;
+   remote.state.onSelf = async () => {
+    if (claimCount() === claims) return;
+    assert.deepEqual(JSON.parse(await readFile(join(stateDir, 'progress.json'), 'utf8')), {}, 'the refused claim is gone before retry');
+    retryChecked = true; stopTimer = setTimeout(() => runner.kill('SIGTERM'), 250);
+   };
+   const continuous = await cli(home, ['business', 'run'], { env, onSpawn: child => { runner = child; } });
+   clearTimeout(stopTimer); remote.state.onSelf = null;
+   assert.equal(continuous.code, 0, continuous.stderr);
+   assert.equal(continuous.stderr, '');
+   assert.ok(retryChecked, 'continuous survives to its next check-in');
+   const retried = remote.state.requests.filter(request => request.route === '/api/business/executors/claim').slice(claims);
+   assert.equal(retried.length, 2, 'one fresh claim after the check-in');
+   assert.notEqual(retried[0].body.claim_id, retried[1].body.claim_id, 'the retry never replays the refused claim');
+   assert.deepEqual(JSON.parse(await readFile(join(stateDir, 'progress.json'), 'utf8')), {}, 'no stale pendingClaim after retry');
+  }
+  t.diagnostic(`PROBE refused: HTTP ${status} ${code ?? 'no code'} ${raw ? 'malformed body' : ''} -> once exit=1, original message retained; continuous ${status === 409 ? 'retries with cleared progress' : 'exit=1'}`);
  }
  remote.state.claimRefusal = null;
  const ended = await deviceOwner(remote, 'approve');

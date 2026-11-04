@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `rer business run` waits when Business asks for the owner's catch-up approval or export details. It prints the owner step, keeps checking between sleeps, and `--once` exits 0; other server errors still fail.
+- `rer business run` waits when Business asks for the owner's catch-up approval or export details. It prints the owner step from the task's vendor, clears waits when tasks leave the list, and `--once` exits 0. Other claim conflicts clear saved progress and retry after the check-in in continuous mode; `--once` and other server errors still fail. Calendly's missing-input step asks for its folder of files to be shared with Business.
 - Missing vendor export inputs now name what the owner needs to confirm in Business and say the run is waiting.
 - Business pairing rejects non-string codes, serializes pairing creation, names state-folder and origin failures accurately, and keeps fixture refusal status faithful; legacy code removal is planned for a later release. `business next` suggests `run --once`.
 

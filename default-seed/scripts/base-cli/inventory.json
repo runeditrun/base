@@ -651,11 +651,11 @@
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
-      "sha256": "2765000bcb47cc825e5e7772e6792d2ee05f391c32ea22952f54903fd5892275"
+      "sha256": "75b01f2481db7fa42e33506f6376557495ddeeece3c9e0b4e8f69336e32dff6b"
     },
     "cli/business/vendor-door.mjs": {
       "source": "cli/business/vendor-door.mjs",
-      "sha256": "b927e15ecd2b65a184a5bbd22d7ca7bf0fb1e6cbed39437ef16baef9c9e8f4f3"
+      "sha256": "a509bf624b296865720309ecfaf87b56f43195d2223c89b1fcfecd88aebf5d53"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",

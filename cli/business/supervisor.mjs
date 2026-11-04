@@ -11,7 +11,7 @@ import { Lease } from './lease.mjs';
 import { runDiscovery } from './discovery-task.mjs';
 import { applyChoices } from './choices.mjs';
 import { businessCommand } from './invocation.mjs';
-import { ExportWaiting, vendorHandle } from './vendor-door.mjs';
+import { ExportWaiting, vendorHandle, titledVendor } from './vendor-door.mjs';
 import { runExport } from './export-task.mjs';
 import { runCatchup } from './catchup-task.mjs';
 import { runArchive } from './archive-task.mjs';
@@ -24,7 +24,7 @@ const checkIn = 25_000;
 
 // Only these platform refusals hand work to the owner. Catch-up completion
 // has already surrendered its lease; an export-input wait never claims one.
-function ownerWait(error, state) {
+function ownerWait(error, state, task) {
  if (error.status !== 409) return null;
  const catchup = error.code === 'business_catchup_approval_required';
  if (!catchup && !(error.code === 'business_export_inputs_required' && error.state === 'waiting_for_owner')) return null;
@@ -36,7 +36,10 @@ function ownerWait(error, state) {
     && url.pathname.startsWith(new URL(link).pathname + '/moves/')) link = url.href;
   } catch { /* The Business page is where the owner can find this step. */ }
  }
- const step = catchup ? 'approve this catch-up' : /\baddress\b/.test(error.reason ?? '') ? 'confirm the address' : 'confirm the export details';
+ const vendor = task && titledVendor(task.kind, task.title);
+ const step = catchup ? 'approve this catch-up' : vendor === 'sorry' ? 'confirm the address'
+  : ['sentry', 'pagerduty'].includes(vendor) ? 'confirm the export details' : null;
+ if (!step) return `${error.reason ?? "Waiting for the owner's export inputs."}\nIn Business: ${link}`;
  return `${error.reason ? error.reason + '\n' : ''}Waiting for the owner to ${step} in Business: ${link}`;
 }
 
@@ -60,7 +63,7 @@ export async function run({ once = false } = {}) {
  let progress, stopCarry, said = '', held = null, summaries = [];
  const say = text => { if (text !== said) { said = text; process.stdout.write(text + '\n'); } };
  // An agent step that waits is said in its own words, never as "Nothing yet".
- const waits = () => [...new Set([...ownerWaits.values()].map(wait => wait.message).concat(summaries.filter(task => parked.has(task.task_id)).map(task => parked.get(task.task_id).message), agentWaiting(summaries)))];
+ const waits = () => [...new Set([...ownerWaits.values()].concat(summaries.filter(task => parked.has(task.task_id)).map(task => parked.get(task.task_id).message), agentWaiting(summaries)))];
  // With no agent step waiting, a move's owner step (freeze, rollback, cancellation) is named with its link.
  const idle = () => { const owner = ownerWaiting(summaries, state); return owner.length ? owner.join('\n') : waitingFor(state); };
  try {
@@ -78,10 +81,9 @@ export async function run({ once = false } = {}) {
    }
    if (!progress.pendingClaim) {
     summaries = await nextQuestions(api, stop.signal);
-    // next_question omits completed tasks, but also omits exports still waiting
-    // for their inputs. A catch-up disappears when Business has applied it.
-    for (const [id, wait] of ownerWaits) if (wait.catchup && !summaries.some(task => task.task_id === id)) ownerWaits.delete(id);
-    for (const task of summaries) if (['ready', 'leased', 'done', 'failed', 'canceled'].includes(task.state)) ownerWaits.delete(task.task_id);
+    // A wait belongs only to a task Business still lists as needing input.
+    // Cancellation, completion or another computer taking it clears the line.
+    for (const id of ownerWaits.keys()) if (!summaries.some(task => task.task_id === id && ['needs_input', 'waiting_for_owner'].includes(task.state))) ownerWaits.delete(id);
     const handles = (await loadState())?.vendorHandles ?? [];
     for (const [id, wait] of parked) if (wait.keyMissing && handles.includes(vendorHandle(wait.keyMissing))) parked.delete(id);
     const selected = summaries.find(task => kinds.has(task.kind) && ['ready','leased'].includes(task.state) && !parked.has(task.task_id));
@@ -98,9 +100,15 @@ export async function run({ once = false } = {}) {
    let claimed;
    try { claimed = await api.post('/api/business/executors/claim', { ...progress.pendingClaim, wait_seconds: 25 }, { signal: stop.signal }); }
    catch (error) {
-    const waiting = ownerWait(error, state);
-    if (!waiting) throw error;
-    ownerWaits.set(progress.pendingClaim.task_id, { message: waiting, catchup: error.code === 'business_catchup_approval_required' }); say(waiting);
+    const waiting = ownerWait(error, state, summaries.find(task => task.task_id === progress.pendingClaim.task_id));
+    if (!waiting) {
+     if (error.status !== 409) throw error;
+     progress = {}; await saveProgress(progress);
+     held = null;
+     if (once) throw error;
+     await pause(checkIn, stop.signal); continue;
+    }
+    ownerWaits.set(progress.pendingClaim.task_id, waiting); say(waiting);
     progress = {}; await saveProgress(progress);
     held = null;
     if (once) return;
@@ -165,7 +173,7 @@ export async function run({ once = false } = {}) {
    if (failure) {
     const waiting = ownerWait(failure, state);
     if (waiting && !stop.signal.aborted) {
-     ownerWaits.set(claimed.task.id, { message: waiting, catchup: failure.code === 'business_catchup_approval_required' }); say(waiting); held = null;
+     ownerWaits.set(claimed.task.id, waiting); say(waiting); held = null;
      if (once) return;
      await pause(checkIn, stop.signal); continue;
     }
