@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.98-dev.g9350793f",
+  "cliVersion": "0.2.98-dev.g2fbd60be",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -515,7 +515,7 @@
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "4f87c67242a65f68ea52301a1590e0bd9d31d95ee16578dccb9f892a380661a7"
+      "sha256": "30d405a491ca2ef550ba7806d3949badc977803c4e3cf5c3cf951cc979d9f165"
     },
     "cli/business/config-policy.mjs": {
       "source": "cli/business/config-policy.mjs",
