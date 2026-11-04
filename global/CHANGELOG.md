@@ -1,10 +1,25 @@
 # Changelog
 
-## Unreleased
+## 0.2.99
 
-- `rer business run` waits when Business asks for the owner's catch-up approval or export details. It prints the owner step from the task's vendor, clears waits when tasks leave the list, and `--once` exits 0. Other claim conflicts clear saved progress and retry after the check-in in continuous mode; `--once` and other server errors still fail. Calendly's missing-input step asks for its folder of files to be shared with Business.
-- Missing vendor export inputs now name what the owner needs to confirm in Business and say the run is waiting.
-- Business pairing rejects non-string codes, serializes pairing creation, names state-folder and origin failures accurately, and keeps fixture refusal status faithful; legacy code removal is planned for a later release. `business next` suggests `run --once`.
+### Agents wait for the owner instead of failing
+
+- `rer business run` now waits when a catch-up needs the owner's approval, or when an export needs an input the owner has not confirmed yet. It prints the platform's message and where the owner acts in Business (for a catch-up, the approval; for an export, the vendor's step, such as confirming the address or the export details), and it does not hand the task back.
+- `rer business run --once` exits 0 when it stops at one of these waits. A continuous `rer business run` keeps running, checks in again every 25 seconds, and picks the work up after the owner acts. A wait clears once Business no longer lists the task as waiting (cancelled, completed or taken by another computer).
+- Every other refusal behaves as before: a 403, a 500 and any other 409 fail or retry exactly as before.
+
+### Plainer words
+
+- A vendor export that is missing an input now says it is waiting for the owner (it used to say the task was released as paused) and names the right thing per vendor: Sentry's organization and export window, PagerDuty's export window, Sorry's status page address, and for Calendly that its folder of files needs to be shared with Business. The owner step printed by `rer business run` follows the vendor too: confirm the address for Sorry, the export details for Sentry and PagerDuty.
+- `rer business next` now tells you to run `rer business run --once` when there is work ready, and after a vendor key step.
+
+### Small connect fixes
+
+- A pairing response whose code is not text is refused.
+- Two `rer business connect --business ID` runs in the same state folder can no longer start two pairings: the second waits, then resumes the saved pairing.
+- A failure before a pairing starts no longer says the pairing code still works when no code exists yet; the `--code` flow keeps that line.
+- `rer business connect --origin URL` with an origin that is not https, and without `--code`, names the origin rule again.
+- The README and the code comment no longer promise a date for removing `--code`; it is planned for a later release. Nothing in 0.2.99 changes the `--code` path.
 
 ## 0.2.98
 
