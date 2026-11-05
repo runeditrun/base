@@ -91,12 +91,43 @@ test('an expired deployment deadline is visible to provider retries before the n
   assert.equal(calls,1,'an expired provider read is not retried');
   assert.equal(deadlines,1,'the operation captures its deadline once');
 });
-test('complete multi-page listing, partial page failure and request limits',async()=>{
+test('complete multi-page listing, one deployments restart, refusals and request limits',async t=>{
   let calls=0;const api=cloudflare({accountId,token:'test',fetch:async()=>{calls++;return response([{name:`resource-${calls}`}],{page:calls,total_pages:2,total_count:2});}});
   assert.equal((await api.list('/d1/database')).length,2);
   const partial=cloudflare({accountId,token:'test',fetch:async()=>response([],{page:1,total_pages:1,total_count:2})});await assert.rejects(partial.list('/queues'),/partial-list/);
   const missing=cloudflare({accountId,token:'test',fetch:async()=>response([])});assert.deepEqual(await missing.list('/queues'),[]);
   const bounded=cloudflare({accountId,token:'test',maxRequests:1,fetch:async()=>response({})});await bounded.request('/workers/subdomain');await assert.rejects(bounded.request('/workers/subdomain'),/budget/);
+  // Exercise the same client request used by site deployment, and its list
+  // door. Only the provider network changes; every pagination decision is real.
+  for (const door of ['request','list']) for (const settleLists of [false,true]) for (const scenario of ['stable','once','twice','refusal','refusal-after-shift','mixed']) {
+    const path='/workers/scripts/listing-fixture/deployments?per_page=2';
+    const stable=[{id:'newest'},{id:'previous'},{id:'oldest'}], pages=[];
+    let attempt=0;
+    const client=cloudflare({accountId,token:'test',settleLists,fetch:async(url,init)=>{
+      assert.equal(init.method,'GET');
+      const page=Number(new URL(url).searchParams.get('page'));
+      pages.push(page);if(page===1) attempt++;
+      const shifted=(scenario!=='stable' && attempt===1) || scenario==='twice';
+      if(page===2 && (scenario==='refusal' || scenario==='refusal-after-shift' && attempt===2))
+        return Response.json({success:false,errors:[{code:10000,message:'Listing refused'}]},{status:403});
+      if(page===2 && scenario==='mixed') return Response.json({success:true,result:{deployments:[]},errors:[{code:10000,message:'Mixed failure'}]});
+      const rows=shifted && page===1 ? [{id:'discarded'},{id:'previous'}] : stable.slice((page-1)*2,page*2);
+      return response({deployments:rows},{page,per_page:2,total_pages:2,total_count:shifted && page===1 ? 4 : 3});
+    }});
+    const run=client[door](path);
+    try {
+      if(['stable','once'].includes(scenario)) {
+        const result=await run;
+        assert.deepEqual(door==='request'?result.deployments:result,stable,`${door}/${settleLists}/${scenario}`);
+      } else await assert.rejects(run,error=>{
+        assert.equal(error.constructor,Error);
+        assert.equal(error.message,scenario==='twice'?'provider-pagination-changed':scenario==='mixed'?'provider-unsuccessful-or-malformed':'provider-http-403');
+        assert.equal(error.providerCall.operation,'GET /workers/scripts/listing-fixture/deployments');
+        return true;
+      });
+      assert.deepEqual(pages,['once','twice','refusal-after-shift'].includes(scenario)?[1,2,1,2]:[1,2],`${door}/${settleLists}/${scenario}`);
+    } finally { t.diagnostic(JSON.stringify({door,settleLists,scenario,pages})); }
+  }
 });
 test('R2 cursor traversal uses encoded cursors, rejects cycles and missing completion evidence',async()=>{
   let calls=0;const api=cloudflare({accountId,token:'test',fetch:async(url)=>{calls++;if(calls===1)return response({buckets:[{name:'one'}]},{per_page:1,cursor:'YWJj=='});assert(url.endsWith('cursor=YWJj%3D%3D'));return response({buckets:[]},{per_page:1});}});

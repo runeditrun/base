@@ -147,17 +147,19 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     }
     return options?.field ? {...result,[options.field]:rows} : rows;
   }
-  // Site deploy opts in here: both request/zoneRequest and list must discard
-  // every page of an inconsistent snapshot. Only this read is replayed; owner
-  // and teardown callers retain their existing settling policies and defaults.
+  // Deployments can shift while another deploy lands. Discard the whole list
+  // once; a second shift must escape even the site deploy's settling policy.
+  // Other lists retain their existing opt-in settling policy.
   async function collect(path, options) {
-    if (!settleLists) return collectOnce(path, options);
+    const deployments = /^\/workers\/scripts\/[^/]+\/deployments$/.test(path.split('?')[0]);
+    if (!settleLists && !deployments) return collectOnce(path, options);
     const signal = deadlineSignal(options?.signal);
     for (let attempt = 1; ; attempt++) {
       signal?.throwIfAborted();
       try { return await collectOnce(path, options); }
       catch (error) {
-        if (attempt === 3 || !['provider-partial-list','provider-pagination-changed'].includes(error.message)) throw error;
+        if (deployments && error.message === 'provider-pagination-changed') return collectOnce(path, options);
+        if (!settleLists || attempt === 3 || !['provider-partial-list','provider-pagination-changed'].includes(error.message)) throw error;
         await timers.setTimeout(20000, undefined, {signal});
       }
     }
