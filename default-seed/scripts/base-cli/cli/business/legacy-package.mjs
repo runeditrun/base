@@ -43,9 +43,9 @@ async function inspect(root, name, expected, json = false) {
 
 /** Validate the complete legacy database package before any upload. Media are customer originals. */
 export async function verifyLegacyPackage(directory) {
- const path = await realpath(resolve(directory));
- let manifestBytes;
- const handle = await open(join(path, 'manifest.json'), constants.O_RDONLY | constants.O_NOFOLLOW);
+ let path, handle, manifestBytes;
+ try { path = await realpath(resolve(directory)); handle = await open(join(path, 'manifest.json'), constants.O_RDONLY | constants.O_NOFOLLOW); }
+ catch { refused('manifest.json', 0, 'file unavailable'); }
  try { const info = await handle.stat(); if (!info.isFile() || info.size > MAX_JSON) refused('manifest.json', 1, 'manifest size'); manifestBytes = await handle.readFile(); }
  finally { await handle.close(); }
  let manifest;
@@ -55,9 +55,10 @@ export async function verifyLegacyPackage(directory) {
   || !Array.isArray(manifest.source.attachments) || manifest.attachmentsComplete !== true) refused('manifest.json', 1, 'invalid legacy manifest');
  await inspect(path, 'manifest.json', { bytes: manifestBytes.length, sha256: sha(manifestBytes) }, true);
  const files = [{ path: 'manifest.json', file: join(path, 'manifest.json'), bytes: manifestBytes.length, sha256: sha(manifestBytes) }], seen = new Set(['manifest.json']), rowCounts = {};
+ let totalBytes = manifestBytes.length;
  const add = (name, bytes, sha256) => {
   if (!filename(name) || seen.has(name) || files.length >= MAX_FILES) refused('manifest.json', 1, 'duplicate filename or file limit');
-  if (!count(bytes) || files.reduce((n, f) => n + f.bytes, 0) + bytes > MAX_BYTES) refused(name, 0, 'package byte limit');
+  if (!count(bytes) || (totalBytes += bytes) > MAX_BYTES) refused(name, 0, 'package byte limit');
   seen.add(name); files.push({ path: name, file: join(path, name), bytes, sha256 });
  };
  for (const [name, n] of Object.entries(manifest.source.rowCounts)) if (!name || !count(n)) refused('manifest.json', 1, 'invalid row counts');
@@ -69,18 +70,18 @@ export async function verifyLegacyPackage(directory) {
   if (primary) Object.defineProperty(rowCounts, part.table, { value: (Object.hasOwn(rowCounts, part.table) ? rowCounts[part.table] : 0) + rows.length, enumerable: true, configurable: true });
  }
  for (const [table, n] of Object.entries(manifest.source.rowCounts)) if ((Object.hasOwn(rowCounts, table) ? rowCounts[table] : 0) !== n) refused('manifest.json', 1, 'table count mismatch');
- const keys = new Set(), media = new Set(); let objectBytes = 0;
+ const keys = new Map(), media = new Set(); let objectBytes = 0;
  for (const object of manifest.objects) {
   if (!object || typeof object.key !== 'string' || !object.key.startsWith('legacy/') || object.key.split('/').includes('..') || object.mediaId == null
    || keys.has(object.key) || media.has(String(object.mediaId)) || !count(object.size)) refused('manifest.json', 1, 'invalid object identity');
-  keys.add(object.key); media.add(String(object.mediaId));
+  keys.set(object.key, String(object.mediaId)); media.add(String(object.mediaId));
   add(object.file, object.size, object.sha256);
   await inspect(path, object.file, { bytes: object.size, sha256: object.sha256 });
   objectBytes += object.size;
  }
  const attachments = manifest.source.attachments;
  if (attachments.length !== manifest.objects.length || new Set(attachments.map(e => e?.key)).size !== attachments.length
-  || attachments.some(e => !manifest.objects.some(o => o.key === e?.key && String(o.mediaId) === String(e.mediaId)))) refused('manifest.json', 1, 'attachment count or identity mismatch');
+  || attachments.some(e => !e || keys.get(e.key) !== String(e.mediaId))) refused('manifest.json', 1, 'attachment count or identity mismatch');
  const bytes = files.reduce((n, f) => n + f.bytes, 0);
  if (!count(bytes) || bytes > MAX_BYTES) refused('manifest.json', 1, 'package byte limit');
  return { path, manifestSha256: sha(manifestBytes), bytes, rowCounts: { ...manifest.source.rowCounts }, objects: { count: manifest.objects.length, bytes: objectBytes }, files, manifest };

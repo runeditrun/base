@@ -600,11 +600,12 @@ whose inventory returns 404. Each request uses a fresh single-use grant.
 
 The reader receives `{manifest, files, read(path, maxBytes?)}`. The accessor checks
 segment custody, index layout and each requested file's digest, and enforces the
-declared package bound plus any tighter requested file bound. Read record files
+declared package bound, the source's `limits.maxBytes` file bound (64 MiB by
+default), and any tighter requested file bound. Read record files
 with a tighter bound where practical. Return the whole snapshot as inert parsed
 records. The door counts the returned aggregate against the current plan grant's
 `maxRecords` before mapping or saving a plan, including legacy packages whose
-`records.total` is null. A numeric declared total must match the returned count.
+`records.total` is null. A numeric declared total and its `byKind` counts must match the returned records.
 A package is one plan, with one lineage comparison and one manifest digest; it
 never authorizes record waves or increases record authority per segment.
 

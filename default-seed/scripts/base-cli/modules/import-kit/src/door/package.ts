@@ -35,7 +35,6 @@ export async function packageUpload(request: DoorRequest, upload: UploadRow): Pr
     total += segment.bytes;
   }
   if (!Number.isSafeInteger(total) || total!==manifest.stream.bytes || manifest.index.bytes > total) invalid();
-  if (manifest.records.total!==null && manifest.records.total > request.access.maxRecords) throw new DoorError('plan_exceeds_grant_quota');
   const rows: UploadRow[] = [], absent: {bytes:number;sha256:string}[] = [];
   const streamHash = createHash('sha256');
   for (const segment of manifest.segments) {
@@ -99,7 +98,7 @@ export async function readPackageSource(request: DoorRequest, upload: UploadRow,
   const pkg = await packageUpload(request,upload), declaration = request.options.package!;
   const limits = limitsFor({...request.options.limits,maxBytes:Math.min(declaration.maxBytes,request.options.limits?.maxBytes ?? DEFAULT_LIMITS.maxBytes),
     maxRecords:Math.min(request.options.limits?.maxRecords ?? request.access.maxRecords,request.access.maxRecords)});
-  const expectedTotal = pkg.manifest.records.total;
+  const expectedTotal = pkg.manifest.records.total, expectedKinds = {...pkg.manifest.records.byKind};
   let records: ParsedRecord[];
   try { records = await declaration.read(pkg,Object.freeze({...limits})); }
   catch (error) { if (error instanceof DoorError) throw error; throw new DoorError('package_reader_failed',422); }
@@ -107,6 +106,11 @@ export async function readPackageSource(request: DoorRequest, upload: UploadRow,
   // Count the reader's aggregate before mapping or saving ANY plan, including when total is null (legacy).
   if (records.length > request.access.maxRecords) throw new DoorError('plan_exceeds_grant_quota');
   if (expectedTotal!==null && records.length!==expectedTotal) throw new DoorError('package_record_count_mismatch',422);
+  if (expectedTotal!==null) {
+    const actual: Record<string,number> = Object.create(null);
+    for (const record of records) actual[record.kind] = (actual[record.kind] ?? 0) + 1;
+    if (Object.keys(actual).length!==Object.keys(expectedKinds).length || Object.entries(actual).some(([kind,n])=>expectedKinds[kind]!==n)) throw new DoorError('package_record_count_mismatch',422);
+  }
   const collector = new RecordCollector(namespace,limits);
   collector.add(records,{artifact:upload.name},upload.bundle_sha256);
   collector.bundle.artifacts.push({name:upload.name,sha256:upload.bundle_sha256,size:upload.total_bytes},

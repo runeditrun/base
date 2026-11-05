@@ -8,7 +8,7 @@ import { createImportDoorHandler } from '../src/door/index.ts';
 import type { ImportDoorPackageSource, ImportDoorPackageUpload, DoorGrant } from '../src/door/index.ts';
 import type { ParsedRecord } from '../src/types.ts';
 import { sha256 } from '../src/provenance/identity.ts';
-import { buildPackage } from '../../../cli/business/package-transfer.mjs';
+import { buildPackage, transferPackage } from '../../../cli/business/package-transfer.mjs';
 import { legacyPackage } from '../../../cli/fixtures/business/legacy-package.mjs';
 import { cli, connect, legacyTask } from '../../../cli/fixtures/business/legacy-cli.mjs';
 import { server } from '../../../cli/fixtures/business/server.mjs';
@@ -75,6 +75,34 @@ test('bounded accessor verifies index/file hashes and file limits; returned meta
   return JSON.parse(Buffer.from(await p.read('records.json')).toString());
  })}));
  assert.equal((await d.call('plan',{uploadId},grants)).status,200);
+});
+
+
+test('P5 a 404 inventory restarts only the forgotten segment; file digest failures refuse planning',async t=>{
+ const d=await door(t);await d.enable();const pkg=await prepared(t);
+ d.mount(createImportDoorHandler({...d.options,package:declaration(async p=>JSON.parse(Buffer.from(await p.read('records.json')).toString()))}));
+ let interrupt=true, forgotten:string|undefined, inventory404=0;
+ const request=async (grant:{action:string},body:any)=>{
+  const result=await d.call(grant.action as any,body,grants);
+  if(result.status!==200) {if(result.status===404)inventory404++;throw Object.assign(Error(result.body.error),{doorStatus:result.status,doorCode:result.body.error,doorDetails:result.body.details});}
+  if(interrupt && body.name==='rer-segment') {forgotten=body.uploadId;throw Error('interrupted after durable chunk');}
+  return result.body;
+ };
+ const options={prepared:pkg,fresh:async(action:string)=>({action}),request,signal:new AbortController().signal,checkpoint:async()=>{}};
+ await assert.rejects(transferPackage(options),/interrupted after durable chunk/);assert.ok(forgotten);
+ d.runtime.native().prepare('DELETE FROM ik_door_chunks WHERE upload_id=?').run(forgotten);
+ d.runtime.native().prepare('DELETE FROM ik_door_uploads WHERE id=?').run(forgotten);
+ interrupt=false;const transferred=await transferPackage(options);assert.equal(inventory404,1);
+ assert.equal((await d.call('plan',{uploadId:transferred.uploadId},grants)).status,200);
+ // A file digest in an otherwise self-consistent transport cannot substitute for its bytes.
+ const corrupt=await prepared(t), bytes=Buffer.from(await readFile(corrupt.segments[0].file));
+ const index=JSON.parse(bytes.subarray(0,corrupt.manifest.index.bytes).toString());index.sha256='0'.repeat(64);
+ const changedIndex=Buffer.from(JSON.stringify(index)+'\n');assert.equal(changedIndex.length,corrupt.manifest.index.bytes);changedIndex.copy(bytes);
+ corrupt.manifest.index.sha256=sha256(changedIndex);corrupt.manifest.stream.sha256=sha256(bytes);corrupt.manifest.segments[0].sha256=sha256(bytes);
+ const another=await door(t);await another.enable();another.mount(createImportDoorHandler({...another.options,package:declaration(async p=>JSON.parse(Buffer.from(await p.read('records.json')).toString()))}));
+ const manifestId=await upload(another,Buffer.from(JSON.stringify(corrupt.manifest)),'rer-package.json');await upload(another,bytes,'rer-segment');
+ assert.equal((await another.call('plan',{uploadId:manifestId},grants)).body.error,'package_file_hash_mismatch');
+ assert.equal(another.runtime.native().prepare('SELECT count(*) n FROM ik_door_plans').get()!.n,0);
 });
 
 test('P1/P3/P5 public rer business run --once transfers >5 MiB with a >2 MiB object, resumes only missing chunks after SIGKILL, and plans once',async t=>{
