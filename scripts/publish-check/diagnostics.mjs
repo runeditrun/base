@@ -61,3 +61,13 @@ export function readReport(path) {
   }
   return { report };
 }
+
+export function incompleteReport(reason) {
+  return {
+    schema: 'rer.publish-check/v3', status: 'INCOMPLETE', complete: false, source: null,
+    findings: [{ rule: reason, path: '.', commit: null, scope: 'newly-public' }],
+    preExisting: [], warnings: [], fixtures: [], reviewed: [], info: [], thirdPartyNotices: [],
+    history: { commits: 0, trees: 0, blobs: 0 },
+    guarantees: { historyScanned: false, visualRecognition: false, environmentChecked: false },
+  };
+}

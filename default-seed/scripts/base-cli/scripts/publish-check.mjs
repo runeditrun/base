@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runningVersion } from '../cli/version.mjs';
 import { parseTimeoutSeconds, timeoutBounds } from './publish-check/timeout.mjs';
-import { controlReader, diagnosticLimit, osFailure, processFact, readReport, workerFact } from './publish-check/diagnostics.mjs';
+import { controlReader, diagnosticLimit, incompleteReport, osFailure, processFact, readReport, workerFact } from './publish-check/diagnostics.mjs';
 
 const args = process.argv.slice(2);
 let seconds = timeoutBounds.default;
@@ -84,13 +84,7 @@ try {
     }
   }
 }
-if (reason) report = {
-  schema: 'rer.publish-check/v3', status: 'INCOMPLETE', complete: false, source: null,
-  findings: [{ rule: reason, path: '.', commit: null, scope: 'newly-public' }],
-  preExisting: [], warnings: [], fixtures: [], reviewed: [], info: [], thirdPartyNotices: [],
-  history: { commits: 0, trees: 0, blobs: 0 },
-  guarantees: { historyScanned: false, visualRecognition: false, environmentChecked: false },
-};
+if (reason) report = incompleteReport(reason);
 if (reason || diagnostics.some(fact => fact.stage === 'cleanup')) report.diagnostics = diagnostics;
 if (report.help) process.stdout.write(report.help);
 else {
@@ -98,7 +92,16 @@ else {
     if (finding.rule === 'scan.usage') process.stderr.write(`publish-check: ${finding.message}; see --help\n`);
   }
   report.implementation ??= {};
-  report.implementation.version = runningVersion();
+  try { report.implementation.version = runningVersion(); }
+  catch (error) {
+    record(osFailure('implementation', 'version.error', error));
+    if (code === 0) {
+      reason ??= 'scan.worker-incomplete';
+      report = incompleteReport(reason);
+      code = 2;
+    }
+    report.diagnostics = diagnostics;
+  }
   process.stdout.write(JSON.stringify(report) + '\n');
 }
 process.exitCode = code;

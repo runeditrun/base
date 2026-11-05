@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.99-dev.g1718d176",
+  "cliVersion": "0.2.99-dev.g6b8102ee",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -5027,11 +5027,11 @@
     },
     "scripts/publish-check.mjs": {
       "source": "scripts/publish-check.mjs",
-      "sha256": "a8db80f9a422528885646c0f70ef488629b639f5c9c8e17ba8a19440be5b1d40"
+      "sha256": "e10925c794c9302538c747e78dd7c61e18513bd90de3a77c1d4e4c4ba11bc585"
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "dfa98d512f2801fb4d3243b619279c9ee7b77700b7b2b344a39f738cec3ac755"
+      "sha256": "c2d8fe8392fd2163cdd4e97c03b07ab683e067d8e1e1581e32c3c5ebfada0861"
     },
     "scripts/publish-check/assignment.py": {
       "source": "scripts/publish-check/assignment.py",
@@ -5099,7 +5099,7 @@
     },
     "scripts/publish-check/diagnostics.mjs": {
       "source": "scripts/publish-check/diagnostics.mjs",
-      "sha256": "f433f2c5aeb6f2d755ddc5fdd1a74da839ff0d710845b84ef52a14952fc81bcc"
+      "sha256": "10cbeeec149dcd0f0f1f76ec5ddf43e17c0862e2e5c67580c4d80ad3e897ec93"
     },
     "scripts/publish-check/env_values.py": {
       "source": "scripts/publish-check/env_values.py",

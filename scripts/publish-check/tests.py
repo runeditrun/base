@@ -619,6 +619,17 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
             self.assertIn(dict(stage='slot', code='process.launch-error', errno='ENOENT'),
                           json.loads(result.stdout)['diagnostics'])
             self.assertEqual(result.stderr, '')
+            # A second launch failure in version stamping must not replace the
+            # original interpreter launch error or leak Git's exception text.
+            (binaries / 'git').unlink()
+            result = subprocess.run(command, capture_output=True, text=True, timeout=10,
+                                    env={**env, 'PATH': str(binaries)})
+            self.assertEqual(result.returncode, 2)
+            report = json.loads(result.stdout)
+            self.assertEqual(report['status'], 'INCOMPLETE')
+            self.assertIn(dict(stage='slot', code='process.launch-error', errno='ENOENT'), report['diagnostics'])
+            self.assertIn(dict(stage='implementation', code='version.error', errno='ENOENT'), report['diagnostics'])
+            self.assertEqual(result.stderr, '')
 
     def test_scan_slots_wait_outside_deadline_and_release_after_kill(self):
         with tempfile.TemporaryDirectory(prefix='scan-slots-test-') as directory:
