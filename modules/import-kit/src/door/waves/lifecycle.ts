@@ -188,9 +188,11 @@ export async function finalize(request: DoorRequest, input: Record<string,unknow
 export async function reverseParent(request: DoorRequest, input: Record<string,unknown>) {
   const root=await rootRow(request,input), parent=activeParent(request,root);
   await assertPredicate(request,parent,'parent_approval_revoked');
+  // A lost final response must resolve to the same durable reversal even after
+  // the complete head has already been restored to the previous snapshot.
+  if (root.state==='reversed') return parentView(request,root);
   const line=await request.options.database.prepare('SELECT head_id,pending_id FROM ik_door_namespaces WHERE installation_id=? AND namespace=?').bind(root.installation_id,root.namespace).first<any>();
   if (!line || (line.pending_id!==root.id && line.head_id!==root.id) || line.pending_id && line.pending_id!==root.id) throw new DoorError('parent_superseded',409);
-  if (root.state==='reversed') return parentView(request,root);
   if (!['approved','applying','completed','reversing'].includes(root.state)) throw new DoorError('parent_reverse_refused',409);
   // Full known-conflict preflight, followed by each ordinary strict transaction.
   // This is resumable partial reversal, never whole-database atomicity.
@@ -215,11 +217,11 @@ async function parentView(request: DoorRequest, root: WaveRoot) {
   const all=await children(request,root), states=[];
   for (const child of all) {
     const job=child.job_id ? await request.options.database.prepare('SELECT state,checkpoint,total,error FROM ik_jobs WHERE id=?').bind(child.job_id).first<any>() : null;
-    states.push({ordinal:child.ordinal,fingerprint:child.fingerprint,source:child.source,native:child.native,job:job ?? null,childSuccess:job?.state==='completed'});
+    states.push({ordinal:child.ordinal,fingerprint:child.fingerprint,source:child.source,native:child.native,job:job ?? null,childSuccess:job?.state==='completed',skipped:!job && root.state==='reversed'});
   }
   const withdrawn=root.state==='withdrawn' || root.epoch!==request.epoch;
   return {protocol:BOUNDED_WAVES,parentId:root.id,fingerprint:root.fingerprint,state:withdrawn?'withdrawn':root.state,
-    census:JSON.parse(root.census_json),children:states,progress:{expected:JSON.parse(root.census_json).children,applied:states.filter(c=>c.childSuccess).length,pending:states.filter(c=>!c.job || ['queued','applying'].includes(c.job.state)).length,failed:states.filter(c=>c.job?.state==='failed').length,reversed:states.filter(c=>['undone','rolled_back'].includes(c.job?.state)).length,withdrawn},aggregateSuccess:false,completionRecorded:!withdrawn && root.state==='completed'};
+    census:JSON.parse(root.census_json),children:states,progress:{expected:JSON.parse(root.census_json).children,applied:states.filter(c=>c.childSuccess).length,pending:states.filter(c=>!c.skipped && (!c.job || ['queued','applying'].includes(c.job.state))).length,skipped:states.filter(c=>c.skipped).length,failed:states.filter(c=>c.job?.state==='failed').length,reversed:states.filter(c=>['undone','rolled_back'].includes(c.job?.state)).length,withdrawn},aggregateSuccess:false,completionRecorded:!withdrawn && root.state==='completed'};
 }
 export async function waveStatus(request: DoorRequest, input: Record<string,unknown>) {
   const root=await rootRow(request,input,true), result=await parentView(request,root);
