@@ -616,3 +616,5 @@ request limits still apply; an oversized read/plan is a refusal, never a partial
 import. HappyToHelp adoption still needs its own package reader, capacity and
 legacy delta semantics. Legacy snapshots above the unchanged 100,000-record
 grant require a separate bounded-wave authority decision before real imports.
+
+The opt-in [complete-parent bounded-wave protocol](waves/README.md) uses separately approved children and the existing D1 journal. Ordinary package planning keeps its aggregate refusal.

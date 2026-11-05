@@ -1,6 +1,7 @@
 import type { D1Database, D1Sql, D1TargetAdapter } from '../d1/types.ts';
 import type { D1ReversalPolicy } from '../d1/undo-types.ts';
 import type { ImportMapping, ImportPlan, Json, ParsedRecord, ReaderLimits } from '../types.ts';
+import type { ImportDoorBoundedSource } from './waves/types.ts';
 import type { DoorGrant } from './protocol.ts';
 import type { ImportDoorIntake } from './intake/types.ts';
 export type { ImportDoorIntake, IntakeFormat } from './intake/types.ts';
@@ -35,6 +36,7 @@ export interface ImportDoorPackageSource {
 /** One decoded source; existing adapters may keep the mount's format. */
 export interface ImportDoorSource {
   package?: ImportDoorPackageSource;
+  bounded?: ImportDoorBoundedSource;
   mapping: ImportMapping;
   parse(value: Json, index: number): ParsedRecord | ParsedRecord[];
   ownerPrincipalId?: string;
@@ -93,7 +95,7 @@ export type ImportDoorOptions = ImportDoorMountOptions & (
     parse?: undefined; mapping?: undefined; readRaw?: undefined;
   });
 export type DoorAccess = Pick<DoorGrant, 'action' | 'installationId' | 'email' | 'namespace'
-  | 'maxBytes' | 'maxChunks' | 'maxRecords' | 'fingerprint' | 'approvalRecordId' | 'approvedAt' | 'catchup'>;
+  | 'bounded' | 'maxBytes' | 'maxChunks' | 'maxRecords' | 'fingerprint' | 'approvalRecordId' | 'approvedAt' | 'catchup'>;
 export interface ImportOperatorOptions extends ImportDoorRuntimeOptions {
   installationId: string;
   appOrigin: string;

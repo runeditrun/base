@@ -123,6 +123,9 @@ export interface D1ProvenanceRow extends ProvenanceRow { predecessorId?: string 
  * sit whole in a job or stream header, an original's name or a private stage.
  * Nothing is ever matched as a substring. */
 export interface D1ImportPerson {
+  /** Server-derived source subjects, including context/metadata subjects that
+   * never became native targets. Never accept this selector from a client. */
+  aliases?: readonly { installationId: string; namespace: string; kind: string; sourceId: string }[];
   target?: { kind: string; id: string };
   values?: string[];
   related?: D1RelatedErasure;

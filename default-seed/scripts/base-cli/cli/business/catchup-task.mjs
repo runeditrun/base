@@ -1,3 +1,5 @@
+import { sendBoundedWaves } from './bounded-waves.mjs';
+import { ExportWaiting } from './vendor-door.mjs';
 import { withUploadedBundle, door, checkedPreview, plural } from './vendor-door.mjs';
 
 // Why the door refused a catch-up under the owner's standing approval
@@ -24,6 +26,11 @@ export function runCatchup({ lease, task, grant, directory, say, ownerPage }) {
  return withUploadedBundle({ lease, task, grant, directory, say,
   doing: (name, origin, keyed) => `Bringing over recent ${name} changes through the shipped read-only adapter. ${keyed ? 'The key stays on this computer; records' : 'Records'} go only to the app's import door at ${origin}.` },
  async ({ origin, uploadId, bundle, fresh, preview: uploadedPreview }) => {
+  if (task.bounded_waves) {
+   const result=await sendBoundedWaves({arrangement:{...task.bounded_waves,catchup:true},uploadId,fresh,request:door,signal:lease.signal,checkpoint:cp=>lease.checkpointSaved(cp)});
+   if (!result.aggregateSuccess) throw new ExportWaiting(`Bounded catch-up ${result.parentId} is ${result.state}; no complete migration receipt.`, 'configuration_required');
+   return {outputs:{parent_id:result.parentId,parent_fingerprint:result.fingerprint,aggregate_success:true},said:`Destination ${origin} reconciled the complete bounded catch-up ${result.parentId}.`};
+  }
   let planGrant = await fresh('plan'), refused = null, preview;
   try { preview = uploadedPreview ?? await door(planGrant, { uploadId, catchup: true }, lease.signal); }
   catch (error) {

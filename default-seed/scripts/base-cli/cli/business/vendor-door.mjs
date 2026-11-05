@@ -99,12 +99,12 @@ function adapterInputs(vendor, task) {
 /** One RER-signed import grant for one door request. `review` asks for a
  * catch-up plan grant without the owner's standing approval; a plan grant
  * Business minted under that approval says so with `catchup: 'bounded'`. */
-async function doorGrant(lease, action, origin, vendor, { review = false } = {}) {
- const grant = await lease.importGrant(action, review ? { review: true } : {});
+async function doorGrant(lease, action, origin, vendor, { review = false, bounded } = {}) {
+ const grant = await lease.importGrant(action, { ...(review ? { review: true } : {}), ...(bounded ? { bounded } : {}) });
  if (!grant || grant.action !== action || grant.destination !== new URL(`/api/rer/import/${action}`, origin).href
   || typeof grant.authorization !== 'string' || grant.authorization.length > 8192 || !/^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(grant.authorization)
   || !VENDORS.includes(grant.namespace) || vendor && grant.namespace !== vendor || !(Date.parse(grant.expires_at) > Date.now())
-  || Object.hasOwn(grant, 'catchup') && (grant.catchup !== 'bounded' || action !== 'plan' || review)) throw Error('Business returned an invalid import grant.');
+  || Object.hasOwn(grant, 'catchup') && (grant.catchup !== 'bounded' || !['plan','prepare'].includes(action) || review)) throw Error('Business returned an invalid import grant.');
  return grant;
 }
 
@@ -201,7 +201,7 @@ export async function withUploadedBundle({ lease, task, grant: claimedGrant, dir
  const fresh = async (action, options) => {
   if (action === 'uploads' && spare && Date.parse(spare.expires_at) - Date.now() > 60_000) { const grant = spare; spare = null; return grant; }
   spare = null;
-  return doorGrant(lease, action, origin, vendor, options);
+  return doorGrant(lease, action, origin, vendor, options ?? (task.bounded_waves && action==='prepare' ? {bounded:{protocol:task.bounded_waves.protocol,migration:task.bounded_waves.migration,revision:task.bounded_waves.revision,policy:task.bounded_waves.policy}} : undefined));
  };
  const inputs = adapterInputs(vendor, task);
  let key = keyed(vendor) ? await createCredentialStore().get(vendorHandle(vendor)) : null;
@@ -221,7 +221,7 @@ export async function withUploadedBundle({ lease, task, grant: claimedGrant, dir
     records: { total: null, byKind: {} }, totals: { rowCounts: legacy.rowCounts, objects: legacy.objects } });
   } catch { throw new ExportWaiting(`Legacy package changed or could not be prepared: ${legacy.path}. Recheck and register that package again.`, 'configuration_required'); }
   let uploaded;
-  try { uploaded = await transferPackage({ prepared, fresh, request: door, signal, checkpoint: cp => lease.checkpointSaved(cp), catchup: task.kind === 'catchup.vendor' }); }
+  try { uploaded = await transferPackage({ prepared, fresh, request: door, signal, checkpoint: cp => lease.checkpointSaved(cp), catchup: task.kind === 'catchup.vendor', ...(task.bounded_waves ? { planAction:'prepare', planInput:{ordinal:0} } : {}) }); }
   catch (error) { if (!error.message.startsWith('SEED_PACKAGE_UNSUPPORTED')) throw error; throw new ExportWaiting(error.message, 'configuration_required'); }
   const { outputs, said } = await finish({ vendor, name, origin, ...uploaded, fresh });
   await lease.complete(outputs);
