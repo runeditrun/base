@@ -561,6 +561,58 @@ On loopback, `rer preview` prints `RER_OPEN` for native owner entry.
 owner session in its isolated demo data. These native entry links work once,
 expire within 15 minutes and are never saved. Restarting retires them.
 
+## Business importer receipt signer
+
+```sh
+rer business receipt-key create stage-importer
+rer business receipt sign --manifest kept-manifest.json --evidence reviewed-evidence.json --key-id stage-importer --output receipt.json
+```
+
+`receipt-key create` generates Ed25519 in process and keeps its PKCS8 private
+key only in macOS Keychain or Linux Secret Service under
+`receipt:<KEY_ID>:sign`. It prints only the SPKI PEM public key. There is no
+file fallback or private-key export. A locked or unavailable credential store
+refuses; an existing key ID refuses rather than replacing its key. IDs contain
+1–128 ASCII letters, digits, dots, underscores or hyphens, starting with a
+letter or digit. Keep the OS store available to the signing process.
+Use Node 22.20.0 or later, as pinned by Base's CLI toolchain. The signer loads
+the existing portable receipt API unchanged in source and npm installations.
+
+Supply that public key to the stage consumer's `BUSINESS_IMPORTER_TRUST_KEYS`
+entry for the same key ID, with `environments: ["stage"]`. The consumer retains
+control of trusted keys; key creation and signing do not update its settings.
+For the existing trust policy shape, see
+[import-kit signing and verification](../modules/import-kit/README.md#signing-receipts-and-supplying-a-trust-policy).
+
+The manifest JSON supplies `incumbent`, `synthetic: false`, `adapter`
+(`repository`, `revision`), and `source` with exactly the v1 receipt members:
+`classification: "authorized-real-export"`, `origin`, `exportedAt`, `format`,
+`version`, `sha256` (the kept source stream's SHA-256) and `size` (its byte
+count). Preserve those captured metadata values. The evidence JSON contains
+exactly `product`, `candidate`, `mapping`, `command`, `runs`, `reconciliation`,
+`unmapped`, `research` and `review`, using the existing
+[v1 receipt schema](../modules/import-kit/schema/importer-verification-receipt.schema.json).
+Evidence cannot override manifest members. Nested members must satisfy the
+same schema, with no additional properties.
+
+The command uses `signImporterVerificationReceipt` and then
+`verifyImporterVerificationReceipt` under a stage-only policy for the stored
+key. Synthetic sources, malformed metadata, mapping or reconciliation SHA
+mismatches, inconsistent counts and all other verifier rejections refuse
+before any output file is created. Success creates a new `0600` receipt file;
+an existing output or symlink refuses. Operational failures print fixed text
+without paths, input values, keys or OS diagnostics. Exit codes are 0 for
+success, 1 for refusal and 2 for usage. Each command supports `--help`.
+
+Signing attests supplied claims. It does not capture or hash an export, run an
+import, produce research, perform review or establish real acceptance. The
+source digest and byte count must already describe the actual kept export;
+the command checks their schema and the verifier's internal consistency rules,
+without reading the source stream. Metadata fixtures are test data and cannot
+establish a real export. A real receipt still needs an authorized export and
+the adopting app's completed evidence; stage trust and importer adoption remain
+separate work. This command adds no production-key or provider operations.
+
 ## Run your business demo
 
 ```sh
