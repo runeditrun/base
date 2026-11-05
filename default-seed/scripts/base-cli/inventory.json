@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.99-dev.g3a2513bf",
+  "cliVersion": "0.2.99-dev.g6cae724a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -567,7 +567,7 @@
     },
     "cli/business/legacy-package.mjs": {
       "source": "cli/business/legacy-package.mjs",
-      "sha256": "3a44bde6d9f0cd454ded6e53fe7c258f51a1df5e73563293da48c051b3fef618"
+      "sha256": "212e595768ed6305d81bcec1e7632aad3445b53e6ffb7214138d41c7e9bbb34f"
     },
     "cli/business/local-commands.mjs": {
       "source": "cli/business/local-commands.mjs",

@@ -115,4 +115,3 @@ export async function legacyPackage(action, directory) {
  // Registration never prints paths or customer rows; a changed task names its package locally.
  process.stdout.write(JSON.stringify(result ? { bytes: result.bytes, rowCounts: result.rowCounts, objects: result.objects, manifestSha256: result.manifestSha256 } : { registered: false }) + '\n');
 }
-
