@@ -669,3 +669,5 @@ erasure, field selection scans destination custody and is available only without
 API and restore checkpoint for their complete person-erasure flow. Existing
 `related.source` still tombstones whole records; do not select a peer record with
 it when that peer must remain resumable and reversible.
+
+The opt-in [complete-parent bounded-wave protocol](src/door/waves/README.md) uses separately approved children and the existing D1 journal. Ordinary package planning keeps its aggregate refusal.

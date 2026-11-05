@@ -14,7 +14,7 @@ const transient = new RegExp([
 ].join('|'),'i');
 /** Only persist allowlisted classifications, never adapter/SQL messages that
  * may contain customer records. Providers can wrap SQLite errors in causes. */
-function reasonCode(error: unknown): string {
+export function reasonCode(error: unknown): string {
   const seen = new Set<unknown>();
   for (let cause = error; cause && typeof cause === 'object' && !seen.has(cause);) {
     seen.add(cause);
