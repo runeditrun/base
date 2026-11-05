@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
-import { mkdtempSync, openSync, closeSync, rmSync } from 'node:fs';
+import { mkdtempSync, openSync, closeSync, rmSync, ftruncateSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runningVersion } from '../cli/version.mjs';
 import { parseTimeoutSeconds, timeoutBounds } from './publish-check/timeout.mjs';
 import { controlReader, diagnosticLimit, incompleteReport, osFailure, processFact, readReport, workerFact } from './publish-check/diagnostics.mjs';
+import { progressBytes, readProgress } from './publish-check/progress.mjs';
 
 const args = process.argv.slice(2);
 let seconds = timeoutBounds.default;
@@ -15,11 +16,13 @@ for (let i = 0; i < args.length; i++) {
     try { seconds = parseTimeoutSeconds(raw); } catch { /* Python reports invalid arguments. */ }
   }
 }
-let scratch, fd, child, reason, timer;
+let scratch, fd, progressFd, child, reason, timer, acquiredAt, stoppedAt, progress;
+const queuedAt = performance.now();
 const diagnostics = [];
 const record = fact => { if (fact && diagnostics.length < diagnosticLimit) diagnostics.push(fact); };
 const stop = value => {
   reason ??= value;
+  stoppedAt ??= performance.now();
   // The child remains unreaped until its close handler; descendants (native
   // Git and Gitleaks) share the private process group and this total deadline.
   if (child?.pid) {
@@ -34,10 +37,14 @@ try {
   scratch = mkdtempSync(join(tmpdir(), 'publish-check-'));
   const output = join(scratch, 'report.json');
   fd = openSync(output, 'wx', 0o600);
+  try {
+    progressFd = openSync(join(scratch, 'progress'), 'wx+', 0o600);
+    ftruncateSync(progressFd, progressBytes);
+  } catch { /* Missing progress is diagnostic unavailability only. */ }
   stage = 'slot';
   child = spawn('python3', ['-B', new URL('./publish-check/slots.py', import.meta.url).pathname, ...args], {
     // Neither holder tracebacks nor worker stderr are safe public diagnostics.
-    detached: true, stdio: ['pipe', fd, 'ignore', 'pipe'], env: { ...process.env, TMPDIR: scratch },
+    detached: true, stdio: ['pipe', fd, 'ignore', 'pipe', progressFd ?? 'ignore'], env: { ...process.env, TMPDIR: scratch },
   });
   const finished = new Promise(resolve => {
     let error;
@@ -48,12 +55,22 @@ try {
   fd = undefined;
   child.stdio[3]?.setEncoding('utf8');
   child.stdio[3]?.on('data', controlReader(message => {
-    if (message === 'acquired' && !timer) timer = setTimeout(() => stop('scan.deadline-exceeded'), seconds * 1000);
+    if (message === 'acquired' && !timer) {
+      acquiredAt = performance.now();
+      timer = setTimeout(() => stop('scan.deadline-exceeded'), seconds * 1000);
+    }
     else if (message === 'waiting') process.stderr.write('waiting for a scan slot\n');
     else if (['scan.slot-timeout', 'scan.slot-configuration'].includes(message)) reason ??= message;
     else record(workerFact(message));
   }));
   const result = await finished;
+  const observedAt = performance.now();
+  progress = {
+    slot: acquiredAt === undefined ? 'queued' : 'acquired',
+    queuedMs: Math.floor((acquiredAt ?? observedAt) - queuedAt),
+    elapsedMs: acquiredAt === undefined ? null : Math.max(0, Math.floor((stoppedAt ?? observedAt) - acquiredAt)),
+    worker: readProgress(progressFd),
+  };
   const parsed = readReport(output);
   // Report errors are secondary facts even when the process failed first.
   if (reason || result.error || result.signal || ![0, 1, 2].includes(result.exitCode) || parsed.diagnostic) {
@@ -73,6 +90,10 @@ try {
   process.removeListener('SIGTERM', interrupt);
   if (fd !== undefined) {
     try { closeSync(fd); }
+    catch (error) { record(osFailure('cleanup', 'cleanup.close-error', error)); }
+  }
+  if (progressFd !== undefined) {
+    try { closeSync(progressFd); }
     catch (error) { record(osFailure('cleanup', 'cleanup.close-error', error)); }
   }
   if (scratch) {
@@ -102,6 +123,9 @@ else {
     }
     report.diagnostics = diagnostics;
   }
+  // Report JSON is not a trusted progress transport, including on exit 2.
+  delete report.progress;
+  if (progress) report.progress = progress;
   process.stdout.write(JSON.stringify(report) + '\n');
 }
 process.exitCode = code;
