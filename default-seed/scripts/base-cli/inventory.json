@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.99-dev.ga52b0edb",
+  "cliVersion": "0.2.99-dev.g9be8d24e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -5127,7 +5127,7 @@
     },
     "scripts/publish-check/history_hydration.py": {
       "source": "scripts/publish-check/history_hydration.py",
-      "sha256": "b76b9bfdacc4a4a357ddc2b924c03a47cd4e1df1c676ed4a0bf40157a65d8fb9"
+      "sha256": "08735fe964c5150159157508aa776b129de36f344731dc74bd6cf1a45a2f26db"
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",
