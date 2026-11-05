@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Setup and dev let the managed Vite listener use its finite startup budget instead of stopping at 60 seconds. Custom start targets retain their declared deadlines; a missing listener announcement reports elapsed and allowed time with startup-log guidance.
+
 - Legacy MCP tool calls held for approval now return their generated `requestState` alongside `approval_required`, so retrying an approved read resumes the original operation without asking for a second approval.
 - `rer deploy --site` now retries a changing or partial Cloudflare list from page one up to three times, waiting 20 seconds between failed reads. It discards incomplete snapshots, never replays deploy writes, preserves other refusals and stops waiting on cancellation.
 

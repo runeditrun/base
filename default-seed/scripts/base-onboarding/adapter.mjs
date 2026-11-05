@@ -233,6 +233,7 @@ async function start(context, hooks) {
   try{return await listenerPorts(child.pid);}
   catch(error){throw installationFailure('command_failed',{step:'start',diagnostic:error});}
  };
+ const readinessTimeoutMs=timeoutMs??60000,readinessStarted=performance.now();
  try {
   await store.waitForReady(readinessLabel, child, async probeSignal => {
    if(runtimePortHandshake){
@@ -267,10 +268,15 @@ async function start(context, hooks) {
     }
    }
    return result;
-  }, { signal, timeoutMs: Math.min(timeoutMs??60000,60000), ...(softAfterMs ? { softAfterMs } : {}), ...(intervalMs ? { intervalMs } : {}) });
+  }, { signal, timeoutMs: readinessTimeoutMs, ...(softAfterMs ? { softAfterMs } : {}), ...(intervalMs ? { intervalMs } : {}) });
  } catch (error) {
   if (signal?.aborted) throw error;
   if(detectedMismatch)throw installationFailure('command_failed',{step:'start',diagnostic:error});
+  if(runtimePortHandshake&&!announcement){
+   const prior=approvedFailure(error);
+   const message=`No managed listener was announced after ${Math.round(performance.now()-readinessStarted)} ms (allowed ${readinessTimeoutMs} ms). Check the runtime startup output in the log below, correct the startup error, then run rer ${context.verb??'setup'} again.`;
+   throw installationFailure('command_failed',{step:'start',diagnostic:commandFailure(`${message}\n${prior?.message??readinessLabel}`,prior??{})});
+  }
   const ports=await ownedPorts();
   if(ports.length){
    let diagnosis;

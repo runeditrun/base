@@ -30,6 +30,8 @@ export function operatorInstaller({ database, features, prepare, prepareData }) 
  return {...lifecycle,localPrerequisites:async({root,vars,demo})=>vars.AUTH_LOCAL==='true'&&vars.MAIL_PROVIDER==='development'&&Boolean(vars.SESSION_SECRET)&&(demo||await operatorPrerequisites(root)),install:(root,input,store,onApp,signal)=>installOperator(root,input,store,onApp,signal,lifecycle.hooks)};
 }
 
+// Setup and dev give the real Vite listener one finite fifteen-minute startup
+// budget, including its announcement and health check; no second readiness wait.
 // Only local runtimes receive the dev key; vite.config.ts passes it to `vite dev` alone.
 // No runtime rer starts serves the Local Explorer: it reads and writes the store
 // without the key. trafficProxy also refuses /cdn-cgi/* on the public listener.
@@ -38,6 +40,6 @@ const developmentEnvironment = () => { const { RER_MODELS_SERVICE, RER_MODELS_KE
 // A demo's Vite persists to its own folder (the seed's vite.config reads RER_STATE_DIR)
 // and its Worker sees RER_DEMO=1 and the demo's end (modules/demo).
 const demoBindings = demo => demo ? { RER_DEMO: '1', RER_DEMO_EXPIRES: demo.ends, RER_STATE_DIR: demo.state, RER_DEMO_RUN_URL: demo.runUrl } : {};
-export const developmentTarget = ({ root, origin, devKey, modelsLive, demo }) => [process.execPath, [fileURLToPath(new URL('./development-runtime.mjs',import.meta.url)), 'dev', '--host', '127.0.0.1', '--port', '0', '--strictPort'], { runtimePortHandshake: true, stdio: ['ignore','pipe','pipe','ipc'], env: { ...developmentEnvironment(), PATH: [process.env.PATH, join(root, 'node_modules', '.bin')].filter(value => value !== undefined).join(delimiter), RER_DEV_ORIGIN: origin, WRANGLER_SEND_METRICS: 'false', X_LOCAL_EXPLORER: 'false', ...devBindings(devKey), ...(modelsLive ? { RER_MODELS_SERVICE: modelsLive.baseUrl, RER_MODELS_KEY: modelsLive.apiKey } : {}), ...demoBindings(demo) } }];
+export const developmentTarget = ({ root, origin, devKey, modelsLive, demo }) => [process.execPath, [fileURLToPath(new URL('./development-runtime.mjs',import.meta.url)), 'dev', '--host', '127.0.0.1', '--port', '0', '--strictPort'], { timeoutMs: 900000, runtimePortHandshake: true, stdio: ['ignore','pipe','pipe','ipc'], env: { ...developmentEnvironment(), PATH: [process.env.PATH, join(root, 'node_modules', '.bin')].filter(value => value !== undefined).join(delimiter), RER_DEV_ORIGIN: origin, WRANGLER_SEND_METRICS: 'false', X_LOCAL_EXPLORER: 'false', ...devBindings(devKey), ...(modelsLive ? { RER_MODELS_SERVICE: modelsLive.baseUrl, RER_MODELS_KEY: modelsLive.apiKey } : {}), ...demoBindings(demo) } }];
 
 export const previewTarget = ({ origin, devKey, scheduled }) => [process.execPath, [fileURLToPath(new URL('./production-runtime.mjs', import.meta.url))], { runtimePortHandshake: true, stdio: ['ignore','pipe','pipe','ipc'], env: { ...process.env, RER_DEV_ORIGIN: origin, RER_RUNTIME_HOST: '127.0.0.1', RER_RUNTIME_PORT: '0', WRANGLER_SEND_METRICS: 'false', CLOUDFLARE_INCLUDE_PROCESS_ENV: 'false', X_LOCAL_EXPLORER: 'false', RER_RUNTIME_TRIGGERS: scheduled ? '1' : '0', ...(devKey ? { RER_DEV_KEY: devKey } : {}) } }];

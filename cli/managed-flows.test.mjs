@@ -149,6 +149,10 @@ test('rer dev shares one canonical checkout, returns its URL, and stops after id
   assert.equal(await failed.done,1,'invalid real configuration fails startup');
  } finally {await writeFile(config,configBytes);if(failed)await f.stop(failed);}
  assert.ok(!events(failed).some(row=>row.event==='ready'));
+ const startupError=events(failed).find(row=>row.event==='error')?.message;
+ assert.match(startupError,/No managed listener was announced after \d+ ms \(allowed 900000 ms\)/);
+ assert.match(startupError,/runtime startup output in the log[^]*run rer dev again/);
+ assert.doesNotMatch(startupError,/through expected internal port|Origin mismatch/);
  assert.ok(controls.size,'startup registered a control endpoint before failure');
  assert.equal((await remainingProcesses([...observed.values()])).length,0,'failed startup stops every observed owned lifetime');
  for(const control of controls)await assert.rejects(access(control),{code:'ENOENT'});

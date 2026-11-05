@@ -139,6 +139,27 @@ test('a complete install generates private settings, hides them from the build, 
  assert.deepEqual(await readdirSafe(join(f.root, '.wrangler/local-build')), [], 'the build restored .dev.vars and removed its run folder');
 });
 
+test('a declared startup budget includes readiness beyond sixty seconds', async t => {
+ const f=await fixture(t),store=await f.open();
+ let elapsed=0,child;
+ const wait=store.waitForReady;
+ store.waitForReady=(label,app,health,options)=>wait(label,app,async signal=>{
+  const result=await health(signal);
+  // Advance only the elapsed clock, once the original app really answers.
+  // The real HTTP transport, owner claim, timers and cleanup still run.
+  if(result===true||result?.ready===true)elapsed=65000;
+  return result;
+ },{...options,now:()=>performance.now()+elapsed,intervalMs:20});
+ const original=hooks();
+ const kit=localInstaller({...original,start:context=>{const target=original.start(context);target[2].timeoutMs=120000;return target;}});
+ t.after(async()=>{if(child)await store.stop(child);});
+ await kit.install(f.root,input,store,app=>{child=app;});
+ assert.equal(store.state.phase,'complete',store.state.error);
+ assert.equal(elapsed,65000);
+ assert.equal(child.exitCode,null,'late readiness retains the original app');
+ assert.deepEqual(JSON.parse(await readFile(join(f.root,'claimed.json'),'utf8')),{email:input.email,displayName:input.displayName});
+});
+
 test('a devIdentity seed\'s install gives the temporary app the dev key and offers the key-gated way in', async t => {
  const f = await fixture(t);
  await mkdir(join(f.root, 'scripts/installer'), { recursive: true });

@@ -70,8 +70,13 @@ its port over their private parent channel. The CLI confirms that the runtime
 owns that socket, then updates the traffic proxy and scheduled-trigger target.
 Custom runtime targets retain the assigned internal port contract: bind it
 strictly. A healthy application on a different owned port causes an immediate
-port-mismatch refusal. Application health has a hard 60-second limit, including
-setup; an individual probe gets at most five seconds by default. Concurrent
+port-mismatch refusal. A start target can declare a finite positive `timeoutMs`
+for listener announcement and health together; targets without it retain the
+60-second default. The shared development target used by setup and dev declares
+fifteen minutes for real Vite startup. A missing listener announcement reports
+elapsed and allowed time and points to the runtime startup log; auxiliary
+process sockets cannot satisfy readiness. An individual probe gets at most five
+seconds by default. Concurrent
 starts waiting on an existing server have one five-minute elapsed deadline,
 including control requests and polling. Loopback HTTP requests use an elapsed
 deadline, so a response that keeps sending bytes cannot extend readiness.
