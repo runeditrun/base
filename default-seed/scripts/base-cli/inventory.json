@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.99-dev.g336537ed",
+  "cliVersion": "0.2.99-dev.g9b5272b9",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -383,7 +383,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "bb563ca3f598676fb66949fe396d3731a286398c6f85be447d0c3a444bef30f4"
+      "sha256": "21aca257e1f3ff554b667651cf7a2db5c63e3d84af775ade2af4c4f8eb9813e5"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -515,7 +515,7 @@
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "30d405a491ca2ef550ba7806d3949badc977803c4e3cf5c3cf951cc979d9f165"
+      "sha256": "eb592739ca28a7e1224dc637a6cc082c07dc887a966f1f0a5059d8cde7a6c7c7"
     },
     "cli/business/config-policy.mjs": {
       "source": "cli/business/config-policy.mjs",
@@ -616,6 +616,14 @@
     "cli/business/questions.mjs": {
       "source": "cli/business/questions.mjs",
       "sha256": "386319d64adec5459c2a7942f1f5fe499ac2abedebd491f2b46f69d0831aaaf1"
+    },
+    "cli/business/receipt-command.mjs": {
+      "source": "cli/business/receipt-command.mjs",
+      "sha256": "b2c1c6b755fedd914d2ab5887511a1d39f8d684666906276d285f891fb90abfb"
+    },
+    "cli/business/receipt-runtime.mjs": {
+      "source": "cli/business/receipt-runtime.mjs",
+      "sha256": "a28f9561ddfa79fa45c006f51b7c2bc8419ec9295b7f474de703f8d84aab11fe"
     },
     "cli/business/repository.mjs": {
       "source": "cli/business/repository.mjs",

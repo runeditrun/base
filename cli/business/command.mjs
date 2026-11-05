@@ -6,6 +6,7 @@ import { next, answer, token } from './questions.mjs';
 import { run } from './supervisor.mjs';
 import { describe } from './errors.mjs';
 import { identifier, originUrl } from './api.mjs';
+import { receiptKeyCommand, receiptCommand } from './receipt-command.mjs';
 
 const usage = `Set up your business: rer business connect
 Business keeps your business name, logo and brand colour together for the apps
@@ -36,6 +37,9 @@ Advanced commands (Usage: rer business VERB)
                                  Catalog vendor or none; uses, sells, both, product-dependency
   vendor-key add|remove VENDOR   Keep a read-only vendor key in OS credential storage; the owner
                                  types it in their own terminal, never in chat or a command
+  receipt-key create KEY_ID      Keep an Ed25519 receipt key in OS credential storage; print its public key
+  receipt sign --manifest FILE --evidence FILE --key-id ID --output FILE
+                                 Sign and verify kept export metadata and import evidence before writing
   token                          MCP headersHelper output; send directly to the MCP client
   status [--json]                Pairing, service, current task and checkpoint
   disconnect                     Revoke this computer, then remove local credentials and additions;
@@ -72,6 +76,8 @@ Requires an existing pairing: rer business connect.
 };
 
 export async function businessCommand(argv) {
+ if (argv[0] === 'receipt-key') return receiptKeyCommand(argv.slice(1));
+ if (argv[0] === 'receipt') return receiptCommand(argv.slice(1));
  if (argv[0] === 'setup') return setupCommand(argv.slice(1));
  if (Object.hasOwn(verbHelp, argv[0]) && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(verbHelp[argv[0]]); return 0; }
  if (!argv.length || argv[0] !== 'scan' && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(usage); return 0; }
