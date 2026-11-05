@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.99-dev.g16e8f9a8",
+  "cliVersion": "0.2.99-dev.g94aa2fe7",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3551,7 +3551,7 @@
     },
     "modules/import-kit/src/door/README.md": {
       "source": "modules/import-kit/src/door/README.md",
-      "sha256": "6c8b090336b151ccc3865be423fae7a98e13ff9ca4f0560a279026f8f4e54aac"
+      "sha256": "605b85886fd2108eb04b04e6088706860c28e5022ed9b609ec39d6d65c133f15"
     },
     "modules/import-kit/src/door/admission.ts": {
       "source": "modules/import-kit/src/door/admission.ts",
