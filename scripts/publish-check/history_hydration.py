@@ -49,6 +49,7 @@ def prepare(history):
         except InspectionError:
             raise missing_blob(history, before[0].decode()) from None
         fetches = 1
+        progress.counts(hydration=True, fetches=fetches)
     after = missing() if before else []
     progress.counts(hydration=True, missingAfter=len(after), fetches=fetches)
     if after:
