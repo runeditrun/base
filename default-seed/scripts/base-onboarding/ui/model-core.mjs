@@ -43,7 +43,8 @@ function setupModel(draft, known = {}) {
     if (!known.providers?.cloudflare?.authenticated && !fields.apiToken.valid(draft.apiToken) && !secretReady('apiToken', draft, known)) connections.push('cloudflare');
   }
   const missing = keys.filter(key => !fields[key].valid(draft[key]) && !(fields[key].type === 'password' && secretReady(key, draft, known)));
-  const complete = keys.filter(key => fields[key].valid(draft[key]) || (fields[key].type === 'password' && secretReady(key, draft, known)));
+  for(const key of seed.invalidKeys?.(draft,known)??[])if(!missing.includes(key))missing.push(key);
+  const complete = keys.filter(key => !missing.includes(key) && (fields[key].valid(draft[key]) || (fields[key].type === 'password' && secretReady(key, draft, known))));
   return { missing, complete, connections, remaining: missing.length + connections.length, ready: !missing.length && !connections.length };
 }
 function installInput(draft) {

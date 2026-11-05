@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "cliVersion": "0.2.99-dev.g336537ed",
+  "cliVersion": "0.2.99-dev.g9b5272b9",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
       "source": "onboarding/README.md",
-      "sha256": "657c48e45bbe49e1348c5bae2464a4db257bace8410d6cb8f1e3479816b59a3e"
+      "sha256": "0960ec0172e83cb01d7e87181ad8659f8d0627a40851b1056e38563379b77eba"
     },
     "activity.mjs": {
       "source": "onboarding/activity.mjs",
@@ -85,7 +85,7 @@
     },
     "email.mjs": {
       "source": "onboarding/email.mjs",
-      "sha256": "19613fc0312e0a3da1cc4d59266d89221b68e571e2cdfe4bd255e23591d1a616"
+      "sha256": "1288f4bde59329f31940121084b71c853b6757d791a2bb16f936619d8b5f72c3"
     },
     "failures.mjs": {
       "source": "onboarding/failures.mjs",
@@ -205,7 +205,7 @@
     },
     "private.mjs": {
       "source": "onboarding/private.mjs",
-      "sha256": "6b974afe918c709dabfd5ce2c90ce0743f500dcf7f1a98f5d34f19fcd5452526"
+      "sha256": "0c2e41fad01d84cb5a4088ad98561ced5a76550c73f08eb88f0e14f3000009c2"
     },
     "process-cleanup.mjs": {
       "source": "onboarding/process-cleanup.mjs",
@@ -305,11 +305,11 @@
     },
     "server.mjs": {
       "source": "onboarding/server.mjs",
-      "sha256": "fdc84158170d44c4ff9c87301c7209468c0ffbaab9c086d6be722be0e74c229f"
+      "sha256": "accac7b0209c05493c7e1042b2306adb187c63a41f466f99be1db318f0e6908f"
     },
     "setup-manifest.mjs": {
       "source": "onboarding/setup-manifest.mjs",
-      "sha256": "46cd56ab6ff6d36e2c045334ce48521f682812d359f97d7e34b9243eb70d16de"
+      "sha256": "b1e92002f6d7cc1ce0375303b2f2080cd94d932c33040b4d7a5f7c871101fc74"
     },
     "start-origin-diagnostic.mjs": {
       "source": "onboarding/start-origin-diagnostic.mjs",
@@ -345,7 +345,7 @@
     },
     "ui/app.js": {
       "source": "onboarding/ui/app.js",
-      "sha256": "07adbae87e903837fe0314fb01094e2f21f67bcc64e562ae524d65be4a636107"
+      "sha256": "096340ff58c6ad2253422d115d144a3eaa2122f30e1a3fbe7dc5cd5951554096"
     },
     "ui/index.html": {
       "source": "onboarding/ui/index.html",
@@ -353,7 +353,7 @@
     },
     "ui/model-core.mjs": {
       "source": "onboarding/ui/model-core.mjs",
-      "sha256": "75016783325a2d5d4107cea6371c24062dc705459568195da01aa46970a0085e"
+      "sha256": "0aa5849ceed05f90ea6c4ad026f691949fb7c77d186a76af7aac9d0b7de03a79"
     },
     "ui/model.mjs": {
       "source": "onboarding/ui/model.mjs",
@@ -383,7 +383,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "bb563ca3f598676fb66949fe396d3731a286398c6f85be447d0c3a444bef30f4"
+      "sha256": "2114f71a55b665c0f4df89d5e672d17e1928f6716337816f1866db6482074382"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -1163,11 +1163,11 @@
     },
     "cli/production-auth.mjs": {
       "source": "cli/production-auth.mjs",
-      "sha256": "51a694676582d14d0da53d64c10080b502c22676b9bfe3d8b723a5bcdaa351b9"
+      "sha256": "e667b8c9fe153230bec9be1939a933fc747f64ddd073e92dab08cba8ce8a540f"
     },
     "cli/production-mail.mjs": {
       "source": "cli/production-mail.mjs",
-      "sha256": "3c5917f22dc6ccbb0feeac7540c9b9de2d78dc45ea978c4ce9c1a536ea875196"
+      "sha256": "eaecd42eb231cc3404015c6cf92812a04d48f1692af28c3ff43b9bca6df58afc"
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",

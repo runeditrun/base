@@ -101,6 +101,9 @@ function missingField(key, container = $('#fields')) {
     setAnswer(key, input.value);
     if (definition.artwork) void art?.commit()?.catch(cause => error(cause.message));
     const dependency=Object.values(fields).some(field=>field.when?.field===key||field.presentations?.some(item=>item.when.field===key))||setupGroups.some(group=>group.presentations?.some(item=>item.when.field===key));
+    // An explicit choice reveals its conditional settings, including defaults
+    // such as a provider's region, so they remain available for review.
+    if(dependency)for(const [name,field]of Object.entries(fields))if(field.when?.field===key||field.presentations?.some(item=>item.when.field===key))visibleKeys.add(name);
     if(dependency||['target','accountId','apiToken'].includes(key))renderPreservingFocus();else refreshStatus();
   });
   container.append(card);

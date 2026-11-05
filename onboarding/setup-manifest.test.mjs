@@ -117,3 +117,47 @@ test('owner hook uses manifest token names and the sign-in hook keeps a plain de
  assert.equal(requests.length,1);
  assert.equal(context.appUrl,context.origin+'/');
 });
+
+test('Mailgun setup uses the declared selector, validates before effects and saves only the named private key',async t=>{
+ const {emailManifest}=await import('./fixtures/email.mjs');
+ const {normalizeEmail,emailEnvironment,emailMetadata}=await import('./email.mjs');
+ const {localEmailBindings}=await import('./private.mjs');
+ const {stat}=await import('node:fs/promises');
+ const root=await fixture(t,emailManifest);
+ const kit=localInstaller({tools:[],dependencies:false,secrets:{}});
+ const {call}=await session(t,root,kit);
+ const selected={EMAIL_PROVIDER:'mailgun',EMAIL_API_KEY_NAME:'MAILGUN_SENDING_KEY',MAILGUN_DOMAIN:'MG.Example.test',EMAIL_FROM:'support@example.test',MAILGUN_SENDING_KEY:'synthetic-domain-sending-token'};
+ const refused=[...['MAILGUN_DOMAIN','EMAIL_FROM','MAILGUN_SENDING_KEY'].map(name=>({...selected,[name]:''})),
+  {...selected,MAILGUN_DOMAIN:'https://mg.example.test'}, {...selected,MAILGUN_DOMAIN:'bad..example.test'},
+  {...selected,MAILGUN_REGION:'ap'}, {...selected,MAILGUN_REGION:''},
+  {...selected,MAILGUN_SENDING_KEY:'bad token'},
+  ...['EMAIL_API_KEY','MAILGUN_ROUTES_KEY','SENDGRID_API_KEY','RESEND_API_KEY','synthetic-credential-value'].map(name=>({...selected,EMAIL_API_KEY_NAME:name})),
+  {...selected,MAILGUN_SENDING_KEY:'',EMAIL_API_KEY:'synthetic-generic-token'}, {...selected,EMAIL_PROVIDER:'unknown'},
+ ];
+ for(const input of refused){const response=await call('/api/start',input);assert.equal(response.status,400,JSON.stringify({...input,MAILGUN_SENDING_KEY:'<synthetic>'})+' '+await response.text());await assert.rejects(readFile(join(root,'.dev.vars')),{code:'ENOENT'});}
+ for(const region of [undefined,'us','eu']){
+  const root=await fixture(t,emailManifest);const {call}=await session(t,root,localInstaller({tools:[],dependencies:false,secrets:{}}));
+  const input={...selected,...(region?{MAILGUN_REGION:region}:{})};
+  assert.equal((await call('/api/start',input)).status,202);
+  for(let attempt=0;attempt<100;attempt++){
+   const state=await (await call('/api/state')).json();
+   assert.ok(!JSON.stringify(state).includes(selected.MAILGUN_SENDING_KEY));
+   if(state.phase==='complete')break;
+   assert.notEqual(state.phase,'failed',state.error);
+   await new Promise(resolve=>setTimeout(resolve,10));
+  }
+  const values=await localEmailBindings(root);
+  assert.equal(values.EMAIL_API_KEY_NAME,'MAILGUN_SENDING_KEY');
+  assert.equal(values.MAILGUN_SENDING_KEY,selected.MAILGUN_SENDING_KEY);
+  assert.equal((await stat(join(root,'.dev.vars'))).mode&0o777,0o600);
+  const emitted=emailEnvironment(normalizeEmail({},values));
+  assert.equal(emitted.MAILGUN_REGION,region??'us');assert.equal(emitted.MAILGUN_DOMAIN,'mg.example.test');
+  assert.equal(emitted.EMAIL_API_KEY,undefined);assert.equal(emitted.MAILGUN_ROUTES_KEY,undefined);
+  const metadata=emailMetadata(emitted);
+  assert.equal(metadata.configuration,'configured');assert.equal(metadata.outbound,'not_tested');
+  assert.ok(!JSON.stringify(metadata).includes(selected.MAILGUN_SENDING_KEY));
+ }
+ // Existing provider uses its own established generic input, with no Mailgun key substitution.
+ const resend=await session(t,await fixture(t,emailManifest),localInstaller({tools:[],dependencies:false,secrets:{}}));
+ assert.equal((await resend.call('/api/start',{EMAIL_PROVIDER:'resend',EMAIL_FROM:'support@example.test',EMAIL_API_KEY:'synthetic-resend-token'})).status,202);
+});

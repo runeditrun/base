@@ -230,3 +230,64 @@ export const commandAdapter = {...seed, deploy: context => seed.deploy(context)}
  assert.match(await error('SENDGRID_API_KEY=test-only-provider-credential\n'), /SENDGRID_API_KEY/, 'native key cannot bypass the declared environment mapping');
  await assert.rejects(access(join(seed.root, 'dist')), { code: 'ENOENT' });
 });
+
+test('rer deploy preflights the exact Mailgun named-key contract without falling back or contacting a provider',async t=>{
+ const seed=await portabilityFixture(t,{generated:false});
+ const declarationPath=join(seed.root,'deploy.json');
+ const declaration=JSON.parse(await readFile(declarationPath,'utf8'));
+ declaration.vars={AUTH_LOCAL:'false',MAIL_PROVIDER:'later'};
+ declaration.publicSettings=['EMAIL_PROVIDER','EMAIL_API_KEY_NAME','MAILGUN_DOMAIN','MAILGUN_REGION','EMAIL_FROM'];
+ declaration.secrets=declaration.secrets.filter(item=>!item.binding.startsWith('MAIL_'));
+ await writeFile(declarationPath,JSON.stringify(declaration));
+ const git=(...args)=>execFileSync('git',['-c','user.name=Fixture','-c','user.email=fixture@example.test','-c','commit.gpgsign=false',...args],{cwd:seed.root,stdio:'pipe'});
+ git('init','-q');git('add','package.json');git('commit','-qm','fixture');
+ await writeFile(join(seed.root,'package.json'),(await readFile(join(seed.root,'package.json'),'utf8'))+'\n');
+ const spec={publicVariableNames:['EMAIL_PROVIDER','EMAIL_API_KEY_NAME','MAILGUN_DOMAIN','MAILGUN_REGION','EMAIL_FROM'],optionalSecretNames:['MAILGUN_SENDING_KEY','EMAIL_API_KEY','MAILGUN_ROUTES_KEY','RESEND_API_KEY','SENDGRID_API_KEY']};
+ const packaging=join(seed.root,'rer-packaging.json');
+ const selected={EMAIL_PROVIDER:'mailgun',EMAIL_API_KEY_NAME:'MAILGUN_SENDING_KEY',MAILGUN_DOMAIN:'MG.runeditrun.com',EMAIL_FROM:productionSender,MAILGUN_SENDING_KEY:'synthetic-domain-sending-token'};
+ const fake=join(seed.root,'network-edge.mjs'),attempts=join(seed.root,'network-attempts');
+ await writeFile(fake,`import {appendFileSync} from 'node:fs';globalThis.fetch=async()=>{appendFileSync(${JSON.stringify(attempts)},'unexpected request\\n');throw Error('Network forbidden in this preflight proof');};`);
+ const {isolatedQueue}=await import('./fixtures/queue.mjs');
+ const env=await isolatedQueue(t,{PATH:process.env.PATH,HOME:process.env.HOME,CI:'true',RER_NODE_AUTO:'0'});
+ const run=async(values,flags=[])=>{
+  await writeFile(packaging,JSON.stringify({artifact:{specInputs:spec}}));
+  await writeFile(join(seed.root,'production.env'),Object.entries(values).map(([name,value])=>`${name}=${value}`).join('\n')+'\n',{mode:0o600});
+  const result=spawnSync(process.execPath,['--import',fake,'scripts/rer.mjs','deploy','--env-file','production.env','--json',...flags],{cwd:seed.root,env,encoding:'utf8',timeout:20000});
+  assert.equal(result.status,4,result.stdout+result.stderr);
+  assert.ok(![result.stdout,result.stderr].join('').includes(selected.MAILGUN_SENDING_KEY));
+  await assert.rejects(access(attempts),{code:'ENOENT'});
+  return result.stdout.trim().split('\n').map(JSON.parse).find(event=>event.event==='error').message;
+ };
+ for(const region of [undefined,'us','eu'])assert.match(await run({...selected,...(region?{MAILGUN_REGION:region}:{})}),/not committed/,'valid Mailgun reaches source guard');
+ for(const name of ['MAILGUN_DOMAIN','EMAIL_FROM','MAILGUN_SENDING_KEY']){const message=await run({...selected,[name]:''});assert.ok(message.includes(name),name+': '+message);}
+ for(const [name,value] of [['MAILGUN_DOMAIN','https://mg.runeditrun.com'],['MAILGUN_DOMAIN','bad..runeditrun.com'],['MAILGUN_REGION','ap'],['MAILGUN_REGION',''],['MAILGUN_SENDING_KEY','bad token']]){const message=await run({...selected,[name]:value});assert.ok(message.includes(name),name+': '+message);}
+ for(const name of ['EMAIL_API_KEY','MAILGUN_ROUTES_KEY','RESEND_API_KEY','SENDGRID_API_KEY','synthetic-credential-value',''])assert.match(await run({...selected,EMAIL_API_KEY_NAME:name}),/EMAIL_API_KEY_NAME/);
+ for(const name of ['EMAIL_API_KEY','MAILGUN_ROUTES_KEY','RESEND_API_KEY','SENDGRID_API_KEY'])assert.match(await run({...selected,MAILGUN_SENDING_KEY:'',[name]:'synthetic-forbidden-token'}),/MAILGUN_SENDING_KEY/);
+ // A complete older MAIL_* configuration cannot rescue a broken explicit Mailgun selection.
+ declaration.vars={AUTH_LOCAL:'false',MAIL_PROVIDER:'resend',MAIL_FROM:productionSender};
+ declaration.secrets.push({binding:'MAIL_API_KEY',environment:'MAIL_API_KEY',optional:true});
+ await writeFile(declarationPath,JSON.stringify(declaration));
+ assert.match(await run({...selected,MAILGUN_DOMAIN:'',MAIL_API_KEY:'synthetic-generic-token'}),/MAILGUN_DOMAIN/);
+ declaration.vars.IDENTITY_PROVIDER='https://auth.example.test';
+ await writeFile(declarationPath,JSON.stringify(declaration));
+ assert.match(await run({...selected,MAILGUN_DOMAIN:''}),/MAILGUN_DOMAIN/,'SSO sign-in cannot excuse invalid explicitly selected outbound Mailgun');
+ delete declaration.vars.IDENTITY_PROVIDER;
+ await writeFile(declarationPath,JSON.stringify(declaration));
+ spec.optionalSecretNames=spec.optionalSecretNames.filter(name=>name!=='MAILGUN_SENDING_KEY');
+ assert.match(await run(selected),/MAILGUN_SENDING_KEY/,'undeclared ambient key is refused');
+ declaration.secrets.push({binding:'MAILGUN_SENDING_KEY',environment:'PRODUCT_SENDING_TOKEN',optional:true});
+ await writeFile(declarationPath,JSON.stringify(declaration));
+ assert.match(await run(selected),/MAILGUN_SENDING_KEY/,'explicit environment mapping cannot be bypassed');
+ assert.match(await run({...selected,MAILGUN_SENDING_KEY:'',PRODUCT_SENDING_TOKEN:selected.MAILGUN_SENDING_KEY}),/not committed/);
+ // The release adapter may map public Mailgun settings through deploy secret
+ // bindings too. Retain the same contract and reject an explicitly empty region.
+ spec.publicVariableNames=[];
+ for(const name of ['EMAIL_PROVIDER','EMAIL_API_KEY_NAME','MAILGUN_DOMAIN','MAILGUN_REGION','EMAIL_FROM'])declaration.secrets.push({binding:name,environment:'PRODUCT_'+name,optional:true});
+ await writeFile(declarationPath,JSON.stringify(declaration));
+ const mapped=Object.fromEntries(Object.entries(selected).filter(([name])=>name!=='MAILGUN_SENDING_KEY').map(([name,value])=>['PRODUCT_'+name,value]));
+ mapped.PRODUCT_SENDING_TOKEN=selected.MAILGUN_SENDING_KEY;
+ assert.match(await run(mapped),/not committed/);
+ assert.match(await run({...mapped,PRODUCT_MAILGUN_REGION:''}),/REGION/);
+ assert.match(await run({...mapped,PRODUCT_EMAIL_PROVIDER:'unknown'}),/EMAIL_PROVIDER/);
+ await assert.rejects(access(join(seed.root,'dist')),{code:'ENOENT'});
+});

@@ -1,3 +1,4 @@
+import { shared } from './shared.mjs';
 import { readFile } from 'node:fs/promises';
 import { contained } from './project.mjs';
 import { refuse } from './errors.mjs';
@@ -9,6 +10,9 @@ import { sourceMailSenders } from './deploy-variables.mjs';
 
 const providers = ['resend', 'sendgrid', 'cloudflare', 'rer'];
 const nativeCredential = { sendgrid: 'SENDGRID_API_KEY', resend: 'RESEND_API_KEY' };
+// Preserve explicit empty adapter inputs: absence alone selects Mailgun's US default.
+const mailgunInputs = new Set(['EMAIL_PROVIDER','EMAIL_API_KEY_NAME','EMAIL_FROM','MAILGUN_DOMAIN','MAILGUN_REGION','MAILGUN_SENDING_KEY']);
+const supplied = (name,value) => present(value) || mailgunInputs.has(name) && typeof value === 'string';
 const present = value => typeof value === 'string' && Boolean(value.trim());
 // The sender forms the mail runtime sends from: a bare address or "Display Name <address>".
 const sender = value => { try { parseAddress(value); return true; } catch { return false; } };
@@ -38,7 +42,7 @@ export async function productionMail(root, declaration, env, declarationPath = '
  const environmentFix = name => `Set ${name} in your environment or owned 0600 --env-file`;
  for (const secret of declaration.secrets ?? []) {
   secrets.add(secret.binding);
-  if (present(env[secret.environment])) {
+  if (supplied(secret.binding,env[secret.environment])) {
    if (secret.binding === 'MAIL_FROM') senders.push({ source: `${declarationPath} secrets.MAIL_FROM from ${secret.environment} (environment or --env-file)`, value: env[secret.environment] });
    bindings[secret.binding] = env[secret.environment];
    if (secret.binding === 'MAIL_FROM') senderFix = environmentFix(secret.environment);
@@ -63,7 +67,7 @@ export async function productionMail(root, declaration, env, declarationPath = '
   for (const name of [...(spec.secretNames ?? []), ...(spec.optionalSecretNames ?? [])]) {
    secrets.add(name);
    // A root secret's explicit environment-to-binding mapping wins.
-   if (!declaration.secrets?.some(secret => secret.binding === name) && present(env[name])) {
+   if (!declaration.secrets?.some(secret => secret.binding === name) && supplied(name,env[name])) {
     bindings[name] = env[name];
     if (name === 'MAIL_FROM') senders.push({ source: `${path} secret MAIL_FROM (environment or --env-file)`, value: env[name] });
     if (name === 'MAIL_FROM') senderFix = environmentFix(name);
@@ -71,7 +75,7 @@ export async function productionMail(root, declaration, env, declarationPath = '
   }
   for (const provider of spec.mail?.providers ?? []) if (providers.includes(provider)) declaredProviders.add(provider);
  }
- for (const name of publicInputs) if (present(env[name])) {
+ for (const name of publicInputs) if (supplied(name,env[name])) {
   if (name === 'MAIL_FROM') senders.push({ source: 'public MAIL_FROM (environment or --env-file)', value: env[name] });
   bindings[name] = env[name];
   if (name === 'MAIL_FROM') senderFix = environmentFix(name);
@@ -82,6 +86,18 @@ export async function productionMail(root, declaration, env, declarationPath = '
  if (present(bindings.MAIL_FROM) && (!sender(bindings.MAIL_FROM) || placeholderSender(bindings.MAIL_FROM))) {
   senderIssue = `MAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>). ${senderFix}, then run rer deploy --dry-run again.`;
  }
+ // EMAIL_* belongs to an edition's direct Mailgun adapter. Only declared
+ // bindings, mapped inputs and inspected declared secrets can satisfy it.
+ if(bindings.EMAIL_PROVIDER==='mailgun'){
+  const {mailgunIssues}=await shared('email.mjs');
+  const has=live=>key=>secrets.has(key)&&(typeof bindings[key]==='string'&&Boolean(bindings[key].trim())&&!/[^\x21-\x7e]/.test(bindings[key])||live.includes(key)&&!Object.hasOwn(bindings,key));
+  const issues=live=>mailgunIssues(bindings,has(live));
+  const invalidSender=present(bindings.EMAIL_FROM)&&(!sender(bindings.EMAIL_FROM)||placeholderSender(bindings.EMAIL_FROM));
+  const emailSenderIssue=invalidSender?'EMAIL_FROM is invalid or a placeholder sender. Use a real sender on your Mailgun verified domain.':undefined;
+  return {declared:true,required:true,senderIssue:emailSenderIssue,fixtureSender:fixtureSender(bindings.EMAIL_FROM),configured:(live=[])=>!emailSenderIssue&&!issues(live).length,canInspect:!emailSenderIssue&&issues(['MAILGUN_SENDING_KEY']).length===0,missing:[...issues([]),...(emailSenderIssue?[emailSenderIssue]:[])].join(', ')};
+ }
+ // An explicit EMAIL_PROVIDER must never fall through to a different MAIL_* provider.
+ if('EMAIL_PROVIDER' in bindings&&!['later','resend','sendgrid','cloudflare','rer'].includes(bindings.EMAIL_PROVIDER))return {declared:true,configured:()=>false,canInspect:false,missing:'EMAIL_PROVIDER (resend, sendgrid, cloudflare, rer or mailgun)'};
  const provider = bindings.MAIL_PROVIDER;
  const deferred = !provider || provider === 'later';
  const choices = new Set(declaredProviders);

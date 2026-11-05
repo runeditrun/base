@@ -26,10 +26,11 @@ export async function requireProductionAuth({ root, declaration, env, setupManif
  const answers = setupSeed ? await savedSetupAnswers({ root, adapter, setupManifest }, setupSeed.model) : undefined;
  // Link approval and live post-link status are checked by linkDependencies;
  // selecting an issuer never bypasses that existing setup requirement.
- if (dependencies.some(item => {
+ if (!mail.required && dependencies.some(item => {
   try { const value = answers?.[item.address] ?? bindings[item.address], issuer = new URL(value); return issuer.protocol === 'https:' && issuer.origin === value && !issuer.username && !issuer.password; } catch { return false; }
  })) return;
  // A dry run goes ahead without the mail inputs and lists them as needed for a real deploy.
- if (options.dryRun) return { signIn: `${mail.missing}${dependencies.length ? ', or an approved Auth SSO install' : ''}` };
+ if (options.dryRun) return { signIn: `${mail.missing}${!mail.required && dependencies.length ? ', or an approved Auth SSO install' : ''}` };
+ if (mail.required) throw refuse(`Production Mailgun is not configured; missing or invalid: ${mail.missing}. Nothing was built or uploaded.`);
  throw refuse(`Production sign-in is not configured. Configure outbound email; missing or invalid: ${mail.missing}. Or select and approve an Auth SSO install through the declared oidc-provider@1 setup dependency. Local dev and demo use automatic RER_OPEN sign-in. Nothing was built or uploaded.`);
 }
