@@ -9,6 +9,7 @@ import { rollbackD1Import, undoD1Import } from '../../d1/reverse.ts';
 import { readD1ImportOriginals } from '../../d1/originals.ts';
 import { assertion, authorized, sql, transact } from '../store.ts';
 import { DoorError } from '../protocol.ts';
+import { recordKey } from '../inventory.ts';
 import { failedPlan, reasonCode, requireNewPlan } from '../failures.ts';
 import { sizeLimitError } from '../limits.ts';
 import { sha256 } from '../../provenance/identity.ts';
@@ -41,7 +42,10 @@ export async function seal(request: DoorRequest, input: Record<string,unknown>) 
     for (const record of snapshot.records) seen.add(hash([record.kind,record.sourceId]));
     changes.additions+=snapshot.differences.additions.length;changes.replacements+=snapshot.differences.replacements.length;changes.unchanged+=snapshot.differences.unchanged.length;
     changes.rejected+=snapshot.plan.counts.rejected;
-    changes.unmapped+=snapshot.records.filter(r=>!r.targets.length).length;
+    // Unchanged sources retain their earlier disposition, including an empty
+    // target set. New or changed targetless sources still require a proposal.
+    const unchanged=new Set(snapshot.differences.unchanged);
+    changes.unmapped+=snapshot.records.filter(r=>!r.targets.length && !unchanged.has(recordKey(r))).length;
   }
   if (totalKeys.some(k=>totals[k]!==expected[k]) || hash(byKind)!==hash(expected.byKind) || hash(nativeByTable)!==hash(expected.nativeByTable)) throw new DoorError('aggregate_census_mismatch',422);
   // Every verified indexed file, including context and objects, has one custody

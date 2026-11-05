@@ -1,6 +1,6 @@
 # Opt-in complete-parent imports
 
-`rer-bounded-waves/1` is a grant-only source protocol. Ordinary `/plan`, including
+The bounded-waves protocol shown below is a grant-only source protocol. Ordinary `/plan`, including
 the logical-package path, keeps its existing aggregate refusal and quotas.
 Transport segments never grant execution authority. This source change does not
 adopt the protocol in an edition, raise a grant, approve an aggregate, or authorize
@@ -27,7 +27,7 @@ by preparation.
 `describe(upload)` independently enumerates the complete source and returns one
 finite `WaveCensus`, including source/native counts by kind/table, originals,
 objects, logical/stored/native/blob/context bytes, accounting version, source
-mode/high water and complete inventory/relationship/baseline digests.
+mode and high water, and complete inventory/relationship/baseline digests.
 `page(upload, ordinal, limits)` returns exactly one indivisible `WaveUnit` with
 all its primary identities, file roles and dependencies on earlier units. The
 adapter must include metadata/context/archive/rejected aliases in its reader's

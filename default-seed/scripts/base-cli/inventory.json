@@ -3631,7 +3631,7 @@
     },
     "modules/import-kit/src/door/waves/README.md": {
       "source": "modules/import-kit/src/door/waves/README.md",
-      "sha256": "74a8b939c90e842e93023d4cef86b70b820224024cc4b51309aaf0ac894d848d"
+      "sha256": "cd1d2e6a82e0fa472e5bcadc521bba19676aa4a500f237ef8464adb0ee1a5a0e"
     },
     "modules/import-kit/src/door/waves/digests.ts": {
       "source": "modules/import-kit/src/door/waves/digests.ts",
@@ -3647,7 +3647,7 @@
     },
     "modules/import-kit/src/door/waves/lifecycle.ts": {
       "source": "modules/import-kit/src/door/waves/lifecycle.ts",
-      "sha256": "ac1fc331ab33a1e57068ebc73876c8e455fe531e5b3b7e420e55d71f356ff9c9"
+      "sha256": "2858773b4e9249f3ed406123bdfc1842e181e25da189cdd1776d43fd75035edb"
     },
     "modules/import-kit/src/door/waves/preparation.ts": {
       "source": "modules/import-kit/src/door/waves/preparation.ts",
