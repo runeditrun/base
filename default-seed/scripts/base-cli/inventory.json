@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.99-dev.g336537ed",
+  "cliVersion": "0.2.99-dev.g9b5272b9",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -5027,11 +5027,11 @@
     },
     "scripts/publish-check.mjs": {
       "source": "scripts/publish-check.mjs",
-      "sha256": "6732590753349d96eefc75929bf213c9772112426feb28fa807e531d64eb13d3"
+      "sha256": "767c18d7f966ac693853e1af595446ee4d7996f81eacfb0f56d00a3105ef29f2"
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "ebf88282d28056dead3207f3d93eb6b23455e154a9dc71e3a09f876e6564ef5b"
+      "sha256": "e842f64b99468ebd2f37185829787491166b56ab26bd09974966da39a8053732"
     },
     "scripts/publish-check/assignment.py": {
       "source": "scripts/publish-check/assignment.py",
@@ -5096,6 +5096,10 @@
     "scripts/publish-check/destination.py": {
       "source": "scripts/publish-check/destination.py",
       "sha256": "03e1bd5e912e7d0761b1f5277f23b33bd52aec81085f275589d04669a31218c7"
+    },
+    "scripts/publish-check/diagnostics.mjs": {
+      "source": "scripts/publish-check/diagnostics.mjs",
+      "sha256": "f433f2c5aeb6f2d755ddc5fdd1a74da839ff0d710845b84ef52a14952fc81bcc"
     },
     "scripts/publish-check/env_values.py": {
       "source": "scripts/publish-check/env_values.py",
@@ -5227,7 +5231,7 @@
     },
     "scripts/publish-check/slots.py": {
       "source": "scripts/publish-check/slots.py",
-      "sha256": "899b3e52c5e1b3d52f42981a18d60f5c54cbaf68817f922140f157daa719f9fa"
+      "sha256": "dc53368b158d4c7a5981816998b7bd13dfc880930123ec4c501a1455368fce33"
     },
     "scripts/publish-check/source_metadata.py": {
       "source": "scripts/publish-check/source_metadata.py",

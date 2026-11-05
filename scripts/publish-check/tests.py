@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import secrets
+import shutil
 import select
 import struct
 import subprocess
@@ -544,6 +545,61 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
         self.assertEqual(help_result.returncode, 0)
         self.assertIn('--public-base', help_result.stdout)
         self.assertEqual(help_result.stderr, '')
+
+    def test_cli_process_failure_diagnostics(self):
+        from pathlib import Path
+        with tempfile.TemporaryDirectory(prefix='scan-diagnostics-test-') as directory:
+            home = Path(directory)
+            injection = home / 'injection'
+            injection.mkdir()
+            env = {**os.environ, 'HOME': directory, 'PYTHONPATH': str(injection)}
+            subprocess.run(['git', 'config', '--file', str(home / '.gitconfig'),
+                            '--add', 'safe.directory', str(ROOT)], check=True)
+            command = [shutil.which('node'), str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo)]
+            canary = 'synthetic-private-' + secrets.token_hex(16)
+            cases = [
+                ("if worker: os._exit(7)", dict(stage='worker', code='process.exit', exitCode=7)),
+                ("if worker: os.kill(os.getpid(), signal.SIGTERM)",
+                 dict(stage='worker', code='process.signal', signal='SIGTERM')),
+                ("if holder: sys.executable = str(pathlib.Path(os.environ['HOME']) / 'missing-python')",
+                 dict(stage='worker', code='process.launch-error', errno='ENOENT')),
+                ("if worker: pathlib.Path(os.environ['TMPDIR'], 'report.json').unlink()",
+                 dict(stage='report', code='report.read-error', errno='ENOENT')),
+                ("if worker:\n import resource\n resource.setrlimit(resource.RLIMIT_FSIZE, (32, 32))",
+                 dict(stage='report', code='report.parse-error')),
+                (f"if worker:\n os.write(2, {canary.encode()!r} * 100000)\n os._exit(7)",
+                 dict(stage='worker', code='process.exit', exitCode=7)),
+            ]
+            for source, fact in cases:
+                with self.subTest(fact=fact):
+                    (injection / 'sitecustomize.py').write_text(
+                        'import os, pathlib, signal, sys\n'
+                        'worker = sys.argv[0].endswith("/cli.py")\n'
+                        'holder = sys.argv[0].endswith("/slots.py")\n' + source + '\n')
+                    result = subprocess.run(command, capture_output=True, text=True, timeout=30, env=env)
+                    self.assertEqual(result.returncode, 2)
+                    report = json.loads(result.stdout)
+                    self.assertEqual(report['status'], 'INCOMPLETE')
+                    self.assertFalse(report['complete'])
+                    self.assertFalse(report['guarantees']['historyScanned'])
+                    self.assertIsNone(report['source'])
+                    self.assertEqual(report['history'], dict(commits=0, trees=0, blobs=0))
+                    self.assertEqual([finding['rule'] for finding in report['findings']], ['scan.worker-incomplete'])
+                    self.assertIn(fact, report['diagnostics'])
+                    self.assertNotIn(canary, result.stdout + result.stderr)
+                    self.assertEqual(result.stderr, '')
+                    self.assertLess(len(result.stdout), 2000)
+            # Fail the public entry point's real interpreter lookup as well.
+            (injection / 'sitecustomize.py').write_text('')
+            binaries = home / 'bin'
+            binaries.mkdir()
+            (binaries / 'git').symlink_to(shutil.which('git'))
+            result = subprocess.run(command, capture_output=True, text=True, timeout=10,
+                                    env={**env, 'PATH': str(binaries)})
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(dict(stage='slot', code='process.launch-error', errno='ENOENT'),
+                          json.loads(result.stdout)['diagnostics'])
+            self.assertEqual(result.stderr, '')
 
     def test_scan_slots_wait_outside_deadline_and_release_after_kill(self):
         with tempfile.TemporaryDirectory(prefix='scan-slots-test-') as directory:
