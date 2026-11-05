@@ -555,7 +555,7 @@ proposal for owner review. No caller-supplied totals relax this boundary.
 
 ## Logical packages across upload grants
 
-A source may opt in to `rer-door-package/1` with
+A source may opt in to rer-door-package/1 with
 `package: {formats, maxBytes, maxSegments, read}` on its resolved source. The
 same declaration belongs on the operator and grant mounts. Other sources keep
 their existing readers and upload limits. No additional schema migration or

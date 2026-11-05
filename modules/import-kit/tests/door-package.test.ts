@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { door } from './door/fixture.ts';
 import { createImportDoorHandler } from '../src/door/index.ts';
+import { retireD1ImportCustody } from '../src/d1/index.ts';
 import type { ImportDoorPackageSource, ImportDoorPackageUpload, DoorGrant } from '../src/door/index.ts';
 import type { ParsedRecord } from '../src/types.ts';
 import { sha256 } from '../src/provenance/identity.ts';
@@ -26,9 +27,9 @@ async function upload(d:any, bytes:Buffer, name:string, extra:Partial<DoorGrant>
 }
 function declaration(read:ImportDoorPackageSource['read'],formats=['test-package/1']):ImportDoorPackageSource {return {formats,maxBytes:16*1024**2,maxSegments:16,read};}
 const rows:ParsedRecord[]=[{kind:'document',sourceId:'1',payload:{title:'First'}},{kind:'document',sourceId:'2',payload:{title:'Second'}}];
-async function prepared(t:any,total:number|null=2) {
- const root=await temporary(t), file=join(root,'records.json'), bytes=Buffer.from(JSON.stringify(rows));await writeFile(file,bytes);
- return buildPackage({files:[{path:'records.json',file,bytes:bytes.length,sha256:sha256(bytes)}],source:{format:'test-package/1',version:1,origin:'synthetic-database',exportedAt:null,synthetic:true,adapter:'test'},records:{total,byKind:total===null?{}:{document:2}},totals:{},quota:QUOTA,directory:join(root,'prepared')});
+async function prepared(t:any,total:number|null=2,records=rows,quota=QUOTA) {
+ const root=await temporary(t), file=join(root,'records.json'), bytes=Buffer.from(JSON.stringify(records));await writeFile(file,bytes);
+ return buildPackage({files:[{path:'records.json',file,bytes:bytes.length,sha256:sha256(bytes)}],source:{format:'test-package/1',version:1,origin:'synthetic-database',exportedAt:null,synthetic:true,adapter:'test'},records:{total,byKind:total===null?{}:{document:2}},totals:{},quota,directory:join(root,'prepared')});
 }
 
 test('P2 package probe has no plan; missing, foreign and altered segments have the same scoped refusal; one aggregate plan is idempotent',async t=>{
@@ -49,6 +50,79 @@ test('P2 package probe has no plan; missing, foreign and altered segments have t
  const accepted=await missing();assert.equal(accepted.status,200,JSON.stringify(accepted.body));assert.equal(accepted.body.summary.sourceRecords,2);assert.equal(accepted.body.created,true);
  assert.equal((await missing()).body.planId,accepted.body.planId);assert.equal(plans(),1);assert.equal(db.prepare('SELECT count(*) n FROM native_records').get()!.n,0);
  t.diagnostic('PROBE P2 installation/namespace/hash/size custody, manifest-before-segments 409/no plan, aggregate plan once; native writes=0');
+ // The same real HTTP/SQLite path must withdraw resolved package custody on
+ // refusal, just as it withdraws an incumbent upload. Collect every retention
+ // failure so the before/after run exercises all three refusal paths.
+ const retained:string[]=[];
+ for(const mode of ['erased','credential','invalid'] as const) {
+  const e=await door(t);await e.enable();const native=e.runtime.native(),marker=['package',mode,'private'].join('-');
+  const records=[{kind:'document',sourceId:'person',payload:{id:'person',title:marker,body:marker+'x'.repeat(70_000)+marker}},rows[1]];
+  if(mode==='credential') Object.assign(records[0].payload,{url:`https://user:${marker}@example.test/`});
+  if(mode==='invalid') Object.assign(records[0].payload,{note:'%'+'25'.repeat(33)+'41'});
+  e.mount(createImportDoorHandler({...e.options,package:declaration(async p=>JSON.parse(Buffer.from(await p.read('records.json')).toString()))}));
+  const preparedPackage=await prepared(t,2,records,65_536), small={...grants,maxBytes:65_536,maxChunks:1};
+  assert.equal(preparedPackage.segments.length,2);
+  const send=async()=>{
+   const manifestId=await upload(e,Buffer.from(await readFile(preparedPackage.manifestFile.file)),'rer-package.json',small),ids:string[]=[];
+   for(const segment of preparedPackage.segments) ids.push(await upload(e,Buffer.from(await readFile(segment.file)),'rer-segment',small));
+   return {manifestId,ids};
+  };
+  const holders=()=>native.prepare("SELECT c.base64 FROM ik_door_chunks c JOIN ik_door_uploads u ON u.id=c.upload_id WHERE u.installation_id='test-installation' AND u.namespace='knowledge'").all()
+   .filter(row=>Buffer.from(row.base64 as string,'base64').toString().includes(marker)).length;
+  if(mode==='erased') {
+   // Preserve erasure of a package that was already applied, including segments.
+   const before=await send(),planned=await e.call('plan',{uploadId:before.manifestId},small);assert.equal(planned.status,200,JSON.stringify(planned.body));
+   assert.equal((await e.apply(planned.body)).state,'completed');assert.equal(holders(),2);
+   const erased=await retireD1ImportCustody({target:{kind:'record',id:'person'}},[{sql:"DELETE FROM native_records WHERE id='person'"}],e.runtime.context(),[{sql:'UPDATE native_authority SET enabled=enabled'}]);
+   assert.equal(erased.phase,'complete');assert.equal(holders(),0);
+   const incumbent=await e.upload([records[0].payload]),refused=await e.call('plan',{uploadId:incumbent});
+   assert.deepEqual([refused.status,refused.body.error],[409,'source_erased']);assert.equal(holders(),0);
+   assert.equal((await e.call('uploads',{uploadId:incumbent})).status,404);
+   t.diagnostic('PROBE cleanup applied-package erasure holders=0; later incumbent refusal=409 source_erased holders=0');
+  }
+  const sent=await send();
+  // Equivalent uploads in this scope must not leave another retained copy.
+  await upload(e,Buffer.from(await readFile(preparedPackage.segments[0].file)),'rer-segment',small);
+  // Neither a foreign installation nor a foreign namespace is cleanup authority.
+  const foreign:string[]=[];
+  for(const field of ['installation_id','namespace']) {
+   const id=await upload(e,Buffer.from(await readFile(preparedPackage.segments[0].file)),'rer-segment',small);
+   native.prepare(`UPDATE ik_door_uploads SET ${field}='foreign' WHERE id=?`).run(id);foreign.push(id);
+  }
+  const foreignChunks=()=>foreign.map(id=>native.prepare('SELECT * FROM ik_door_chunks WHERE upload_id=?').all(id));
+  const unchanged=foreignChunks();
+  // A second manifest can legitimately resolve the same uploads. Cleanup must
+  // make its inventory request the missing bytes, rather than use stale custody.
+  const shared=await upload(e,Buffer.from(JSON.stringify({...preparedPackage.manifest,mode:'shared'})),'rer-package.json',small);
+  const expected=mode==='erased'?[409,'source_erased']:[422,mode==='credential'?'source_credential':'source_invalid_or_credential_source_data'];
+  const refused=await e.call('plan',{uploadId:sent.manifestId},small);
+  assert.deepEqual([refused.status,refused.body.error],expected,JSON.stringify(refused.body));
+  assert.equal((await e.call('uploads',{uploadId:sent.manifestId},small)).status,404);
+  assert.deepEqual(foreignChunks(),unchanged);
+  const remaining=holders();if(remaining) retained.push(`${mode}: ${remaining} decoded chunk holders`);
+  // Inspect every scoped custody table as well as the decoded upload chunks.
+  const tables=native.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name!='ik_door_chunks'").all().map(row=>row.name as string);
+  for(const table of tables) for(const row of native.prepare(`SELECT * FROM ${table}`).all()) assert.ok(!JSON.stringify(row).includes(marker),table);
+  const sharedPlan=await e.call('plan',{uploadId:shared},small);
+  if(sharedPlan.body.error!=='package_segment_missing') retained.push(`${mode}: shared manifest did not request missing segments`);
+  else assert.deepEqual(sharedPlan.body.details.missing,preparedPackage.manifest.segments);
+  t.diagnostic(`PROBE cleanup ${mode} refusal=${refused.status} ${refused.body.error} decoded_holders=${remaining} foreign_scopes_unchanged=true shared=${sharedPlan.body.error}`);
+  if(mode==='erased') {
+   // A failed segment withdrawal must also roll back the manifest deletion.
+   const atomic=await send(), held=holders();
+   native.exec(`CREATE TRIGGER refuse_segment_cleanup BEFORE DELETE ON ik_door_chunks WHEN OLD.upload_id='${atomic.ids[0]}' BEGIN SELECT RAISE(ABORT,'test cleanup failure'); END`);
+   const interrupted=await e.call('plan',{uploadId:atomic.manifestId},small);assert.ok([409,410].includes(interrupted.status),JSON.stringify(interrupted.body));
+   const inventory=await e.call('uploads',{uploadId:atomic.manifestId},small);
+   if(inventory.status!==200 || holders()!==held) retained.push('erased: segment cleanup did not roll back the manifest and chunks together');
+   native.exec('DROP TRIGGER refuse_segment_cleanup');
+   t.diagnostic(`PROBE cleanup rollback manifest_status=${inventory.status} decoded_holders=${holders()} expected=${held}`);
+   if(inventory.status===200) {
+    const retried=await e.call('plan',{uploadId:atomic.manifestId},small);assert.deepEqual([retried.status,retried.body.error],expected);
+    assert.equal(holders(),0);
+   }
+  }
+ }
+ assert.deepEqual(retained,[],'refused packages keep no scoped sensitive segment copies');
 });
 
 test('P2 actual aggregate count is limited even for legacy null total, before mapping or plan writes; undeclared sources remain unchanged',async t=>{

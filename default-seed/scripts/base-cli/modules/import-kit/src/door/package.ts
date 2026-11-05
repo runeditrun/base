@@ -16,7 +16,7 @@ const missing = (segments: {bytes: number; sha256: string}[]): never => { throw 
 const json = (bytes: Uint8Array): any => { try { return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)); } catch { return invalid(); } };
 
 /** Resolve only verified complete segments in this installation AND namespace. No schema or grant changes. */
-export async function packageUpload(request: DoorRequest, upload: UploadRow): Promise<ImportDoorPackageUpload> {
+export async function packageUpload(request: DoorRequest, upload: UploadRow, resolved?: (rows: readonly UploadRow[]) => void): Promise<ImportDoorPackageUpload> {
   const declaration = request.options.package;
   if (!declaration) throw new DoorError('seed_package_unsupported',415);
   const raw = await bundleBytes(request,upload), value = json(raw);
@@ -51,6 +51,8 @@ export async function packageUpload(request: DoorRequest, upload: UploadRow): Pr
   }
   if (absent.length) missing(absent);
   if (streamHash.digest('hex')!==manifest.stream.sha256) invalid();
+  // Planning owns these verified custody identities even if the index or reader refuses.
+  resolved?.(rows);
   // Range reads materialize at most one segment plus the bounded requested file.
   async function range(start: number, size: number): Promise<Uint8Array> {
     const result = new Uint8Array(size); let offset = 0, written = 0;
