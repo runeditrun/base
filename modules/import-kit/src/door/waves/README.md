@@ -136,7 +136,9 @@ A separately reviewed proposal can describe a complete snapshot with absence;
 its previous targets remain attributed and retained. Catch-up Undo preserves
 unchanged original owners. Reverse checks all known conflicts first, then uses
 ordinary strict Undo or partial-job rollback, descending dependants first. It is
-bounded, resumable reversal, not whole-database atomicity.
+bounded, resumable reversal, not whole-database atomicity. Reversal reserves the
+same pending-parent slot, so concurrent cumulative preparation cannot race its
+preflight or clear another parent during complete-head restoration.
 
 Every request retains the existing plan/value/parser/SQL/transport limits. A
 complete reconciliation or baseline read that cannot fit the actual request

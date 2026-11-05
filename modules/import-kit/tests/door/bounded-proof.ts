@@ -162,10 +162,14 @@ export async function boundedProof(t: TestContext) {
  db.prepare("UPDATE native_records SET value_json='{}' WHERE id='3'").run();
  assert.equal((await send('reverse-parent',{parentId},pb)).body.error,'native_edit_conflict');assert.equal(db.prepare('SELECT count(*) n FROM native_records').get()!.n,4);
  db.prepare("UPDATE native_records SET value_json=? WHERE id='3'").run(original);
- for(let i=0;i<5;i++) {const reverse=await send('reverse-parent',{parentId},pb);assert.equal(reverse.status,200,JSON.stringify(reverse.body));}
+ const originalPrepare=d.db.prepare.bind(d.db);let raceArmed=true,raced:any;const raceBinding={...binding,revision:'revision-reverse-race'};
+ (d.db as any).prepare=(query:string)=>{const statement=originalPrepare(query) as any;if(query!=='SELECT head_id,pending_id FROM ik_door_namespaces WHERE installation_id=? AND namespace=?')return statement;const wrap=(stmt:any):any=>({query:stmt.query,values:stmt.values,bind:(...args:any[])=>wrap(stmt.bind(...args)),all:()=>stmt.all(),first:async()=>{const value=await stmt.first();if(raceArmed){raceArmed=false;raced=await send('prepare',{uploadId:uploaded.uploadId,ordinal:0,catchup:true},raceBinding);}return value;}});return wrap(statement);};
+ try{const reverseRace=await send('reverse-parent',{parentId},pb);assert.equal(raced.status,200,JSON.stringify(raced.body));assert.equal(reverseRace.status,409);assert.equal(db.prepare('SELECT count(*) n FROM native_records').get()!.n,4);}finally{d.db.prepare=originalPrepare;}
+ assert.equal((await send('prepare',{parentId:raced.body.parentId,cancel:true},raceBinding)).body.state,'cancelled');
+ for(let i=0;i<5;i++) {const reverse=await send('reverse-parent',{parentId},pb);assert.equal(reverse.status,200,JSON.stringify(reverse.body));if(i===0)assert.equal((await send('prepare',{uploadId:uploaded.uploadId,ordinal:0,catchup:true},{...binding,revision:'revision-while-reversing'})).body.error,'namespace_has_pending_import');}
  assert.equal(db.prepare('SELECT count(*) n FROM native_records').get()!.n,0);assert.equal(db.prepare('SELECT count(*) n FROM native_blob_chunks').get()!.n,0);
  assert.equal(db.prepare("SELECT head_id FROM ik_door_namespaces WHERE namespace='knowledge'").get()!.head_id,null);
- t.diagnostic('PROBE 4 native edit/strict root reverse: known conflict preserves all 4 records; descending dependent-first reversal removes own records/blob chunks and restores previous head only after all children');
+ t.diagnostic('PROBE 4 native edit/strict root reverse: known conflict/concurrent HTTP catch-up preserve all 4 records; reversal reserves pending lineage; descending dependent-first reversal removes own records/blob chunks and restores previous head only after all children');
  // A grouped child commits one ordinary batch, then a genuine SQLite write
  // failure leaves an honest partial job. Root rollback uses that journal.
  grouped=true;bounded.batchSize=1;const partialBinding={...binding,revision:'revision-partial'};let partialId='';
