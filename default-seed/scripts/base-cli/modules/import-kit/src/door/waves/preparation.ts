@@ -60,6 +60,7 @@ async function begin(request: DoorRequest, input: Record<string,unknown>) {
   await transact(request.options.database,authority(request),[
     sql('INSERT OR IGNORE INTO ik_door_namespaces(installation_id,namespace) VALUES(?,?)',root.installation_id,root.namespace),
     assertion(sql('EXISTS(SELECT 1 FROM ik_door_namespaces WHERE installation_id=? AND namespace=? AND head_id IS ? AND pending_id IS NULL)',root.installation_id,root.namespace,root.previous_id)),
+    assertion(sql("? IS NULL OR EXISTS(SELECT 1 FROM ik_door_wave_roots WHERE id=? AND state='completed' AND fingerprint=? AND epoch=?)",root.previous_id,root.previous_id,totals.baselineHash,root.epoch)),
     sql(`INSERT INTO ik_door_wave_roots(id,installation_id,namespace,destination,owner,mapping_version,bundle_sha256,upload_id,previous_id,epoch,binding_json,census_json,fingerprint,state,pages,chain,catchup) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,...Object.values(root)),
     sql('UPDATE ik_door_namespaces SET pending_id=? WHERE installation_id=? AND namespace=?',root.id,root.installation_id,root.namespace),
   ]);

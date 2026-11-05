@@ -197,7 +197,15 @@ export async function reverseParent(request: DoorRequest, input: Record<string,u
   // Full known-conflict preflight, followed by each ordinary strict transaction.
   // This is resumable partial reversal, never whole-database atomicity.
   await executionFence(request,root);
-  if (root.state!=='reversing') await transition(request,root,'reversing',parent);
+  if (root.state!=='reversing') {
+    // Reserve the same pending-parent slot before reversing a completed head.
+    // A catch-up prepared after our read cannot race or be cleared by Undo.
+    await transact(request.options.database,authority(request,parent),[
+      assertion(rootFence(root)),sql("UPDATE ik_door_wave_roots SET state='reversing' WHERE id=?",root.id),
+      sql('UPDATE ik_door_namespaces SET pending_id=? WHERE installation_id=? AND namespace=?',root.id,root.installation_id,root.namespace),
+    ],[rootFence({...root,state:'reversing'})]);
+    root.state='reversing';
+  }
   const all=await children(request,root);
   for (const child of all.toReversed()) {
     if (!child.job_id) continue;
@@ -210,7 +218,7 @@ export async function reverseParent(request: DoorRequest, input: Record<string,u
     assertion(rootFence(root)),
     sql("UPDATE ik_door_wave_roots SET state='reversed' WHERE id=?",root.id),
     sql('UPDATE ik_door_namespaces SET head_id=CASE WHEN head_id=? THEN ? ELSE head_id END,pending_id=NULL WHERE installation_id=? AND namespace=?',root.id,root.previous_id,root.installation_id,root.namespace),
-  ]);
+  ],[rootFence({...root,state:'reversed'})]);
   return parentView(request,{...root,state:'reversed'});
 }
 async function parentView(request: DoorRequest, root: WaveRoot) {

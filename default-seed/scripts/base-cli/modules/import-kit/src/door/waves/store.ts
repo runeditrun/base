@@ -31,8 +31,12 @@ export async function rootRow(request: DoorRequest, input: Record<string,unknown
   return row;
 }
 export function rootFence(row: WaveRoot) {
+  const settled=row.state==='completed' || row.state==='reversed';
   return sql(`EXISTS(SELECT 1 FROM ik_door_wave_roots WHERE id=? AND state=? AND pages=? AND chain=? AND fingerprint IS ? AND epoch=? AND content_revision=?)
-    AND (SELECT count(*) FROM ik_d1_erasure_journal WHERE destination=?)=?`,row.id,row.state,row.pages,row.chain,row.fingerprint,row.epoch,row.content_revision ?? 0,row.destination,row.epoch);
+    AND (SELECT count(*) FROM ik_d1_erasure_journal WHERE destination=?)=?
+    AND EXISTS(SELECT 1 FROM ik_door_namespaces WHERE installation_id=? AND namespace=? AND pending_id IS ?
+      AND (head_id IS ? OR (?=1 AND head_id=?)))`,row.id,row.state,row.pages,row.chain,row.fingerprint,row.epoch,row.content_revision ?? 0,row.destination,row.epoch,
+    row.installation_id,row.namespace,settled?null:row.id,row.state==='completed'?row.id:row.previous_id,row.state==='reversing'?1:0,row.id);
 }
 export function activeParent(request: DoorRequest, root: WaveRoot) {
   const b = revision(request);
