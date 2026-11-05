@@ -54,6 +54,26 @@ its worker inherits the lock so it cannot outlive its slot. Queueing has its
 own one-hour cap. `timeout.json` supplies the shared default and upper bound
 to Python and the Node/release validator.
 
+Process failures keep the v3 INCOMPLETE/exit-2 refusal. Its optional
+`diagnostics` array identifies worker or slot launch errors, exits and signals,
+report read/empty/parse/shape failures, version-metadata failures and scratch
+cleanup failures. Cleanup cannot replace the original process/report failure. Completed worker reports
+keep their existing status, exit and coverage fields when cleanup succeeds.
+Cleanup failure preserves an existing refusal and its diagnostics; if the
+worker succeeded, cleanup failure returns INCOMPLETE/exit 2 instead of PASS.
+Version stamping also preserves earlier failure facts and refuses on failure.
+
+Only fixed stage/code strings, OS errno names, signal names and numeric exit
+codes cross this diagnostic boundary. No exception message, traceback, command
+argument, path, report fragment or child stderr is retained or forwarded.
+Both holder and worker stderr are discarded; queue notices are fixed text
+rendered by Node from the holder's private fd-3 protocol. The worker does not
+inherit that descriptor. Protocol lines retain at most 128 characters and
+public reports contain at most eight diagnostic facts. Scratch remains private,
+and cleanup removes only the directory this invocation created. If removal
+fails, the report records its errno without exposing the scratch path; there
+is no retained-stderr file or diagnostic log to collect.
+
 Git message records carry their kind explicitly. Only commit records enable the
 bounded public coauthor address rule described in the command guide; a file named
 `@commit-message` has no special status. `public_hygiene.py` matches complete raw

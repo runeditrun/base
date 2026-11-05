@@ -5039,11 +5039,11 @@
     },
     "scripts/publish-check.mjs": {
       "source": "scripts/publish-check.mjs",
-      "sha256": "6732590753349d96eefc75929bf213c9772112426feb28fa807e531d64eb13d3"
+      "sha256": "e10925c794c9302538c747e78dd7c61e18513bd90de3a77c1d4e4c4ba11bc585"
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "ebf88282d28056dead3207f3d93eb6b23455e154a9dc71e3a09f876e6564ef5b"
+      "sha256": "c2d8fe8392fd2163cdd4e97c03b07ab683e067d8e1e1581e32c3c5ebfada0861"
     },
     "scripts/publish-check/assignment.py": {
       "source": "scripts/publish-check/assignment.py",
@@ -5108,6 +5108,10 @@
     "scripts/publish-check/destination.py": {
       "source": "scripts/publish-check/destination.py",
       "sha256": "03e1bd5e912e7d0761b1f5277f23b33bd52aec81085f275589d04669a31218c7"
+    },
+    "scripts/publish-check/diagnostics.mjs": {
+      "source": "scripts/publish-check/diagnostics.mjs",
+      "sha256": "10cbeeec149dcd0f0f1f76ec5ddf43e17c0862e2e5c67580c4d80ad3e897ec93"
     },
     "scripts/publish-check/env_values.py": {
       "source": "scripts/publish-check/env_values.py",
@@ -5239,7 +5243,7 @@
     },
     "scripts/publish-check/slots.py": {
       "source": "scripts/publish-check/slots.py",
-      "sha256": "899b3e52c5e1b3d52f42981a18d60f5c54cbaf68817f922140f157daa719f9fa"
+      "sha256": "dc53368b158d4c7a5981816998b7bd13dfc880930123ec4c501a1455368fce33"
     },
     "scripts/publish-check/source_metadata.py": {
       "source": "scripts/publish-check/source_metadata.py",
