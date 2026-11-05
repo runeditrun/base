@@ -23,9 +23,9 @@ const beyond = {
 export function runCatchup({ lease, task, grant, directory, say, ownerPage }) {
  return withUploadedBundle({ lease, task, grant, directory, say,
   doing: (name, origin, keyed) => `Bringing over recent ${name} changes through the shipped read-only adapter. ${keyed ? 'The key stays on this computer; records' : 'Records'} go only to the app's import door at ${origin}.` },
- async ({ origin, uploadId, bundle, fresh }) => {
+ async ({ origin, uploadId, bundle, fresh, preview: uploadedPreview }) => {
   let planGrant = await fresh('plan'), refused = null, preview;
-  try { preview = await door(planGrant, { uploadId, catchup: true }, lease.signal); }
+  try { preview = uploadedPreview ?? await door(planGrant, { uploadId, catchup: true }, lease.signal); }
   catch (error) {
    const reason = planGrant.catchup === 'bounded' && /^catchup_requires_proposal:([a-z0-9_]+)$/.exec(error.doorCode ?? '')?.[1];
    if (!reason) throw error;

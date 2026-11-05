@@ -30,6 +30,7 @@ function since(window) {
 
 const shapes = {
  uptimerobot: () => ({}),
+ 'happytohelp-legacy': () => ({}),
  sentry(value, now) {
   closed(value, ['organization', 'window']);
   const organization = closed(value.organization, ['id', 'slug', 'region']);
@@ -63,7 +64,7 @@ export const inputNeeds = { sentry: 'its Sentry organization and export window',
  * `export_inputs`, or null when the task carries none yet. */
 export function exportInputs(vendor, task, now = Date.now()) {
  if (!Object.hasOwn(shapes, vendor)) return null;
- if (vendor === 'uptimerobot') return {};
+ if (vendor === 'uptimerobot' || vendor === 'happytohelp-legacy') return {};
  if (task.export_inputs === undefined || task.export_inputs === null) return null;
  return shapes[vendor](task.export_inputs, now);
 }

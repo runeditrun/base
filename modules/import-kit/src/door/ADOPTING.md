@@ -484,3 +484,40 @@ For a concrete grant client and harness see Spool's `tests/business-import.mjs`;
 its `grant`, `doorRequest`, `nativeSnapshot`, `startTestWorker` and `signIn`
 provide those network edges. Run with `nice -n 15 node <existing-test-journey>`
 after the seed's normal build. No `rer check` extension is required.
+
+### Package-aware sources
+
+Re-vendor the door together with its ordinary dependency closure, including
+`door/package.ts`, `planning.ts`, `types.ts`, `handler.ts` and `admission.ts`.
+There is no package schema or migration-ledger change: segments use existing
+upload/chunk storage. Include the static `package` declaration in each source
+allow-list result on both mounts. An undeclared namespace remains refused before
+any grant row is saved. See [Logical packages](README.md#logical-packages-across-upload-grants)
+for the stream/index contract and an accessor's bounds.
+
+Provide `package.formats`, `maxBytes`, `maxSegments` and `read`. Keep readers
+responsible for format semantics, metadata, per-table counts, attachment bindings
+and explained omissions. Base verifies transport custody and aggregate record
+authority; a reader must return the entire snapshot in one call. It must not
+split a snapshot into independently authorized plans. The legacy CLI deliberately
+declares `records.total: null`: it chooses no record units or waves. HappyToHelp
+must supply D-CAP (package capacity), D-LEG (legacy/delta reader) and D-WAVES
+(aggregate bounded-wave authority) before real oversized legacy imports.
+
+The agent registers a locally prepared legacy database export with:
+
+```sh
+rer business legacy-package add DIR
+rer business legacy-package status DIR
+rer business legacy-package remove DIR
+```
+
+Registration verifies all declared file sizes and digests, row chunk/context
+counts, per-table totals, object identities and attachment counts. JSON files pass
+the outbound detector before upload; customer-original media are exempt. It
+stores a private local registration and prints only counts and the manifest SHA.
+A leased `happytohelp-legacy` export checks that registration again, pauses and
+names the local package if it changed, then sends the exact package files through
+the logical package protocol. It needs no vendor key and makes no request to a
+live HappyToHelp account. Disconnect removes the registration and transfer
+journal/spool; removing registration leaves the source directory intact.

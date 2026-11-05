@@ -1,3 +1,4 @@
+import { packageFiles } from './legacy-package.mjs';
 import { createServer } from 'node:http';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readdir, stat } from 'node:fs/promises';
@@ -26,6 +27,11 @@ export async function door(t) {
  }
  const refuse = (code, status = 400) => { throw Object.assign(Error(code), { code, status }); };
  async function uploads(body, namespace) {
+  if (Object.keys(body).length === 1 && body.uploadId) {
+   const upload = state.uploads.get(body.uploadId);
+   if (!upload || upload.namespace !== namespace) refuse('upload_not_found', 404);
+   return { uploadId: upload.id, bundleSha256: upload.bundleSha256, complete: !!upload.bytes, received: [...upload.chunks].map(([ordinal, bytes]) => ({ ordinal, sha256: sha256(bytes), size: bytes.length })) };
+  }
   const keys = ['uploadId', 'name', 'bundleSha256', 'totalBytes', 'totalChunks', 'index', 'chunkSha256', 'base64'];
   if (Object.keys(body).some(key => !keys.includes(key))) refuse('invalid_upload_input');
   if (state.stateDir) for (const name of await readdir(state.stateDir)) if (/^export-[0-9a-f]{32}\.bundle$/.test(name)) state.bundleModes.push((await stat(join(state.stateDir, name))).mode & 0o777);
@@ -36,9 +42,9 @@ export async function door(t) {
   if (bytes.length !== (body.index < body.totalChunks - 1 ? CHUNK : body.totalBytes - CHUNK * (body.totalChunks - 1))) refuse('invalid_chunk_size');
   if (sha256(bytes) !== body.chunkSha256) refuse('chunk_sha256_mismatch');
   let upload;
-  if (body.uploadId === undefined) {
+  if (body.uploadId === undefined || !state.uploads.has(body.uploadId)) {
    if (body.index !== 0) refuse('upload_not_found', 404);
-   upload = { id: randomUUID(), namespace, name: body.name, bundleSha256: body.bundleSha256, totalBytes: body.totalBytes, totalChunks: body.totalChunks, chunks: new Map() };
+   upload = { id: body.uploadId ?? randomUUID(), namespace, name: body.name, bundleSha256: body.bundleSha256, totalBytes: body.totalBytes, totalChunks: body.totalChunks, chunks: new Map() };
    state.uploads.set(upload.id, upload);
   } else {
    upload = state.uploads.get(body.uploadId);
@@ -80,6 +86,13 @@ export async function door(t) {
   },
  };
  const read = (bytes, namespace = 'uptimerobot') => readers[namespace](bytes);
+ function packageRecords(upload) {
+  if (state.packageUnsupported) refuse('seed_package_unsupported', 415);
+  const manifest = JSON.parse(upload.bytes);
+  if (manifest.format !== 'rer-door-package/1' || manifest.source.format !== 'happytohelp-legacy-chunks-v1') refuse('seed_package_unsupported', 415);
+  const files = packageFiles(manifest, state.uploads, upload.namespace), legacy = JSON.parse(files.get('manifest.json'));
+  return legacy.chunks.flatMap(part => JSON.parse(files.get(part.file)).map(row => ({ id: `${part.table}:${row.id}` })));
+ }
  const counts = monitors => ({ input: monitors.length, unique: monitors.length, duplicates: 0, mapped: monitors.length, unmapped: 0, rejected: 0, effects: monitors.length, byKind: { monitor: monitors.length } });
  function uploaded(id, namespace) {
   const upload = state.uploads.get(id);
@@ -96,7 +109,7 @@ export async function door(t) {
    if (grant.catchup === 'bounded' && !kept.standing) refuse('standing_approval_mismatch', 403);
    return kept.preview;
   }
-  const monitors = read(upload.bytes, grant.namespace), baseline = state.baselines.get(grant.namespace);
+  const monitors = upload.name === 'rer-package.json' ? packageRecords(upload) : read(upload.bytes, grant.namespace), baseline = state.baselines.get(grant.namespace);
   if (baseline && body.catchup !== true) refuse('catchup_required', 409);
   if (!baseline && (body.catchup === true || grant.catchup === 'bounded')) refuse('catchup_requires_baseline', 409);
   const ids = monitors.map(monitor => String(monitor.id)), additions = baseline ? ids.filter(id => !baseline.includes(id)) : ids;
@@ -157,7 +170,7 @@ export async function door(t) {
    if (action === 'restore-check' && Object.keys(body).some(key => key !== 'archiveId')) refuse('invalid_restore_check_input');
    return send(action === 'uploads' ? await uploads(body, grant.namespace) : action === 'plan' ? plan(body, grant)
     : action === 'archive' ? archive(body, grant.namespace) : restoreCheck(body.archiveId, grant.namespace));
-  } catch (error) { send({ error: error.code ?? 'import_door_conflict' }, error.status ?? 500); }
+  } catch (error) { send({ error: error.code ?? 'import_door_conflict', ...(error.details ? { details: error.details } : {}) }, error.status ?? 500); }
  });
  await new Promise(resolve => http.listen(0, '127.0.0.1', resolve));
  t.after(() => new Promise(resolve => { http.close(resolve); http.closeAllConnections(); }));

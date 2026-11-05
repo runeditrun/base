@@ -1,3 +1,4 @@
+export { legacyPackage } from './legacy-package.mjs';
 import { writeFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadState, loadPending, saveState, stateDirectory, removeStateDirectory, removeWorkFiles, deviceCredentialHandle, liveSupervisor } from './state.mjs';

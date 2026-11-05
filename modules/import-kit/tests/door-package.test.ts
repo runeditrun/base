@@ -1,0 +1,130 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { door } from './door/fixture.ts';
+import { createImportDoorHandler } from '../src/door/index.ts';
+import type { ImportDoorPackageSource, ImportDoorPackageUpload, DoorGrant } from '../src/door/index.ts';
+import type { ParsedRecord } from '../src/types.ts';
+import { sha256 } from '../src/provenance/identity.ts';
+import { buildPackage } from '../../../cli/business/package-transfer.mjs';
+import { legacyPackage } from '../../../cli/fixtures/business/legacy-package.mjs';
+import { cli, connect, legacyTask } from '../../../cli/fixtures/business/legacy-cli.mjs';
+import { server } from '../../../cli/fixtures/business/server.mjs';
+import { verifyLegacyPackage } from '../../../cli/business/legacy-package.mjs';
+const QUOTA = 2 * 1024 ** 2;
+const grants = {maxBytes:QUOTA,maxChunks:32,maxRecords:100_000};
+async function temporary(t:any) { const root = await mkdtemp(join(tmpdir(),'.business-connect-package-')); t.after(()=>rm(root,{recursive:true,force:true})); return root; }
+async function upload(d:any, bytes:Buffer, name:string, extra:Partial<DoorGrant>={}) {
+ let uploadId:string|undefined;
+ for(let index=0;index<Math.ceil(bytes.length/65_536);index++) {
+  const chunk=bytes.subarray(index*65_536,(index+1)*65_536), result=await d.call('uploads',{...(uploadId?{uploadId}:{}),name,bundleSha256:sha256(bytes),totalBytes:bytes.length,totalChunks:Math.ceil(bytes.length/65_536),index,chunkSha256:sha256(chunk),base64:chunk.toString('base64')},{...grants,...extra});
+  assert.equal(result.status,200,JSON.stringify(result.body));uploadId=result.body.uploadId;
+ }
+ return uploadId!;
+}
+function declaration(read:ImportDoorPackageSource['read'],formats=['test-package/1']):ImportDoorPackageSource {return {formats,maxBytes:16*1024**2,maxSegments:16,read};}
+const rows:ParsedRecord[]=[{kind:'document',sourceId:'1',payload:{title:'First'}},{kind:'document',sourceId:'2',payload:{title:'Second'}}];
+async function prepared(t:any,total:number|null=2) {
+ const root=await temporary(t), file=join(root,'records.json'), bytes=Buffer.from(JSON.stringify(rows));await writeFile(file,bytes);
+ return buildPackage({files:[{path:'records.json',file,bytes:bytes.length,sha256:sha256(bytes)}],source:{format:'test-package/1',version:1,origin:'synthetic-database',exportedAt:null,synthetic:true,adapter:'test'},records:{total,byKind:total===null?{}:{document:2}},totals:{},quota:QUOTA,directory:join(root,'prepared')});
+}
+
+test('P2 package probe has no plan; missing, foreign and altered segments have the same scoped refusal; one aggregate plan is idempotent',async t=>{
+ const d=await door(t);await d.enable();
+ d.mount(createImportDoorHandler({...d.options,package:declaration(async pkg=>JSON.parse(Buffer.from(await pkg.read('records.json')).toString()))}));
+ const pkg=await prepared(t), manifest=Buffer.from(await readFile(pkg.manifestFile.file)), uploadId=await upload(d,manifest,'rer-package.json');
+ const missing=()=>d.call('plan',{uploadId},grants), plans=()=>d.runtime.native().prepare('SELECT count(*) n FROM ik_door_plans').get()!.n;
+ const first=await missing();assert.deepEqual([first.status,first.body.error],[409,'package_segment_missing']);assert.deepEqual(first.body.details.missing,pkg.manifest.segments);assert.equal(plans(),0);
+ const segmentId=await upload(d,Buffer.from(await readFile(pkg.segments[0].file)),'rer-segment');
+ const db=d.runtime.native();
+ db.prepare("UPDATE ik_door_uploads SET installation_id='foreign' WHERE id=?").run(segmentId);assert.equal((await missing()).body.error,'package_segment_missing');
+ db.prepare("UPDATE ik_door_uploads SET installation_id='test-installation',namespace='foreign' WHERE id=?").run(segmentId);assert.equal((await missing()).body.error,'package_segment_missing');
+ db.prepare("UPDATE ik_door_uploads SET namespace='knowledge',total_bytes=total_bytes+1 WHERE id=?").run(segmentId);assert.equal((await missing()).body.error,'package_segment_missing');
+ db.prepare('UPDATE ik_door_uploads SET total_bytes=total_bytes-1 WHERE id=?').run(segmentId);
+ const original=db.prepare('SELECT base64 FROM ik_door_chunks WHERE upload_id=? AND ordinal=0').get(segmentId)!.base64;
+ db.prepare("UPDATE ik_door_chunks SET base64='YWx0ZXJlZA==' WHERE upload_id=? AND ordinal=0").run(segmentId);assert.equal((await missing()).body.error,'package_segment_missing');assert.equal(plans(),0);
+ db.prepare('UPDATE ik_door_chunks SET base64=? WHERE upload_id=? AND ordinal=0').run(original,segmentId);
+ const accepted=await missing();assert.equal(accepted.status,200,JSON.stringify(accepted.body));assert.equal(accepted.body.summary.sourceRecords,2);assert.equal(accepted.body.created,true);
+ assert.equal((await missing()).body.planId,accepted.body.planId);assert.equal(plans(),1);assert.equal(db.prepare('SELECT count(*) n FROM native_records').get()!.n,0);
+ t.diagnostic('PROBE P2 installation/namespace/hash/size custody, manifest-before-segments 409/no plan, aggregate plan once; native writes=0');
+});
+
+test('P2 actual aggregate count is limited even for legacy null total, before mapping or plan writes; undeclared sources remain unchanged',async t=>{
+ const d=await door(t);await d.enable();let maps=0;
+ const pkg=await prepared(t,null), uploadId=await upload(d,Buffer.from(await readFile(pkg.manifestFile.file)),'rer-package.json');
+ await upload(d,Buffer.from(await readFile(pkg.segments[0].file)),'rer-segment');
+ d.mount(createImportDoorHandler({...d.options,mapping:{version:'v1',map:record=>{maps++;return {effects:[{targetKind:'record',targetId:record.sourceId,value:record.payload}]};}},package:declaration(async p=>JSON.parse(Buffer.from(await p.read('records.json')).toString()))}));
+ const limited=await d.call('plan',{uploadId},{...grants,maxRecords:1});assert.deepEqual([limited.status,limited.body.error],[403,'plan_exceeds_grant_quota']);assert.equal(maps,0);
+ assert.equal(d.runtime.native().prepare('SELECT count(*) n FROM ik_door_plans').get()!.n,0);
+ d.mount(createImportDoorHandler(d.options));assert.equal((await d.call('plan',{uploadId},grants)).body.error,'seed_package_unsupported');
+ const {parse,mapping,...mount}=d.options;
+ d.mount(createImportDoorHandler({...mount,source:namespace=>namespace==='knowledge'?{parse,mapping}:null}));
+ const before=d.runtime.native().prepare('SELECT count(*) n FROM ik_door_grants').get()!.n;
+ assert.equal((await d.call('plan',{uploadId},{...grants,namespace:'unlisted'})).body.error,'unknown_import_source');assert.equal(d.runtime.native().prepare('SELECT count(*) n FROM ik_door_grants').get()!.n,before);
+});
+
+test('bounded accessor verifies index/file hashes and file limits; returned metadata cannot alter custody',async t=>{
+ const d=await door(t);await d.enable();const pkg=await prepared(t), uploadId=await upload(d,Buffer.from(await readFile(pkg.manifestFile.file)),'rer-package.json');
+ await upload(d,Buffer.from(await readFile(pkg.segments[0].file)),'rer-segment');
+ d.mount(createImportDoorHandler({...d.options,package:declaration(async p=>{
+  await assert.rejects(p.read('../escape'),/package_file_missing/);await assert.rejects(p.read('records.json',1),/package_file_exceeds_limit/);
+  // The callback sees a detached manifest; mutating it cannot move byte ranges.
+  (p.manifest.index as {bytes:number}).bytes=0;
+  return JSON.parse(Buffer.from(await p.read('records.json')).toString());
+ })}));
+ assert.equal((await d.call('plan',{uploadId},grants)).status,200);
+});
+
+test('P1/P3/P5 public rer business run --once transfers >5 MiB with a >2 MiB object, resumes only missing chunks after SIGKILL, and plans once',async t=>{
+ const home=await temporary(t), source=await legacyPackage(join(home,'legacy'),{large:true}), verified=await verifyLegacyPackage(source.root), d=await door(t);await d.enable();
+ let readBack=0;
+ const reader=declaration(async (pkg:ImportDoorPackageUpload)=>{
+  readBack++;
+  const files=new Map<string,Buffer>();
+  // Re-derive every file digest and byte size from bytes actually transferred.
+  for(const file of pkg.files) {const bytes=Buffer.from(await pkg.read(file.path,8*1024**2));assert.equal(bytes.length,file.bytes);assert.equal(sha256(bytes),file.sha256);assert.deepEqual(bytes,source.files.get(file.path));files.set(file.path,bytes);}
+  const manifest=JSON.parse(files.get('manifest.json')!.toString()), rowCounts:Record<string,number>={}, records:ParsedRecord[]=[];
+  for(const part of manifest.chunks) {const rows=JSON.parse(files.get(part.file)!.toString());assert.equal(rows.length,part.count);rowCounts[part.table]=(rowCounts[part.table]??0)+rows.length;for(const row of rows)records.push({kind:part.table,sourceId:String(row.id),payload:row});}
+  const objectBytes=manifest.objects.reduce((n:number,o:any)=>{const bytes=files.get(o.file)!;assert.equal(bytes.length,o.size);assert.equal(sha256(bytes),o.sha256);return n+bytes.length;},0);
+  assert.deepEqual(rowCounts,manifest.source.rowCounts);assert.equal(manifest.objects.length,manifest.source.attachments.length);assert.deepEqual(pkg.manifest.totals,{rowCounts,objects:{count:manifest.objects.length,bytes:objectBytes}});
+  assert.equal(pkg.manifest.records.total,null);assert.equal(pkg.manifest.source.origin,'legacy-database');
+  assert.equal(d.runtime.native().prepare('SELECT count(*) n FROM native_records').get()!.n,0);
+  return records;
+ },['happytohelp-legacy-chunks-v1']);
+ const real=createImportDoorHandler({...d.options,package:reader}), planRows:any[]=[], uploads:any[]=[];let child:any, killed=false;
+ d.mount(async request=>{
+  const action=new URL(request.url).pathname.split('/').pop(), body=await request.clone().json() as any;
+  if(action==='uploads') {
+   uploads.push(body);
+   // Commit the chunk first, then kill before the acknowledgement reaches rer.
+   if(!killed && body.name==='rer-segment' && body.index===7) {const response=await real(request);killed=true;child.kill('SIGKILL');return response;}
+  }
+  const response=await real(request);
+  if(action==='plan' && response?.status===200) {const preview=await response.clone().json() as any;if(!planRows.some(p=>p.planId===preview.planId))planRows.push({...preview,uploadId:body.uploadId});}
+  return response;
+ });
+ const remote=await server(t), tokens:Record<string,string[]>={uploads:[],plan:[],status:[]};
+ for(const action of ['uploads','plan','status'] as const)for(let i=0;i<(action==='uploads'?250:10);i++)tokens[action].push(await d.token(action,{...grants,namespace:'happytohelp-legacy'}));
+ remote.state.door={origin:d.origin,mint:(action:string)=>{const token=tokens[action].shift();assert.ok(token);return token;},state:{plans:planRows}};
+ remote.state.exportVendor='happytohelp-legacy';
+ assert.equal((await connect(home,remote)).code,0);assert.equal((await cli(home,['legacy-package','add',source.root])).code,0);
+ remote.state.tasks=[legacyTask('large-package')];
+ const interrupted=await cli(home,['run','--once'],{onSpawn:(running:any)=>{child=running;}});assert.equal(interrupted.signal,'SIGKILL');assert.equal(killed,true);
+ const firstChunks=uploads.filter(b=>b.name==='rer-segment'), before=firstChunks.map(b=>[b.bundleSha256,b.index].join(':'));
+ // The pending claim replays its still-valid lease, as on an immediate restart.
+ const resumed=await cli(home,['run','--once']);assert.equal(resumed.code,0,resumed.stderr);
+ const after=uploads.filter(b=>b.name==='rer-segment').map(b=>[b.bundleSha256,b.index].join(':'));
+ assert.equal(new Set(after).size,after.length,'no acknowledged or unacknowledged durable chunk is re-sent');assert.ok(after.length>before.length);
+ assert.equal(planRows.length,1);assert.equal(d.runtime.native().prepare('SELECT count(*) n FROM ik_door_plans').get()!.n,1);
+ assert.equal(d.runtime.native().prepare('SELECT count(*) n FROM native_records').get()!.n,0);assert.ok(readBack>=1);
+ const segments=uploads.filter(b=>b.name==='rer-segment');assert.ok(segments.every(b=>b.totalBytes<=QUOTA && b.totalChunks<=32));
+ assert.ok(verified.bytes>=5*1024**2);assert.ok(source.manifest.objects.some((o:any)=>o.size>QUOTA));
+ const duplicateTokens=d.runtime.native().prepare('SELECT count(*) n FROM ik_door_grants').get()!.n;assert.equal(duplicateTokens,d.requests.length,'each admitted door request used a fresh ES256 grant');
+ const completion=remote.state.requests.find((r:any)=>r.route.endsWith('/complete'))!.body.outputs;
+ assert.deepEqual(completion,{upload_id:planRows[0].uploadId,plan_id:planRows[0].planId,bundle_sha256:planRows[0].bundleSha256});
+ t.diagnostic(`PROBE P1 exit=0 bytes=${verified.bytes} segments=${new Set(segments.map(b=>b.bundleSha256)).size} upload_id=${completion.upload_id} plan_id=${completion.plan_id} bundle_sha256=${completion.bundle_sha256}`);
+ t.diagnostic(`PROBE P3 rowCounts=${JSON.stringify(verified.rowCounts)} objects=${verified.objects.count} objectBytes=${verified.objects.bytes} all file SHA-256s match; native writes=0`);
+ t.diagnostic(`PROBE P5 SIGKILL after chunk 7; before=${before.length} total=${after.length}; inventory resumed with zero repeated chunk writes`);
+});

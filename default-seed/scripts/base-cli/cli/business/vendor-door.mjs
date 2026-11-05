@@ -1,3 +1,5 @@
+import { registeredLegacyPackage } from './legacy-package.mjs';
+import { buildPackage, transferPackage } from './package-transfer.mjs';
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { open, unlink } from 'node:fs/promises';
@@ -18,7 +20,7 @@ import { businessCommand } from './invocation.mjs';
 const CHUNK_BYTES = 65_536;
 const DOOR_RESPONSE_BYTES = 4 * 1024 * 1024;
 // The catalogue names the platform builds vendor task titles from.
-export const vendorNames = Object.freeze({ sentry: 'Sentry', uptimerobot: 'UptimeRobot', pagerduty: 'PagerDuty', calendly: 'Calendly', sorry: 'Sorry' });
+export const vendorNames = Object.freeze({ sentry: 'Sentry', uptimerobot: 'UptimeRobot', pagerduty: 'PagerDuty', calendly: 'Calendly', sorry: 'Sorry', 'happytohelp-legacy': 'HappyToHelp legacy' });
 /** Whether a vendor's export needs the owner's read-only key (Sorry's public page does not). */
 export const keyed = vendor => KEYED_VENDORS.includes(vendor);
 export const vendorHandle = vendor => `vendor:${vendor}:read`;
@@ -130,7 +132,7 @@ export async function door(grant, body, signal) {
  if (!response.ok) {
   // A door code is snake_case, sometimes with one named reason (`catchup_requires_proposal:source_records_gone`).
   const doorCode = typeof result?.error === 'string' && /^[a-z][a-z0-9_]{0,79}(?::[a-z][a-z0-9_]{0,79})?$/.test(result.error) ? result.error : null;
-  throw Object.assign(Error(`The app's import door refused the ${action} request (HTTP ${response.status}${doorCode ? `: ${doorCode}` : ''}).`), { doorStatus: response.status, doorCode });
+  throw Object.assign(Error(`The app's import door refused the ${action} request (HTTP ${response.status}${doorCode ? `: ${doorCode}` : ''}).`), { doorStatus: response.status, doorCode, ...(doorCode === 'package_segment_missing' ? { doorDetails: result.details } : {}) });
  }
  if (!result || typeof result !== 'object' || Array.isArray(result)) throw Error(`The app's import door returned an invalid ${action} answer.`);
  return result;
@@ -204,6 +206,27 @@ export async function withUploadedBundle({ lease, task, grant: claimedGrant, dir
  const inputs = adapterInputs(vendor, task);
  let key = keyed(vendor) ? await createCredentialStore().get(vendorHandle(vendor)) : null;
  if (keyed(vendor) && !key) throw new ExportWaiting(`Business vendor export needs the owner's read-only ${name} key on this computer: ${keyStep(vendor)}\nThen run ${businessCommand('run')} again.`, 'owner_required', { keyMissing: vendor });
+ if (vendor === 'happytohelp-legacy') {
+  if (!['export.vendor', 'catchup.vendor'].includes(task.kind)) throw new ExportWaiting('Legacy package tasks require a package-aware export or catch-up reader.', 'configuration_required');
+  let legacy;
+  try { legacy = await registeredLegacyPackage(); }
+  catch (error) { throw new ExportWaiting(error.message, 'configuration_required'); }
+  say(doing(name, origin, false));
+  const packageDirectory = join(directory, `package-${hash(task.id).slice(0, 32)}`);
+  let prepared;
+  try {
+   prepared = await buildPackage({ files: legacy.files, quota, directory: packageDirectory, signal,
+    source: { format: legacy.manifest.format, version: 1, origin: 'legacy-database', exportedAt: legacy.manifest.exportedAt ?? legacy.manifest.source.exportedAt ?? null,
+     synthetic: legacy.manifest.source.synthetic === true, adapter: 'rer:happytohelp-legacy' },
+    records: { total: null, byKind: {} }, totals: { rowCounts: legacy.rowCounts, objects: legacy.objects } });
+  } catch { throw new ExportWaiting(`Legacy package changed or could not be prepared: ${legacy.path}. Recheck and register that package again.`, 'configuration_required'); }
+  let uploaded;
+  try { uploaded = await transferPackage({ prepared, fresh, request: door, signal, checkpoint: cp => lease.checkpointSaved(cp), catchup: task.kind === 'catchup.vendor' }); }
+  catch (error) { if (!error.message.startsWith('SEED_PACKAGE_UNSUPPORTED')) throw error; throw new ExportWaiting(error.message, 'configuration_required'); }
+  const { outputs, said } = await finish({ vendor, name, origin, ...uploaded, fresh });
+  await lease.complete(outputs);
+  return said;
+ }
  const path = join(directory, `export-${hash(task.id).slice(0, 32)}.bundle`);
  try {
   say(doing(name, origin, keyed(vendor)));
