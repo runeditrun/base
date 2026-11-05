@@ -1,0 +1,840 @@
+{
+  "files": [
+    {
+      "path": "cli/ledger-refusal.mjs",
+      "bytes": 1946,
+      "sha256": "95326f968b79383ffbced2acdb408b5c1997de95d1cbe26a38f41f77c5fdf62d",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "cli/legacy-ledger-portability.test.mjs",
+      "bytes": 6632,
+      "sha256": "17918ea682f489fc44bfd8d4b531d29002f88b904b4459848645c25064bfc536",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "cli/platform-ledger-leave.test.mjs",
+      "bytes": 20008,
+      "sha256": "9abbea5f192b155b6cbf1febc9a5934a8bb3d601e4b587f096a853956eef4f2c",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0001_reference.sql",
+      "bytes": 880,
+      "sha256": "05def717d32160b6c8b40363a6b35a4e807f1c5f527a95e32ddc26474ef77344",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0002_operator_auth.sql",
+      "bytes": 3336,
+      "sha256": "a1b0e72a45da5e5a8a12e8b52124ace7ff1ad0f251b012e470b641e1abce416a",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0003_invitation_cancellation.sql",
+      "bytes": 1150,
+      "sha256": "2130793483660155aaa1851b6111e51a7aeaf1f8ceb86d467d42ba684c35b562",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0004_development_outbox.sql",
+      "bytes": 397,
+      "sha256": "45d6b03eadfe1e91737763ae85cdff74e7216f859869e34431550bba48294996",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0005_portability.sql",
+      "bytes": 1256,
+      "sha256": "c7db9042f6d5c571e10297c02df858ad2f3466beb4fa85649fee407cc228747b",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0006_first_run.sql",
+      "bytes": 332,
+      "sha256": "aef92de36233195e5a03cce67b192c5c0c38033b695f7ebce6062fc89152c2a9",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0007_dev_sessions.sql",
+      "bytes": 1409,
+      "sha256": "18754583983c09f3624038131c1b03fadecb8375dddb0a5d09c449a4238ce298",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0008_identity_providers.sql",
+      "bytes": 1937,
+      "sha256": "f879fb86b079e591dfe4a8513752a8e0394e252b940aa35d3f7430f27b7382c6",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0009_domain_rules_step_up.sql",
+      "bytes": 1274,
+      "sha256": "e41c7f1381f547582148cdf247b521d7f166461ab24058ace95acdf21839e815",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0010_provider_control.sql",
+      "bytes": 1384,
+      "sha256": "a1e74cd263d294e75b5b09baf364c81d324e50ae17a77c5a287d58b833b56cdc",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0011_dependencies.sql",
+      "bytes": 849,
+      "sha256": "3481d8aef870a9eda153a1617e99bb71a408e61a25dea92bb132efa7dd1c2526",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0012_owner_claim.sql",
+      "bytes": 724,
+      "sha256": "c3ffe653727bb4867b064dc2489df5013613f08f4b5998d2fe2b6a8485cdb815",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0013_idp_owner.sql",
+      "bytes": 212,
+      "sha256": "a870102648a2226b18a2fe8168d096389b698af88333d112fa8137e582fc2b33",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0014_provider_pins.sql",
+      "bytes": 352,
+      "sha256": "f0cfb6b3740869fd098ee449efb25807f8b1ef51c353fd07bafeb00ce38aeb63",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0015_dependency_setup.sql",
+      "bytes": 1156,
+      "sha256": "7b36f7e1fb0991fe3e808613d911393bbad3386ead06427082c69a48c5738108",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0015_people.sql",
+      "bytes": 1139,
+      "sha256": "877e45a69a397988283499943b6299ad1a9852f8a349c76c7a67ba291ae1091b",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0016_dependency_approval.sql",
+      "bytes": 174,
+      "sha256": "7d3742369189b69ea28bdc000097f150f83221c6474f7e177c7b5590691b67e9",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0016_erasure.sql",
+      "bytes": 814,
+      "sha256": "1dba1e748a4fa8253d486eba3fccce065a38f280a4ddcd8e5503bfc914aa2b74",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0017_erasure_scope.sql",
+      "bytes": 471,
+      "sha256": "10ec62e5e0e37441265141d56636cf0cc2a9537425819d7a27a9727fc4dabdff",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0018_import_kit.sql",
+      "bytes": 75426,
+      "sha256": "7e46e981be4ace16e5dbc7d5e625102e51802a28508d4aeba6a4b5b0653d34b7",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0019_people_imports.sql",
+      "bytes": 204,
+      "sha256": "d4b780a7c624a555ca92fa37d856e579643bcb4d967abdf1294c9422919fa691",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0020_import_erasure_append_only.sql",
+      "bytes": 662,
+      "sha256": "1e569e41a24ee60455a2d4fc934970fda02a9eb1555e31b7272a83aeff0d86ae",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0021_import_preparation_steps.sql",
+      "bytes": 1273,
+      "sha256": "05e1d22169d841cccbcdd26fc76f6ca4a41c1ab562d230c83b4ce4a3d66f9310",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0022_import_stream_sources.sql",
+      "bytes": 396,
+      "sha256": "16c5fc06273046bf82587559de20942f5a4888617ab494ff6c046e689daa2dfd",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0023_person_erasure_redactions.sql",
+      "bytes": 494,
+      "sha256": "7c2ae7bcc1904b9895f7cac0801700c4da99a0912663be55487fabc5776f6ab2",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0024_owner_signin.sql",
+      "bytes": 670,
+      "sha256": "98da904e768e35b43fb1be83d9dcc9c9b5d86ab3a795234ed5223c4fddc567d9",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0025_command_receipts.sql",
+      "bytes": 510,
+      "sha256": "8064fe877c22bf0500ff5c20d274cbd4e8b2e0dea986fa9e3e4fef4faf2c54a0",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0026_import_custody_replace.sql",
+      "bytes": 12398,
+      "sha256": "3c18b6de3352ded7465ff87b628d0cad84472f475fe545e98cce78407e9a38ea",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0027_import_erasure_progress.sql",
+      "bytes": 1374,
+      "sha256": "a564a78f102b6e20d1e44d68662671fa40081ffbd5e434d044ba4d85e66d6f0f",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0028_import_door.sql",
+      "bytes": 2703,
+      "sha256": "b8e836a88d82edca863fba821fba4f7ae8039395a2d8df975d2b956dafa8a165",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0029_import_door_archive.sql",
+      "bytes": 759,
+      "sha256": "6a99800f2320007a4e784d896c9cb2bd96a48992b137289b090a9214f36b9e13",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0029_scheduled_policy.sql",
+      "bytes": 919,
+      "sha256": "9459f042ca2ed0813b734dc917486bd410a721c26b60321016eeb7e5fbf39fbd",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0030_scheduled_policy_hardening.sql",
+      "bytes": 760,
+      "sha256": "71726d5009fd671101a49a0071982f710e429b976779fb10ce3d57fe2cb6750f",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0031_last_signin.sql",
+      "bytes": 708,
+      "sha256": "289f99fd90e5263e9bb421f14887b0540e0686f7c7aa72110dd1ad20374bc945",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0032_dependency_keys_sealed.sql",
+      "bytes": 426,
+      "sha256": "9c8fa5f94c48a230f326cd4d666cbc2bd1e7d5a18327b89e65b339ac6a533d9a",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0033_business_settings.sql",
+      "bytes": 1056,
+      "sha256": "a16f736a781aa3fe02a2e090c993f8c360c904f9fb6d86126acdab6e1f24e773",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0034_agent_door.sql",
+      "bytes": 1968,
+      "sha256": "354587e1614c65ab0bbab9e14114eebe4170c23edf1dbaca34564b6ac6f2517c",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0035_agent_erasure_actor.sql",
+      "bytes": 221,
+      "sha256": "419089a7f4f91aef7f6b35500958053fba3658fca812ffebfcde9dfc6e764718",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0036_agent_empty_state.sql",
+      "bytes": 337,
+      "sha256": "9d7de802eb9a36d012b894621242a0369c101f2b90f394a58497d8cd74686520",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0037_business_people.sql",
+      "bytes": 402,
+      "sha256": "51aa39622d866b987d71b6e37c9a8300e7f24c54a55611edaab669ed051b01cd",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0038_agent_erasure_custody.sql",
+      "bytes": 1109,
+      "sha256": "da17adcaad8ae04c004a4d2d799f8a2c6afa6d9a4d700d0b0300aabb682185a0",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0039_agent_replay_window.sql",
+      "bytes": 764,
+      "sha256": "b9f849e06613bef3924d724b300e0eedb3c3409267d4d3b72ce4d138d96fe821",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0040_agent_door_relay.sql",
+      "bytes": 3839,
+      "sha256": "8b9514ad840af9990bb2113781c48e074cf0a064bb45708d0e81127ebd0fb5d6",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0041_agent_retired_refs.sql",
+      "bytes": 86,
+      "sha256": "f479b410066f52b0c6872e07e11b62b073f26c16d8dd70b17564aad92cfe7d6a",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/migrations/core/0042_import_bounded_waves.sql",
+      "bytes": 7523,
+      "sha256": "0d2d43e8bf43b2af4d2ece8f41b244e6098e96990c1c694c54d701646667e06c",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/cli/ledger-refusal.mjs",
+      "bytes": 1946,
+      "sha256": "95326f968b79383ffbced2acdb408b5c1997de95d1cbe26a38f41f77c5fdf62d",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/dependencies/schema/approval-attempt.sql",
+      "bytes": 174,
+      "sha256": "7d3742369189b69ea28bdc000097f150f83221c6474f7e177c7b5590691b67e9",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/dependencies/schema/dependencies.sql",
+      "bytes": 849,
+      "sha256": "3481d8aef870a9eda153a1617e99bb71a408e61a25dea92bb132efa7dd1c2526",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/dependencies/schema/keys-sealed.sql",
+      "bytes": 426,
+      "sha256": "9c8fa5f94c48a230f326cd4d666cbc2bd1e7d5a18327b89e65b339ac6a533d9a",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/deploy-kit/migration-ledger.mjs",
+      "bytes": 8768,
+      "sha256": "ce29388e4e3ee73952d3d612ea6481222b6a3d8d7d543614cec648347cc56782",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/erasure/schema/erasure-rates.sql",
+      "bytes": 264,
+      "sha256": "84cedc143a2cb8ed642852159a2ade1381157abf811da918580ab7bc74d404b3",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/erasure/schema/erasure.sql",
+      "bytes": 1207,
+      "sha256": "44fd4fac1aee4fda0d1d580373cbed9ef3da837e0186e7fe2130fb68dfceadbe",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/integrations/core/schema.sql",
+      "bytes": 2037,
+      "sha256": "1a24ad5a3b682c5bb3ab53966732a62ea97a7e7a23a16effbefbd0a908722509",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/integrations/core/upgrade-token-usage-context.sql",
+      "bytes": 380,
+      "sha256": "da8094c17a33532455642b148e9776d66860b1d361e24dc744afd6c167671556",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/mail/src/development/schema.sql",
+      "bytes": 397,
+      "sha256": "45d6b03eadfe1e91737763ae85cdff74e7216f859869e34431550bba48294996",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/mail/src/events/d1-schema.sql",
+      "bytes": 948,
+      "sha256": "c18a168f27d6994d2930730e775422d65cb97023f5550cdccc2d95fdf64440b1",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/operator-auth/accounts/schema/dependency-setup.sql",
+      "bytes": 1156,
+      "sha256": "7b36f7e1fb0991fe3e808613d911393bbad3386ead06427082c69a48c5738108",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/operator-auth/accounts/schema/dev-sessions.sql",
+      "bytes": 1409,
+      "sha256": "18754583983c09f3624038131c1b03fadecb8375dddb0a5d09c449a4238ce298",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/operator-auth/accounts/schema/domain-rules-step-up.sql",
+      "bytes": 1274,
+      "sha256": "e41c7f1381f547582148cdf247b521d7f166461ab24058ace95acdf21839e815",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/operator-auth/accounts/schema/invitation-cancellation.sql",
+      "bytes": 1150,
+      "sha256": "2130793483660155aaa1851b6111e51a7aeaf1f8ceb86d467d42ba684c35b562",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/operator-auth/accounts/schema/last-signin.sql",
+      "bytes": 708,
+      "sha256": "289f99fd90e5263e9bb421f14887b0540e0686f7c7aa72110dd1ad20374bc945",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/operator-auth/accounts/schema/operator-auth.sql",
+      "bytes": 10208,
+      "sha256": "e4cf66f7258c5b85876c16f18fb78fe3c9bd998244634ee267bb921403d01912",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/operator-auth/accounts/schema/owner-signin.sql",
+      "bytes": 670,
+      "sha256": "98da904e768e35b43fb1be83d9dcc9c9b5d86ab3a795234ed5223c4fddc567d9",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/operator-auth/accounts/schema/provider-control.sql",
+      "bytes": 1737,
+      "sha256": "f19cc7a792538a8ff36d87760a3cad58fccab0316984488d1834af14fbf37cfe",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/operator-auth/accounts/schema/provider-pins.sql",
+      "bytes": 352,
+      "sha256": "f0cfb6b3740869fd098ee449efb25807f8b1ef51c353fd07bafeb00ce38aeb63",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/operator-auth/accounts/schema/scheduled-policy-hardening.sql",
+      "bytes": 760,
+      "sha256": "71726d5009fd671101a49a0071982f710e429b976779fb10ce3d57fe2cb6750f",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/operator-auth/accounts/schema/scheduled-policy.sql",
+      "bytes": 1205,
+      "sha256": "377fa07ed05a95b64385af865b66d695c127a1086c0d85fe093c3eb5bebf3ebe",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/operator-auth/identity/oidc/schema/oidc.sql",
+      "bytes": 1937,
+      "sha256": "f879fb86b079e591dfe4a8513752a8e0394e252b940aa35d3f7430f27b7382c6",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/owner-claim/schema/idp.sql",
+      "bytes": 212,
+      "sha256": "a870102648a2226b18a2fe8168d096389b698af88333d112fa8137e582fc2b33",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/owner-claim/schema/owner-claim.sql",
+      "bytes": 724,
+      "sha256": "c3ffe653727bb4867b064dc2489df5013613f08f4b5998d2fe2b6a8485cdb815",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/portability/ledgers.mjs",
+      "bytes": 9109,
+      "sha256": "7a0a2ed823edc17305696ba624e85c38b9b405341d4886d7a43e30252abe3a04",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/scripts/base-cli/modules/portability/schema/portability.sql",
+      "bytes": 1256,
+      "sha256": "c7db9042f6d5c571e10297c02df858ad2f3466beb4fa85649fee407cc228747b",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "default-seed/tests/e2e/fixtures.sql",
+      "bytes": 238,
+      "sha256": "81c3e3fe913b0cd8479956a95b7c392a18f63273fd9dcbd8ba51656cfc398022",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "foundation/runtime/command-receipts.sql",
+      "bytes": 510,
+      "sha256": "8064fe877c22bf0500ff5c20d274cbd4e8b2e0dea986fa9e3e4fef4faf2c54a0",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "foundation/template/migrations/core/0004_first_run.sql",
+      "bytes": 332,
+      "sha256": "aef92de36233195e5a03cce67b192c5c0c38033b695f7ebce6062fc89152c2a9",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/agent-door/adoption/penny/0106_agent_erasure_custody.sql",
+      "bytes": 1484,
+      "sha256": "6e93ac2193eae573b8f8b0926211b082b407003052d14a05da1960a7841f1854",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/agent-door/schema/agent-door.sql",
+      "bytes": 5360,
+      "sha256": "ce5c705fc45dd290898eb3ac98add3a72fcd39481ae7aaec6a151eff1ad6a41c",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/agent-door/schema/replay-aliases.sql",
+      "bytes": 637,
+      "sha256": "8ad6104039ba8ae3c07793e32d5ce4974bf440d56902c3b21d15d61bdfff27a8",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/agent-door/tests/fixtures/schema-0.2.93/agent-door.sql",
+      "bytes": 1914,
+      "sha256": "016d8a98b964385f5c4a13447361c3c783910a76aaf4606b0e0081482bc819cc",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/agent-door/tests/fixtures/schema-0.2.95/agent-door.sql",
+      "bytes": 2035,
+      "sha256": "887180c9bca827001bc230f76dbac5c7fc6fddfb4e5ac001f0792a697ab58f32",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/agent-door/tests/fixtures/schema-0.2.95/replay-aliases.sql",
+      "bytes": 637,
+      "sha256": "8ad6104039ba8ae3c07793e32d5ce4974bf440d56902c3b21d15d61bdfff27a8",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/agent-door/tests/fixtures/schema-0.2.96/agent-door.sql",
+      "bytes": 5273,
+      "sha256": "f9adc849e49561737dab15061aa21e8ac191d982c5aa4886260b146f9bada763",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/agreement-signing/schema/agreement-signing.sql",
+      "bytes": 5805,
+      "sha256": "c8559efa3d5b5d9eeaf44af67ced33fcbb3f32fac611df3ca02fc94cc8f2d2f3",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/agreement-signing/tests/consumer/migrations/0001_native_agreements.sql",
+      "bytes": 1878,
+      "sha256": "357f364db73ea873f04121da8dd832000fcb717ee89d7240af7ff9ec55abe202",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/agreement-signing/tests/consumer/migrations/0002_agreement_signing.sql",
+      "bytes": 5805,
+      "sha256": "c8559efa3d5b5d9eeaf44af67ced33fcbb3f32fac611df3ca02fc94cc8f2d2f3",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/agreement-signing/tests/consumer/migrations/0003_preserve_populated_history.sql",
+      "bytes": 895,
+      "sha256": "439f962a1ef6839273aa5623ae5f234748034417cb033c7fdf9c8da6f4b133ee",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/business-settings/schema/0001_business_settings.sql",
+      "bytes": 1056,
+      "sha256": "a16f736a781aa3fe02a2e090c993f8c360c904f9fb6d86126acdab6e1f24e773",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/business-settings/schema/0002_business_people.sql",
+      "bytes": 402,
+      "sha256": "51aa39622d866b987d71b6e37c9a8300e7f24c54a55611edaab669ed051b01cd",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/catalogue-ordering/schema/catalogue-ordering.sql",
+      "bytes": 6037,
+      "sha256": "bedc473118abfae14c96e481d913a25a5ee8a7e962f353345a9bb3844ed3e29b",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/catalogue-ordering/tests/fixtures/0001_native.sql",
+      "bytes": 3109,
+      "sha256": "a1f3c7b7bbcf1ab77e32d9514b2677e471b19ecc7f135d0817a69cbbd5421eef",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/catalogue-ordering/tests/fixtures/0003_populated_upgrade.sql",
+      "bytes": 2201,
+      "sha256": "393991d367b50ca495b5198c71c5ece35b23a9da912f01f7b6c3e68cf7d1c399",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/dependencies/schema/approval-attempt.sql",
+      "bytes": 174,
+      "sha256": "7d3742369189b69ea28bdc000097f150f83221c6474f7e177c7b5590691b67e9",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/dependencies/schema/dependencies.sql",
+      "bytes": 849,
+      "sha256": "3481d8aef870a9eda153a1617e99bb71a408e61a25dea92bb132efa7dd1c2526",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/dependencies/schema/keys-sealed.sql",
+      "bytes": 426,
+      "sha256": "9c8fa5f94c48a230f326cd4d666cbc2bd1e7d5a18327b89e65b339ac6a533d9a",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/dependencies/tests/fixtures/trigger-writes.sql",
+      "bytes": 659,
+      "sha256": "f6a1f2bf059337900da45d6563df2aa8812f088e71d85768b06804e32f504e4a",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/deploy-kit/migration-ledger.mjs",
+      "bytes": 8768,
+      "sha256": "ce29388e4e3ee73952d3d612ea6481222b6a3d8d7d543614cec648347cc56782",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/erasure/schema/erasure-rates.sql",
+      "bytes": 264,
+      "sha256": "84cedc143a2cb8ed642852159a2ade1381157abf811da918580ab7bc74d404b3",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/erasure/schema/erasure.sql",
+      "bytes": 1207,
+      "sha256": "44fd4fac1aee4fda0d1d580373cbed9ef3da837e0186e7fe2130fb68dfceadbe",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/integrations/core/schema.sql",
+      "bytes": 2037,
+      "sha256": "1a24ad5a3b682c5bb3ab53966732a62ea97a7e7a23a16effbefbd0a908722509",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/integrations/core/upgrade-token-usage-context.sql",
+      "bytes": 380,
+      "sha256": "da8094c17a33532455642b148e9776d66860b1d361e24dc744afd6c167671556",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/mail/src/development/schema.sql",
+      "bytes": 397,
+      "sha256": "45d6b03eadfe1e91737763ae85cdff74e7216f859869e34431550bba48294996",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/mail/src/events/d1-schema.sql",
+      "bytes": 948,
+      "sha256": "c18a168f27d6994d2930730e775422d65cb97023f5550cdccc2d95fdf64440b1",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/accounts/schema/dependency-setup.sql",
+      "bytes": 1156,
+      "sha256": "7b36f7e1fb0991fe3e808613d911393bbad3386ead06427082c69a48c5738108",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/accounts/schema/dev-sessions.sql",
+      "bytes": 1409,
+      "sha256": "18754583983c09f3624038131c1b03fadecb8375dddb0a5d09c449a4238ce298",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/accounts/schema/domain-rules-step-up.sql",
+      "bytes": 1274,
+      "sha256": "e41c7f1381f547582148cdf247b521d7f166461ab24058ace95acdf21839e815",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/accounts/schema/invitation-cancellation.sql",
+      "bytes": 1150,
+      "sha256": "2130793483660155aaa1851b6111e51a7aeaf1f8ceb86d467d42ba684c35b562",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/accounts/schema/last-signin.sql",
+      "bytes": 708,
+      "sha256": "289f99fd90e5263e9bb421f14887b0540e0686f7c7aa72110dd1ad20374bc945",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/accounts/schema/operator-auth.sql",
+      "bytes": 10208,
+      "sha256": "e4cf66f7258c5b85876c16f18fb78fe3c9bd998244634ee267bb921403d01912",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/accounts/schema/owner-signin.sql",
+      "bytes": 670,
+      "sha256": "98da904e768e35b43fb1be83d9dcc9c9b5d86ab3a795234ed5223c4fddc567d9",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/accounts/schema/provider-control.sql",
+      "bytes": 1737,
+      "sha256": "f19cc7a792538a8ff36d87760a3cad58fccab0316984488d1834af14fbf37cfe",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/accounts/schema/provider-pins.sql",
+      "bytes": 352,
+      "sha256": "f0cfb6b3740869fd098ee449efb25807f8b1ef51c353fd07bafeb00ce38aeb63",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/accounts/schema/scheduled-policy-hardening.sql",
+      "bytes": 760,
+      "sha256": "71726d5009fd671101a49a0071982f710e429b976779fb10ce3d57fe2cb6750f",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/accounts/schema/scheduled-policy.sql",
+      "bytes": 1205,
+      "sha256": "377fa07ed05a95b64385af865b66d695c127a1086c0d85fe093c3eb5bebf3ebe",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/identity/oidc/schema/oidc.sql",
+      "bytes": 1937,
+      "sha256": "f879fb86b079e591dfe4a8513752a8e0394e252b940aa35d3f7430f27b7382c6",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/fixtures/auth-1-store/rows.sql",
+      "bytes": 8220,
+      "sha256": "e53806114441dfab57f9dfe7417b3c2561577cc20ebf465bbe349edc9c9b12e6",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/fixtures/dev-sessions/rows.sql",
+      "bytes": 2524,
+      "sha256": "4acb92e94e65da720bb9ac88540ad4d2382330b2d921bcb2269e43833062ca1e",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/fixtures/pre-ledger/README.md",
+      "bytes": 2023,
+      "sha256": "68b77ef7bfbab8dc6f3393ea7586611b47e60ec8d4e09d794c5415c996bc42c2",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/fixtures/pre-ledger/owner-state.mjs",
+      "bytes": 1078,
+      "sha256": "b90f9706d457fe607ddfa09c230b2aa8f7fbad31cdc0f9f998e9784da044b964",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/fixtures/pre-ledger/rows.sql",
+      "bytes": 3380,
+      "sha256": "e853472f2234a203fa76bc680b7f72682e8e7375736cfd4412aa1066b3c643ee",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/fixtures/pre-ledger/schema.sql",
+      "bytes": 3336,
+      "sha256": "a1b0e72a45da5e5a8a12e8b52124ace7ff1ad0f251b012e470b641e1abce416a",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/fixtures/trigger-writes.sql",
+      "bytes": 1248,
+      "sha256": "103ffca9fdef42d0a79cc751d6e27068f75439b5938350c5b833a56c42ecfe41",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/native/schema.sql",
+      "bytes": 1971,
+      "sha256": "e49cbafd41a57780249c561537e08158033676bce9ede7eceafdf0b13d33f8fd",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/pre-ledger-assertions.mjs",
+      "bytes": 4493,
+      "sha256": "b2555d9b416d8d71c9a65cb2006f8905355823981d18270da0ecef68803fc55b",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/pre-ledger-cancellation.test.mjs",
+      "bytes": 5924,
+      "sha256": "8316dbd2a59ad33ba2d6293151e344a1dcfeccfeb9d214f8ee32b7383c293bb7",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/pre-ledger-runtime.mjs",
+      "bytes": 4125,
+      "sha256": "8b905064c266a4d97d00039054d7f5401e050dc670cae964eb0e7e24d5c78eef",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/pre-ledger-sql.test.mjs",
+      "bytes": 3135,
+      "sha256": "de029ec728e69a9f2a51a7308366a725336d68436c47d3701559d2bd9ed47f1f",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/pre-ledger-upgrade.test.mjs",
+      "bytes": 4395,
+      "sha256": "8cb1a13681341d5592c34bc1d63045724810761ef98a7a709920de0a14aac088",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/operator-auth/tests/pre-ledger-worker.mjs",
+      "bytes": 839,
+      "sha256": "e44f6bcbd5b2dd77d1a4abd3a5ad1b3ac9872790e786eeade8c0d6315c444fe7",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/owner-claim/schema/idp.sql",
+      "bytes": 212,
+      "sha256": "a870102648a2226b18a2fe8168d096389b698af88333d112fa8137e582fc2b33",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/owner-claim/schema/owner-claim.sql",
+      "bytes": 724,
+      "sha256": "c3ffe653727bb4867b064dc2489df5013613f08f4b5998d2fe2b6a8485cdb815",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/portability/ledgers.mjs",
+      "bytes": 9109,
+      "sha256": "7a0a2ed823edc17305696ba624e85c38b9b405341d4886d7a43e30252abe3a04",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/portability/schema/portability.sql",
+      "bytes": 1256,
+      "sha256": "c7db9042f6d5c571e10297c02df858ad2f3466beb4fa85649fee407cc228747b",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/portability/tests/ledger-placement.test.mjs",
+      "bytes": 10241,
+      "sha256": "6511a1e1fd0bf66676a72a0b19405092eb35a78b541fbb60aa9993e9cc0e1de2",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/time-billing/schema/time-billing.sql",
+      "bytes": 7652,
+      "sha256": "9a44eeb253f697f9ab183c1f3d446e31d3c989415ea6c9227f2f02fd3c1cbe47",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/time-billing/tests/migrations/0001-native.sql",
+      "bytes": 3257,
+      "sha256": "eb317e8044c32e8d418a7792e8232ede4214fb8832a89ea05e9df69a121ea5e9",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/time-billing/tests/migrations/0003-legacy-time.sql",
+      "bytes": 2998,
+      "sha256": "7e49d7ed1c517152b1164cdc0b9fdfb51bf676d4d067e57e2bd147125fdb9b1e",
+      "unchanged_from_original": true
+    }
+  ],
+  "all_unchanged": true,
+  "ledger_check": "not required; SQL/ledger untouched"
+}

@@ -1,0 +1,66 @@
+▶ every complete relocated module copy passes native publication with zero findings
+  ✔ modules/agent-door (3357.813182ms)
+  ✔ modules/agreement-signing (2116.529501ms)
+  ✔ modules/ai (2151.838384ms)
+  ✔ modules/boundary-checker (1921.160034ms)
+  ✔ modules/business-settings (1705.891788ms)
+  ✔ modules/catalogue-ordering (1905.863154ms)
+  ✔ modules/container (2128.903718ms)
+  ✔ modules/d1-transport (1739.568875ms)
+  ✔ modules/delivery-producer (2324.36836ms)
+  ✔ modules/demo (1928.173776ms)
+  ✔ modules/demo-host (2107.771088ms)
+  ✔ modules/dependencies (2101.695357ms)
+  ✔ modules/deploy-kit (2730.399596ms)
+  ✔ modules/editor (2112.328869ms)
+  ✔ modules/egress-service (4353.924583ms)
+  ✔ modules/erasure (1920.994472ms)
+  ✖ modules/import-kit (5003.06579ms)
+  ✔ modules/integrations (2307.283729ms)
+  ✔ modules/job-queue (1909.138585ms)
+  ✔ modules/mail (2960.877908ms)
+  ✔ modules/operator-auth (4576.31394ms)
+  ✔ modules/owner-claim (1904.489984ms)
+  ✔ modules/portability (2523.94592ms)
+  ✔ modules/release (3128.629557ms)
+  ✔ modules/review-harness (1910.844408ms)
+  ✔ modules/sendgrid-email (1704.48264ms)
+  ✔ modules/site (1707.880606ms)
+  ✔ modules/time-billing (1901.421553ms)
+✖ every complete relocated module copy passes native publication with zero findings (68159.26134ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 27
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 68245.78224
+
+✖ failing tests:
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/import-kit (5003.06579ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   'scan.github-incomplete src/base/modules/import-kit/src/door/waves/README.md'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:149:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'scan.github-incomplete src/base/modules/import-kit/src/door/waves/README.md' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

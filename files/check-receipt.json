@@ -1,0 +1,77 @@
+{
+  "checks": {
+    "catchup-before": 1,
+    "catchup-after": 0,
+    "bar-before-with-prerequisites": 1,
+    "bar-after": 0,
+    "p2-regression": 0,
+    "source-check": 0,
+    "source-lock-check": 0,
+    "ordinary-catchup": 0,
+    "module-typecheck": 0,
+    "export-mechanical-test": 0,
+    "export-initial": 0,
+    "export-final": 0,
+    "source-check-final": 0,
+    "inventory-byte-hash-consistency": 0,
+    "git-diff-check": 0
+  },
+  "original_probe": "not shipped; equivalent adaptation retained",
+  "initial_bar_attempt": "missing Gitleaks prerequisite; installed checksum-pinned 8.30.1 then reproduced deterministically",
+  "source_check_initial": "wrong Base authoring cwd exit 3; corrected default-seed cwd passes",
+  "probe_counts": {
+    "catchup_before": {
+      "exit": 1,
+      "seal_status": 409,
+      "source": 6,
+      "native": 5,
+      "aggregateSuccess": true,
+      "nativeSuccess": false
+    },
+    "catchup_after": {
+      "exit": 0,
+      "seal_status": 200,
+      "source": 6,
+      "native": 5,
+      "aggregateSuccess": true,
+      "nativeSuccess": false,
+      "reused": 6,
+      "native_rows_byte_identical_within_run": true
+    },
+    "bar_before": {
+      "exit": 1,
+      "tests": 29,
+      "pass": 27,
+      "fail": 2,
+      "failed_module_copies": 1,
+      "finding": "scan.github-incomplete src/base/modules/import-kit/src/door/waves/README.md"
+    },
+    "bar_after": {
+      "exit": 0,
+      "tests": 29,
+      "pass": 29,
+      "fail": 0,
+      "findings": 0
+    },
+    "p2": {
+      "tests": 1,
+      "pass": 1,
+      "five_original_behavior_probes_executed": true
+    },
+    "ordinary": {
+      "tests": 2,
+      "pass": 2
+    },
+    "export_mechanical": {
+      "tests": 1,
+      "pass": 1
+    }
+  },
+  "root_contract_views_source_lock": "N/A for Base authoring root; nested module contracts and default-seed/template views unchanged",
+  "runtime": {
+    "node": "24.19.0",
+    "pnpm": "10.12.4",
+    "gitleaks": "8.30.1 checksum-verified",
+    "note": "Supplied toolchain kept newer Node at root (no root pin); default-seed source:check warns about exact Node 22.20.0 engine, exits 0. Exact pinned CI remains authoritative."
+  }
+}

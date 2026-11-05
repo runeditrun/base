@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "cli_files": 1239,
+  "onboarding_files": 93,
+  "cliVersion": "0.2.99-dev.gc2c61c41",
+  "source_commit": "c2c61c4120f9ee623e88e526e02e975de5f29287"
+}

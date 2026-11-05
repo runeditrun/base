@@ -1,0 +1,30 @@
+✖ complete source6/native5 identical routine catch-up retains rejected disposition (8533.639429ms)
+ℹ {"phase":"baseline","source":6,"native":5,"aggregateSuccess":true,"nativeSuccess":false,"nativeHash":"680e01b0bf3b8e38874bd22b224852f6874a83527a7550db9818f5a55e8c2aa1"}
+ℹ {"phase":"identical-catchup","preparedPages":6,"status":409,"error":"catchup_requires_proposal:rejected_or_unmapped_records","nativeRows":5,"nativeHash":"680e01b0bf3b8e38874bd22b224852f6874a83527a7550db9818f5a55e8c2aa1","unchangedNative":true}
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8849.291865
+
+✖ failing tests:
+
+test at .catchup-exclusion-q0elchx7.test.ts:14:1
+✖ complete source6/native5 identical routine catch-up retains rejected disposition (8533.639429ms)
+  AssertionError [ERR_ASSERTION]: {"error":"catchup_requires_proposal:rejected_or_unmapped_records"}
+  
+  409 !== 200
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/.catchup-exclusion-q0elchx7.test.ts:38:45)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 409,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

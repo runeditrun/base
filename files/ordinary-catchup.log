@@ -1,0 +1,10 @@
+✔ HTTP upload, reviewed plan, bounded apply, reconcile and owner-visible undo preserve original custody (9362.672619ms)
+✔ HTTP grants and bounded catch-up fail closed while valid snapshot replacements preserve undo lineage (10585.613428ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20250.508292

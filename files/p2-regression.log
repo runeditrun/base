@@ -1,0 +1,25 @@
+✔ P2 package probe has no plan; missing, foreign and altered segments have the same scoped refusal; one aggregate plan is idempotent (61695.066373ms)
+ℹ MECHANICAL additive wave schema applied twice over a completed ordinary import; previous job/original/provenance rows byte-identical
+ℹ PROBE 3 final head-update triggers that change native values or remove original bytes abort and roll back the entire finalization; no complete head or lost custody
+ℹ PROBE 1/2/3/5 mounted ES256 door + SQLite + Business sender: source=4 native=9 above grant=3; 2 segments; exact original/blob bytes; no effects before review; parent/child/dependency refusals; idempotent child; missing final child leaves head=null; destination aggregate receipt consumed
+ℹ PROBE 3 global zero-change cumulative catch-up preserves all original native revisions/journal owners; later-head reverse is refused; catch-up Undo retains original targets and restores prior complete head
+ℹ PROBE 3 complete 4-to-3 source snapshot: routine global gone exclusion refuses; separately reviewed proposal withholds gone/head while partial, then reports gone-but-retained at final reconciliation; no native deletion and reverse restores complete baseline
+ℹ PROBE 4 native edit/strict root reverse: known conflict/concurrent HTTP catch-up preserve all 4 records; reversal reserves pending lineage; descending dependent-first reversal removes own records/blob chunks and restores previous head only after all children
+ℹ PROBE 4 grouped child checkpoint=1/2 after genuine SQLite write failure; ordinary rollback removes partial effects, skips unstarted child, reverses shared ancestor last; complete head remains null
+ℹ PROBE 4 erasure after complete/during child: root and reused journals/original/blob custody retired, later child/finalize=410; stale root restore fails erasure trigger; corrected re-upload is refused/cleaned before new effects; 3 peer native records and foreign-destination custody preserved
+ℹ PROBE 1/4 context-only subject indexed separately from 4 primary/9 native units; pre-preparation erasure persists scoped alias digest with no native target; later preparation refuses and removes exact package custody
+ℹ PROBE 5 actual rer business run --once: first command pauses with zero effects awaiting exact review; second command transports inventory, uses six server-approved children under grant=2, and completes only after real destination aggregate reconciliation
+ℹ PROBE P2 installation/namespace/hash/size custody, manifest-before-segments 409/no plan, aggregate plan once; native writes=0
+ℹ PROBE cleanup applied-package erasure holders=0; later incumbent refusal=409 source_erased holders=0
+ℹ PROBE cleanup erased refusal=409 source_erased decoded_holders=0 foreign_scopes_unchanged=true shared=package_segment_missing
+ℹ PROBE cleanup rollback manifest_status=200 decoded_holders=2 expected=2
+ℹ PROBE cleanup credential refusal=422 source_credential decoded_holders=0 foreign_scopes_unchanged=true shared=package_segment_missing
+ℹ PROBE cleanup invalid refusal=422 source_invalid_or_credential_source_data decoded_holders=0 foreign_scopes_unchanged=true shared=package_segment_missing
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 62027.407548

@@ -1,0 +1,7 @@
+{"call": 1, "utc": "2026-11-05T22:55:05.239552+00:00", "command": ["gh", "api", "repos/runeditrun/base/pulls", "--input", "/tmp/gr-base-fix-pr.json", "--jq", "{number,html_url,head: .head.sha,draft}"]}
+{"call": 2, "utc": "2026-11-05T22:55:22.342432+00:00", "command": ["gh", "api", "repos/runeditrun/base/actions/runs?head_sha=c0539b0001d71a6246c755e100c47141f525bf5e&per_page=100"]}
+{"call": 3, "utc": "2026-11-05T23:00:22.340310+00:00", "command": ["gh", "api", "repos/runeditrun/base/actions/runs/42125479357", "--jq", "{status,conclusion,head_sha,html_url}"]}
+{"call": 4, "utc": "2026-11-05T23:05:22.362244+00:00", "command": ["gh", "api", "repos/runeditrun/base/actions/runs/42125479357", "--jq", "{status,conclusion,head_sha,html_url}"]}
+{"call": 5, "utc": "2026-11-05T23:10:22.373055+00:00", "command": ["gh", "api", "repos/runeditrun/base/actions/runs/42125479357", "--jq", "{status,conclusion,head_sha,html_url}"]}
+{"call": 6, "utc": "2026-11-05T23:15:22.349847+00:00", "command": ["gh", "api", "repos/runeditrun/base/actions/runs/42125479357", "--jq", "{status,conclusion,head_sha,html_url}"]}
+{"call": 7, "utc": "2026-11-05T23:20:22.352908+00:00", "command": ["gh", "api", "repos/runeditrun/base/actions/runs/42125479357", "--jq", "{status,conclusion,head_sha,html_url}"]}

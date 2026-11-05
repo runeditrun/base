@@ -1,0 +1,59 @@
+{
+  "utc": "2026-11-05T23:20:59.678645+00:00",
+  "repository": "runeditrun/base",
+  "branch": "cloud/gr-base-bounded-waves-fix-1",
+  "head": "c0539b0001d71a6246c755e100c47141f525bf5e",
+  "original": "8ff4d564234407ef91009390411cd0e1a1e0e6b4",
+  "pr": "https://github.com/runeditrun/base/pull/825",
+  "custody": "READY",
+  "ci": {
+    "utc": "2026-11-05T23:20:22.326968+00:00",
+    "run_id": 42125479357,
+    "conclusion": "success",
+    "head_sha": "c0539b0001d71a6246c755e100c47141f525bf5e",
+    "html_url": "https://github.com/runeditrun/base/actions/runs/42125479357",
+    "status": "completed"
+  },
+  "github_calls_used": 7,
+  "local_checks": "all focused checks passed",
+  "blockers_local": 0,
+  "remaining_dependencies": [
+    "same frozen independent reviewer on correction; original retained probe was not shipped here",
+    "Mac final ordinary AND explicit journeys=true qualification",
+    "Mac COMPLETE full-history product publication scan",
+    "root consumption of frozen review and hold handling; no hold released"
+  ],
+  "clause_status_changes": {
+    "A/R3": "implementation corrected; independent frozen review pending",
+    "BAR": "README source corrected; selected publication tests and exact-head ordinary Verify pass",
+    "R1/R2/R4/R5": "unchanged MET per frozen rubric; no promotion"
+  },
+  "before_after": {
+    "catchup_seal": [
+      409,
+      200
+    ],
+    "source": [
+      6,
+      6
+    ],
+    "native": [
+      5,
+      5
+    ],
+    "nativeSuccess": [
+      false,
+      false
+    ],
+    "relocated_copy_tests_pass": [
+      27,
+      29
+    ],
+    "relocated_copy_tests_fail": [
+      2,
+      0
+    ]
+  },
+  "original_probe_limitation": "Referenced catchup-exclusion.py absent from shipped files; identical equivalent adaptation used before and after, retained as catchup-exclusion-adapted.py",
+  "no_landing_or_hold_release": true
+}

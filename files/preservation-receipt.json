@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "original_tests": [
+    {
+      "path": "foundation/public-copy-secrets.test.mjs",
+      "sha256": "0e137aa0be2839688c4d10c9faacf97863995ccda1b4c3fed4d77adc3ba95063",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/import-kit/tests/door-package.test.ts",
+      "sha256": "c4a17188b66dc50933124c3056aa3ea0d3369cba294921fb63eb910c51bc8a99",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/import-kit/tests/door/bounded-proof.ts",
+      "sha256": "a8ad8fb81008fd81b739120a807a92428c5e98cdfa2e28ec079254b8fc76ed36",
+      "unchanged_from_original": true
+    },
+    {
+      "path": "modules/import-kit/tests/door/bounded-cli-proof.ts",
+      "sha256": "5a6b829cb66f1f3fcdd3c093183a8d35906189d8027afd366a990bd2f43d3897",
+      "unchanged_from_original": true
+    }
+  ],
+  "only_changed_author_sources": [
+    "modules/import-kit/src/door/waves/lifecycle.ts",
+    "modules/import-kit/src/door/waves/README.md"
+  ],
+  "only_other_changes": "matching exported copies and deterministic inventory"
+}

@@ -1,0 +1,658 @@
+▶ every complete relocated module copy passes native publication with zero findings
+  ✖ modules/agent-door (336.925519ms)
+  ✖ modules/agreement-signing (310.7081ms)
+  ✖ modules/ai (303.278815ms)
+  ✖ modules/boundary-checker (314.656696ms)
+  ✖ modules/business-settings (304.848777ms)
+  ✖ modules/catalogue-ordering (302.542849ms)
+  ✖ modules/container (325.54247ms)
+  ✖ modules/d1-transport (306.763435ms)
+  ✖ modules/delivery-producer (346.577049ms)
+  ✖ modules/demo (303.036805ms)
+  ✖ modules/demo-host (307.224372ms)
+  ✖ modules/dependencies (300.887837ms)
+  ✖ modules/deploy-kit (320.610451ms)
+  ✖ modules/editor (302.035077ms)
+  ✖ modules/egress-service (335.491029ms)
+  ✖ modules/erasure (307.512981ms)
+  ✖ modules/import-kit (412.454067ms)
+  ✖ modules/integrations (318.147284ms)
+  ✖ modules/job-queue (306.723194ms)
+  ✖ modules/mail (326.298574ms)
+  ✖ modules/operator-auth (366.6619ms)
+  ✖ modules/owner-claim (306.484183ms)
+  ✖ modules/portability (335.149039ms)
+  ✖ modules/release (321.199242ms)
+  ✖ modules/review-harness (312.528273ms)
+  ✖ modules/sendgrid-email (308.48914ms)
+  ✖ modules/site (312.198887ms)
+  ✖ modules/time-billing (304.261986ms)
+✖ every complete relocated module copy passes native publication with zero findings (8970.528124ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 0
+ℹ fail 29
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9068.670948
+
+✖ failing tests:
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/agent-door (336.925519ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/agreement-signing (310.7081ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/ai (303.278815ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/boundary-checker (314.656696ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/business-settings (304.848777ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/catalogue-ordering (302.542849ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/container (325.54247ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/d1-transport (306.763435ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/delivery-producer (346.577049ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/demo (303.036805ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/demo-host (307.224372ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/dependencies (300.887837ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/deploy-kit (320.610451ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/editor (302.035077ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/egress-service (335.491029ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/erasure (307.512981ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/import-kit (412.454067ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/integrations (318.147284ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/job-queue (306.723194ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/mail (326.298574ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/operator-auth (366.6619ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/owner-claim (306.484183ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/portability (335.149039ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/release (321.199242ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/review-harness (312.528273ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/sendgrid-email (308.48914ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/site (312.198887ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at foundation/public-copy-secrets.test.mjs:145:41
+✖ modules/time-billing (304.261986ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at TestContext.test (node:internal/test_runner/test:394:20)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-bounded-waves-fix-1/base/foundation/public-copy-secrets.test.mjs:145:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

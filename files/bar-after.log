@@ -1,0 +1,38 @@
+▶ every complete relocated module copy passes native publication with zero findings
+  ✔ modules/agent-door (3567.153784ms)
+  ✔ modules/agreement-signing (2123.252329ms)
+  ✔ modules/ai (1703.462223ms)
+  ✔ modules/boundary-checker (1921.177202ms)
+  ✔ modules/business-settings (1704.748071ms)
+  ✔ modules/catalogue-ordering (1898.65777ms)
+  ✔ modules/container (2117.861287ms)
+  ✔ modules/d1-transport (1703.13846ms)
+  ✔ modules/delivery-producer (2105.59438ms)
+  ✔ modules/demo (1901.745809ms)
+  ✔ modules/demo-host (2124.931653ms)
+  ✔ modules/dependencies (1910.382232ms)
+  ✔ modules/deploy-kit (2717.522102ms)
+  ✔ modules/editor (1921.224554ms)
+  ✔ modules/egress-service (4549.640067ms)
+  ✔ modules/erasure (1903.582405ms)
+  ✔ modules/import-kit (5213.958377ms)
+  ✔ modules/integrations (2321.069503ms)
+  ✔ modules/job-queue (1907.96667ms)
+  ✔ modules/mail (2926.835128ms)
+  ✔ modules/operator-auth (4386.576591ms)
+  ✔ modules/owner-claim (1907.382932ms)
+  ✔ modules/portability (2740.627861ms)
+  ✔ modules/release (3350.093805ms)
+  ✔ modules/review-harness (2107.623307ms)
+  ✔ modules/sendgrid-email (1708.806894ms)
+  ✔ modules/site (1904.56852ms)
+  ✔ modules/time-billing (2134.69149ms)
+✔ every complete relocated module copy passes native publication with zero findings (68501.205565ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 68591.436078

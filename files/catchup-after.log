@@ -1,0 +1,12 @@
+✔ complete source6/native5 identical routine catch-up retains rejected disposition (9014.23147ms)
+ℹ {"phase":"baseline","source":6,"native":5,"aggregateSuccess":true,"nativeSuccess":false,"nativeHash":"fbbdbdf25cbe41ba9cbc4e9bb5df98706204fca8fb4bf0431f82ffb9004a5288"}
+ℹ {"phase":"identical-catchup","preparedPages":6,"status":200,"error":null,"nativeRows":5,"nativeHash":"fbbdbdf25cbe41ba9cbc4e9bb5df98706204fca8fb4bf0431f82ffb9004a5288","unchangedNative":true}
+ℹ {"phase":"complete-catchup","source":6,"native":5,"aggregateSuccess":true,"nativeSuccess":false,"reused":6,"unchangedNative":true}
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9299.207396
