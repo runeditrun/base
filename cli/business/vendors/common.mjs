@@ -201,7 +201,7 @@ export function client({ origin, headers, route, signal, limits, counters, key }
 /** Opt-in transport for long-lived snapshots. Existing adapters retain client()'s
  * no-retry contract. The caller validates every target before credentials or a
  * request are constructed, including manually followed attachment redirects. */
-export function pacedClient({ origin, signal, validate, secrets = [], limits = {} }) {
+export function pacedClient({ origin, signal, validate, secrets = [], limits = {}, beforeRequest }) {
  const maximum = { requests: 250_000, response: 32 * 1024 * 1024, bytes: 32 * 1024 ** 3, ...limits };
  const counters = { requests: 0, bytes: 0, retryMs: 0 };
  let token, last = 0, next = 0, advertisedBefore = false;
@@ -216,6 +216,7 @@ export function pacedClient({ origin, signal, validate, secrets = [], limits = {
    signal?.throwIfAborted();
    await wait(Math.max(next, last + (advertisedBefore ? 0 : url.pathname.includes('/incremental/') ? 6000 : 300)) - Date.now());
    if (++counters.requests > maximum.requests) fail('REQUEST_LIMIT');
+   await beforeRequest?.();
    last = Date.now();
    const headers = { accept: 'application/json', ...(options.json ? { 'content-type': 'application/json' } : {}),
     ...(token && url.origin === origin && options.authenticated !== false ? { authorization: `Bearer ${token}` } : {}) };
@@ -223,17 +224,21 @@ export function pacedClient({ origin, signal, validate, secrets = [], limits = {
    try { response = await fetch(url, { method, headers, redirect: options.redirect ?? 'error',
     ...(options.json ? { body: JSON.stringify(options.json) } : {}), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000) }); }
    catch { fail(signal?.aborted ? 'CANCELLED' : 'NETWORK_FAILED'); }
+   const waits = [];
    const remaining = response.headers.get('ratelimit-remaining') ?? response.headers.get('x-rate-limit-remaining');
-   const reset = response.headers.get('ratelimit-reset');
+   const reset = response.headers.get('ratelimit-reset') ?? '60';
+   const capacity = (remaining, seconds) => {
+    if (!/^\d+$/u.test(remaining ?? '') || !/^\d+$/u.test(seconds ?? '') || Number(seconds) > 3600) return;
+    waits.push(Math.max(300, Math.ceil(Number(seconds) * 1000 / Math.max(1, Number(remaining)))));
+   };
+   capacity(remaining, reset);
+   for (const [name,value] of response.headers) if (name.toLowerCase().startsWith('zendesk-ratelimit-')) capacity(/remaining=(\d+)/u.exec(value)?.[1], /resets=(\d+)/u.exec(value)?.[1]);
    const interval = response.headers.get('ratelimit-limit') ?? response.headers.get('x-rate-limit');
-   const endpoint = [...response.headers].filter(([name]) => name.toLowerCase().startsWith('zendesk-ratelimit-')).map(([, value]) => value).join(';');
-   const endpointRemaining = /remaining=(\d+)/u.exec(endpoint)?.[1], endpointReset = /resets=(\d+)/u.exec(endpoint)?.[1];
-   const budget = Number(endpointRemaining ?? remaining), seconds = Number(endpointReset ?? reset ?? 60);
-   // Valid advertised capacity can replace the conservative fallback. Never
-   // turn absent/invalid headers into an unpaced burst.
-   const advertised = (remaining !== null || endpointRemaining !== undefined) && Number.isFinite(budget) && budget >= 0 && Number.isFinite(seconds) && seconds >= 0 && seconds <= 3600;
-   advertisedBefore = advertised || !!interval && /^\d+$/u.test(interval);
-   next = Date.now() + (advertised ? Math.max(300, Math.ceil(seconds * 1000 / Math.max(1, budget))) : interval && /^\d+$/u.test(interval) ? Math.max(300, Math.ceil(60_000 / Math.max(1, Number(interval)))) : 0);
+   if (!waits.length && /^\d+$/u.test(interval ?? '')) waits.push(Math.max(300, Math.ceil(60_000 / Math.max(1, Number(interval)))));
+   // Obey the tightest account/endpoint budget. Without valid advertised
+   // capacity the next request retains the conservative fallback spacing.
+   advertisedBefore = waits.length > 0;
+   next = Date.now() + Math.max(0, ...waits);
    if (response.status === 429) {
     const after = response.headers.get('retry-after');
     await response.body?.cancel().catch(() => {});

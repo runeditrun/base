@@ -17,5 +17,9 @@ export async function zendeskDoor(t) {
  const observed = { uploads: [], plans: [] };
  // Business reads its reported plan independently from the real persisted door.
  Object.defineProperty(observed, 'plans', { get: () => d.runtime.native().prepare('SELECT p.id AS planId, u.id AS uploadId, p.bundle_sha256 AS bundleSha256 FROM ik_door_plans p JOIN ik_door_uploads u ON u.bundle_sha256=p.bundle_sha256 AND u.namespace=p.namespace WHERE p.complete=1').all() });
- return { ...d, state: observed, mint: action => d.token(action, { namespace: 'zendesk', maxBytes: 2_097_152, maxRecords: 100_000, maxChunks: 32 }) };
+ return { ...d, state: observed, async applyLatest() {
+  const latest = observed.plans.at(-1), planned = await d.call('plan', { uploadId: latest.uploadId }, { namespace: 'zendesk' });
+  if (planned.status !== 200) throw Error('public_plan_failed');
+  return d.apply(planned.body, { namespace: 'zendesk' });
+ }, mint: action => d.token(action, { namespace: 'zendesk', maxBytes: 2_097_152, maxRecords: 100_000, maxChunks: 32 }) };
 }

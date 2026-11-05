@@ -72,7 +72,7 @@ test('P1 P2 P4 P7 P8: Z0 archived tickets, exact census, paging, privacy and one
  assert.deepEqual(c.comments, { total: 4, public: 2, private: 2 });
  assert.deepEqual(c.attachments, { referenced: 4, fetched: 2, bytes: blob.length * 2, uniqueBlobs: 1, undelivered: { deleted: 1, malware_found: 1 } });
  assert.deepEqual(c.users, { unique: 2, inactive: 1, withoutEmail: 1 });
- assert.deepEqual(c.guide, { available: true, articles: 1, restricted: 1, draft: 1, translations: 1, sections: 1, categories: 1, segments: 1 });
+ assert.deepEqual(c.guide, { available: true, articles: 1, restricted: 1, draft: 1, translations: 3, sections: 1, categories: 1, segments: 1 });
  assert.equal(c.credentialShapesRemoved, 1); assert.deepEqual(c.credentialRemovals, [{ kind: 'ticket', id: '10', pointer: '/comments/0/body' }]);
  assert.match(tickets[0].comments[0].body, /\[removed\]/); assert.equal(c.highWater, 130);
  const blobs = [...data.attachments.values()].filter(item => item.blob).map(item => item.blob.sha256); assert.equal(new Set(blobs).size, 1);
@@ -89,6 +89,10 @@ test('P1 P2 P4 P7 P8: Z0 archived tickets, exact census, paging, privacy and one
  }
  assert.ok((await readFile(join(s.path,'checkpoint.json'))).length < 128 * 1024);
  assert.equal(s.seed.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get().n, 0);
+ const uploaded = Buffer.concat(s.seed.runtime.native().prepare('SELECT base64 FROM ik_door_chunks ORDER BY ordinal').all().map(row => Buffer.from(row.base64, 'base64')));
+ assert.deepEqual(uploaded, exported.bytes);
+ const transfer = JSON.parse(await readFile(join(s.path, 'transfer.json'), 'utf8'));
+ assert.equal(transfer.bundleSha256, hash(uploaded));
  t.diagnostic(`PROBE P8 Z0: plan_id=${s.seed.state.plans[0].planId} upload_id=${s.seed.state.plans[0].uploadId} sha256=${hash(exported.bytes)} records=7 native_writes=0`);
 });
 
@@ -99,7 +103,6 @@ test('P3: SIGKILL in A, B and F resumes byte-equal records and census; edited st
   const s = await setup(t, `resume-${phase}`), killed = await s.run({ scenario: `kill-${phase}` });
   assert.equal(killed.signal, 'SIGKILL');
   // The supervisor's killed lease is recoverable under the existing contract.
-  s.remote.state.leaseUntil = 0;
   const resumed = await s.run({ scenario: `kill-${phase}` }); assert.equal(resumed.code, 0, resumed.stderr);
   const actual = await result(s.path); assert.deepEqual(actual.bytes, expected.bytes); assert.deepEqual(actual.census, expected.census);
   t.diagnostic(`PROBE P3 phase=${phase} records_sha256=${hash(actual.bytes)} byte_equal=true`);
@@ -119,7 +122,7 @@ test('P4: hidden key input only and write scope refuses before any data GET', as
 });
 
 test('P5: redirect credentials, refused targets, invalid pagination and size failures', async t => {
- for (const scenario of ['redirect-public','redirect-http','redirect-ip','redirect-userinfo','redirect-local','bad-page','size-mismatch']) {
+ for (const scenario of ['redirect-public','redirect-http','redirect-ip','redirect-userinfo','redirect-local','redirect-port','bad-page','size-mismatch']) {
   const s = await setup(t, scenario), output = await s.run({ scenario }), log = await requests(s.home);
   if (scenario === 'bad-page' || scenario === 'size-mismatch') { assert.equal(output.code, 1); assert.match(output.stderr, scenario === 'bad-page' ? /INVALID_PAGINATION/ : /ATTACHMENT_SIZE_MISMATCH/); }
   else {
@@ -151,10 +154,18 @@ test('P8 package dependency and P9 sweep, census-only and retire signal', async 
  const packed = await result(large.path); assert.equal(packed.kind, 'package'); assert.equal(large.seed.state.plans.length, 0); assert.equal(large.seed.requests.length, 0);
  assert.ok([...packed.files.keys()].includes('guide/user_segments.ndjson'));
  const s = await setup(t, 'lifetime'); assert.equal((await s.run()).code, 0);
- s.task('sweep', { mode: 'sweep', highWater: 130 }); const swept = await s.run(); assert.equal(swept.code, 0, swept.stderr);
- assert.deepEqual((await result(s.path)).bytes, (await result(s.path)).bytes);
+ await s.seed.applyLatest();
+ const baseline = (await result(s.path)).bytes;
+ s.task('sweep', { mode: 'sweep', highWater: 130 }); const swept = await s.run({ scenario: 'sweep-change' }); assert.equal(swept.code, 0, swept.stderr);
+ const complete = await result(s.path);
+ assert.notDeepEqual(complete.bytes, baseline);
+ const rows = complete.bytes.toString().trim().split('\n').map(JSON.parse);
+ assert.deepEqual(rows.filter(row => row.ticket).map(row => row.ticket.id), [10,900001]);
+ assert.equal(rows[0].ticket.subject, 'swept last version');
+ assert.equal(rows[0].ticket.comments[1].body, 'Updated private reply');
+ assert.equal(complete.census.highWater, 140);
  const log = await requests(s.home); assert.ok(log.some(row => row.path.includes('start_time=130')));
- s.task('census', { mode: 'census', highWater: 130 }); const before = log.length, counted = await s.run();
+ s.task('census', { mode: 'census', highWater: 140 }); const before = log.length, counted = await s.run({ scenario: 'sweep-change' });
  assert.match(counted.stdout + counted.stderr, /3 tickets; 0 unswept/);
  assert.ok((await requests(s.home)).slice(before).every(row => row.path === '/oauth/tokens' || row.path === '/api/v2/oauth/tokens/current' || row.path.includes('/incremental/tickets/')));
  assert.equal((await census(join(s.path,'probe'))).unswept, 0);
@@ -162,5 +173,19 @@ test('P8 package dependency and P9 sweep, census-only and retire signal', async 
  await assert.rejects(stat(s.path), { code: 'ENOENT' });
  assert.ok(!Object.hasOwn(JSON.parse(await readFile(join(s.home,'fake-keychain.json'),'utf8')), 'vendor:zendesk:read'));
  s.task('refused-after-retire'); const refused = await s.run(); assert.match(refused.stderr, /VENDOR_REVOKED/);
- t.diagnostic('PROBE P8 Fixture Z package plan NOT RUN: cloud/gr-legacy-package-1 READY head unavailable; complete snapshot retained; no partial upload');
+ t.diagnostic('PROBE P8: package-required snapshot retained without partial upload; package plan not exercised');
+});
+
+test('P7: Guide unavailable coverage and source-locale records are explicit', async t => {
+ for (const scenario of ['guide-404','source-locale']) {
+  const s = await setup(t, scenario), output = await s.run({ scenario });
+  assert.equal(output.code, 0, output.stderr);
+  const exported = await result(s.path);
+  if (scenario === 'guide-404') { assert.equal(exported.census.guide.available, false); assert.equal(exported.census.guide.articles, 0); }
+  else {
+   const article = exported.bytes.toString().trim().split('\n').map(JSON.parse).find(row => row.article).article;
+   assert.equal(article.locale, 'en-us'); assert.equal(article.title, 'Restricted draft');
+   assert.ok((await requests(s.home)).some(row => row.path === '/api/v2/help_center/en-us/articles/8'));
+  }
+ }
 });

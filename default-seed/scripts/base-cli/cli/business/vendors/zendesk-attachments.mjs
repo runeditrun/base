@@ -8,7 +8,7 @@ export function attachmentReferences(data) {
   if (data.tickets.get(ticket)?.row.status === 'deleted' || data.tickets.get(ticket)?.row.deleted) continue;
   for (const [comment, { row }] of comments) for (const attachment of row.attachments ?? []) refs.push({ key: `ticket:${ticket}:${comment}:${numericId(attachment.id)}`, ticket, comment, attachment });
  }
- for (const [id, { row }] of data.article_attachments) refs.push({ key: `article:${id}`, article: id.split(':')[0], attachment: row });
+ for (const [id, { row }] of data.article_attachments) refs.push({ key: `article:${id}`, article: id.split(':')[1], attachment: row });
  return refs.sort((a,b) => a.key.localeCompare(b.key));
 }
 export async function download(request, origin, attachment) {
@@ -19,7 +19,7 @@ export async function download(request, origin, attachment) {
  if (size > 64 * 1024 * 1024) return { reason: 'too_large' };
  let url;
  try { url = new URL(attachment.content_url); } catch { return { reason: 'refused_location' }; }
- if (url.origin !== origin || !attachmentPath(url.pathname) || !await publicLocation(url.href, origin)) return { reason: 'refused_location' };
+ if (url.origin !== origin || !attachmentPath(url.pathname) || !await publicLocation(attachment.content_url, origin)) return { reason: 'refused_location' };
  let response;
  try {
   response = await request(url.href, { attachment: true, binary: true, maxBytes: 64 * 1024 * 1024, redirect: 'manual', allow: [403,404,410] });

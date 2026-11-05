@@ -26,9 +26,12 @@ export async function snapshot({ key, inputs, directory, runId, signal }) {
    await store.reset({ phase: 'A', path: null, index: 0, attachmentIndex: 0, stage: 0, runId, origin, mode, inputHighWater: inputs.highWater ?? null,
     exportedAt: new Date().toISOString(), bytes: mode === 'sweep' ? store.state.bytes : 0, requests: 0 }, { retain: mode === 'sweep' });
   } else if (store.state.origin !== origin || store.state.mode !== mode || store.state.inputHighWater !== (inputs.highWater ?? null)) fail('INVALID_CHECKPOINT');
-  const ctx = { store, inputs, ...await transport({ inputs, key, signal }) };
-  const savedRequests = store.state.requests;
-  store.requestCount = () => savedRequests + ctx.request.counters.requests;
+  store.requestTotal = store.state.requests;
+  const ctx = { store, inputs, ...await transport({ inputs, key, signal, beforeRequest: async () => {
+   if (store.requestTotal >= 250_000) fail('REQUEST_LIMIT');
+   store.requestTotal++;
+   await store.commit(store.state);
+  } }) };
   while (store.state.phase !== 'done') {
    signal?.throwIfAborted();
    const phase = store.state.phase;
@@ -46,6 +49,7 @@ export async function snapshot({ key, inputs, directory, runId, signal }) {
    return { kind: 'census', census, store };
   }
   const result = await encodeSnapshot(store, { origin });
+  if (store.state.highWater !== result.census.highWater) await store.commit({ ...store.state, highWater: result.census.highWater });
   await store.write('census.json', result.census);
   await store.write('baseline.json', { highWater: result.census.highWater, head: store.head });
   return { ...result, store };

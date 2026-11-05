@@ -14,7 +14,7 @@ function cleaned(value, kind, id, report, pointer = '') {
  const removed = () => report.removals.push({ kind, id, pointer: pointer || '/' });
  if (Array.isArray(value)) return value.map((child,index) => cleaned(child, kind, id, report, `${pointer}/${index}`));
  if (value && typeof value === 'object') {
-  const result = {};
+  const result = Object.create(null);
   for (const [key,child] of Object.entries(value)) {
    if (['content_url','download_url','original_url'].includes(key)) { report.redactedUrls++; continue; }
    if (credentialShaped(key)) fail('CREDENTIAL_SHAPE_UNREMOVABLE');
@@ -23,7 +23,12 @@ function cleaned(value, kind, id, report, pointer = '') {
   return result;
  }
  if (typeof value !== 'string') return value;
- let text = value.replace(/-----\s*BEGIN\b[^\r\n]*-----[\s\S]*?-----\s*END\b[^\r\n]*-----/giu, () => { removed(); return '[removed]'; });
+ let text = value.replace(/https?:\/\/[^\s<>"']+/giu, match => {
+  let url; try { url = new URL(match); } catch { return match; }
+  if (!url.username && !url.password && !url.search && !url.hash) return match;
+  url.username = ''; url.password = ''; url.search = ''; url.hash = ''; report.redactedUrls++; return url.href;
+ });
+ text = text.replace(/-----\s*BEGIN\s+([A-Z0-9 ]+)-----[\s\S]*?-----\s*END\s+\1-----/giu, () => { removed(); return '[removed]'; });
  // SSH material includes a scheme and key separated by whitespace.
  text = text.replace(/\b(?:ssh-(?:rsa|ed25519)|ecdsa-sha2-[\w-]+)\s+[A-Za-z0-9+/=]+/gu, () => { removed(); return '[removed]'; });
  text = text.replace(/[^\s<>"'`,;(){}\[\]]+/gu, token => {
@@ -56,7 +61,10 @@ function attachmentCensus(references, data, { article = false } = {}) {
 export async function encodeSnapshot(store, { origin, packageBindings = false } = {}) {
  const data = await materialize(store), report = { removals: [], redactedUrls: 0 }, lines = [], byKind = {}, blobs = new Map();
  const add = (kind, id, value) => {
-  const line = encode({ [kind]: cleaned(value, kind, id, report) });
+  // Bindings are integrity-checked original bytes, never redaction input.
+  const clean = kind === 'ticket' ? { ...cleaned({ ...value, _offline: undefined }, kind, id, report), _offline: value._offline } : cleaned(value, kind, id, report);
+  const line = encode({ [kind]: clean });
+  if (line.length > 64 * 1024 * 1024) fail('RECORD_LIMIT');
   try { assertChunk(line, []); } catch { fail('CREDENTIAL_SHAPE_UNREMOVABLE'); }
   lines.push(line); byKind[kind] = (byKind[kind] ?? 0) + 1;
  };
@@ -102,7 +110,7 @@ export async function encodeSnapshot(store, { origin, packageBindings = false } 
   users: { unique: data.users.size, inactive: [...data.users.values()].filter(item => item.row.active === false).length, withoutEmail: [...data.users.values()].filter(item => !item.row.email).length },
   organizations: data.organizations.size, fields: data.ticket_fields.size,
   guide: { available: data.available, articles: data.articles.size, restricted, draft, translations: data.translations.size, sections: data.sections.size, categories: data.categories.size, segments: data.user_segments.size },
-  records: byKind, credentialShapesRemoved: report.removals.length, credentialRemovals: report.removals, redactedUrls: report.redactedUrls, highWater: data.highWater, omissions };
+  records: byKind, undelivered: { tombstones: tombstones.length, translations: data.translations.size, sections: data.sections.size, categories: data.categories.size, segments: data.user_segments.size, articleAttachments: data.article_attachments.size }, credentialShapesRemoved: report.removals.length, credentialRemovals: report.removals, redactedUrls: report.redactedUrls, highWater: data.highWater, omissions };
  const files = new Map([['records-000001.ndjson', records], ['tombstones.ndjson', Buffer.concat(tombstones.map(row => encode(row)))]]);
  for (const kind of ['translations','sections','categories','user_segments','article_attachments']) {
   const bytes = Buffer.concat([...data[kind]].sort(([a],[b]) => a.localeCompare(b)).map(([id,{ row }]) => encode(cleaned(row, kind, id, report))));

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.99-dev.g9b5272b9",
+  "cliVersion": "0.2.99-dev.g8e37612e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -547,7 +547,7 @@
     },
     "cli/business/export-task.mjs": {
       "source": "cli/business/export-task.mjs",
-      "sha256": "9b107b776bbf7c6a6afb58c12fce4361965bfc436d457f6a8ce8eff868e05d46"
+      "sha256": "42005423de302e16a4536ab9956e82d356061e14b546ed70071d1b54139132df"
     },
     "cli/business/files.mjs": {
       "source": "cli/business/files.mjs",
@@ -567,7 +567,7 @@
     },
     "cli/business/local-commands.mjs": {
       "source": "cli/business/local-commands.mjs",
-      "sha256": "0dc3f1465a9d5003acc28666046c4b97cc5f2a89dea56725907c3c1e8b1ab719"
+      "sha256": "bc40e6a241fd564d55cb2fec911fb63f715cfb8afc6783af5826db3f129bdfc2"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
@@ -655,7 +655,7 @@
     },
     "cli/business/vendor-door.mjs": {
       "source": "cli/business/vendor-door.mjs",
-      "sha256": "3a41e4e231aae983697fb97ba1e1a7e06d73fdb06216262c1e6d3629786bd3f9"
+      "sha256": "6253abccc005a42daae5406e34ba0767c59e77b463e68adb93ab677b7166b3cc"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",
@@ -667,7 +667,7 @@
     },
     "cli/business/vendors/common.mjs": {
       "source": "cli/business/vendors/common.mjs",
-      "sha256": "d4621f53422bd4056c1bedf0672bbd4d79e5d96acdc5435fd1c028d5be7fb61f"
+      "sha256": "badc6b46870b1674f6801bd053e614be380f3ef43a50211fcd5ea32a9a6425e9"
     },
     "cli/business/vendors/credential-names.mjs": {
       "source": "cli/business/vendors/credential-names.mjs",
@@ -695,19 +695,19 @@
     },
     "cli/business/vendors/zendesk-attachments.mjs": {
       "source": "cli/business/vendors/zendesk-attachments.mjs",
-      "sha256": "bc3e26ac9b808116267e1fea2a4ecec319ebca4f327573670eea55c82d4527e2"
+      "sha256": "55372b4e1a1bc6819ef9ba40ae18493c61febff3c65c872882ff8cf35cd45ded"
     },
     "cli/business/vendors/zendesk-encode.mjs": {
       "source": "cli/business/vendors/zendesk-encode.mjs",
-      "sha256": "3468a52b7f3458507f4ad220ae0accdb991a97969a47786c39f3f66e6cccb439"
+      "sha256": "d940e6fdf960d571577202310abb1fef8cda93d503b24e843549f41af42ebd91"
     },
     "cli/business/vendors/zendesk-guide.mjs": {
       "source": "cli/business/vendors/zendesk-guide.mjs",
-      "sha256": "cc1f30d06c158fee26ae82ab3e349a6751185403e7bc0ddd5844a1d5eaf2c381"
+      "sha256": "9a2fd9876f4631a3513a0dd0c52a58d7ceea0e846f82551ce07db56465b48b90"
     },
     "cli/business/vendors/zendesk-pages.mjs": {
       "source": "cli/business/vendors/zendesk-pages.mjs",
-      "sha256": "6bfdbbb41ce37cf0563217f825f1da93c335dadb1b71ad02783de4c83c47fde5"
+      "sha256": "e74e40f75c3af62e1634e65eca1af3b48da0473bb3a11aa5377fa7b240c30932"
     },
     "cli/business/vendors/zendesk-people.mjs": {
       "source": "cli/business/vendors/zendesk-people.mjs",
@@ -715,23 +715,23 @@
     },
     "cli/business/vendors/zendesk-store.mjs": {
       "source": "cli/business/vendors/zendesk-store.mjs",
-      "sha256": "c112031c3dc7dd5b5c951e88bdbf799fe5416b6a9276922f06930443ea59b2d7"
+      "sha256": "da24e6d027d9cda687d2352157ba524f764045c05ea9d76a4c90760135e29b5d"
     },
     "cli/business/vendors/zendesk-tickets.mjs": {
       "source": "cli/business/vendors/zendesk-tickets.mjs",
-      "sha256": "514a2ba2646dcfe4b13836cf49eb42f0b2b74583a68cdad0292c64c50902b649"
+      "sha256": "8adda57e04213ad7875a267a07028277ec8a0f40a427a0ae3a6f056b13726bb9"
     },
     "cli/business/vendors/zendesk-token.mjs": {
       "source": "cli/business/vendors/zendesk-token.mjs",
-      "sha256": "dd9073b0a303b310f4a0196f35a07c34fb1132ac0cc59fb138c52aa1bf05df66"
+      "sha256": "173a2e2e4cf4e9a1c257cf7375b41e40ac7a388c8110f475491f6daab0ba10d4"
     },
     "cli/business/vendors/zendesk-transport.mjs": {
       "source": "cli/business/vendors/zendesk-transport.mjs",
-      "sha256": "dcfadda0e1040fe1bb553bd1f1ee424a88211a0283e0c48896a103845dfc1861"
+      "sha256": "22a64888ffd28cf863ba9ac45bdf9f5500e70afa73da1e4ea55e97520db6ee52"
     },
     "cli/business/vendors/zendesk.mjs": {
       "source": "cli/business/vendors/zendesk.mjs",
-      "sha256": "5c8e9e307d693f42b27b8ca618e7f7694834fb4f69b6a96825aa2bebf74c6c98"
+      "sha256": "b632d6ebb1e8a604990079915e4d9014be7df395dd1a8da99ed548ccba2d6335"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",

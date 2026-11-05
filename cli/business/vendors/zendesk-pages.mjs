@@ -42,9 +42,20 @@ export async function fetchPage({ store, request, origin, state, kind, path, ext
   return next;
  }
  list(object(response.body)[kind], 1000);
+ const seenKey = JSON.stringify([state.runId, kind, extra.ticket ?? extra.article ?? '', extra.resource ?? '']);
+ if (!store.pagePaths) {
+  store.pagePaths = new Map();
+  for (const event of store.events) if (event.requestPath) {
+   const paths = store.pagePaths.get(event.seenKey) ?? new Set(); paths.add(event.requestPath); store.pagePaths.set(event.seenKey, paths);
+  }
+ }
+ const seen = store.pagePaths.get(seenKey) ?? new Set();
+ if (seen.has(path)) fail('INVALID_PAGINATION');
  const next = nextPage(response.body, path, origin, { incremental, time });
+ if (next && seen.has(next)) fail('INVALID_PAGINATION');
  const nextState = next ? { ...state, path: next } : onDone({ ...state, path: null });
  nextState.requests = state.requests + 1;
- await store.page(kind, response, nextState, extra);
+ await store.page(kind, response, nextState, { ...extra, requestPath: path, seenKey });
+ seen.add(path); store.pagePaths.set(seenKey, seen);
  return store.state;
 }

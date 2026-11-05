@@ -23,7 +23,7 @@ export async function mintToken(request, key) {
  if (typeof body.access_token !== 'string' || !body.access_token || body.access_token.length > 8192 || /[\u0000-\u0020\u007f]/u.test(body.access_token)
   || body.token_type?.toLowerCase() !== 'bearer') fail('INVALID_TOKEN');
  request.authorize(body.access_token);
- const current = await request('/api/v2/oauth/tokens/current');
+ const current = await request('/api/v2/oauth/tokens/current', { tokenResponse: true });
  const scopes = current.body?.token?.scopes ?? current.body?.scopes;
  const values = typeof scopes === 'string' ? scopes.split(/\s+/u) : scopes;
  if (!Array.isArray(values) || !values.length || values.some(scope => !['read', ...SCOPES].includes(scope))) fail('KEY_NOT_READ_ONLY');

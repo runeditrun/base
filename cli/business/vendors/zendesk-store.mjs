@@ -1,5 +1,5 @@
 import { constants } from 'node:fs';
-import { mkdir, lstat, open, rename, unlink, rm } from 'node:fs/promises';
+import { mkdir, lstat, open, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { hash, fail, stable } from './common.mjs';
@@ -79,10 +79,12 @@ export class ZendeskStore {
   try { file = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600); }
   catch (error) { if (error.code !== 'EEXIST') throw error; await this.get(ref); return ref; }
   try { await file.writeFile(bytes); await file.sync(); } finally { await file.close(); }
+  const parent = await open(join(this.path, 'objects'), constants.O_RDONLY);
+  try { await parent.sync(); } finally { await parent.close(); }
   return ref;
  }
  async commit(state, event = null, refs = []) {
-  state = { ...state, requests: this.requestCount?.() ?? state.requests };
+  state = { ...state, requests: this.requestTotal ?? state.requests };
   if (!Number.isSafeInteger(state.bytes) || state.bytes > 32 * 1024 ** 3 || state.requests > 250_000) fail('BYTE_LIMIT');
   const node = { format: 'rer-zendesk-journal/1', previous: this.head, state, event, refs };
   const head = await this.put(encode(node));
@@ -97,7 +99,7 @@ export class ZendeskStore {
   await this.commit({ ...state, bytes: state.bytes + raw.bytes }, { kind, raw, ...extra }, [raw]);
  }
  async reset(state, { retain = false } = {}) {
-  if (!retain) { this.events = []; this.head = null; this.cache = null; }
+  if (!retain) { this.events = []; this.head = null; this.cache = null; this.pagePaths = null; }
   await this.commit(state);
  }
  async write(name, value) {
@@ -105,7 +107,12 @@ export class ZendeskStore {
   await atomic(join(this.path, name), encode(value));
  }
  async baseline() {
-  try { return JSON.parse((await read(join(this.path, 'baseline.json'), 128 * 1024)).toString()); }
+  try {
+   const baseline = JSON.parse((await read(join(this.path, 'baseline.json'), 128 * 1024)).toString());
+   const node = JSON.parse((await this.get(baseline.head)).toString());
+   if (node.state?.phase !== 'done' || node.state.highWater !== baseline.highWater) fail('INVALID_CHECKPOINT');
+   return baseline;
+  }
   catch (error) { if (error.code !== 'ENOENT') fail('INVALID_CHECKPOINT'); return null; }
  }
  async discard() { await rm(this.path, { recursive: true, force: true }); }
@@ -125,15 +132,15 @@ export async function materialize(store) {
   if (event.kind === 'attachment') { data.attachments.set(event.key, event); continue; }
   if (!event.raw) continue;
   const body = JSON.parse((await store.get(event.raw)).toString());
-  const rows = body[event.kind];
+  const rows = event.single ? [body[event.single]] : body[event.kind];
   if (!Array.isArray(rows)) fail('INVALID_CHECKPOINT');
   const destination = event.kind === 'comments' ? (event.reset ? new Map() : data.comments.get(event.ticket) ?? new Map()) : data[event.kind];
   if (!destination) fail('INVALID_CHECKPOINT');
   rows.forEach((row,index) => {
    const id = numericId(row.id);
    if (Buffer.byteLength(JSON.stringify(row)) > 64 * 1024 * 1024) fail('RECORD_LIMIT');
-   const key = ['translations', 'article_attachments'].includes(event.kind) ? `${event.article}:${id}` : id;
-   destination.set(key, { row, provenance: { file: event.raw.file, sha256: event.raw.sha256, row: index + 1, pointer: `/${event.kind}/${index}` } });
+   const key = ['translations', 'article_attachments'].includes(event.kind) ? `${event.resource ?? "articles"}:${event.article}:${id}` : id;
+   destination.set(key, { row, provenance: { file: event.raw.file, sha256: event.raw.sha256, row: index + 1, pointer: event.single ? `/${event.single}` : `/${event.kind}/${index}` } });
    if (event.kind === 'tickets') {
     const stamp = row.generated_timestamp;
     if (!Number.isSafeInteger(stamp) || stamp < 0) fail('INVALID_RESPONSE');

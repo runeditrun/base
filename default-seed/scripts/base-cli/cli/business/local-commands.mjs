@@ -80,6 +80,7 @@ export async function vendorKey(action, vendor) {
   try { if (vendor === 'zendesk') clientCredential(secret); await store.set(handle, secret); } finally { secret = undefined; }
   state.vendorHandles = [...new Set([...(state.vendorHandles ?? []), handle])];
  } else {
+  if (vendor === 'zendesk') await stopSupervisor(stateDirectory());
   await store.delete(handle);
   if (vendor === 'zendesk') {
    await removeZendeskStores(stateDirectory());

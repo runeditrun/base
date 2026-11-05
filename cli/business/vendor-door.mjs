@@ -143,7 +143,7 @@ export async function door(grant, body, signal) {
 async function exportBundle({ vendor, key = null, inputs, path, quota, signal, directory, runId, business }) {
  await unlink(path).catch(error => { if (error.code !== 'ENOENT') throw error; });
  const file = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
- const digest = createHash('sha256'); let size = 0;
+ const digest = createHash('sha256'); let size = 0, zendeskStore;
  try {
   let items;
   if (vendor === 'zendesk') {
@@ -151,6 +151,7 @@ async function exportBundle({ vendor, key = null, inputs, path, quota, signal, d
    const result = await zendeskSnapshot({ key, inputs, directory: inputs.mode === 'census' ? join(root, 'probe') : root, runId, signal });
    if (result.kind === 'census') throw new ExportWaiting(`Zendesk census: ${result.census.tickets.unique} tickets; ${result.census.unswept} unswept. CENSUS_OUTPUTS_UNSUPPORTED: waiting for Business census task outputs.`, 'connected_runner_required');
    if (result.kind === 'package') throw new VendorExportError('SEED_PACKAGE_UNSUPPORTED');
+   zendeskStore = result.store;
    items = [{ bytes: result.bytes }];
   } else items = exportVendor(vendor, { key, inputs, signal });
   for await (const item of items) {
@@ -169,7 +170,7 @@ async function exportBundle({ vendor, key = null, inputs, path, quota, signal, d
   throw Error(`${vendorNames[vendor]} export stopped (${error.code}${error.status ? `, HTTP ${error.status}` : ''}). Nothing was uploaded.`);
  } finally { await file.close(); }
  if (!size) throw Error(`${vendorNames[vendor]} export produced nothing to upload.`);
- return { size, sha256: digest.digest('hex') };
+ return { size, sha256: digest.digest('hex'), ...(zendeskStore ? { store: zendeskStore, mode: inputs.mode } : {}) };
 }
 
 async function readChunk(path, index, size) {
@@ -230,7 +231,23 @@ export async function withUploadedBundle({ lease, task, grant: claimedGrant, dir
   try { bundle = await exportBundle({ vendor, key, inputs, path, quota, signal, directory, runId: task.id, business: state?.businessId }); } finally { key = undefined; }
   const total = Math.ceil(bundle.size / CHUNK_BYTES);
   let uploadId;
+  const received = new Set();
+  const journal = bundle.store?.events.findLast(event => event.kind === 'transfer');
+  if (journal && journal.origin === origin && journal.bundleSha256 === bundle.sha256 && journal.totalBytes === bundle.size) {
+   try {
+    const inventory = await door(await fresh('uploads'), { uploadId: journal.uploadId }, signal);
+    if (inventory.uploadId !== journal.uploadId || inventory.bundleSha256 !== bundle.sha256 || !Array.isArray(inventory.received)) throw new VendorExportError('INVALID_CHECKPOINT');
+    for (const item of inventory.received) {
+     if (!Number.isSafeInteger(item.ordinal) || item.ordinal < 0 || item.ordinal >= total || received.has(item.ordinal)) throw new VendorExportError('INVALID_CHECKPOINT');
+     const bytes = await readChunk(path, item.ordinal, bundle.size);
+     if (item.sha256 !== hash(bytes) || item.size !== bytes.length) throw new VendorExportError('INVALID_CHECKPOINT');
+     received.add(item.ordinal);
+    }
+    uploadId = journal.uploadId;
+   } catch (error) { if (error.doorStatus !== 404) throw error; }
+  }
   for (let index = 0; index < total; index++) {
+   if (received.has(index)) continue;
    signal.throwIfAborted();
    const bytes = await readChunk(path, index, bundle.size);
    const result = await door(await fresh('uploads'), { ...(uploadId ? { uploadId } : {}), name: capability.output, bundleSha256: bundle.sha256,
@@ -238,6 +255,11 @@ export async function withUploadedBundle({ lease, task, grant: claimedGrant, dir
    if (typeof result.uploadId !== 'string' || !DOOR_ID.test(result.uploadId) || uploadId && result.uploadId !== uploadId
     || result.bundleSha256 !== bundle.sha256 || index === total - 1 && result.complete !== true) throw Error("The app's import door returned an invalid upload answer.");
    uploadId = result.uploadId;
+   if (bundle.store) {
+    const transfer = { kind: 'transfer', origin, bundleSha256: bundle.sha256, totalBytes: bundle.size, uploadId };
+    await bundle.store.commit(bundle.store.state, transfer);
+    await bundle.store.write('transfer.json', transfer);
+   }
    await lease.checkpointSaved({ page: index + 1, total, bytes_done: Math.min((index + 1) * CHUNK_BYTES, bundle.size), progress: Math.floor((index + 1) / total * 90) });
   }
   const { outputs, said } = await finish({ vendor, name, origin, uploadId, bundle, fresh });
