@@ -29,7 +29,7 @@ export async function persistLocalEmail(root,variables){
 }
 export async function localEmailBindings(root){
  let text;try{text=await readPrivateFile(join(root,'.dev.vars'))}catch(error){if(error.code==='ENOENT')return {};throw error}
- const allowed=new Set(['EMAIL_PROVIDER','EMAIL_FROM','EMAIL_ACCOUNT_ID','EMAIL_API_KEY']);const values={};
+ const allowed=new Set(['EMAIL_PROVIDER','EMAIL_FROM','EMAIL_ACCOUNT_ID','EMAIL_API_KEY','EMAIL_API_KEY_NAME','MAILGUN_DOMAIN','MAILGUN_REGION','MAILGUN_SENDING_KEY']);const values={};
  for(const line of text.split(/\r?\n/)){const index=line.indexOf('=');const key=line.slice(0,index).trim();if(index<0||!allowed.has(key))continue;let value=line.slice(index+1).trim();if(value.startsWith('"')){try{value=JSON.parse(value)}catch{continue}}else if(value.startsWith("'")&&value.endsWith("'"))value=value.slice(1,-1);values[key]=value}
  return values;
 }

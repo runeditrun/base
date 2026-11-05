@@ -7,6 +7,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { emailManifest } from '../fixtures/email.mjs';
 import { startInstaller } from '../server.mjs';
 import { createOutputRoot, finishOutputRoot } from './browser-output.mjs';
 import { assertSelectChevron } from '../../default-seed/tests/e2e/select-chevron.mjs';
@@ -49,7 +50,7 @@ const seed = {
     await store.phase('complete');
   },
 };
-const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] });
+const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] });
 const results = [];
 
 async function checkViewport(width, height) {
@@ -432,7 +433,44 @@ async function checkManifestInputs(width, height) {
   console.log('Manifest browser: conditional labels, requiredness, hidden fields, validation and private-input invalidation passed');
  } finally {await context?.close();await installer?.close();await rm(root,{recursive:true,force:true});}
 }
+async function checkMailgunInputs(width,height){
+ const root=await mkdtemp(join(taskTemp,'onboarding-mailgun-'));let installer,context;
+ try{
+  await writeFile(join(root,'seed.mjs'),"export const product={name:'Email setup'}; export const features={};");
+  const manifest=structuredClone(emailManifest);delete manifest.fields[0].default;
+  await writeFile(join(root,'rer-setup.json'),JSON.stringify(manifest));
+  installer=await startInstaller(root,{seed:{product:'Email setup',browserModule:'seed.mjs',setup:{manifestFile:'rer-setup.json'},install:async()=>{throw Error('This browser proof never starts installation');}}});
+  context=await browser.newContext({viewport:{width,height}});
+  const page=await context.newPage();await page.goto(installer.origin);
+  await page.waitForSelector('#EMAIL_PROVIDER');
+  await page.locator('#EMAIL_PROVIDER').selectOption('mailgun');
+  await page.waitForSelector('#MAILGUN_DOMAIN');
+  await page.locator('#EMAIL_FROM').fill('support@example.test');
+  await page.locator('#MAILGUN_DOMAIN').fill('mg.example.test');
+  await page.locator('#MAILGUN_REGION').selectOption('eu');
+  await page.screenshot({path:join(outputRoot,'screenshots',`${width}x${height}-mailgun.png`),fullPage:true});
+  if(width===1440){
+   assert.equal(await page.locator('#EMAIL_API_KEY_NAME').inputValue(),'MAILGUN_SENDING_KEY');
+   assert.equal(await page.locator('#MAILGUN_SENDING_KEY').getAttribute('type'),'password');
+   assert.equal(await page.locator('#EMAIL_API_KEY').count(),0);
+   assert.equal(await page.locator('#continue').isDisabled(),true);
+   await page.locator('#MAILGUN_SENDING_KEY').fill('synthetic-browser-sending-token');
+   assert.equal(await page.locator('#continue').isDisabled(),false);
+   await page.locator('#MAILGUN_DOMAIN').fill('https://wrong.example.test');
+   assert.equal(await page.locator('#continue').isDisabled(),true);
+   await page.locator('#MAILGUN_DOMAIN').fill('mg.example.test');
+   await page.locator('#EMAIL_PROVIDER').selectOption('resend');
+   assert.equal(await page.locator('#MAILGUN_SENDING_KEY').count(),0);
+   await page.locator('#EMAIL_PROVIDER').selectOption('mailgun');
+   assert.equal(await page.locator('#MAILGUN_SENDING_KEY').inputValue(),'');
+   assert.equal(await page.locator('#continue').isDisabled(),true);
+   assert.ok(!JSON.stringify(installer.state).includes('synthetic-browser-sending-token'));
+  }
+ }finally{await context?.close();await installer?.close();await rm(root,{recursive:true,force:true});}
+}
 try {
+  await checkMailgunInputs(1440,1000);
+  await checkMailgunInputs(390,844);
   await checkManifestInputs(1440, 1000);
   await checkManifestInputs(390, 844);
   await checkViewport(1440, 1000);

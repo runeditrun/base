@@ -73,6 +73,32 @@ manifest specifies a generation method, and never accepted as CLI values.
 setup must supply every required answer; it never silently adopts the git
 identity. Conflicting flag and answer-file values fail before effects.
 
+## Mailgun settings
+
+The installer renders each edition's existing `rer-setup.json`; it does not add
+providers to a product whose runtime does not support them. An edition using the
+direct Mailgun adapter adds `mailgun` / `Mailgun` to its `EMAIL_PROVIDER` select,
+keeps its existing choices, and declares conditional fields for that choice:
+
+| Field | Manifest kind | Requirement |
+| --- | --- | --- |
+| `EMAIL_FROM` | `email` | Required sender |
+| `EMAIL_API_KEY_NAME` | `select` | Required, sole option and default `MAILGUN_SENDING_KEY` |
+| `MAILGUN_DOMAIN` | `text` | Required sending domain, without a URL or path |
+| `MAILGUN_REGION` | `select` | Options `us` and `eu`; default `us` |
+| `MAILGUN_SENDING_KEY` | `secret`, `input: entered`, `ownerVisible: true` | Required private domain sending key |
+
+Use `"when": {"field": "EMAIL_PROVIDER", "equals": "mailgun"}` for the
+Mailgun-only fields and the existing `presentations` mechanism for a sender
+shared across providers. Shared setup validates these inputs before effects,
+saves the declared settings privately and clears entered keys when the provider
+changes. `EMAIL_API_KEY_NAME` is a public binding name, never a credential value.
+The generic email key, Mailgun Routes key and other providers' keys cannot satisfy
+the Mailgun contract. Region absence retains the adapter's US default.
+
+These configuration checks make no provider requests. Real domain verification,
+domain-scoped key provisioning and live delivery remain external acceptance work.
+
 ## Seed theme
 
 A seed dresses Base's installer and its shared sign-in and first-run frames in

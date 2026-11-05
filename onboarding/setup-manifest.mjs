@@ -1,3 +1,4 @@
+import {mailgunIssues} from './email.mjs';
 import {parseSetupManifestBytes, validateSetupManifest, setupConditionMatches, validateSetupValue, setupFieldAudience} from './schema/setup-validation.mjs';
 import {createModel} from './ui/model-core.mjs';
 import {installerInputs} from './installer-inputs.mjs';
@@ -32,6 +33,13 @@ export function createInstallerModel(manifest,presentation={},options={}) {
  // The first required text field names the workspace; URL/colour fields provide
  // artwork context. Installer-owned hosting inputs are outside that context.
  const nameKey=manifest.fields.find(field=>field.kind==='text'&&field.required)?.name;
+ const mailgun=manifest.fields.find(field=>field.name==='EMAIL_PROVIDER')?.options?.some(option=>option.value==='mailgun');
+ if(mailgun){
+  for(const name of ['EMAIL_FROM','EMAIL_API_KEY_NAME','MAILGUN_DOMAIN','MAILGUN_SENDING_KEY']){
+   const field=manifest.fields.find(field=>field.name===name);
+   if(!field||(name==='MAILGUN_SENDING_KEY'?(field.kind!=='secret'):field.kind==='secret'))throw Error(`rer-setup.json: Mailgun requires ${name} as ${name==='MAILGUN_SENDING_KEY'?'a private secret':'a public setting'}.`);
+  }
+ }
  const fields={},secretScopes={...own.secretScopes};
  function active(field,draft){
   if(field.when&&!setupConditionMatches(field.when,draft))return null;
@@ -64,6 +72,10 @@ export function createInstallerModel(manifest,presentation={},options={}) {
  const internal={...presentation,product:presentation.product??{name:manifest.title},fields,safeKeys,secretScopes,setupGroups:groups,
   summaryDefaults:Object.keys(defaults),initialValues:()=>defaults,nameKey,
   requiredKeys(draft){return [...manifest.fields.filter(field=>{const current=active(field,draft);return current?.required&&(field.kind!=='secret'||field.input==='entered');}).map(field=>field.name),...Object.keys(own.fields).filter(key=>!own.fields[key].optional)];},
+  invalidKeys(draft,known){
+   if(!mailgun||draft.EMAIL_PROVIDER!=='mailgun')return [];
+   return mailgunIssues(draft).filter(issue=>issue!=='MAILGUN_SENDING_KEY'||draft.MAILGUN_SENDING_KEY||!model.secretReady('MAILGUN_SENDING_KEY',draft,known)).map(issue=>issue.split(' ')[0]);
+  },
  };
  const model=createModel(internal);
  model.secretScopes=secretScopes;

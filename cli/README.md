@@ -288,6 +288,18 @@ resolves the deferred choice for preflight. An explicitly selected provider
 still requires its own credentials. Undeclared environment values do not count;
 the product's deploy adapter remains responsible for applying these settings.
 
+An edition with the direct Mailgun adapter instead declares `EMAIL_PROVIDER=mailgun`,
+`EMAIL_API_KEY_NAME=MAILGUN_SENDING_KEY`, `MAILGUN_DOMAIN` and `EMAIL_FROM`.
+`MAILGUN_REGION` is `us` (the default when absent) or `eu`. Declare the public
+names in `publicVariableNames` (or fixed `publicVariables`) and the private
+`MAILGUN_SENDING_KEY` in `secretNames` or `optionalSecretNames`, or use the root
+deploy declaration's explicit environment-to-binding mapping. The key name is
+configuration; its value is supplied separately through that declared secret.
+Preflight never borrows `EMAIL_API_KEY`, `MAIL_API_KEY`, a Routes key or another
+provider's credential for Mailgun. It checks local configuration and declared
+secret presence only; it does not verify domain ownership, key scope or delivery.
+
+
 `rer deploy --dry-run` accepts syntactically valid fixture senders on reserved
 domains: `.test`, `.example`, `.invalid`, `.localhost`, and `example.com`,
 `example.net` or `example.org` (including their subdomains). It prints the local
