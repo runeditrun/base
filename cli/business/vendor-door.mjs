@@ -1,3 +1,6 @@
+import { buildPackage, transferPackage } from './package-transfer.mjs';
+import { registeredLegacyPackage } from './legacy-package.mjs';
+import { prepareZendeskPackage } from './vendors/zendesk-package.mjs';
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { open, unlink } from 'node:fs/promises';
@@ -20,7 +23,7 @@ import { businessCommand } from './invocation.mjs';
 const CHUNK_BYTES = 65_536;
 const DOOR_RESPONSE_BYTES = 4 * 1024 * 1024;
 // The catalogue names the platform builds vendor task titles from.
-export const vendorNames = Object.freeze({ sentry: 'Sentry', uptimerobot: 'UptimeRobot', pagerduty: 'PagerDuty', calendly: 'Calendly', sorry: 'Sorry', zendesk: 'Zendesk' });
+export const vendorNames = Object.freeze({ sentry: 'Sentry', uptimerobot: 'UptimeRobot', pagerduty: 'PagerDuty', calendly: 'Calendly', sorry: 'Sorry', zendesk: 'Zendesk', 'happytohelp-legacy': 'HappyToHelp legacy' });
 /** Whether a vendor's export needs the owner's read-only key (Sorry's public page does not). */
 export const keyed = vendor => KEYED_VENDORS.includes(vendor);
 export const vendorHandle = vendor => `vendor:${vendor}:read`;
@@ -132,7 +135,7 @@ export async function door(grant, body, signal) {
  if (!response.ok) {
   // A door code is snake_case, sometimes with one named reason (`catchup_requires_proposal:source_records_gone`).
   const doorCode = typeof result?.error === 'string' && /^[a-z][a-z0-9_]{0,79}(?::[a-z][a-z0-9_]{0,79})?$/.test(result.error) ? result.error : null;
-  throw Object.assign(Error(`The app's import door refused the ${action} request (HTTP ${response.status}${doorCode ? `: ${doorCode}` : ''}).`), { doorStatus: response.status, doorCode });
+  throw Object.assign(Error(`The app's import door refused the ${action} request (HTTP ${response.status}${doorCode ? `: ${doorCode}` : ''}).`), { doorStatus: response.status, doorCode, ...(doorCode === 'package_segment_missing' ? { doorDetails: result.details } : {}) });
  }
  if (!result || typeof result !== 'object' || Array.isArray(result)) throw Error(`The app's import door returned an invalid ${action} answer.`);
  return result;
@@ -150,7 +153,7 @@ async function exportBundle({ vendor, key = null, inputs, path, quota, signal, d
    const root = zendeskStorePath(directory, business, `https://${inputs.account.subdomain}.zendesk.com`);
    const result = await zendeskSnapshot({ key, inputs, directory: inputs.mode === 'census' ? join(root, 'probe') : root, runId, signal });
    if (result.kind === 'census') throw new ExportWaiting(`Zendesk census: ${result.census.tickets.unique} tickets; ${result.census.unswept} unswept. CENSUS_OUTPUTS_UNSUPPORTED: waiting for Business census task outputs.`, 'connected_runner_required');
-   if (result.kind === 'package') throw new VendorExportError('SEED_PACKAGE_UNSUPPORTED');
+   if (result.kind === 'package') return { package: result, store: result.store, mode: inputs.mode };
    zendeskStore = result.store;
    items = [{ bytes: result.bytes }];
   } else items = exportVendor(vendor, { key, inputs, signal });
@@ -224,11 +227,39 @@ export async function withUploadedBundle({ lease, task, grant: claimedGrant, dir
  if (vendor === 'zendesk' && state?.vendorRevocations?.zendesk) throw new VendorExportError('VENDOR_REVOKED');
  let key = keyed(vendor) ? await createCredentialStore().get(vendorHandle(vendor)) : null;
  if (keyed(vendor) && !key) throw new ExportWaiting(`Business vendor export needs the owner's read-only ${name} key on this computer: ${keyStep(vendor)}\nThen run ${businessCommand('run')} again.`, 'owner_required', { keyMissing: vendor });
+ if (vendor === 'happytohelp-legacy') {
+  if (!['export.vendor', 'catchup.vendor'].includes(task.kind)) throw new ExportWaiting('Legacy package tasks require a package-aware export or catch-up reader.', 'configuration_required');
+  let legacy;
+  try { legacy = await registeredLegacyPackage(); }
+  catch (error) { throw new ExportWaiting(error.message, 'configuration_required'); }
+  say(doing(name, origin, false));
+  const packageDirectory = join(directory, `package-${hash(task.id).slice(0, 32)}`);
+  let prepared;
+  try {
+   prepared = await buildPackage({ files: legacy.files, quota, directory: packageDirectory, signal,
+    source: { format: legacy.manifest.format, version: 1, origin: 'legacy-database', exportedAt: legacy.manifest.exportedAt ?? legacy.manifest.source.exportedAt ?? null,
+     synthetic: legacy.manifest.source.synthetic === true, adapter: 'rer:happytohelp-legacy' },
+    records: { total: null, byKind: {} }, totals: { rowCounts: legacy.rowCounts, objects: legacy.objects } });
+  } catch { throw new ExportWaiting(`Legacy package changed or could not be prepared: ${legacy.path}. Recheck and register that package again.`, 'configuration_required'); }
+  let uploaded;
+  try { uploaded = await transferPackage({ prepared, fresh, request: door, signal, checkpoint: cp => lease.checkpointSaved(cp), catchup: task.kind === 'catchup.vendor' }); }
+  catch (error) { if (!error.message.startsWith('SEED_PACKAGE_UNSUPPORTED')) throw error; throw new ExportWaiting(error.message, 'configuration_required'); }
+  const { outputs, said } = await finish({ vendor, name, origin, ...uploaded, fresh });
+  await lease.complete(outputs);
+  return said;
+ }
  const path = join(directory, `export-${hash(task.id).slice(0, 32)}.bundle`);
  try {
   say(doing(name, origin, keyed(vendor)));
   let bundle;
   try { bundle = await exportBundle({ vendor, key, inputs, path, quota, signal, directory, runId: task.id, business: state?.businessId }); } finally { key = undefined; }
+  if (bundle.package) {
+   const prepared = await prepareZendeskPackage({ result: bundle.package, quota, directory: join(bundle.store.path, `package-${hash(task.id).slice(0,32)}`), signal, mode: inputs.mode });
+   const uploaded = await transferPackage({ prepared, fresh, request: door, signal, checkpoint: cp => lease.checkpointSaved(cp), catchup: task.kind === 'catchup.vendor' || inputs.mode === 'sweep' });
+   const finished = await finish({ vendor, name, origin, ...uploaded, fresh });
+   await lease.complete(finished.outputs);
+   return finished.said;
+  }
   const total = Math.ceil(bundle.size / CHUNK_BYTES);
   let uploadId;
   const received = new Set();

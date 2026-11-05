@@ -2,7 +2,7 @@
 // server records credential presence as a boolean, never the key/token itself.
 import { appendFile, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { origin, key, token, blob, fixture } from './zendesk-data.mjs';
+import { origin, key, token, blob, largeBlob, fixture } from './zendesk-data.mjs';
 const home = process.env.HOME, real = globalThis.fetch;
 if (!home?.includes('.business-connect-')) throw Error('Fixture requires an isolated test HOME');
 const scenario = process.env.ZENDESK_CASE ?? 'Z0', data = fixture(scenario === 'Z'), counts = new Map();
@@ -54,7 +54,7 @@ globalThis.fetch = async (input, init = {}) => {
    const locations = { 'redirect-public': 'https://example.com/customer.txt', 'redirect-http': 'http://example.com/customer.txt', 'redirect-ip': 'https://127.0.0.1/customer.txt', 'redirect-userinfo': 'https://user@example.com/customer.txt', 'redirect-local': 'https://internal.local/customer.txt', 'redirect-port': 'https://example.com:443/customer.txt' };
    return new Response(null, { status: 302, headers: { location: locations[scenario], 'ratelimit-remaining': '1000000', 'ratelimit-reset': '1' } });
   }
-  return new Response(scenario === 'size-mismatch' ? Buffer.from('wrong bytes') : blob, { headers: { 'ratelimit-remaining': '1000000', 'ratelimit-reset': '1' } });
+  return new Response(scenario === 'size-mismatch' ? Buffer.from('wrong bytes') : scenario === 'Z' ? largeBlob : blob, { headers: { 'ratelimit-remaining': '1000000', 'ratelimit-reset': '1' } });
  }
  if (url.pathname === '/api/v2/incremental/users/cursor') return json({ users: data.users, end_of_stream: true });
  if (url.pathname === '/api/v2/incremental/organizations') return json({ organizations: data.organizations, end_of_stream: true });

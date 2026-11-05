@@ -665,9 +665,11 @@ are counted with fixed reasons; no binding is invented.
 
 A whole snapshot fitting 2 MiB, 5,000 records, 128 KiB per ticket, and at most
 20 inline attachments of 48 KiB per ticket goes as one v1 bundle. Anything larger
-needs the package sender and HH package-aware reader. Until those are available,
-`SEED_PACKAGE_UNSUPPORTED` retains the complete local snapshot and uploads
-nothing. Never narrow the snapshot to fit. Translations, categories, sections,
+uses the shared logical package sender with path bindings, deduplicated blobs,
+census, tombstones and Guide sidecars. The manifest probes the destination
+before segments are sent. A destination without the package-aware reader answers
+`SEED_PACKAGE_UNSUPPORTED`: the complete local snapshot stays and no segments
+are uploaded. Never narrow the snapshot to fit. Translations, categories, sections,
 segments, article media and tombstones are retained as package sidecars and
 counted pending HH adoption. This is a synthetic-edge implementation, not proof
 of real-account parity, client-scope availability or a completed migration.

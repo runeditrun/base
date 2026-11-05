@@ -39,6 +39,7 @@ const shapes = {
   return { account: { subdomain: account.subdomain }, mode: value.mode ?? 'snapshot', ...(value.highWater !== undefined ? { highWater: value.highWater } : {}) };
  },
  uptimerobot: () => ({}),
+ 'happytohelp-legacy': () => ({}),
  sentry(value, now) {
   closed(value, ['organization', 'window']);
   const organization = closed(value.organization, ['id', 'slug', 'region']);
@@ -72,7 +73,7 @@ export const inputNeeds = { zendesk: 'its Zendesk account subdomain', sentry: 'i
  * `export_inputs`, or null when the task carries none yet. */
 export function exportInputs(vendor, task, now = Date.now()) {
  if (!Object.hasOwn(shapes, vendor)) return null;
- if (vendor === 'uptimerobot') return {};
+ if (vendor === 'uptimerobot' || vendor === 'happytohelp-legacy') return {};
  if (task.export_inputs === undefined || task.export_inputs === null) return null;
  return shapes[vendor](task.export_inputs, now);
 }

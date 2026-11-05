@@ -23,9 +23,9 @@ No export runs merely by importing these modules. No account export was run
 during implementation.
 
 `VENDORS` is the closed vendor enum (`sentry`, `uptimerobot`, `pagerduty`,
-`calendly`, `sorry`). `VENDOR_CAPABILITIES` describes the adapter,
+`calendly`, `sorry`, `zendesk`, `happytohelp-legacy`). `VENDOR_CAPABILITIES` describes the adapter,
 required vendor-key capability, native importer format, layout and read scopes.
-These adapters cannot verify that a supplied key itself has read-only scope;
+Except for Zendesk's checked OAuth scopes, adapters cannot verify that a supplied key itself has read-only scope;
 the owner must create the documented read-only key where the vendor offers one.
 
 ## Transport and resume
@@ -184,8 +184,9 @@ rather than a bare API token. `snapshot({key,inputs,directory,runId,signal})` in
 `directory` and `runId` for this vendor; the Business door provides a directory
 keyed by Business and account. It does not apply the older vendors' 2,000-item
 or one-MiB item limits. The complete deliverable is checked against HH v1 limits
-before any upload. Package-required results are retained and refused until the
-package sender is integrated; no per-part plan or fallback is used.
+before any upload. Package-required results use the shared package sender with path bindings and
+sidecars. It probes the manifest before sending segments, resumes the transfer
+journal and plans one complete snapshot; no per-part plan or fallback is used.
 
 Responsibilities are separated into token/scope checking, transport, pages,
 tickets/comments, people, attachments, Guide, store and HH encoding. Requests
@@ -209,6 +210,6 @@ leaves only unreachable objects. Resume validates the reachable graph and
 rebuilds last-version records and census from it. Repeated attachment bytes
 have one blob. The census declares tombstones, inaccessible/deleted/malware/large
 attachments and omissions explicitly. Guide 404 records unavailable coverage.
-The JSON census and Guide sidecars stay local or in the future package; Business
+The JSON census and Guide sidecars stay local and in the package; Business
 receives only the door's ids and SHA for a successful bundle. See the CLI guide
 for the separate Business census/retire output dependencies.

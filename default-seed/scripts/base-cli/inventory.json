@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.99-dev.g8e37612e",
+  "cliVersion": "0.2.99-dev.g16e8f9a8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -383,7 +383,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "8dc1f90901223c05465d42ef9489f574edb1467ac6a8c780132e1d5d3796360e"
+      "sha256": "a4d089cf0498869342a40be740ea27ef9cfcce0cce9070530c28172a0541852b"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -507,7 +507,7 @@
     },
     "cli/business/catchup-task.mjs": {
       "source": "cli/business/catchup-task.mjs",
-      "sha256": "f8394e1c934bab5faeec9df2057cc9a6b127f9e2ccfad857315112356baf2ba3"
+      "sha256": "6fa4deb11e328d246dabbf51f8d9603fe34eba0170b1ce908deeb3626dae4116"
     },
     "cli/business/choices.mjs": {
       "source": "cli/business/choices.mjs",
@@ -515,7 +515,7 @@
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "9fb4176131002047cbb0fdef2dc8c1f53f0f31ee8edad13c189ca499aec334e8"
+      "sha256": "fee6f1afaed9f04d704130ce1d7dc9217b1cb33526110a36f459b480655e46e6"
     },
     "cli/business/config-policy.mjs": {
       "source": "cli/business/config-policy.mjs",
@@ -543,11 +543,11 @@
     },
     "cli/business/export-inputs.mjs": {
       "source": "cli/business/export-inputs.mjs",
-      "sha256": "58e58f379ed7fda45c83f10202e17b33efcad325ff5cf02a058c2a415332675f"
+      "sha256": "7e4962d5e6c062dfddf0a1f2025962e8f51136dd1dc655935c4eec9cc62fcfec"
     },
     "cli/business/export-task.mjs": {
       "source": "cli/business/export-task.mjs",
-      "sha256": "42005423de302e16a4536ab9956e82d356061e14b546ed70071d1b54139132df"
+      "sha256": "bedbf53823d9efd7fcbbaf40681ae925ecb5d976fca1ee7f8da65dcf318e9f8b"
     },
     "cli/business/files.mjs": {
       "source": "cli/business/files.mjs",
@@ -565,13 +565,21 @@
       "source": "cli/business/lease.mjs",
       "sha256": "9fbfd46033d08a3f6a304e5e398fae38b2fe7e5fd9039b87391bc4bef1b94597"
     },
+    "cli/business/legacy-package.mjs": {
+      "source": "cli/business/legacy-package.mjs",
+      "sha256": "212e595768ed6305d81bcec1e7632aad3445b53e6ffb7214138d41c7e9bbb34f"
+    },
     "cli/business/local-commands.mjs": {
       "source": "cli/business/local-commands.mjs",
-      "sha256": "bc40e6a241fd564d55cb2fec911fb63f715cfb8afc6783af5826db3f129bdfc2"
+      "sha256": "8e2956bcdcf7b3be01565b455a2818ae5e87db2f9b164f8ac9d4bc5621edec98"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
       "sha256": "7ff52d308d20b857f54906ecab760dbf0fb059d6830093dcc74716232d1fe938"
+    },
+    "cli/business/package-transfer.mjs": {
+      "source": "cli/business/package-transfer.mjs",
+      "sha256": "97befcfb754b0d9fd5776d7536e68db98c0bb1a973c9500633c321c14921527f"
     },
     "cli/business/parsers-config.mjs": {
       "source": "cli/business/parsers-config.mjs",
@@ -647,7 +655,7 @@
     },
     "cli/business/state.mjs": {
       "source": "cli/business/state.mjs",
-      "sha256": "5849ca871ce894a168342f0d08d2d1a598e769557fb8ea5a4e909d4d0c4c3dba"
+      "sha256": "b5c52cd12eafdfd3cfeb29a6b8d67c5d2f40895480d33b466ce114a745db23d7"
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
@@ -655,11 +663,11 @@
     },
     "cli/business/vendor-door.mjs": {
       "source": "cli/business/vendor-door.mjs",
-      "sha256": "6253abccc005a42daae5406e34ba0767c59e77b463e68adb93ab677b7166b3cc"
+      "sha256": "e6a3c2b4b4b41d4b504dea3fa7af3d161ac566dd72f3f20cdce93d0e664c7f5d"
     },
     "cli/business/vendors/README.md": {
       "source": "cli/business/vendors/README.md",
-      "sha256": "e1bfd8c1bcf85df01a781e8074da6b3e176164c854b65bb753d01cc674c1a091"
+      "sha256": "0c2f95427c8dc2572e5e2705ad3941aab390dcfe2f3621800aae80e433a3f3ac"
     },
     "cli/business/vendors/calendly.mjs": {
       "source": "cli/business/vendors/calendly.mjs",
@@ -675,7 +683,7 @@
     },
     "cli/business/vendors/index.mjs": {
       "source": "cli/business/vendors/index.mjs",
-      "sha256": "25bb081dec8d6aa819d556c485a4ed37c0724f5153659376815fa47cd3e5c617"
+      "sha256": "1d4a9847f7b052dcdc5750d2c40a4ba9cee235be32390a7cab70f5f52942bd63"
     },
     "cli/business/vendors/pagerduty.mjs": {
       "source": "cli/business/vendors/pagerduty.mjs",
@@ -704,6 +712,10 @@
     "cli/business/vendors/zendesk-guide.mjs": {
       "source": "cli/business/vendors/zendesk-guide.mjs",
       "sha256": "9a2fd9876f4631a3513a0dd0c52a58d7ceea0e846f82551ce07db56465b48b90"
+    },
+    "cli/business/vendors/zendesk-package.mjs": {
+      "source": "cli/business/vendors/zendesk-package.mjs",
+      "sha256": "b39aa91813bafcdb866f518a847a2d5f59bfcf0edc208fd04c14c6c6cc38a947"
     },
     "cli/business/vendors/zendesk-pages.mjs": {
       "source": "cli/business/vendors/zendesk-pages.mjs",
@@ -3535,15 +3547,15 @@
     },
     "modules/import-kit/src/door/ADOPTING.md": {
       "source": "modules/import-kit/src/door/ADOPTING.md",
-      "sha256": "98590f6ae722467512d4d33e67d8d62498bf86d2102bef59340d30ab77d754e4"
+      "sha256": "82693dfaf4a179f32aa053f14dee476cb05d08dc0cf244a5f54cf17e69345bcc"
     },
     "modules/import-kit/src/door/README.md": {
       "source": "modules/import-kit/src/door/README.md",
-      "sha256": "14e940323738d713b07cdc07e8eb602638be20208136fda638da8251cec08969"
+      "sha256": "6c8b090336b151ccc3865be423fae7a98e13ff9ca4f0560a279026f8f4e54aac"
     },
     "modules/import-kit/src/door/admission.ts": {
       "source": "modules/import-kit/src/door/admission.ts",
-      "sha256": "8f35144e2dce9518dca504783b288a5d496919649f71f0f580d8066b3af784e8"
+      "sha256": "31f925ba4bb05b6408385d1e9c0928d7c3321f0afaad86dc4c013507db8a73cc"
     },
     "modules/import-kit/src/door/archive.ts": {
       "source": "modules/import-kit/src/door/archive.ts",
@@ -3563,7 +3575,7 @@
     },
     "modules/import-kit/src/door/handler.ts": {
       "source": "modules/import-kit/src/door/handler.ts",
-      "sha256": "ffc70cf01cfb91035edfe567fcc058127567254873350311bd262c4ffab5ceaa"
+      "sha256": "bf43839ccee4359fb6229838442d3fc4383b013f489e9122e762a071a10902a1"
     },
     "modules/import-kit/src/door/index.ts": {
       "source": "modules/import-kit/src/door/index.ts",
@@ -3609,9 +3621,13 @@
       "source": "modules/import-kit/src/door/operator.ts",
       "sha256": "2ba4c679bb17edd92697a890f50957e84223eb8e16efdd1b07e0d2dc3fb6cd43"
     },
+    "modules/import-kit/src/door/package.ts": {
+      "source": "modules/import-kit/src/door/package.ts",
+      "sha256": "181b93cedb49d4d272447ff8fb8e27a12d42f8e5e726b4fddf5a1fbfe7a0ee97"
+    },
     "modules/import-kit/src/door/planning.ts": {
       "source": "modules/import-kit/src/door/planning.ts",
-      "sha256": "dd6ccb3069ff0c8bb29a82bd408bd8fa4a030fee230bd39433b05dc728a025bc"
+      "sha256": "b16d75589048fde0dbb03552fe455c11b577f45797d717e9ae76e09c3d9f9cf6"
     },
     "modules/import-kit/src/door/protocol.ts": {
       "source": "modules/import-kit/src/door/protocol.ts",
@@ -3635,7 +3651,7 @@
     },
     "modules/import-kit/src/door/types.ts": {
       "source": "modules/import-kit/src/door/types.ts",
-      "sha256": "7413afb4be8765c89f83a839fea570e336c002be66bc86f957a43bd03c1d2ed1"
+      "sha256": "ead9134600794f3a56a859c667d1fc9c4fccec1de1acff983cda2ce961fa4622"
     },
     "modules/import-kit/src/door/uploads.ts": {
       "source": "modules/import-kit/src/door/uploads.ts",

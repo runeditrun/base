@@ -27,8 +27,8 @@ async function cli(home, args, { terminal = false, input = '', scenario = 'Z0' }
   child.stdin.end(input);
  });
 }
-async function setup(t, name) {
- const home = join(root, name), remote = await server(t), seed = await zendeskDoor(t);
+async function setup(t, name, doorOptions) {
+ const home = join(root, name), remote = await server(t), seed = await zendeskDoor(t, doorOptions);
  remote.state.pollSeconds = 1; remote.state.optIns = { installPermissions: false, awakeConsent: false, installService: false };
  let approved = false;
  const pairing = cli(home, ['connect','--code','ABCD-1234','--origin',remote.origin]);
@@ -148,11 +148,28 @@ test('P6: bounded Retry-After and conservative incremental pacing', async t => {
  }
 });
 
-test('P8 package dependency and P9 sweep, census-only and retire signal', async t => {
- const large = await setup(t, 'large'), unsupported = await large.run({ scenario: 'Z' });
+test('P8 public-door package and P9 sweep, census-only and retire signal', async t => {
+ const large = await setup(t, 'large'), transferred = await large.run({ scenario: 'Z' });
+ assert.equal(transferred.code, 0, transferred.stderr);
+ const packed = await result(large.path); assert.equal(packed.kind, 'package'); assert.equal(large.seed.state.plans.length, 1);
+ const received = large.seed.state.packages.at(-1);
+ assert.equal(received.manifest.records.total, 7); assert.equal(received.manifest.format, 'rer-door-package/1');
+ assert.ok(received.manifest.segments.length >= 2);
+ assert.ok(received.manifest.segments.slice(0,-1).every(segment => segment.bytes === 2_097_152));
+ assert.deepEqual(received.files.get('records-000001.ndjson'), packed.bytes);
+ assert.deepEqual(JSON.parse(received.files.get('guide/user_segments.ndjson').toString()), fixture().user_segments[0]);
+ for (const secret of [key, token, ...Object.values(JSON.parse(key))]) {
+  assert.ok(!JSON.stringify(received.manifest).includes(secret));
+  for (const bytes of received.files.values()) assert.ok(!bytes.includes(Buffer.from(secret)));
+ }
+ assert.equal(large.seed.requests.filter(item => item.action === 'plan' && item.status === 409).length, 1);
+ assert.equal(large.seed.runtime.native().prepare('SELECT COUNT(*) n FROM native_records').get().n, 0);
+ t.diagnostic(`PROBE P8 Fixture Z: plan_id=${large.seed.state.plans[0].planId} upload_id=${large.seed.state.plans[0].uploadId} sha256=${large.seed.state.plans[0].bundleSha256} records=7 native_writes=0`);
+ const old = await setup(t, 'unsupported-package', { packageAware: false }), unsupported = await old.run({ scenario: 'Z' });
  assert.equal(unsupported.code, 1); assert.match(unsupported.stderr, /SEED_PACKAGE_UNSUPPORTED/);
- const packed = await result(large.path); assert.equal(packed.kind, 'package'); assert.equal(large.seed.state.plans.length, 0); assert.equal(large.seed.requests.length, 0);
- assert.ok([...packed.files.keys()].includes('guide/user_segments.ndjson'));
+ assert.equal(old.seed.state.plans.length, 0);
+ assert.equal(old.seed.runtime.native().prepare("SELECT COUNT(*) n FROM ik_door_uploads WHERE name='rer-segment'").get().n, 0);
+ assert.equal((await result(old.path)).kind, 'package');
  const s = await setup(t, 'lifetime'); assert.equal((await s.run()).code, 0);
  await s.seed.applyLatest();
  const baseline = (await result(s.path)).bytes;
@@ -173,7 +190,7 @@ test('P8 package dependency and P9 sweep, census-only and retire signal', async 
  await assert.rejects(stat(s.path), { code: 'ENOENT' });
  assert.ok(!Object.hasOwn(JSON.parse(await readFile(join(s.home,'fake-keychain.json'),'utf8')), 'vendor:zendesk:read'));
  s.task('refused-after-retire'); const refused = await s.run(); assert.match(refused.stderr, /VENDOR_REVOKED/);
- t.diagnostic('PROBE P8: package-required snapshot retained without partial upload; package plan not exercised');
+ t.diagnostic('PROBE P9: complete sweep, census zero unswept, local retire and refusal after revocation');
 });
 
 test('P7: Guide unavailable coverage and source-locale records are explicit', async t => {

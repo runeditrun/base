@@ -1,3 +1,4 @@
+import { packageUpload, readPackageSource } from './package.ts';
 import { readRawSource } from './raw.ts';
 import { randomUUID } from 'node:crypto';
 import { canonicalJson, sha256 } from '../provenance/identity.ts';
@@ -32,7 +33,7 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
     // cannot inspect for one, never plans, so it is not kept.
     const unreadable = refused?.code === 'source_credential' || refused?.code === 'source_invalid_or_credential_source_data';
     if (unreadable) await forget(request,upload);
-    if (unreadable || refused?.code === 'source_erased') throw refused;
+    if (unreadable || refused?.code === 'source_erased' || refused?.code === 'package_segment_missing') throw refused;
     // Whatever refuses this plan first (a pending import, interrupted staging, a
     // withdrawn snapshot, the catch-up shape, a bound or the source itself), an
     // upload holding an erased record is refused for that instead, and goes. A
@@ -44,6 +45,7 @@ export async function plan(request: DoorRequest, input: Record<string, unknown>)
   }
 }
 async function planUpload(request: DoorRequest, input: Record<string, unknown>, upload: UploadRow) {
+  if (upload.name === 'rer-package.json') await packageUpload(request,upload);
   const current = await lineage(request);
   // A plan whose apply failed, or whose import was undone or rolled back, has
   // left the lineage: the same bundle plans afresh instead of reusing it. A
@@ -174,6 +176,7 @@ async function readUpload(request: DoorRequest, upload: UploadRow, planId: strin
   const retained = await retainedSource(request,upload);
   if (retained) return {kitNamespace,retainedFrom:retained.planId,source:{...retained.source,records:retained.source.records.map(record=>({...record,namespace:kitNamespace}))}};
   // Credential values are removed per record, never imported, and never refuse a record.
+  if (upload.name === 'rer-package.json') return {kitNamespace,source:await readPackageSource(request,upload,kitNamespace),retainedFrom:undefined};
   const bytes = await bundleBytes(request,upload);
   const limits = {...options.limits,maxBytes:Math.min(options.limits?.maxBytes ?? request.access.maxBytes,request.access.maxBytes),maxRecords:Math.min(options.limits?.maxRecords ?? request.access.maxRecords,request.access.maxRecords)};
   const source = options.format === 'raw'
