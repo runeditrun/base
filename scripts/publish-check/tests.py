@@ -570,13 +570,32 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
                 (f"if worker:\n os.write(2, {canary.encode()!r} * 100000)\n os._exit(7)",
                  dict(stage='worker', code='process.exit', exitCode=7)),
             ]
+            # Permission denial is a real cleanup failure for unprivileged
+            # callers; root bypasses these directory modes.
+            if os.geteuid() != 0:
+                restrict = ("pathlib.Path(os.environ['HOME'], 'owned-scratch').write_text(os.environ['TMPDIR']); "
+                            "pathlib.Path(os.environ['TMPDIR']).chmod(0o500)")
+                cases.extend([
+                    ("if worker:\n import atexit\n def restrict():\n  " + restrict + "\n atexit.register(restrict)",
+                     dict(stage='cleanup', code='cleanup.remove-error', errno='EACCES')),
+                    ("if worker:\n " + restrict + "\n os._exit(7)",
+                     dict(stage='cleanup', code='cleanup.remove-error', errno='EACCES')),
+                ])
             for source, fact in cases:
                 with self.subTest(fact=fact):
                     (injection / 'sitecustomize.py').write_text(
                         'import os, pathlib, signal, sys\n'
                         'worker = sys.argv[0].endswith("/cli.py")\n'
                         'holder = sys.argv[0].endswith("/slots.py")\n' + source + '\n')
-                    result = subprocess.run(command, capture_output=True, text=True, timeout=30, env=env)
+                    try:
+                        result = subprocess.run(command, capture_output=True, text=True, timeout=30, env=env)
+                    finally:
+                        owned = home / 'owned-scratch'
+                        if owned.exists():
+                            scratch = Path(owned.read_text())
+                            scratch.chmod(0o700)
+                            shutil.rmtree(scratch)
+                            owned.unlink()
                     self.assertEqual(result.returncode, 2)
                     report = json.loads(result.stdout)
                     self.assertEqual(report['status'], 'INCOMPLETE')

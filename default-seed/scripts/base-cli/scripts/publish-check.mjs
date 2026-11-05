@@ -77,7 +77,11 @@ try {
   }
   if (scratch) {
     try { rmSync(scratch, { recursive: true, force: true }); }
-    catch (error) { record(osFailure('cleanup', 'cleanup.remove-error', error)); }
+    catch (error) {
+      record(osFailure('cleanup', 'cleanup.remove-error', error));
+      // Retain existing failures, and never publish PASS after failed cleanup.
+      if (code === 0) { reason ??= 'scan.worker-incomplete'; code = 2; }
+    }
   }
 }
 if (reason) report = {

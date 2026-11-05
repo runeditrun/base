@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.99-dev.g9b5272b9",
+  "cliVersion": "0.2.99-dev.g1718d176",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -5027,11 +5027,11 @@
     },
     "scripts/publish-check.mjs": {
       "source": "scripts/publish-check.mjs",
-      "sha256": "767c18d7f966ac693853e1af595446ee4d7996f81eacfb0f56d00a3105ef29f2"
+      "sha256": "a8db80f9a422528885646c0f70ef488629b639f5c9c8e17ba8a19440be5b1d40"
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "e842f64b99468ebd2f37185829787491166b56ab26bd09974966da39a8053732"
+      "sha256": "dfa98d512f2801fb4d3243b619279c9ee7b77700b7b2b344a39f738cec3ac755"
     },
     "scripts/publish-check/assignment.py": {
       "source": "scripts/publish-check/assignment.py",

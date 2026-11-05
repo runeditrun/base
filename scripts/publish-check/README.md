@@ -58,8 +58,9 @@ Process failures keep the v3 INCOMPLETE/exit-2 refusal. Its optional
 `diagnostics` array identifies worker or slot launch errors, exits and signals,
 report read/empty/parse/shape failures, and scratch cleanup failures. Cleanup
 cannot replace the original process/report failure. Completed worker reports
-keep their existing status, exit and coverage fields; a cleanup failure adds a
-diagnostic without claiming that completed inspection was incomplete.
+keep their existing status, exit and coverage fields when cleanup succeeds.
+Cleanup failure preserves an existing refusal and its diagnostics; if the
+worker succeeded, cleanup failure returns INCOMPLETE/exit 2 instead of PASS.
 
 Only fixed stage/code strings, OS errno names, signal names and numeric exit
 codes cross this diagnostic boundary. No exception message, traceback, command
