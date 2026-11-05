@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.99-dev.gb24a2bd7",
+  "cliVersion": "0.2.99-dev.g8fb27dd0",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3647,7 +3647,7 @@
     },
     "modules/import-kit/src/door/waves/lifecycle.ts": {
       "source": "modules/import-kit/src/door/waves/lifecycle.ts",
-      "sha256": "3153dfab9228b9df6499c7d9b106b87e5f8e39ee3dd7755bd094a8ed2c930971"
+      "sha256": "17f74befbd9ced668eff9d728e13efc2eee437ba80930531c31e6f3a01f376bc"
     },
     "modules/import-kit/src/door/waves/preparation.ts": {
       "source": "modules/import-kit/src/door/waves/preparation.ts",
