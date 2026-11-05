@@ -36,11 +36,13 @@ Advanced commands (Usage: rer business VERB)
                                  Catalog vendor or none; uses, sells, both, product-dependency
   vendor-key add|remove VENDOR   Keep a read-only vendor key in OS credential storage; the owner
                                  types it in their own terminal, never in chat or a command
+                                 Zendesk: single-line {"client_id":"…","client_secret":"…"}; remove
+                                 revokes local export and deletes its retained snapshot
   token                          MCP headersHelper output; send directly to the MCP client
   status [--json]                Pairing, service, current task and checkpoint
   disconnect                     Revoke this computer, then remove local credentials and additions;
                                  inside an agent sandbox it names the one command that finishes
-Vendors: sentry, uptimerobot, pagerduty, calendly (with a read-only key); sorry (its public page,
+Vendors: sentry, uptimerobot, pagerduty, calendly, zendesk (with a read-only key); sorry (its public page,
 no key). Owner approvals stay in the browser.
 State lives in $RER_BUSINESS_STATE_DIR when set, otherwise in ~/.rer/business.
 In an agent sandbox that writes only inside its working folder, use RER_BUSINESS_STATE_DIR="$PWD/.rer-business".

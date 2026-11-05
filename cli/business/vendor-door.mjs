@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { open, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
+import { loadState, saveState } from './state.mjs';
+import { snapshot as zendeskSnapshot, storePath as zendeskStorePath, removeZendeskStores } from './vendors/zendesk.mjs';
 import { taskPath } from './api.mjs';
 import { assertChunk } from './outbound.mjs';
 import { createCredentialStore } from './keychain.mjs';
@@ -18,7 +20,7 @@ import { businessCommand } from './invocation.mjs';
 const CHUNK_BYTES = 65_536;
 const DOOR_RESPONSE_BYTES = 4 * 1024 * 1024;
 // The catalogue names the platform builds vendor task titles from.
-export const vendorNames = Object.freeze({ sentry: 'Sentry', uptimerobot: 'UptimeRobot', pagerduty: 'PagerDuty', calendly: 'Calendly', sorry: 'Sorry' });
+export const vendorNames = Object.freeze({ sentry: 'Sentry', uptimerobot: 'UptimeRobot', pagerduty: 'PagerDuty', calendly: 'Calendly', sorry: 'Sorry', zendesk: 'Zendesk' });
 /** Whether a vendor's export needs the owner's read-only key (Sorry's public page does not). */
 export const keyed = vendor => KEYED_VENDORS.includes(vendor);
 export const vendorHandle = vendor => `vendor:${vendor}:read`;
@@ -138,12 +140,20 @@ export async function door(grant, body, signal) {
 
 /** Run the shipped adapter into a private 0600 bundle file, checking every
  * item with the outbound detector before it is written. */
-async function exportBundle({ vendor, key = null, inputs, path, quota, signal }) {
+async function exportBundle({ vendor, key = null, inputs, path, quota, signal, directory, runId, business }) {
  await unlink(path).catch(error => { if (error.code !== 'ENOENT') throw error; });
  const file = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
  const digest = createHash('sha256'); let size = 0;
  try {
-  for await (const item of exportVendor(vendor, { key, inputs, signal })) {
+  let items;
+  if (vendor === 'zendesk') {
+   const root = zendeskStorePath(directory, business, `https://${inputs.account.subdomain}.zendesk.com`);
+   const result = await zendeskSnapshot({ key, inputs, directory: inputs.mode === 'census' ? join(root, 'probe') : root, runId, signal });
+   if (result.kind === 'census') throw new ExportWaiting(`Zendesk census: ${result.census.tickets.unique} tickets; ${result.census.unswept} unswept. CENSUS_OUTPUTS_UNSUPPORTED: waiting for Business census task outputs.`, 'connected_runner_required');
+   if (result.kind === 'package') throw new VendorExportError('SEED_PACKAGE_UNSUPPORTED');
+   items = [{ bytes: result.bytes }];
+  } else items = exportVendor(vendor, { key, inputs, signal });
+  for await (const item of items) {
    assertChunk(item.bytes, key ? [key] : []);
    size += item.bytes.length;
    if (size > quota) throw Error(`Business vendor export is larger than the app's import door accepts (${quota} bytes). Nothing was uploaded.`);
@@ -202,13 +212,22 @@ export async function withUploadedBundle({ lease, task, grant: claimedGrant, dir
   return doorGrant(lease, action, origin, vendor, options);
  };
  const inputs = adapterInputs(vendor, task);
+ const state = vendor === 'zendesk' ? await loadState() : null;
+ if (vendor === 'zendesk' && inputs.mode === 'retire') {
+  // The retire signal is local revocation, never an OAuth/provider write.
+  await createCredentialStore().delete(vendorHandle(vendor));
+  await removeZendeskStores(directory);
+  await saveState({ ...state, vendorHandles: (state.vendorHandles ?? []).filter(handle => handle !== vendorHandle(vendor)), vendorRevocations: { ...state.vendorRevocations, zendesk: true } });
+  throw new ExportWaiting('Zendesk retired locally (VENDOR_REVOKED). RETIRE_OUTPUTS_UNSUPPORTED: waiting for Business retire task acknowledgement.', 'connected_runner_required');
+ }
+ if (vendor === 'zendesk' && state?.vendorRevocations?.zendesk) throw new VendorExportError('VENDOR_REVOKED');
  let key = keyed(vendor) ? await createCredentialStore().get(vendorHandle(vendor)) : null;
  if (keyed(vendor) && !key) throw new ExportWaiting(`Business vendor export needs the owner's read-only ${name} key on this computer: ${keyStep(vendor)}\nThen run ${businessCommand('run')} again.`, 'owner_required', { keyMissing: vendor });
  const path = join(directory, `export-${hash(task.id).slice(0, 32)}.bundle`);
  try {
   say(doing(name, origin, keyed(vendor)));
   let bundle;
-  try { bundle = await exportBundle({ vendor, key, inputs, path, quota, signal }); } finally { key = undefined; }
+  try { bundle = await exportBundle({ vendor, key, inputs, path, quota, signal, directory, runId: task.id, business: state?.businessId }); } finally { key = undefined; }
   const total = Math.ceil(bundle.size / CHUNK_BYTES);
   let uploadId;
   for (let index = 0; index < total; index++) {
