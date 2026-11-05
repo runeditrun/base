@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.99-dev.g6b8102ee",
+  "cliVersion": "0.2.99-dev.ga52b0edb",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -5027,11 +5027,11 @@
     },
     "scripts/publish-check.mjs": {
       "source": "scripts/publish-check.mjs",
-      "sha256": "e10925c794c9302538c747e78dd7c61e18513bd90de3a77c1d4e4c4ba11bc585"
+      "sha256": "a3b1636b5276df04f746e79fd4fc79b4140f7873e307a7883bec141843288bfd"
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "c2d8fe8392fd2163cdd4e97c03b07ab683e067d8e1e1581e32c3c5ebfada0861"
+      "sha256": "2bb4f4baca211c145872f8f1d48d4ba195fd7222168d344562c5f2c156707195"
     },
     "scripts/publish-check/assignment.py": {
       "source": "scripts/publish-check/assignment.py",
@@ -5047,7 +5047,7 @@
     },
     "scripts/publish-check/cli.py": {
       "source": "scripts/publish-check/cli.py",
-      "sha256": "fda6c8c6938d7a9b35c1f11c7ede83a32ee17c556466ba61e16095a0cf646f17"
+      "sha256": "ffcc5d5b39244ef4ac57f7ad23d6ef39ae62171c2580eacfa5678ec73f4c2d2e"
     },
     "scripts/publish-check/command_arguments.py": {
       "source": "scripts/publish-check/command_arguments.py",
@@ -5111,15 +5111,15 @@
     },
     "scripts/publish-check/git_history.py": {
       "source": "scripts/publish-check/git_history.py",
-      "sha256": "8a9cacce7ed7fe65befc823ea622573cd9d2ba9c09014f0b2f0e5ece89cb71a1"
+      "sha256": "8c73a790c2608e392635e2b6414eecc89cbf8ffd4b1fb54fea9cbc92dbed34b0"
     },
     "scripts/publish-check/github_refs.py": {
       "source": "scripts/publish-check/github_refs.py",
-      "sha256": "2cdf8b05242aacb508d8d0131063782eea85ab710b9dd510b7b052c2cdf2bab7"
+      "sha256": "d1b29cf346ddbd09009d309ab2477c3049382993043a85acece74a1af97e1224"
     },
     "scripts/publish-check/gitleaks.py": {
       "source": "scripts/publish-check/gitleaks.py",
-      "sha256": "e0132616953c8a7380b186f2665fbf6f84837698be17f9dbf370251018dd526e"
+      "sha256": "07bb4ed2aee77a700c80f1f22bcc260a61232aa2fd6acf209d9459463ea8b83a"
     },
     "scripts/publish-check/gitleaks.toml": {
       "source": "scripts/publish-check/gitleaks.toml",
@@ -5127,11 +5127,11 @@
     },
     "scripts/publish-check/history_hydration.py": {
       "source": "scripts/publish-check/history_hydration.py",
-      "sha256": "6d5da8b9bf0c2d21df05f79bed028f92208f478f34c43627af081c0edf7104eb"
+      "sha256": "b76b9bfdacc4a4a357ddc2b924c03a47cd4e1df1c676ed4a0bf40157a65d8fb9"
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",
-      "sha256": "f7375219eb58458843797753a9922b875090cf8ffd57f986d92d8f8f9c5a7762"
+      "sha256": "c08f8dbece7fcda99e284e30aff6284d8d9b65f0eb4470ed6238ef164dd506d4"
     },
     "scripts/publish-check/hit_location.py": {
       "source": "scripts/publish-check/hit_location.py",
@@ -5180,6 +5180,14 @@
     "scripts/publish-check/policy.py": {
       "source": "scripts/publish-check/policy.py",
       "sha256": "02166aca1594dcd590cdfdfc402c46af9792d38298eda3d224ca19cd162457bb"
+    },
+    "scripts/publish-check/progress.mjs": {
+      "source": "scripts/publish-check/progress.mjs",
+      "sha256": "0dbaba0e15a394a8230ba1758e14399786b896faf808eb7258223c763fae437f"
+    },
+    "scripts/publish-check/progress.py": {
+      "source": "scripts/publish-check/progress.py",
+      "sha256": "da0267e2c0a64be46e0d76188ab14f3f7cf5e01cf7c5d75321ba13c490d87ea5"
     },
     "scripts/publish-check/project_identity.py": {
       "source": "scripts/publish-check/project_identity.py",
@@ -5231,7 +5239,7 @@
     },
     "scripts/publish-check/slots.py": {
       "source": "scripts/publish-check/slots.py",
-      "sha256": "dc53368b158d4c7a5981816998b7bd13dfc880930123ec4c501a1455368fce33"
+      "sha256": "a47681aee5b4e465ec317a129b97ae595d850e6fa48bd340757d8a847b47ad7a"
     },
     "scripts/publish-check/source_metadata.py": {
       "source": "scripts/publish-check/source_metadata.py",

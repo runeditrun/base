@@ -54,6 +54,29 @@ its worker inherits the lock so it cannot outlive its slot. Queueing has its
 own one-hour cap. `timeout.json` supplies the shared default and upper bound
 to Python and the Node/release validator.
 
+`progress.py` retains the latest worker observation in a private 1024-byte
+frame on fd 4. Native subprocesses do not inherit that descriptor. The frame
+has an integrity digest to reject partial writes; `progress.mjs` checks its
+size and exact fixed enum/numeric shape before constructing public `progress`.
+Report JSON cannot supply progress. Invalid or missing frames yield
+`progress.worker: null`, without changing the scan verdict.
+
+The public observation separates slot queue time (`queuedMs`) from monotonic
+post-acquisition time (`elapsedMs`, sampled at interruption when interrupted).
+`slot` is `queued` or `acquired`. The worker's `observedElapsedMs` is monotonic
+time at its last observation, not a live clock or a completion claim.
+`lastEnteredPhase` and `lastCompletedPhase` distinguish preparation, public-base
+fetch, promised-object hydration, history/text, Gitleaks and reference work.
+`activeOperation` is a fixed Git, Gitleaks or gh operation enum, or `none` when
+no instrumented native call is active. Selected/public revision counts describe
+revision roots; `historyCommits` and `publicCommits` retain the actual native
+revision-list counts once available, not a count of completed inspections.
+Hydration's `missingBefore`, `missingAfter`
+and completed `fetches` counts become available only when measured. Counts and
+phase fields that have not been measured stay null; numeric fields are bounded
+to nonnegative JavaScript safe integers. A deadline still returns INCOMPLETE,
+source null, unscanned history and exit 2, regardless of retained progress.
+
 Process failures keep the v3 INCOMPLETE/exit-2 refusal. Its optional
 `diagnostics` array identifies worker or slot launch errors, exits and signals,
 report read/empty/parse/shape failures, version-metadata failures and scratch
