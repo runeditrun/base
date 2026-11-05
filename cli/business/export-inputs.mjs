@@ -29,6 +29,15 @@ function since(window) {
 }
 
 const shapes = {
+ zendesk(value) {
+  closed(value, ['account'], ['mode','highWater']);
+  const account = closed(value.account, ['subdomain']);
+  if (typeof account.subdomain !== 'string' || !/^(?!-)[a-z0-9-]{1,63}(?<!-)$/u.test(account.subdomain)
+   || !['snapshot','sweep','census','retire'].includes(value.mode ?? 'snapshot')
+   || value.highWater !== undefined && (!Number.isSafeInteger(value.highWater) || value.highWater < 0)
+   || value.mode === 'sweep' && value.highWater === undefined) invalid();
+  return { account: { subdomain: account.subdomain }, mode: value.mode ?? 'snapshot', ...(value.highWater !== undefined ? { highWater: value.highWater } : {}) };
+ },
  uptimerobot: () => ({}),
  'happytohelp-legacy': () => ({}),
  sentry(value, now) {
@@ -58,7 +67,7 @@ const shapes = {
  },
 };
 /** What each vendor's inputs are, in the owner's terms, while a task lacks them. */
-export const inputNeeds = { sentry: 'its Sentry organization and export window', pagerduty: 'its export window', sorry: "its status page's address" };
+export const inputNeeds = { zendesk: 'its Zendesk account subdomain', sentry: 'its Sentry organization and export window', pagerduty: 'its export window', sorry: "its status page's address" };
 
 /** The shipped adapter's inputs for `vendor` from the leased task's
  * `export_inputs`, or null when the task carries none yet. */

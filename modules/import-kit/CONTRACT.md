@@ -316,7 +316,7 @@ and the absence of an authentication context when reading saved files.
 
 ## Logical package transport (additive)
 
-An explicitly declared door source may accept rer-door-package/1 with static
+An explicitly declared door source may accept manifests with `format: "rer-door-package/1"` and static
 `package: {formats, maxBytes, maxSegments, read}`. Undeclared sources retain their
 existing readers and quotas. The manifest upload remains within one grant;
 segments are ordinary `rer-segment` uploads in 64 KiB chunks, each request with a

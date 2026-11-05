@@ -197,3 +197,84 @@ export function client({ origin, headers, route, signal, limits, counters, key }
     return { body, text, headers: response.headers };
   };
 }
+
+/** Opt-in transport for long-lived snapshots. Existing adapters retain client()'s
+ * no-retry contract. The caller validates every target before credentials or a
+ * request are constructed, including manually followed attachment redirects. */
+export function pacedClient({ origin, signal, validate, secrets = [], limits = {}, beforeRequest }) {
+ const maximum = { requests: 250_000, response: 32 * 1024 * 1024, bytes: 32 * 1024 ** 3, ...limits };
+ const counters = { requests: 0, bytes: 0, retryMs: 0 };
+ let token, last = 0, next = 0, advertisedBefore = false;
+ const wait = async milliseconds => { if (milliseconds > 0) await delay(milliseconds, undefined, { signal }); };
+ const request = async (path, options = {}) => {
+  let url;
+  try { url = new URL(path, origin); } catch { fail('INVALID_REFERENCE'); }
+  await validate(url, options);
+  const method = options.method ?? 'GET';
+  if (method !== 'GET' && !(method === 'POST' && url.origin === origin && url.pathname === '/oauth/tokens')) fail('INVALID_REFERENCE');
+  for (let retries = 0; ; retries++) {
+   signal?.throwIfAborted();
+   await wait(Math.max(next, last + (advertisedBefore ? 0 : url.pathname.includes('/incremental/') ? 6000 : 300)) - Date.now());
+   if (++counters.requests > maximum.requests) fail('REQUEST_LIMIT');
+   await beforeRequest?.();
+   last = Date.now();
+   const headers = { accept: 'application/json', ...(options.json ? { 'content-type': 'application/json' } : {}),
+    ...(token && url.origin === origin && options.authenticated !== false ? { authorization: `Bearer ${token}` } : {}) };
+   let response;
+   try { response = await fetch(url, { method, headers, redirect: options.redirect ?? 'error',
+    ...(options.json ? { body: JSON.stringify(options.json) } : {}), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000) }); }
+   catch { fail(signal?.aborted ? 'CANCELLED' : 'NETWORK_FAILED'); }
+   const waits = [];
+   const remaining = response.headers.get('ratelimit-remaining') ?? response.headers.get('x-rate-limit-remaining');
+   const reset = response.headers.get('ratelimit-reset') ?? '60';
+   const capacity = (remaining, seconds) => {
+    if (!/^\d+$/u.test(remaining ?? '') || !/^\d+$/u.test(seconds ?? '') || Number(seconds) > 3600) return;
+    waits.push(Math.max(300, Math.ceil(Number(seconds) * 1000 / Math.max(1, Number(remaining)))));
+   };
+   capacity(remaining, reset);
+   for (const [name,value] of response.headers) if (name.toLowerCase().startsWith('zendesk-ratelimit-')) capacity(/remaining=(\d+)/u.exec(value)?.[1], /resets=(\d+)/u.exec(value)?.[1]);
+   const interval = response.headers.get('ratelimit-limit') ?? response.headers.get('x-rate-limit');
+   if (!waits.length && /^\d+$/u.test(interval ?? '')) waits.push(Math.max(300, Math.ceil(60_000 / Math.max(1, Number(interval)))));
+   // Obey the tightest account/endpoint budget. Without valid advertised
+   // capacity the next request retains the conservative fallback spacing.
+   advertisedBefore = waits.length > 0;
+   next = Date.now() + Math.max(0, ...waits);
+   if (response.status === 429) {
+    const after = response.headers.get('retry-after');
+    await response.body?.cancel().catch(() => {});
+    const seconds = /^\d+$/u.test(after ?? '') ? Number(after) : 0;
+    if (retries >= 3 || seconds < 1 || seconds > 60 || counters.retryMs + seconds * 1000 > 600_000) throw new VendorExportError('RATE_LIMITED', 429);
+    counters.retryMs += seconds * 1000;
+    await wait(seconds * 1000);
+    continue;
+   }
+   if (options.redirect === 'manual' && [301, 302, 303, 307, 308].includes(response.status)) {
+    const location = response.headers.get('location');
+    await response.body?.cancel().catch(() => {});
+    return { status: response.status, location, headers: response.headers };
+   }
+   if (!response.ok) {
+    await response.body?.cancel().catch(() => {});
+    if (options.allow?.includes(response.status)) return { status: response.status };
+    throw new VendorExportError('HTTP_REFUSED', response.status);
+   }
+   const chunks = []; let size = 0;
+   try {
+    for await (const chunk of response.body ?? []) {
+     size += chunk.byteLength; counters.bytes += chunk.byteLength;
+     if (size > (options.maxBytes ?? maximum.response) || counters.bytes > maximum.bytes) fail('BYTE_LIMIT');
+     chunks.push(chunk);
+    }
+   } catch (error) { if (error instanceof VendorExportError) throw error; fail(signal?.aborted ? 'CANCELLED' : 'NETWORK_FAILED'); }
+   const bytes = Buffer.concat(chunks);
+   if (!options.tokenResponse && [...secrets, token].some(secret => secret && bytes.includes(Buffer.from(secret)))) fail('CREDENTIAL_IN_RESPONSE');
+   if (options.binary) return { bytes, headers: response.headers, status: response.status };
+   let body;
+   try { body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); } catch { fail('INVALID_JSON'); }
+   return { body, bytes, headers: response.headers, status: response.status };
+  }
+ };
+ request.authorize = value => { token = value; };
+ request.counters = counters;
+ return request;
+}
