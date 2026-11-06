@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import subprocess
+import progress
 from public_base import parse, display, PublicBaseError
 
 
@@ -23,10 +24,13 @@ class History:
         self.public_tags = set()
         self.reader = None
         self.commit = self.run('rev-parse', '--verify', '--end-of-options', ref + '^{commit}').decode().strip()
+        progress.counts(selectedRevisions=1)
         if self.run('rev-parse', '--is-shallow-repository').strip() != b'false':
             raise InspectionError('history.shallow')
         if public_base is not None:
             url, branch = parse(public_base, self.repo)
+            progress.completed('preparation')
+            progress.enter('fetch')
             try:
                 self.run('fetch', '--quiet', '--prune', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', '--',
                          url, 'refs/heads/' + branch + ':refs/publish-check/public/base',
@@ -35,14 +39,24 @@ class History:
                 self.public_label = display(url) + '#' + branch
                 self.public_tags = set(self.run('for-each-ref', '--format=%(objectname)',
                                                'refs/publish-check/public/tags').decode().splitlines())
+                progress.counts(publicRevisions=1 + len(self.public_tags))
+                progress.completed('fetch')
             except InspectionError:
                 raise PublicBaseError('public-base.fetch-failed') from None
         public_revisions = [self.public_commit, *sorted(self.public_tags)] if public_base else []
+        if not public_base:
+            progress.counts(publicRevisions=0)
+            progress.completed('preparation')
         self.revisions = [self.commit, *public_revisions] if public_base else ['--all', self.commit]
         from history_hydration import prepare
+        progress.enter('hydration')
         self.hydration = prepare(self)
+        progress.completed('hydration')
+        progress.enter('history-text')
         self.commits = self.run('rev-list', *self.revisions).decode().splitlines()
+        progress.counts(historyCommits=len(self.commits))
         self.public_commits = set(self.run('rev-list', *public_revisions).decode().splitlines()) if public_base else set()
+        progress.counts(publicCommits=len(self.public_commits))
         self.trees = {}
         self.tree_ids = dict(line.split() for line in self.run('log', '--format=%H %T', *self.revisions).decode().splitlines())
         self.reader = subprocess.Popen(['git', '-C', self.repo, 'cat-file', '--batch'],
@@ -50,8 +64,11 @@ class History:
 
     def run(self, *args, input=None):
         try:
-            result = subprocess.run(['git', '-C', self.repo, '-c', 'core.quotePath=false', *args],
-                                    env=self.env, input=input, capture_output=True, timeout=120)
+            operation = args[0] if args[0] in ('rev-parse', 'fetch', 'rev-list', 'log', 'config',
+                                             'ls-tree', 'for-each-ref', 'cat-file') else 'other'
+            with progress.operation('git.' + operation):
+                result = subprocess.run(['git', '-C', self.repo, '-c', 'core.quotePath=false', *args],
+                                        env=self.env, input=input, capture_output=True, timeout=120)
             if result.returncode:
                 raise InspectionError('history.git-failed')
             return result.stdout
@@ -82,6 +99,10 @@ class History:
         return self.entries(commit, False)
 
     def blob(self, oid):
+        with progress.operation('git.cat-file'):
+            return self.read_blob(oid)
+
+    def read_blob(self, oid):
         if not oid or any(c not in '0123456789abcdef' for c in oid):
             raise InspectionError('history.invalid-object')
         self.reader.stdin.write(oid.encode() + b'\n')

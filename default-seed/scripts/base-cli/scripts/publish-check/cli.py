@@ -6,6 +6,7 @@ from pathlib import Path
 from history_scan import scan
 from public_base import parse as parse_public_base, PublicBaseError
 from report import new_report
+import progress
 
 
 def flag_name(value):
@@ -55,6 +56,7 @@ def seconds(value):
 
 
 def main():
+    progress.start()
     parser = SafeParser(description='Scan working files and full history with system Git and pinned Gitleaks.')
     parser.add_argument('--repo', required=True)
     parser.add_argument('--ref', default='HEAD')
