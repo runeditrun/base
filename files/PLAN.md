@@ -1,0 +1,10 @@
+# rer 0.2.100 preparation plan
+
+1. Bind fresh main and tree; verify W1, Zendesk vendor, package reader and released 0.2.99 ancestry. Check latest GitHub/npm release and absence of an existing 0.2.100 tag or named preparation branch.
+2. Read Base instructions, global CLI and release documentation, release workflow, previous accepted two-commit pattern, and landed flow changes. Preserve applied migrations, clauses, status judgments and all prior changelog sections.
+3. Create M with global/package.json version 0.2.100 and accurate flow-grouped global/CHANGELOG.md only. No dependency, product, schema, acceptance, test or workflow changes.
+4. Run node scripts/export-cli.mjs default-seed twice at M. Compare the entire tracked generated output, file modes, digests and inventory; create C containing only required exporter output. Verify the inventory names M, not C.
+5. Run touched metadata, package/export-integrity and packed help/describe probes, retaining per-point command receipts. Do not run full local Verify, a browser matrix, scale campaign, provider requests or a real import.
+6. Before the single product publication, use the maintained publication wrapper against the exact full-history C with runeditrun/base identity, public main base and the ordinary 300-second deadline. Require complete full-history PASS with zero findings. Inspect all unpublished authors, committers, trailers and complete messages.
+7. Publish only the named cloud branch, open one draft PR and observe the natural exact-head Verify and Release rer dry-run within the ten-call observer budget and five-minute per-run interval. Never dispatch, rerun, force-push, tag, publish npm or land main. Later Mac integration owns final ordinary plus explicit journeys=true,clean_bootstrap=false Verify and its own full-history scan.
+8. Write complete actual non-secret reports and receipts to this packet, publish them only to evidence/gr-base-release-02100-prepare-1, then remove owned scratch and clone once product/evidence custody is secure. Emit the lane POST handoff and an honest READY/PUSHED/BLOCKED final status.

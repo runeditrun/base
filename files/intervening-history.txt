@@ -1,0 +1,27 @@
+d9886e6acbbb81f51625270be9f8514a8abedd84 fix(site): settle inconsistent Cloudflare list snapshots
+336537ed2472181d202f9689165095a050cc9e65 fix(agent-door): resume approved legacy held reads
+9b5272b9dfa4110d6e38ddf5899bcb40ee47abe3 Honor bounded runtime startup budgets during setup readiness
+1718d176b3c49c17103f4e4f6c6eccbb7a4eeedb Retain safe publication worker failure diagnostics
+6b8102eeb5079d9b7973f64b30ed4cab9f9c061a Keep scratch cleanup failures refusing publication
+4120b7d163c1b0fdfb391fb0a43f8b54f286608b Preserve worker diagnostics when version stamping fails
+3a2513bf3a4741d763dd94855ad646ca1c018b90 Add bounded logical package transfer and legacy registration [skip ci]
+6cae724a21d01adffe91defbc76e261cb65f1ceb Verify package recovery and enforce declared aggregate counts
+7ad1d2661be7d08994e164549c330db3abe4138d Refresh portable package source provenance
+1ac2d6082ac07d9a3028b27a9976438847f2f0bd fix(import-kit): withdraw refused package segment custody [skip ci]
+5dd6b3c170dd50e494008e4b8f80050a6ff36e14 Refresh refused-package CLI source provenance
+5eb957718bea4ceb0c96e2739af04c4ea3be4df3 Merge qualified publication diagnostics into legacy package candidate
+264805b3d5f74fdb6934c2c2fb2c7c1a8f08d74e Refresh merged CLI source provenance
+b9a2fc0b5b61462ae87a728c425cde3f59b0259c Add opt-in complete-parent bounded imports and sender [skip ci]
+b24a2bd7b98eb4a0e27de926176c0e4077157293 Merge current main before bounded-wave export [skip ci]
+046135e1b076d2e03851035820fc1737907b307f Refresh bounded-wave CLI copies and source inventory
+8fb27dd08b5f709da6247cd9357ce44e4eb82b6c Resolve completed root reversal retries and skipped children [skip ci]
+604041f7305e345fbfeec263c23c48921f887dfd Refresh retry-safe bounded-wave source inventory
+d06094a5bb838223e469f238d51aacf33688b7e8 Fence bounded-wave reversal against concurrent parent preparation [skip ci]
+bc6d282921de45bc02eadae75560f351b772d834 Merge current main before lineage-fenced source export [skip ci]
+8ff4d564234407ef91009390411cd0e1a1e0e6b4 Refresh lineage-fenced bounded-wave source inventory
+b02e9239aa9242e1cc04e3d8fd3199e5d554d5d8 Deliver Zendesk snapshots with original FIX1 corrections
+a15b3ad0fd51ed1d52f7aee61d4e70eb0adb95e8 Refresh Zendesk delivery CLI source provenance
+c2c61c4120f9ee623e88e526e02e975de5f29287 Preserve unchanged bounded catch-up dispositions and clarify source guide [skip ci]
+c0539b0001d71a6246c755e100c47141f525bf5e Refresh corrected bounded-wave CLI source provenance
+f4722e63cec7dbb43ba1f64f48dca2877f44f797 Integrate accepted bounded waves with reviewed Zendesk delivery
+601a56e0a5e8e21507003b902949e12723036148 Refresh integrated bounded-wave CLI source provenance

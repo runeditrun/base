@@ -1,0 +1,21 @@
+{
+  "tag": "gr-base-release-02100-prepare-1",
+  "repository": "runeditrun/base",
+  "branch": "cloud/gr-base-release-02100-prepare-1",
+  "main": "601a56e0a5e8e21507003b902949e12723036148",
+  "mainTree": "d237a77ae5e490fdea89d6909894500f695665f3",
+  "sourceVersion": "0.2.99",
+  "latestGitHubRelease": "rer-v0.2.99",
+  "latestNpmVersion": "0.2.99",
+  "releasedTagObject": "b4c18c6c6a8c2717b6525bd27061596d7ee4f6ed",
+  "releasedSource": "ca42f4a94fbe71d98b0402607e5d557a51cfac90",
+  "ancestorChecks": {
+    "ca42f4a94fbe71d98b0402607e5d557a51cfac90": true,
+    "601a56e0a5e8e21507003b902949e12723036148": true,
+    "a15b3ad0fd51ed1d52f7aee61d4e70eb0adb95e8": true,
+    "264805b3d5f74fdb6934c2c2fb2c7c1a8f08d74e": true
+  },
+  "newerMainCommits": [],
+  "clauseChanges": [],
+  "statusChanges": []
+}

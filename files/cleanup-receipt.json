@@ -1,0 +1,12 @@
+{
+  "serversStarted": 0,
+  "browsersStarted": 0,
+  "ownedServerPids": [],
+  "productDependencyInstalls": 0,
+  "productCheckoutClean": true,
+  "packedScratch": "packed extraction and tarball removed; digests and command outputs retained",
+  "clone": "retained until evidence publication succeeds",
+  "fleetTools": "retained as requested outside product repository",
+  "packedProbeRemoved": true,
+  "packedTarballRemoved": true
+}

@@ -1,0 +1,12 @@
+{
+  "metadataCommit": "32682133152a8ebd84a792ed2f18b702f1de05ae",
+  "metadataTree": "05ffcbbcca97affe0f45e335ebc6daa3ebd17a9f",
+  "firstGeneratedTree": "1c955c147b4abff3b57993f612470ecc6e754af6",
+  "secondGeneratedTree": "1c955c147b4abff3b57993f612470ecc6e754af6",
+  "repeatEqual": true,
+  "cliVersion": "0.2.100-dev.g32682133",
+  "changedPaths": [
+    "default-seed/scripts/base-cli/inventory.json"
+  ],
+  "generatedDiffSha256": "447382c4022a9d0feb4f8e57608e597c8d12325badd30765296a4a7e24aa6479"
+}

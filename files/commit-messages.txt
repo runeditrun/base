@@ -1,0 +1,15 @@
+commit 105902c3c6e14479bc0ab901a0bbfcd986d46edc
+Author:     Run Edit Run fleet <fleet@runeditrun.com>
+AuthorDate: Fri Nov 6 02:10:27 2026 +0000
+Commit:     Run Edit Run fleet <fleet@runeditrun.com>
+CommitDate: Fri Nov 6 02:10:27 2026 +0000
+
+    Refresh generated CLI provenance for rer 0.2.100
+
+commit 32682133152a8ebd84a792ed2f18b702f1de05ae
+Author:     Run Edit Run fleet <fleet@runeditrun.com>
+AuthorDate: Fri Nov 6 02:10:01 2026 +0000
+Commit:     Run Edit Run fleet <fleet@runeditrun.com>
+CommitDate: Fri Nov 6 02:10:01 2026 +0000
+
+    Prepare rer 0.2.100 release metadata [skip ci]

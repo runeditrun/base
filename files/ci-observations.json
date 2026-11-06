@@ -1,0 +1,81 @@
+{
+  "discoveredAt": 1793931379.1821477,
+  "runs": [
+    {
+      "id": 42149205106,
+      "name": "Verify",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "105902c3c6e14479bc0ab901a0bbfcd986d46edc",
+      "html_url": "https://github.com/runeditrun/base/actions/runs/42149205106",
+      "head_branch": "cloud/gr-base-release-02100-prepare-1",
+      "created_at": "2026-11-06T02:15:57Z"
+    },
+    {
+      "id": 42149185719,
+      "name": "Release rer",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "105902c3c6e14479bc0ab901a0bbfcd986d46edc",
+      "html_url": "https://github.com/runeditrun/base/actions/runs/42149185719",
+      "head_branch": "cloud/gr-base-release-02100-prepare-1",
+      "created_at": "2026-11-06T02:15:46Z"
+    }
+  ],
+  "policy": "One watcher; at most one REST call per run per 300 seconds, including discovery; reuse natural runs; no dispatch or rerun.",
+  "observations": [
+    {
+      "runId": 42149205106,
+      "observedAt": 1793931680.182411,
+      "conclusion": null,
+      "head_sha": "105902c3c6e14479bc0ab901a0bbfcd986d46edc",
+      "html_url": "https://github.com/runeditrun/base/actions/runs/42149205106",
+      "status": "in_progress"
+    },
+    {
+      "runId": 42149185719,
+      "observedAt": 1793931680.6851795,
+      "conclusion": null,
+      "head_sha": "105902c3c6e14479bc0ab901a0bbfcd986d46edc",
+      "html_url": "https://github.com/runeditrun/base/actions/runs/42149185719",
+      "status": "in_progress"
+    },
+    {
+      "runId": 42149205106,
+      "observedAt": 1793931981.6853607,
+      "conclusion": null,
+      "head_sha": "105902c3c6e14479bc0ab901a0bbfcd986d46edc",
+      "html_url": "https://github.com/runeditrun/base/actions/runs/42149205106",
+      "status": "in_progress"
+    },
+    {
+      "runId": 42149185719,
+      "observedAt": 1793931982.1389248,
+      "conclusion": "success",
+      "head_sha": "105902c3c6e14479bc0ab901a0bbfcd986d46edc",
+      "html_url": "https://github.com/runeditrun/base/actions/runs/42149185719",
+      "status": "completed"
+    },
+    {
+      "runId": 42149205106,
+      "observedAt": 1793932282.6855645,
+      "conclusion": null,
+      "head_sha": "105902c3c6e14479bc0ab901a0bbfcd986d46edc",
+      "html_url": "https://github.com/runeditrun/base/actions/runs/42149205106",
+      "status": "in_progress"
+    },
+    {
+      "runId": 42149205106,
+      "observedAt": 1793933157.0001583,
+      "conclusion": "success",
+      "head_sha": "105902c3c6e14479bc0ab901a0bbfcd986d46edc",
+      "html_url": "https://github.com/runeditrun/base/actions/runs/42149205106",
+      "status": "completed"
+    }
+  ],
+  "observerFinishedAt": 1793933157.4416547,
+  "observerFinished": true,
+  "finalObservationScheduledAt": 1793933157.0
+}

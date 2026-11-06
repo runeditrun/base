@@ -1,0 +1,25 @@
+{
+  "source": "105902c3c6e14479bc0ab901a0bbfcd986d46edc",
+  "version": "0.2.100-dev.g105902c3",
+  "sha256": "22dde8a242c764800e0226f854a316cf5edb7ddca0f945292184b28fdce87847",
+  "bytes": 2730795,
+  "regularFiles": 1396,
+  "declaredExportTargetsPresent": true,
+  "testSourcesExcluded": true,
+  "packedVersion": "0.2.100-dev.g105902c3",
+  "packedHelpExit": 0,
+  "packedDescribeExit": 0,
+  "packedDescribeCliVersion": "0.2.100-dev.g105902c3",
+  "businessHelpExit": 0,
+  "documentedVendorCommand": "rer business vendor-key add zendesk",
+  "vendorCommandSource": "cli/README.md:620 and cli/business/command.mjs vendor-key help",
+  "notRun": [
+    "vendor-key add (requires owner terminal and provider credentials)",
+    "npm install",
+    "full local Verify",
+    "browser matrix",
+    "scale campaign",
+    "real import",
+    "tag or publication"
+  ]
+}

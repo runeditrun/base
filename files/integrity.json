@@ -1,0 +1,6851 @@
+{
+  "inventoryFilesVerified": 1343,
+  "allSourceBytesHashesModesMatch": true,
+  "priorChangelogUnchanged": true,
+  "metadataVersion": "0.2.100",
+  "appliedMigrationsAndClausesUnchanged": true,
+  "commitsAboveBoundMain": 2,
+  "candidateTreeEqualsGeneratedTree": true,
+  "exportCheck": {
+    "version": 1,
+    "verb": "check",
+    "event": "result",
+    "ok": true,
+    "exitCode": 0,
+    "clauses": [
+      {
+        "id": "deploy.vars-secrets",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.schema",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.seed",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.specialist",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.tools",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.notTools",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.resources",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.resource.base://person/{id}",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.resource.base://operator/{id}",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-005.surface.escalations",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.access.invite.name",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.access.invite.scope",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.access.invite.readOnly",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.access.invite.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.access.invite.clauses",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.access.role.name",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.access.role.scope",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.access.role.readOnly",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.access.role.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-005.surface.base.access.role.sponsor-escalation",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.access.role.clauses",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.events.list.name",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.events.list.scope",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.events.list.readOnly",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.events.list.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.events.list.clauses",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.create.name",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.create.scope",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.create.readOnly",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.create.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.create.clauses",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.erase.name",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.erase.scope",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.erase.readOnly",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.erase.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.erase.clauses",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.list.name",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.list.scope",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.list.readOnly",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.list.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.list.clauses",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.note.name",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.note.scope",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.note.readOnly",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.note.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.note.clauses",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.read.name",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.read.scope",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.read.readOnly",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.read.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.read.clauses",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.workspace.snapshot.name",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.workspace.snapshot.scope",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.workspace.snapshot.readOnly",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.workspace.snapshot.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.workspace.snapshot.clauses",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.notTools.0",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.notTools.1",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.snapshot",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.snapshot.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.create",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.create.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-003.4.fixture.create.state",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-003.4.fixture.create.journey.create.resource.ref.create",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.note",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.note.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.note.ref.create",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-003.4.fixture.note.state",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-003.4.fixture.note.journey.note.resource.ref.create",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-003.4.fixture.note.journey.note.resource.ref.note",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.note.inject",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.read",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.read.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.read.ref.create",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.list",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.list.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.invite",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.invite.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.widen",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.widen.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.widen.ref.invite",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.narrow",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.narrow.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.narrow.ref.invite",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.erase",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.erase.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.erase.ref.create",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.events",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.journey.events.classes",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-005.surface.invite-sponsor",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-005.surface.invite-sponsor.authority",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-005.surface.escalations.invite-sponsor.sponsor",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-005.surface.base.access.invite.coverage",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-005.surface.base.access.role.coverage",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.access.invite.coverage.external",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.access.invite.coverage.access",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.access.role.coverage.access",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.events.list.coverage.standard",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.create.coverage.standard",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.erase.coverage.destructive",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.list.coverage.sensitive",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.note.coverage.standard",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.people.read.coverage.sensitive",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.base.workspace.snapshot.coverage.standard",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.events",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-003.4.fixture",
+        "ok": true
+      },
+      {
+        "id": "SC-14.agents.BASE-AGENT-013.surface.witness",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.setup",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.dev",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.build",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.verify",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.reset",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.deploy",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.export",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.import",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.release",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.doctor",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.describe",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.check",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.install",
+        "ok": true
+      },
+      {
+        "id": "SC-10.inputs.preview",
+        "ok": true
+      },
+      {
+        "id": "SC-09.profile",
+        "ok": true
+      },
+      {
+        "id": "SC-01.adapter",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.preview",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.dependencies",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.build",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.migrate",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.start",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.health",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.owner",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.signIn",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.verify",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.deploy",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.portability",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.state",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.settings",
+        "ok": true
+      },
+      {
+        "id": "SC-01.hook.input",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.install",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.install.help",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.install.cwd",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.install.non-interactive",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.install.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.install.no-queue",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.install",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.setup",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.setup.help",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.setup.cwd",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.setup.non-interactive",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.setup.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.setup.owner-email",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.setup.owner-name",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.setup.port",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.setup.host",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.setup.answers",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.setup.door",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.setup.no-queue",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.setup",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.dev",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.help",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.cwd",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.non-interactive",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.port",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.host",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.idle-timeout",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.stop",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.detach",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.foreground",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.as",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.login",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.models",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.models-service",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.door",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.direct",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.demo",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.platform",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.dev.no-queue",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.dev",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.preview",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.preview.help",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.preview.cwd",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.preview.non-interactive",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.preview.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.preview.port",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.preview.host",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.preview.idle-timeout",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.preview.stop",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.preview.detach",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.preview.foreground",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.preview.platform",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.preview.no-queue",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.preview",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.build",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.build.help",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.build.cwd",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.build.non-interactive",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.build.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.build.site",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.build.platform",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.build.no-queue",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.build",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.verify",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.verify.help",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.verify.cwd",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.verify.non-interactive",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.verify.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.verify.no-queue",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.verify",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.reset",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.reset.help",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.reset.cwd",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.reset.non-interactive",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.reset.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.reset.yes",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.reset",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.deploy",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.help",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.cwd",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.non-interactive",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.owner-name",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.environment",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.dry-run",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.site",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.demo",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.host",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.env-file",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.image",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.bind-address",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.http-port",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.https-port",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.remove",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.yes",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.set-secret",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.unset-secret",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.rotate-secret",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.reopen-installation-key",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.platform",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.deploy.no-queue",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.deploy",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.export",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.export.help",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.export.cwd",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.export.non-interactive",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.export.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.export.target",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.export.output",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.export.origin",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.export.session-file",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.export.platform",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.export.no-queue",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.export",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.import",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.help",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.cwd",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.non-interactive",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.target",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.input",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.journal",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.origin",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.session-file",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.yes",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.legacy-v1",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.acknowledge-unverified-metadata",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.acknowledge-unverified-schema-objects",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.output",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.platform",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.import.no-queue",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.import",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.doctor",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.doctor.help",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.doctor.cwd",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.doctor.non-interactive",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.doctor.json",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.doctor",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.describe",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.describe.help",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.describe.cwd",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.describe.non-interactive",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.describe.json",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.describe",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.check",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.check.help",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.check.cwd",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.check.non-interactive",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.check.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.check.profile",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.check",
+        "ok": true
+      },
+      {
+        "id": "SC-01.verb.release",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.repo",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.project",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.repository",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.output",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.ref",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.public-base",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.dry-run",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.local-verify",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.verify-workflow",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.scan-timeout-seconds",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.tag",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.clean-history",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.onto",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.env-file",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.allow-placeholder-mark",
+        "ok": true
+      },
+      {
+        "id": "SC-01.flag.release.no-queue",
+        "ok": true
+      },
+      {
+        "id": "SC-02.target.release",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.setup",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.dev",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.preview",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.build",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.verify",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.reset",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.deploy",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.export",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.import",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.doctor",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.describe",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.check",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.release",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.deps",
+        "ok": true
+      },
+      {
+        "id": "SC-02.alias.rer",
+        "ok": true
+      },
+      {
+        "id": "SC-02.install-lifecycle",
+        "ok": true
+      },
+      {
+        "id": "SC-02.node-file",
+        "ok": true
+      },
+      {
+        "id": "SC-02.node-engine",
+        "ok": true
+      },
+      {
+        "id": "SC-02.pnpm",
+        "ok": true
+      },
+      {
+        "id": "SC-01.portable.scripts/rer.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.portable.scripts/base-cli/inventory.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.portable.scripts/base-onboarding/adapter.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding.production-runtime.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding.production-options.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding.production-plan.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding.production-modules.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding.project-vite.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding.operator-install.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding.operator-prerequisites.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding.command-recovery.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding.queue.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding.queued-entry.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding.commands.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding.process-scope.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.activity.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.adapter-auth.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.adapter-hosting.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.adapter-labels.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.adapter-settings.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.adapter.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.agent-handoff.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.app-fetch.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.app-processes.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.archive-output.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.archive-output.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.busy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.command-custody.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.command-recovery.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.commands.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.dependency-approval.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.dependency-environment.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.dev-identity.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.development-runtime.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.email.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.failures.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.icon-files.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.icon-files.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.input-limits.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.installer-inputs.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.launcher.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.local-variables-output.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.local-variables-output.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.local/build-files.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.local/build.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.local/environment.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.local/files.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.local/operation.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.local/owner.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.local/process-table.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.local/recovery.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.local/sqlite-custody.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.local/state-files.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.local/state.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.loopback-fetch.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.metadata.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.operator-install.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.operator-installer.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.operator-migrations.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.operator-prerequisites.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.package.json",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.port-probe.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.prefill.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.private-files.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.private.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.process-cleanup.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.process-diagnostics.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.process-scope.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.process-table.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.process-tree.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.production-assets.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.production-modules.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.production-options.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.production-plan.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.production-runtime.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.project-vite.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.providers.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.queue.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.queued-entry.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.readiness.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.redaction-jwt.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.redaction-wrapped.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.redaction.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.schema/SETUP.schema.json",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.schema/business-field-inputs.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.schema/dependencies.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.schema/json-schema.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.schema/setup-validation.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.secrets.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.server.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.setup-manifest.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.start-origin-diagnostic.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.state.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.step-failure.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.theme-files.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.theme.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.tool-command.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.ui/activity.js",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.ui/address-client.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.ui/app.js",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.ui/index.html",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.ui/model-core.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.ui/model.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.ui/style.css",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.ui/theme.css",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.ui/workspace-art.js",
+        "ok": true
+      },
+      {
+        "id": "SC-12.onboarding-inventory.wrangler-auth.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-09.inventory-complete",
+        "ok": true
+      },
+      {
+        "id": "SC-11.source.cli/settings.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-11.source.cli/bounded.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-11.source.cli/server-resources.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-11.source.cli/managed-server.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-11.source.cli/server-registry.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-11.source.cli/server-activity.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-11.source.cli/server-proxy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-11.source.cli/preview-cache.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.source.modules/job-queue/cli.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.source.modules/job-queue/config.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.source.modules/job-queue/resources.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.source.modules/job-queue/storage.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.source.modules/job-queue/identity.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.source.modules/job-queue/processes.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.source.modules/job-queue/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.source.modules/job-queue/command.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.source.modules/job-queue/supervisor.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.source.modules/job-queue/membership.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-12.source.modules/job-queue/policy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.bin/rer.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/adapter.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-bindings.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-door.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-fixtures.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-history-database.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-history-isolation.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-history.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-initializer.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-journey-fixtures.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-mail.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-network.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-reviewers.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-rpc.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-secrets.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-sponsors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-surface.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-verifier.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/agent-webhooks.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/ai-local.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/archive-path.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/archive-vite.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/archive.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/auth-copy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/authoring.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/bounded.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/browser-runtime.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/api.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/archive-task.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/bounded-waves.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/bounded-waves.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/carry-files.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/carry.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/catchup-task.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/choices.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/command.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/config-policy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/connect.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/detector.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/device.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/discovery-task.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/export-inputs.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/export-task.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/files.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/invocation.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/keychain.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/lease.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/legacy-package.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/local-commands.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/outbound.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/package-transfer.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/parsers-config.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/parsers-infrastructure.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/parsers-packages.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/parsers-pulumi.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/parsers-syntax.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/parsers-terraform.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/parsers.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/permissions.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/policy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/progress.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/questions.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/repository.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/scan-command.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/scan.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/service.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/setup-command.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/setup-company.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/setup-demo.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/state.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/supervisor.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendor-door.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/calendly.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/common.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/credential-names.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/pagerduty.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/sentry.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/sorry.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/uptimerobot.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/zendesk-attachments.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/zendesk-encode.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/zendesk-guide.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/zendesk-package.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/zendesk-pages.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/zendesk-people.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/zendesk-store.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/zendesk-tickets.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/zendesk-token.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/zendesk-transport.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/business/vendors/zendesk.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/cache-doctor.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/checkout-folders.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/checkout-preparation.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/api.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/auth.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/command.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/commands.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/event-payload.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/grants.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/no-turn-evidence.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/providers/claude.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/providers/codex.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/providers/jsonl-rpc.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/providers/sandbox.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/providers/secrets.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/recovery.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/runner.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/setup.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/state.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/companion/workspace.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/container-transfer.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/container.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/contract-status.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/contract.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/delivery-declarations.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/demo-build.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/demo-deploy-error.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/demo-host.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/demo-native.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/demo-removal-provider.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/demo.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/dependencies.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/dependency-approval.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/dependency-doctor.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/dependency-input.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-claim-request.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-claim-session.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-command.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-config.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-hook-record.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-hook.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-inputs.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-installation-key.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-needs.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-observation.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-owner-input.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-owner.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-product.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-readiness.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-secret-error.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-secrets.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-settings.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-setup.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-source.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy-variables.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deploy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/deployment-record.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/detached-server.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/dev-identity.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/door-clauses.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/door-mode.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/door.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/export-summary.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/export.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/font-cache.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/hosted-export-command.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/hosted-export.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/hosted-hosts.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/hosted-mail.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/hosted-output.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/hosted-queue-producers.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/human-error.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/hydration/browser.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/hydration/cases.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/hydration/check.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/hydration/probe.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/hydration/scripts.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/hydration/verdict.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/import-origin.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/import-summary.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/independent.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/inspect.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/jsonc.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/ledger-refusal.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/lifecycle.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/listen.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/listing.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/local-env.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/local.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/main.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/managed-data-schema.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/managed-data-zip.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/managed-data.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/managed-server.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/native-owner-entry.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/node-runtime-cache.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/node-runtime-discovery.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/node-runtime-download.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/node-runtime.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/output.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/package-calls.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/package-mode.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/parse.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/placeholder-mark.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/pnpm-probe.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/pnpm-runtime.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/port.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/portability-empty.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/portability-evidence.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/portability-evidence.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/portability-migrations.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/portability-policy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/portability-progress.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/portability-worker.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/portability.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/preview-cache.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/production-auth.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/production-mail.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/project-pnpm.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/project.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/ready-summary.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/release.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/run-transfers.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/runtime-front-door.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/scheduled.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/server-activity.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/server-limit-file.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/server-proxy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/server-registry.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/server-resources.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/settings.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/setup-answers.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/setup-input.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/shared.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/signin.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-bindings.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-browser-objects.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-check.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-client.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-data.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-diagnostics.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-entities.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-hosting.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-input-assets.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-inputs.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-markup.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-prepare.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-preview.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-private.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-references.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-render.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-runtime.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site-syntax.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/site.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/sqlite-notice.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/stdio.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/transfers.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/upstream-agent.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.cli/version.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.composition/git-source.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.default-seed/public/brand/mark.svg",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.default-seed/public/fonts/outfit/LICENSE.txt",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.default-seed/public/fonts/outfit/outfit-latin-ext-wght-normal.woff2",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.default-seed/public/fonts/outfit/outfit-latin-wght-normal.woff2",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.default-seed/public/rer-theme.css",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/adopt.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/archive-source.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/base-acknowledgements.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/base-copies.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/cli.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/copy-checkout.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/copy-namespaces.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/edition-migrations.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/files.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/lock.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/manifest.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/module-closure.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/module-edges.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/module-packages.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/module-resolution.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/module-syntax.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/offline-git.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/package-target.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/parent-comparison.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/projection-lock.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/release.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/runtime-dependencies.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/sources.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/updates.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/LICENSE",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-helper-string-parser/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-helper-validator-identifier/identifier.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-helper-validator-identifier/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-helper-validator-identifier/keyword.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/options.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parse-error.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parse-error/bind-operator-errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parse-error/module-errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parse-error/parse-expression-errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parse-error/pipeline-operator-errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parse-error/standard-errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parse-error/strict-mode-errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parse-error/to-node-description.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parser/base.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parser/comments.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parser/expression.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parser/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parser/lval.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parser/node.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parser/statement.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/parser/util.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/plugin-utils.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/plugins/estree.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/plugins/flow/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/plugins/flow/scope.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/plugins/jsx/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/plugins/jsx/xhtml.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/plugins/placeholders.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/plugins/typescript/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/plugins/typescript/scope.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/plugins/v8intrinsic.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/tokenizer/context.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/tokenizer/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/tokenizer/state.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/tokenizer/types.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/types.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/util/class-scope.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/util/expression-scope.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/util/identifier.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/util/location.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/util/production-parameter.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/util/scope.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/util/scopeflags.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/babel-parser/babel-parser/util/whitespace.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/LICENSE",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/compose-collection.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/compose-doc.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/compose-node.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/compose-scalar.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/composer.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/resolve-block-map.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/resolve-block-scalar.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/resolve-block-seq.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/resolve-end.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/resolve-flow-collection.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/resolve-flow-scalar.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/resolve-props.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/util-contains-newline.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/util-empty-scalar-position.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/util-flow-indent-check.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/compose/util-map-includes.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/doc/Document.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/doc/anchors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/doc/applyReviver.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/doc/createNode.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/doc/directives.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/log.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/nodes/Alias.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/nodes/Collection.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/nodes/Node.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/nodes/Pair.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/nodes/Scalar.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/nodes/YAMLMap.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/nodes/YAMLSeq.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/nodes/addPairToJSMap.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/nodes/identity.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/nodes/toJS.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/parse/cst-scalar.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/parse/cst-stringify.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/parse/cst-visit.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/parse/cst.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/parse/lexer.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/parse/line-counter.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/parse/parser.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/public-api.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/Schema.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/common/map.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/common/null.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/common/seq.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/common/string.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/core/bool.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/core/float.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/core/int.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/core/schema.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/json/schema.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/tags.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/yaml-1.1/binary.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/yaml-1.1/bool.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/yaml-1.1/float.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/yaml-1.1/int.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/yaml-1.1/merge.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/yaml-1.1/omap.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/yaml-1.1/pairs.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/yaml-1.1/schema.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/yaml-1.1/set.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/schema/yaml-1.1/timestamp.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/stringify/foldFlowLines.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/stringify/stringify.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/stringify/stringifyCollection.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/stringify/stringifyComment.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/stringify/stringifyDocument.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/stringify/stringifyNumber.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/stringify/stringifyPair.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/stringify/stringifyString.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/util.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/vendor/yaml/visit.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/workflow-copies.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.edition-authoring/workflow-scripts.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.foundation/runtime/contract-anchor.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.foundation/runtime/contract-docs.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.foundation/runtime/contract-prose-patterns.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.foundation/runtime/contract-prose.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.foundation/runtime/run-data.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.foundation/runtime/run-data.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.foundation/runtime/seed-contract.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/CLAUSES.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/capabilities.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/capabilities.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/audit-pages.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/audit-rows.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/audit.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/authority.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/authority.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/crypto.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/discovery.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/erasure.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/fixtures.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/injection.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/invocation.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/journey.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/narrowing.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/narrowing.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/negative.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/network-modules.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/network-runtime.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/policy-phases.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/protocol.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/relay.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/replay.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/schema.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/security.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/sponsors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/step-hooks.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/subscription.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/subset.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/surface.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/target.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/tool-name.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/tool-name.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/unpair.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/agent-door/conformance/webhooks.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/ai/LICENSE",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/ai/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/ai/client.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/ai/config.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/ai/dev/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/ai/dev/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/ai/dev/outbox.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/ai/errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/ai/fake/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/ai/fake/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/ai/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/ai/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/ai/package.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/adapters/d1-limits.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/adapters/d1-sqlite.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/adapters/d1-workerd-preload.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/adapters/d1-workerd-setup.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/adapters/d1-workerd.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/adapters/d1.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/adapters/egress.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/adapters/jobs.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/adapters/objects.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/adapters/retained.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/adapters/sqlite-error.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/adapters/sqlite-worker.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/assets.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/bindings.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/boundary.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/build.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/demo-egress.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/deploy-input.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/durable-objects.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/entrypoint.sh",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/host.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/image-variables.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/import-graph.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/ingress.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/lock.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/migration-inventory.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/migrations.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/node-engine.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/portability-schema.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/remote/deploy.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/remote/files.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/remote/resources.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/runner.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/ssh-plan.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/ssh.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/transfer.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/websockets.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/container/worker-engine.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/d1-transport/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/d1-transport/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/delivery-producer/bindings.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/delivery-producer/declarations.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/delivery-producer/mail.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/delivery-producer/migrations.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/build.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/capacity.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/certificate.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/claim.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/diagnostics.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/measurement.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/alarms.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/bindings.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/bridge.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/config.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/cron.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/d1.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/deploy-r2.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/isolate.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/loader.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/namespace.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/prepare.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/queues.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/r2-client.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/r2-store.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/r2.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/resources.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/seed-object.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/sql.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/visitor.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/warm.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/native/worker.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/operator.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/ownership.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/page-style.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/pages.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/plan.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/remove.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/start-script.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/theme-css.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/theme-script.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/theme.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/upgrade.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo-host/worker.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/declaration.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/effects.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/input-path.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/label.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/label.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/navigation.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/responses.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/run-url.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/sockets.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/vite.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/demo/vite.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/approval.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/auth.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/authority.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/crypto.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/custody.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/logout.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/native.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/protocol.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/schema/approval-attempt.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/schema/dependencies.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/schema/keys-sealed.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/sealing.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/dependencies/store.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/artifact.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/asset-health.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/build-modules.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/check.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/cli.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/container-config.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/d1-import-diagnostics.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/d1-import.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/default-stage.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/deploy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/diagnostics.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/env-file.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/health-request.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/health.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/jsonc.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/local-only.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/migration-directory.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/migration-ledger.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/migration-retry.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/migrations.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/owner-cli.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/owner-rekey.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/owner-remove.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/owner-secret-copy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/owner-secret-names.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/owner-secret.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/owner-signin.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/owner.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/pagination.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/prepare.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/provider-transport.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/provider.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/public-origin.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/queue-consumer.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/r2-object-transport.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/r2-objects.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/readiness-window.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/receipt.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/render.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/resources.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/service-grants.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/site-readback.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/site-runtime.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/site.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/sql-safety.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/sql-tokens.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/teardown.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/templates.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/uploaded-worker.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/validation.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/deploy-kit/worker.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/CONTRACT.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/audit.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/blobs.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/cascade.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/completion.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/declaration.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/fence.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/order.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/plan.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/queue.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/rate.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/receipt.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/root.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/schema/erasure-rates.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/schema/erasure.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/scope.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/sql.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/erasure/verification.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/schema/importer-verification-receipt.schema.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/schema/importers.schema.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/apply-effects.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/apply.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/atomic-prefix.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/budget.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/column-layout.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/compressed-plan.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/creation.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/custody-fence.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/custody-state-schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/database.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/entry-locator.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erased-artifacts.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erased-custody.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erased-plan.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erased-reversal.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-bounded.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-claims.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-compiler.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-disposition.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-fragments.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-index.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-pages.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-progress-schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-progress.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-related.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-report.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-selection.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-snapshot.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-stage.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-step.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-superseded.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-values.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure-writes.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/erasure.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/evolutions/0001-preserved-undo.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/expected-state.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/field-redaction.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/guards.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/history.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/index.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/integrity.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/inventory-snapshot.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/jobs.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/native-set.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/native-staging-admission.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/native-staging-context.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/native-staging-lifecycle.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/native-staging-offset.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/native-staging-publication.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/native-staging-rows.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/native-staging-schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/native-staging-state.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/native-staging.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/original-copies.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/original-storage.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/originals.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/plan-dictionary.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/plans.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preparation-fingerprint.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preparation-header.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preparation-reader.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preparation-schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preparation-state.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preparation-step-combine.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preparation-step-control.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preparation-step-hash.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preparation-step-pages.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preparation-steps-schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preparation-steps.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preparations.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preserved-preview.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/preserved-reverse.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/provenance-set.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/publication-fence.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/publication-receipt-schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/published-stream.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/read-fence.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/read-results.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/redacted-custody.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/redaction-step.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/referenced-plans.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/retained-values.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/retirement-bounded.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/retirement-door.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/retirement-schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/retirement-scope.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/retirement-steps.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/retirement-tally.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/retirement.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/reversal-conversion-record.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/reversal-conversion-schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/reversal-conversion.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/reversal-fence-schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/reversal-fence.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/reversal-journal.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/reverse.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/reviewed-source.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/sets.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/snapshot-text.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/staged-creation.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/staging-admission.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/staging-control.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/staging-erasure.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/staging-lifecycle.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/staging-plan.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/staging-privacy.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/staging-publication.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/staging-schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/staging-statements.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/staging-transport.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-boundary.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-create.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-identity-admission.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-input.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-layout.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-origin.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-page-integrity.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-partition.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-plan.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-receipt.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-revision-schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-snapshot.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-stage.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-state.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/stream-working-set.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/streams.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/target-guards.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/target-identities.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/transport.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/types.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/undo-observations.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/undo-report.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/undo-snapshot.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/undo-state.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/undo-types.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/verified-plan.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/wave-boundary.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/d1/wave-retirement.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/ADOPTING.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/admission.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/archive.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/authority.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/failures.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/grants.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/handler.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/index.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/intake-policy.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/intake-upload.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/intake/csv.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/intake/json.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/intake/projection.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/intake/types.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/inventory.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/jobs.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/limits.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/operator.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/package.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/planning.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/protocol.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/raw.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/refusals.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/store.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/types.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/uploads.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/waves/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/waves/digests.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/waves/inventory.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/waves/journal.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/waves/lifecycle.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/waves/preparation.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/waves/schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/waves/store.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/door/waves/types.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/journal/authority.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/plan/budget.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/plan/index.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/plan/size.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/provenance/canonical-hash.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/provenance/canonical-stream.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/provenance/credential-names.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/provenance/credentials.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/provenance/identity.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/provenance/json-snapshot.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/provenance/numeric-credentials.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/provenance/resumable-sha256.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/provenance/validate-json.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/readers/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/readers/api-policy.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/readers/api.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/readers/bytes.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/readers/errors.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/readers/file.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/readers/index.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/readers/json.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/readers/numeric-lexemes.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/readers/original.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/readers/records.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/receipt/encoding.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/receipt/index.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/receipt/policy.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/receipt/types.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/receipt/uri.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/receipt/validation.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/status/encoding.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/status/evidence.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/status/index.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/status/schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/status/types.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/storage/originals.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/storage/provenance.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/storage/schema.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/import-kit/src/types.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/CONTRACT.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/crypto.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/database.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/delivery.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/destination.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/index.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/node-transport.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/public-address.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/repository.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/schema.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/sqlite.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/timestamped-body-signature.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/tokens.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/types.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/upgrade-token-usage-context.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/integrations/core/webhook.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/cli.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/command.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/config.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/identity.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/load-admission.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/membership.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/module.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/policy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/processes.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/resources.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/slots.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/storage.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/supervisor.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/job-queue/waiting.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/.gitignore",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/LICENSE",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/doctor.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/live-proof/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/live-proof/run.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/package.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/pnpm-lock.yaml",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/cloudflare/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/cloudflare/headers.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/cloudflare/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/cloudflare/response.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/messaging/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/messaging/contract.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/messaging/event-schema.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/messaging/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/messaging/jws.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/messaging/request.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/messaging/serialize.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/rer/contract.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/rer/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/rer/list-headers.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/resend/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/resend/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/resend/response.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/resend/serialize.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/resend/size.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/sendgrid/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/sendgrid/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/adapters/sendgrid/serialize.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/core/errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/core/transport.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/core/validation.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/development/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/development/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/development/outbox.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/development/schema.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/doctor/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/doctor/common.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/doctor/dns.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/doctor/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/doctor/probe.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/doctor/receive.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/doctor/records.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/events/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/events/d1-schema.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/events/d1-storage.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/events/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/events/intake.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/events/storage.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/events/verify.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/inbound/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/inbound/bytes.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/inbound/headers.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/inbound/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/inbound/mime.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/inbound/multipart.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/inbound/resend-attachment.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/inbound/resend.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/inbound/sendgrid.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/sender.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/sendgrid-email/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/sendgrid-email/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/mail/src/unsubscribe/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/SCHEDULED-POLICY.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/adapter.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/admin.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/audit.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/business-team.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/credentials.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/delegated.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/display-name.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/domain-audit.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/editor-owner.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/email-change.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/native.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/native.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/oa.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/one-click.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/owner-signin.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/provider-control.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/provider-pin.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/provider-setup.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/roles.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/schema/dependency-setup.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/schema/dev-sessions.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/schema/domain-rules-step-up.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/schema/invitation-cancellation.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/schema/last-signin.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/schema/operator-auth.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/schema/owner-signin.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/schema/provider-control.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/schema/provider-pins.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/schema/scheduled-policy-hardening.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/schema/scheduled-policy.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/settings-page.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/status.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/accounts/store.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/branding.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/business-settings.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/config.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/conformance/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/conformance/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/conformance/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/conformance/presentation.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/crypto.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/csp.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/dev-admission.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/dev-admission.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/dev-gate.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/dev/cli-session.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/dev/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/dev/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/dev/personas.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/dev/refusal.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/dev/sign-in-as.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/dev/sign-in-as.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/docs/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/docs/native-accounts.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/docs/tanstack-start.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/docs/vite-spa.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/http.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/icon-head.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/icon-head.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/admission.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/after-confirm.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/email-link/confirmation.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/email-link/expiry.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/email-link/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/email-link/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/email-link/message.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/admin-audit.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/aes-gcm.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/client-auth.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/config.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/crypto.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/jwt.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/network.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/presets.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/schema/oidc.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/oidc/store.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/identity/principal.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/input.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/local-cli.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/loopback.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/owner-signin-grant.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/page.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/policy.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/policy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/rejected-response.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/representation.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/routes.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/scheduled/definition.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/scheduled/expiry.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/scheduled/fence.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/scheduled/history.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/scheduled/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/scheduled/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/scheduled/runner.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/service.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/signin/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/signin/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/operator-auth/signin/one-click.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/owner-claim/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/owner-claim/idp.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/owner-claim/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/owner-claim/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/owner-claim/page.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/owner-claim/schema/idp.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/owner-claim/schema/owner-claim.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/owner-claim/transaction.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/owner-claim/verify.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/owner-claim/verify.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/backfills.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/bookkeeping.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/bridge.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/catalogue.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/checkout-history.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/cli-options.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/cli.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/copies.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/derived.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/dev-data.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/diff.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/export.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/files.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/format.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/generated.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/hash.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/http-client.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/http-errors.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/http.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/import-lease.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/import-safety.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/import-staging.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/import.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/index.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/index.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/journal.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/ledgers.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/legacy-files.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/legacy-safety.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/library-history.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/lines.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/migration-history.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/migration-sql.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/migration-statements.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/payloads.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/policy-data.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/progress.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/provider-data.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/rebuilds.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/references.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/replay-views.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/restore-empty.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/restore-safety.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/schema-identity.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/schema-legacy.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/schema/portability.sql",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/snapshot-objects.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/sql-text.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/sqlite-tokens.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/storage.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/transient-tables.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/worker-history.d.mts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/portability/worker-history.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/catalogue.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/cleanup.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/export.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/github-verify.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/keygen.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/listing.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/look.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/previous-listing.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/produce.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/public-base.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/public-child-transport-state.cjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/public-child.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/public-git.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/publication-scan.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/publish-handoff.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/screenshots.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/sign.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/signature.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/signing-cli.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/signing-io.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/signing-key.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/source-verification.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/source.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/statement.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/tag-adoption.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/test-summary.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/vectors/generate.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/vectors/publisher-projects.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/vectors/release-signature-vectors.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/verify-workflow.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/release/verify.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/site/docs-search/SearchField.tsx",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/site/docs-search/artifacts.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/site/docs-search/client.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/site/docs-search/index-build.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/site/docs-search/retrieve.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/site/docs-search/search.css",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/site/docs-search/sections.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/site/docs-search/types.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.modules/site/docs-search/worker.ts",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.operations/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.operations/operations.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.operations/project-operations.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/README.md",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/assignment.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/c2pa.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/checksum_maps.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/cli.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/command_arguments.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/command_shell_quotes.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/command_source_quotes.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/content_identities.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/controller_metadata.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/copy_identities.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/credential_assignments.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/credential_assignments.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/credential_literals.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/credential_syntax.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/der.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/destination.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/diagnostics.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/env_values.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/font_licence.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/git_history.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/github_refs.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/gitleaks.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/gitleaks.toml",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/history_hydration.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/history_scan.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/hit_location.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/hygiene_config.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/hygiene_text.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/identity-recipe.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/json_identity.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/license-exceptions.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/licenses.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/lockfile_metadata.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/lockfile_metadata.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/media.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/png_text.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/policy.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/project_identity.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/provenance.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/provenance_pins.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/public_base.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/public_hygiene.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/publication-config.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/publication_config.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/report.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/repository_commands.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/repository_intent.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/reviewed.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/scan_timings.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/slots.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/source_metadata.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/source_shapes.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/staged_annotation.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/third-party-notices.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/third_party_notices.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/timeout.json",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/timeout.mjs",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/tree_scan.py",
+        "ok": true
+      },
+      {
+        "id": "SC-01.inventory.scripts/publish-check/trust_bundle.py",
+        "ok": true
+      },
+      {
+        "id": "SC-08.portability",
+        "ok": true
+      },
+      {
+        "id": "SC-05.dev-identity.entry",
+        "ok": true
+      },
+      {
+        "id": "SC-05.dev-identity.exclusion",
+        "ok": true
+      }
+    ]
+  },
+  "vendoredDescribeCliVersion": "0.2.100-dev.g32682133"
+}

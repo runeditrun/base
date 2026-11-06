@@ -1,0 +1,4 @@
+Usage: rer VERB [FLAGS]
+Commands: install, setup, dev, preview, build, verify, reset, deploy, export, import, doctor, describe, check, adopt-edition, refresh-base, signin, release, listing
+Run rer VERB --help for flags.
+
