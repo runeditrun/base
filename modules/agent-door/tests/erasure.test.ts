@@ -107,6 +107,72 @@ test('pending approval loses its inputs and marks, cannot execute after native e
   assert.ok(!JSON.stringify((await r.db.prepare('SELECT * FROM agent_door_approvals').all()).results).includes(id))
 })
 
+test('People erase preserves Fred when Ed is a substring of his email, including claims, audit, replay and pending approval', async t => {
+  const { personErasureRuntime } = await import('./person-erasure-runtime.mjs')
+  const r = await personErasureRuntime(t)
+  const ed = await r.person('/api/people', { name: 'Edward Customer', email: 'ed@acme.test', details: {} })
+  const fred = await r.person('/api/people', { name: 'Frederick Customer', email: 'fred@acme.test', details: {} })
+  assert.equal(ed.status, 201); assert.equal(fred.status, 201)
+  // Keep the same policy revision for completed replays and pending work.
+  const held = autonomousPolicy(); held.rules = [{ id: 'hold', class: '*', do: 'approval', approver: ['sponsor'], wait: 'PT1H' }]
+  await r.c.adopt(held)
+  const args = { id: fred.body.id, body: 'Contact fred@acme.test about the renewal', idempotency_key: crypto.randomUUID() }
+  const completed = await r.c.tool('base.people.note', args)
+  const peerId = completed.result._meta['com.runeditrun/approval'].id
+  const peerView = await r.person('/agents/api/approvals/' + peerId)
+  const peerApproved = await r.person('/agents/api/approvals/' + peerId + '/approve', { revision: peerView.body.approval.revision, summary_sha256: peerView.body.approval.summary_sha256 })
+  assert.equal(peerApproved.status, 200); assert.equal(peerApproved.body.approval.state, 'executed')
+  const completedReplay = await r.replay('base.people.note', args)
+  assert.equal(code(completedReplay), undefined)
+  const ownArgs = { id: ed.body.id, body: 'Contact ed@acme.test about the renewal', idempotency_key: crypto.randomUUID() }
+  const own = await r.c.tool('base.people.note', ownArgs)
+  const ownId = own.result._meta['com.runeditrun/approval'].id
+  const ownView = await r.person('/agents/api/approvals/' + ownId)
+  const ownApproved = await r.person('/agents/api/approvals/' + ownId + '/approve', { revision: ownView.body.approval.revision, summary_sha256: ownView.body.approval.summary_sha256 })
+  assert.equal(ownApproved.status, 200); assert.equal(ownApproved.body.approval.state, 'executed')
+  const pendingArgs = { id: fred.body.id, body: 'Send the proposal to fred@acme.test', idempotency_key: crypto.randomUUID() }
+  const pending = await r.c.tool('base.people.note', pendingArgs)
+  const pendingId = pending.result._meta['com.runeditrun/approval'].id
+  const approvalBefore = await r.person('/agents/api/approvals/' + pendingId)
+  const peerDecisions = [completed.decision.id, pending.decision.id]
+  const peerRows = async (table: string) => (await r.db.prepare(`SELECT * FROM ${table} WHERE ${table === 'agent_door_audit' ? 'id' : 'decision_id'} IN (?,?) ORDER BY rowid`).bind(...peerDecisions).all()).results
+  const before = Object.fromEntries(await Promise.all(['agent_door_calls', 'agent_door_audit', 'agent_door_usage'].map(async table => [table, await peerRows(table)])))
+  const erased = await r.person('/api/people/' + ed.body.id + '/erasure', { confirmation: 'erase ' + ed.body.id })
+  assert.equal(erased.status, 200); assert.equal(erased.body.receipt.phase, 'complete')
+
+  // Keep these independent so the unfixed run exposes every lost peer surface.
+  await t.test('peer claims retain their keys and outcomes', async () => {
+    assert.deepEqual(await peerRows('agent_door_calls'), before.agent_door_calls)
+  })
+  await t.test('peer audit retains its contents and sponsor', async () => {
+    assert.deepEqual(await peerRows('agent_door_audit'), before.agent_door_audit)
+    assert.deepEqual(await peerRows('agent_door_usage'), before.agent_door_usage)
+  })
+  await t.test('peer replay returns the recorded result without another note', async () => {
+    const notesBefore = await r.db.prepare('SELECT * FROM person_notes WHERE person_id=? ORDER BY id').bind(fred.body.id).all()
+    const replay = await r.replay('base.people.note', args)
+    assert.equal(code(replay), undefined)
+    assert.deepEqual(replay.result.structuredContent, completedReplay.result.structuredContent)
+    assert.deepEqual((await r.db.prepare('SELECT * FROM person_notes WHERE person_id=? ORDER BY id').bind(fred.body.id).all()).results, notesBefore.results)
+  })
+  await t.test('peer pending approval keeps its exact summary and applies', async () => {
+    const after = await r.person('/agents/api/approvals/' + pendingId)
+    const { revision, summary_sha256 } = approvalBefore.body.approval
+    const decided = await r.person('/agents/api/approvals/' + pendingId + '/approve', { revision, summary_sha256 })
+    t.diagnostic('Fred approval after Ed erasure: code=' + (after.body.approval.code ?? 'none') + '; approve status=' + decided.status)
+    assert.deepEqual(after, approvalBefore)
+    assert.equal(decided.status, 200); assert.equal(decided.body.approval.state, 'executed')
+    assert.equal(await r.db.prepare('SELECT count(*) n FROM person_notes WHERE person_id=? AND body=?').bind(fred.body.id, pendingArgs.body).first('n'), 1)
+  })
+  await t.test('Ed still loses his native records and gets a value-free replay tombstone', async () => {
+    assert.equal((await r.person('/api/people/' + ed.body.id + '/export')).status, 404)
+    const call = await r.db.prepare('SELECT * FROM agent_door_calls WHERE decision_id=?').bind(own.decision.id).first<any>()
+    assert.equal(call.key, 'erased:' + own.decision.id)
+    assert.ok(!JSON.stringify(call).includes('ed@acme.test'))
+    assert.equal(code(await r.replay('base.people.note', ownArgs)), 'subject_erased')
+  })
+})
+
 test('adoption refuses undeclared tables and columns', async t => {
   const r = await fixture(t)
   await checkAgentArtifacts(r.db, personAgentArtifacts)
