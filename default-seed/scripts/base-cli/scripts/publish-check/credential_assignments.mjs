@@ -1,5 +1,5 @@
 /** SEC-3 credential assignment: literal syntax, entropy and fixture/reference semantics. */
-import {codeSource, typeDeclarations} from './credential_syntax.mjs';
+import {codeSource, parameterNames, typeDeclarations} from './credential_syntax.mjs';
 import {carriesCredential, isPlaceholder, cssLiteral} from './credential_literals.mjs';
 
 function shannonEntropy(value) {
@@ -16,25 +16,25 @@ const assignment=/(?<![A-Za-z0-9_.$-])([A-Za-z0-9_.$-]{0,48}(?:secret|token|pass
 const numberAssignment=/(?<![A-Za-z0-9_.$-])([A-Za-z0-9_.$-]{0,48}(?:secret|token|passw(?:or)?d|api[_-]?key|private[_-]?key)[A-Za-z0-9_]{0,48})[ \t]{0,8}(?::=|:|=)[ \t]{0,8}([+-]?(?:0x[\da-f]{16,512}|\d{16,512}))(?![\w.$])/gi
 
 
-function parameterType(text,match){
+function parameterType(parameters,match){
  // A colon directly after a parameter name describes its type. Defaults use '=' and still scan.
  const afterName=match[0].slice(match[1].length)
- return /^[ \t]*:/.test(afterName)&&/(?:^|[,(])[ \t\r\n]*$/.test(text.slice(Math.max(0,match.index -256),match.index))
+ return /^[ \t]*:/.test(afterName)&&parameters.has(match.index)
 }
 
 const envAssignment=/^[ \t]{0,8}(?:export[ \t]+)?([A-Za-z0-9_]{0,48}(?:SECRET|TOKEN|PASSW(?:OR)?D|API_?KEY|PRIVATE_?KEY)[A-Za-z0-9_]{0,48})[ \t]*=[ \t]*([^\s"'`#]{16,512})[ \t]*$/gim
 
 /** SEC-3: names that look like credentials assigned a literal of at least 16 characters with entropy ≥ 3.5 bits, other than CSS assigned to a token name (cssLiteral). */
 function findCredentialAssignments(text,options={}) {
- const found=[],types=options.code===false?[]:typeDeclarations(text)
+ const found=[],types=options.code===false?[]:typeDeclarations(text),parameters=options.code===false?new Set():parameterNames(text)
  const consider=(name,value,index)=>{
   // Theme and design tokens are named token; CSS is never a secret's, password's or key's value.
   if(types.some(({start,end})=>index>=start&&index<end)||shannonEntropy(value)<3.5||!/secret|passw|key/i.test(name)&&cssLiteral(value))return
   if(/^(process\.env|import\.meta\.env|env\.|c\.env)/.test(value))return
   found.push({name,value,index,placeholder:isPlaceholder(value)})
  }
- for(const match of text.matchAll(assignment))if(!parameterType(text,match))consider(match[1],match[3],match.index +match[0].lastIndexOf(match[3]))
- for(const pattern of [numberAssignment,...(options.code===false?[envAssignment]:[])])for(const match of text.matchAll(pattern))if(!parameterType(text,match))consider(match[1],match[2],match.index +match[0].lastIndexOf(match[2]))
+ for(const match of text.matchAll(assignment))if(!parameterType(parameters,match))consider(match[1],match[3],match.index +match[0].lastIndexOf(match[3]))
+ for(const pattern of [numberAssignment,...(options.code===false?[envAssignment]:[])])for(const match of text.matchAll(pattern))if(!parameterType(parameters,match))consider(match[1],match[2],match.index +match[0].lastIndexOf(match[2]))
  return found
 }
 

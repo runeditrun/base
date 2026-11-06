@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.99-dev.gb02e9239",
+  "cliVersion": "0.2.99-dev.ge6dcc42b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -5131,7 +5131,7 @@
     },
     "scripts/publish-check/credential_assignments.mjs": {
       "source": "scripts/publish-check/credential_assignments.mjs",
-      "sha256": "69d91fbc8de29c471ef13aec24e96bbbcea26b8a8aeca3e387390d96cdee3317"
+      "sha256": "36594477c6786fa346a45f130c243ddc5afc98eccdd740fc52533075a4711593"
     },
     "scripts/publish-check/credential_assignments.py": {
       "source": "scripts/publish-check/credential_assignments.py",
@@ -5143,7 +5143,7 @@
     },
     "scripts/publish-check/credential_syntax.mjs": {
       "source": "scripts/publish-check/credential_syntax.mjs",
-      "sha256": "95d7a281de62ac484b226792c62b4c88ff40174de001b0583d7695ac081ff44f"
+      "sha256": "2073ee82a75a088d2560c1c550530eb3a50bc4cd51a916b34efbfe91a91011e7"
     },
     "scripts/publish-check/der.py": {
       "source": "scripts/publish-check/der.py",

@@ -68,7 +68,7 @@ for(const kind of ['default-seed','foundation'])test(`${kind}: standalone real W
  assert.equal(events(setupResult).find(event=>event.event==='setup-ready').setupUrl,`http://127.0.0.1:${setupPort}/setup`);
  await rm(answers);
  const settings=await readFile(join(f.root,'.dev.vars'));
- if(kind==='foundation'){assert.ok(settings.includes(Buffer.from('WORKSPACE_TITLE="Manifest workspace"')),'declared public answer saved');assert.ok(settings.includes(Buffer.from('CONNECTION_PASSWORD=fixture-connection-passphrase')),'entered manifest secret saved privately');}
+ if(kind==='foundation'){assert.ok(settings.includes(Buffer.from('WORKSPACE_TITLE="Manifest workspace"')),'declared public answer saved');assert.ok(settings.includes(Buffer.from('CONNECTION_PASSWORD=synthetic-fixture-connection-passphrase')),'entered manifest secret saved privately');}
 assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  const description=JSON.parse((await f.run(['describe','--json'])).stdoutText);assert.ok(description.verbs.dev.flags.includes('--port'));
  // Setup is locally healthy without the optional Cloudflare deployment inputs.

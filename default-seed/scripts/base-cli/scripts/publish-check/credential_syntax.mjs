@@ -4,6 +4,21 @@ export const codeSource=(path)=>path===undefined||/\.(?:[cm]?[jt]sx?|py|rs|go|ja
 
 export const sourceTokens=/\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)|\/(?![*/])(?:\\[\s\S]?|\[(?:\\[\s\S]?|[^\]\\])*(?:\]|$)|[^/\\[\n])+(?:\/[a-z]*|$)|"(?:\\[\s\S]?|[^"\\])*(?:"|$)|'(?:\\[\s\S]?|[^'\\])*(?:'|$)|`(?:\\[\s\S]?|[^`\\])*(?:`|$)|[A-Za-z_$][\w$]*|[^\s]/g
 
+/** Simple parameter names belong directly to parentheses, never a nested object or array. */
+export function parameterNames(text) {
+ const names=new Set(),delimiters=[]
+ let previous=''
+ for(const token of text.matchAll(sourceTokens)){
+  const value=token[0]
+  if(value.startsWith('//')||value.startsWith('/*'))continue
+  if(delimiters.at(-1)==='('&&['(',','].includes(previous)&&/^[A-Za-z_$][\w$]*$/.test(value))names.add(token.index)
+  if(['(','{','['].includes(value))delimiters.push(value)
+  else if([')', '}', ']'].includes(value))delimiters.pop()
+  previous=value
+ }
+ return names
+}
+
 /** Type declarations are recognized outside comments and strings, so text cannot hide later assignments. */
 export function typeDeclarations(text) {
  if(!/\b(?:interface|type)\s+[A-Za-z_$]/.test(text))return []

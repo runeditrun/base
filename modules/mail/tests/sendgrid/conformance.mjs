@@ -43,7 +43,7 @@ export async function runSendGridConformance() {
     equal(init.method, 'POST', 'method');
     equal(init.redirect, 'manual', 'redirect policy');
     check(init.signal instanceof AbortSignal, 'abort signal');
-    equal(Object.fromEntries(new Headers(init.headers)), { authorization: 'Bearer fixture-sendgrid-key', 'content-type': 'application/json' }, 'authentication');
+    equal(Object.fromEntries(new Headers(init.headers)), { authorization: 'Bearer synthetic-fixture-sendgrid-key', 'content-type': 'application/json' }, 'authentication');
     equal(init.body, before, 'serializer and transport agree');
     return new Response(null, { status: 202, headers: { 'X-Message-Id': 'actual-provider-id' } });
   } });
@@ -70,7 +70,7 @@ export async function runSendGridConformance() {
     calls = 0;
     const result = await sendSendGrid(config, input, { fetch: async () => {
       calls++;
-      if (failure === 'throw') throw new Error('PRIVATE network diagnostic fixture-sendgrid-key');
+      if (failure === 'throw') throw new Error('PRIVATE network diagnostic synthetic-fixture-sendgrid-key');
       return { status: 202, headers: new Headers({ 'x-message-id': 'fake' }) };
     } });
     equal(result.status, 'uncertain', 'failed transport');

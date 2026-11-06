@@ -27,7 +27,7 @@ test('static asset multipart preserves JavaScript MIME for imported browser .mjs
   assert.deepEqual(calls.map(request => request.url),[`${origin}/workers/scripts/browser-assets/assets-upload-session`,`${origin}/workers/assets/upload?base64=true`]);
   assert(calls.every(request => request.method === 'POST'));
   const [session,upload] = calls;
-  assert.equal(session.headers.get('Authorization'),'Bearer fixture-account-token');
+  assert.equal(session.headers.get('Authorization'),'Bearer synthetic-fixture-account-token');
   const {manifest} = await session.json();
   assert.deepEqual(Object.keys(manifest),cases.map(file => `/${file.path}`));
   for (const file of cases) assert.equal(manifest[`/${file.path}`].size,Buffer.byteLength(file.bytes));

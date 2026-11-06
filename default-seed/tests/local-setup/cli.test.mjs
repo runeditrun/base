@@ -325,7 +325,7 @@ test('ordinary build excludes local credentials and restores the exact file afte
     assert.equal(command.authEnv, undefined)
     assert.equal(command.loadDevVars, 'false')
     assert.equal(command.includeProcessEnv, 'false')
-    assert.doesNotMatch(result.stdout + result.stderr, /unit-private-|inherited-build-secret/)
+    assert.doesNotMatch(result.stdout + result.stderr, /unit-private-|synthetic-inherited-build-secret/)
   }
 })
 
