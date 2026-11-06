@@ -72,6 +72,17 @@ function address(value) {
 }
 const accepted = { file: 'a file export from the old tool', key: "a read-only key for the old tool, entered in the seed's Move in page", address: "the old tool's public address, entered in the seed's Move in page" };
 
+/** The seed's import-format document: a GitHub link pinned to its release commit (each path part is checked on its own,
+ * and the 40-hex commit id is not a credential), or another plain address. */
+function formatLink(value) {
+ if (typeof value !== 'string' || value.length > 2000) return null;
+ try {
+  const url = new URL(value), pinned = url.pathname.match(/^\/[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}\/blob\/([0-9a-f]{40})\/[A-Za-z0-9_.~%/-]{1,500}$/);
+  if (url.protocol === 'https:' && url.hostname === 'github.com' && pinned && !url.username && !url.password && !url.search && !url.hash
+   && !url.pathname.split('/').some(part => part !== pinned[1] && sensitive(decodeURIComponent(part)))) return url.href;
+ } catch { /* Not an address. */ }
+ return address(value);
+}
 /** A Move in path on the seed (`/app/move-in`), or null. */
 const movePath = value => typeof value === 'string' && /^\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]{0,199}$/.test(value) && !value.startsWith('//') && !sensitive(value) ? value : null;
 
@@ -83,7 +94,7 @@ export function moveInLines(task) {
  const move = view.move_in && typeof view.move_in === 'object' ? view.move_in : {};
  const tool = text(view.tool, 80), app = text(view.app_name, 80) ?? text(view.app, 80), home = address(view.app_address);
  const lines = [`Step: Move ${tool ?? 'the old tool'} into ${app ?? 'its seed'} with the seed's own Move in page. The seed shows the dry run's counts, imports and undoes; Business imports nothing itself.`];
- const format = address(move.format);
+ const format = formatLink(move.format);
  const page = move.state === 'declared' ? address(move.address) : null, path = move.state === 'declared' ? movePath(move.path) : null;
  if (page) lines.push(`Move in page (sign in as the owner): ${page}`);
  else if (path) lines.push(`Move in page (sign in as the owner): ${path} on the seed${home ? ` at ${home}` : ', once it has an address'}`);

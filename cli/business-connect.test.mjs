@@ -1186,7 +1186,8 @@ test('a Move in step names the seed\'s own Move in page and how to export, and f
  assert.ok(formatOnly.stdout.includes('declares no Move in page') && formatOnly.stdout.includes(formatLink) && !formatOnly.stdout.includes('/app/move-in'), formatOnly.stdout);
  // Server text that looks like a credential, or an address with credentials, never reaches the agent's output.
  remote.state.tasks = [{ task_id: 'biz:move-in:unsafe', kind: 'move.in', state: 'ready', runner: 'executor', fence: 0,
-  move_in: view({ ...declared, address: 'https://owner:fixture-password@status.example.test/app/move-in', path: '/app/move-in?token=sk_live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4', export: 'Use key sk_live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4' }) }];
+  move_in: view({ ...declared, address: 'https://owner:fixture-password@status.example.test/app/move-in', path: '/app/move-in?token=sk_live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4',
+   format: formatLink.replace('LEGACY-EXPORT', 'sk_live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4'), export: 'Use key sk_live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4' }) }];
  const unsafe = await cli(home, ['business', 'next']);
  assert.ok(!unsafe.stdout.includes('fixture-password') && !unsafe.stdout.includes('sk_live_') && unsafe.stdout.includes('declares no Move in page'), unsafe.stdout);
  remote.state.tasks = [{ task_id: 'biz:move-in:sorry', kind: 'move.in', state: 'ready', runner: 'executor', fence: 0, move_in }];
