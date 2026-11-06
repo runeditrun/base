@@ -1,0 +1,15 @@
+{
+  "M": "896a437f0c5def74b1fcc2ce7cd0a50e073ef584",
+  "commands": [
+    "node scripts/export-cli.mjs default-seed",
+    "node scripts/export-cli.mjs default-seed"
+  ],
+  "repeat_equal": true,
+  "snapshot_files": 1573,
+  "snapshot_sha256": "83e2f56c5eedd6aed4d847ccc4d4e72a8dc9f2598a1c2b270d9ee3837f3e8f09",
+  "inventory_cliVersion": "0.2.100-dev.g896a437f",
+  "inventory_source_hashes_and_modes_checked": 1343,
+  "changed_files": [
+    "default-seed/scripts/base-cli/inventory.json"
+  ]
+}

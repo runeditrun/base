@@ -1,0 +1,13 @@
+{
+  "version_before": "0.2.99",
+  "version_after": "0.2.100",
+  "manifest_other_fields_unchanged": true,
+  "historical_changelog_unchanged": true,
+  "source_files_edited": 0,
+  "tests_added_or_changed": 0,
+  "clause_status_changes": 0,
+  "metadata_changed_files": [
+    "global/CHANGELOG.md",
+    "global/package.json"
+  ]
+}

@@ -1,0 +1,17 @@
+All candidate commits, including side parents: 2
+Run Edit Run fleet <fleet@runeditrun.com>
+Run Edit Run fleet <fleet@runeditrun.com>
+
+Run Edit Run fleet <fleet@runeditrun.com>
+Run Edit Run fleet <fleet@runeditrun.com>
+
+
+Full messages:
+1863aa8caafb4eef44c0d8fafd524c9b8cd1eb66
+Refresh the generated CLI source revision for 0.2.100
+
+Generated twice at the release metadata commit with identical bytes and modes. Only the required M-stamped inventory changes.
+
+896a437f0c5def74b1fcc2ce7cd0a50e073ef584
+Prepare rer 0.2.100 from the accepted mail-off source [skip ci]
+

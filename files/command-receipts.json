@@ -1,0 +1,88 @@
+[
+  {
+    "command": "git clone --filter=blob:none https://github.com/runeditrun/base.git <task clone>",
+    "exit": 0,
+    "result": "full history; no depth limit"
+  },
+  {
+    "command": "git ls-remote --heads --tags origin <source, main, named branch and rer-v0.2.100 refs>",
+    "exit": 0,
+    "result": "accepted source exact; no duplicate tag or named branch"
+  },
+  {
+    "command": "npm view @runeditrun/rer@0.2.100 version --json",
+    "exit": 1,
+    "result": "E404 No match found for version 0.2.100"
+  },
+  {
+    "command": "npm view @runeditrun/rer dist-tags --json",
+    "exit": 0,
+    "result": {
+      "latest": "0.2.99"
+    }
+  },
+  {
+    "command": "git fetch origin main",
+    "exit": 0,
+    "result": "main advanced from 601a56e0a5e8e21507003b902949e12723036148 to accepted 1da58f1537aeef14b733223de19c1791a17d68f2"
+  },
+  {
+    "command": "bash scripts/install-gitleaks.sh",
+    "exit": 0,
+    "result": "Gitleaks 8.30.1 linux_x64 checksum verified"
+  },
+  {
+    "command": "node scripts/publish-check.mjs --repo . --ref HEAD --project runeditrun/base --repository https://github.com/runeditrun/base --public-base https://github.com/runeditrun/base#main",
+    "head": "896a437f0c5def74b1fcc2ce7cd0a50e073ef584",
+    "exit": 0,
+    "receipt": "scan-M.json"
+  },
+  {
+    "command": "python3 $HOME/rer-consolidation/.tools/cloud-push.py origin cloud/gr-rer-mailoff-02100-prepare-1",
+    "head": "896a437f0c5def74b1fcc2ce7cd0a50e073ef584",
+    "exit": 0,
+    "receipt": "push-M.log"
+  },
+  {
+    "command": "git merge --ff-only origin/main",
+    "exit": 0,
+    "result": "Already up to date; no new main source integrated"
+  },
+  {
+    "command": "node scripts/export-cli.mjs default-seed",
+    "exit": 0,
+    "repeat": 2,
+    "head": "896a437f0c5def74b1fcc2ce7cd0a50e073ef584",
+    "receipt": "generation-receipt.json"
+  },
+  {
+    "command": "node --test --test-name-pattern='portable CLI source inventory is deterministic' cli/cli.test.mjs",
+    "exit": 0,
+    "head": "1863aa8caafb4eef44c0d8fafd524c9b8cd1eb66",
+    "receipt": "export-integrity-test.log"
+  },
+  {
+    "command": "python3 /tmp/rer-pack-proof.py",
+    "exit": 0,
+    "head": "1863aa8caafb4eef44c0d8fafd524c9b8cd1eb66",
+    "receipt": "package-receipt.json",
+    "harness_correction": "The initial ad hoc describe assertion incorrectly expected an event envelope, then commands instead of verbs. Actual command exited zero throughout. Corrected the evidence harness to read the documented descriptor shape; no product or existing-test assertion changed."
+  },
+  {
+    "command": "node scripts/publish-check.mjs --repo . --ref HEAD --project runeditrun/base --repository https://github.com/runeditrun/base --public-base https://github.com/runeditrun/base#main",
+    "head": "1863aa8caafb4eef44c0d8fafd524c9b8cd1eb66",
+    "exit": 0,
+    "receipt": "scan-C.json"
+  },
+  {
+    "command": "python3 $HOME/rer-consolidation/.tools/cloud-push.py origin cloud/gr-rer-mailoff-02100-prepare-1",
+    "head": "1863aa8caafb4eef44c0d8fafd524c9b8cd1eb66",
+    "exit": 0,
+    "receipt": "push-C.log"
+  },
+  {
+    "command": "gh api repos/runeditrun/base/pulls --method POST --input <packet>/pr-request.json",
+    "exit": 0,
+    "receipt": "pr-receipt.json"
+  }
+]

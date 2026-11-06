@@ -1,0 +1,62 @@
+{
+  "task": "gr-rer-mailoff-02100-prepare-1",
+  "repository": "runeditrun/base",
+  "branch": "cloud/gr-rer-mailoff-02100-prepare-1",
+  "head": "1863aa8caafb4eef44c0d8fafd524c9b8cd1eb66",
+  "source": "1da58f1537aeef14b733223de19c1791a17d68f2",
+  "M": "896a437f0c5def74b1fcc2ce7cd0a50e073ef584",
+  "tree": "c7002c230298b1865920f694c9e87de74b2979d1",
+  "custody": "PUSHED",
+  "pr": "https://github.com/runeditrun/base/pull/831",
+  "draft": true,
+  "CI": {
+    "Verify": {
+      "conclusion": null,
+      "created_at": "2026-11-06T14:33:43Z",
+      "event": "pull_request",
+      "head_branch": "cloud/gr-rer-mailoff-02100-prepare-1",
+      "head_sha": "1863aa8caafb4eef44c0d8fafd524c9b8cd1eb66",
+      "html_url": "https://github.com/runeditrun/base/actions/runs/42235012226",
+      "id": 42235012226,
+      "name": "Verify",
+      "path": ".github/workflows/verify.yml",
+      "status": "in_progress"
+    },
+    "Release rer": {
+      "conclusion": "success",
+      "created_at": "2026-11-06T14:34:12Z",
+      "event": "workflow_dispatch",
+      "head_branch": "cloud/gr-rer-mailoff-02100-prepare-1",
+      "head_sha": "1863aa8caafb4eef44c0d8fafd524c9b8cd1eb66",
+      "html_url": "https://github.com/runeditrun/base/actions/runs/42235085021",
+      "id": 42235085021,
+      "name": "Release rer",
+      "path": ".github/workflows/rer-release.yml",
+      "status": "completed"
+    }
+  },
+  "landing_hold": "HELD; no landing, tag or publication authorized by this preparation",
+  "product_blockers": [],
+  "pending": [
+    "ordinary exact-C Verify completion"
+  ],
+  "later_release_qualifications": [
+    "ordinary and explicit journeys=true Verify on final C",
+    "complete publication scan on final C",
+    "stranger/installer requirements and all existing release prerequisites",
+    "strategy release of landing hold"
+  ],
+  "clause_status_changes": 0,
+  "counts": {
+    "version_before": "0.2.99",
+    "version_after": "0.2.100",
+    "files_before": 4761,
+    "files_after": 4761,
+    "files_changed": 3,
+    "tests_added": 0,
+    "tests_removed": 0,
+    "tests_changed": 0,
+    "clauses_changed": 0
+  },
+  "cleanup": "clone retained through evidence publication, then removed; packet retained outside clone"
+}

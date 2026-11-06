@@ -1,0 +1,32 @@
+{
+  "source": "1da58f1537aeef14b733223de19c1791a17d68f2",
+  "M": "896a437f0c5def74b1fcc2ce7cd0a50e073ef584",
+  "C": "1863aa8caafb4eef44c0d8fafd524c9b8cd1eb66",
+  "source_tree": "8a324fd7b6f0cbebb8c33b8c86e37d85f9604f86",
+  "M_tree": "b13c933c39662b5babb3c4fdbb928a8c5a4311e4",
+  "C_tree": "c7002c230298b1865920f694c9e87de74b2979d1",
+  "files": [
+    "M\tdefault-seed/scripts/base-cli/inventory.json",
+    "M\tglobal/CHANGELOG.md",
+    "M\tglobal/package.json"
+  ],
+  "diffstat": "default-seed/scripts/base-cli/inventory.json |  2 +-\n global/CHANGELOG.md                          | 20 +++++++++++++++++---\n global/package.json                          |  2 +-\n 3 files changed, 19 insertions(+), 5 deletions(-)",
+  "candidate_commits": [
+    "1863aa8caafb4eef44c0d8fafd524c9b8cd1eb66 Refresh the generated CLI source revision for 0.2.100",
+    "896a437f0c5def74b1fcc2ce7cd0a50e073ef584 Prepare rer 0.2.100 from the accepted mail-off source [skip ci]"
+  ],
+  "source_release_base": "ca42f4a94fbe71d98b0402607e5d557a51cfac90",
+  "tracked_files_before": 4761,
+  "tracked_files_after": 4761,
+  "product_source_changes": 0,
+  "dependency_changes": 0,
+  "migration_changes": 0,
+  "contract_changes": 0,
+  "test_changes": 0,
+  "clauses_promoted_or_demoted": 0,
+  "local_test_registrations_run": 1,
+  "local_test_pass": 1,
+  "local_test_fail": 0,
+  "packed_command_probes": 4,
+  "landing_hold": "HELD; preparation does not release landing or publication authority"
+}

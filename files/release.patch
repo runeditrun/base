@@ -1,0 +1,56 @@
+diff --git a/default-seed/scripts/base-cli/inventory.json b/default-seed/scripts/base-cli/inventory.json
+index c2240ee9eee1a446e269a71e438da29cb6662295..ddaafefda12e0d47d73456a0bf50a164a83d5d20 100644
+--- a/default-seed/scripts/base-cli/inventory.json
++++ b/default-seed/scripts/base-cli/inventory.json
+@@ -1,6 +1,6 @@
+ {
+   "version": 1,
+-  "cliVersion": "0.2.99-dev.g0da8ea78",
++  "cliVersion": "0.2.100-dev.g896a437f",
+   "onboarding": "../base-onboarding",
+   "onboardingFiles": {
+     "README.md": {
+diff --git a/global/CHANGELOG.md b/global/CHANGELOG.md
+index 2251e4521f9e133d5d7b98dc9de1fa361178ba5a..b2e16cbaa00f0adb4c91d858832fbebe9a39c977 100644
+--- a/global/CHANGELOG.md
++++ b/global/CHANGELOG.md
+@@ -2,10 +2,24 @@
+ 
+ ## Unreleased
+ 
+-- Setup and dev let the managed Vite listener use its finite startup budget instead of stopping at 60 seconds. Custom start targets retain their declared deadlines; a missing listener announcement reports elapsed and allowed time with startup-log guidance.
++## 0.2.100
++
++### Deploy with outbound email explicitly off
++
++- `rer deploy` and `rer deploy --dry-run` accept explicit `MAIL_PROVIDER=none` only when the seed's adapter declares `mailOffSignIn`, naming its sign-in command without mail. They bind no mail credential and name the hosted sign-in command and environment. Missing mail configuration is still refused; `none` with a sending credential, account or relay binding is refused before build or upload. The seed owns its behavior with mail off; turning mail on later uses the documented provider inputs and `rer deploy --set-secret`.
++
++### Import transport and opt-in bounded waves
+ 
+-- Legacy MCP tool calls held for approval now return their generated `requestState` alongside `approval_required`, so retrying an approved read resumes the original operation without asking for a second approval.
+-- `rer deploy --site` now retries a changing or partial Cloudflare list from page one up to three times, waiting 20 seconds between failed reads. It discards incomplete snapshots, never replays deploy writes, preserves other refusals and stops waiting on cancellation.
++- The import door supports a logical package whose files travel in bounded, verified segments. Completed-file hashes, declared aggregate counts and existing source/native quotas are checked before planning; refused packages withdraw their segment custody. Segment transport does not approve an import or raise a quota.
++- Opt-in complete-parent imports can prepare, seal and approve ordered bounded waves, preserving parent lineage, complete membership and native before-images. Unchanged catch-up dispositions and completed reversal retries remain stable; concurrent parent preparation fences reversal. Adopters supply their source/native integrations and a new numbered migration for the additive bounded-wave schema. The reference includes the schema; no edition adoption, live migration, import or cutover is claimed.
++- Business can register a verified local legacy package and transfer its exact files to the granted import door. The accepted Zendesk exporter captures paginated people, tickets, comments, attachments and Guide content into the documented package, with bounded read-only transport, credential removal and resumable checkpoints. These are the inherited accepted package, bounded-wave and Zendesk changes; this release adds no further Business command changes.
++
++### Startup, approval replay and deployment recovery
++
++- Setup and dev let the managed Vite listener use its finite startup budget instead of stopping at 60 seconds. Custom start targets retain their declared deadlines; a missing listener announcement reports elapsed and allowed time with startup-log guidance.
++- Legacy MCP tool calls held for approval return their generated `requestState` alongside `approval_required`, so retrying an approved read resumes the original operation without asking for a second approval.
++- `rer deploy --site` retries a changing or partial Cloudflare list from page one up to three times, waiting 20 seconds between failed reads. It discards incomplete snapshots, never replays deploy writes, preserves other refusals and stops waiting on cancellation.
++- Publication scans retain value-free worker, report, version-stamping and cleanup failure diagnostics. Cleanup and version-stamping failures still refuse publication; diagnostic handling does not turn a failed scan into a pass.
+ 
+ ## 0.2.99
+ 
+diff --git a/global/package.json b/global/package.json
+index ee0725949e4c4dd1ea54354bd1322ce56570ebf9..60fbdcadac81e67a78411bcd64642f00f781e2d4 100644
+--- a/global/package.json
++++ b/global/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "@runeditrun/rer",
+-  "version": "0.2.99",
++  "version": "0.2.100",
+   "description": "The rer command: install, set up, run and launch Run Edit Run checkouts.",
+   "license": "MIT",
+   "type": "module",

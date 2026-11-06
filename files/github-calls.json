@@ -1,0 +1,104 @@
+[
+  {
+    "number": 1,
+    "time": "2026-11-06T14:33:39.764515+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/pulls",
+      "--method",
+      "POST",
+      "--input",
+      "../packet/pr-request.json",
+      "--jq",
+      "{number,html_url,draft,head:{sha:.head.sha,ref:.head.ref},base:{ref:.base.ref}}"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 2,
+    "time": "2026-11-06T14:34:10.479497+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs?head_sha=1863aa8caafb4eef44c0d8fafd524c9b8cd1eb66&per_page=100",
+      "--jq",
+      ".workflow_runs | map({id,name,path,event,status,conclusion,head_sha,head_branch,html_url,created_at})"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 3,
+    "time": "2026-11-06T14:34:12.424483+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/workflows/rer-release.yml/dispatches",
+      "--method",
+      "POST",
+      "-f",
+      "ref=cloud/gr-rer-mailoff-02100-prepare-1"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 4,
+    "time": "2026-11-06T14:39:11.175885+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs?head_sha=1863aa8caafb4eef44c0d8fafd524c9b8cd1eb66&per_page=100",
+      "--jq",
+      ".workflow_runs | map({id,name,path,event,status,conclusion,head_sha,head_branch,html_url,created_at})"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 5,
+    "time": "2026-11-06T14:44:11.788569+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/42235012226",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 6,
+    "time": "2026-11-06T14:44:12.163459+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/42235085021",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 7,
+    "time": "2026-11-06T14:49:12.374431+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/42235012226",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 8,
+    "time": "2026-11-06T14:54:13.067531+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/42235012226",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  }
+]

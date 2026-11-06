@@ -1,0 +1,9 @@
+{
+  "time": "2026-11-06T14:33:35.444755+00:00",
+  "refs": {
+    "refs/heads/cd/rer-mail-off-deploy-1": "1da58f1537aeef14b733223de19c1791a17d68f2",
+    "refs/heads/main": "1da58f1537aeef14b733223de19c1791a17d68f2"
+  },
+  "candidate": "1863aa8caafb4eef44c0d8fafd524c9b8cd1eb66",
+  "main_drift_beyond_source": false
+}

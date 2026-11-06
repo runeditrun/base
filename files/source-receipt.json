@@ -1,0 +1,14 @@
+{
+  "source": "1da58f1537aeef14b733223de19c1791a17d68f2",
+  "source_parent": "0da8ea78be784494f67c30673230241280ce22cb",
+  "main_at_clone": "601a56e0a5e8e21507003b902949e12723036148",
+  "main_after_fetch": "1da58f1537aeef14b733223de19c1791a17d68f2",
+  "advertisement": "1da58f1537aeef14b733223de19c1791a17d68f2\trefs/heads/cd/rer-mail-off-deploy-1\n1da58f1537aeef14b733223de19c1791a17d68f2\trefs/heads/main",
+  "release_base": "ca42f4a94fbe71d98b0402607e5d557a51cfac90",
+  "shallow": "false",
+  "main_source_ancestry": "main at accepted source; source is descendant of original main; no drift beyond source",
+  "npm_0_2_100": "E404 No match found",
+  "npm_latest": "0.2.99",
+  "release_hold": "HELD until strategy releases hold and final release qualifications pass",
+  "source_tree": "8a324fd7b6f0cbebb8c33b8c86e37d85f9604f86"
+}
