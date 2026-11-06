@@ -1,0 +1,21 @@
+{
+  "base_sha": "30f624e457d5e2dba7dbf6076529d05220a5cee9",
+  "base_worktree_head": "30f624e457d5e2dba7dbf6076529d05220a5cee9",
+  "matcher_files": [
+    {
+      "path": "default-seed/src/agent-door/erasure.ts",
+      "sha256": "00bd4713f8da3ce7c33962dfd330cb51941847ef8a934d8ffb7de87000934886",
+      "unchanged_at_base": true
+    },
+    {
+      "path": "modules/agent-door/adoption/penny/penny-map.ts",
+      "sha256": "336c536c7e238890dab57ea68b4e06e61bf2e84340782e2fefa60d01500a67cc",
+      "unchanged_at_base": true
+    }
+  ],
+  "command": "node --test --test-name-pattern='People erase preserves Fred' modules/agent-door/tests/erasure.test.ts",
+  "exit_code": 1,
+  "period_proposals_leaked_before": 4,
+  "peer_surfaces_unchanged": true,
+  "assertions_weakened_or_deleted": false
+}

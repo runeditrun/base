@@ -1,0 +1,19 @@
+{
+  "total": 23,
+  "success": 22,
+  "failed": [
+    {
+      "conclusion": "failure",
+      "failed_steps": [
+        {
+          "name": "Run full-verify stages assigned to this job",
+          "number": 13
+        }
+      ],
+      "html_url": "https://github.com/runeditrun/base/actions/runs/42297595918/job/128166873338",
+      "id": 128166873338,
+      "name": "Verify (foundation)",
+      "status": "completed"
+    }
+  ]
+}

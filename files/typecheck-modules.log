@@ -1,0 +1,5 @@
+
+> seeds-base@ typecheck:modules /home/agent/rer-consolidation/work/gr-base-erasure-overmatch-fix-5/base
+> ./default-seed/node_modules/.bin/tsc --project default-seed/tsconfig.seed-copies.json && ./default-seed/node_modules/.bin/tsc --project modules/egress-service/tsconfig.json --noUnusedLocals --noUnusedParameters --noFallthroughCasesInSwitch && ./default-seed/node_modules/.bin/tsc --project modules/catalogue-ordering/tsconfig.json && node scripts/ci/check-module-js.mjs && ./default-seed/node_modules/.bin/tsc --project modules/time-billing/tests/tsconfig.json && ./default-seed/node_modules/.bin/tsc --project modules/agreement-signing/tests/tsconfig.json && ./default-seed/node_modules/.bin/tsc --noEmit --strict --skipLibCheck --allowImportingTsExtensions --module NodeNext --moduleResolution NodeNext --target ES2022 --lib ES2022,DOM default-seed/node_modules/@cloudflare/workers-types/index.d.ts modules/agent-door/tests/types.check.mts
+
+Checked 498 module JavaScript files for syntax, unused declarations and switch fallthrough.

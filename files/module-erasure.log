@@ -1,0 +1,35 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ native erasure keeps sequence and value-free tombstones; old keys refuse in-window and become new requests after expiry; archives exclude replay custody (8671.004795ms)
+ℹ all mapped columns clear; audit sequence intact; in-window replay effect=1 at now, 24h+1ms, horizon-1ms; horizon+1ms=new request/current policy_blocked, call+alias deleted, no recovered value; concurrent capture=409; peer unchanged; alias/key absent from export; older archive refused
+✔ pending approval loses its inputs and marks, cannot execute after native erasure (1960.555948ms)
+▶ People erase preserves Fred when Ed is a substring of his email, including claims, audit, replay and pending approval
+  ✔ peer claims retain their keys and outcomes (23.690832ms)
+  ✔ peer audit retains its contents and sponsor (12.419874ms)
+  ✔ peer replay returns the recorded result without another note (29.719451ms)
+  ✔ peer pending approval keeps its exact summary and applies (42.384374ms)
+  ✔ suffix peer keeps its exact proposal, claims, audit and usage (12.811925ms)
+  ✔ sentence-period mention erases: Introduce Gail to ed@acme.test. (80.049849ms)
+  ✔ sentence-period mention erases: Merge the duplicate record 01M6SC583ZT9KN1Z6MK94V3CF4. (97.879253ms)
+  ✔ sentence-period mention erases: Done. ed@acme.test. Next step (94.488322ms)
+  ✔ sentence-period mention erases: Done. 01M6SC583ZT9KN1Z6MK94V3CF4.) (69.111894ms)
+  ✔ sentence-period personal values are absent from the post-erasure archive (8743.132818ms)
+  ✔ Ed still loses his native records and gets a value-free replay tombstone (30.564961ms)
+✔ People erase preserves Fred when Ed is a substring of his email, including claims, audit, replay and pending approval (12324.276404ms)
+ℹ Fred approval after Ed erasure: code=none; approve status=200
+ℹ sentence-period proposals: pending 4 -> held/tombstoned 4; live saved/archive personal mentions 4 -> 0; Fred and suffix peer rows byte-identical
+✔ seed and Penny maps agree on sentence periods and preserve identifier continuations (2278.217457ms)
+✔ adoption refuses undeclared tables and columns (2203.825463ms)
+✔ an admitted completion cannot overwrite a tombstone or append late personal events; stale selections roll back (3110.981312ms)
+✔ operator retirement keeps paired and local peer approvals pending, accepts refreshes, and survives archives (27192.787639ms)
+ℹ paired: declaration/subject refusals; native batch; envelope/revision unchanged; peer audit unchanged/differs=0; pending marker; refresh/liveness; in-flight audit/review/call/event retired; completed peer replay and owner Undo; late MCP and embedded copies retired; checkpoint and archive restore custody; release=0
+ℹ local: declaration/subject refusals; native batch; envelope/revision unchanged; peer audit unchanged/differs=0; pending marker; refresh/liveness; in-flight audit/review/call/event retired; completed peer replay and owner Undo; late MCP and embedded copies retired; checkpoint and archive restore custody; release=0
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 58807.402855

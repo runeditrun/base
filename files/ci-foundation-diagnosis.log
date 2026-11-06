@@ -1,0 +1,102 @@
+Waiting 269 seconds before the one permitted failed-job archive read
+failed-job archive command exit=0
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5422462Z [verify:foundation] ok 21 - fictional examples never exempt nearby names, real private repositories or explicit states
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5423765Z [verify:foundation]   ---
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5424599Z [verify:foundation]   duration_ms: 10469.298042
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5425426Z [verify:foundation]   type: 'test'
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5426468Z [verify:foundation]   ...
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5459035Z [verify:foundation] # Subtest: drains ordinary JSON and preserves the supplied response
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5464101Z [verify:foundation] ok 22 - drains ordinary JSON and preserves the supplied response
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5486852Z [verify:foundation]   ---
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5487386Z [verify:foundation]   duration_ms: 31.812291
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5487959Z [verify:foundation]   type: 'test'
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5488460Z [verify:foundation]   ...
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5489134Z [verify:foundation] # Subtest: accepts exactly 64 KiB across multiple chunks
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5490089Z [verify:foundation] ok 23 - accepts exactly 64 KiB across multiple chunks
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5490825Z [verify:foundation]   ---
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5491320Z [verify:foundation]   duration_ms: 1.120289
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5492152Z [verify:foundation]   type: 'test'
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5492691Z [verify:foundation]   ...
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5493410Z [verify:foundation] # Subtest: rejects a body one byte over 64 KiB and cancels its stream
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5494476Z [verify:foundation] ok 24 - rejects a body one byte over 64 KiB and cancels its stream
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5495258Z [verify:foundation]   ---
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5495935Z [verify:foundation]   duration_ms: 1.47
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5496507Z [verify:foundation]   type: 'test'
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5496972Z [verify:foundation]   ...
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5497700Z [verify:foundation] # Subtest: a stalled body receives 408 within the bounded drain timeout
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5498789Z [verify:foundation] ok 25 - a stalled body receives 408 within the bounded drain timeout
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5499876Z [verify:foundation]   ---
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5500377Z [verify:foundation]   duration_ms: 2000.656202
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5500947Z [verify:foundation]   type: 'test'
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5501457Z [verify:foundation]   ...
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5502200Z [verify:foundation] # Subtest: preserves the supplied response for an already consumed body
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5503317Z [verify:foundation] ok 26 - preserves the supplied response for an already consumed body
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5504150Z [verify:foundation]   ---
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5504633Z [verify:foundation]   duration_ms: 0.760554
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5505172Z [verify:foundation]   type: 'test'
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5505665Z [verify:foundation]   ...
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5506587Z [verify:foundation] # Subtest: preserves the supplied response when there is no body
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5507593Z [verify:foundation] ok 27 - preserves the supplied response when there is no body
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5508369Z [verify:foundation]   ---
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5508845Z [verify:foundation]   duration_ms: 0.268914
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5509391Z [verify:foundation]   type: 'test'
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5509904Z [verify:foundation]   ...
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5510272Z [verify:foundation] # Subtest: propagates body read failures
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5510686Z [verify:foundation] ok 28 - propagates body read failures
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5511018Z [verify:foundation]   ---
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5511273Z [verify:foundation]   duration_ms: 1.182705
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5511584Z [verify:foundation]   type: 'test'
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5511850Z [verify:foundation]   ...
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5512234Z [verify:foundation] # Subtest: notFoundResponse drains unused input and returns a 404
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5512834Z [verify:foundation] ok 29 - notFoundResponse drains unused input and returns a 404
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5513253Z [verify:foundation]   ---
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5513509Z [verify:foundation]   duration_ms: 0.663352
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5513815Z [verify:foundation]   type: 'test'
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5514083Z [verify:foundation]   ...
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5514609Z [verify:foundation] # Subtest: Slate's contract parses into its target, areas and one clause per Status row, counted from the rows
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5515448Z [verify:foundation] ok 30 - Slate's contract parses into its target, areas and one clause per Status row, counted from the rows
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5516649Z [verify:foundation]   ---
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5517156Z [verify:foundation]   duration_ms: 29.410944
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5517733Z [verify:foundation]   type: 'test'
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5518221Z [verify:foundation]   ...
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5519167Z [verify:foundation] # Subtest: two-digit AREA-NN and legacy E1-style clause IDs parse; other shapes still refuse at their line
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5520687Z [verify:foundation] ok 31 - two-digit AREA-NN and legacy E1-style clause IDs parse; other shapes still refuse at their line
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5521711Z [verify:foundation]   ---
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5522236Z [verify:foundation]   duration_ms: 66.030246
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5522792Z [verify:foundation]   type: 'test'
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5523291Z [verify:foundation]   ...
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5537968Z [verify:foundation] # Subtest: a malformed or inconsistent contract is refused, naming the line of each problem
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5539261Z [verify:foundation] ok 32 - a malformed or inconsistent contract is refused, naming the line of each problem
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5540245Z [verify:foundation]   ---
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5540812Z [verify:foundation]   duration_ms: 209.020803
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5541582Z [verify:foundation]   type: 'test'
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5542163Z [verify:foundation]   ...
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5542676Z [verify:foundation] 1..32
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5543144Z # tests 71
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5543589Z [verify:foundation] # suites 0
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5544110Z # pass 68
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5544538Z # fail 2
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5544880Z # cancelled 0
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5545433Z # skipped 1
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5546506Z # todo 0
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.5547002Z [verify:foundation] # duration_ms 150205.872225
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.6072435Z [verify:foundation]  ELIFECYCLE  Command failed with exit code 1.
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.6228630Z VERIFY_STAGE end verify:foundation exit=1 seconds=150.651
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.6229288Z VERIFY_STAGE start verify:publish-check
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.8909938Z [verify:publish-check] 
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.8910527Z [verify:publish-check] > seeds-base@ verify:publish-check /__w/base/base
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.8911635Z [verify:publish-check] > node onboarding/queued-entry.mjs verify:publish-check -- sh -c 'python3 -B scripts/publish-check/tests.py && python3 -B scripts/publish-check/coverage_tests.py'
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.8912588Z [verify:publish-check] 
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:37:04.9536741Z [verify:publish-check] verify:publish-check
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:42:15.2210723Z [verify:publish-check] .....................................
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:42:15.2211645Z [verify:publish-check] ----------------------------------------------------------------------
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:42:15.2212466Z [verify:publish-check] Ran 37 tests in 310.116s
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:42:15.2213094Z [verify:publish-check] 
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:42:15.2213546Z [verify:publish-check] OK
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:43:44.5787559Z [verify:publish-check] .......................
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:43:44.5788606Z [verify:publish-check] ----------------------------------------------------------------------
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:43:44.5789466Z [verify:publish-check] Ran 23 tests in 89.194s
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:43:44.5790011Z [verify:publish-check] 
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:43:44.5790473Z [verify:publish-check] OK
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:43:44.6493148Z VERIFY_STAGE end verify:publish-check exit=0 seconds=400.026
+Verify (foundation)	Run full-verify stages assigned to this job	2026-11-06T21:43:44.6711175Z ##[error]Process completed with exit code 1.

@@ -1,0 +1,5 @@
+Person erasure now treats a trailing period as sentence punctuation when the next outward character cannot continue an identifier. Gail's pending proposals mentioning Ed's email or long ID are redacted, while fred@acme.test and ed@x.org.uk remain unchanged.
+
+This includes the unlanded fix-4 matching changes from 30f624e457d5e2dba7dbf6076529d05220a5cee9, squashed onto current main for this single product commit. Seed and Penny each use one boundary definition. No migration, setting, URI exception or contract judgment changes.
+
+Validation: the expanded public-door regression fails at the exact fix-4 SHA for all four sentence-period forms and its archive check; the full module erasure file passes after the fix. A 17-case matrix exercises both maps' periods, prefix/suffix peers, long IDs in paths, short version/source IDs and literal metacharacters. Both module and seed typechecks and the real default-seed build pass. The complete emitted-Worker person-erasure file passes 12/12 tests through final clean-archive restore.

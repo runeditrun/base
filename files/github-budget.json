@@ -1,0 +1,136 @@
+[
+  {
+    "call": 1,
+    "at": "2026-11-06T21:32:37.835043+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/pulls",
+      "--method",
+      "POST",
+      "-f",
+      "head=cloud/gr-base-erasure-overmatch-fix-5",
+      "-f",
+      "base=main",
+      "-f",
+      "title=Fix person erasure boundaries for sentence-period mentions",
+      "-F",
+      "body=@../packet/PR-BODY.md",
+      "--jq",
+      "{number,html_url,head_sha:.head.sha,base:.base.ref}"
+    ],
+    "exit": 0
+  },
+  {
+    "call": 2,
+    "at": "2026-11-06T21:32:51.706808+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs?head_sha=c3f4fc864543b5e929e6d4a198de000000000000&per_page=100",
+      "--jq",
+      ".workflow_runs | map({id,name,status,conclusion,head_sha,html_url})"
+    ],
+    "exit": 0
+  },
+  {
+    "call": 3,
+    "at": "2026-11-06T21:37:52.750958+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs?head_sha=c3f4fc8659b659b8babe245f333bcef0a071871a&per_page=100",
+      "--jq",
+      ".workflow_runs | map({id,name,status,conclusion,head_sha,html_url})"
+    ],
+    "exit": 0
+  },
+  {
+    "call": 4,
+    "at": "2026-11-06T21:42:53.794332+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/42297595918",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  },
+  {
+    "call": 5,
+    "at": "2026-11-06T21:47:54.815256+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/42297595918",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  },
+  {
+    "call": 6,
+    "at": "2026-11-06T21:52:55.842102+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/42297595918",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  },
+  {
+    "call": 7,
+    "at": "2026-11-06T21:57:56.869271+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/42297595918",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  },
+  {
+    "call": 8,
+    "at": "2026-11-06T22:02:57.905185+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/42297595918/jobs?per_page=100",
+      "--jq",
+      "{total_count,jobs:[.jobs[]|{id,name,status,conclusion,html_url,failed_steps:[.steps[]?|select(.conclusion==\"failure\")|{name,number}]}]}"
+    ],
+    "exit": 0
+  },
+  {
+    "call": 9,
+    "at": "2026-11-06T22:07:58.931016+00:00",
+    "command": [
+      "gh",
+      "run",
+      "view",
+      "42297595918",
+      "--repo",
+      "runeditrun/base",
+      "--job",
+      "128166873338",
+      "--log-failed"
+    ],
+    "exit": 0
+  },
+  {
+    "call": 10,
+    "at": "2026-11-06T22:42:49.260675+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs?head_sha=5961885da3859c758b648f7ff0717e3afd0b7298&per_page=100",
+      "--jq",
+      ".workflow_runs | map({id,name,status,conclusion,head_sha,html_url})"
+    ],
+    "exit": 0
+  }
+]

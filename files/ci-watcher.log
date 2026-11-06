@@ -1,0 +1,16 @@
+CI watcher: next permitted call in 266 seconds
+[{"conclusion":null,"head_sha":"c3f4fc8659b659b8babe245f333bcef0a071871a","html_url":"https://github.com/runeditrun/base/actions/runs/42297595918","id":42297595918,"name":"Verify","status":"in_progress"}]
+
+CI watcher: next permitted call in 300 seconds
+{"conclusion":null,"head_sha":"c3f4fc8659b659b8babe245f333bcef0a071871a","html_url":"https://github.com/runeditrun/base/actions/runs/42297595918","status":"in_progress"}
+
+CI watcher: next permitted call in 301 seconds
+{"conclusion":null,"head_sha":"c3f4fc8659b659b8babe245f333bcef0a071871a","html_url":"https://github.com/runeditrun/base/actions/runs/42297595918","status":"in_progress"}
+
+CI watcher: next permitted call in 301 seconds
+{"conclusion":null,"head_sha":"c3f4fc8659b659b8babe245f333bcef0a071871a","html_url":"https://github.com/runeditrun/base/actions/runs/42297595918","status":"in_progress"}
+
+CI watcher: next permitted call in 301 seconds
+{"conclusion":"failure","head_sha":"c3f4fc8659b659b8babe245f333bcef0a071871a","html_url":"https://github.com/runeditrun/base/actions/runs/42297595918","status":"completed"}
+
+CI terminal conclusion=failure exact_sha=c3f4fc8659b659b8babe245f333bcef0a071871a

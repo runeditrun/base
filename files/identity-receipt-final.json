@@ -1,0 +1,17 @@
+{
+  "all_candidate_commits_including_side_parents": [
+    {
+      "sha": "5961885da3859c758b648f7ff0717e3afd0b7298",
+      "author": "Run Edit Run fleet <fleet@runeditrun.com>",
+      "committer": "Run Edit Run fleet <fleet@runeditrun.com>",
+      "trailers": ""
+    },
+    {
+      "sha": "c3f4fc8659b659b8babe245f333bcef0a071871a",
+      "author": "Run Edit Run fleet <fleet@runeditrun.com>",
+      "committer": "Run Edit Run fleet <fleet@runeditrun.com>",
+      "trailers": ""
+    }
+  ],
+  "passed": true
+}

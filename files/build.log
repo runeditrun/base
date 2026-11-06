@@ -1,0 +1,74 @@
+Using project Node 22.20.0 (current Node 24.19.0).
+Heavy job admitted: default-seed build:workflow [009fc3b9c8bd]
+Checking pinned pnpm
+10.12.4
+Building your application
+build:app
+▲ [WARNING] Proxy environment variables detected. We'll use your proxy for fetch requests.
+
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 165 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/client/.assetsignore                     0.02 kB
+dist/client/assets/reference-DD52GQ6r.js      0.35 kB │ gzip:   0.25 kB
+dist/client/assets/records-BwbI5f--.js        0.55 kB │ gzip:   0.33 kB
+dist/client/assets/app-BhgEHKs8.js            0.64 kB │ gzip:   0.38 kB
+dist/client/assets/app.index-DWYS9awe.js      5.69 kB │ gzip:   1.90 kB
+dist/client/assets/jsx-runtime-ByaQ0wya.js    8.77 kB │ gzip:   3.33 kB
+dist/client/assets/index-AimUAz_3.js        343.42 kB │ gzip: 110.75 kB
+
+✓ built in 420ms
+vite v8.2.2 building ssr environment for production...
+transforming...
+✓ 926 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/server/wrangler.json                                               1.78 kB │ gzip:   0.82 kB
+dist/server/.vite/manifest.json                                        11.02 kB │ gzip:   1.52 kB
+dist/server/assets/theme-BXcFr6qf.js                                    0.14 kB │ gzip:   0.13 kB
+dist/server/assets/empty-plugin-adapters-BJtp80G-.js                    0.28 kB │ gzip:   0.18 kB
+dist/server/assets/start-BaVJMenj.js                                    0.29 kB │ gzip:   0.21 kB
+dist/server/assets/start-session.server-Bfa_OJYz.js                     0.32 kB │ gzip:   0.20 kB
+dist/server/assets/font-head-CVaHI6aq.js                                0.45 kB │ gzip:   0.30 kB
+dist/server/assets/identifiers.server-Bwp7YGmm.js                       0.55 kB │ gzip:   0.37 kB
+dist/server/assets/reference-U-5d2pB6.js                                0.70 kB │ gzip:   0.36 kB
+dist/server/assets/identity-DxmpXcVp.js                                 0.79 kB │ gzip:   0.42 kB
+dist/server/assets/session.server-1T1OirbZ.js                           1.10 kB │ gzip:   0.56 kB
+dist/server/assets/scheduled.server-BFtNCuRr.js                         1.14 kB │ gzip:   0.63 kB
+dist/server/assets/records-D4A43sUC.js                                  1.15 kB │ gzip:   0.48 kB
+dist/server/assets/app-BNdE_WOh.js                                      1.32 kB │ gzip:   0.55 kB
+dist/server/assets/_tanstack-start-manifest_v-KwtCWiYS.js               1.32 kB │ gzip:   0.46 kB
+dist/server/assets/command-receipts-CE3tCAS0.js                         3.92 kB │ gzip:   1.66 kB
+dist/server/assets/loaders-D88xhY99.js                                  4.25 kB │ gzip:   1.17 kB
+dist/server/assets/actor-BrqqCqrn.js                                    4.45 kB │ gzip:   1.98 kB
+dist/server/assets/hash-DFqpWAv6.js                                     4.63 kB │ gzip:   2.12 kB
+dist/server/assets/storage-DqHyry9j.js                                  5.10 kB │ gzip:   2.04 kB
+dist/server/assets/theme-frame-BeLvNlwC.js                              5.20 kB │ gzip:   2.17 kB
+dist/server/assets/page.server-ChjrcHLE.js                              5.56 kB │ gzip:   2.40 kB
+dist/server/assets/app.index-BesqgSQh.js                               11.00 kB │ gzip:   2.59 kB
+dist/server/assets/page.server-B2fri2EF.js                             12.43 kB │ gzip:   4.36 kB
+dist/server/assets/createServerFn-CiSFlVBp.js                          14.05 kB │ gzip:   4.26 kB
+dist/server/assets/jsx-runtime-DCnzmCt0.js                             19.34 kB │ gzip:   5.15 kB
+dist/server/assets/loaders-Ce0pdso4.js                                 23.12 kB │ gzip:   6.10 kB
+dist/server/assets/__23tanstack-start-server-fn-resolver-DenNYVUq.js   25.32 kB │ gzip:   8.43 kB
+dist/server/assets/router-VCqu5-gp.js                                  27.38 kB │ gzip:   7.67 kB
+dist/server/assets/person-events.server-DLnslN_e.js                   172.21 kB │ gzip:  39.33 kB
+dist/server/assets/business.server-C0VARLKG.js                        376.67 kB │ gzip:  94.11 kB
+dist/server/index.js                                                  381.76 kB │ gzip:  94.59 kB
+dist/server/assets/undo-snapshot-BhmXtHTW.js                          436.04 kB │ gzip: 110.19 kB
+dist/server/assets/routes-7RcDKa3G.js                                 576.82 kB │ gzip: 148.63 kB
+dist/server/assets/server-Dt1IvEWB.js                                 832.92 kB │ gzip: 176.85 kB
+
+✓ built in 579ms
+[prerender] Prerendering pages...
+[prerender] Concurrency: 5
+[prerender] Crawling: /reference
+GET /reference/ 307 Temporary Redirect (17ms)
+GET /reference 200 OK (17ms)
+[prerender] Prerendered 1 pages:
+[prerender] - /reference
+Your application is built
+build: complete (exit 0)

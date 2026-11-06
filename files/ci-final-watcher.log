@@ -1,0 +1,33 @@
+Final exact-SHA discovery reserved for 2026-11-06T22:42:49.221677+00:00 head=5961885da3859c758b648f7ff0717e3afd0b7298
+Waiting for final exact-SHA check: 29 minutes remain
+Waiting for final exact-SHA check: 28 minutes remain
+Waiting for final exact-SHA check: 27 minutes remain
+Waiting for final exact-SHA check: 26 minutes remain
+Waiting for final exact-SHA check: 25 minutes remain
+Waiting for final exact-SHA check: 24 minutes remain
+Waiting for final exact-SHA check: 23 minutes remain
+Waiting for final exact-SHA check: 22 minutes remain
+Waiting for final exact-SHA check: 21 minutes remain
+Waiting for final exact-SHA check: 20 minutes remain
+Waiting for final exact-SHA check: 19 minutes remain
+Waiting for final exact-SHA check: 18 minutes remain
+Waiting for final exact-SHA check: 17 minutes remain
+Waiting for final exact-SHA check: 16 minutes remain
+Waiting for final exact-SHA check: 15 minutes remain
+Waiting for final exact-SHA check: 14 minutes remain
+Waiting for final exact-SHA check: 13 minutes remain
+Waiting for final exact-SHA check: 12 minutes remain
+Waiting for final exact-SHA check: 11 minutes remain
+Waiting for final exact-SHA check: 10 minutes remain
+Waiting for final exact-SHA check: 9 minutes remain
+Waiting for final exact-SHA check: 8 minutes remain
+Waiting for final exact-SHA check: 7 minutes remain
+Waiting for final exact-SHA check: 6 minutes remain
+Waiting for final exact-SHA check: 5 minutes remain
+Waiting for final exact-SHA check: 4 minutes remain
+Waiting for final exact-SHA check: 3 minutes remain
+Waiting for final exact-SHA check: 2 minutes remain
+Waiting for final exact-SHA check: 1 minutes remain
+[{"conclusion":"success","head_sha":"5961885da3859c758b648f7ff0717e3afd0b7298","html_url":"https://github.com/runeditrun/base/actions/runs/42302783755","id":42302783755,"name":"Verify","status":"completed"}]
+
+Final exact-SHA result: completed/success

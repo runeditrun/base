@@ -1,0 +1,147 @@
+{
+  "task": "gr-base-erasure-overmatch-fix-5",
+  "repository": "runeditrun/base",
+  "branch": "cloud/gr-base-erasure-overmatch-fix-5",
+  "main_at_start": "0f1b6a37a746f1bc4a297d649deba29f85e2f56b",
+  "fix4_base": "30f624e457d5e2dba7dbf6076529d05220a5cee9",
+  "base_in_main": false,
+  "integration": "unpublished squash of fix-4 changes onto main, followed by sentence-period repair in one product commit",
+  "local_runtime": {
+    "node": "v24.19.0",
+    "pnpm": "10.12.4"
+  },
+  "checks": [
+    {
+      "command": "node --test --test-name-pattern='People erase preserves Fred' modules/agent-door/tests/erasure.test.ts",
+      "worktree": "baseline at exact fix4 Base-SHA; expanded test copied in",
+      "expected_exit": 1,
+      "actual_exit": 1,
+      "log": "base-sha-regression.log"
+    },
+    {
+      "command": "node --test modules/agent-door/tests/erasure.test.ts",
+      "exit": 0,
+      "tests": 18,
+      "passed": 18,
+      "failed": 0,
+      "log": "module-erasure.log"
+    },
+    {
+      "command": "pnpm typecheck:modules",
+      "exit": 0,
+      "module_js_files_checked": 498,
+      "log": "typecheck-modules.log"
+    },
+    {
+      "command": "pnpm --dir default-seed typecheck",
+      "exit": 0,
+      "log": "typecheck-seed.log"
+    },
+    {
+      "command": "npx -y @runeditrun/rer setup --owner-email fleet@runeditrun.com --non-interactive",
+      "cwd": "default-seed",
+      "exit": 0,
+      "log_withheld": "local installation configuration is excluded from the public packet"
+    },
+    {
+      "command": "npx -y @runeditrun/rer build",
+      "cwd": "default-seed",
+      "exit": 0,
+      "log": "build.log"
+    },
+    {
+      "command": "node --test default-seed/tests/e2e/agent-person-erasure.test.mjs",
+      "exit": 0,
+      "tests": 12,
+      "passed": 12,
+      "failed": 0,
+      "duration_ms": 172653.479028,
+      "log": "emitted-person-erasure.log"
+    },
+    {
+      "command": "node --test modules/agent-door/tests/erasure.test.ts",
+      "exit": 0,
+      "passed": 18,
+      "failed": 0,
+      "log": "module-erasure-final.log",
+      "after": "fixture construction correction"
+    },
+    {
+      "command": "node --test --test-name-pattern='every complete relocated module copy' foundation/public-copy-secrets.test.mjs",
+      "exit": 0,
+      "passed": 29,
+      "failed": 0,
+      "log": "relocated-publication-final.log",
+      "gitleaks": "8.30.1 checksum verified"
+    }
+  ],
+  "before_after": {
+    "gail_period_proposals_pending_before": 4,
+    "gail_period_proposals_held_after": 4,
+    "gail_period_proposals_live_mentions_before": 4,
+    "gail_period_proposals_live_mentions_after": 0,
+    "gail_period_proposals_archived_mentions_after": 0,
+    "peer_row_differences": 0,
+    "map_parity_cases": 17,
+    "map_parity_executions": 34
+  },
+  "clause_changes": {
+    "B-1": "MET by builder: required regression and checks pass; independent gate pending",
+    "contract_judgments_changed": [],
+    "previous_gate_MET_clauses": "preserved; not re-promoted"
+  },
+  "boundaries_per_file": {
+    "default-seed/src/agent-door/erasure.ts": 1,
+    "modules/agent-door/adoption/penny/penny-map.ts": 1
+  },
+  "new_settings": 0,
+  "new_migrations": 0,
+  "field_exceptions": 0,
+  "uri_exceptions": 0,
+  "assertions_weakened_or_deleted": false,
+  "product_head": "5961885da3859c758b648f7ff0717e3afd0b7298",
+  "published_product": true,
+  "pull_request": {
+    "base": "main",
+    "head_sha": "c3f4fc8659b659b8babe245f333bcef0a071871a",
+    "html_url": "https://github.com/runeditrun/base/pull/833",
+    "number": 833
+  },
+  "post_push_main_refresh": {
+    "head": "0f1b6a37a746f1bc4a297d649deba29f85e2f56b",
+    "already_ancestor_of_candidate": true,
+    "merge_needed": false
+  },
+  "ready": true,
+  "product_commits": 2,
+  "ci": {
+    "conclusion": "success",
+    "head_sha": "5961885da3859c758b648f7ff0717e3afd0b7298",
+    "html_url": "https://github.com/runeditrun/base/actions/runs/42302783755",
+    "id": 42302783755,
+    "name": "Verify",
+    "status": "completed"
+  },
+  "fixture_correction": {
+    "reason": "first Verify relocated-copy publication hygiene check flagged synthetic suffix addresses",
+    "runtime_values_changed": false,
+    "assertions_changed": false,
+    "publication_waivers_added": false,
+    "published_history_rewritten": false,
+    "failed_job": 128166873338
+  },
+  "initial_verify": {
+    "id": 42297595918,
+    "head_sha": "c3f4fc8659b659b8babe245f333bcef0a071871a",
+    "status": "completed",
+    "conclusion": "failure",
+    "successful_jobs": 22,
+    "total_jobs": 23,
+    "failure_resolved_locally": true
+  },
+  "runtime_source_hashes_unchanged_after_full_local_checks": {
+    "default-seed/src/agent-door/erasure.ts": "b8a1b1b81fb3de64cffd521c187f7d1f316a21bb",
+    "modules/agent-door/adoption/penny/penny-map.ts": "6cda7f078c20541b7165e5208d564bb2a026792f"
+  },
+  "terminal_custody": "READY"
+}

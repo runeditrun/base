@@ -1,0 +1,15 @@
+{
+  "head": "5961885da3859c758b648f7ff0717e3afd0b7298",
+  "product_files": [
+    "default-seed/src/agent-door/erasure.ts",
+    "modules/agent-door/adoption/penny/penny-map.ts",
+    "modules/agent-door/tests/erasure.test.ts",
+    "modules/agent-door/tests/person-erasure-runtime.mjs",
+    "modules/agent-door/tests/person-erasure-worker.ts"
+  ],
+  "worktree_clean": true,
+  "evidence_outside_product": true,
+  "contract_or_generated_view_changes": false,
+  "independent_publication_scan": "fleet Mac gate, not claimed from this cloud",
+  "product_commits": 2
+}

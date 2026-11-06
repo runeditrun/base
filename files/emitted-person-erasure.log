@@ -1,0 +1,44 @@
+(node:2231) Warning: Accessing non-existent property 'replaceRouteChunk' of module exports inside circular dependency
+(Use `node --trace-warnings ...` to show where the warning was created)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ native person erasure redacts pending and approved agent proposals, retains receipts and isolates peers across replay and restore (38054.859702ms)
+ℹ Before erasure: personal marker rows=9
+ℹ PROBE A native POST /api/people/:id/erasure -> HTTP 200 complete; 4 approvals retained, 3 redacted; live/archive/restore marker hits=0; pending+executed+key replays=subject_erased
+ℹ PROBE B proposal ids/times/status/agent/decision receipts retained; audit rows=7; usage reservations=3; peer proposal and usage unchanged
+ℹ PROBE C older backup -> HTTP 400 erasure_epoch; clean restore succeeds; existing tombstone/concurrent-capture assertions run in module erasure suite
+ℹ PROBE ISOLATION source="1": peer proposal/call/audit/usage byte-identical; counts=6/9/3 unchanged; bounded source mention redacted
+ℹ PROBE ISOLATION source="source-12": peer proposal/call/audit/usage byte-identical; counts=8/11/3 unchanged; bounded source mention redacted
+ℹ PROBE ISOLATION source="source[*]?": peer proposal/call/audit/usage byte-identical; counts=10/13/3 unchanged; bounded source mention redacted
+▶ recorded names in proposal or audit free text erase with word boundaries and preserve peers
+  ✔ "Recorded Name 1d8d7126-dda2-4d32-b87e-e3dbf7202cf9" (9664.102637ms)
+  ✔ "a" (10757.817151ms)
+  ✔ "Al" (10832.407926ms)
+  ✔ "1" (10986.363622ms)
+  ✔ "Zoë" (11152.679853ms)
+  ✔ "Name[*]?" (11372.864349ms)
+  ✔ "Al: please follow up tomorrow" (11296.82245ms)
+  ✔ "Please follow up tomorrow:Al" (11571.131225ms)
+  ✔ "Follow up:Al:tomorrow" (11311.819197ms)
+  ✔ "Al: value; key:Al" (11880.353152ms)
+✔ recorded names in proposal or audit free text erase with word boundaries and preserve peers (133779.005425ms)
+ℹ PROBE NAME "Recorded Name 1d8d7126-dda2-4d32-b87e-e3dbf7202cf9": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 3/4/4/1 -> 3/4/4/1
+ℹ PROBE NAME "a": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 6/8/8/2 -> 6/8/8/2
+ℹ PROBE NAME "Al": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 9/12/12/3 -> 9/12/12/3
+ℹ PROBE NAME "1": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 12/16/16/4 -> 12/16/16/4
+ℹ PROBE NAME "Zoë": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 15/20/20/5 -> 15/20/20/5
+ℹ PROBE NAME "Name[*]?": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 18/24/24/6 -> 18/24/24/6
+ℹ PROBE NAME "Al: please follow up tomorrow": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 21/28/28/7 -> 21/28/28/7
+ℹ PROBE NAME "Please follow up tomorrow:Al": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 24/32/32/8 -> 24/32/32/8
+ℹ PROBE NAME "Follow up:Al:tomorrow": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 27/36/36/9 -> 27/36/36/9
+ℹ PROBE NAME "Al: value; key:Al": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 30/40/40/10 -> 30/40/40/10
+ℹ PROBE NAME RESTORE: 20 non-personal proposal and audit stubs preserved; older archives HTTP 400 erasure_epoch
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 172653.479028
