@@ -9,8 +9,8 @@ import type { DoorGrant } from './protocol.ts';
 function fail(): never { throw new DoorError('invalid_grant'); }
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const requiredKeys = ['v', 'iss', 'aud', 'installationId', 'email', 'jti', 'iat', 'exp', 'action', 'namespace', 'maxBytes', 'maxChunks', 'maxRecords'];
-const optionalKeys = ['fingerprint', 'approvalRecordId', 'approvedAt', 'catchup', 'bounded'];
-const actions: readonly string[] = ['uploads', 'plan', 'apply', 'status', 'reconcile', 'undo', 'cancel', 'archive', 'restore-check', 'prepare', 'seal-parent', 'review-parent', 'apply-child', 'wave-status', 'finalize-parent', 'reverse-parent'];
+const optionalKeys = ['fingerprint', 'approvalRecordId', 'approvedAt', 'catchup'];
+const actions: readonly string[] = ['uploads', 'plan', 'apply', 'status', 'reconcile', 'undo', 'cancel', 'archive', 'restore-check'];
 
 function decode(segment: string): Uint8Array<ArrayBuffer> {
   if (!/^[A-Za-z0-9_-]+$/.test(segment)) fail();
@@ -80,28 +80,14 @@ function validateGrant(value: Record<string, unknown>, config: Readonly<OwnerCla
     || !quota(value.maxBytes, 300_000_000) || !quota(value.maxChunks, 1024) || !quota(value.maxRecords, 1_000_000)) fail();
 
   const catchup = Object.hasOwn(value, 'catchup');
-  if (catchup && (value.catchup !== 'bounded' || (value.action !== 'plan' && value.action !== 'apply' && !(value.bounded && ['prepare','apply-child'].includes(value.action as string))))) fail();
+  if (catchup && (value.catchup !== 'bounded' || (value.action !== 'plan' && value.action !== 'apply'))) fail();
   if (catchup && !approved(value)) fail();
-  const waveActions=['prepare','seal-parent','review-parent','apply-child','wave-status','finalize-parent','reverse-parent'];
-  const wave=waveActions.includes(value.action as string);
-  if (wave !== Object.hasOwn(value,'bounded')) fail();
-  if (wave) {
-    const b=value.bounded;
-    if (!object(b) || b.protocol!=='rer-bounded-waves/1' || !['migration','revision','policy'].every(k=>typeof b[k]==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(b[k] as string))
-      || Object.keys(b).some(k=>!['protocol','migration','revision','policy','parentFingerprint','childFingerprint','parentApprovalRecordId','parentApprovedAt'].includes(k))
-      || ['parentFingerprint','childFingerprint'].some(k=>Object.hasOwn(b,k) && (typeof b[k]!=='string' || !/^[a-f0-9]{64}$/.test(b[k] as string)))) fail();
-    if (['apply-child','finalize-parent','reverse-parent'].includes(value.action as string)
-      && (!b.parentFingerprint || typeof b.parentApprovalRecordId!=='string' || !b.parentApprovalRecordId.trim() || b.parentApprovalRecordId.length>256
-      || typeof b.parentApprovedAt!=='string' || !Number.isFinite(Date.parse(b.parentApprovedAt)) || new Date(b.parentApprovedAt).toISOString()!==b.parentApprovedAt)) fail();
-    if (value.action==='apply-child' && (!b.childFingerprint || value.fingerprint!==b.childFingerprint)) fail();
-    if (value.action==='review-parent' && (value.fingerprint!==b.parentFingerprint || value.approvalRecordId!==b.parentApprovalRecordId || value.approvedAt!==b.parentApprovedAt)) fail();
-  }
-  if (value.action === 'apply' || ['review-parent','apply-child'].includes(value.action as string)) {
+  if (value.action === 'apply') {
     if (typeof value.fingerprint !== 'string' || !/^[0-9a-f]{64}$/.test(value.fingerprint) || !approved(value)) fail();
   } else {
     if (Object.hasOwn(value, 'fingerprint')) fail();
     const hasApproval = Object.hasOwn(value, 'approvalRecordId') || Object.hasOwn(value, 'approvedAt');
-    if (hasApproval && (!['plan','prepare'].includes(value.action as string) || !catchup || !approved(value))) fail();
+    if (hasApproval && (value.action !== 'plan' || !catchup || !approved(value))) fail();
   }
   return Object.freeze(value) as unknown as Readonly<DoorGrant>;
 }

@@ -2,55 +2,27 @@ import { startCarryRefresh } from './carry.mjs';
 import { randomUUID } from 'node:crypto';
 import { access, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Api, taskPath, pause } from './api.mjs';
+import { Api, pause } from './api.mjs';
 import { paired, revokedByServer, revokedText } from './local-commands.mjs';
-import { nextQuestions, ownerLink, waitingFor, agentWaiting, ownerWaiting } from './questions.mjs';
+import { nextQuestions, ownerLink, waitingFor, agentWaiting } from './questions.mjs';
 import { lockSupervisor, stateDirectory, saveState, loadState } from './state.mjs';
 import { loadProgress, saveProgress } from './progress.mjs';
 import { Lease } from './lease.mjs';
 import { runDiscovery } from './discovery-task.mjs';
 import { applyChoices } from './choices.mjs';
 import { businessCommand } from './invocation.mjs';
-import { ExportWaiting, vendorHandle, titledVendor } from './vendor-door.mjs';
-import { runExport } from './export-task.mjs';
-import { runCatchup } from './catchup-task.mjs';
-import { runArchive } from './archive-task.mjs';
 
-// The vendor tasks this computer performs into an app's import door.
-const vendorWork = { 'export.vendor': runExport, 'catchup.vendor': runCatchup, 'switchoff.archive': runArchive };
-const kinds = new Set(['discover.local', ...Object.keys(vendorWork)]);
+// The one task this computer performs itself: the names-only folder scan. Move in and every other step is reported by `next`.
+const kinds = new Set(['discover.local']);
 export function supportsTaskKind(kind) { return kinds.has(kind); }
 const checkIn = 25_000;
-
-// Only these platform refusals hand work to the owner. Catch-up completion
-// has already surrendered its lease; an export-input wait never claims one.
-function ownerWait(error, state, task) {
- if (error.status !== 409) return null;
- const catchup = error.code === 'business_catchup_approval_required';
- if (!catchup && !(error.code === 'business_export_inputs_required' && error.state === 'waiting_for_owner')) return null;
- let link = ownerLink(state);
- if (catchup && typeof error.link === 'string') {
-  try {
-   const url = new URL(error.link, state.origin);
-   if (url.origin === state.origin && !url.username && !url.password && !url.search && !url.hash
-    && url.pathname.startsWith(new URL(link).pathname + '/moves/')) link = url.href;
-  } catch { /* The Business page is where the owner can find this step. */ }
- }
- const vendor = task && titledVendor(task.kind, task.title);
- const step = catchup ? 'approve this catch-up' : vendor === 'sorry' ? 'confirm the address'
-  : ['sentry', 'pagerduty'].includes(vendor) ? 'confirm the export details' : null;
- if (!step) return `${error.reason ?? "Waiting for the owner's export inputs."}\nIn Business: ${link}`;
- return `${error.reason ? error.reason + '\n' : ''}Waiting for the owner to ${step} in Business: ${link}`;
-}
 
 /** Work this computer's tasks. It says what it is doing and what it waits
  * for, applies the owner's choices at every check-in, and removes run.lock on
  * every exit, including Ctrl-C, SIGTERM and a closed terminal (SIGHUP). */
 export async function run({ once = false } = {}) {
  const { state, credential } = await paired(), api = new Api(state.origin, credential), directory = stateDirectory();
- // Tasks this run handed back as paused, with what each waits for. An export
- // waiting only for the owner's vendor key is picked up again once it is stored.
- const parked = new Map(), ownerWaits = new Map(), unlock = await lockSupervisor(), stop = new AbortController();
+ const unlock = await lockSupervisor(), stop = new AbortController();
  // A terminal's Ctrl-C reaches npx and this process together, and npx then
  // forwards another SIGINT, which can arrive at any moment until this process
  // has exited. So the handlers stay for the rest of the process: a repeated
@@ -63,9 +35,8 @@ export async function run({ once = false } = {}) {
  let progress, stopCarry, said = '', held = null, summaries = [];
  const say = text => { if (text !== said) { said = text; process.stdout.write(text + '\n'); } };
  // An agent step that waits is said in its own words, never as "Nothing yet".
- const waits = () => [...new Set([...ownerWaits.values()].concat(summaries.filter(task => parked.has(task.task_id)).map(task => parked.get(task.task_id).message), agentWaiting(summaries)))];
- // With no agent step waiting, a move's owner step (freeze, rollback, cancellation) is named with its link.
- const idle = () => { const owner = ownerWaiting(summaries, state); return owner.length ? owner.join('\n') : waitingFor(state); };
+ const waits = () => agentWaiting(summaries);
+ const idle = () => waitingFor(state);
  try {
   stopCarry = await startCarryRefresh(api, state, stop.signal);
   progress = await loadProgress();
@@ -81,12 +52,7 @@ export async function run({ once = false } = {}) {
    }
    if (!progress.pendingClaim) {
     summaries = await nextQuestions(api, stop.signal);
-    // A wait belongs only to a task Business still lists as needing input.
-    // Cancellation, completion or another computer taking it clears the line.
-    for (const id of ownerWaits.keys()) if (!summaries.some(task => task.task_id === id && ['needs_input', 'waiting_for_owner'].includes(task.state))) ownerWaits.delete(id);
-    const handles = (await loadState())?.vendorHandles ?? [];
-    for (const [id, wait] of parked) if (wait.keyMissing && handles.includes(vendorHandle(wait.keyMissing))) parked.delete(id);
-    const selected = summaries.find(task => kinds.has(task.kind) && ['ready','leased'].includes(task.state) && !parked.has(task.task_id));
+    const selected = summaries.find(task => kinds.has(task.kind) && ['ready','leased'].includes(task.state));
     if (!selected) {
      const waiting = waits();
      say(waiting.length ? waiting.join('\n') : idle());
@@ -100,18 +66,10 @@ export async function run({ once = false } = {}) {
    let claimed;
    try { claimed = await api.post('/api/business/executors/claim', { ...progress.pendingClaim, wait_seconds: 25 }, { signal: stop.signal }); }
    catch (error) {
-    const waiting = ownerWait(error, state, summaries.find(task => task.task_id === progress.pendingClaim.task_id));
-    if (!waiting) {
-     if (error.status !== 409) throw error;
-     progress = {}; await saveProgress(progress);
-     held = null;
-     if (once) throw error;
-     await pause(checkIn, stop.signal); continue;
-    }
-    ownerWaits.set(progress.pendingClaim.task_id, waiting); say(waiting);
+    if (error.status !== 409) throw error;
     progress = {}; await saveProgress(progress);
     held = null;
-    if (once) return;
+    if (once) throw error;
     await pause(checkIn, stop.signal); continue;
    }
    if (!claimed.task || claimed.task.state !== 'leased' || claimed.task.fence !== claimed.fence || Date.parse(claimed.lease_expires_at) <= Date.now()) {
@@ -135,51 +93,28 @@ export async function run({ once = false } = {}) {
    try {
     progress.current = { kind: claimed.task.kind, checkpoint: claimed.task.checkpoint, uploadedBytes: claimed.task.checkpoint?.bytes_done ?? 0 };
     await saveProgress(progress);
-    if (Object.hasOwn(vendorWork, claimed.task.kind)) {
-     try {
-      const done = await vendorWork[claimed.task.kind]({ lease, task: claimed.task, grant: claimed.grant, directory, say, ownerPage: ownerLink(state) });
-      finished = true;
-      say(done);
-     } catch (error) {
-      if (!(error instanceof ExportWaiting) || lease.signal.aborted) throw error;
-      // Business shows the owner what this vendor task waits for; the lease goes back as paused.
-      parked.set(claimed.task.id, { message: error.message, keyMissing: error.keyMissing });
-      await lease.send(taskPath(claimed.task.id, 'events'), { event: { kind: 'question', payload: { question: error.question } } });
-      throw error;
-     }
-    } else {
-     const page = claimed.task.checkpoint?.page;
-     say(page ? `Resuming the names-only scan of this computer's allowed folders from page ${page + 1}.` : 'Scanning this computer\'s allowed folders for tool names (names only; no file contents leave this computer).');
-     const result = await runDiscovery({ task: claimed.task, grant: claimed.grant, checkpoint: claimed.task.checkpoint, signal: lease.signal,
-      send: (destination, body) => lease.send(destination, body), stateDir: directory,
-      saveCheckpoint: async checkpoint => {
-       await lease.checkpointSaved(checkpoint);
-       if (checkpoint.page) process.stdout.write(`Sent page ${checkpoint.page} of ${checkpoint.total}; the server has ${checkpoint.records_done} names and saved this checkpoint.\n`);
-      } });
-     await lease.complete(); finished = true;
-     await result.cleanup();
-     if (!state.discovered) { state.discovered = true; await saveState(state); }
-     say('Business discover.local completed and checked by the server.');
-    }
+    const page = claimed.task.checkpoint?.page;
+    say(page ? `Resuming the names-only scan of this computer's allowed folders from page ${page + 1}.` : 'Scanning this computer\'s allowed folders for tool names (names only; no file contents leave this computer).');
+    const result = await runDiscovery({ task: claimed.task, grant: claimed.grant, checkpoint: claimed.task.checkpoint, signal: lease.signal,
+     send: (destination, body) => lease.send(destination, body), stateDir: directory,
+     saveCheckpoint: async checkpoint => {
+      await lease.checkpointSaved(checkpoint);
+      if (checkpoint.page) process.stdout.write(`Sent page ${checkpoint.page} of ${checkpoint.total}; the server has ${checkpoint.records_done} names and saved this checkpoint.\n`);
+     } });
+    await lease.complete(); finished = true;
+    await result.cleanup();
+    if (!state.discovered) { state.discovered = true; await saveState(state); }
+    say('Business discover.local completed and checked by the server.');
    } catch (error) { failure = lease.signal.aborted ? lease.signal.reason : error; }
    finally {
-    if (!finished && failure?.status !== 401 && !ownerWait(failure ?? {}, state)) {
-     try { await lease.release(stop.signal.aborted ? 'handover' : parked.has(claimed.task.id) ? 'paused' : 'failed'); released = true; }
+    if (!finished && failure?.status !== 401) {
+     try { await lease.release(stop.signal.aborted ? 'handover' : 'failed'); released = true; }
      catch (error) { if (error.status === 401) failure = error; }
     }
     await lease.close();
-    if (finished || released || ownerWait(failure ?? {}, state)) { progress = {}; await saveProgress(progress); }
+    if (finished || released) { progress = {}; await saveProgress(progress); }
    }
-   if (failure) {
-    const waiting = ownerWait(failure, state);
-    if (waiting && !stop.signal.aborted) {
-     ownerWaits.set(claimed.task.id, waiting); say(waiting); held = null;
-     if (once) return;
-     await pause(checkIn, stop.signal); continue;
-    }
-    if (failure.status === 401 || once || !parked.has(claimed.task.id)) throw failure;
-    process.stderr.write(failure.message + '\n');
-   }
+   if (failure) throw failure;
    if (once) return;
   } while (!stop.signal.aborted);
  } catch (error) {

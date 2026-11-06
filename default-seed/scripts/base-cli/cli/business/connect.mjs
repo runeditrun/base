@@ -14,7 +14,7 @@ import { revokedText } from './local-commands.mjs';
 // then and let the server decide whether it was approved in time.
 const approvalWindow = 600_000;
 
-export const capabilities = ['discover.local', 'export.vendor:sentry', 'export.vendor:uptimerobot', 'export.vendor:pagerduty', 'export.vendor:calendly'];
+export const capabilities = ['discover.local'];
 
 const clock = time => new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const nothingSent = 'Nothing was sent, so the pairing code still works.';

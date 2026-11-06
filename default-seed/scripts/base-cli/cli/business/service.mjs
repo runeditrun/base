@@ -1,4 +1,4 @@
-import { execFile, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { mkdir, readFile, writeFile, rename, unlink, realpath, stat, lstat, rmdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, isAbsolute } from 'node:path';
@@ -129,27 +129,4 @@ export async function serviceStatus(input = {}) {
   ? await o.run('/bin/launchctl', ['print', `gui/${process.getuid()}/${label}`])
   : await o.run('systemctl', ['--user', 'is-active', '--quiet', unit]);
  return { installed: true, running: result.code === 0 && (o.platform !== 'darwin' || /(?:^|\n)\s*state = running\s*(?:\n|$)/.test(result.stdout ?? '')) };
-}
-
-/** The caller holds an export lease only within this callback. -w also makes
- * caffeinate stop if the executor is killed before its finally block runs.
- */
-export async function withExportAwake(work, { consent = false, platform = process.platform, signal } = {}) {
- if (platform !== 'darwin') return work();
- if (consent !== true) throw new Error('Keeping this Mac awake for an export requires explicit consent.');
- signal?.throwIfAborted();
- const child = spawn('/usr/bin/caffeinate', ['-i', '-w', String(process.pid)], { stdio: 'ignore' });
- const closed = new Promise(resolve => child.once('close', resolve));
- const stop = () => { if (child.exitCode === null && !child.killed) child.kill('SIGTERM'); };
- const onExit = () => stop();
- try {
-  await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', () => reject(new Error('Could not keep this Mac awake for the export.'))); });
-  signal?.addEventListener('abort', stop, { once: true }); process.once('exit', onExit);
-  signal?.throwIfAborted();
-  return await work();
- } finally {
-  signal?.removeEventListener('abort', stop); process.off('exit', onExit);
-  stop();
-  if (child.pid) await closed;
- }
 }
