@@ -1,0 +1,11 @@
+{
+  "repository": "runeditrun/base",
+  "source_ref": "refs/heads/cloud/gr-publish-scan-progress-1",
+  "target_ref": "refs/heads/cloud/gr-publish-scan-progress-land-3",
+  "head": "5d67855b3a32d51722ef57fa12c1288317803c57",
+  "push_exit": 0,
+  "remote_verified": true,
+  "new_product_commits": 0,
+  "changed_files": 0,
+  "identity_commits_checked": 5
+}

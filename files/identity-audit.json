@@ -1,0 +1,53 @@
+{
+  "range": "origin/main..HEAD",
+  "includes_side_parents": true,
+  "candidate_count": 5,
+  "result": "passed",
+  "commits": [
+    {
+      "sha": "5d67855b3a32d51722ef57fa12c1288317803c57",
+      "author": "James Peter",
+      "author_email": "github@zemaj.com",
+      "committer": "James Peter",
+      "committer_email": "github@zemaj.com",
+      "message": "Merge origin/main into cloud/gr-publish-scan-progress-1",
+      "trailers": ""
+    },
+    {
+      "sha": "f1e337225ea68fa8008db32df6317eab9a81fc63",
+      "author": "Run Edit Run fleet",
+      "author_email": "fleet@runeditrun.com",
+      "committer": "Run Edit Run fleet",
+      "committer_email": "fleet@runeditrun.com",
+      "message": "Refresh portable scanner hydration observation",
+      "trailers": ""
+    },
+    {
+      "sha": "9be8d24e22e0fcc38285d580ad60d1368bb44600",
+      "author": "Run Edit Run fleet",
+      "author_email": "fleet@runeditrun.com",
+      "committer": "Run Edit Run fleet",
+      "committer_email": "fleet@runeditrun.com",
+      "message": "Publish completed hydration fetch count before verification",
+      "trailers": ""
+    },
+    {
+      "sha": "720043795fbb012f42c46e798cac8a1925ba0ce6",
+      "author": "Run Edit Run fleet",
+      "author_email": "fleet@runeditrun.com",
+      "committer": "Run Edit Run fleet",
+      "committer_email": "fleet@runeditrun.com",
+      "message": "Regenerate portable CLI with retained scan progress",
+      "trailers": ""
+    },
+    {
+      "sha": "a52b0edbeadae23a318f96e3503778fd62ac54b7",
+      "author": "Run Edit Run fleet",
+      "author_email": "fleet@runeditrun.com",
+      "committer": "Run Edit Run fleet",
+      "committer_email": "fleet@runeditrun.com",
+      "message": "Retain bounded native scan progress across worker deadlines",
+      "trailers": ""
+    }
+  ]
+}

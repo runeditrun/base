@@ -1,0 +1,14 @@
+{
+  "timestamp_utc": "2026-11-06T13:05:09.003956+00:00",
+  "head": "5d67855b3a32d51722ef57fa12c1288317803c57",
+  "branch": "cloud/gr-publish-scan-progress-land-3",
+  "worktree_clean": true,
+  "new_product_commits": 0,
+  "changed_product_files": 0,
+  "clause_status_changes": 0,
+  "verify_run_id": 42216473958,
+  "verify_status": "completed",
+  "verify_conclusion": "success",
+  "pull_request": "https://github.com/runeditrun/base/pull/830",
+  "blockers": []
+}

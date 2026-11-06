@@ -1,0 +1,76 @@
+{
+  "files": [
+    {
+      "blob": "47e74e7561e378e432c5b4d47f0feffbfaf69d5e",
+      "bytes": 4664,
+      "path": "REPORT.md",
+      "sha256": "c347c0f66451542c02b3bd41245d852b3ace970bf5694d0ca2d7ced98e320e2a"
+    },
+    {
+      "blob": "1a43de5eedd784a42a504a080d0f85f64213ecf3",
+      "bytes": 403,
+      "path": "candidate-identities.txt",
+      "sha256": "f33219ac585eb978337e37e1c765632f7b54250013a6ad97cd8708a1a96c56ff"
+    },
+    {
+      "blob": "fe51488c7066f6687ef680d6bfaa4f7768ef205c",
+      "bytes": 3,
+      "path": "existing-pull-requests.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "blob": "fc4680df4a3e321a93eea89bed977e3d80ca5ff0",
+      "bytes": 460,
+      "path": "final-product-state.json",
+      "sha256": "261f43347b746d1b5cafd8884c127756ed3b06714efc598bb69838f2cd0218f0"
+    },
+    {
+      "blob": "304a3b1e00aa1f0b49fc57a497dae833e70cf767",
+      "bytes": 1811,
+      "path": "identity-audit.json",
+      "sha256": "d6307207d508b1003fef4356dc833e2151965c7fee3b8ef08a4f27eda948e6d9"
+    },
+    {
+      "blob": "6cd967034f2e511c33eb120a83197400eea0451b",
+      "bytes": 638,
+      "path": "product-push.txt",
+      "sha256": "ecb8cc9fbb0409ea6f0d57bd11f0750520be9240e09eae9c45aca787ce78617f"
+    },
+    {
+      "blob": "afff215baac617142bca6a9bc9b3cb713129454c",
+      "bytes": 351,
+      "path": "product-receipt.json",
+      "sha256": "b0ba15bfcf141ced9a7ef8ad435242798f4a0793374a89d5f1e3f49e3c547c11"
+    },
+    {
+      "blob": "d58103bb4f0a086aef6ca3d66e254941ebbba201",
+      "bytes": 202,
+      "path": "pull-request.json",
+      "sha256": "bce230cc2c4a5d63e04ec760e8c9268c449d89e4da84e7b5ac29ea7329c498f4"
+    },
+    {
+      "blob": "59f9d646bcb0e247dc2547668e57bf15f9601a12",
+      "bytes": 85,
+      "path": "source-ref.txt",
+      "sha256": "d3f37a8026b1b199b2a30603e782c184898a247787a242db3b48db0775a896e7"
+    },
+    {
+      "blob": "3ec9e4bb49a7753f63b1f793cd39c5ae2b124769",
+      "bytes": 90,
+      "path": "target-ref.txt",
+      "sha256": "57da96a4cdad61bf773c79a16690c0b792d7d6179d4789d011232a2729cbb9fc"
+    },
+    {
+      "blob": "4262e3f306173a601ba56f50f9f0aa79a5e64015",
+      "bytes": 283,
+      "path": "verify-42216473958.json",
+      "sha256": "dce5e638c45f820ffc5acafd99cade71c8d234eb2ec08541b546d0309745c0b2"
+    }
+  ],
+  "product_branch": "cloud/gr-publish-scan-progress-land-3",
+  "product_head": "5d67855b3a32d51722ef57fa12c1288317803c57",
+  "ref": "refs/heads/evidence/gr-publish-scan-progress-land-3",
+  "repository": "runeditrun/base",
+  "schema": 1,
+  "tag": "gr-publish-scan-progress-land-3"
+}

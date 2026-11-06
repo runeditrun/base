@@ -1,0 +1,11 @@
+fleet Git: removed 0 credential-bearing GitHub URL rewrite sections
+PUSH attempt=1/5 command=git push --porcelain origin HEAD:refs/heads/cloud/gr-publish-scan-progress-land-3
+fleet Git: removed 0 credential-bearing GitHub URL rewrite sections
+To https://github.com/runeditrun/base.git
+*	HEAD:refs/heads/cloud/gr-publish-scan-progress-land-3	[new branch]
+Done
+remote: 
+remote: Create a pull request for 'cloud/gr-publish-scan-progress-land-3' on GitHub by visiting:        
+remote:      https://github.com/runeditrun/base/pull/new/cloud/gr-publish-scan-progress-land-3        
+remote: 
+PUSH_OK branch=cloud/gr-publish-scan-progress-land-3
