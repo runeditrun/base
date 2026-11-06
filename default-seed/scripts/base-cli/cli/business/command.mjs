@@ -1,7 +1,7 @@
 import { setupCommand } from './setup-command.mjs';
 import { scanCommand } from './scan-command.mjs';
 import { connect } from './connect.mjs';
-import { vendorKey, disconnect, status } from './local-commands.mjs';
+import { vendorKey, legacyPackage, disconnect, status } from './local-commands.mjs';
 import { next, answer, token } from './questions.mjs';
 import { run } from './supervisor.mjs';
 import { describe } from './errors.mjs';
@@ -36,12 +36,16 @@ Advanced commands (Usage: rer business VERB)
                                  Catalog vendor or none; uses, sells, both, product-dependency
   vendor-key add|remove VENDOR   Keep a read-only vendor key in OS credential storage; the owner
                                  types it in their own terminal, never in chat or a command
+                                 Zendesk: single-line {"client_id":"…","client_secret":"…"}; remove
+                                 revokes local export and deletes its retained snapshot
+  legacy-package add|remove|status DIR
+                                 Register a verified HappyToHelp legacy package (no key)
   token                          MCP headersHelper output; send directly to the MCP client
   status [--json]                Pairing, service, current task and checkpoint
   disconnect                     Revoke this computer, then remove local credentials and additions;
                                  inside an agent sandbox it names the one command that finishes
-Vendors: sentry, uptimerobot, pagerduty, calendly (with a read-only key); sorry (its public page,
-no key). Owner approvals stay in the browser.
+Vendors: sentry, uptimerobot, pagerduty, calendly, zendesk (with a read-only key); sorry (its public page,
+no key); happytohelp-legacy (a local package, no key). Owner approvals stay in the browser.
 State lives in $RER_BUSINESS_STATE_DIR when set, otherwise in ~/.rer/business.
 In an agent sandbox that writes only inside its working folder, use RER_BUSINESS_STATE_DIR="$PWD/.rer-business".
 `;
@@ -98,6 +102,7 @@ export async function businessCommand(argv) {
    if (options.origin !== undefined && options.code === undefined && options.business === undefined) originUrl(options.origin);
    await connect(options);
   } else if (verb === 'vendor-key' && args.length === 2) await vendorKey(...args);
+  else if (verb === 'legacy-package' && args.length === 2 && ['add', 'remove', 'status'].includes(args[0])) await legacyPackage(...args);
   else if (verb === 'answer' && [3, 4].includes(args.length)) await answer(...args);
   else if (verb === 'run' && (!args.length || args.length === 1 && args[0] === '--once')) await run({ once: args[0] === '--once' });
   else if (verb === 'status' && args.length === 1 && args[0] === '--json') await status({ json: true });

@@ -4,11 +4,14 @@ import * as uptimerobot from './uptimerobot.mjs';
 import * as pagerduty from './pagerduty.mjs';
 import * as calendly from './calendly.mjs';
 import * as sorry from './sorry.mjs';
+import * as zendesk from './zendesk.mjs';
 
 export { VendorExportError } from './common.mjs';
-export const VENDORS = Object.freeze(['sentry','uptimerobot','pagerduty','calendly','sorry']);
+export const VENDORS = Object.freeze(['sentry','uptimerobot','pagerduty','calendly','sorry','zendesk','happytohelp-legacy']);
 const adapters = { sentry, uptimerobot, pagerduty, calendly, sorry };
 export const VENDOR_CAPABILITIES = Object.freeze({
+  'happytohelp-legacy': Object.freeze({ vendor: 'happytohelp-legacy', adapter: 'rer:happytohelp-legacy', capability: null, format: 'happytohelp-legacy-chunks-v1', layout: 'package', output: 'rer-package.json', readOnly: true, resume: true, scopes: [], origins: [] }),
+  zendesk: Object.freeze({ vendor: 'zendesk', adapter: 'rer:zendesk', capability: 'vendor_key:zendesk', format: 'happytohelp-zendesk-offline-v1', layout: 'snapshot', output: 'zendesk.ndjson', readOnly: true, resume: true, scopes: ['tickets:read','users:read','organizations:read','hc:read','ticket_attachments:read'], origins: ['https://<subdomain>.zendesk.com'] }),
   sentry: Object.freeze({ vendor: 'sentry', adapter: 'rer:sentry', capability: 'vendor_key:sentry', format: 'spool-sentry-org-export-v1', layout: 'concatenate', output: 'sentry-export.json', readOnly: true, resume: true, scopes: ['org:read','project:read','event:read'], origins: Object.values(sentry.origins) }),
   uptimerobot: Object.freeze({ vendor: 'uptimerobot', adapter: 'rer:uptimerobot', capability: 'vendor_key:uptimerobot', format: 'uptimerobot-v3-monitors', layout: 'concatenate', output: 'uptimerobot-monitors.json', readOnly: true, resume: true, scopes: ['read-only API key'], origins: [uptimerobot.origin] }),
   pagerduty: Object.freeze({ vendor: 'pagerduty', adapter: 'rer:pagerduty', capability: 'vendor_key:pagerduty', format: 'pagerduty-saved-responses', layout: 'concatenate', output: 'pagerduty-export.json', readOnly: true, resume: true, scopes: ['read-only REST API key'], origins: [pagerduty.origin] }),
@@ -33,9 +36,16 @@ const LIMITS = Object.freeze({
 /** Persist each checkpoint only after the corresponding bytes have been acknowledged.
  * Bytes are private seed-bound artifacts; checkpoints are metadata, never API bodies.
  */
-export async function* exportVendor(vendor, { key, inputs = {}, checkpoint, signal } = {}) {
+export async function* exportVendor(vendor, { key, inputs = {}, checkpoint, signal, directory, runId } = {}) {
   try {
     if (!VENDORS.includes(vendor)) fail('UNSUPPORTED_VENDOR');
+    if (vendor === 'happytohelp-legacy') fail('LOCAL_PACKAGE_REQUIRED');
+    if (vendor === 'zendesk') {
+      const result = await zendesk.snapshot({ key, inputs, directory, runId, signal });
+      if (result.kind !== 'bundle') fail(result.kind === 'package' ? 'SEED_PACKAGE_UNSUPPORTED' : 'INVALID_INPUT');
+      yield { name: 'zendesk.ndjson', bytes: result.bytes, checkpoint: { version: 1, vendor, head: result.store.head } };
+      return;
+    }
     const keyed = KEYED_VENDORS.includes(vendor);
     if (keyed ? typeof key !== 'string' || !key || key.length > 8192 || /[\u0000-\u0020\u007f]/u.test(key) : key != null) fail('INVALID_KEY');
     object(inputs);

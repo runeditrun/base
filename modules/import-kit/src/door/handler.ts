@@ -11,7 +11,10 @@ import { archive, restoreCheck } from './archive.ts';
 import { streamUpload } from './intake-upload.ts';
 import { intakeIdentity } from './intake-policy.ts';
 
-const routes = {uploads,plan,apply,status,reconcile,undo,cancel,archive,'restore-check':restoreCheck};
+import { prepare } from './waves/preparation.ts';
+import { seal, reviewParent, applyChild, waveStatus, finalize, reverseParent } from './waves/lifecycle.ts';
+
+const routes = {prepare,'seal-parent':seal,'review-parent':reviewParent,'apply-child':applyChild,'wave-status':waveStatus,'finalize-parent':finalize,'reverse-parent':reverseParent,uploads,plan,apply,status,reconcile,undo,cancel,archive,'restore-check':restoreCheck};
 const headers = {'Cache-Control':'no-store','Content-Type':'application/json','X-Content-Type-Options':'nosniff'};
 async function readInput(request: Request): Promise<Record<string,unknown>> {
   if (request.headers.get('Content-Type')?.split(';')[0] !== 'application/json' || !request.body) throw new DoorError('json_body_required',400);
@@ -46,6 +49,12 @@ export function runtimeOptions<T extends RuntimeConfiguration>(options: T): T & 
     || (options.format === 'raw' ? typeof options.readRaw !== 'function' || options.intake !== undefined
       : typeof options.parse !== 'function')) throw new DoorError('invalid_configuration',503);
   if (options.intake !== undefined) intakeIdentity(options.intake);
+  const pkg = options.package;
+  if (pkg && (options.intake || !Array.isArray(pkg.formats) || !pkg.formats.length || pkg.formats.some(f=>typeof f!=='string' || !f.trim())
+    || !Number.isSafeInteger(pkg.maxBytes) || pkg.maxBytes < 1 || !Number.isSafeInteger(pkg.maxSegments) || pkg.maxSegments < 1 || typeof pkg.read !== 'function')) throw new DoorError('invalid_configuration',503);
+  if (options.bounded && (!pkg || options.bounded.protocol !== 'rer-bounded-waves/1'
+    || options.bounded.batchSize!==undefined && (!Number.isSafeInteger(options.bounded.batchSize) || options.bounded.batchSize<1 || options.bounded.batchSize>20)
+    || ['describe','page','native','authority'].some(key=>typeof (options.bounded as any)[key]!=='function'))) throw new DoorError('invalid_configuration',503);
   return options as T & ImportDoorRuntime;
 }
 /** Server-side mount only. A null response belongs to another dispatcher. Every
@@ -78,6 +87,8 @@ export function createDoorHandler(prefix: string, database: D1Database,
       const input = await readInput(request);
       admitted = await review(admitted,input);
       if (['status','reconcile','undo','cancel'].includes(action) && Object.keys(input).some(k=>k!=='planId')) throw new DoorError('invalid_input',400);
+      if (['seal-parent','review-parent','wave-status','finalize-parent','reverse-parent'].includes(action) && Object.keys(input).some(k=>k!=='parentId')
+        || action==='apply-child' && Object.keys(input).some(k=>!['parentId','ordinal','reviewedFingerprint'].includes(k))) throw new DoorError('invalid_input',400);
       const result = await routes[action](admitted,input);
       await authorized(admitted);
       return Response.json(result,{headers});

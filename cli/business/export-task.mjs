@@ -1,3 +1,5 @@
+import { sendBoundedWaves } from './bounded-waves.mjs';
+import { ExportWaiting } from './vendor-door.mjs';
 import { withUploadedBundle, door, checkedPreview, plural } from './vendor-door.mjs';
 
 /** Perform a claimed export.vendor: the shipped adapter's bundle uploaded into
@@ -7,8 +9,13 @@ import { withUploadedBundle, door, checkedPreview, plural } from './vendor-door.
 export function runExport({ lease, task, grant, directory, say, ownerPage }) {
  return withUploadedBundle({ lease, task, grant, directory, say,
   doing: (name, origin, keyed) => `Exporting ${name} through the shipped read-only adapter. ${keyed ? 'The key stays on this computer; records' : 'Records'} go only to the app's import door at ${origin}.` },
- async ({ origin, uploadId, bundle, fresh }) => {
-  const preview = await door(await fresh('plan'), { uploadId }, lease.signal), { records, created, updated, unchanged, rejected } = checkedPreview(preview, bundle);
+ async ({ origin, uploadId, bundle, fresh, preview: uploadedPreview }) => {
+  if (task.bounded_waves) {
+   const result=await sendBoundedWaves({arrangement:task.bounded_waves,uploadId,fresh,request:door,signal:lease.signal,checkpoint:cp=>lease.checkpointSaved(cp)});
+   if (!result.aggregateSuccess) throw new ExportWaiting(`Bounded import ${result.parentId} is ${result.state}; no complete migration receipt.`, 'configuration_required');
+   return {outputs:{parent_id:result.parentId,parent_fingerprint:result.fingerprint,aggregate_success:true},said:`Destination ${origin} reconciled the complete bounded import ${result.parentId}.`};
+  }
+  const preview = uploadedPreview ?? await door(await fresh('plan'), { uploadId, ...(bundle.mode === 'sweep' ? { catchup: true } : {}) }, lease.signal), { records, created, updated, unchanged, rejected } = checkedPreview(preview, bundle);
   // Identifiers only: Business reads that plan from the door with its own grants
   // and completes the task only if it is the plan of exactly this bundle.
   return { outputs: { upload_id: uploadId, plan_id: preview.planId, bundle_sha256: bundle.sha256 },

@@ -1,7 +1,8 @@
+import {importDoorBoundedWavesCheck} from './waves/schema.ts';
 import type { ImportDoorOptions, ImportDoorRuntime, DoorRequest } from './types.ts';
 import { runtimeOptions } from './handler.ts';
 import { DoorError, verifyImportGrant, type DoorAction } from './grants.ts';
-import { doorFence, erasures, sql, transact } from './store.ts';
+import { authorized, doorFence, erasures, sql, transact } from './store.ts';
 import { importDoorSchemaCheck } from './schema.ts';
 
 /** The storage key; grants are still verified against `claim.installationId`. */
@@ -21,7 +22,7 @@ async function source(options: ImportDoorOptions, namespace: string): Promise<Im
   if (!options.source) return runtimeOptions(options);
   const listed = await options.source(namespace);
   if (!listed) throw new DoorError('unknown_import_source');
-  return runtimeOptions({...options, parse: listed.parse, mapping: listed.mapping, intake: listed.intake,
+  return runtimeOptions({...options, parse: listed.parse, mapping: listed.mapping, intake: listed.intake, package: listed.package, bounded: listed.bounded,
     format: listed.format ?? options.format, readRaw: 'readRaw' in listed ? listed.readRaw : undefined,
     ownerPrincipalId: listed.ownerPrincipalId ?? options.ownerPrincipalId});
 }
@@ -43,5 +44,14 @@ export async function admit(options: ImportDoorOptions, request: Request, action
     throw new DoorError('grant_replayed_revoked_or_expired');
   }
   const authority = sql(`(${basic.sql}) AND EXISTS(SELECT 1 FROM ik_door_grants WHERE installation_id=? AND jti=? AND action=? AND namespace=? AND kid=? AND expires=?)`, ...basic.params ?? [], key, grant.jti, action, grant.namespace, kid, grant.exp);
-  return {options: runtime, access: {...grant, installationId: key}, authority, via:'grant', epoch, nonce: {jti: grant.jti, kid}};
+  if (grant.bounded) {
+    if ((await options.database.prepare(importDoorBoundedWavesCheck).first())?.current!==1) throw new DoorError('bounded_waves_schema_outdated',503);
+    if (!runtime.bounded) throw new DoorError('bounded_waves_not_adopted',409);
+    const external=runtime.bounded.authority(grant.bounded,action);
+    authority.sql=`(${authority.sql}) AND (${external.sql})`;
+    authority.params=[...authority.params ?? [],...external.params ?? []];
+  }
+  const admitted: DoorRequest = {options: runtime, access: {...grant, installationId: key}, authority, via:'grant', epoch, nonce: {jti: grant.jti, kid}};
+  if (grant.bounded) await authorized(admitted);
+  return admitted;
 }

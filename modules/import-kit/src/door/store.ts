@@ -8,8 +8,8 @@ import { importDoorSchemaCheck } from './schema.ts';
 export const sql = (sql: string, ...params: unknown[]): D1Sql => ({ sql, params });
 export const statement = (db: D1Database, query: D1Sql) => db.prepare(query.sql).bind(...query.params ?? []);
 export const assertion = (query: D1Sql) => sql(`INSERT INTO ik_d1_assertions(ok) SELECT CASE WHEN (${query.sql}) THEN 1 ELSE 0 END`, ...query.params ?? []);
-export async function transact(db: D1Database, authority: D1Sql, queries: D1Sql[]): Promise<void> {
-  await db.batch([assertion(authority), ...queries, assertion(authority), sql('DELETE FROM ik_d1_assertions')].map(q => statement(db, q)));
+export async function transact(db: D1Database, authority: D1Sql, queries: D1Sql[], final: D1Sql[] = []): Promise<void> {
+  await db.batch([assertion(authority), ...queries, assertion(authority), sql('DELETE FROM ik_d1_assertions'), ...[authority,...final].map(predicate=>sql(`SELECT CASE WHEN (${predicate.sql}) THEN 1 ELSE json('IMPORT_ATOMIC_GUARD') END`,...predicate.params ?? []))].map(q => statement(db, q)));
 }
 export async function authorized(request: DoorRequest): Promise<void> {
   const row = await statement(request.options.database, sql(`SELECT CASE WHEN (${request.authority.sql}) THEN 1 ELSE 0 END AS ok`, ...request.authority.params ?? [])).first();

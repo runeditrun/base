@@ -8,7 +8,7 @@ import { d1Preflight, d1ResultPreflight, guardD1Rows } from '../../../container/
  * original query once, retaining its SQL and binding order. */
 export function sqliteRows(native: DatabaseSync, query: string, values: any[], first = false) {
   d1Preflight(query, values);
-  guardD1Rows(native, sql => DatabaseSync.prototype.prepare.call(native, sql), sql => DatabaseSync.prototype.exec.call(native, sql));
+  guardD1Rows(native, (sql: string) => DatabaseSync.prototype.prepare.call(native, sql), (sql: string) => DatabaseSync.prototype.exec.call(native, sql));
   const statement = native.prepare(query), columns = statement.columns();
   const read = selectText(query);
   // Non-SELECT statement grammars (including setup PRAGMA) stay native.

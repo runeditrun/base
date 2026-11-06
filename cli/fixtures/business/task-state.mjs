@@ -28,6 +28,7 @@ export function taskStore(state) {
   return { id: task.summary.task_id, business_id: 'biz', kind: task.summary.kind, kind_version: 1,
    state: task.phase, fence: task.fence, lease_expires_at: task.phase === 'leased' ? task.lease : null,
    checkpoint: Object.fromEntries(numeric.filter(key => Number.isSafeInteger(task.checkpoint[key]) && task.checkpoint[key] >= 0).map(key => [key, task.checkpoint[key]])),
+   ...(task.summary.bounded_waves && task.phase==='leased' ? {bounded_waves:task.summary.bounded_waves}:{}),
    ...(task.summary.question ? { question: task.summary.question } : {}),
    // An export's non-secret adapter inputs reach only the executor holding its lease (platform executorTaskView).
    ...(task.summary.kind === 'export.vendor' && task.phase === 'leased' && task.summary.export_inputs ? { export_inputs: task.summary.export_inputs } : {}) };
@@ -75,9 +76,19 @@ export function taskStore(state) {
   return reply(candidate);
  }
  function action(id, action, body, mcp = false) {
-  actionBody(action, body, mcp);
   const task = find(id); runnable(task);
-  if (action === 'complete' && ['export.vendor', 'catchup.vendor'].includes(task.summary.kind)) exportOutputs(body.outputs);
+  if (task.summary.bounded_waves && body.checkpoint) {
+   const {parent_id,prepared_children,aggregate_success,child,job_id,child_success,...ordinary}=body.checkpoint;
+   for (const value of [parent_id,job_id]) requireValue(value===undefined || typeof value==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(value));
+   for (const value of [prepared_children,child]) if(value!==undefined) integer(value);
+   for (const value of [aggregate_success,child_success]) requireValue(value===undefined || typeof value==='boolean');
+   actionBody(action,{...body,checkpoint:ordinary},mcp);
+  } else actionBody(action, body, mcp);
+  if (action==='complete' && task.summary.bounded_waves) {
+   const output=body.outputs;
+   closed(output,['parent_id','parent_fingerprint','aggregate_success']);
+   requireValue(output.aggregate_success===true && state.door?.state.aggregates?.some(row=>row.parentId===output.parent_id && row.fingerprint===output.parent_fingerprint && row.aggregateSuccess===true),409);
+  } else if (action === 'complete' && ['export.vendor', 'catchup.vendor'].includes(task.summary.kind)) exportOutputs(body.outputs);
   else if (action === 'complete' && task.summary.kind === 'switchoff.archive') archiveOutputs(body.outputs);
   else if (body.outputs !== undefined) {
    if (task.summary.kind === 'classify.row') classificationOutput(body.outputs, task.summary.question?.answer_schema);
@@ -116,6 +127,8 @@ export function taskStore(state) {
     if (task.summary.kind === 'classify.row') {
      requireValue(!state.refuseQuestion && body.outputs !== undefined, 409);
      state.questionCompleted = body.outputs;
+    } else if (task.summary.bounded_waves) {
+     requireValue(body.outputs.aggregate_success===true && state.door?.state.aggregates?.some(row=>row.parentId===body.outputs.parent_id && row.fingerprint===body.outputs.parent_fingerprint && row.aggregateSuccess===true),409);
     } else if (task.summary.kind === 'export.vendor') {
      // The platform's check (exportPreviewCheck): the door holds the reported plan, for the reported upload, of exactly the reported bundle.
      const { upload_id, plan_id, bundle_sha256 } = body.outputs;
@@ -150,17 +163,19 @@ export function taskStore(state) {
  /** POST /api/business/tasks/:taskId/import-grants (platform executors/grants.ts issueImportGrant). A catch-up's plan
   * grant carries the owner's standing approval (`catchup: 'bounded'`) when one covers the tool, unless `review` asks
   * for a plan the owner reviews per action. */
- function importGrant(id, body) {
-  closed(body, ['fence', 'grant_id', 'action', 'review']); integer(body.fence); identifier(body.grant_id);
+ async function importGrant(id, body) {
+  closed(body, ['fence', 'grant_id', 'action', 'review', 'bounded']); integer(body.fence); identifier(body.grant_id);
   const task = find(id); runnable(task);
   requireValue(Object.hasOwn(doorActions, task.summary.kind), 409);
-  requireValue(doorActions[task.summary.kind].includes(body.action));
+  const waves=task.summary.bounded_waves;
+  requireValue(doorActions[task.summary.kind].includes(body.action) || waves && ['prepare','seal-parent','review-parent','apply-child','wave-status','finalize-parent','reverse-parent'].includes(body.action));
+  requireValue(body.bounded===undefined || waves && ['protocol','migration','revision','policy'].every(k=>body.bounded[k]===waves[k]));
   requireValue(body.review === undefined || body.review === true && task.summary.kind === 'catchup.vendor' && body.action === 'plan');
   const bound = grant(task, body.fence);
   requireValue(bound.id === body.grant_id && task.fence === body.fence && task.phase === 'leased' && Date.parse(task.lease) > Date.now() && state.door, 409);
   state.importGrants = (state.importGrants ?? 0) + 1;
   const namespace = state.exportVendor ?? 'uptimerobot', bounded = task.summary.kind === 'catchup.vendor' && body.action === 'plan' && !body.review && state.standingApproval;
-  return { destination: `${state.door.origin}/api/rer/import/${body.action}`, authorization: `Bearer ${state.door.mint(body.action, namespace, { catchup: bounded ? 'bounded' : undefined })}`,
+  return { destination: `${state.door.origin}/api/rer/import/${body.action}`, authorization: `Bearer ${await state.door.mint(body.action, namespace, { catchup: bounded ? 'bounded' : undefined, ...(waves?{bounded:body.bounded}:{}) })}`,
    action: body.action, namespace, ...(bounded ? { catchup: 'bounded' } : {}), expires_at: new Date(Date.now() + 300_000).toISOString() };
  }
  return { find, summary, claim, action, importGrant };

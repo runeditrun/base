@@ -1,6 +1,7 @@
 import type { D1Database, D1Sql, D1TargetAdapter } from '../d1/types.ts';
 import type { D1ReversalPolicy } from '../d1/undo-types.ts';
 import type { ImportMapping, ImportPlan, Json, ParsedRecord, ReaderLimits } from '../types.ts';
+import type { ImportDoorBoundedSource } from './waves/types.ts';
 import type { DoorGrant } from './protocol.ts';
 import type { ImportDoorIntake } from './intake/types.ts';
 export type { ImportDoorIntake, IntakeFormat } from './intake/types.ts';
@@ -12,8 +13,30 @@ export interface ImportDoorRawUpload {
   readonly sha256: string;
   readonly size: number;
 }
+export interface DoorPackageFile { readonly path: string; readonly bytes: number; readonly sha256: string; readonly offset: number }
+export interface DoorPackageManifest {
+  format: 'rer-door-package/1'; source: {format: string; [key: string]: Json}; mode: string;
+  stream: {bytes: number; sha256: string}; segments: {bytes: number; sha256: string}[];
+  index: {path: 'index.ndjson'; bytes: number; sha256: string};
+  records: {total: number | null; byKind: Record<string, number>}; totals: Json;
+}
+export interface ImportDoorPackageUpload {
+  readonly manifest: Readonly<DoorPackageManifest>;
+  readonly files: readonly Readonly<DoorPackageFile>[];
+  /** A verified file, bounded by the declaration and the caller's optional tighter limit. */
+  read(path: string, maxBytes?: number): Promise<Uint8Array>;
+}
+export interface ImportDoorPackageSource {
+  formats: readonly string[];
+  maxBytes: number;
+  maxSegments: number;
+  /** Return the whole logical snapshot, never one plan per segment or record wave. */
+  read(upload: ImportDoorPackageUpload, limits: Readonly<Required<ReaderLimits>>): ParsedRecord[] | Promise<ParsedRecord[]>;
+}
 /** One decoded source; existing adapters may keep the mount's format. */
 export interface ImportDoorSource {
+  package?: ImportDoorPackageSource;
+  bounded?: ImportDoorBoundedSource;
   mapping: ImportMapping;
   parse(value: Json, index: number): ParsedRecord | ParsedRecord[];
   ownerPrincipalId?: string;
@@ -72,7 +95,7 @@ export type ImportDoorOptions = ImportDoorMountOptions & (
     parse?: undefined; mapping?: undefined; readRaw?: undefined;
   });
 export type DoorAccess = Pick<DoorGrant, 'action' | 'installationId' | 'email' | 'namespace'
-  | 'maxBytes' | 'maxChunks' | 'maxRecords' | 'fingerprint' | 'approvalRecordId' | 'approvedAt' | 'catchup'>;
+  | 'bounded' | 'maxBytes' | 'maxChunks' | 'maxRecords' | 'fingerprint' | 'approvalRecordId' | 'approvedAt' | 'catchup'>;
 export interface ImportOperatorOptions extends ImportDoorRuntimeOptions {
   installationId: string;
   appOrigin: string;
