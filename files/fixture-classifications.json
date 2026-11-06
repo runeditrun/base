@@ -1,0 +1,346 @@
+[
+  {
+    "path": "cli/agent-door-hooks.test.mjs",
+    "line": 69,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/business-connect.test.mjs",
+    "line": 1027,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/business-connect.test.mjs",
+    "line": 1031,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/business-connect.test.mjs",
+    "line": 1031,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/companion.test.mjs",
+    "line": 152,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/companion.test.mjs",
+    "line": 359,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/deployment-record.test.mjs",
+    "line": 30,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/fixtures/business/server.mjs",
+    "line": 118,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "in-memory network edge or disposable integration setup",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/fixtures/business/zendesk-data.mjs",
+    "line": 4,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "in-memory network edge or disposable integration setup",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/fixtures/companion/server.mjs",
+    "line": 6,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "in-memory network edge or disposable integration setup",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/fixtures/dependency-deploy.mjs",
+    "line": 135,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "in-memory network edge or disposable integration setup",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/fixtures/dependency-deploy.mjs",
+    "line": 135,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "in-memory network edge or disposable integration setup",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/fixtures/dependency-deploy.mjs",
+    "line": 135,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "in-memory network edge or disposable integration setup",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/fixtures/dependency-link.mjs",
+    "line": 75,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "in-memory network edge or disposable integration setup",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "cli/reference-journey.test.mjs",
+    "line": 58,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "default-seed/tests/local-setup/cli.test.mjs",
+    "line": 315,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "default-seed/tests/local-setup/native-bindings.test.mjs",
+    "line": 76,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "global/tests/package-pin.test.mjs",
+    "line": 23,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "live-proofs/tests/linux-ci/browser.mjs",
+    "line": 49,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/dependencies/tests/admission-transition.test.mjs",
+    "line": 110,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/dependencies/tests/local-provider.test.mjs",
+    "line": 11,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/dependencies/tests/owner-approval.test.mjs",
+    "line": 47,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/dependencies/tests/runtime.mjs",
+    "line": 25,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/dependencies/tests/runtime.mjs",
+    "line": 25,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/deploy-kit/tests/asset-upload.test.mjs",
+    "line": 17,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/editor/tests/compiled-native.browser.test.mjs",
+    "line": 90,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/mail/tests/core/validation.test.mjs",
+    "line": 18,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/mail/tests/sendgrid/conformance.mjs",
+    "line": 4,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/operator-auth/tests/cancellation-runtime.mjs",
+    "line": 24,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/operator-auth/tests/native-auth.test.mjs",
+    "line": 184,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/operator-auth/tests/native-auth.test.mjs",
+    "line": 197,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/operator-auth/tests/native-auth.test.mjs",
+    "line": 199,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/operator-auth/tests/native-auth.test.mjs",
+    "line": 200,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/operator-auth/tests/native-types.check.mts",
+    "line": 18,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/operator-auth/tests/presentation.test.mjs",
+    "line": 19,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/operator-auth/tests/regression-runtime.mjs",
+    "line": 24,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "modules/operator-auth/tests/reinvitation-upgrade-runtime.mjs",
+    "line": 26,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "onboarding/adapter-settings.test.mjs",
+    "line": 45,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "onboarding/private.test.mjs",
+    "line": 84,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "onboarding/redaction-shapes.test.mjs",
+    "line": 244,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "operations/mail-bindings.test.mjs",
+    "line": 89,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "operations/mail-bindings.test.mjs",
+    "line": 130,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  },
+  {
+    "path": "operations/operations.test.mjs",
+    "line": 67,
+    "classification": "SYNTHETIC",
+    "exactCredentialFormat": false,
+    "context": "existing test-only input or validation sentinel",
+    "operation": "prefix generic literal with existing synthetic- marker; preserve consumers and assertions"
+  }
+]

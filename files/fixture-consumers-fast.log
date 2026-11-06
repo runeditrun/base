@@ -1,0 +1,43 @@
+✔ vendor exports strip credential values before upload, keeping every record, empty credential fields and pagination (5634.889006ms)
+✔ missing deployment commands name the requested environment and offer the checkout records through the CLI (5850.179142ms)
+ℹ No deployment of the production environment in this checkout. It holds:
+  review: rer deploy --environment review --cwd . --remove --yes
+  sd-x: rer deploy --environment sd-x --cwd . --remove --yes
+ℹ No deployment of the production environment in this checkout. This checkout holds no deployment environments. Run it from the checkout that deployed it.
+✔ pending approval retains the approving session pin through provider redemption (356.95046ms)
+✔ under rer dev a seed links to a seed on http loopback, whatever the port and loopback spelling, and signs in through it (880.1901ms)
+✔ a hosted app refuses http loopback providers; production still needs https (202.555468ms)
+✔ http to anything but loopback is refused even under rer dev (236.448676ms)
+✔ every dependency callback needs its own live app approval; unlink and in-flight authority changes cannot restore provider access (14590.131431ms)
+✔ static asset multipart preserves JavaScript MIME for imported browser .mjs and .js, and binary MIME for unknown extensions (31.587726ms)
+✔ explicit provider configuration never falls back to development (3.278783ms)
+✔ portable SendGrid wire, receipt and transport conformance (17.453499ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ native opt-in and explicit callback configuration refuse partial adapters, unsupported capabilities and conflicting/foreign URLs (2837.935615ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ branding validates all optional fields and snapshots only public presentation (10.57459ms)
+Saving private local settings
+Applying database migrations
+Heavy job admitted: adapter-settings-HtbEhr installer:command [d3c93cef1901]
+[REDACTED]
+[REDACTED]
+[REDACTED]
+Your application is running locally
+✔ all credential-shaped saved settings are registered before a command emits bare values (1311.985311ms)
+✔ a receipt remains resumable after interruption between publication and staging unlink (23.088185ms)
+✔ acronym-prefixed credential variables register their values (2.640079ms)
+✔ development mail is explicit and confined to canonical loopback origins in development mode (78.507783ms)
+✔ another project binds its own selector, hosted credentials, sender, account and development guard names (186.889323ms)
+✔ CLI exit statuses and strict arguments keep output machine-readable (286.595771ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 21029.517578

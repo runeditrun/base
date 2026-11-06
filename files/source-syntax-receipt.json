@@ -1,0 +1,20 @@
+{
+  "label": "source-syntax",
+  "points": [
+    "P1",
+    "P2"
+  ],
+  "argv": [
+    "node",
+    "--input-type=module",
+    "-e",
+    "import {execFileSync} from \"node:child_process\";const paths=execFileSync(\"git\",[\"diff\",\"--name-only\"],{encoding:\"utf8\"}).trim().split(\"\\n\").filter(p=>p.endsWith(\".mjs\"));for(const p of paths)execFileSync(process.execPath,[\"--check\",p]);console.log(JSON.stringify({checked:paths.length,paths}));"
+  ],
+  "exit": 0,
+  "source": {
+    "head": "a15b3ad0fd51ed1d52f7aee61d4e70eb0adb95e8",
+    "tree": "c2498d3df00e65b32c36d5473a460b33be660d68",
+    "clean": false
+  },
+  "output": "source-syntax.log"
+}

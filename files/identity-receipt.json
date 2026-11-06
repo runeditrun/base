@@ -1,0 +1,10 @@
+{
+  "assertion": "PASS",
+  "commits": [
+    "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+    "e6dcc42b8d406084b5e9bba86ccdf92f9614021a"
+  ],
+  "identity": "Run Edit Run fleet <fleet@runeditrun.com>",
+  "trailers": "absent",
+  "allSideParentsIncluded": true
+}

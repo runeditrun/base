@@ -1,0 +1,18 @@
+{
+  "label": "export",
+  "points": [
+    "P3"
+  ],
+  "argv": [
+    "node",
+    "scripts/export-cli.mjs",
+    "default-seed"
+  ],
+  "exit": 0,
+  "source": {
+    "head": "e6dcc42b8d406084b5e9bba86ccdf92f9614021a",
+    "tree": "5dbe434e42be854faf1467aa42cde1f51e8a099e",
+    "clean": true
+  },
+  "output": "export.log"
+}

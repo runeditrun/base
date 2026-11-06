@@ -1,0 +1,44 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ per-install secret source provisions isolated receiver and wrong signatures remain refused (2488.460114ms)
+ℹ Per-run random secret: valid signature 202, wrong signature 401; read-only state and sanitized accessor failures passed.
+﹣ run turns a job into an exact-commit isolated checkout inside the OS boundary and relays it durably (1394.843005ms) # run needs macOS sandbox-exec
+✔ claude-auth reports success only when the provider confirms a login in the dedicated executor home (642.170617ms)
+✖ ordinary build excludes local credentials and restores the exact file after success and failure (1278.346712ms)
+✔ native Wrangler receives only explicit private file bindings despite inherited loader settings (4234.404032ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ invitation race: cancellation commits before the authorized competing request (1531.025234ms)
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+✔ setup rejects duplicate form/JSON credentials before owner claim, with a single escaped form field positive control (2199.747127ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 10002.571419
+
+✖ failing tests:
+
+test at default-seed/tests/local-setup/cli.test.mjs:308:1
+✖ ordinary build excludes local credentials and restores the exact file after success and failure (1278.346712ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  384 !== 416
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-publish-sec3-object-key-1/base/default-seed/tests/local-setup/cli.test.mjs:320:12)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 384,
+    expected: 416,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

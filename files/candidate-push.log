@@ -1,0 +1,7 @@
+fleet Git: removed 0 credential-bearing GitHub URL rewrite sections
+PUSH attempt=1/5 command=git push --porcelain origin HEAD:refs/heads/cloud/gr-publish-sec3-object-key-1
+fleet Git: removed 0 credential-bearing GitHub URL rewrite sections
+To https://github.com/runeditrun/base.git
+ 	HEAD:refs/heads/cloud/gr-publish-sec3-object-key-1	e6dcc42..7e78f21
+Done
+PUSH_OK branch=cloud/gr-publish-sec3-object-key-1

@@ -1,0 +1,350 @@
+{
+  "schema": "rer.publish-check/v3",
+  "status": "FAIL",
+  "complete": true,
+  "source": {
+    "commit": "150793e9d38f5023fd14950080287a902085e373",
+    "tree": "024a6fb4c7782de2c8818f473195a5ad6402bf30"
+  },
+  "scanner": {
+    "name": "gitleaks",
+    "version": "8.30.1"
+  },
+  "history": {
+    "scope": "all-local-refs-and-selected-commit",
+    "commits": 1,
+    "trees": 1,
+    "blobs": 2,
+    "commitMessages": 1,
+    "tagMessages": 0,
+    "hydration": {
+      "missingBefore": 0,
+      "missingAfter": 0,
+      "fetches": 0,
+      "seconds": 0.002546
+    },
+    "preExistingCommits": [],
+    "newlyPublicCommits": [
+      "150793e9d38f5023fd14950080287a902085e373"
+    ]
+  },
+  "findings": [
+    {
+      "rule": "SEC-3",
+      "path": "default.ts",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "line": 1
+    },
+    {
+      "rule": "SEC-3",
+      "path": "assignment.mjs",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "line": 1
+    },
+    {
+      "rule": "SEC-3",
+      "path": "first.mjs",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "line": 1
+    },
+    {
+      "rule": "SEC-3",
+      "path": "quoted.json",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "line": 1
+    },
+    {
+      "rule": "SEC-3",
+      "path": "nested.mjs",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "line": 5
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "arrow-later.ts",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "assignment.mjs",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "arrow-first.ts",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "alias.ts",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "method.ts",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "function-first.ts",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "second.mjs",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "second.ts",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "first.mjs",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "function-later.ts",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "interface.ts",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "nested.mjs",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "quoted.json",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "default.ts",
+      "commit": "150793e9d38f5023fd14950080287a902085e373",
+      "commits": [
+        "150793e9d38f5023fd14950080287a902085e373"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "scannerRule": "generic-api-key"
+    }
+  ],
+  "preExisting": [],
+  "warnings": [],
+  "fixtures": [],
+  "reviewed": [],
+  "info": [],
+  "thirdPartyNotices": [],
+  "guarantees": {
+    "historyScanned": true,
+    "visualRecognition": false,
+    "environmentChecked": false
+  },
+  "timings": {
+    "totalSeconds": 1.597757,
+    "phases": {
+      "history.prepare": {
+        "calls": 1,
+        "seconds": 0.012731
+      },
+      "history.context": {
+        "calls": 1,
+        "seconds": 0.001897
+      },
+      "history.text": {
+        "calls": 2,
+        "seconds": 0.06103
+      },
+      "working-tree.context": {
+        "calls": 1,
+        "seconds": 2.3e-05
+      },
+      "working-tree.text": {
+        "calls": 16,
+        "seconds": 0.00863
+      },
+      "identities.prepare": {
+        "calls": 1,
+        "seconds": 4e-05
+      },
+      "gitleaks.git": {
+        "calls": 1,
+        "seconds": 0.425662
+      },
+      "gitleaks.dir": {
+        "calls": 1,
+        "seconds": 0.416107
+      },
+      "checksums.prepare": {
+        "calls": 1,
+        "seconds": 8e-06
+      },
+      "messages.text": {
+        "calls": 1,
+        "seconds": 0.000748
+      },
+      "gitleaks.messages": {
+        "calls": 1,
+        "seconds": 0.393164
+      },
+      "github.references": {
+        "calls": 1,
+        "seconds": 5.9e-05
+      }
+    }
+  },
+  "implementation": {
+    "version": "0.2.99-dev.ga15b3ad0",
+    "sha256": "c5f2d788f2f08764cd018e049b507c26f5ac01f651e2e8696398d89a5a886ffb",
+    "python": "3.12.14"
+  },
+  "publicBase": null
+}

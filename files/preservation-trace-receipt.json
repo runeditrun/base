@@ -1,0 +1,54 @@
+{
+  "source": {
+    "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+    "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096"
+  },
+  "points": [
+    "P2",
+    "P4",
+    "P5"
+  ],
+  "argv": [
+    "git",
+    "diff",
+    "--exit-code",
+    "origin/main",
+    "HEAD",
+    "--",
+    "scripts/publish-check/credential_literals.mjs",
+    "scripts/publish-check/gitleaks.toml",
+    "scripts/publish-check/credential_assignments.py",
+    "scripts/publish-check/reviewed.py",
+    "scripts/publish-check/report.py",
+    "scripts/publish-check/git_history.py",
+    "scripts/publish-check/history_scan.py",
+    "scripts/publish-check/history_hydration.py",
+    "scripts/publish-check/gitleaks.py",
+    "scripts/publish-check/env_values.py",
+    "scripts/publish-check/timeout.json",
+    "scripts/publish-check/slots.py"
+  ],
+  "exit": 0,
+  "unchangedPaths": [
+    "scripts/publish-check/credential_literals.mjs",
+    "scripts/publish-check/gitleaks.toml",
+    "scripts/publish-check/credential_assignments.py",
+    "scripts/publish-check/reviewed.py",
+    "scripts/publish-check/report.py",
+    "scripts/publish-check/git_history.py",
+    "scripts/publish-check/history_scan.py",
+    "scripts/publish-check/history_hydration.py",
+    "scripts/publish-check/gitleaks.py",
+    "scripts/publish-check/env_values.py",
+    "scripts/publish-check/timeout.json",
+    "scripts/publish-check/slots.py"
+  ],
+  "assertion": "PASS: marker/classifier, provider/environment, history/hydration, outcome/review, deadline/slot policies unchanged",
+  "trace": {
+    "history": "git_history.py traverses selected/public or all local refs; shallow history is inspection-incomplete",
+    "publicBase": "history_scan.py compares selected and working bytes to same-path public tip bytes; ancestry alone does not exempt changed bytes",
+    "SEC3": "credential_assignments.py translates the persistent worker into location-only SEC-3; failure is credential-assignment-incomplete",
+    "review": "reviewed.py accepted rule schema excludes SEC-3; report.py derives complete PASS/FAIL or INCOMPLETE",
+    "independence": "gitleaks.py provider handling and env_values.py known-value handling remain independent"
+  }
+}

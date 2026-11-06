@@ -1,0 +1,174 @@
+{
+  "source": {
+    "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+    "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096"
+  },
+  "assertion": "PASS: each fixture diff consists only of inserting synthetic-; no assertion or registration removed",
+  "files": [
+    {
+      "path": "cli/agent-door-hooks.test.mjs",
+      "markerInsertions": 2,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "cli/business-connect.test.mjs",
+      "markerInsertions": 6,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "cli/companion.test.mjs",
+      "markerInsertions": 2,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "cli/deployment-record.test.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "cli/fixtures/business/server.mjs",
+      "markerInsertions": 2,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "cli/fixtures/business/zendesk-data.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "cli/fixtures/companion/server.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "cli/fixtures/dependency-deploy.mjs",
+      "markerInsertions": 3,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "cli/fixtures/dependency-link.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "cli/reference-journey.test.mjs",
+      "markerInsertions": 2,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "default-seed/tests/local-setup/cli.test.mjs",
+      "markerInsertions": 2,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "default-seed/tests/local-setup/native-bindings.test.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "global/tests/package-pin.test.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "live-proofs/tests/linux-ci/browser.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/dependencies/tests/admission-transition.test.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/dependencies/tests/local-provider.test.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/dependencies/tests/owner-approval.test.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/dependencies/tests/runtime.mjs",
+      "markerInsertions": 2,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/deploy-kit/tests/asset-upload.test.mjs",
+      "markerInsertions": 2,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/editor/tests/compiled-native.browser.test.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/mail/tests/core/validation.test.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/mail/tests/sendgrid/conformance.mjs",
+      "markerInsertions": 3,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/operator-auth/tests/cancellation-runtime.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/operator-auth/tests/native-auth.test.mjs",
+      "markerInsertions": 4,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/operator-auth/tests/native-types.check.mts",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/operator-auth/tests/presentation.test.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/operator-auth/tests/regression-runtime.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "modules/operator-auth/tests/reinvitation-upgrade-runtime.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "onboarding/adapter-settings.test.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "onboarding/private.test.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "onboarding/redaction-shapes.test.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "operations/mail-bindings.test.mjs",
+      "markerInsertions": 2,
+      "assertionsPreserved": true
+    },
+    {
+      "path": "operations/operations.test.mjs",
+      "markerInsertions": 1,
+      "assertionsPreserved": true
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "label": "history-controls",
+  "points": [
+    "P4"
+  ],
+  "argv": [
+    "python3",
+    "-B",
+    "scripts/publish-check/tests.py",
+    "HistoryTests.test_clean",
+    "HistoryTests.test_deleted_secret",
+    "HistoryTests.test_working_tree_including_ignored_files",
+    "HistoryTests.test_other_branch",
+    "HistoryTests.test_media_samples_are_not_text_and_public_base_copies_are_pre_existing"
+  ],
+  "exit": 0,
+  "source": {
+    "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+    "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+    "clean": true
+  },
+  "output": "history-controls.log"
+}

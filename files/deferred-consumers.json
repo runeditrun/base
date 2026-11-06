@@ -1,0 +1,53 @@
+[
+  {
+    "paths": [
+      "cli/fixtures/dependency-deploy.mjs",
+      "cli/fixtures/dependency-link.mjs"
+    ],
+    "consumer": "cli/dependency-setup.test.mjs",
+    "reason": "Existing consumer builds reference/foundation and includes browser journeys; explicitly excluded from this local task."
+  },
+  {
+    "paths": [
+      "cli/reference-journey.test.mjs"
+    ],
+    "consumer": "standalone real Worker install/setup/dev/sign-in/build/reset and teardown",
+    "reason": "Reference build/install/browser journey excluded; matching private-setting expectation updated, assertion preserved."
+  },
+  {
+    "paths": [
+      "global/tests/package-pin.test.mjs"
+    ],
+    "consumer": "fresh package checkouts and deployment credential isolation tests",
+    "reason": "Package construction/install journey excluded from local scope."
+  },
+  {
+    "paths": [
+      "live-proofs/tests/linux-ci/browser.mjs"
+    ],
+    "consumer": "live-proofs/tests/linux-ci/run.mjs browser-boundary",
+    "reason": "Docker/browser qualification excluded from local scope; forbidden environment variable name unchanged."
+  },
+  {
+    "paths": [
+      "modules/editor/tests/compiled-native.browser.test.mjs"
+    ],
+    "consumer": "native authorization, actual application frame-src, private overlay and published reload agree",
+    "reason": "Browser suite excluded; only synthetic rejected-CSRF input relabeled."
+  },
+  {
+    "paths": [
+      "modules/operator-auth/tests/reinvitation-upgrade-runtime.mjs"
+    ],
+    "consumer": "modules/operator-auth/tests/reinvitation-upgrade.mjs",
+    "reason": "Requires unprovided independent OA_BASELINE_SOURCE; no historical snapshot or baseline acquired."
+  },
+  {
+    "paths": [
+      "cli/companion.test.mjs",
+      "cli/fixtures/companion/server.mjs"
+    ],
+    "consumer": "run turns a job into an exact-commit isolated checkout inside the OS boundary and relays it durably",
+    "reason": "Existing test self-skipped because macOS sandbox-exec is unavailable; skip policy unchanged. Separate claude-auth consumer passed."
+  }
+]

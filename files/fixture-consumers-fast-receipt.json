@@ -1,0 +1,34 @@
+{
+  "label": "fixture-consumers-fast",
+  "points": [
+    "P2"
+  ],
+  "argv": [
+    "node",
+    "--test",
+    "--test-concurrency=2",
+    "--test-name-pattern=^vendor exports strip credential values|^missing deployment commands|^pending approval retains|^under rer dev a seed links|^a hosted app refuses|^http to anything|^every dependency callback|^static asset multipart|^explicit provider configuration|^portable SendGrid wire|^native opt-in and explicit callback|^branding validates|^all credential-shaped saved settings|^a receipt remains resumable|^acronym-prefixed credential variables|^development mail is explicit|^another project binds|^CLI exit statuses",
+    "cli/business-connect.test.mjs",
+    "cli/deployment-record.test.mjs",
+    "modules/dependencies/tests/admission-transition.test.mjs",
+    "modules/dependencies/tests/local-provider.test.mjs",
+    "modules/dependencies/tests/owner-approval.test.mjs",
+    "modules/deploy-kit/tests/asset-upload.test.mjs",
+    "modules/mail/tests/core/validation.test.mjs",
+    "modules/mail/tests/sendgrid/wire.test.mjs",
+    "modules/operator-auth/tests/native-auth.test.mjs",
+    "modules/operator-auth/tests/presentation.test.mjs",
+    "onboarding/adapter-settings.test.mjs",
+    "onboarding/private.test.mjs",
+    "onboarding/redaction-shapes.test.mjs",
+    "operations/mail-bindings.test.mjs",
+    "operations/operations.test.mjs"
+  ],
+  "exit": 0,
+  "source": {
+    "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+    "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+    "clean": false
+  },
+  "output": "fixture-consumers-fast.log"
+}

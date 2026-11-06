@@ -1,0 +1,30 @@
+{
+  "label": "native-types-consumer",
+  "points": [
+    "P2"
+  ],
+  "argv": [
+    "./default-seed/node_modules/.bin/tsc",
+    "--noEmit",
+    "--strict",
+    "--skipLibCheck",
+    "--allowImportingTsExtensions",
+    "--module",
+    "NodeNext",
+    "--moduleResolution",
+    "NodeNext",
+    "--target",
+    "ES2022",
+    "--lib",
+    "ES2022,DOM",
+    "default-seed/node_modules/@cloudflare/workers-types/index.d.ts",
+    "modules/operator-auth/tests/native-types.check.mts"
+  ],
+  "exit": 0,
+  "source": {
+    "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+    "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+    "clean": true
+  },
+  "output": "native-types-consumer.log"
+}

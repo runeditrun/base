@@ -1,0 +1,17 @@
+{
+  "finalConsumerExpectationPaths": [
+    "cli/reference-journey.test.mjs",
+    "default-seed/tests/local-setup/cli.test.mjs",
+    "modules/deploy-kit/tests/asset-upload.test.mjs",
+    "modules/mail/tests/sendgrid/conformance.mjs"
+  ],
+  "unchangedUnrelatedLocations": [
+    "modules/mail/tests/resend/validation.test.mjs:47",
+    "onboarding/redaction-shapes.test.mjs:77"
+  ],
+  "source": {
+    "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+    "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096"
+  },
+  "assertion": "matching expected headers/private-setting bytes and failure payloads retain the relabeled input; unrelated same-spelling literals left intact"
+}

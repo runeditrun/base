@@ -1,0 +1,275 @@
+{
+  "paths": 33,
+  "edits": [
+    {
+      "path": "cli/agent-door-hooks.test.mjs",
+      "originalLocations": [
+        69
+      ],
+      "replacedLiteralTokens": 2,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "cli/business-connect.test.mjs",
+      "originalLocations": [
+        1027,
+        1031
+      ],
+      "replacedLiteralTokens": 6,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "cli/companion.test.mjs",
+      "originalLocations": [
+        152,
+        359
+      ],
+      "replacedLiteralTokens": 2,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "cli/deployment-record.test.mjs",
+      "originalLocations": [
+        30
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "cli/fixtures/business/server.mjs",
+      "originalLocations": [
+        118
+      ],
+      "replacedLiteralTokens": 2,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "cli/fixtures/business/zendesk-data.mjs",
+      "originalLocations": [
+        4
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "cli/fixtures/companion/server.mjs",
+      "originalLocations": [
+        6
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "cli/fixtures/dependency-deploy.mjs",
+      "originalLocations": [
+        135
+      ],
+      "replacedLiteralTokens": 3,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "cli/fixtures/dependency-link.mjs",
+      "originalLocations": [
+        75
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "cli/reference-journey.test.mjs",
+      "originalLocations": [
+        58
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "default-seed/tests/local-setup/cli.test.mjs",
+      "originalLocations": [
+        315
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "default-seed/tests/local-setup/native-bindings.test.mjs",
+      "originalLocations": [
+        76
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "global/tests/package-pin.test.mjs",
+      "originalLocations": [
+        23
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "live-proofs/tests/linux-ci/browser.mjs",
+      "originalLocations": [
+        49
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/dependencies/tests/admission-transition.test.mjs",
+      "originalLocations": [
+        110
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/dependencies/tests/local-provider.test.mjs",
+      "originalLocations": [
+        11
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/dependencies/tests/owner-approval.test.mjs",
+      "originalLocations": [
+        47
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/dependencies/tests/runtime.mjs",
+      "originalLocations": [
+        25
+      ],
+      "replacedLiteralTokens": 2,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/deploy-kit/tests/asset-upload.test.mjs",
+      "originalLocations": [
+        17
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/editor/tests/compiled-native.browser.test.mjs",
+      "originalLocations": [
+        90
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/mail/tests/core/validation.test.mjs",
+      "originalLocations": [
+        18
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/mail/tests/sendgrid/conformance.mjs",
+      "originalLocations": [
+        4
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/operator-auth/tests/cancellation-runtime.mjs",
+      "originalLocations": [
+        24
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/operator-auth/tests/native-auth.test.mjs",
+      "originalLocations": [
+        184,
+        197,
+        199,
+        200
+      ],
+      "replacedLiteralTokens": 4,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/operator-auth/tests/native-types.check.mts",
+      "originalLocations": [
+        18
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/operator-auth/tests/presentation.test.mjs",
+      "originalLocations": [
+        19
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/operator-auth/tests/regression-runtime.mjs",
+      "originalLocations": [
+        24
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "modules/operator-auth/tests/reinvitation-upgrade-runtime.mjs",
+      "originalLocations": [
+        26
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "onboarding/adapter-settings.test.mjs",
+      "originalLocations": [
+        45
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "onboarding/private.test.mjs",
+      "originalLocations": [
+        84
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "onboarding/redaction-shapes.test.mjs",
+      "originalLocations": [
+        244
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "operations/mail-bindings.test.mjs",
+      "originalLocations": [
+        89,
+        130
+      ],
+      "replacedLiteralTokens": 2,
+      "remainingAtIdentifiedLines": 0
+    },
+    {
+      "path": "operations/operations.test.mjs",
+      "originalLocations": [
+        67
+      ],
+      "replacedLiteralTokens": 1,
+      "remainingAtIdentifiedLines": 0
+    }
+  ]
+}

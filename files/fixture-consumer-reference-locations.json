@@ -1,0 +1,30 @@
+[
+  {
+    "path": "cli/reference-journey.test.mjs",
+    "line": 71
+  },
+  {
+    "path": "default-seed/tests/local-setup/cli.test.mjs",
+    "line": 328
+  },
+  {
+    "path": "modules/deploy-kit/tests/asset-upload.test.mjs",
+    "line": 30
+  },
+  {
+    "path": "modules/mail/tests/resend/validation.test.mjs",
+    "line": 47
+  },
+  {
+    "path": "modules/mail/tests/sendgrid/conformance.mjs",
+    "line": 46
+  },
+  {
+    "path": "modules/mail/tests/sendgrid/conformance.mjs",
+    "line": 73
+  },
+  {
+    "path": "onboarding/redaction-shapes.test.mjs",
+    "line": 77
+  }
+]

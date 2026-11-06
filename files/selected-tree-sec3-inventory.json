@@ -1,0 +1,311 @@
+{
+  "target_head": "a15b3ad0fd51ed1d52f7aee61d4e70eb0adb95e8",
+  "target_tree": "c2498d3df00e65b32c36d5473a460b33be660d68",
+  "scanner": "candidate working source; selected tracked HEAD bytes only",
+  "baseline": "incumbent worker copied before editing",
+  "before_count": 0,
+  "after_count": 43,
+  "newly_exposed": [
+    {
+      "path": "cli/agent-door-hooks.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 69
+      }
+    },
+    {
+      "path": "cli/business-connect.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 1027
+      }
+    },
+    {
+      "path": "cli/business-connect.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 1031
+      }
+    },
+    {
+      "path": "cli/business-connect.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 1031
+      }
+    },
+    {
+      "path": "cli/companion.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 152
+      }
+    },
+    {
+      "path": "cli/companion.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 359
+      }
+    },
+    {
+      "path": "cli/deployment-record.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 30
+      }
+    },
+    {
+      "path": "cli/fixtures/business/server.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 118
+      }
+    },
+    {
+      "path": "cli/fixtures/business/zendesk-data.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 4
+      }
+    },
+    {
+      "path": "cli/fixtures/companion/server.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 6
+      }
+    },
+    {
+      "path": "cli/fixtures/dependency-deploy.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 135
+      }
+    },
+    {
+      "path": "cli/fixtures/dependency-deploy.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 135
+      }
+    },
+    {
+      "path": "cli/fixtures/dependency-deploy.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 135
+      }
+    },
+    {
+      "path": "cli/fixtures/dependency-link.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 75
+      }
+    },
+    {
+      "path": "cli/reference-journey.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 58
+      }
+    },
+    {
+      "path": "default-seed/tests/local-setup/cli.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 315
+      }
+    },
+    {
+      "path": "default-seed/tests/local-setup/native-bindings.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 76
+      }
+    },
+    {
+      "path": "global/tests/package-pin.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 23
+      }
+    },
+    {
+      "path": "live-proofs/tests/linux-ci/browser.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 49
+      }
+    },
+    {
+      "path": "modules/dependencies/tests/admission-transition.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 110
+      }
+    },
+    {
+      "path": "modules/dependencies/tests/local-provider.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 11
+      }
+    },
+    {
+      "path": "modules/dependencies/tests/owner-approval.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 47
+      }
+    },
+    {
+      "path": "modules/dependencies/tests/runtime.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 25
+      }
+    },
+    {
+      "path": "modules/dependencies/tests/runtime.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 25
+      }
+    },
+    {
+      "path": "modules/deploy-kit/tests/asset-upload.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 17
+      }
+    },
+    {
+      "path": "modules/editor/tests/compiled-native.browser.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 90
+      }
+    },
+    {
+      "path": "modules/mail/tests/core/validation.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 18
+      }
+    },
+    {
+      "path": "modules/mail/tests/sendgrid/conformance.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 4
+      }
+    },
+    {
+      "path": "modules/operator-auth/tests/cancellation-runtime.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 24
+      }
+    },
+    {
+      "path": "modules/operator-auth/tests/native-auth.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 184
+      }
+    },
+    {
+      "path": "modules/operator-auth/tests/native-auth.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 197
+      }
+    },
+    {
+      "path": "modules/operator-auth/tests/native-auth.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 199
+      }
+    },
+    {
+      "path": "modules/operator-auth/tests/native-auth.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 200
+      }
+    },
+    {
+      "path": "modules/operator-auth/tests/native-types.check.mts",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 18
+      }
+    },
+    {
+      "path": "modules/operator-auth/tests/presentation.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 19
+      }
+    },
+    {
+      "path": "modules/operator-auth/tests/regression-runtime.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 24
+      }
+    },
+    {
+      "path": "modules/operator-auth/tests/reinvitation-upgrade-runtime.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 26
+      }
+    },
+    {
+      "path": "onboarding/adapter-settings.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 45
+      }
+    },
+    {
+      "path": "onboarding/private.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 84
+      }
+    },
+    {
+      "path": "onboarding/redaction-shapes.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 244
+      }
+    },
+    {
+      "path": "operations/mail-bindings.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 89
+      }
+    },
+    {
+      "path": "operations/mail-bindings.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 130
+      }
+    },
+    {
+      "path": "operations/operations.test.mjs",
+      "rule": "SEC-3",
+      "classification": {
+        "line": 67
+      }
+    }
+  ]
+}

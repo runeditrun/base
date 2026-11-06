@@ -1,0 +1,10 @@
+{
+  "requestedMode": "0640",
+  "observedMode": "0600",
+  "taskUmask": "0077",
+  "assertion": "PASS: a newly created empty file is already 0600 before any application runs",
+  "failedConsumer": "ordinary build excludes local credentials and restores the exact file after success and failure",
+  "failedAssertion": "after.mode & 0777 equals 0640; actual 0600",
+  "disposition": "environment/test assumption; fixture creates with mode 0640 but inherits umask 0077; no candidate retry or baseline run; no assertion weakened",
+  "evidence": "consumer checks same inode and exact bytes before reaching hardcoded mode assertion; source changes only synthetic input and matching non-disclosure expectation"
+}

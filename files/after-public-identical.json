@@ -1,0 +1,139 @@
+{
+  "schema": "rer.publish-check/v3",
+  "status": "PASS",
+  "complete": true,
+  "source": {
+    "commit": "4cbcabd5649e1c42827497af386c5e0090870661",
+    "tree": "941cbb942c20d2cb3c8580f326adee39ac0fc2d5"
+  },
+  "scanner": {
+    "name": "gitleaks",
+    "version": "8.30.1"
+  },
+  "history": {
+    "scope": "selected-and-public-base",
+    "commits": 3,
+    "trees": 3,
+    "blobs": 4,
+    "commitMessages": 3,
+    "tagMessages": 0,
+    "hydration": {
+      "missingBefore": 0,
+      "missingAfter": 0,
+      "fetches": 0,
+      "seconds": 0.002329
+    },
+    "preExistingCommits": [
+      "6e4c553330b236961090b4bf565d6478cbac305c",
+      "7d4bfda84cee3e89570c6125abe75e54f7f60be0"
+    ],
+    "newlyPublicCommits": [
+      "4cbcabd5649e1c42827497af386c5e0090870661"
+    ]
+  },
+  "findings": [],
+  "preExisting": [
+    {
+      "rule": "SEC-3",
+      "path": "settings.mjs",
+      "commit": "4cbcabd5649e1c42827497af386c5e0090870661",
+      "commits": [
+        "4cbcabd5649e1c42827497af386c5e0090870661",
+        "7d4bfda84cee3e89570c6125abe75e54f7f60be0"
+      ],
+      "scope": "pre-existing",
+      "scopes": [
+        "pre-existing"
+      ],
+      "blob": "fea78fdfc1656cc0a7a71d89efa0df0b98a5a71e",
+      "line": 1
+    },
+    {
+      "rule": "secret.assignment",
+      "path": "settings.mjs",
+      "commit": "7d4bfda84cee3e89570c6125abe75e54f7f60be0",
+      "commits": [
+        "7d4bfda84cee3e89570c6125abe75e54f7f60be0",
+        "4cbcabd5649e1c42827497af386c5e0090870661"
+      ],
+      "scope": "pre-existing",
+      "scopes": [
+        "pre-existing"
+      ],
+      "blob": "fea78fdfc1656cc0a7a71d89efa0df0b98a5a71e",
+      "scannerRule": "generic-api-key"
+    }
+  ],
+  "warnings": [],
+  "fixtures": [],
+  "reviewed": [],
+  "info": [],
+  "thirdPartyNotices": [],
+  "guarantees": {
+    "historyScanned": true,
+    "visualRecognition": false,
+    "environmentChecked": false
+  },
+  "timings": {
+    "totalSeconds": 1.826866,
+    "phases": {
+      "history.prepare": {
+        "calls": 1,
+        "seconds": 0.035036
+      },
+      "history.context": {
+        "calls": 3,
+        "seconds": 0.006816
+      },
+      "history.text": {
+        "calls": 4,
+        "seconds": 0.065716
+      },
+      "working-tree.context": {
+        "calls": 1,
+        "seconds": 1.4e-05
+      },
+      "working-tree.text": {
+        "calls": 3,
+        "seconds": 0.001357
+      },
+      "identities.prepare": {
+        "calls": 1,
+        "seconds": 4e-06
+      },
+      "gitleaks.git": {
+        "calls": 1,
+        "seconds": 0.448825
+      },
+      "checksums.prepare": {
+        "calls": 2,
+        "seconds": 1.1e-05
+      },
+      "gitleaks.dir": {
+        "calls": 1,
+        "seconds": 0.428866
+      },
+      "messages.text": {
+        "calls": 3,
+        "seconds": 0.000759
+      },
+      "gitleaks.messages": {
+        "calls": 1,
+        "seconds": 0.513275
+      },
+      "github.references": {
+        "calls": 1,
+        "seconds": 5.2e-05
+      }
+    }
+  },
+  "implementation": {
+    "version": "0.2.99-dev.g7e78f21a",
+    "sha256": "c5f2d788f2f08764cd018e049b507c26f5ac01f651e2e8696398d89a5a886ffb",
+    "python": "3.12.14"
+  },
+  "publicBase": {
+    "ref": "/tmp/sec3-public-8pvkoi06/public.git#main",
+    "commit": "7d4bfda84cee3e89570c6125abe75e54f7f60be0"
+  }
+}

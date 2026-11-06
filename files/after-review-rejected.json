@@ -1,0 +1,67 @@
+{
+  "schema": "rer.publish-check/v3",
+  "status": "INCOMPLETE",
+  "complete": false,
+  "source": {
+    "commit": "5a1005cf93fbbf7ad2e50c426a8700f8c3ba3651",
+    "tree": "517231e5f4ab7075d121ac4c6faf2c74cf3ae1aa"
+  },
+  "scanner": {
+    "name": "gitleaks",
+    "version": "8.30.1"
+  },
+  "history": {
+    "scope": "all-local-refs-and-selected-commit",
+    "commits": 0,
+    "trees": 0,
+    "blobs": 0,
+    "commitMessages": 0,
+    "tagMessages": 0,
+    "hydration": {
+      "missingBefore": 0,
+      "missingAfter": 0,
+      "fetches": 0,
+      "seconds": 0.002631
+    }
+  },
+  "findings": [
+    {
+      "rule": "scan.configuration-incomplete",
+      "path": ".",
+      "commit": null,
+      "commits": [
+        null
+      ],
+      "scope": "newly-public",
+      "scopes": [
+        "newly-public"
+      ]
+    }
+  ],
+  "preExisting": [],
+  "warnings": [],
+  "fixtures": [],
+  "reviewed": [],
+  "info": [],
+  "thirdPartyNotices": [],
+  "guarantees": {
+    "historyScanned": false,
+    "visualRecognition": false,
+    "environmentChecked": false
+  },
+  "timings": {
+    "totalSeconds": 0.287407,
+    "phases": {
+      "history.prepare": {
+        "calls": 1,
+        "seconds": 0.012614
+      }
+    }
+  },
+  "implementation": {
+    "version": "0.2.99-dev.g7e78f21a",
+    "sha256": "c5f2d788f2f08764cd018e049b507c26f5ac01f651e2e8696398d89a5a886ffb",
+    "python": "3.12.14"
+  },
+  "publicBase": null
+}

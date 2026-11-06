@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/agent/rer-consolidation/work/gr-publish-sec3-object-key-1/selected-inventory.py"
+  ],
+  "exit": 0,
+  "target": {
+    "head": "a15b3ad0fd51ed1d52f7aee61d4e70eb0adb95e8",
+    "tree": "c2498d3df00e65b32c36d5473a460b33be660d68"
+  },
+  "scanner": {
+    "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+    "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+    "description": "Invoked from candidate working source before its first source commit; maintained worker source is unchanged from source-save e6dcc42 through final candidate."
+  },
+  "output": "selected-tree-sec3-inventory.json",
+  "assertion": "43 newly exposed value-free classifications across 33 paths; preserved unmodified"
+}

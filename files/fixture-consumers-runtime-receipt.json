@@ -1,0 +1,25 @@
+{
+  "label": "fixture-consumers-runtime",
+  "points": [
+    "P2"
+  ],
+  "argv": [
+    "node",
+    "--test",
+    "--test-concurrency=2",
+    "--test-name-pattern=^per-install secret source|^run turns a job|^claude-auth reports|^ordinary build excludes|^native Wrangler receives|^invitation race: cancellation commits|^setup rejects duplicate form/JSON",
+    "cli/agent-door-hooks.test.mjs",
+    "cli/companion.test.mjs",
+    "default-seed/tests/local-setup/cli.test.mjs",
+    "default-seed/tests/local-setup/native-bindings.test.mjs",
+    "modules/operator-auth/tests/cancellation-races.test.mjs",
+    "modules/operator-auth/tests/credentials.test.mjs"
+  ],
+  "exit": 1,
+  "source": {
+    "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+    "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+    "clean": false
+  },
+  "output": "fixture-consumers-runtime.log"
+}

@@ -1,0 +1,21 @@
+{
+  "label": "outcome-controls",
+  "points": [
+    "P5"
+  ],
+  "argv": [
+    "python3",
+    "-B",
+    "scripts/publish-check/tests.py",
+    "HistoryTests.test_shallow_is_incomplete",
+    "HistoryTests.test_environment_value_cannot_be_waived",
+    "HistoryTests.test_cli_process_failure_diagnostics"
+  ],
+  "exit": 0,
+  "source": {
+    "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+    "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+    "clean": false
+  },
+  "output": "outcome-controls.log"
+}

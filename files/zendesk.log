@@ -1,0 +1,13 @@
+✔ P1 P2 P4 P7 P8: Z0 archived tickets, exact census, paging, privacy and one public-door v1 plan (16459.554237ms)
+ℹ PROBE P8 Z0: plan_id=a5941d3e-c07b-4e20-9798-a95adbee578f upload_id=6e599add-82b4-4133-ab93-565e3afd0c6d sha256=fd8810cffdb5ff135e29a6ac3dacff51a78216741d49aba5849c2afdd0fb052d records=7 native_writes=0
+✔ P8 public-door package and P9 sweep, census-only and retire signal (54390.568257ms)
+ℹ PROBE P8 Fixture Z: plan_id=980d21b3-e5fb-4cb7-95e6-c42914f819db upload_id=5c721d54-1cb2-427a-a866-9bd3be8c2789 sha256=ddf7ef9700a1c789d45332100c39c5137471cc24d238ff0b5743e0096d26456c records=7 native_writes=0
+ℹ PROBE P9: complete sweep, census zero unswept, local retire and refusal after revocation
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 71364.035197

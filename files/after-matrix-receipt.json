@@ -1,0 +1,449 @@
+{
+  "phase": "after",
+  "points": [
+    "P1",
+    "P2",
+    "P4",
+    "P5"
+  ],
+  "source": {
+    "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+    "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+    "clean": true
+  },
+  "assertion": "PASS",
+  "commands": [
+    {
+      "label": "objects-and-annotations",
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "argv": [
+        "node",
+        "/home/agent/rer-consolidation/work/gr-publish-sec3-object-key-1/base/scripts/publish-check.mjs",
+        "--repo",
+        "/tmp/publish-fixture-apq0d7td"
+      ],
+      "exit": 1,
+      "status": "FAIL",
+      "complete": true,
+      "report": "after-objects-and-annotations.json",
+      "sec3": [
+        {
+          "bucket": "findings",
+          "path": "default.ts",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "assignment.mjs",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "first.mjs",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "quoted.json",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "nested.mjs",
+          "line": 5,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "second.ts",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "second.mjs",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        }
+      ],
+      "assertion": "PASS: all object/default locations found; all type locations excluded",
+      "expectedPositive": [
+        [
+          "assignment.mjs",
+          1
+        ],
+        [
+          "default.ts",
+          1
+        ],
+        [
+          "first.mjs",
+          1
+        ],
+        [
+          "nested.mjs",
+          5
+        ],
+        [
+          "quoted.json",
+          1
+        ],
+        [
+          "second.mjs",
+          1
+        ],
+        [
+          "second.ts",
+          1
+        ]
+      ],
+      "expectedExcluded": [
+        [
+          "alias.ts",
+          1
+        ],
+        [
+          "arrow-first.ts",
+          1
+        ],
+        [
+          "arrow-later.ts",
+          1
+        ],
+        [
+          "function-first.ts",
+          1
+        ],
+        [
+          "function-later.ts",
+          1
+        ],
+        [
+          "interface.ts",
+          1
+        ],
+        [
+          "method.ts",
+          1
+        ]
+      ]
+    },
+    {
+      "label": "portable-object",
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "argv": [
+        "node",
+        "/home/agent/rer-consolidation/work/gr-publish-sec3-object-key-1/base/default-seed/scripts/base-cli/scripts/publish-check.mjs",
+        "--repo",
+        "/tmp/publish-fixture-apq0d7td"
+      ],
+      "exit": 1,
+      "status": "FAIL",
+      "complete": true,
+      "report": "after-portable-object.json",
+      "sec3": [
+        {
+          "bucket": "findings",
+          "path": "default.ts",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "assignment.mjs",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "first.mjs",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "quoted.json",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "nested.mjs",
+          "line": 5,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "second.ts",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "second.mjs",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        }
+      ],
+      "assertion": "PASS: generated scanner reports second.mjs:1 as SEC-3"
+    },
+    {
+      "label": "marker-synthetic",
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "argv": [
+        "node",
+        "/home/agent/rer-consolidation/work/gr-publish-sec3-object-key-1/base/scripts/publish-check.mjs",
+        "--repo",
+        "/tmp/publish-fixture-3cmk7qf9"
+      ],
+      "exit": 0,
+      "status": "PASS",
+      "complete": true,
+      "report": "after-marker-synthetic.json",
+      "sec3": [],
+      "assertion": "PASS"
+    },
+    {
+      "label": "marker-fixture",
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "argv": [
+        "node",
+        "/home/agent/rer-consolidation/work/gr-publish-sec3-object-key-1/base/scripts/publish-check.mjs",
+        "--repo",
+        "/tmp/publish-fixture-r_1m40vf"
+      ],
+      "exit": 1,
+      "status": "FAIL",
+      "complete": true,
+      "report": "after-marker-fixture.json",
+      "sec3": [
+        {
+          "bucket": "findings",
+          "path": "settings.mjs",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        }
+      ],
+      "assertion": "PASS"
+    },
+    {
+      "label": "marker-test",
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "argv": [
+        "node",
+        "/home/agent/rer-consolidation/work/gr-publish-sec3-object-key-1/base/scripts/publish-check.mjs",
+        "--repo",
+        "/tmp/publish-fixture-qypqjxqt"
+      ],
+      "exit": 1,
+      "status": "FAIL",
+      "complete": true,
+      "report": "after-marker-test.json",
+      "sec3": [
+        {
+          "bucket": "findings",
+          "path": "settings.mjs",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        }
+      ],
+      "assertion": "PASS"
+    },
+    {
+      "label": "marker-reference",
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "argv": [
+        "node",
+        "/home/agent/rer-consolidation/work/gr-publish-sec3-object-key-1/base/scripts/publish-check.mjs",
+        "--repo",
+        "/tmp/publish-fixture-ifz1zcdf"
+      ],
+      "exit": 0,
+      "status": "PASS",
+      "complete": true,
+      "report": "after-marker-reference.json",
+      "sec3": [],
+      "assertion": "PASS"
+    },
+    {
+      "label": "deleted-history",
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "argv": [
+        "node",
+        "/home/agent/rer-consolidation/work/gr-publish-sec3-object-key-1/base/scripts/publish-check.mjs",
+        "--repo",
+        "/tmp/publish-fixture-u1x7t_7w"
+      ],
+      "exit": 1,
+      "status": "FAIL",
+      "complete": true,
+      "report": "after-deleted-history.json",
+      "sec3": [
+        {
+          "bucket": "findings",
+          "path": "settings.mjs",
+          "line": 1,
+          "scopes": [
+            "newly-public"
+          ]
+        }
+      ],
+      "assertion": "PASS: deleted second-key credential remains blocking history"
+    },
+    {
+      "label": "public-identical",
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "argv": [
+        "node",
+        "/home/agent/rer-consolidation/work/gr-publish-sec3-object-key-1/base/scripts/publish-check.mjs",
+        "--repo",
+        "/tmp/publish-fixture-8g549u4s",
+        "--public-base",
+        "/tmp/sec3-public-8pvkoi06/public.git#main"
+      ],
+      "exit": 0,
+      "status": "PASS",
+      "complete": true,
+      "report": "after-public-identical.json",
+      "sec3": [
+        {
+          "bucket": "preExisting",
+          "path": "settings.mjs",
+          "line": 1,
+          "scopes": [
+            "pre-existing"
+          ]
+        }
+      ],
+      "assertion": "PASS: old public and identical selected/working bytes are preExisting"
+    },
+    {
+      "label": "public-changed",
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "argv": [
+        "node",
+        "/home/agent/rer-consolidation/work/gr-publish-sec3-object-key-1/base/scripts/publish-check.mjs",
+        "--repo",
+        "/tmp/publish-fixture-8g549u4s",
+        "--public-base",
+        "/tmp/sec3-public-8pvkoi06/public.git#main"
+      ],
+      "exit": 1,
+      "status": "FAIL",
+      "complete": true,
+      "report": "after-public-changed.json",
+      "sec3": [
+        {
+          "bucket": "findings",
+          "path": "settings.mjs",
+          "line": 1,
+          "scopes": [
+            "release-tree",
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "preExisting",
+          "path": "settings.mjs",
+          "line": 1,
+          "scopes": [
+            "pre-existing"
+          ]
+        }
+      ],
+      "assertion": "PASS: changed selected/working bytes block independently of old public ancestry"
+    },
+    {
+      "label": "review-rejected",
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "argv": [
+        "node",
+        "/home/agent/rer-consolidation/work/gr-publish-sec3-object-key-1/base/scripts/publish-check.mjs",
+        "--repo",
+        "/tmp/publish-fixture-159pmlnb"
+      ],
+      "exit": 2,
+      "status": "INCOMPLETE",
+      "complete": false,
+      "report": "after-review-rejected.json",
+      "sec3": [],
+      "assertion": "PASS: exact SEC-3 review is rejected, never waived"
+    }
+  ]
+}

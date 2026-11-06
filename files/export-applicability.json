@@ -1,0 +1,11 @@
+{
+  "changed": [
+    "default-seed/scripts/base-cli/inventory.json",
+    "default-seed/scripts/base-cli/scripts/publish-check/credential_assignments.mjs",
+    "default-seed/scripts/base-cli/scripts/publish-check/credential_syntax.mjs"
+  ],
+  "testsExported": false,
+  "fixturesExported": false,
+  "topLevelGuideExported": false,
+  "sourceStamp": "e6dcc42b8d406084b5e9bba86ccdf92f9614021a"
+}

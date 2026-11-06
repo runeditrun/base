@@ -1,0 +1,112 @@
+{
+  "schema": "rer.publish-check/v3",
+  "status": "FAIL",
+  "complete": true,
+  "source": {
+    "commit": "7291f3cec105a4414ef90f4d32356529a2a44376",
+    "tree": "024a6fb4c7782de2c8818f473195a5ad6402bf30"
+  },
+  "scanner": {
+    "name": "gitleaks",
+    "version": "8.30.1"
+  },
+  "history": {
+    "scope": "all-local-refs-and-selected-commit",
+    "commits": 1,
+    "trees": 1,
+    "blobs": 2,
+    "commitMessages": 1,
+    "tagMessages": 0,
+    "hydration": {
+      "missingBefore": 0,
+      "missingAfter": 0,
+      "fetches": 0,
+      "seconds": 0.002658
+    },
+    "preExistingCommits": [],
+    "newlyPublicCommits": [
+      "7291f3cec105a4414ef90f4d32356529a2a44376"
+    ]
+  },
+  "findings": [
+    {
+      "rule": "SEC-3",
+      "path": "settings.mjs",
+      "commit": "7291f3cec105a4414ef90f4d32356529a2a44376",
+      "commits": [
+        "7291f3cec105a4414ef90f4d32356529a2a44376"
+      ],
+      "scope": "working-tree",
+      "scopes": [
+        "working-tree"
+      ],
+      "line": 1
+    }
+  ],
+  "preExisting": [],
+  "warnings": [],
+  "fixtures": [],
+  "reviewed": [],
+  "info": [],
+  "thirdPartyNotices": [],
+  "guarantees": {
+    "historyScanned": true,
+    "visualRecognition": false,
+    "environmentChecked": false
+  },
+  "timings": {
+    "totalSeconds": 1.887812,
+    "phases": {
+      "history.prepare": {
+        "calls": 1,
+        "seconds": 0.011761
+      },
+      "history.context": {
+        "calls": 1,
+        "seconds": 0.002311
+      },
+      "history.text": {
+        "calls": 2,
+        "seconds": 0.117387
+      },
+      "working-tree.context": {
+        "calls": 1,
+        "seconds": 1.7e-05
+      },
+      "working-tree.text": {
+        "calls": 3,
+        "seconds": 0.002435
+      },
+      "identities.prepare": {
+        "calls": 1,
+        "seconds": 4e-06
+      },
+      "gitleaks.git": {
+        "calls": 1,
+        "seconds": 0.458694
+      },
+      "gitleaks.dir": {
+        "calls": 1,
+        "seconds": 0.56666
+      },
+      "messages.text": {
+        "calls": 1,
+        "seconds": 0.000784
+      },
+      "gitleaks.messages": {
+        "calls": 1,
+        "seconds": 0.43803
+      },
+      "github.references": {
+        "calls": 1,
+        "seconds": 7.2e-05
+      }
+    }
+  },
+  "implementation": {
+    "version": "0.2.99-dev.g7e78f21a",
+    "sha256": "c5f2d788f2f08764cd018e049b507c26f5ac01f651e2e8696398d89a5a886ffb",
+    "python": "3.12.14"
+  },
+  "publicBase": null
+}

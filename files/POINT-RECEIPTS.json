@@ -1,0 +1,351 @@
+{
+  "source": {
+    "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+    "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096"
+  },
+  "points": {
+    "P1": {
+      "result": "MET locally",
+      "receipts": [
+        "before-matrix-receipt.json",
+        "after-matrix-receipt.json",
+        "hosted-assignment-receipt.json",
+        "final-syntax-receipt.json"
+      ],
+      "assertion": "before lacks SEC-3 at second.mjs:1; after finds every expected object/default line and excludes seven real type controls"
+    },
+    "P2": {
+      "result": "MET for scanner/guide/Zendesk; additional consumer environment caveat",
+      "receipts": [
+        "after-matrix-receipt.json",
+        "selected-tree-sec3-inventory.json",
+        "fixture-classifications.json",
+        "fixture-relabel-receipt.json",
+        "fixture-diff-preservation.json",
+        "zendesk-receipt.json",
+        "fixture-consumers-fast-receipt.json",
+        "fixture-consumers-runtime-receipt.json",
+        "native-types-consumer-receipt.json",
+        "file-mode-observation.json"
+      ],
+      "assertion": "unchanged marker policy; 43 generic synthetic occurrences relabeled across 33 paths; Zendesk authentication/redaction and deliberate removal fixture preserved"
+    },
+    "P3": {
+      "result": "MET locally",
+      "receipts": [
+        "export-receipt.json",
+        "export-applicability.json",
+        "portable-inventory-receipt.json",
+        "after-matrix-receipt.json",
+        "final-syntax-receipt.json"
+      ],
+      "assertion": "existing exporter changed only two declared runtime copies and inventory; generated scanner reports second.mjs:1"
+    },
+    "P4": {
+      "result": "MET locally",
+      "receipts": [
+        "after-matrix-receipt.json",
+        "history-controls-receipt.json",
+        "preservation-trace-receipt.json"
+      ],
+      "assertion": "deleted historical key blocks; old public/identical selected and working bytes preExisting; changed selected/working bytes block"
+    },
+    "P5": {
+      "result": "MET locally",
+      "receipts": [
+        "after-matrix-receipt.json",
+        "outcome-controls-receipt.json",
+        "preservation-trace-receipt.json"
+      ],
+      "assertion": "complete PASS/0 and FAIL/1, INCOMPLETE/2, forbidden SEC-3 review, independent native/environment handling and non-disclosure preserved"
+    }
+  },
+  "commands": {
+    "hosted-assignment-receipt.json": {
+      "label": "hosted-assignment",
+      "points": [
+        "P1"
+      ],
+      "argv": [
+        "python3",
+        "-B",
+        "scripts/publish-check/tests.py",
+        "HistoryTests.test_hosted_credential_assignment_through_cli"
+      ],
+      "exit": 0,
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": false
+      },
+      "output": "hosted-assignment.log"
+    },
+    "zendesk-receipt.json": {
+      "label": "zendesk",
+      "points": [
+        "P2"
+      ],
+      "argv": [
+        "node",
+        "--test",
+        "--test-name-pattern=^P1 P2 P4 P7 P8:|^P8 public-door package",
+        "cli/business-zendesk.test.mjs"
+      ],
+      "exit": 0,
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "output": "zendesk.log"
+    },
+    "portable-inventory-receipt.json": {
+      "label": "portable-inventory",
+      "points": [
+        "P3"
+      ],
+      "argv": [
+        "node",
+        "--test",
+        "--test-name-pattern=^portable CLI source inventory is deterministic and independent execution works outside Base$",
+        "cli/cli.test.mjs"
+      ],
+      "exit": 0,
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "output": "portable-inventory.log"
+    },
+    "history-controls-receipt.json": {
+      "label": "history-controls",
+      "points": [
+        "P4"
+      ],
+      "argv": [
+        "python3",
+        "-B",
+        "scripts/publish-check/tests.py",
+        "HistoryTests.test_clean",
+        "HistoryTests.test_deleted_secret",
+        "HistoryTests.test_working_tree_including_ignored_files",
+        "HistoryTests.test_other_branch",
+        "HistoryTests.test_media_samples_are_not_text_and_public_base_copies_are_pre_existing"
+      ],
+      "exit": 0,
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "output": "history-controls.log"
+    },
+    "outcome-controls-receipt.json": {
+      "label": "outcome-controls",
+      "points": [
+        "P5"
+      ],
+      "argv": [
+        "python3",
+        "-B",
+        "scripts/publish-check/tests.py",
+        "HistoryTests.test_shallow_is_incomplete",
+        "HistoryTests.test_environment_value_cannot_be_waived",
+        "HistoryTests.test_cli_process_failure_diagnostics"
+      ],
+      "exit": 0,
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": false
+      },
+      "output": "outcome-controls.log"
+    },
+    "final-syntax-receipt.json": {
+      "label": "final-syntax",
+      "points": [
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "argv": [
+        "node",
+        "--input-type=module",
+        "-e",
+        "import {execFileSync} from \"node:child_process\";const paths=execFileSync(\"git\",[\"diff\",\"--name-only\",\"origin/main..HEAD\"],{encoding:\"utf8\"}).trim().split(\"\\n\").filter(p=>/\\.(?:mjs|mts)$/.test(p));for(const p of paths)execFileSync(process.execPath,[\"--check\",p]);console.log(JSON.stringify({checked:paths.length,paths}));"
+      ],
+      "exit": 0,
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "output": "final-syntax.log"
+    },
+    "export-receipt.json": {
+      "label": "export",
+      "points": [
+        "P3"
+      ],
+      "argv": [
+        "node",
+        "scripts/export-cli.mjs",
+        "default-seed"
+      ],
+      "exit": 0,
+      "source": {
+        "head": "e6dcc42b8d406084b5e9bba86ccdf92f9614021a",
+        "tree": "5dbe434e42be854faf1467aa42cde1f51e8a099e",
+        "clean": true
+      },
+      "output": "export.log"
+    },
+    "native-types-consumer-receipt.json": {
+      "label": "native-types-consumer",
+      "points": [
+        "P2"
+      ],
+      "argv": [
+        "./default-seed/node_modules/.bin/tsc",
+        "--noEmit",
+        "--strict",
+        "--skipLibCheck",
+        "--allowImportingTsExtensions",
+        "--module",
+        "NodeNext",
+        "--moduleResolution",
+        "NodeNext",
+        "--target",
+        "ES2022",
+        "--lib",
+        "ES2022,DOM",
+        "default-seed/node_modules/@cloudflare/workers-types/index.d.ts",
+        "modules/operator-auth/tests/native-types.check.mts"
+      ],
+      "exit": 0,
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": true
+      },
+      "output": "native-types-consumer.log"
+    },
+    "fixture-consumers-fast-receipt.json": {
+      "label": "fixture-consumers-fast",
+      "points": [
+        "P2"
+      ],
+      "argv": [
+        "node",
+        "--test",
+        "--test-concurrency=2",
+        "--test-name-pattern=^vendor exports strip credential values|^missing deployment commands|^pending approval retains|^under rer dev a seed links|^a hosted app refuses|^http to anything|^every dependency callback|^static asset multipart|^explicit provider configuration|^portable SendGrid wire|^native opt-in and explicit callback|^branding validates|^all credential-shaped saved settings|^a receipt remains resumable|^acronym-prefixed credential variables|^development mail is explicit|^another project binds|^CLI exit statuses",
+        "cli/business-connect.test.mjs",
+        "cli/deployment-record.test.mjs",
+        "modules/dependencies/tests/admission-transition.test.mjs",
+        "modules/dependencies/tests/local-provider.test.mjs",
+        "modules/dependencies/tests/owner-approval.test.mjs",
+        "modules/deploy-kit/tests/asset-upload.test.mjs",
+        "modules/mail/tests/core/validation.test.mjs",
+        "modules/mail/tests/sendgrid/wire.test.mjs",
+        "modules/operator-auth/tests/native-auth.test.mjs",
+        "modules/operator-auth/tests/presentation.test.mjs",
+        "onboarding/adapter-settings.test.mjs",
+        "onboarding/private.test.mjs",
+        "onboarding/redaction-shapes.test.mjs",
+        "operations/mail-bindings.test.mjs",
+        "operations/operations.test.mjs"
+      ],
+      "exit": 0,
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": false
+      },
+      "output": "fixture-consumers-fast.log"
+    },
+    "fixture-consumers-runtime-receipt.json": {
+      "label": "fixture-consumers-runtime",
+      "points": [
+        "P2"
+      ],
+      "argv": [
+        "node",
+        "--test",
+        "--test-concurrency=2",
+        "--test-name-pattern=^per-install secret source|^run turns a job|^claude-auth reports|^ordinary build excludes|^native Wrangler receives|^invitation race: cancellation commits|^setup rejects duplicate form/JSON",
+        "cli/agent-door-hooks.test.mjs",
+        "cli/companion.test.mjs",
+        "default-seed/tests/local-setup/cli.test.mjs",
+        "default-seed/tests/local-setup/native-bindings.test.mjs",
+        "modules/operator-auth/tests/cancellation-races.test.mjs",
+        "modules/operator-auth/tests/credentials.test.mjs"
+      ],
+      "exit": 1,
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+        "clean": false
+      },
+      "output": "fixture-consumers-runtime.log"
+    },
+    "preservation-trace-receipt.json": {
+      "source": {
+        "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+        "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096"
+      },
+      "points": [
+        "P2",
+        "P4",
+        "P5"
+      ],
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "origin/main",
+        "HEAD",
+        "--",
+        "scripts/publish-check/credential_literals.mjs",
+        "scripts/publish-check/gitleaks.toml",
+        "scripts/publish-check/credential_assignments.py",
+        "scripts/publish-check/reviewed.py",
+        "scripts/publish-check/report.py",
+        "scripts/publish-check/git_history.py",
+        "scripts/publish-check/history_scan.py",
+        "scripts/publish-check/history_hydration.py",
+        "scripts/publish-check/gitleaks.py",
+        "scripts/publish-check/env_values.py",
+        "scripts/publish-check/timeout.json",
+        "scripts/publish-check/slots.py"
+      ],
+      "exit": 0,
+      "unchangedPaths": [
+        "scripts/publish-check/credential_literals.mjs",
+        "scripts/publish-check/gitleaks.toml",
+        "scripts/publish-check/credential_assignments.py",
+        "scripts/publish-check/reviewed.py",
+        "scripts/publish-check/report.py",
+        "scripts/publish-check/git_history.py",
+        "scripts/publish-check/history_scan.py",
+        "scripts/publish-check/history_hydration.py",
+        "scripts/publish-check/gitleaks.py",
+        "scripts/publish-check/env_values.py",
+        "scripts/publish-check/timeout.json",
+        "scripts/publish-check/slots.py"
+      ],
+      "assertion": "PASS: marker/classifier, provider/environment, history/hydration, outcome/review, deadline/slot policies unchanged",
+      "trace": {
+        "history": "git_history.py traverses selected/public or all local refs; shallow history is inspection-incomplete",
+        "publicBase": "history_scan.py compares selected and working bytes to same-path public tip bytes; ancestry alone does not exempt changed bytes",
+        "SEC3": "credential_assignments.py translates the persistent worker into location-only SEC-3; failure is credential-assignment-incomplete",
+        "review": "reviewed.py accepted rule schema excludes SEC-3; report.py derives complete PASS/FAIL or INCOMPLETE",
+        "independence": "gitleaks.py provider handling and env_values.py known-value handling remain independent"
+      }
+    }
+  },
+  "sharedCommands": "Each successful same-head command is recorded once and referenced by POINT; before/export receipts explicitly name their earlier sources.",
+  "CI": "No same-SHA runs exist in one REST discovery (HTTP 200); GR owns initial ordinary dispatch and independent gate. No READY/acceptance/landing claim.",
+  "localEnvironmentFailure": "Additional consumer failed its hardcoded 0640 mode assertion under task umask 0077; separate empty-file observation proves initial 0600, without a test retry or baseline."
+}

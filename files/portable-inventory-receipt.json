@@ -1,0 +1,19 @@
+{
+  "label": "portable-inventory",
+  "points": [
+    "P3"
+  ],
+  "argv": [
+    "node",
+    "--test",
+    "--test-name-pattern=^portable CLI source inventory is deterministic and independent execution works outside Base$",
+    "cli/cli.test.mjs"
+  ],
+  "exit": 0,
+  "source": {
+    "head": "7e78f21a12e1a14ee73d4e3e1a0c066527c9db4d",
+    "tree": "43701bd8995a0bec997eb216f6d7eb3be020b096",
+    "clean": true
+  },
+  "output": "portable-inventory.log"
+}

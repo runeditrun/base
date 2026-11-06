@@ -1,0 +1,15 @@
+# SEC-3 object-key implementation plan
+
+Scope: P1 lexical object-versus-parameter context; P2 truthful marker guidance and newly exposed verified generic synthetic fixtures; P3 portable scanner export/inventory; P4 history/public-base preservation; P5 outcomes, review rejection and non-disclosure preservation.
+
+1. Record advertised/clone main and tree, install fleet identity/hooks, read fresh AGENTS and scanner guidance. Complete: main a15b3ad0fd51ed1d52f7aee61d4e70eb0adb95e8, tree c2498d3df00e65b32c36d5473a460b33be660d68; shallow blobless builder clone.
+2. Run frozen before probe once through the public CLI. Complete: native FAIL/1 but missing SEC-3 at second.mjs:1.
+3. Replace the comma-only heuristic with existing lexical-token delimiter context. Extend only HistoryTests.test_hosted_credential_assignment_through_cli; retain incumbent controls and assertions. Correct both README paragraphs and document bounded syntax.
+4. Run one selected-tree comparison through incumbent/candidate workers. Complete: 43 newly exposed occurrences across 33 test/fixture files; all inspected as generic SYNTHETIC inputs, zero exact credential formats. Prefix only these literals and same-file matching consumer expectations with existing synthetic-. Preserve Zendesk body-removal fixture and all redaction/auth assertions.
+5. Preserve the first source commit on the named cloud branch with [skip ci]. Refresh main first; rebase only while unpublished. Every later main reconciliation is a merge. Never force-push.
+6. Run node scripts/export-cli.mjs default-seed after source commit for source-derived stamping; retain only declared scanner copies/inventory.
+7. Commit the final candidate, run the exact focused commands and frozen after matrix once, with shared per-POINT receipts. Run syntax checks on changed maintained/generated JS. Use actual existing relevant fixture consumers only. No full local verify, product history scan, package/reference build, browser suite, dependency/edition/migration changes, dispatch, rerun, PR, release or deployment.
+8. Inspect every candidate commit identity/trailer before each guarded product push. Discover exact-SHA Verify via REST within ten-call budget; GR owns initial dispatch because current workflow does not trigger ordinary cloud pushes. Report qualification honestly.
+9. Publish full non-secret reports and receipts only on evidence/gr-publish-sec3-object-key-1 using cloud_evidence.py; hand off candidate and GR POST line. Independent gate hold remains untouched; later Mac lander owns complete full-history publication scan and final ordinary plus explicit journeys qualification.
+
+N/A: Base/default-seed have no sources.lock.json and Base root has no CONTRACT.md; no source-lock or contract-listing generator applies. No schema, SQL, migration or edition selection changed, so migration ledger is N/A. No scanner TypeScript project exists; scanner typecheck is N/A. Syntax and public behavior checks apply. A synthetic literal in the existing native type-check consumer is checked through its existing type route if available, without adding a project.

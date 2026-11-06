@@ -1,0 +1,135 @@
+{
+  "phase": "before",
+  "points": [
+    "P1"
+  ],
+  "source": {
+    "head": "a15b3ad0fd51ed1d52f7aee61d4e70eb0adb95e8",
+    "tree": "c2498d3df00e65b32c36d5473a460b33be660d68",
+    "clean": true
+  },
+  "assertion": "PASS",
+  "commands": [
+    {
+      "label": "objects-and-annotations",
+      "source": {
+        "head": "a15b3ad0fd51ed1d52f7aee61d4e70eb0adb95e8",
+        "tree": "c2498d3df00e65b32c36d5473a460b33be660d68",
+        "clean": true
+      },
+      "argv": [
+        "node",
+        "/home/agent/rer-consolidation/work/gr-publish-sec3-object-key-1/base/scripts/publish-check.mjs",
+        "--repo",
+        "/tmp/publish-fixture-9fm8d66n"
+      ],
+      "exit": 1,
+      "status": "FAIL",
+      "complete": true,
+      "report": "before-objects-and-annotations.json",
+      "sec3": [
+        {
+          "bucket": "findings",
+          "path": "default.ts",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "assignment.mjs",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "first.mjs",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "quoted.json",
+          "line": 1,
+          "scopes": [
+            "working-tree"
+          ]
+        },
+        {
+          "bucket": "findings",
+          "path": "nested.mjs",
+          "line": 5,
+          "scopes": [
+            "working-tree"
+          ]
+        }
+      ],
+      "assertion": "PASS: later bare object key lacks SEC-3 despite native FAIL",
+      "expectedPositive": [
+        [
+          "assignment.mjs",
+          1
+        ],
+        [
+          "default.ts",
+          1
+        ],
+        [
+          "first.mjs",
+          1
+        ],
+        [
+          "nested.mjs",
+          5
+        ],
+        [
+          "quoted.json",
+          1
+        ],
+        [
+          "second.mjs",
+          1
+        ],
+        [
+          "second.ts",
+          1
+        ]
+      ],
+      "expectedExcluded": [
+        [
+          "alias.ts",
+          1
+        ],
+        [
+          "arrow-first.ts",
+          1
+        ],
+        [
+          "arrow-later.ts",
+          1
+        ],
+        [
+          "function-first.ts",
+          1
+        ],
+        [
+          "function-later.ts",
+          1
+        ],
+        [
+          "interface.ts",
+          1
+        ],
+        [
+          "method.ts",
+          1
+        ]
+      ]
+    }
+  ]
+}
