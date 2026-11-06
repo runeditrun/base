@@ -22,7 +22,7 @@ const effects = {
 };
 const said = {
  installPermissions: { true: 'allowed; the rules are in Claude Code settings', false: 'not allowed; no rules added' },
- awakeConsent: { true: 'allowed while an export runs', false: 'not allowed' },
+ awakeConsent: { true: 'allowed', false: 'not allowed' },
  installService: { true: 'allowed; the service is installed and works tasks after this chat ends', false: 'not allowed; no service installed' },
 };
 
