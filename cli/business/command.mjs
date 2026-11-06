@@ -13,9 +13,8 @@ that support shared Business settings. Choose what to share in your browser.
 
 Advanced commands (Usage: rer business VERB)
   setup --origin URL --session-file FILE --confirm-demo
-                                 Set up the synthetic Run your business demo company
-                                 --hosting managed|assisted|self_host (default: managed)
-                                 --wait-seconds 0..240 (default: 240); --json
+                                 Create the synthetic demo company's Business and its profile
+                                 --hosting managed|assisted|self_host (default: managed); --json
   scan [DIR...] [--json]          Names-only local discovery
   connect --business ID [--origin URL] [--timeout SECONDS]
                                  Print a code and link for the owner to approve in a signed-in browser
@@ -40,6 +39,22 @@ In an agent sandbox that writes only inside its working folder, use RER_BUSINESS
 `;
 
 const verbHelp = {
+ setup: `Usage: rer business setup --origin URL --session-file FILE --confirm-demo [--hosting managed|assisted|self_host] [--json]
+Create the Business for the synthetic demo company in setup-company.json and save
+its profile, through the platform's owner routes. A repeat reuses that Business and
+changes nothing when its profile already matches. It provisions no seeds.
+
+  --origin URL          Platform address to create the Business on.
+  --session-file FILE   The signed-in session file Business setup reads: an owned,
+                        regular 0600 file containing rer_session=VALUE or
+                        __Host-rer_session=VALUE. Symlinks are refused.
+                        The session is sent only as the platform Cookie header.
+  --confirm-demo        Required confirmation to create the synthetic demo company.
+  --hosting MODE        managed (default), assisted or self_host.
+  --json                Print the JSON receipt (also the default).
+  --help, -h            Show this help without reading the session file.
+Exits 0 when the Business exists with that profile; 1 with a named {code} on stderr.
+`,
  run: `Usage: rer business run [--once]
 Work this computer's tasks (the folder scan the owner allows) and check in every
 25 seconds until stopped. Steps for this computer's agent, such as a seed's Move in,
@@ -65,8 +80,8 @@ Requires an existing pairing: rer business connect.
 };
 
 export async function businessCommand(argv) {
- if (argv[0] === 'setup') return setupCommand(argv.slice(1));
  if (Object.hasOwn(verbHelp, argv[0]) && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(verbHelp[argv[0]]); return 0; }
+ if (argv[0] === 'setup') return setupCommand(argv.slice(1));
  if (!argv.length || argv[0] !== 'scan' && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(usage); return 0; }
  if (argv[0] === 'scan') return scanCommand(argv);
  try {

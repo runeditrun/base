@@ -80,7 +80,7 @@ test('Business verb help explains each command without pairing or reading a sess
   assert.match(result.stdout, new RegExp(`Usage: rer business ${verb}(?:\\s|$)`));
   if (verb === 'setup') {
    assert.match(result.stdout, /--session-file FILE[^\n]*signed-in session/i);
-   assert.match(result.stdout, /provision[^\n]*demo/i);
+   assert.match(result.stdout, /Create the Business[^\n]*demo company/i);
   }
  }
  const badOrigin = await cli(home, ['business', 'connect', '--origin', 'http://example.test']);

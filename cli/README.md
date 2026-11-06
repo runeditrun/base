@@ -567,31 +567,24 @@ expire within 15 minutes and are never saved. Restarting retires them.
 rer business setup --origin https://app.runeditrun.com --session-file /private/path/owner.session --confirm-demo
 ```
 
-This provisions the synthetic Juniper Harbor Software demo through the platform's
-Business routes using the signed-in person's session. The session file must be
-an owned regular file with mode `0600`, containing only `rer_session=VALUE` or
-`__Host-rer_session=VALUE`. Symbolic links are refused. The session is read in
-process, sent only as the platform Cookie header, and never printed or placed
-in argv, local Business state or a receipt. `--confirm-demo` is required.
+This creates the Business for the synthetic Juniper Harbor Software company in
+`cli/business/setup-company.json` and saves its profile, through the platform's
+owner routes (`GET` and `POST /api/business`, then `GET` and `PUT
+/api/business/ID/profile`) using the signed-in person's session. It provisions
+no seeds. The session file must be an owned regular file with mode `0600`,
+containing only `rer_session=VALUE` or `__Host-rer_session=VALUE`. Symbolic links
+are refused. The session is read in process, sent only as the platform Cookie
+header, and never printed or placed in argv, local Business state or a receipt.
+`--confirm-demo` is required.
 
 Hosting defaults to `managed`; `--hosting assisted` and `--hosting self_host`
-are also supported. There is no `hosted` alias. `--wait-seconds 0..240` bounds
-provisioning polling (default: 240). Both normal output and `--json` print the
-platform script's JSON receipt, including each seed's actual state and only
-credential identifiers. Errors print a named `{code}` to stderr and exit 1.
-
-Run the same command to resume. Completed seeds keep their token, consent and
-policy identifiers and report equal receipts (`already provisioned`). The
-receipt includes each seed's state and a top-level `complete` flag. Exit 0
-requires `complete: true`: every required seed must be provisioned, token-issued,
-policy-confirmed, settings-delivered and have its door proofs recorded.
-Missing adoptions remain `not yet on the agent door` and exit nonzero.
-
-The route order, policy, synthetic company profile and receipt are mirrored from
-the RER platform at commit `0261033177e8e05284c037369ee9c3a85922a8aa`,
-`scripts/business/demo.mjs` and `demo/company.json`. The platform owns the seed
-catalogue, fixture data and door proofs. This command does not pair the computer
-or use its stored device credential.
+are also supported. There is no `hosted` alias. Both normal output and `--json`
+print the receipt: `business_id`, `name`, `default_hosting`, `created` and
+`profile` (`saved` or `unchanged`). Run it again to reuse the same Business: a
+repeat whose profile matches changes nothing, and a Business of that name with
+other hosting is refused (`existing_demo_hosting_differs`). Errors print a named
+`{code}` to stderr and exit 1. This command does not pair the computer or use
+its stored device credential.
 
 ## Sync agent contract clauses
 

@@ -10,17 +10,18 @@ import { readPackage, writePackage } from '../global/update/archive.mjs';
 import { setupServer } from './fixtures/business/setup-server.mjs';
 
 const base = resolve(import.meta.dirname, '..');
-test('packed Business setup provisions through owner routes, repeats as a read and protects the owner session', { timeout: 40_000 }, async t => {
+test('packed Business setup creates the Business and its profile through owner routes, repeats as a read and protects the owner session', { timeout: 40_000 }, async t => {
  const directory = await mkdtemp(join(tmpdir(), 'rer-business-setup-'));
  t.after(() => rm(directory, { recursive: true, force: true }));
  const bytes = await readFile(await buildPackage(base, join(directory, 'package')));
  const packed = join(directory, 'packed');
  await writePackage(readPackage(bytes, { integrity: integrity(bytes) }), packed);
+ const company = JSON.parse(await readFile(join(base, 'cli/business/setup-company.json'), 'utf8'));
  const session = crypto.randomUUID().replaceAll('-', ''), cookie = '__Host-rer_session=' + session;
  const sessionFile = join(directory, 'owner.session');
  await writeFile(sessionFile, cookie + '\n', { mode: 0o600 });
  const remote = await setupServer(t, cookie);
- const args = ['--origin', remote.origin, '--session-file', sessionFile, '--wait-seconds', '0'];
+ const args = ['--origin', remote.origin, '--session-file', sessionFile];
  async function cli(extra, launcher = join(packed, 'global/rer.mjs')) {
   const result = await new Promise((resolveRun, reject) => {
    const argv = [launcher, 'business', 'setup', ...extra];
@@ -44,39 +45,30 @@ test('packed Business setup provisions through owner routes, repeats as a read a
  await chmod(sessionFile, 0o600);
  const wrongHosting = await cli([...args, '--confirm-demo', '--hosting', 'hosted']);
  assert.equal(wrongHosting.code, 1); assert.equal(JSON.parse(wrongHosting.stderr).code, 'demo_arguments_invalid');
+ const badOrigin = await cli(['--origin', 'http://example.test', '--session-file', sessionFile, '--confirm-demo']);
+ assert.equal(badOrigin.code, 1); assert.equal(JSON.parse(badOrigin.stderr).code, 'demo_origin_invalid');
  assert.equal(remote.requests.length, 0, 'refusals happen before any network effect');
  const first = await cli([...args, '--confirm-demo']);
  assert.equal(first.code, 0, first.stderr);
  const receipt = JSON.parse(first.stdout);
- assert.equal(receipt.complete, true);
- assert.equal(receipt.required_provisioned, remote.seeds.length);
- assert.ok(receipt.seeds.every(row => row.state === 'already provisioned' && row.pause_refused && row.attributed));
+ assert.deepEqual(receipt, { business_id: 'demo-business', name: company.name, default_hosting: 'managed', created: true, profile: 'saved' });
  assert.equal(remote.businesses[0].default_hosting, 'managed', 'platform default');
- assert.ok(remote.profile.display_name && remote.profile.country && remote.profile.timezone);
- const root = '/api/business/demo-business';
- assert.equal(remote.requests.filter(row => row.path === root + '/settings/deliver').length, remote.seeds.length);
- assert.ok(remote.requests.filter(row => row.path === root + '/settings/deliver').every(row => JSON.stringify(row.body) === '{}'));
- assert.equal(remote.requests.filter(row => row.path === root + '/agents/seed-token').length, remote.seeds.length);
- assert.ok(remote.requests.some(row => row.path.endsWith('/confirm')));
+ assert.deepEqual(remote.profile, company.profile, 'the setup file profile is saved');
+ assert.deepEqual(remote.requests.map(row => `${row.method} ${row.path}`),
+  ['GET /api/business', 'POST /api/business', 'PUT /api/business/demo-business/profile'], 'only the owner routes that create a Business and save its profile');
  const mutations = remote.requests.filter(row => row.method !== 'GET').length;
  const second = await cli([...args, '--confirm-demo', '--json']);
  assert.equal(second.code, 0, second.stderr);
- const repeat = JSON.parse(second.stdout);
- assert.deepEqual(repeat, receipt, 'successful repeats return the same complete receipts');
- assert.equal(repeat.business_id, receipt.business_id); assert.equal(repeat.policy_id, receipt.policy_id);
- for (const row of repeat.seeds) {
-  const previous = receipt.seeds.find(seed => seed.app === row.app);
-  assert.equal(row.state, 'already provisioned');
-  for (const id of ['token_id', 'consent_id', 'policy_id']) assert.equal(row[id], previous[id]);
- }
+ assert.deepEqual(JSON.parse(second.stdout), { ...receipt, created: false, profile: 'unchanged' }, 'a repeat reuses the same Business');
  assert.equal(remote.requests.filter(row => row.method !== 'GET').length, mutations, 'repeat performs no mutation');
- // Missing required adoptions remain visible and nonzero on the real command.
- remote.seeds.push({ app: 'extra-required', required: true, state: 'not yet on the agent door' });
- remote.seeds[0].required = false;
- const incomplete = await cli([...args, '--confirm-demo', '--json']);
- assert.equal(incomplete.code, 1);
- assert.equal(JSON.parse(incomplete.stdout).complete, false);
- assert.ok(JSON.parse(incomplete.stdout).seeds.some(row => row.app === 'extra-required' && row.state === 'not yet on the agent door'));
+ // A profile that drifted is saved again on the same Business; a Business made with other hosting is refused.
+ remote.profile.timezone = 'UTC';
+ const drifted = await cli([...args, '--confirm-demo']);
+ assert.equal(drifted.code, 0, drifted.stderr);
+ assert.equal(JSON.parse(drifted.stdout).profile, 'saved'); assert.equal(remote.profile.timezone, company.profile.timezone);
+ assert.equal(remote.businesses.length, 1);
+ const otherHosting = await cli([...args, '--confirm-demo', '--hosting', 'self_host']);
+ assert.equal(otherHosting.code, 1); assert.equal(JSON.parse(otherHosting.stderr).code, 'existing_demo_hosting_differs');
  remote.refusal = { code: session, message: cookie };
  const reflected = await cli([...args, '--confirm-demo', '--json']);
  assert.equal(reflected.code, 1); assert.equal(JSON.parse(reflected.stderr).code, 'demo_session_in_response');
