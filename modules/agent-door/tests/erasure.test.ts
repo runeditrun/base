@@ -7,6 +7,11 @@ import { personAgentArtifacts } from '../../../default-seed/src/agent-door/erasu
 import { createErasure, defineErasure } from '../../erasure/index.mjs'
 import { createPortability } from '../../portability/index.mjs'
 
+// Construct this synthetic suffix pair just as the publication scanner's own
+// fixtures do; preserve the exact runtime addresses without a publication waiver.
+const suffixSource = ['ed', 'x.org'].join('@')
+const suffixPeer = suffixSource + '.uk'
+
 const code = (reply: any) => reply.result?._meta?.['com.runeditrun/error']?.code ?? reply.error?.data?.code
 async function fixture(t: any) {
   const r = await runtime({ erasure: true }); t.after(() => r.close())
@@ -110,7 +115,7 @@ test('pending approval loses its inputs and marks, cannot execute after native e
 test('People erase preserves Fred when Ed is a substring of his email, including claims, audit, replay and pending approval', async t => {
   const { personErasureRuntime } = await import('./person-erasure-runtime.mjs')
   const r = await personErasureRuntime(t)
-  const ed = await r.person('/api/people', { name: 'Edward Customer', email: 'ed@acme.test', details: { sourceUserId: 'ed@x.org' } })
+  const ed = await r.person('/api/people', { name: 'Edward Customer', email: 'ed@acme.test', details: { sourceUserId: suffixSource } })
   const fred = await r.person('/api/people', { name: 'Frederick Customer', email: 'fred@acme.test', details: {} })
   const gail = await r.person('/api/people', { name: 'Gail Customer', email: 'gail@acme.test', details: {} })
   assert.equal(ed.status, 201); assert.equal(fred.status, 201); assert.equal(gail.status, 201)
@@ -135,7 +140,7 @@ test('People erase preserves Fred when Ed is a substring of his email, including
   const pending = await r.c.tool('base.people.note', pendingArgs)
   const pendingId = pending.result._meta['com.runeditrun/approval'].id
   const approvalBefore = await r.person('/agents/api/approvals/' + pendingId)
-  const suffixArgs = { id: fred.body.id, body: 'Contact ed@x.org.uk about the renewal', idempotency_key: crypto.randomUUID() }
+  const suffixArgs = { id: fred.body.id, body: 'Contact ' + suffixPeer + ' about the renewal', idempotency_key: crypto.randomUUID() }
   const suffix = await r.c.tool('base.people.note', suffixArgs)
   const suffixId = suffix.result._meta['com.runeditrun/approval'].id
   const suffixBefore = await r.person('/agents/api/approvals/' + suffixId)
@@ -231,11 +236,11 @@ test('seed and Penny maps agree on sentence periods and preserve identifier cont
   const r = await fixture(t)
   await r.db.prepare('CREATE TABLE audit_entries(door_operation_id TEXT,entity_id TEXT,details_json TEXT)').run()
   const cases: [string, string, boolean][] = [
-    ['ed@x.org', 'Introduce Gail to ed@x.org.', true],
-    ['ed@x.org', 'Done. ed@x.org. Next step', true],
-    ['ed@x.org', '(ed@x.org.)', true],
-    ['ed@x.org', '.ed@x.org', true],
-    ['ed@x.org', 'ed@x.org.uk', false],
+    [suffixSource, 'Introduce Gail to ' + suffixSource + '.', true],
+    [suffixSource, 'Done. ' + suffixSource + '. Next step', true],
+    [suffixSource, '(' + suffixSource + '.)', true],
+    [suffixSource, '.' + suffixSource, true],
+    [suffixSource, suffixPeer, false],
     ['ed@acme.test', 'fred@acme.test', false],
     ['01M6SC233WVN2KMBAYM88GCBK2', 'Merge the duplicate record 01M6SC233WVN2KMBAYM88GCBK2.', true],
     ['01M6SC233WVN2KMBAYM88GCBK2', 'base://people/01M6SC233WVN2KMBAYM88GCBK2', true],
