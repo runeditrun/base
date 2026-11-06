@@ -230,3 +230,36 @@ export const commandAdapter = {...seed, deploy: context => seed.deploy(context)}
  assert.match(await error('SENDGRID_API_KEY=test-only-provider-credential\n'), /SENDGRID_API_KEY/, 'native key cannot bypass the declared environment mapping');
  await assert.rejects(access(join(seed.root, 'dist')), { code: 'ENOENT' });
 });
+
+test('rer deploy accepts an explicit MAIL_PROVIDER=none only for a seed that declares a sign-in without mail', async t => {
+ const seed = await portabilityFixture(t, { generated: false });
+ const descriptorPath = join(seed.root, 'OPERATIONS.json');
+ const descriptor = JSON.parse(await readFile(descriptorPath, 'utf8'));
+ const original = descriptor.seedContract.adapter;
+ const wrap = signIn => writeFile(join(seed.root, 'product-adapter.mjs'), `import {commandAdapter as seed} from './${original}';
+export const commandAdapter = {...seed${signIn ? `, mailOffSignIn: ${JSON.stringify(signIn)}` : ''}};\n`);
+ descriptor.seedContract.adapter = 'product-adapter.mjs';
+ await writeFile(descriptorPath, JSON.stringify(descriptor));
+ const git = (...args) => execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', '-c', 'commit.gpgsign=false', ...args], { cwd: seed.root, stdio: 'pipe' });
+ git('init', '-q'); git('add', 'package.json'); git('commit', '-qm', 'fixture');
+ await writeFile(join(seed.root, 'package.json'), (await readFile(join(seed.root, 'package.json'), 'utf8')) + '\n');
+ const env = values => writeFile(join(seed.root, 'production.env'), values, { mode: 0o600 });
+ const refusal = async (args = []) => seed.run(['deploy', '--env-file', 'production.env', ...args], 4).then(events => events.find(event => event.event === 'error').message);
+ const signIn = 'node scripts/signin.mjs';
+ // A seed that declares no mail-less sign-in, or a deploy that does not say `none`, refuses exactly as before.
+ await wrap(); await env('MAIL_PROVIDER=none\n');
+ assert.match(await refusal(), /Production sign-in is not configured/);
+ await wrap(signIn);
+ for (const values of ['', 'MAIL_PROVIDER=later\n', 'MAIL_PROVIDER=direct\n']) { await env(values); assert.match(await refusal(), /Production sign-in is not configured/, values || 'a missing MAIL_PROVIDER'); }
+ // An explicit none passes the sign-in preflight with no mail input at all.
+ await env('MAIL_PROVIDER=none\n');
+ assert.match(await refusal(), /not committed/);
+ const dry = await seed.text(['deploy', '--dry-run', '--env-file', 'production.env', '--owner-name', 'Maya Chen']);
+ const text = dry.stdout + dry.stderr;
+ assert.match(text, /Outbound email is off/); assert.ok(text.includes(signIn), text);
+ assert.doesNotMatch(text, /production sign-in mail/);
+ // It cannot be combined with anything that binds a way to send.
+ await env('MAIL_PROVIDER=none\nMAIL_API_KEY=test-only-mail-credential\n');
+ const conflict = await refusal();
+ assert.match(conflict, /MAIL_PROVIDER=none/); assert.match(conflict, /MAIL_API_KEY/); assert.ok(!conflict.includes('test-only-mail-credential'));
+});
