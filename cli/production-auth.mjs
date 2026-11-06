@@ -2,16 +2,29 @@ import { refuse } from './errors.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { hookState } from './deploy-hook-record.mjs';
 import { savedSetupAnswers } from './setup-answers.mjs';
-import { productionMail } from './production-mail.mjs';
+import { productionMail, mailOffSignInCommand } from './production-mail.mjs';
+
+// What a deploy says when outbound email is deliberately off: the state and the way in.
+export function mailOffNotice({ signIn }, environment = 'production') {
+ return `Outbound email is off (MAIL_PROVIDER=none): no mail credential is bound and this installation sends nothing. Sign in without mail with \`${signIn}\` for the ${environment} environment, from this checkout with the Cloudflare credentials that deployed it. Turn mail on later with rer deploy --environment ${environment} --set-secret and the provider inputs.`;
+}
 
 // Validate the shared email/identity contract using the bindings that will reach
 // the runtime. Independently authored authentication remains the adapter's job.
-export async function requireProductionAuth({ root, declaration, env, setupManifest, setupSeed, adapter, declarationPath, options = {} }) {
+// `mailOffSignIn` names the seed's mail-less sign-in command when the caller holds it apart
+// from `adapter` (the owner deploy runs on the lifecycle, the seed declares on its command adapter).
+export async function requireProductionAuth({ root, declaration, env, setupManifest, setupSeed, adapter, declarationPath, options = {}, mailOffSignIn: declaredSignIn = mailOffSignInCommand(adapter) }) {
  const dependencies = setupManifest?.dependencies?.filter(item => item.interface === 'oidc-provider@1') ?? [];
  const bindings = { ...declaration.vars };
  for (const secret of declaration.secrets ?? []) if (env[secret.environment]?.trim()) bindings[secret.binding] = env[secret.environment];
- const mail = await productionMail(root, declaration, env, declarationPath, adapter);
+ const mail = await productionMail(root, declaration, env, declarationPath, adapter, declaredSignIn);
  if (!setupManifest?.steps?.some(step => step.type === 'owner-claim') && !dependencies.length && !mail.declared) return;
+ // MAIL_PROVIDER=none is accepted only for a seed that declares how its owner signs in without mail.
+ const mailOffSignIn = mail.off ? declaredSignIn : undefined;
+ if (mailOffSignIn) {
+  if (mail.offConflicts.length) throw refuse(`MAIL_PROVIDER=none turns outbound email off, and ${mail.offConflicts.join(', ')} would bind a way to send. Remove ${mail.offConflicts.length > 1 ? 'them' : 'it'} or choose a mail provider. Nothing was built or uploaded.`);
+  return { mailOff: { signIn: mailOffSignIn } };
+ }
  if (mail.senderIssue && options.verb === 'deploy' && !(options.dryRun && mail.fixtureSender)) throw refuse(`${mail.senderIssue} Nothing was built or uploaded.`);
  if (mail.configured()) return;
  if (mail.canInspect && !options.dryRun && declarationPath) {

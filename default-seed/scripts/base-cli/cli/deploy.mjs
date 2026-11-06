@@ -1,4 +1,5 @@
-import { requireProductionAuth } from './production-auth.mjs';
+import { requireProductionAuth, mailOffNotice } from './production-auth.mjs';
+import { mailOffSignInCommand } from './production-mail.mjs';
 import { readFile } from 'node:fs/promises';
 import { deployDiagnostic, migrationFailure, providerFailure, assetFailure } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
@@ -41,10 +42,10 @@ export function ownerDeploy(declarationPath, lifecycle) {
   const recordedState = change.length ? await deploymentRecord(root, options) : undefined;
   // A dry run reads the settings file too, so a refused key fails here and not only on the real deploy.
   if (options.dryRun && options.envFile) await deployEnvironment({ root, options, declaration, localOnlyKeys });
-  let production, ownerInput, signIn;
+  let production, ownerInput, signIn, mailOff;
   if (!change.length) {
    production = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
-   ({signIn} = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed, adapter: lifecycle, declarationPath, options }) ?? {});
+   ({signIn, mailOff} = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed, adapter: lifecycle, declarationPath, options, mailOffSignIn: mailOffSignInCommand(adapter) ?? mailOffSignInCommand(lifecycle) }) ?? {});
    if (!options.dryRun) committedSource(root, options);
    ownerInput = await deployOwnerInput({ root, adapter, setupSeed, options, signal });
    await withoutLocalSettings(root, { settings: lifecycle.settings, operationToken }, () => lifecycle.run(root, {}, store, () => {}, signal, { verb: 'build', operationToken }));
@@ -132,7 +133,8 @@ export function ownerDeploy(declarationPath, lifecycle) {
    // The app claims the OWNER_EMAIL the Worker holds: the local one only when this run uploaded it.
    const email = declared(claim?.emailField);
    const named = !email ? '' : deployed.sentSecrets.includes(email.binding) && env[email.environment] ? ` (${env[email.environment]})` : ` (the ${email.binding} already set on the Worker)`;
-   if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${named}; the one-time setup token was removed. Sign in by email at ${deployed.origin}.`);
+   if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${named}; the one-time setup token was removed. ${mailOff ? mailOffNotice(mailOff, environment) : `Sign in by email at ${deployed.origin}.`}`);
+   else if (mailOff) store.report(mailOffNotice(mailOff, environment));
    return { deployed: true, origin: deployed.origin, ...(claimed ? { owner: claimed } : {}), dependenciesLinked: true };
   } catch (error) {
    if (error instanceof RerError) throw error;

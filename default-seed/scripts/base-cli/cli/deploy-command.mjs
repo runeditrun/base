@@ -1,4 +1,4 @@
-import { requireProductionAuth } from './production-auth.mjs';
+import { requireProductionAuth, mailOffNotice } from './production-auth.mjs';
 import { observedReadiness } from '../modules/deploy-kit/readiness-window.mjs';
 import { readFile, readdir } from 'node:fs/promises';
 import { contained } from './project.mjs';
@@ -85,7 +85,8 @@ export async function deployCommand(context) {
   const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
   const plan = result?.plan ?? (await owner(['local-plan', '--declaration', path, '--environment', options.environment ?? 'production', ...await deployProductArguments(root, deployProductDirectory(declaration))], production.env, { cwd: root, localOnlyKeys })).plan;
   result = { ...result, dryRun: true, deployed: false, providerChecked: false, plan };
-  const { signIn } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
+  const { signIn, mailOff } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
+  if (mailOff) store.report(mailOffNotice(mailOff, options.environment ?? 'production'));
   const needed = [...new Set([...neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false }), ...(result.neededForRealDeploy ?? [])])];
   reportNeeded(store, needed);
   if (declaration.secrets?.some(item => item.binding === 'INSTALLATION_KEY')) store.report('deploy: INSTALLATION_KEY is a private generated binding; INSTALLATION_KEY_PREVIOUS is optional and managed only during rotation or an explicit retired-key reopen. Values are withheld.');
@@ -110,7 +111,7 @@ export async function deployCommand(context) {
  if (adapter.deploy.managesHostedOwner) { const result = await runHook(context); return options.dryRun ? dryRun(result) : result; }
  const productDirectory = deployProductDirectory(declaration);
  const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
- await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options });
+ const { mailOff } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
  const sourceSha = options.dryRun ? undefined : committedSource(root, options);
  const ownerInput = await deployOwnerInput(context);
  const { env, supplied, generated, reused, rotated } = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
@@ -180,7 +181,7 @@ export async function deployCommand(context) {
    const { setupToken: _, ...result } = deployed;
    return { ...result, ...(claimed ? { owner: claimed } : {}), dependenciesLinked: true };
   });
-  if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${recorded ? '; the one-time setup token was removed' : ''}. Sign in by email at ${result.origin}.`);
+  if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${recorded ? '; the one-time setup token was removed' : ''}. ${mailOff ? mailOffNotice(mailOff, environment) : `Sign in by email at ${result.origin}.`}`);
   return result;
  } catch (error) {
   if (error instanceof DeployProductError) throw error;

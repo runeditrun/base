@@ -6,10 +6,24 @@
 - `importers.json` has a version 2: each row declares the seed's Move in path (`moveIn`), what it takes (`accepts`: file, key, address) and how to export (`export`), with `status` and `evidence` optional, and the file may name the seed's own import format. Version 1 files stay valid.
 - `rer business setup --confirm-demo` now only creates (or reuses) the synthetic demo company's Business and saves its profile; it provisions no seeds and calls no demo routes, and `--wait-seconds` is gone. Its receipt is `{business_id, name, default_hosting, created, profile}`.
 
-- Setup and dev let the managed Vite listener use its finite startup budget instead of stopping at 60 seconds. Custom start targets retain their declared deadlines; a missing listener announcement reports elapsed and allowed time with startup-log guidance.
+## 0.2.100
 
-- Legacy MCP tool calls held for approval now return their generated `requestState` alongside `approval_required`, so retrying an approved read resumes the original operation without asking for a second approval.
-- `rer deploy --site` now retries a changing or partial Cloudflare list from page one up to three times, waiting 20 seconds between failed reads. It discards incomplete snapshots, never replays deploy writes, preserves other refusals and stops waiting on cancellation.
+### Deploy with outbound email explicitly off
+
+- `rer deploy` and `rer deploy --dry-run` accept explicit `MAIL_PROVIDER=none` only when the seed's adapter declares `mailOffSignIn`, naming its sign-in command without mail. They bind no mail credential and name the hosted sign-in command and environment. Missing mail configuration is still refused; `none` with a sending credential, account or relay binding is refused before build or upload. The seed owns its behavior with mail off; turning mail on later uses the documented provider inputs and `rer deploy --set-secret`.
+
+### Import transport and opt-in bounded waves
+
+- The import door supports a logical package whose files travel in bounded, verified segments. Completed-file hashes, declared aggregate counts and existing source/native quotas are checked before planning; refused packages withdraw their segment custody. Segment transport does not approve an import or raise a quota.
+- Opt-in complete-parent imports can prepare, seal and approve ordered bounded waves, preserving parent lineage, complete membership and native before-images. Unchanged catch-up dispositions and completed reversal retries remain stable; concurrent parent preparation fences reversal. Adopters supply their source/native integrations and a new numbered migration for the additive bounded-wave schema. The reference includes the schema; no edition adoption, live migration, import or cutover is claimed.
+- Business can register a verified local legacy package and transfer its exact files to the granted import door. The accepted Zendesk exporter captures paginated people, tickets, comments, attachments and Guide content into the documented package, with bounded read-only transport, credential removal and resumable checkpoints. These are the inherited accepted package, bounded-wave and Zendesk changes; this release adds no further Business command changes.
+
+### Startup, approval replay and deployment recovery
+
+- Setup and dev let the managed Vite listener use its finite startup budget instead of stopping at 60 seconds. Custom start targets retain their declared deadlines; a missing listener announcement reports elapsed and allowed time with startup-log guidance.
+- Legacy MCP tool calls held for approval return their generated `requestState` alongside `approval_required`, so retrying an approved read resumes the original operation without asking for a second approval.
+- `rer deploy --site` retries a changing or partial Cloudflare list from page one up to three times, waiting 20 seconds between failed reads. It discards incomplete snapshots, never replays deploy writes, preserves other refusals and stops waiting on cancellation.
+- Publication scans retain value-free worker, report, version-stamping and cleanup failure diagnostics. Cleanup and version-stamping failures still refuse publication; diagnostic handling does not turn a failed scan into a pass.
 
 ## 0.2.99
 

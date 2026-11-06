@@ -277,6 +277,21 @@ secrets after the provider verifies the owned deployment. Local setup and demo
 do not require production mail credentials. Preview serves production output
 and prints its ready address without a captured-mail sign-in flow.
 
+A deployment can instead turn outbound email off on purpose. `MAIL_PROVIDER=none`
+in the environment or the `--env-file` is accepted only when the seed's adapter
+declares a sign-in that works without mail: the `commandAdapter` option
+`mailOffSignIn`, one line naming the command a person runs from the checkout. Both
+`rer deploy` and `rer deploy --dry-run` then pass the production sign-in check
+without any mail input, bind nothing that can send, and report that outbound email
+is off together with that command. `none` is never inferred: a missing
+`MAIL_PROVIDER`, `later` or `direct` keeps today's refusal, a seed without the
+declaration keeps today's refusal for `none` too, and `none` together with a
+mail credential (`MAIL_API_KEY`, `SENDGRID_API_KEY`, `RESEND_API_KEY`,
+`MAIL_PROVIDER_API_KEY`, `MAIL_ACCOUNT_ID` or `MAIL_RELAY_URL`) refuses before
+anything is built or uploaded. The seed owns what an installation does with mail
+off, and turning mail on later is a `rer deploy --set-secret` of the provider
+inputs the seed documents.
+
 The production preflight also reads the product's `artifact.specInputs` in
 `rer-packaging.json`, `packaging.json` or `scripts/delivery/base/packaging.json`,
 and `management/integration/deployment-spec.json`. Public inputs come from
