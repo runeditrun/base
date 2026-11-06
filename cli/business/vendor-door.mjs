@@ -1,9 +1,12 @@
-import { registeredLegacyPackage } from './legacy-package.mjs';
 import { buildPackage, transferPackage } from './package-transfer.mjs';
+import { registeredLegacyPackage } from './legacy-package.mjs';
+import { prepareZendeskPackage } from './vendors/zendesk-package.mjs';
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { open, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
+import { loadState, saveState } from './state.mjs';
+import { snapshot as zendeskSnapshot, storePath as zendeskStorePath, removeZendeskStores } from './vendors/zendesk.mjs';
 import { taskPath } from './api.mjs';
 import { assertChunk } from './outbound.mjs';
 import { createCredentialStore } from './keychain.mjs';
@@ -20,7 +23,7 @@ import { businessCommand } from './invocation.mjs';
 const CHUNK_BYTES = 65_536;
 const DOOR_RESPONSE_BYTES = 4 * 1024 * 1024;
 // The catalogue names the platform builds vendor task titles from.
-export const vendorNames = Object.freeze({ sentry: 'Sentry', uptimerobot: 'UptimeRobot', pagerduty: 'PagerDuty', calendly: 'Calendly', sorry: 'Sorry', 'happytohelp-legacy': 'HappyToHelp legacy' });
+export const vendorNames = Object.freeze({ sentry: 'Sentry', uptimerobot: 'UptimeRobot', pagerduty: 'PagerDuty', calendly: 'Calendly', sorry: 'Sorry', zendesk: 'Zendesk', 'happytohelp-legacy': 'HappyToHelp legacy' });
 /** Whether a vendor's export needs the owner's read-only key (Sorry's public page does not). */
 export const keyed = vendor => KEYED_VENDORS.includes(vendor);
 export const vendorHandle = vendor => `vendor:${vendor}:read`;
@@ -99,12 +102,12 @@ function adapterInputs(vendor, task) {
 /** One RER-signed import grant for one door request. `review` asks for a
  * catch-up plan grant without the owner's standing approval; a plan grant
  * Business minted under that approval says so with `catchup: 'bounded'`. */
-async function doorGrant(lease, action, origin, vendor, { review = false } = {}) {
- const grant = await lease.importGrant(action, review ? { review: true } : {});
+async function doorGrant(lease, action, origin, vendor, { review = false, bounded } = {}) {
+ const grant = await lease.importGrant(action, { ...(review ? { review: true } : {}), ...(bounded ? { bounded } : {}) });
  if (!grant || grant.action !== action || grant.destination !== new URL(`/api/rer/import/${action}`, origin).href
   || typeof grant.authorization !== 'string' || grant.authorization.length > 8192 || !/^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(grant.authorization)
   || !VENDORS.includes(grant.namespace) || vendor && grant.namespace !== vendor || !(Date.parse(grant.expires_at) > Date.now())
-  || Object.hasOwn(grant, 'catchup') && (grant.catchup !== 'bounded' || action !== 'plan' || review)) throw Error('Business returned an invalid import grant.');
+  || Object.hasOwn(grant, 'catchup') && (grant.catchup !== 'bounded' || !['plan','prepare'].includes(action) || review)) throw Error('Business returned an invalid import grant.');
  return grant;
 }
 
@@ -140,12 +143,21 @@ export async function door(grant, body, signal) {
 
 /** Run the shipped adapter into a private 0600 bundle file, checking every
  * item with the outbound detector before it is written. */
-async function exportBundle({ vendor, key = null, inputs, path, quota, signal }) {
+async function exportBundle({ vendor, key = null, inputs, path, quota, signal, directory, runId, business }) {
  await unlink(path).catch(error => { if (error.code !== 'ENOENT') throw error; });
  const file = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
- const digest = createHash('sha256'); let size = 0;
+ const digest = createHash('sha256'); let size = 0, zendeskStore;
  try {
-  for await (const item of exportVendor(vendor, { key, inputs, signal })) {
+  let items;
+  if (vendor === 'zendesk') {
+   const root = zendeskStorePath(directory, business, `https://${inputs.account.subdomain}.zendesk.com`);
+   const result = await zendeskSnapshot({ key, inputs, directory: inputs.mode === 'census' ? join(root, 'probe') : root, runId, signal });
+   if (result.kind === 'census') throw new ExportWaiting(`Zendesk census: ${result.census.tickets.unique} tickets; ${result.census.unswept} unswept. CENSUS_OUTPUTS_UNSUPPORTED: waiting for Business census task outputs.`, 'connected_runner_required');
+   if (result.kind === 'package') return { package: result, store: result.store, mode: inputs.mode };
+   zendeskStore = result.store;
+   items = [{ bytes: result.bytes }];
+  } else items = exportVendor(vendor, { key, inputs, signal });
+  for await (const item of items) {
    assertChunk(item.bytes, key ? [key] : []);
    size += item.bytes.length;
    if (size > quota) throw Error(`Business vendor export is larger than the app's import door accepts (${quota} bytes). Nothing was uploaded.`);
@@ -161,7 +173,7 @@ async function exportBundle({ vendor, key = null, inputs, path, quota, signal })
   throw Error(`${vendorNames[vendor]} export stopped (${error.code}${error.status ? `, HTTP ${error.status}` : ''}). Nothing was uploaded.`);
  } finally { await file.close(); }
  if (!size) throw Error(`${vendorNames[vendor]} export produced nothing to upload.`);
- return { size, sha256: digest.digest('hex') };
+ return { size, sha256: digest.digest('hex'), ...(zendeskStore ? { store: zendeskStore, mode: inputs.mode } : {}) };
 }
 
 async function readChunk(path, index, size) {
@@ -201,9 +213,18 @@ export async function withUploadedBundle({ lease, task, grant: claimedGrant, dir
  const fresh = async (action, options) => {
   if (action === 'uploads' && spare && Date.parse(spare.expires_at) - Date.now() > 60_000) { const grant = spare; spare = null; return grant; }
   spare = null;
-  return doorGrant(lease, action, origin, vendor, options);
+  return doorGrant(lease, action, origin, vendor, options ?? (task.bounded_waves && action==='prepare' ? {bounded:{protocol:task.bounded_waves.protocol,migration:task.bounded_waves.migration,revision:task.bounded_waves.revision,policy:task.bounded_waves.policy}} : undefined));
  };
  const inputs = adapterInputs(vendor, task);
+ const state = vendor === 'zendesk' ? await loadState() : null;
+ if (vendor === 'zendesk' && inputs.mode === 'retire') {
+  // The retire signal is local revocation, never an OAuth/provider write.
+  await createCredentialStore().delete(vendorHandle(vendor));
+  await removeZendeskStores(directory);
+  await saveState({ ...state, vendorHandles: (state.vendorHandles ?? []).filter(handle => handle !== vendorHandle(vendor)), vendorRevocations: { ...state.vendorRevocations, zendesk: true } });
+  throw new ExportWaiting('Zendesk retired locally (VENDOR_REVOKED). RETIRE_OUTPUTS_UNSUPPORTED: waiting for Business retire task acknowledgement.', 'connected_runner_required');
+ }
+ if (vendor === 'zendesk' && state?.vendorRevocations?.zendesk) throw new VendorExportError('VENDOR_REVOKED');
  let key = keyed(vendor) ? await createCredentialStore().get(vendorHandle(vendor)) : null;
  if (keyed(vendor) && !key) throw new ExportWaiting(`Business vendor export needs the owner's read-only ${name} key on this computer: ${keyStep(vendor)}\nThen run ${businessCommand('run')} again.`, 'owner_required', { keyMissing: vendor });
  if (vendor === 'happytohelp-legacy') {
@@ -221,7 +242,7 @@ export async function withUploadedBundle({ lease, task, grant: claimedGrant, dir
     records: { total: null, byKind: {} }, totals: { rowCounts: legacy.rowCounts, objects: legacy.objects } });
   } catch { throw new ExportWaiting(`Legacy package changed or could not be prepared: ${legacy.path}. Recheck and register that package again.`, 'configuration_required'); }
   let uploaded;
-  try { uploaded = await transferPackage({ prepared, fresh, request: door, signal, checkpoint: cp => lease.checkpointSaved(cp), catchup: task.kind === 'catchup.vendor' }); }
+  try { uploaded = await transferPackage({ prepared, fresh, request: door, signal, checkpoint: cp => lease.checkpointSaved(cp), catchup: task.kind === 'catchup.vendor', ...(task.bounded_waves ? { planAction:'prepare', planInput:{ordinal:0} } : {}) }); }
   catch (error) { if (!error.message.startsWith('SEED_PACKAGE_UNSUPPORTED')) throw error; throw new ExportWaiting(error.message, 'configuration_required'); }
   const { outputs, said } = await finish({ vendor, name, origin, ...uploaded, fresh });
   await lease.complete(outputs);
@@ -231,10 +252,33 @@ export async function withUploadedBundle({ lease, task, grant: claimedGrant, dir
  try {
   say(doing(name, origin, keyed(vendor)));
   let bundle;
-  try { bundle = await exportBundle({ vendor, key, inputs, path, quota, signal }); } finally { key = undefined; }
+  try { bundle = await exportBundle({ vendor, key, inputs, path, quota, signal, directory, runId: task.id, business: state?.businessId }); } finally { key = undefined; }
+  if (bundle.package) {
+   const prepared = await prepareZendeskPackage({ result: bundle.package, quota, directory: join(bundle.store.path, `package-${hash(task.id).slice(0,32)}`), signal, mode: inputs.mode });
+   const uploaded = await transferPackage({ prepared, fresh, request: door, signal, checkpoint: cp => lease.checkpointSaved(cp), catchup: task.kind === 'catchup.vendor' || inputs.mode === 'sweep' });
+   const finished = await finish({ vendor, name, origin, ...uploaded, fresh });
+   await lease.complete(finished.outputs);
+   return finished.said;
+  }
   const total = Math.ceil(bundle.size / CHUNK_BYTES);
   let uploadId;
+  const received = new Set();
+  const journal = bundle.store?.events.findLast(event => event.kind === 'transfer');
+  if (journal && journal.origin === origin && journal.bundleSha256 === bundle.sha256 && journal.totalBytes === bundle.size) {
+   try {
+    const inventory = await door(await fresh('uploads'), { uploadId: journal.uploadId }, signal);
+    if (inventory.uploadId !== journal.uploadId || inventory.bundleSha256 !== bundle.sha256 || !Array.isArray(inventory.received)) throw new VendorExportError('INVALID_CHECKPOINT');
+    for (const item of inventory.received) {
+     if (!Number.isSafeInteger(item.ordinal) || item.ordinal < 0 || item.ordinal >= total || received.has(item.ordinal)) throw new VendorExportError('INVALID_CHECKPOINT');
+     const bytes = await readChunk(path, item.ordinal, bundle.size);
+     if (item.sha256 !== hash(bytes) || item.size !== bytes.length) throw new VendorExportError('INVALID_CHECKPOINT');
+     received.add(item.ordinal);
+    }
+    uploadId = journal.uploadId;
+   } catch (error) { if (error.doorStatus !== 404) throw error; }
+  }
   for (let index = 0; index < total; index++) {
+   if (received.has(index)) continue;
    signal.throwIfAborted();
    const bytes = await readChunk(path, index, bundle.size);
    const result = await door(await fresh('uploads'), { ...(uploadId ? { uploadId } : {}), name: capability.output, bundleSha256: bundle.sha256,
@@ -242,6 +286,11 @@ export async function withUploadedBundle({ lease, task, grant: claimedGrant, dir
    if (typeof result.uploadId !== 'string' || !DOOR_ID.test(result.uploadId) || uploadId && result.uploadId !== uploadId
     || result.bundleSha256 !== bundle.sha256 || index === total - 1 && result.complete !== true) throw Error("The app's import door returned an invalid upload answer.");
    uploadId = result.uploadId;
+   if (bundle.store) {
+    const transfer = { kind: 'transfer', origin, bundleSha256: bundle.sha256, totalBytes: bundle.size, uploadId };
+    await bundle.store.commit(bundle.store.state, transfer);
+    await bundle.store.write('transfer.json', transfer);
+   }
    await lease.checkpointSaved({ page: index + 1, total, bytes_done: Math.min((index + 1) * CHUNK_BYTES, bundle.size), progress: Math.floor((index + 1) / total * 90) });
   }
   const { outputs, said } = await finish({ vendor, name, origin, uploadId, bundle, fresh });

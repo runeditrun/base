@@ -238,7 +238,7 @@ export async function refuseErased(request: DoorRequest, upload: UploadRow, plan
     throw new DoorError('source_erased', 409);
   }
 }
-const forget = (request: DoorRequest, upload: UploadRow, segments: readonly UploadRow[] = []) =>
+export const forget = (request: DoorRequest, upload: UploadRow, segments: readonly UploadRow[] = []) =>
   transact(request.options.database,request.authority,cleanup(request,upload,segments,true));
 /** The upload planned on its own with the plain mapping: one holding an erased
  * record is refused and goes. Answers whether the reader removed credential values. */

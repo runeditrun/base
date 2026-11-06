@@ -7,6 +7,7 @@ import { approvalCaption } from './failures.ts';
 import { reserveReturn } from '../d1/budget.ts';
 
 const actions: Record<DoorAction, ImportAction[]> = {
+  prepare: [], 'seal-parent': [], 'review-parent': [], 'apply-child': [], 'wave-status': [], 'finalize-parent': [], 'reverse-parent': [],
   uploads: [], plan: ['plan', 'read'], apply: ['create', 'apply', 'read'],
   status: ['read'], reconcile: ['read'], undo: ['read', 'undo', 'rollback'],
   cancel: [],

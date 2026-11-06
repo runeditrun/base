@@ -68,7 +68,7 @@ export async function buildPackage({ files, source, mode = 'snapshot', records, 
 }
 
 /** Persist upload ids before their first request. Inventory is the authority after an interrupted ACK. */
-export async function transferPackage({ prepared, fresh, request, signal, checkpoint, catchup = false }) {
+export async function transferPackage({ prepared, fresh, request, signal, checkpoint, catchup = false, planAction = 'plan', planInput = {} }) {
  const { manifestFile, segments, directory } = prepared, journalPath = join(directory, 'journal.json');
  let journal;
  try { journal = JSON.parse(await readFile(journalPath, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
@@ -112,7 +112,7 @@ export async function transferPackage({ prepared, fresh, request, signal, checkp
  }
  const uploadId = await upload(manifestFile, 'rer-package.json', 'manifest');
  let preview;
- try { preview = await request(await fresh('plan'), { uploadId, ...(catchup ? { catchup: true } : {}) }, signal); }
+ try { preview = await request(await fresh(planAction), { ...planInput, uploadId, ...(catchup ? { catchup: true } : {}) }, signal); }
  catch (error) {
   if (error.doorStatus !== 409 || error.doorCode !== 'package_segment_missing' || !Array.isArray(error.doorDetails?.missing) || !error.doorDetails.missing.length
    || error.doorDetails.missing.some(row => !segments.some(s => s.sha256 === row.sha256 && s.bytes === row.bytes))) {
@@ -120,6 +120,7 @@ export async function transferPackage({ prepared, fresh, request, signal, checkp
   }
   journal.supported = true; await save();
  }
+ if (preview && !journal.supported && planAction==='prepare' && preview.protocol==='rer-bounded-waves/1' && typeof preview.parentId==='string') {journal.supported=true;await save();}
  if (preview && !journal.supported) throw Error('SEED_PACKAGE_UNSUPPORTED: the seed did not request package segments. No segments were sent.');
  if (!preview) for (let index = 0; index < segments.length; index++) await upload(segments[index], 'rer-segment', String(index));
  return { uploadId, bundle: { size: manifestFile.bytes, sha256: manifestFile.sha256 }, ...(preview ? { preview } : {}) };

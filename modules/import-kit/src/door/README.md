@@ -555,7 +555,7 @@ proposal for owner review. No caller-supplied totals relax this boundary.
 
 ## Logical packages across upload grants
 
-A source may opt in to rer-door-package/1 with
+A source may opt in to manifests with `format: "rer-door-package/1"` and
 `package: {formats, maxBytes, maxSegments, read}` on its resolved source. The
 same declaration belongs on the operator and grant mounts. Other sources keep
 their existing readers and upload limits. No additional schema migration or
@@ -616,3 +616,5 @@ request limits still apply; an oversized read/plan is a refusal, never a partial
 import. HappyToHelp adoption still needs its own package reader, capacity and
 legacy delta semantics. Legacy snapshots above the unchanged 100,000-record
 grant require a separate bounded-wave authority decision before real imports.
+
+The opt-in [complete-parent bounded-wave protocol](waves/README.md) uses separately approved children and the existing D1 journal. Ordinary package planning keeps its aggregate refusal.

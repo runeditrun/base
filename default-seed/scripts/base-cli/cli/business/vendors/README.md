@@ -23,9 +23,9 @@ No export runs merely by importing these modules. No account export was run
 during implementation.
 
 `VENDORS` is the closed vendor enum (`sentry`, `uptimerobot`, `pagerduty`,
-`calendly`, `sorry`). `VENDOR_CAPABILITIES` describes the adapter,
+`calendly`, `sorry`, `zendesk`, `happytohelp-legacy`). `VENDOR_CAPABILITIES` describes the adapter,
 required vendor-key capability, native importer format, layout and read scopes.
-These adapters cannot verify that a supplied key itself has read-only scope;
+Except for Zendesk's checked OAuth scopes, adapters cannot verify that a supplied key itself has read-only scope;
 the owner must create the documented read-only key where the vendor offers one.
 
 ## Transport and resume
@@ -174,3 +174,42 @@ Seed documentation and official APIs were inspected on 16 October 2026.
 These sources document shapes; no real-account parity or migration success is
 claimed. Parent integration must provide seed assembly and transport under the
 actual import grant protocol, plus network-edge acceptance coverage.
+
+## Zendesk's retained snapshot
+
+`zendesk` is a keyed vendor with `layout: 'snapshot'`. Its credential is the
+hidden-input JSON client credential documented in [the CLI guide](../../README.md#zendesk-offline-snapshots),
+rather than a bare API token. `snapshot({key,inputs,directory,runId,signal})` in
+`zendesk.mjs` drives phases A–F into the durable store. `exportVendor` accepts
+`directory` and `runId` for this vendor; the Business door provides a directory
+keyed by Business and account. It does not apply the older vendors' 2,000-item
+or one-MiB item limits. The complete deliverable is checked against HH v1 limits
+before any upload. Package-required results use the shared package sender with path bindings and
+sidecars. It probes the manifest before sending segments, resumes the transfer
+journal and plans one complete snapshot; no per-part plan or fallback is used.
+
+Responsibilities are separated into token/scope checking, transport, pages,
+tickets/comments, people, attachments, Guide, store and HH encoding. Requests
+stop at 250,000, responses at 32 MiB, records/blobs at 64 MiB, snapshots at
+32 GiB. The opt-in `pacedClient` in `common.mjs` supports bounded 429 retries
+(1–60 seconds, at most three per request and ten minutes per run), rate headers,
+and manual attachment redirects. Without rate headers it waits at least six
+seconds between incremental requests and 300 ms otherwise. Other vendors keep
+`client()` and its previous no-retry behavior.
+
+Only the account origin receives Authorization. The first attachment URL must
+be on that origin's attachment path. One redirect may go to a public HTTPS DNS
+host, with no userinfo, IP, explicit port or local/private address, and receives
+no credential even when it returns to the account origin. Further redirects
+are errors. Pagination is independently checked for account origin, exact
+collection and allowed query parameters.
+
+Checkpoints point at immutable SHA-256 journal nodes and raw objects. Each page
+is fsynced before its journal and atomic checkpoint; a kill before acknowledgement
+leaves only unreachable objects. Resume validates the reachable graph and
+rebuilds last-version records and census from it. Repeated attachment bytes
+have one blob. The census declares tombstones, inaccessible/deleted/malware/large
+attachments and omissions explicitly. Guide 404 records unavailable coverage.
+The JSON census and Guide sidecars stay local and in the package; Business
+receives only the door's ids and SHA for a successful bundle. See the CLI guide
+for the separate Business census/retire output dependencies.

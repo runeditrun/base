@@ -241,7 +241,7 @@ export async function server(t, { businessId = 'biz' } = {}) {
    if (granting) {
     if (request.headers.authorization === `Bearer ${device}`) { requireDevice(request); requireValue(false, 403); }
     const id = decodeURIComponent(granting[1]); bearer(request, 'tasks', id);
-    return send(tasks.importGrant(id, body));
+    return send(await tasks.importGrant(id, body));
    }
    const match = /^\/api\/business\/tasks\/([^/]+)\/(heartbeat|events|complete|release|uploads)$/.exec(route);
    if (match) {

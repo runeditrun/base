@@ -4,6 +4,7 @@ import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { door } from './door/fixture.ts';
+import { boundedProof } from './door/bounded-proof.ts';
 import { createImportDoorHandler } from '../src/door/index.ts';
 import { retireD1ImportCustody } from '../src/d1/index.ts';
 import type { ImportDoorPackageSource, ImportDoorPackageUpload, DoorGrant } from '../src/door/index.ts';
@@ -33,6 +34,7 @@ async function prepared(t:any,total:number|null=2,records=rows,quota=QUOTA) {
 }
 
 test('P2 package probe has no plan; missing, foreign and altered segments have the same scoped refusal; one aggregate plan is idempotent',async t=>{
+ await boundedProof(t);
  const d=await door(t);await d.enable();
  d.mount(createImportDoorHandler({...d.options,package:declaration(async pkg=>JSON.parse(Buffer.from(await pkg.read('records.json')).toString()))}));
  const pkg=await prepared(t), manifest=Buffer.from(await readFile(pkg.manifestFile.file)), uploadId=await upload(d,manifest,'rer-package.json');
