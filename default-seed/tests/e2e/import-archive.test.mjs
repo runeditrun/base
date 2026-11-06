@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { completeFirstRun } from '../operator-auth/first-run.mjs'
 import { emittedRuntime, owner, setupToken } from '../operator-auth/emitted-runtime.mjs'
-import { withoutCredentials } from '../../scripts/base-cli/cli/business/vendors/common.mjs'
 
 const issuer = 'https://business.example.test'
 const claimInstallation = 'business-archive-test-installation'
@@ -73,14 +72,14 @@ async function businessSeed(t) {
 
 test('Business keeps a tool\'s final export as an archive in the default seed: plan and catch-up leave it, and restore-check parses it writing nothing', async (t) => {
   const seed = await businessSeed(t)
-  // What rer's vendor export uploads: each live credential value stripped, its
+  // An already-sanitized export: each live credential value stripped, its
   // marker left in a field (`[removed]`), a URL's user name (`removed@`) and a
   // credential query parameter (`=removed`). That bundle holds no credential, so it archives.
-  const team = withoutCredentials([
-    { ref: 'ada', name: 'Ada Archive', email: 'ada@example.test', details: { team: 'Support', apiKey: randomUUID() } },
-    { ref: 'lin', name: 'Lin Archive', email: 'lin@example.test', details: { health: `https://monitor:${randomUUID()}@status.example.test/health` } },
-    { ref: 'hal', name: 'Hal Archive', email: 'hal@example.test', details: { hook: `https://hooks.example.test/in?api_key=${randomUUID()}&region=eu` } },
-  ])
+  const team = [
+    { ref: 'ada', name: 'Ada Archive', email: 'ada@example.test', details: { team: 'Support', apiKey: '[removed]' } },
+    { ref: 'lin', name: 'Lin Archive', email: 'lin@example.test', details: { health: 'https://removed@status.example.test/health' } },
+    { ref: 'hal', name: 'Hal Archive', email: 'hal@example.test', details: { hook: 'https://hooks.example.test/in?api_key=removed&region=eu' } },
+  ]
   const first = await seed.upload(team)
   const takenAt = new Date().toISOString(), request = { uploadId: first.uploadId, tool: 'people-vendor', takenAt }
   const archived = await seed.call('archive', request)

@@ -1156,8 +1156,13 @@ test('a Move in step names the seed\'s own Move in page and how to export, and f
  const remote = await fixtureServer(t), home = join(directory, 'move-in-home');
  await connect(home, remote);
  remote.state.optIns = { installPermissions: false, awakeConsent: false, installService: false };
- const move_in = { tool: 'Sorry', app: 'Lamp', app_url: 'https://status.example.test/', move_in_url: 'https://status.example.test/app/move-in',
-  accepts: ['file', 'key'], export: 'In Sorry, open Settings, then Export, and download the JSON file.', format: 'docs/LEGACY-EXPORT.md' };
+ // The step as Business sends it: its view of the seed's pinned importers.json row.
+ const formatLink = 'https://github.com/just-every/run-lamp/blob/0123456789abcdef0123456789abcdef01234567/docs/LEGACY-EXPORT.md';
+ const view = (move_in, app_address = 'https://status.example.test') => ({ tool: 'Sorry', vendor_id: 'sorry', decision: 'moves', app: 'lamp', app_name: 'Lamp', app_address, move_in,
+  instructions: 'Open Lamp’s Move in page and follow its steps there.' });
+ const declared = { state: 'declared', address: 'https://status.example.test/app/move-in', path: '/app/move-in', accepts: ['file', 'key'],
+  export: 'In Sorry, open Settings, then Export, and download the JSON file.', format: formatLink };
+ const move_in = view(declared);
  remote.state.tasks = [{ task_id: 'biz:move-in:sorry', kind: 'move.in', state: 'ready', runner: 'executor', fence: 0, title: 'Move Sorry into Lamp', move_in }];
  const next = await cli(home, ['business', 'next']);
  assert.equal(next.code, 0, next.stderr);
@@ -1167,13 +1172,21 @@ test('a Move in step names the seed\'s own Move in page and how to export, and f
  assert.equal(running.code, 0, running.stderr);
  assert.match(running.stdout, /A Move in step waits for this computer's agent/);
  assert.equal(remote.state.requests.filter(entry => entry.route === '/api/business/executors/claim').length, 0, 'run never claims a Move in step');
+ // A declared page on an app without an address yet names the page's path.
+ remote.state.tasks = [{ task_id: 'biz:move-in:pending', kind: 'move.in', state: 'ready', runner: 'executor', fence: 0, move_in: view({ ...declared, address: null }, null) }];
+ const pending = await cli(home, ['business', 'next']);
+ assert.ok(pending.stdout.includes('/app/move-in on the seed, once it has an address') && pending.stdout.includes('In Sorry, open Settings, then Export'), pending.stdout);
  // A seed that declares no Move in page says so, and never guesses one.
- remote.state.tasks = [{ task_id: 'biz:move-in:none', kind: 'move.in', state: 'ready', runner: 'executor', fence: 0, move_in: { tool: 'NewTool', app: 'Lamp', app_url: 'https://status.example.test/' } }];
+ remote.state.tasks = [{ task_id: 'biz:move-in:none', kind: 'move.in', state: 'ready', runner: 'executor', fence: 0, move_in: { ...view({ state: 'not_declared' }), tool: 'NewTool' } }];
  const undeclared = await cli(home, ['business', 'next']);
- assert.ok(undeclared.stdout.includes('declares no Move in page') && !undeclared.stdout.includes('/app/move-in'), undeclared.stdout);
+ assert.ok(undeclared.stdout.includes('declares no Move in page') && undeclared.stdout.includes('https://status.example.test') && !undeclared.stdout.includes('/app/move-in'), undeclared.stdout);
+ // A seed with its own import format but no importer for the tool links that format.
+ remote.state.tasks = [{ task_id: 'biz:move-in:format', kind: 'move.in', state: 'ready', runner: 'executor', fence: 0, move_in: { ...view({ state: 'format', format: formatLink }), tool: 'NewTool' } }];
+ const formatOnly = await cli(home, ['business', 'next']);
+ assert.ok(formatOnly.stdout.includes('declares no Move in page') && formatOnly.stdout.includes(formatLink) && !formatOnly.stdout.includes('/app/move-in'), formatOnly.stdout);
  // Server text that looks like a credential, or an address with credentials, never reaches the agent's output.
  remote.state.tasks = [{ task_id: 'biz:move-in:unsafe', kind: 'move.in', state: 'ready', runner: 'executor', fence: 0,
-  move_in: { tool: 'Sorry', app: 'Lamp', move_in_url: 'https://owner:fixture-password@status.example.test/app/move-in', export: 'Use key sk_live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4' } }];
+  move_in: view({ ...declared, address: 'https://owner:fixture-password@status.example.test/app/move-in', path: '/app/move-in?token=sk_live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4', export: 'Use key sk_live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4' }) }];
  const unsafe = await cli(home, ['business', 'next']);
  assert.ok(!unsafe.stdout.includes('fixture-password') && !unsafe.stdout.includes('sk_live_') && unsafe.stdout.includes('declares no Move in page'), unsafe.stdout);
  remote.state.tasks = [{ task_id: 'biz:move-in:sorry', kind: 'move.in', state: 'ready', runner: 'executor', fence: 0, move_in }];

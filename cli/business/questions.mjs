@@ -72,21 +72,30 @@ function address(value) {
 }
 const accepted = { file: 'a file export from the old tool', key: "a read-only key for the old tool, entered in the seed's Move in page", address: "the old tool's public address, entered in the seed's Move in page" };
 
-/** What the seed's Move in step asks of this computer's agent, in words. The step carries the seed's own declaration
- * (its `importers.json` row); only closed shapes and short text are printed. */
+/** A Move in path on the seed (`/app/move-in`), or null. */
+const movePath = value => typeof value === 'string' && /^\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]{0,199}$/.test(value) && !value.startsWith('//') && !sensitive(value) ? value : null;
+
+/** What the seed's Move in step asks of this computer's agent, in words. The step carries Business's view of the seed's own
+ * declaration (its pinned `importers.json` row): `{tool, app, app_name, app_address, move_in: {state, address, path, accepts,
+ * export, format}}`, with `state` one of `declared`, `format` or `not_declared`. Only closed shapes and short text are printed. */
 export function moveInLines(task) {
- const move = task.move_in && typeof task.move_in === 'object' ? task.move_in : {};
- const tool = text(move.tool, 80), app = text(move.app, 80), page = address(move.move_in_url);
+ const view = task.move_in && typeof task.move_in === 'object' ? task.move_in : {};
+ const move = view.move_in && typeof view.move_in === 'object' ? view.move_in : {};
+ const tool = text(view.tool, 80), app = text(view.app_name, 80) ?? text(view.app, 80), home = address(view.app_address);
  const lines = [`Step: Move ${tool ?? 'the old tool'} into ${app ?? 'its seed'} with the seed's own Move in page. The seed shows the dry run's counts, imports and undoes; Business imports nothing itself.`];
- if (!page) {
-  const home = address(move.app_url);
+ const format = address(move.format);
+ const page = move.state === 'declared' ? address(move.address) : null, path = move.state === 'declared' ? movePath(move.path) : null;
+ if (page) lines.push(`Move in page (sign in as the owner): ${page}`);
+ else if (path) lines.push(`Move in page (sign in as the owner): ${path} on the seed${home ? ` at ${home}` : ', once it has an address'}`);
+ else {
   lines.push(`This seed declares no Move in page for the tool.${home ? ` Its address: ${home}` : ''}`);
- } else lines.push(`Move in page (sign in as the owner): ${page}`);
+  if (move.state === 'format' && format) lines.push(`Export what the old tool offers, convert it to the seed's own import format and upload it in the seed. The format: ${format}`);
+  return lines;
+ }
  const takes = Array.isArray(move.accepts) ? move.accepts.filter(item => Object.hasOwn(accepted, item)) : [];
  if (takes.length) lines.push(`The seed takes: ${takes.map(item => accepted[item]).join('; or ')}.`);
  const how = text(move.export, 1000);
  if (how) lines.push(`How to export from the old tool: ${how}`);
- const format = text(move.format, 300);
  if (format) lines.push(`The seed's own import format (for a tool it has no importer for): ${format}`);
  return lines;
 }
