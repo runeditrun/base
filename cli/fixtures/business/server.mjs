@@ -98,7 +98,7 @@ export async function server(t, { businessId = 'biz' } = {}) {
   if (body.pairing_token !== undefined) {
    closed(body, ['pairing_token']);
    requireValue(typeof body.pairing_token === 'string' && body.pairing_token.length <= 200);
-   requireValue(redeemed && !issued && body.pairing_token === 'fixture-pairing-poll' && Date.now() < pairingExpires, 401, 'Pairing expired or used');
+   requireValue(redeemed && !issued && body.pairing_token === 'synthetic-fixture-pairing-poll' && Date.now() < pairingExpires, 401, 'Pairing expired or used');
    if (!state.approved) return [{ status: 'authorization_pending', interval: state.pollSeconds ?? 5 }, 202];
    issued = true;
    return [{ status: 'paired', device_credential: device, executor_id: 'executor1', business_id: businessId, idle_expires_at: later(30 * 24 * 3600) }, 200];
@@ -115,7 +115,7 @@ export async function server(t, { businessId = 'biz' } = {}) {
   // Like the platform, the code's own expiry applies until approval.
   redeemed = true; issued = false; state.approved = false; state.revoked = false; state.active = false; state.agentKind = body.agent_kind;
   const seconds = state.pairingSeconds ?? 600; pairingExpires = Date.now() + seconds * 1000;
-  return [{ status: 'pending_approval', pairing_token: 'fixture-pairing-poll', confirmation_number: '246810', expires_at: later(seconds), interval: state.pollSeconds ?? 5 }, 202];
+  return [{ status: 'pending_approval', pairing_token: 'synthetic-fixture-pairing-poll', confirmation_number: '246810', expires_at: later(seconds), interval: state.pollSeconds ?? 5 }, 202];
  }
  function tool(token, name, args) {
   object(args);

@@ -42,7 +42,7 @@ test('recovery restores the saved origin before selecting the start address', as
 
 test('all credential-shaped saved settings are registered before a command emits bare values', async t => {
  const { root, store, install } = await fixture(t);
- const values = { privateKey: 'test-synthetic-private-setting', dbPassword: 'test-synthetic-password-setting', clientSecret: 'test-synthetic-client-setting' };
+ const values = { privateKey: 'test-synthetic-private-setting', dbPassword: 'synthetic-test-synthetic-password-setting', clientSecret: 'test-synthetic-client-setting' };
  await writeFile(join(root, 'settings.json'), JSON.stringify(values), { mode: 0o600 });
  const state = await install({ secrets: { file: 'settings.json', format: 'json' }, migrate: [process.execPath, ['-e', "const v=JSON.parse(require('fs').readFileSync('settings.json'));for(const s of Object.values(v))console.log(s)"]] });
  assert.equal(state.phase, 'complete');

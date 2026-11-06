@@ -181,7 +181,7 @@ test('native provider proof/mix-up/signature matrix and URI/policy changes fail 
 });
 
 test('native opt-in and explicit callback configuration refuse partial adapters, unsupported capabilities and conflicting/foreign URLs',async t=>{
-  const options={db:{prepare(){throw new Error('No account DB query allowed');}},clientIp:()=> 'test',config:{origin:ORIGIN,OWNER_EMAIL:'owner@example.com',SESSION_SECRET:'test-session-secret-32-bytes-value'}};
+  const options={db:{prepare(){throw new Error('No account DB query allowed');}},clientIp:()=> 'test',config:{origin:ORIGIN,OWNER_EMAIL:'owner@example.com',SESSION_SECRET:'synthetic-test-session-secret-32-bytes-value'}};
   for(const injection of [{accounts:{}},{proofs:{}},{accounts:null,proofs:null},{accounts:undefined},{proofs:undefined}])assert.throws(()=>createOperatorAuth({...options,...injection}),/adapter/);
   const partial=nativeFixture(options.db,Date.now,{noDependencies:true});
   const nativeAuth=createOperatorAuth({...options,...partial});
@@ -194,10 +194,10 @@ test('native opt-in and explicit callback configuration refuse partial adapters,
   assert.throws(()=>createEmailLinkLifecycle(direct),/invalid_confirmation_hooks/,'a veto without revocation authority refuses construction');
   assert.throws(()=>createEmailLinkLifecycle({...direct,afterConfirm:async(_request,value)=>value}),/invalid_confirmation_hooks/,'a wrapper cannot silently replace a supplied veto');
   for(const redirectUri of ['https://foreign.example/callback','https://user:pass@app.example/callback',ORIGIN+'/callback?q=1',ORIGIN+'/callback#hash',ORIGIN+'/auth/oidc/incumbent/start',ORIGIN+'/auth/owner-claim',ORIGIN+'/auth/dev/enter',ORIGIN+'/__dev/personas',ORIGIN+'/__dev/key']) {
-    assert.throws(()=>createOidcProviders({db:options.db,admission:{admit:async()=>{}},clientIp:options.clientIp,config:{origin:ORIGIN,transactionSecret:'fixture-transactions-secret-32-bytes',providers:[{...provider,redirectUri}]}}),/configuration/);
+    assert.throws(()=>createOidcProviders({db:options.db,admission:{admit:async()=>{}},clientIp:options.clientIp,config:{origin:ORIGIN,transactionSecret:'synthetic-fixture-transactions-secret-32-bytes',providers:[{...provider,redirectUri}]}}),/configuration/);
   }
-  assert.throws(()=>createOidcProviders({db:options.db,admission:{admit:async()=>{}},clientIp:options.clientIp,config:{origin:ORIGIN,transactionSecret:'fixture-transactions-secret-32-bytes',providers:[provider,{...provider,id:'other'}]}}),/configuration/);
-  const oidc=createOidcProviders({db:options.db,admission:{admit:async()=>{}},clientIp:options.clientIp,config:{origin:ORIGIN,transactionSecret:'fixture-transactions-secret-32-bytes',providers:[provider]}});
+  assert.throws(()=>createOidcProviders({db:options.db,admission:{admit:async()=>{}},clientIp:options.clientIp,config:{origin:ORIGIN,transactionSecret:'synthetic-fixture-transactions-secret-32-bytes',providers:[provider,{...provider,id:'other'}]}}),/configuration/);
+  const oidc=createOidcProviders({db:options.db,admission:{admit:async()=>{}},clientIp:options.clientIp,config:{origin:ORIGIN,transactionSecret:'synthetic-fixture-transactions-secret-32-bytes',providers:[provider]}});
   assert.equal(await createOidcHandler(oidc)(new Request(ORIGIN+'/unconfigured/callback')),null);
   const r=await runtime(t,setup({native:{noLocal:true,noSettings:true}}));const cookie=await login(r);
   for(const [path,input] of [['/auth/bootstrap',{}],['/auth/invite',{email:'x@example.com',role:'owner'}],['/auth/operator/role',{operatorId:'native-contact',role:'owner'}],['/auth/setup-complete',{}],['/auth/settings/identity',{idpSignIn:true}],['/test/password',{operatorId:'native-contact'}]])assert.equal((await post(r,path,input,cookie)).status,501,path);

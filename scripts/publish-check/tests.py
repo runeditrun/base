@@ -79,6 +79,50 @@ class HistoryTests(RepositoryFixture, unittest.TestCase):
                 self.assertEqual(result.returncode, 0, report)
                 self.assertEqual(report['status'], 'PASS')
 
+        # Object-member commas are assignments; actual simple parameter types
+        # remain types. Exercise both through the same public scanner door.
+        for previous in ('settings.ts', '@commit-message', '@tag-message'):
+            (self.repo / previous).unlink(missing_ok=True)
+        positives, annotations, literals = set(), set(), []
+        def source(path, template, positive=True):
+            literal = generic_credential()
+            literals.append(literal)
+            text = template.replace('VALUE', json.dumps(literal) if path.endswith('.json') else "'" + literal + "'") + '\n'
+            self.write(path, text)
+            location = (path, text[:text.index(literal)].count('\n') + 1)
+            (positives if positive else annotations).add(location)
+        for path, template in (
+                ('second.mjs', 'const config = { harmless: true, apiKey: VALUE };'),
+                ('second.ts', 'const config = { harmless: true, client_secret: VALUE };'),
+                ('nested.mjs', 'const config = { nested: {\n harmless: true,\n count: 2,\n // later member\n token: VALUE\n} };'),
+                ('quoted.json', '{ "harmless": true, "apiKey": VALUE }'),
+                ('first.mjs', 'const config = { apiKey: VALUE, harmless: true };'),
+                ('assignment.mjs', 'const API_KEY = VALUE;'),
+                ('default.ts', 'function f(harmless: string, apiKey = VALUE) {}')):
+            source(path, template)
+        for path, template in (
+                ('function-first.ts', 'function f(apiKey: VALUE, harmless: string) {}'),
+                ('function-later.ts', 'function f(harmless: string, apiKey: VALUE) {}'),
+                ('arrow-first.ts', 'const f = (apiKey: VALUE, harmless: string) => {};'),
+                ('arrow-later.ts', 'const f = (harmless: string, apiKey: VALUE) => {};'),
+                ('method.ts', 'class Service { f(harmless: string, apiKey: VALUE) {} }'),
+                ('interface.ts', 'interface Options { harmless: string; apiKey: VALUE; }'),
+                ('alias.ts', 'type Options = { harmless: string; apiKey: VALUE; };')):
+            source(path, template, False)
+        result = subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(self.repo)],
+                                capture_output=True, text=True, timeout=120)
+        report = json.loads(result.stdout)
+        self.assertFalse(any(literal in result.stdout + result.stderr for literal in literals),
+                         'diagnostics must never contain generated values')
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(report['status'], 'FAIL')
+        self.assertTrue(report['complete'])
+        locations = {(f['path'], f['line']) for f in report['findings'] if f['rule'] == 'SEC-3'}
+        self.assertTrue(positives <= locations, 'each object/default must have SEC-3 at its literal line')
+        self.assertFalse(annotations & locations, 'parameter and declaration literal types are excluded from SEC-3')
+        self.assertTrue(any(f['rule'] == 'secret.assignment' for f in report['findings']),
+                        'independent native assignment findings remain intact')
+
     def test_copy_digests_require_same_tree_regular_preimages_and_exact_locations(self):
         files = {'base/runtime/api-key.mjs': b'export const enabled = true;\n',
                  'base/runtime/token-cache.py': b'cache = {}\n'}

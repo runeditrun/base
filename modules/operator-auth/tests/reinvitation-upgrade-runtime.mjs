@@ -23,7 +23,7 @@ export async function runtime() {
   const oldScript = await compile(join(source, 'operator-auth/tests/worker.mjs'));
   const newScript = await compile(fileURLToPath(new URL('./worker.mjs', import.meta.url)));
   const directory = await mkdtemp(join(tmpdir(), 'operator-auth-upgrade-'));
-  const config = { origin: 'https://auth.test', OWNER_EMAIL: 'owner@example.com', SESSION_SECRET: 'test-upgrade-session-secret-at-least-32-characters', SETUP_TOKEN: setup,
+  const config = { origin: 'https://auth.test', OWNER_EMAIL: 'owner@example.com', SESSION_SECRET: 'synthetic-test-upgrade-session-secret-at-least-32-characters', SETUP_TOKEN: setup,
     MAIL_FROM: 'auth@example.com', ipLimit: 1000, emailLimit: 1000, limitWindowSeconds: 86400 };
   const init = script => new Miniflare({ ...convertV4MiniflareOptions({ modules: true, script, compatibilityDate: '2026-09-01',
     d1Databases: { DB: 'auth-db' }, bindings: { TEST_CONFIG: JSON.stringify(config), TEST_OPTIONS: '{}' },

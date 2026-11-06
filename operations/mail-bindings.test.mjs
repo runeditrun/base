@@ -86,7 +86,7 @@ test('development mail is explicit and confined to canonical loopback origins in
   const local = { MAIL_PROVIDER: 'development', ENVIRONMENT: 'development', MAIL_FROM: 'noreply@example.test' };
   for (const origin of ['http://localhost', 'https://localhost:8787', 'http://127.0.0.1:8787', 'http://[::1]:8787/']) {
     assert.equal((await inspectOperations(root, { ...local, APP_URL: origin })).ok, true);
-    assert.equal((await inspectOperations(root, { ...local, APP_URL: origin, MAIL_API_KEY: 'unused-synthetic-value' })).ok, true);
+    assert.equal((await inspectOperations(root, { ...local, APP_URL: origin, MAIL_API_KEY: 'synthetic-unused-synthetic-value' })).ok, true);
   }
   for (const origin of [undefined, '', 'https://remote.example.test', 'http://localhost.remote.example.test', 'http://127.0.0.2', 'http://127.1', 'http://2130706433', 'http://localhost.', 'http://LOCALHOST', 'http://localhost/a', 'http://localhost/..', 'http://localhost?x', 'http://localhost?', 'http://localhost#', 'http://user:synthetic-private@localhost', 'ftp://localhost', ' http://localhost', 'http://[::ffff:127.0.0.1]', false]) {
     const report = await inspectOperations(root, { ...local, APP_URL: origin });
@@ -127,7 +127,7 @@ test('another project binds its own selector, hosted credentials, sender, accoun
     assert.equal(result.ok, false);
     assert.deepEqual(result.loops[0].missingEnvironment, ['DELIVERY_ACCOUNT']);
   }
-  const missing = run({ DELIVERY_DRIVER: 'cloudflare', CLOUDFLARE_EMAIL_API_TOKEN: 'wrong-synthetic-token', CLOUDFLARE_EMAIL_ACCOUNT_ID: 'a'.repeat(32), SENDER_ADDRESS: hosted.SENDER_ADDRESS });
+  const missing = run({ DELIVERY_DRIVER: 'cloudflare', CLOUDFLARE_EMAIL_API_TOKEN: 'synthetic-wrong-synthetic-token', CLOUDFLARE_EMAIL_ACCOUNT_ID: 'a'.repeat(32), SENDER_ADDRESS: hosted.SENDER_ADDRESS });
   assert.equal(missing.status, 1);
   assert.deepEqual(JSON.parse(missing.stdout).loops[0].missingEnvironment, ['DELIVERY_TOKEN', 'DELIVERY_ACCOUNT']);
   assert.ok(missing.stderr.includes(descriptor.environmentSources.DELIVERY_TOKEN));

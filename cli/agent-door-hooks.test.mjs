@@ -65,8 +65,8 @@ test('per-install secret source provisions isolated receiver and wrong signature
   assert.equal(wrong.status, 401); await wrong.body?.cancel();
   await assert.rejects(() => hosted.database('UNDECLARED'));
   assert.throws(() => database.prepare('DELETE FROM fixture_installation'), /read-only/);
-  await writeFile(join(root, 'broken-source.mjs'), 'export default () => { throw new Error("never expose accessor values"); };');
-  const broken = await createAgentConformanceNetwork(root, { ...config, secretSource: 'broken-source.mjs' });
+  await writeFile(join(root, 'synthetic-broken-source.mjs'), 'export default () => { throw new Error("never expose accessor values"); };');
+  const broken = await createAgentConformanceNetwork(root, { ...config, secretSource: 'synthetic-broken-source.mjs' });
   try { await assert.rejects(() => broken.provision(hosted), error => error.code === 'agent_secret_source_invalid' && !error.message.includes('never expose')); }
   finally { await broken.close(); }
   t.diagnostic('Per-run random secret: valid signature 202, wrong signature 401; read-only state and sanitized accessor failures passed.');

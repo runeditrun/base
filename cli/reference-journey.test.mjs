@@ -55,7 +55,7 @@ for(const kind of ['default-seed','foundation'])test(`${kind}: standalone real W
  await f.run(['setup','--answers','answers.json','--owner-email','cli-owner@example.test','--json','--non-interactive'],2);
  await f.run(['setup','--answers','../outside.json','--json','--non-interactive'],4);
  await symlink(answers,join(f.root,'linked-answers.json'));await f.run(['setup','--answers','linked-answers.json','--json','--non-interactive'],4);await rm(join(f.root,'linked-answers.json'));await rm(answers);
- const manifestAnswers={OWNER_EMAIL:'cli-owner@example.test',...(kind==='foundation'?{WORKSPACE_TITLE:'Manifest workspace',CONNECTION_PASSWORD:'fixture-connection-passphrase'}:{})};
+ const manifestAnswers={OWNER_EMAIL:'cli-owner@example.test',...(kind==='foundation'?{WORKSPACE_TITLE:'Manifest workspace',CONNECTION_PASSWORD:'synthetic-fixture-connection-passphrase'}:{})};
  await writeFile(answers,JSON.stringify(manifestAnswers),{mode:0o600});
  const setupCommand=steps[1].replace('you@example.com','cli-owner@example.test')+' --answers answers.json --owner-name CLI --non-interactive --json';
  const [setupProgram,...setupArgs]=documentedCommand(setupCommand);

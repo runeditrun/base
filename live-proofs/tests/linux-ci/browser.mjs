@@ -46,7 +46,7 @@ export async function browserBoundary(ctx) {
   assert.equal(error, 'container-operation-failed');
   const c = dockerContext(ctx.env, ctx.receipt);
   try {
-    const id = await c.create(ctx.images.browser, [{ source: snapshot, target: '/controller' }], { HOME: '/tmp', PATH: '/usr/local/bin:/usr/bin:/bin', T016_BROWSER_CONTAINER: '1', SYNTHETIC_API_KEY: 'forbidden-test-input' });
+    const id = await c.create(ctx.images.browser, [{ source: snapshot, target: '/controller' }], { HOME: '/tmp', PATH: '/usr/local/bin:/usr/bin:/bin', T016_BROWSER_CONTAINER: '1', SYNTHETIC_API_KEY: 'synthetic-forbidden-test-input' });
     await disconnect(c, id);
     const rejected = await c.docker(['exec', '--interactive', id, 'node', '/controller/live-proofs/t016/browser-entry.mjs'], { input: '{}' });
     assert.equal(rejected.exitCode, 1); assert.match(rejected.stderr.toString(), /Hosted browser journey failed/);

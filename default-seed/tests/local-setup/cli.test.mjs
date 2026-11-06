@@ -312,7 +312,7 @@ test('ordinary build excludes local credentials and restores the exact file afte
     const original = '# retain comment\nSESSION_SECRET=unit-private-session\nSETUP_TOKEN=unit-private-setup\n'
     await writeFile(path, original, { mode: 0o640 })
     const before = await stat(path)
-    const result = await run([], { TEST_FAIL: failure, SESSION_SECRET: 'inherited-build-secret' }, 'local-build')
+    const result = await run([], { TEST_FAIL: failure, SESSION_SECRET: 'synthetic-inherited-build-secret' }, 'local-build')
     assert.equal(result.code, failure ? 1 : 0)
     assert.equal(await readFile(path, 'utf8'), original)
     const after = await stat(path)

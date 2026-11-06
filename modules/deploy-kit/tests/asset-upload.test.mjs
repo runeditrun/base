@@ -14,7 +14,7 @@ test('static asset multipart preserves JavaScript MIME for imported browser .mjs
   const accountId = 'a'.repeat(32);
   const origin = `https://api.cloudflare.com/client/v4/accounts/${accountId}`;
   const calls = [];
-  const api = cloudflare({accountId,token:'fixture-account-token',fetch:async (url,init) => {
+  const api = cloudflare({accountId,token:'synthetic-fixture-account-token',fetch:async (url,init) => {
     const request = new Request(url,init);
     calls.push(request);
     if (url === `${origin}/workers/scripts/browser-assets/assets-upload-session`) {

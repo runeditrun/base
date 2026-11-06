@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 // The management service's device edge, in memory: pairing, heartbeat
 // controls, claims, and the event/result relay. Every request is recorded.
 export async function managementServer(t, { repository, projectId }) {
- const state = { requests: [], token: 'fixture-device-key-0001', code: 'ABCD-2345', job: null, claimed: false, controls: [], failResults: 0, redirect: null, onRequest: () => {} };
+ const state = { requests: [], token: 'synthetic-fixture-device-key-0001', code: 'ABCD-2345', job: null, claimed: false, controls: [], failResults: 0, redirect: null, onRequest: () => {} };
  const reply = (response, status, body) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(body)); };
  const server = createServer(async (request, response) => {
   let text = '';

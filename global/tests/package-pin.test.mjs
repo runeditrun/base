@@ -20,7 +20,7 @@ import { devModes } from './dev-mode.mjs';
 const base = resolve(import.meta.dirname, '../..');
 const launcher = join(base, 'global/rer.mjs');
 // Synthetic provider credentials a person has exported in their shell.
-const credentials = { CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare-token-0001', CLOUDFLARE_ACCOUNT_ID: '0123456789abcdef0123456789abcdef', SENDGRID_API_KEY: 'SG.synthetic-sendgrid-key-0001' };
+const credentials = { CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare-token-0001', CLOUDFLARE_ACCOUNT_ID: '0123456789abcdef0123456789abcdef', SENDGRID_API_KEY: 'synthetic-SG.synthetic-sendgrid-key-0001' };
 // Other credentials a dependency script never sees: vault sessions, a
 // connection string, a private key, an Authorization header, provider tokens,
 // and any variable not on the install's allowlist, whatever it is called.

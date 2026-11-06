@@ -241,7 +241,7 @@ test('4 MiB pathological inputs redact in time comparable to ordinary output', (
 
 
 test('acronym-prefixed credential variables register their values', () => {
- const values = { APIToken: 'test-synthetic-api-token', AWSSecretKey: 'test-synthetic-aws-key', APISecret: 'test-synthetic-api-secret', APIPassword: 'test-synthetic-api-password' };
+ const values = { APIToken: 'test-synthetic-api-token', AWSSecretKey: 'test-synthetic-aws-key', APISecret: 'test-synthetic-api-secret', APIPassword: 'synthetic-test-synthetic-api-password' };
  assert.deepEqual(credentialValues(values), Object.values(values));
 });
 

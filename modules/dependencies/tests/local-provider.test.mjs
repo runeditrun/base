@@ -8,7 +8,7 @@ async function signIn(r) {
  const grant=await r.idp.authorize(start.headers.get('location'),{});
  return r.call(`/auth/oidc/auth/callback?code=${grant.code}&state=${grant.state}`,{cookie:start.headers.get('set-cookie')});
 }
-const setup=(r,issuer)=>r.call('/auth/dependencies/setup',{body:{issuer,interface:'oidc-provider@1',token:'setup-secret-only-for-test-thirty-two-bytes'}});
+const setup=(r,issuer)=>r.call('/auth/dependencies/setup',{body:{issuer,interface:'oidc-provider@1',token:'synthetic-setup-secret-only-for-test-thirty-two-bytes'}});
 
 test('under rer dev a seed links to a seed on http loopback, whatever the port and loopback spelling, and signs in through it',async t=>{
  for(const issuer of ['http://127.0.0.1:9787','http://localhost:9788','http://[::1]:9789']){

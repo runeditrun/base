@@ -1,7 +1,7 @@
 // Portable test-only cases: import and await this in Node or a workerd handler.
 import { sendSendGrid, serializeSendGridMessage } from '../../src/adapters/sendgrid/index.mjs';
 
-export const config = { provider: 'sendgrid', mode: 'test', apiKey: 'fixture-sendgrid-key' };
+export const config = { provider: 'sendgrid', mode: 'test', apiKey: 'synthetic-fixture-sendgrid-key' };
 export function message() {
   return {
     deliveryId: 'command-78', from: 'Support <support@example.org>',

@@ -72,7 +72,7 @@ export async function linkedSetup(kind,t) {
   }catch(error){edge.push({error:error.message});res.writeHead(500);res.end();}
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
- await writeFile(join(f.root,'answers.json'),JSON.stringify({OWNER_EMAIL:'cli-owner@example.test',IDENTITY_PROVIDER:provider.issuer,...(kind==='default-seed'?{ERROR_PROVIDER:provider.issuer}:{}),...(kind==='foundation'?{WORKSPACE_TITLE:'Linked workspace',CONNECTION_PASSWORD:'local-fixture-private-value'}:{})}),{mode:0o600});
+ await writeFile(join(f.root,'answers.json'),JSON.stringify({OWNER_EMAIL:'cli-owner@example.test',IDENTITY_PROVIDER:provider.issuer,...(kind==='default-seed'?{ERROR_PROVIDER:provider.issuer}:{}),...(kind==='foundation'?{WORKSPACE_TITLE:'Linked workspace',CONNECTION_PASSWORD:'synthetic-local-fixture-private-value'}:{})}),{mode:0o600});
  const approvalFiles=Object.fromEntries(contracts.map((contract,i)=>[contract,`approval-${i}.json`]));
  const writeApprovals=async()=>{for(const [contract,value] of approvals)await writeFile(join(f.root,approvalFiles[contract]),JSON.stringify(value),{mode:0o600});};
  await writeApprovals();

@@ -21,7 +21,7 @@ export const post = (input, sessionCookie, headers) => ({ method: 'POST', input,
 
 export async function runtime({ existingStore = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'operator-auth-cancellation-'));
-  const config = { origin: 'https://auth.test', OWNER_EMAIL: 'owner@example.com', SESSION_SECRET: 'test-regression-session-secret-at-least-32-characters', SETUP_TOKEN: SETUP,
+  const config = { origin: 'https://auth.test', OWNER_EMAIL: 'owner@example.com', SESSION_SECRET: 'synthetic-test-regression-session-secret-at-least-32-characters', SETUP_TOKEN: SETUP,
     MAIL_FROM: 'auth@example.com', ipLimit: 1000, emailLimit: 1000 };
   const options = {};
   const init = () => new Miniflare({ ...convertV4MiniflareOptions({ modules: true, script: output.outputFiles[0].text,

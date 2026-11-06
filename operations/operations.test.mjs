@@ -64,7 +64,7 @@ test('CLI exit statuses and strict arguments keep output machine-readable', asyn
   assert.equal(JSON.parse(checked.stdout).ok, false);
   assert.match(checked.stderr, /Missing inputs:[\s\S]*SECRET/);
   assert.match(checked.stderr, /Missing inputs are expected before a deployment is configured\./);
-  const valid = spawnSync(process.execPath, [new URL('./operations.mjs', import.meta.url).pathname, 'check'], { cwd: root, env: { PATH: process.env.PATH, SECRET: 'configured-value' }, encoding: 'utf8' });
+  const valid = spawnSync(process.execPath, [new URL('./operations.mjs', import.meta.url).pathname, 'check'], { cwd: root, env: { PATH: process.env.PATH, SECRET: 'synthetic-configured-value' }, encoding: 'utf8' });
   assert.equal(valid.status, 0);
   assert.equal(JSON.parse(valid.stdout).ok, true);
   assert.match(valid.stderr, /Operations check passed/);

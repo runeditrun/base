@@ -107,7 +107,7 @@ test('pending approval retains the approving session pin through provider redemp
   try {
     const privateKey = (await dependencyStore(r.db,r.config).readKey()).key;
     const auth = createOperatorAuth({ db: r.db, clock: r.now, fetch: r.fetch, clientIp: () => '192.0.2.1', config: {
-      ...r.config, dependencies: false, OIDC_TRANSACTION_SECRET: 'static-fixture-transaction-secret-thirty-two-bytes',
+      ...r.config, dependencies: false, OIDC_TRANSACTION_SECRET: 'synthetic-static-fixture-transaction-secret-thirty-two-bytes',
       providers: [{ id: 'auth', preset: 'auth', issuer: ISSUER, clientId: 'app-client', privateKey }],
     } });
     assert.equal((await createAuthHandler(auth)(r.request('/auth/providers/relink', { cookie: proof, body: { provider: 'auth' } }))).status, 200);

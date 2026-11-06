@@ -1,7 +1,7 @@
 // Synthetic ground truth. The archived ticket is deliberately absent from List
 // Tickets. Two different attachment ids have identical customer bytes.
 export const origin = 'https://fixture-zendesk.zendesk.com';
-export const key = JSON.stringify({ client_id: 'fixture-synthetic-zendesk-client-id', client_secret: 'fixture-synthetic-zendesk-client-secret' });
+export const key = JSON.stringify({ client_id: 'fixture-synthetic-zendesk-client-id', client_secret: 'synthetic-fixture-synthetic-zendesk-client-secret' });
 export const token = 'synthetic-synthetic-zendesk-oauth-token';
 export const blob = Buffer.from('original customer attachment\n');
 export const largeBlob = Buffer.alloc(3 * 1024 * 1024, 65);

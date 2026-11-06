@@ -132,7 +132,7 @@ export async function linkedDeploy(t, f, localOrigin) {
   const env = { NODE_OPTIONS: '--import ' + resolve('cli/fixtures/deploy-network.mjs'),
     AUTH_TEST_DEPLOY_EDGE: 'http://127.0.0.1:' + server.address().port, AUTH_TEST_DEPLOY_ORIGIN: origin,
     CLOUDFLARE_ACCOUNT_ID: account.accountId, CLOUDFLARE_API_TOKEN: account.token,
-    OWNER_EMAIL: 'cli-owner@example.com', SESSION_SECRET: 'deploy-fixture-session-secret-thirty-two-bytes', SETUP_TOKEN: 'deploy-fixture-setup-token-thirty-two-bytes', MAIL_API_KEY: 'deploy-fixture-mail-key',
+    OWNER_EMAIL: 'cli-owner@example.com', SESSION_SECRET: 'synthetic-deploy-fixture-session-secret-thirty-two-bytes', SETUP_TOKEN: 'synthetic-deploy-fixture-setup-token-thirty-two-bytes', MAIL_API_KEY: 'synthetic-deploy-fixture-mail-key',
     RER_LINK_TOKEN_FILE: '', RER_LINK_TOKEN_FILES: JSON.stringify(files) };
   const approve = async approvedOrigin => {
     for (const contract of contracts) {

@@ -149,7 +149,7 @@ test('run turns a job into an exact-commit isolated checkout inside the OS bound
  await mkdir(join(home, '.codex'));
  await writeFile(join(home, '.codex/auth.json'), JSON.stringify({ OPENAI_API_KEY: null, tokens: { access_token: codexToken } }));
  await writeFile(join(home, '.codex/config.toml'), '[mcp_servers.host]\ncommand = "host-mcp"\n');
- const env = { GITHUB_TOKEN: 'synthetic-fixture-github-token', CLOUDFLARE_API_TOKEN: 'fixture-cloudflare-token', GIT_TEMPLATE_DIR: template, GIT_DIR: join(root, 'wrong-git-dir'), GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.hooksPath', GIT_CONFIG_VALUE_0: join(template, 'hooks') };
+ const env = { GITHUB_TOKEN: 'synthetic-fixture-github-token', CLOUDFLARE_API_TOKEN: 'synthetic-fixture-cloudflare-token', GIT_TEMPLATE_DIR: template, GIT_DIR: join(root, 'wrong-git-dir'), GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.hooksPath', GIT_CONFIG_VALUE_0: join(template, 'hooks') };
 
  assert.equal((await companion(['codex-auth'], { home, state, env })).code, 0);
  assert.equal(existsSync(join(state, 'executor-home/.codex/config.toml')), false, 'only auth.json is copied');
@@ -356,7 +356,7 @@ console.log(JSON.stringify({ loggedIn: ${loggedIn} && existsSync(home + '/.signe
   await writeFile(join(bin, 'claude'), script, { mode: 0o755 });
   await rm(join(state, 'executor-home'), { recursive: true, force: true });
   await rm(join(root, 'calls.jsonl'), { force: true });
-  const result = await companion(['claude-auth', ...args], { home, state, env: { PATH: `${bin}:${process.env.PATH}`, ANTHROPIC_API_KEY: 'host-wide-key-must-not-pass' } });
+  const result = await companion(['claude-auth', ...args], { home, state, env: { PATH: `${bin}:${process.env.PATH}`, ANTHROPIC_API_KEY: 'synthetic-host-wide-key-must-not-pass' } });
   const calls = existsSync(join(root, 'calls.jsonl')) ? (await readFile(join(root, 'calls.jsonl'), 'utf8')).trim().split('\n').map(line => JSON.parse(line)) : [];
   return { result, calls };
  };

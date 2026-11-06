@@ -15,7 +15,7 @@ test('explicit provider configuration never falls back to development', () => {
   rejects(() => validateConfig({ provider: 'development', mode: 'production' }), 'development_mode_required');
   assert.doesNotThrow(() => validateConfig({ provider: 'development', mode: 'development' }));
   assert.equal(validateConfig({ provider: 'development', mode: 'development' }, { outbox: { async put() {} } }).provider, 'development');
-  rejects(() => validateConfig({ provider: 'sendgrid', mode: 'production', apiKey: 'SENSITIVE\r\nInjected:x' }), 'invalid_api_key');
+  rejects(() => validateConfig({ provider: 'sendgrid', mode: 'production', apiKey: 'synthetic-SENSITIVE\r\nInjected:x' }), 'invalid_api_key');
 });
 
 test('envelope, threading and binary contents remain intact', () => {

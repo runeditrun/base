@@ -87,7 +87,7 @@ test('native authorization, actual application frame-src, private overlay and pu
     assert.match(denied.headers()['cache-control'], /no-store/);
     assert.equal(denied.headers()['x-reference-dispatch'], 'hono');
     const csrf = await page.request.post(runtime.origin + '/auth/bootstrap', {
-      headers: { origin: 'https://attacker.example' }, data: { email: 'operator@example.test', password: 'test-compiled-password' },
+      headers: { origin: 'https://attacker.example' }, data: { email: 'operator@example.test', password: 'synthetic-test-compiled-password' },
     });
     assert.equal(csrf.status(), 403);
     await login(page);

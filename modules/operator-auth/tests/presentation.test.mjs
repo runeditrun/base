@@ -16,7 +16,7 @@ test('branding validates all optional fields and snapshots only public presentat
   for (const invalid of [null, [], '', 1, true, { productName: '' }, { productName: '   ' }, { productName: 1 }, { productName: 'a'.repeat(81) }, { productName: 'a\nB' }, { productName: 'a\u0085B' }, { accentColor: '#fff' }, { accentColor: 'red' }, { accentColor: '#112233; color:red' }, { accentColor: null }, { signInPath: null }, ...['//evil.test', '/\\evil.test', 'https://evil.test', 'javascript:alert(1)', '/\nroute', '/%2fevil.test', '/%252fevil.test', '/%5cevil.test', '/%00', '/%zz', '/%25250a'].map(signInPath => ({ signInPath }))]) {
     assert.throws(() => configure({ ...base, branding: invalid }), { code: 'invalid_configuration', status: 503 });
   }
-  const input = { ...branding, SESSION_SECRET: 'test-must-not-copy-extra-fields' };
+  const input = { ...branding, SESSION_SECRET: 'synthetic-test-must-not-copy-extra-fields' };
   const auth = createOperatorAuth({ db: {}, config: { ...base, branding: input }, clientIp: () => '192.0.2.1' });
   assert.deepEqual(auth.presentation, branding);
   input.productName = 'Changed';

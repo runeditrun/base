@@ -73,7 +73,7 @@ test('native Wrangler receives only explicit private file bindings despite inher
         CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false',
         CLOUDFLARE_INCLUDE_PROCESS_ENV: 'true',
         LOCAL_SETUP_PROCESS_SENTINEL: 'must-not-be-bound',
-        SESSION_SECRET: 'inherited-value-must-not-override-file',
+        SESSION_SECRET: 'synthetic-inherited-value-must-not-override-file',
       },
     })
     let exited = false

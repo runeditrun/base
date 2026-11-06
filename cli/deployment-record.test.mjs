@@ -27,7 +27,7 @@ test('missing deployment commands name the requested environment and offer the c
  globalThis.fetch = (input, init = {}) => { if ((init.method ?? 'GET') !== 'GET') throw Error('Unexpected provider mutation'); return provider.fetch(input, init); };
  process.on('exit', () => provider.close());`);
  const provider = ownerProvider();
- const env = { PATH: process.env.PATH, HOME: process.env.HOME, CI: 'true', RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${preload}`, CLOUDFLARE_ACCOUNT_ID: provider.accountId, CLOUDFLARE_API_TOKEN: provider.token, SESSION_SECRET: 'fixture-session-value' };
+ const env = { PATH: process.env.PATH, HOME: process.env.HOME, CI: 'true', RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${preload}`, CLOUDFLARE_ACCOUNT_ID: provider.accountId, CLOUDFLARE_API_TOKEN: provider.token, SESSION_SECRET: 'synthetic-fixture-session-value' };
  provider.close();
  const record = environment => JSON.stringify({ version: 1, kind: 'rer-deploy-owner-state', environment, project: 'tests/fixture', owned: { worker: null, d1: {}, r2: {}, kv: {}, queues: {} }, receipt: null });
  await writeFile(join(root, '.rer/deploy/sd-x.json'), record('sd-x'));

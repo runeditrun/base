@@ -15,7 +15,7 @@ const config: AuthConfig = { origin:'https://app.example', OWNER_EMAIL:'owner@ex
 }] };
 const auth=createOperatorAuth({db,config,accounts,proofs,mailSender:mail,clientIp:()=> '192.0.2.1'});
 const admission=createAdmission({accounts:accountsAdapter(accounts),config});
-createOidcProviders({db,admission,config:{origin:config.origin,transactionSecret:'from-transaction-secret',providers:config.providers??[]},clientIp:()=> '192.0.2.1'});
+createOidcProviders({db,admission,config:{origin:config.origin,transactionSecret:'synthetic-from-transaction-secret',providers:config.providers??[]},clientIp:()=> '192.0.2.1'});
 requireEditorOwner({request:new Request(config.origin),getSession:auth.getSession,accounts});
 createAuthHandler(auth);createSignInHandler(auth);createDependencies({db,origin:config.origin,name:'Native',auth});
 const refusedSetup:Promise<never>=auth.authorizeDependencySetup(new Request(config.origin),{token:'setup'});

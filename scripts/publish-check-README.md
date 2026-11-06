@@ -43,11 +43,20 @@ tracked files in those paths still receive the history scan. Use a full clone:
 shallow history, missing Git objects, unreadable inputs, submodules, LFS pointers,
 scanner failures and unresolved GitHub visibility return INCOMPLETE.
 
-Gitleaks' built-in rules detect stored provider tokens, private keys and generic
-API-key literals. Explicit synthetic credential values carrying a leading fixture/test/example
-marker, synthetic JWT signatures and PEM bodies are allowed, independent of
-the containing path. Comma-delimited prose and file-to-SHA-256 manifest entries
-are not credential assignments.
+Gitleaks' rules detect stored provider tokens, private keys and generic API-key
+literals. Its configured allowlists recognize explicit leading synthetic and
+fixture/test/example-style markers, including specific provider-prefix, JWT
+signature and PEM-body forms. These Gitleaks rules do not define SEC-3's markers.
+SEC-3 recognizes case-insensitive placeholder substrings `example`, `placeholder`,
+`xxxx`, `test-only`, `<` and `${`, plus constrained instruction and credential
+variable-name forms when no exact credential format is present. Separately, a
+leading `synthetic-` or `synthetic_` excludes a generic literal from SEC-3 only
+when it carries no exact credential format. Leading `fixture-` or `test-` alone
+does not exclude an otherwise eligible SEC-3 assignment. For verified generic
+synthetic literals, use `synthetic-`; it does not waive provider or known
+environment findings. All of these rules are independent of the containing path.
+Comma-delimited prose and proved file-to-SHA-256 manifest entries are not
+credential assignments.
 There is no blanket tests or documentation exemption. Known values from an
 explicit dotenv file are compared in memory and cannot be reviewed away.
 The scanner never executes that file and reports neither values nor hashes.
@@ -191,14 +200,25 @@ the accepted review schema, including SEC-3, rejects the review document and
 makes the scan `scan.configuration-incomplete`.
 
 First establish whether a flagged value is a credential. Remove and rotate real
-credentials. For a verified synthetic constant, rewrite the constant so it no
-longer matches, using the leading fixture/test/example marker semantics described
-above, then rescan. Changing the working file does not clear historical findings:
+credentials. For a verified generic synthetic constant, use the existing leading
+`synthetic-` marker and rescan, observing the separate Gitleaks and SEC-3 rules
+above. This does not waive an exact credential format or a known environment
+value; do not assume `fixture-` or `test-` alone clears SEC-3. Changing the working
+file does not clear historical findings:
 re-author an unpublished commit to remove the matching literal, or use the
 approved clean-history publication path (`rer release --clean-history`) when
 retaining private history. Do not add a SEC-3 review record to bypass the finding.
 
 ## Coverage limits
+
+SEC-3 uses a bounded lexical assignment heuristic, not a complete language
+parser. It distinguishes ordinary object members from simple function, arrow
+and method parameter literal types, excludes supported interface/type
+declarations, and still inspects credential `=` defaults. It does not evaluate
+concatenation, dynamic/computed names, escaped identifiers or arbitrary template
+interpolation, resolve all JSX/regular-expression ambiguity, or cover every
+TypeScript type expression or another language's full grammar. Anonymous inline
+object types and exotic destructuring are not guaranteed.
 
 Historical binary metadata decoders and contained-fixture inspection are
 removed, along with screenshot and file-size policy. Existing contained-fixture

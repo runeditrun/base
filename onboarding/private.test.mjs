@@ -81,7 +81,7 @@ test('a receipt remains resumable after interruption between publication and sta
  const root=await workspace(t),directory=join(root,'.seed/installer/private');await mkdir(directory,{recursive:true});
  const path=join(directory,createHash('sha256').update(origin).digest('hex')+'.json');
  const temporary=path+'.'+'a'.repeat(32)+'.tmp';
- const saved={origin,token:'test-published-before-crash',deployed:false};
+ const saved={origin,token:'synthetic-test-published-before-crash',deployed:false};
  await writeFile(temporary,JSON.stringify(saved),{mode:0o600});await link(temporary,path);
  const credential=await installationCredential(root,origin);
  assert.equal(credential.token,saved.token);assert.equal(credential.deployed,false);
