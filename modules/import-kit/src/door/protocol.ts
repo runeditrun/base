@@ -1,7 +1,6 @@
-import type { WaveBinding } from './waves/types.ts';
-export type DoorAction = 'uploads' | 'plan' | 'apply' | 'status' | 'reconcile' | 'undo' | 'cancel' | 'archive' | 'restore-check' | 'prepare' | 'seal-parent' | 'review-parent' | 'apply-child' | 'wave-status' | 'finalize-parent' | 'reverse-parent';
+export type DoorAction = 'uploads' | 'plan' | 'apply' | 'status' | 'reconcile' | 'undo' | 'cancel' | 'archive' | 'restore-check';
 /** Grant-only actions: the owner-session mount answers them 404. */
-export const GRANT_ONLY_ACTIONS: readonly DoorAction[] = ['cancel', 'archive', 'restore-check', 'prepare', 'seal-parent', 'review-parent', 'apply-child', 'wave-status', 'finalize-parent', 'reverse-parent'];
+export const GRANT_ONLY_ACTIONS: readonly DoorAction[] = ['cancel', 'archive', 'restore-check'];
 
 export interface DoorGrant {
   v: 1;
@@ -21,7 +20,6 @@ export interface DoorGrant {
   approvalRecordId?: string;
   approvedAt?: string;
   catchup?: 'bounded';
-  bounded?: WaveBinding;
 }
 
 export class DoorError extends Error {

@@ -1,8 +1,8 @@
 import { setupCommand } from './setup-command.mjs';
 import { scanCommand } from './scan-command.mjs';
 import { connect } from './connect.mjs';
-import { vendorKey, legacyPackage, disconnect, status } from './local-commands.mjs';
-import { next, answer, token } from './questions.mjs';
+import { disconnect, status } from './local-commands.mjs';
+import { next, answer, done, token } from './questions.mjs';
 import { run } from './supervisor.mjs';
 import { describe } from './errors.mjs';
 import { identifier, originUrl } from './api.mjs';
@@ -13,7 +13,7 @@ that support shared Business settings. Choose what to share in your browser.
 
 Advanced commands (Usage: rer business VERB)
   setup --origin URL --session-file FILE --confirm-demo
-                                 Provision the synthetic Run your business demo
+                                 Set up the synthetic Run your business demo company
                                  --hosting managed|assisted|self_host (default: managed)
                                  --wait-seconds 0..240 (default: 240); --json
   scan [DIR...] [--json]          Names-only local discovery
@@ -21,40 +21,29 @@ Advanced commands (Usage: rer business VERB)
                                  Print a code and link for the owner to approve in a signed-in browser
                                  Older Business pages: connect --code CODE [--origin URL]
                                  Connect carries the Business name into local apps
-  run [--once]                   Work this computer's tasks: the folder scan the owner allows, then
-                                 vendor exports into each app's import door (a preview the owner
-                                 approves), catch-ups (applied within the owner's standing approval,
-                                 else reviewed by the owner) and the final archive the app keeps and
-                                 test-restores; the vendor key stays in OS credential storage. Says
-                                 what it is doing and waiting for; applies the owner's choices at
-                                 each check-in
+  run [--once]                   Work this computer's tasks: the folder scan the owner allows. Says what
+                                 it is doing and what it waits for; applies the owner's choices at each
+                                 check-in
   next                           Apply the owner's choices, then return one templated question, the
-                                 agent's next step, an owner step with its browser link (freeze,
-                                 rollback card, cancellation; never agent work), or nothing yet
-                                 within 60 seconds
+                                 agent's next step (a Move in step names the seed's Move in page, what the
+                                 seed takes and how to export), an owner step with its browser link, or
+                                 nothing yet within 60 seconds
   answer ID VENDOR USAGE [CONFIDENCE]
                                  Catalog vendor or none; uses, sells, both, product-dependency
-  vendor-key add|remove VENDOR   Keep a read-only vendor key in OS credential storage; the owner
-                                 types it in their own terminal, never in chat or a command
-                                 Zendesk: single-line {"client_id":"…","client_secret":"…"}; remove
-                                 revokes local export and deletes its retained snapshot
-  legacy-package add|remove|status DIR
-                                 Register a verified HappyToHelp legacy package (no key)
+  done ID --note TEXT            Finish a Move in step once the owner has the data in the seed
   token                          MCP headersHelper output; send directly to the MCP client
   status [--json]                Pairing, service, current task and checkpoint
   disconnect                     Revoke this computer, then remove local credentials and additions;
                                  inside an agent sandbox it names the one command that finishes
-Vendors: sentry, uptimerobot, pagerduty, calendly, zendesk (with a read-only key); sorry (its public page,
-no key); happytohelp-legacy (a local package, no key). Owner approvals stay in the browser.
 State lives in $RER_BUSINESS_STATE_DIR when set, otherwise in ~/.rer/business.
 In an agent sandbox that writes only inside its working folder, use RER_BUSINESS_STATE_DIR="$PWD/.rer-business".
 `;
 
 const verbHelp = {
  run: `Usage: rer business run [--once]
-Work this computer's tasks and check in every 25 seconds until stopped.
-When Business needs the owner's catch-up approval or export details,
-print the owner step and keep waiting between check-ins. --once returns then.
+Work this computer's tasks (the folder scan the owner allows) and check in every
+25 seconds until stopped. Steps for this computer's agent, such as a seed's Move in,
+are shown by rer business next. --once returns after one check-in.
 Exits 0 completed, idle or waiting for the owner; 1 failed; 2 usage.
 `,
  connect: `Usage: rer business connect --business ID [--origin URL] [--timeout SECONDS]
@@ -101,8 +90,7 @@ export async function businessCommand(argv) {
    } catch { return invalid(); }
    if (options.origin !== undefined && options.code === undefined && options.business === undefined) originUrl(options.origin);
    await connect(options);
-  } else if (verb === 'vendor-key' && args.length === 2) await vendorKey(...args);
-  else if (verb === 'legacy-package' && args.length === 2 && ['add', 'remove', 'status'].includes(args[0])) await legacyPackage(...args);
+  } else if (verb === 'done' && args.length === 3) await done(...args);
   else if (verb === 'answer' && [3, 4].includes(args.length)) await answer(...args);
   else if (verb === 'run' && (!args.length || args.length === 1 && args[0] === '--once')) await run({ once: args[0] === '--once' });
   else if (verb === 'status' && args.length === 1 && args[0] === '--json') await status({ json: true });

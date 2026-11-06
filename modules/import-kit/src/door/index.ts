@@ -18,9 +18,3 @@ export function createImportDoorHandler(options: ImportDoorOptions): (request: R
   return createDoorHandler('/api/rer/import/', options.database, (request, action, database) => admit({...options, database}, request, action),
     undefined, async database => !!options.claim?.publicKeys && Object.keys(options.claim.publicKeys).length > 0 && await enabled({...options, database}));
 }
-
-export { importDoorBoundedWavesMigration } from './waves/schema.ts';
-export type * from './waves/types.ts';
-export { revokeImportDoorWaveApproval } from './waves/store.ts';
-export { waveInventoryHash, inventoryMember } from './waves/digests.ts';
-export type {WaveInventoryInput, WaveInventoryMember} from './waves/digests.ts';

@@ -313,24 +313,3 @@ other credential query keys, userinfo, cross-origin API navigation/redirects and
 reflected provided authentication secrets remain rejected. Target mappings retain
 the strict credential policy. See the reader documentation for combining bundles
 and the absence of an authentication context when reading saved files.
-
-## Logical package transport (additive)
-
-An explicitly declared door source may accept manifests with `format: "rer-door-package/1"` and static
-`package: {formats, maxBytes, maxSegments, read}`. Undeclared sources retain their
-existing readers and quotas. The manifest upload remains within one grant;
-segments are ordinary `rer-segment` uploads in 64 KiB chunks, each request with a
-fresh grant. Before a plan is created, missing, incomplete, foreign, wrong-size
-or altered segments answer 409 `package_segment_missing` and list the missing
-segment digests and sizes. Complete segments resolve only within the manifest's
-installation and namespace. The index and bounded file accessor verify layout,
-SHA-256 and size without treating upload ids as cross-scope authority.
-
-The whole logical snapshot plans once and participates in ordinary lineage.
-The receiver checks the reader's aggregate source-record count against the plan
-grant before mapping or saving a plan, even when legacy metadata declares
-`records.total: null`. Segments never multiply record authority. This transport
-supplies file digest metadata, with originals explicitly unavailable through the
-kit's custody API; it makes no new original-retention, seed capacity, wave,
-delta or hosted compatibility claim. A seed needing those must adopt and verify
-its own reader/product contract. See `src/door/README.md` for the byte protocol.

@@ -4,7 +4,6 @@ import { sensitive } from './detector.mjs';
 import { paired, revokedByServer, revokedText } from './local-commands.mjs';
 import { applyChoices } from './choices.mjs';
 import { businessCommand } from './invocation.mjs';
-import { titledVendor, keyStep, keyed, vendorNames, vendorHandle } from './vendor-door.mjs';
 
 const protocolVersion = '2025-11-25';
 const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': protocolVersion };
@@ -36,7 +35,7 @@ export async function nextQuestions(api, signal) {
  if (!Array.isArray(result.tasks)) throw Error('Business server returned invalid task summaries.');
  return result.tasks;
 }
-const ownerKinds = new Set(['signup.checkout','connect.cloudflare','connect.github','consent.grant','confirm.inventory','plan.review','wave.approve','switchoff.cancel','cutover.billing','rollback.billing']);
+const ownerKinds = new Set(['signup.checkout','connect.cloudflare','connect.github','consent.grant','confirm.inventory','plan.review']);
 export const ownerLink = state => `${state.origin}/business/${encodeURIComponent(identifier(state.businessId))}`;
 
 // What this computer is waiting for, in the owner's terms. Until its own
@@ -53,45 +52,52 @@ export function waitingFor(state) {
  return `Waiting for the next task. Nothing needs this computer until the owner moves the plan forward: ${ownerLink(state)}`;
 }
 const runWork = { 'discover.local': "this computer's names-only scan of the folders the owner allowed" };
-// The vendor tasks run performs into an app's import door, and what each one is, in the owner's terms.
-const vendorSteps = {
- 'export.vendor': name => `export the owner's ${name} history into its app's import door. It lands as a preview: nothing changes in the app until the owner approves it in the browser.`,
- 'catchup.vendor': name => `bring the owner's recent ${name} changes into its app's import door as a catch-up. Within the owner's standing catch-up approval Business applies it; anything larger waits for the owner's approval in the browser.`,
- 'switchoff.archive': name => `archive the owner's final ${name} export in its app's import door. The app keeps the exact file in its own storage and test-restores it with no writes; cancelling ${name} stays the owner's step.`,
-};
-const vendorStep = task => Object.hasOwn(vendorSteps, task.kind) && task.runner === 'executor' && ['ready', 'leased'].includes(task.state);
+// A Move in step: the seed's own Move in page does the import; this computer's agent only brings the old tool's export to it.
+const moveInStep = task => task.kind === 'move.in' && task.runner === 'executor' && ['ready', 'leased'].includes(task.state);
 const agentQuestion = task => task.kind === 'classify.row' && task.runner === 'executor' && ['ready', 'leased'].includes(task.state);
+const known = new Set(['discover.local', 'classify.row', 'move.in', ...ownerKinds]);
+// A step this rer does not handle is reported by its kind, never failed.
+const unhandledStep = task => task.runner === 'executor' && ['ready', 'leased'].includes(task.state) && !known.has(task.kind);
 
-// A move's owner steps: freezing the old tool, a rollback (its card when Business
-// cannot undo the switch itself) and cancelling at the vendor. Each happens in the
-// browser and is never this computer's agent work.
-const moveSteps = {
- 'freeze.vendor': name => `freeze ${name} (pause changes in it as the move page lists), then confirm the freeze there`,
- rollback: () => 'follow the rollback card for this switch on the move page (Business undoes what it can itself and checks the rest)',
- 'switchoff.cancel': name => `cancel ${name} at the vendor once the move is ready to cancel, then confirm it there (RER never contacts the vendor)`,
-};
-const moveStep = kind => typeof kind !== 'string' ? null : kind.startsWith('rollback.') ? moveSteps.rollback : ['freeze.vendor', 'switchoff.cancel'].includes(kind) ? moveSteps[kind] : null;
-/** The move's page when the task names its tool, else the switch-over board (the Business home, which links each move). */
-function moveLink(state, task) {
- const tool = typeof task.tool_id === 'string' && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,399}$/.test(task.tool_id) && !sensitive(task.tool_id) ? task.tool_id : null;
- return tool ? `${ownerLink(state)}/moves/${encodeURIComponent(tool)}` : ownerLink(state);
+const text = (value, limit) => typeof value === 'string' && value.length > 0 && value.length <= limit && !sensitive(value) ? value.replace(/\s+/g, ' ').trim() : null;
+/** An address on the seed or in the seed's repository, or null. Only https (or http on this machine) and no credentials. */
+function address(value) {
+ if (typeof value !== 'string' || value.length > 2000) return null;
+ try {
+  const url = new URL(value);
+  if (url.username || url.password || sensitive(value)) return null;
+  if (url.protocol === 'https:' || url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) return url.href;
+ } catch { /* Not an address. */ }
+ return null;
 }
-/** A move's owner step in plain words with its link, or null. The vendor is named from a closed local table. */
-export function ownerStep(task, state) {
- const step = moveStep(task.kind);
- if (!step) return null;
- const vendor = titledVendor(task.kind, task.title);
- return { words: step(vendor ? vendorNames[vendor] : 'the old tool'), link: moveLink(state, task) };
-}
-/** The owner steps of moves that Business lists, as what this computer waits for. */
-export function ownerWaiting(tasks, state) {
- return [...new Set(tasks.map(task => ownerStep(task, state)).filter(Boolean).map(step => `Waiting for the owner to ${step.words}: ${step.link}`))];
+const accepted = { file: 'a file export from the old tool', key: "a read-only key for the old tool, entered in the seed's Move in page", address: "the old tool's public address, entered in the seed's Move in page" };
+
+/** What the seed's Move in step asks of this computer's agent, in words. The step carries the seed's own declaration
+ * (its `importers.json` row); only closed shapes and short text are printed. */
+export function moveInLines(task) {
+ const move = task.move_in && typeof task.move_in === 'object' ? task.move_in : {};
+ const tool = text(move.tool, 80), app = text(move.app, 80), page = address(move.move_in_url);
+ const lines = [`Step: Move ${tool ?? 'the old tool'} into ${app ?? 'its seed'} with the seed's own Move in page. The seed shows the dry run's counts, imports and undoes; Business imports nothing itself.`];
+ if (!page) {
+  const home = address(move.app_url);
+  lines.push(`This seed declares no Move in page for the tool.${home ? ` Its address: ${home}` : ''}`);
+ } else lines.push(`Move in page (sign in as the owner): ${page}`);
+ const takes = Array.isArray(move.accepts) ? move.accepts.filter(item => Object.hasOwn(accepted, item)) : [];
+ if (takes.length) lines.push(`The seed takes: ${takes.map(item => accepted[item]).join('; or ')}.`);
+ const how = text(move.export, 1000);
+ if (how) lines.push(`How to export from the old tool: ${how}`);
+ const format = text(move.format, 300);
+ if (format) lines.push(`The seed's own import format (for a tool it has no importer for): ${format}`);
+ return lines;
 }
 
 /** Agent steps that wait on this computer but not on run itself, in plain words. */
 export function agentWaiting(tasks) {
- return tasks.some(agentQuestion) ? [`A question waits for this computer's agent. Answer it with: ${businessCommand('next')}`] : [];
+ return [...(tasks.some(agentQuestion) ? [`A question waits for this computer's agent. Answer it with: ${businessCommand('next')}`] : []),
+  ...(tasks.some(moveInStep) ? [`A Move in step waits for this computer's agent. See it with: ${businessCommand('next')}`] : []),
+  ...(tasks.some(unhandledStep) ? [`Business has a step this version of rer does not handle (${[...new Set(tasks.filter(unhandledStep).map(task => kindName(task.kind)))].join(', ')}). Update rer, or do it in the browser.`] : [])];
 }
+const kindName = kind => typeof kind === 'string' && /^[a-z][a-z0-9._-]{0,63}$/.test(kind) ? kind : 'unknown';
 
 function classification(task) {
  const toolId = identifier(task.question?.tool_id), vendorId = task.question?.vendor_id;
@@ -118,31 +124,21 @@ export async function next() {
   throw Error(`Business pairing expired or was revoked. This computer was ${revokedText(await revokedByServer(state))}`);
  }
  // This computer's agent hears its own steps first, then the owner's.
- const item = tasks.find(task => task.kind === 'classify.row' || vendorStep(task)) ?? tasks.find(task => task.runner === 'owner' || ownerKinds.has(task.kind) || moveStep(task.kind));
+ const item = tasks.find(task => task.kind === 'classify.row' || moveInStep(task)) ?? tasks.find(task => task.runner === 'owner' || ownerKinds.has(task.kind));
  if (!item) {
   // Nothing to answer here; say whether run has work, or what it waits for.
   const work = tasks.find(task => Object.hasOwn(runWork, task.kind) && task.state === 'ready');
   if (work) { process.stdout.write(`Ready for run: ${runWork[work.kind]}. Start it with: ${businessCommand('run --once')}\n`); return; }
-  process.stdout.write(`${waitingFor(state)}\nNothing yet.\n`); return;
+  const unhandled = agentWaiting(tasks.filter(unhandledStep));
+  process.stdout.write(`${unhandled.length ? unhandled.join('\n') + '\n' : ''}${waitingFor(state)}\nNothing yet.\n`); return;
  }
  const id = identifier(item.task_id);
  if (sensitive(id)) throw Error('Business task identifier was refused by the outbound detector.');
- const step = ownerStep(item, state);
- if (step) {
-  process.stdout.write(`Owner: ${id}\nOwner step, not this computer's agent work: ${step.words}.\nIn the browser: ${step.link}\n`); return;
- }
  if (item.runner === 'owner' || ownerKinds.has(item.kind)) {
   process.stdout.write(`Owner: ${id}\nAnswer in your browser: ${ownerLink(state)}\n`); return;
  }
- if (Object.hasOwn(vendorSteps, item.kind)) {
-  // The vendor is named from a closed local table, never from server text.
-  const vendor = titledVendor(item.kind, item.title), name = vendor ? vendorNames[vendor] : 'vendor';
-  const stored = vendor && (state.vendorHandles ?? []).includes(vendorHandle(vendor));
-  process.stdout.write(`Agent: ${id}\nStep: ${vendorSteps[item.kind](name)}\n`
-   + (vendor && !keyed(vendor) ? `Vendor key: none; ${name} is read from its public page, with no key.\n`
-    : stored ? `Vendor key: the owner's read-only ${name} key is stored in this computer's OS credential storage. To replace it, ${keyStep(vendor)}\n`
-    : `Vendor key: ${keyStep(vendor)}${vendor ? '' : `\n  where <vendor> is the tool this step reads: ${Object.keys(vendorNames).filter(keyed).join(' | ')}`}\n`)
-   + `Then run: ${businessCommand('run --once')}\n`);
+ if (moveInStep(item)) {
+  process.stdout.write(`Agent: ${id}\n${moveInLines(item).join('\n')}\nWhen the owner has the data in the seed, finish this step: ${businessCommand(`done ${id} --note "what moved, from the dry run's counts"`)}\n`);
   return;
  }
  const { toolId, vendorId, vendors } = classification(item);
@@ -158,7 +154,7 @@ export async function answer(id, vendorId, choice, rawConfidence = '1') {
  const confidence = Number(rawConfidence);
  const { state, credential } = await paired(), api = new Api(state.origin, credential), signal = AbortSignal.timeout(55_000);
  const summary = await (await mcpClient(api, { signal }))('explain_task', { task_id: id });
- if (summary.runner === 'owner' || ownerKinds.has(summary.kind) || moveStep(summary.kind)) throw Error(`This item requires the owner in the browser: ${ownerStep(summary, state)?.link ?? ownerLink(state)}`);
+ if (summary.runner === 'owner' || ownerKinds.has(summary.kind)) throw Error(`This item requires the owner in the browser: ${ownerLink(state)}`);
  if (summary.kind !== 'classify.row' || summary.runner !== 'executor') throw Error('This item does not accept a CLI classification answer.');
  const { vendors } = classification(summary);
  if (!vendors.includes(vendorId)) throw Error('Choose a catalog vendor id from this question, or none.');
@@ -173,6 +169,27 @@ export async function answer(id, vendorId, choice, rawConfidence = '1') {
   throw error;
  }
  process.stdout.write('Business answer submitted for server validation.\n');
+}
+
+/** Finish a Move in step with a short note, through the same claim-then-complete answer door as a classification. */
+export async function done(id, flag, note) {
+ identifier(id);
+ if (flag !== '--note' || typeof note !== 'string' || !note.trim() || note.length > 500) throw Error('Finish a Move in step with: done ID --note "what moved" (up to 500 characters).');
+ if (sensitive(note)) throw Error('The note looks like it holds a secret, so it was not sent. Say what moved, without keys or tokens.');
+ const { state, credential } = await paired(), api = new Api(state.origin, credential), signal = AbortSignal.timeout(55_000);
+ const summary = await (await mcpClient(api, { signal }))('explain_task', { task_id: id });
+ if (summary.kind !== 'move.in' || summary.runner !== 'executor') throw Error('This item is not a Move in step for this computer.');
+ const tool = await mcpClient(api, { taskId: id, signal });
+ let lease = summary;
+ if (summary.state === 'ready') lease = await tool('answer', { task_id: id, action: 'claim', client_event_id: randomUUID(), fence: summary.fence });
+ if (typeof lease.grant_id !== 'string') throw Error('Business did not return a grant for this step.');
+ try {
+  await tool('answer', { task_id: id, action: 'complete', client_event_id: randomUUID(), fence: lease.fence, grant_id: lease.grant_id, outputs: { note: note.trim() } });
+ } catch (error) {
+  try { await tool('answer', { task_id: id, action: 'release', client_event_id: randomUUID(), fence: lease.fence, grant_id: lease.grant_id, reason: 'failed' }); } catch { /* Expiry/revocation still fences the lease. */ }
+  throw error;
+ }
+ process.stdout.write('Business Move in step finished.\n');
 }
 
 export async function token() {

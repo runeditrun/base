@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Business is light: `rer business` keeps pairing, token, scan, setup, run, next, answer, status and disconnect, and no longer exports from old tools. `vendor-key` and `legacy-package` are gone with the Sentry, PagerDuty, Sorry, UptimeRobot, Calendly and Zendesk exporters and the export, catch-up and archive tasks: each seed imports in its own Move in page. `rer business next` names a seed's Move in page, what it takes and how to export, `rer business done ID --note TEXT` finishes the step, and `run` reports a step kind it does not know instead of failing. A read-only key stored by an earlier rer is still removed by `disconnect`.
+- `importers.json` has a version 2: each row declares the seed's Move in path (`moveIn`), what it takes (`accepts`: file, key, address) and how to export (`export`), with `status` and `evidence` optional, and the file may name the seed's own import format. Version 1 files stay valid.
+
 - Setup and dev let the managed Vite listener use its finite startup budget instead of stopping at 60 seconds. Custom start targets retain their declared deadlines; a missing listener announcement reports elapsed and allowed time with startup-log guidance.
 
 - Legacy MCP tool calls held for approval now return their generated `requestState` alongside `approval_required`, so retrying an approved read resumes the original operation without asking for a second approval.

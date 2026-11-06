@@ -1,4 +1,3 @@
-import { importDoorBoundedWavesMigration } from './waves/schema.ts';
 function planTables(suffix = ''): string[] {
   return [
     `CREATE TABLE IF NOT EXISTS ik_door_plans${suffix} (
@@ -99,5 +98,4 @@ export const importDoorSchema = [
   ...failureSchema,
   ...importDoorScopesMigration,
   ...importDoorArchiveMigration,
-  ...importDoorBoundedWavesMigration,
 ];

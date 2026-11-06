@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFile } from 'node:fs/promises';
 import { validateImporters, type ImporterEvidencePort } from '../../src/status/index.ts';
+import { validateStatusDocumentSchema } from '../../src/status/schema.ts';
 import { canonicalJson, documentedFixture, digest, noImporterFixture, verifiedFixture } from './fixtures.ts';
 
 function portFor(artifacts: Map<string, { url: string; bytes: Uint8Array }>, options: Partial<ImporterEvidencePort> = {}): ImporterEvidencePort {
@@ -149,4 +151,40 @@ test('evidence metadata does not accept secret-bearing command text', async () =
   const result = await validateImporters(fixture.document, portFor(fixture.artifacts, { receiptPublicKeys: fixture.receiptPublicKeys }));
   assert.ok(result.issues.some((issue) => issue.code === 'RECEIPT_UNSAFE_TEXT'));
   assert.equal(digest(fixture.receiptBytes).length, 64);
+});
+
+const moveInRow = { incumbent: 'Sorry', product: 'Lamp', moveIn: '/app/move-in', accepts: ['file', 'key'], export: 'In Sorry, open Settings, then Export, and download the JSON file.' };
+const moveInDocument = (rows: unknown[], extra: Record<string, unknown> = {}) => ({ $schema: './schema/importers.schema.json', schemaVersion: 2, ...extra, importers: rows });
+
+test('a version 1 file (Lamp\'s current one) and a version 2 file with Move in rows validate against the schema', async () => {
+  const lamp = JSON.parse(await readFile(new URL('./lamp-importers-v1.json', import.meta.url), 'utf8'));
+  assert.deepEqual(validateStatusDocumentSchema(lamp), []);
+  assert.deepEqual(validateStatusDocumentSchema(moveInDocument([moveInRow, { ...moveInRow, incumbent: 'Statuspage', accepts: ['address'] }], { format: 'docs/LEGACY-EXPORT.md' })), []);
+  const fixture = documentedFixture();
+  const withStatus = moveInDocument([{ ...moveInRow, ...fixture.document.importers[0] }]);
+  assert.deepEqual(validateStatusDocumentSchema(withStatus), [], 'status and evidence keep their version 1 shape beside the Move in fields');
+  const result = await validateImporters(moveInDocument([moveInRow]));
+  assert.equal(result.valid, true, JSON.stringify(result.issues));
+  assert.deepEqual(result.evidence, { required: 0, resolved: 0, verifiedReceipts: 0 }, 'a row with no evidence needs no evidence port');
+  const documented = await validateImporters(withStatus, portFor(fixture.artifacts));
+  assert.equal(documented.valid, true, JSON.stringify(documented.issues));
+});
+
+test('a Move in row with no accepted input, a path without a leading slash, an over-long export or the wrong file version is refused', async () => {
+  const refused = (row: Record<string, unknown>) => validateStatusDocumentSchema(moveInDocument([{ ...moveInRow, ...row }])).length > 0;
+  assert.equal(refused({ accepts: [] }), true);
+  assert.equal(refused({ accepts: ['file', 'file'] }), true);
+  assert.equal(refused({ accepts: ['upload'] }), true);
+  assert.equal(refused({ moveIn: 'app/move-in' }), true);
+  assert.equal(refused({ moveIn: '//elsewhere.example/move-in' }), true);
+  assert.equal(refused({ export: 'x'.repeat(1001) }), true);
+  assert.equal(refused({ export: 'x'.repeat(1000) }), false);
+  assert.equal(refused({ export: 'Two paragraphs.\n\nNot one.' }), true);
+  assert.equal(validateStatusDocumentSchema(moveInDocument([moveInRow], { format: '../outside.md' })).length > 0, true);
+  const missing: Record<string, unknown> = { ...moveInRow }; delete missing.export;
+  assert.equal(validateStatusDocumentSchema(moveInDocument([missing])).length > 0, true);
+  const versionOne = await validateImporters({ ...moveInDocument([moveInRow]), schemaVersion: 1 });
+  assert.equal(versionOne.valid, false);
+  const plainRowInVersionTwo = moveInDocument([documentedFixture().document.importers[0]]);
+  assert.ok((await validateImporters(plainRowInVersionTwo)).issues.some((issue) => issue.code === 'SCHEMA_VERSION_ROW'));
 });

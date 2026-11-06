@@ -86,7 +86,7 @@ export async function checkStateWritable({ codeExists = true } = {}) {
 
 // Files this CLI writes in its state folder. A folder named by RER_BUSINESS_STATE_DIR
 // may hold other things, so only these are removed from it.
-const owned = /^(?:(?:state|pairing|progress|permissions|service|carried|legacy-package)\.json|(?:run|pairing)\.lock|disconnect|service(?:-error)?\.log|discovery-[A-Za-z0-9_.:-]+\.(?:json|tmp)|export-[0-9a-f]{32}\.bundle|package-[0-9a-f]{32}|.*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.tmp(?:\.check)?)$/;
+const owned = /^(?:(?:state|pairing|progress|permissions|service|carried)\.json|(?:run|pairing)\.lock|disconnect|service(?:-error)?\.log|discovery-[A-Za-z0-9_.:-]+\.(?:json|tmp)|export-[0-9a-f]{32}\.bundle|.*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.tmp(?:\.check)?)$/;
 /** After a revocation whose local cleanup was refused, keep only what a later
  * disconnect needs to finish: the state and the receipts of what remains. */
 export async function removeWorkFiles(keep = ['state.json', 'permissions.json', 'service.json']) {

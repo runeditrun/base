@@ -1,8 +1,4 @@
-import { actionBody, archiveOutputs, classificationOutput, closed, exportOutputs, identifier, integer, requireValue } from './contract.mjs';
-
-// The vendor tasks that write into an app's import door, and the door actions each may ask a grant for
-// (platform executors/grants.ts for export.vendor; catch-up and archive as the M5 contract asks).
-const doorActions = { 'export.vendor': ['uploads', 'plan', 'status'], 'catchup.vendor': ['uploads', 'plan', 'status'], 'switchoff.archive': ['uploads', 'archive', 'restore-check'] };
+import { actionBody, classificationOutput, closed, integer, moveInOutputs, requireValue } from './contract.mjs';
 
 const expires = () => new Date(Date.now() + 600_000).toISOString();
 const numeric = ['page', 'total', 'records_done', 'bytes_done', 'progress'];
@@ -28,12 +24,9 @@ export function taskStore(state) {
   return { id: task.summary.task_id, business_id: 'biz', kind: task.summary.kind, kind_version: 1,
    state: task.phase, fence: task.fence, lease_expires_at: task.phase === 'leased' ? task.lease : null,
    checkpoint: Object.fromEntries(numeric.filter(key => Number.isSafeInteger(task.checkpoint[key]) && task.checkpoint[key] >= 0).map(key => [key, task.checkpoint[key]])),
-   ...(task.summary.bounded_waves && task.phase==='leased' ? {bounded_waves:task.summary.bounded_waves}:{}),
-   ...(task.summary.question ? { question: task.summary.question } : {}),
-   // An export's non-secret adapter inputs reach only the executor holding its lease (platform executorTaskView).
-   ...(task.summary.kind === 'export.vendor' && task.phase === 'leased' && task.summary.export_inputs ? { export_inputs: task.summary.export_inputs } : {}) };
+   ...(task.summary.question ? { question: task.summary.question } : {}) };
  }
- function summary(task) { const { export_inputs: _, ...rest } = task.summary; return { ...rest, state: task.phase, fence: task.fence }; }
+ function summary(task) { return { ...task.summary, state: task.phase, fence: task.fence }; }
  function grant(task, fence) {
   const value = task.grants.get(fence);
   requireValue(value, 409);
@@ -47,12 +40,9 @@ export function taskStore(state) {
   runnable(task); requireValue(task.phase === 'ready', 409);
   task.phase = 'leased'; task.fence++; task.lease = expires();
   const id = `grant-${task.summary.task_id}-${task.fence}`, local = task.summary.kind === 'discover.local';
-  // A vendor task names its app's import door once that door is ready (platform grantView).
-  const door = Object.hasOwn(doorActions, task.summary.kind) && state.door;
   task.grants.set(task.fence, { id, task_id: task.summary.task_id, fence: task.fence,
-   destination: local ? state.destination ?? `/api/business/tasks/${encodeURIComponent(task.summary.task_id)}/uploads` : task.summary.kind === 'classify.row' ? 'none' : door ? `${door.origin}/api/rer/import/uploads` : 'unavailable:no-linked-installation',
-   quota_bytes: local ? state.quotaBytes ?? 2 * 1024 * 1024 : door ? 2 * 1024 * 1024 : 0,
-   ...(local || task.summary.kind === 'classify.row' ? {} : door ? { import_grants: `/api/business/tasks/${encodeURIComponent(task.summary.task_id)}/import-grants` } : { available: false, reason: 'no-linked-installation' }),
+   destination: local ? state.destination ?? `/api/business/tasks/${encodeURIComponent(task.summary.task_id)}/uploads` : 'none',
+   quota_bytes: local ? state.quotaBytes ?? 2 * 1024 * 1024 : 0,
    consent: local ? { id: 'consent1', scope: { paths: [state.root] } } : null });
   state.grants.set(id, state.uploadedBytes ?? 0); sync(task);
  }
@@ -77,19 +67,8 @@ export function taskStore(state) {
  }
  function action(id, action, body, mcp = false) {
   const task = find(id); runnable(task);
-  if (task.summary.bounded_waves && body.checkpoint) {
-   const {parent_id,prepared_children,aggregate_success,child,job_id,child_success,...ordinary}=body.checkpoint;
-   for (const value of [parent_id,job_id]) requireValue(value===undefined || typeof value==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(value));
-   for (const value of [prepared_children,child]) if(value!==undefined) integer(value);
-   for (const value of [aggregate_success,child_success]) requireValue(value===undefined || typeof value==='boolean');
-   actionBody(action,{...body,checkpoint:ordinary},mcp);
-  } else actionBody(action, body, mcp);
-  if (action==='complete' && task.summary.bounded_waves) {
-   const output=body.outputs;
-   closed(output,['parent_id','parent_fingerprint','aggregate_success']);
-   requireValue(output.aggregate_success===true && state.door?.state.aggregates?.some(row=>row.parentId===output.parent_id && row.fingerprint===output.parent_fingerprint && row.aggregateSuccess===true),409);
-  } else if (action === 'complete' && ['export.vendor', 'catchup.vendor'].includes(task.summary.kind)) exportOutputs(body.outputs);
-  else if (action === 'complete' && task.summary.kind === 'switchoff.archive') archiveOutputs(body.outputs);
+  actionBody(action, body, mcp);
+  if (action === 'complete' && task.summary.kind === 'move.in') moveInOutputs(body.outputs);
   else if (body.outputs !== undefined) {
    if (task.summary.kind === 'classify.row') classificationOutput(body.outputs, task.summary.question?.answer_schema);
    else requireValue(Object.keys(body.outputs).length === 0, 409);
@@ -127,20 +106,8 @@ export function taskStore(state) {
     if (task.summary.kind === 'classify.row') {
      requireValue(!state.refuseQuestion && body.outputs !== undefined, 409);
      state.questionCompleted = body.outputs;
-    } else if (task.summary.bounded_waves) {
-     requireValue(body.outputs.aggregate_success===true && state.door?.state.aggregates?.some(row=>row.parentId===body.outputs.parent_id && row.fingerprint===body.outputs.parent_fingerprint && row.aggregateSuccess===true),409);
-    } else if (task.summary.kind === 'export.vendor') {
-     // The platform's check (exportPreviewCheck): the door holds the reported plan, for the reported upload, of exactly the reported bundle.
-     const { upload_id, plan_id, bundle_sha256 } = body.outputs;
-     requireValue(state.door?.state.plans.some(plan => plan.planId === plan_id && plan.uploadId === upload_id && plan.bundleSha256 === bundle_sha256 && !plan.failureCode), 409, 'business_export_preview_mismatch');
-    } else if (task.summary.kind === 'catchup.vendor') {
-     // A catch-up names a catch-up plan the door holds for exactly that upload and bundle.
-     const { upload_id, plan_id, bundle_sha256 } = body.outputs;
-     requireValue(state.door?.state.plans.some(plan => plan.planId === plan_id && plan.uploadId === upload_id && plan.bundleSha256 === bundle_sha256 && plan.catchup), 409, 'business_catchup_plan_mismatch');
-    } else if (task.summary.kind === 'switchoff.archive') {
-     // Business test-restores the reported archive itself: zero writes, the executor's hash.
-     const restored = state.door?.restoreCheck(body.outputs.archive_id);
-     requireValue(restored && restored.bundleSha256 === body.outputs.bundle_sha256, 409, 'business_archive_restore_mismatch');
+    } else if (task.summary.kind === 'move.in') {
+     state.moveInCompleted = body.outputs;
     } else requireValue(task.summary.kind === 'discover.local' && state.uploads.length > 0, 409);
     task.phase = 'done'; task.lease = null;
    }
@@ -160,23 +127,5 @@ export function taskStore(state) {
   return result;
  }
  function heartbeatControls(body) { return { controls: [], cursor: body.cursor ?? 0, cancel_requested: false }; }
- /** POST /api/business/tasks/:taskId/import-grants (platform executors/grants.ts issueImportGrant). A catch-up's plan
-  * grant carries the owner's standing approval (`catchup: 'bounded'`) when one covers the tool, unless `review` asks
-  * for a plan the owner reviews per action. */
- async function importGrant(id, body) {
-  closed(body, ['fence', 'grant_id', 'action', 'review', 'bounded']); integer(body.fence); identifier(body.grant_id);
-  const task = find(id); runnable(task);
-  requireValue(Object.hasOwn(doorActions, task.summary.kind), 409);
-  const waves=task.summary.bounded_waves;
-  requireValue(doorActions[task.summary.kind].includes(body.action) || waves && ['prepare','seal-parent','review-parent','apply-child','wave-status','finalize-parent','reverse-parent'].includes(body.action));
-  requireValue(body.bounded===undefined || waves && ['protocol','migration','revision','policy'].every(k=>body.bounded[k]===waves[k]));
-  requireValue(body.review === undefined || body.review === true && task.summary.kind === 'catchup.vendor' && body.action === 'plan');
-  const bound = grant(task, body.fence);
-  requireValue(bound.id === body.grant_id && task.fence === body.fence && task.phase === 'leased' && Date.parse(task.lease) > Date.now() && state.door, 409);
-  state.importGrants = (state.importGrants ?? 0) + 1;
-  const namespace = state.exportVendor ?? 'uptimerobot', bounded = task.summary.kind === 'catchup.vendor' && body.action === 'plan' && !body.review && state.standingApproval;
-  return { destination: `${state.door.origin}/api/rer/import/${body.action}`, authorization: `Bearer ${await state.door.mint(body.action, namespace, { catchup: bounded ? 'bounded' : undefined, ...(waves?{bounded:body.bounded}:{}) })}`,
-   action: body.action, namespace, ...(bounded ? { catchup: 'bounded' } : {}), expires_at: new Date(Date.now() + 300_000).toISOString() };
- }
- return { find, summary, claim, action, importGrant };
+ return { find, summary, claim, action };
 }
