@@ -163,7 +163,7 @@ export function taskStore(state) {
  /** POST /api/business/tasks/:taskId/import-grants (platform executors/grants.ts issueImportGrant). A catch-up's plan
   * grant carries the owner's standing approval (`catchup: 'bounded'`) when one covers the tool, unless `review` asks
   * for a plan the owner reviews per action. */
- function importGrant(id, body) {
+ async function importGrant(id, body) {
   closed(body, ['fence', 'grant_id', 'action', 'review', 'bounded']); integer(body.fence); identifier(body.grant_id);
   const task = find(id); runnable(task);
   requireValue(Object.hasOwn(doorActions, task.summary.kind), 409);
@@ -175,7 +175,7 @@ export function taskStore(state) {
   requireValue(bound.id === body.grant_id && task.fence === body.fence && task.phase === 'leased' && Date.parse(task.lease) > Date.now() && state.door, 409);
   state.importGrants = (state.importGrants ?? 0) + 1;
   const namespace = state.exportVendor ?? 'uptimerobot', bounded = task.summary.kind === 'catchup.vendor' && body.action === 'plan' && !body.review && state.standingApproval;
-  return { destination: `${state.door.origin}/api/rer/import/${body.action}`, authorization: `Bearer ${state.door.mint(body.action, namespace, { catchup: bounded ? 'bounded' : undefined, ...(waves?{bounded:body.bounded}:{}) })}`,
+  return { destination: `${state.door.origin}/api/rer/import/${body.action}`, authorization: `Bearer ${await state.door.mint(body.action, namespace, { catchup: bounded ? 'bounded' : undefined, ...(waves?{bounded:body.bounded}:{}) })}`,
    action: body.action, namespace, ...(bounded ? { catchup: 'bounded' } : {}), expires_at: new Date(Date.now() + 300_000).toISOString() };
  }
  return { find, summary, claim, action, importGrant };

@@ -12,6 +12,7 @@ import { KEYED_VENDORS } from './vendors/index.mjs';
 import { vendorHandle } from './vendor-door.mjs';
 import { rerCommand, businessCommand } from './invocation.mjs';
 import { describe } from './errors.mjs';
+import { clientCredential, removeZendeskStores } from './vendors/zendesk.mjs';
 import { supportsTaskKind } from './supervisor.mjs';
 
 export async function paired() {
@@ -45,6 +46,7 @@ export async function forgetLocally(state, { stopRun = true } = {}) {
  for (const handle of store ? state.vendorHandles ?? [] : []) if (await attempt('vendorKeys', () => store.delete(handle))) vendorKeys.push(handle);
  const refused = store ? await attempt('credential', () => store.delete(deviceCredentialHandle(state))) : undefined;
  await removeCarries();
+ await removeZendeskStores(directory);
  if (!leftovers.length) { await removeStateDirectory(); return []; }
  const unique = [...new Set(leftovers)];
  const cause = refused && (refused.sandboxRefused ? `macOS Keychain refused to remove it inside this agent sandbox (security exited with status ${refused.osStatus ?? 'unknown'}).` : describe(refused));
@@ -66,6 +68,7 @@ export async function revokedByServer(state) {
  if (await permissionsAdded()) leftovers.push('permissions');
  const saved = { ...state, revoked: { at: new Date().toISOString(), leftovers, ...(cause ? { cause } : {}) } };
  await saveState(saved);
+ await removeZendeskStores(stateDirectory());
  await removeWorkFiles(['state.json', 'permissions.json', 'service.json', 'run.lock', 'carried.json']);
  return saved;
 }
@@ -75,10 +78,15 @@ export async function vendorKey(action, vendor) {
  const { state } = await paired(), store = createCredentialStore(), handle = vendorHandle(vendor);
  if (action === 'add') {
   let secret = await readSecret();
-  try { await store.set(handle, secret); } finally { secret = undefined; }
+  try { if (vendor === 'zendesk') clientCredential(secret); await store.set(handle, secret); } finally { secret = undefined; }
   state.vendorHandles = [...new Set([...(state.vendorHandles ?? []), handle])];
  } else {
+  if (vendor === 'zendesk') await stopSupervisor(stateDirectory());
   await store.delete(handle);
+  if (vendor === 'zendesk') {
+   await removeZendeskStores(stateDirectory());
+   state.vendorRevocations = { ...state.vendorRevocations, zendesk: true };
+  }
   state.vendorHandles = (state.vendorHandles ?? []).filter(item => item !== handle);
  }
  await saveState(state);
