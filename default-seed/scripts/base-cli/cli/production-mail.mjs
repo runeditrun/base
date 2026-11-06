@@ -8,6 +8,8 @@ import { validateMailSenders } from '../modules/delivery-producer/mail.mjs';
 import { sourceMailSenders } from './deploy-variables.mjs';
 
 const providers = ['resend', 'sendgrid', 'cloudflare', 'rer'];
+// Bindings that can send mail. MAIL_PROVIDER=none contradicts every one of them.
+const sendingBindings = ['MAIL_API_KEY', 'SENDGRID_API_KEY', 'RESEND_API_KEY', 'MAIL_PROVIDER_API_KEY', 'MAIL_ACCOUNT_ID', 'MAIL_RELAY_URL'];
 const nativeCredential = { sendgrid: 'SENDGRID_API_KEY', resend: 'RESEND_API_KEY' };
 const present = value => typeof value === 'string' && Boolean(value.trim());
 // The sender forms the mail runtime sends from: a bare address or "Display Name <address>".
@@ -27,10 +29,17 @@ const placeholderSender = value => {
   || /^(?:fake|placeholder|change-?me|replace-?me|your-?email|your-?name|you)(?:[+._-]|$)/.test(local);
 };
 
+// A seed that signs its owner in without mail declares the command on its adapter
+// (`mailOffSignIn`: one line naming a command the person runs from the checkout).
+export function mailOffSignInCommand(adapter) {
+ const command = adapter?.mailOffSignIn;
+ return typeof command === 'string' && command.trim() && command.length <= 300 && !/[\u0000-\u001f\u007f]/.test(command) ? command.trim() : undefined;
+}
+
 // Packaging can declare inputs that a product's deploy adapter adds to the
 // root declaration later. Read that source contract, never arbitrary ambient
 // keys or the adapter's executable source, before any build or provider write.
-export async function productionMail(root, declaration, env, declarationPath = 'deploy.json', adapter) {
+export async function productionMail(root, declaration, env, declarationPath = 'deploy.json', adapter, mailOffSignIn = mailOffSignInCommand(adapter)) {
  const bindings = { ...declaration.vars }, secrets = new Set(), publicInputs = new Set(), declaredProviders = new Set();
  const senders = [{ source: `${declarationPath} vars.MAIL_FROM`, value: declaration.vars?.MAIL_FROM }];
  senders.push(...await sourceMailSenders(root, adapter));
@@ -76,6 +85,12 @@ export async function productionMail(root, declaration, env, declarationPath = '
   bindings[name] = env[name];
   if (name === 'MAIL_FROM') senderFix = environmentFix(name);
  }
+ // Outbound email is off only when the deployment says so in words: a seed that
+ // declares a mail-less sign-in command and a MAIL_PROVIDER setting, with an
+ // explicit `none` for it. A missing or deferred value ('later', 'direct') never
+ // turns mail off.
+ if (mailOffSignIn && present(env.MAIL_PROVIDER) && env.MAIL_PROVIDER.trim() === 'none' && 'MAIL_PROVIDER' in bindings) bindings.MAIL_PROVIDER = 'none';
+ const off = bindings.MAIL_PROVIDER === 'none';
  try { validateMailSenders(senders); }
  catch (error) { throw refuse(`${error.message} Nothing was built or uploaded.`); }
  let senderIssue;
@@ -112,6 +127,8 @@ export async function productionMail(root, declaration, env, declarationPath = '
   };
  });
  return {
+  off,
+  offConflicts: off ? sendingBindings.filter(key => present(bindings[key])) : [],
   declared: 'MAIL_PROVIDER' in bindings || publicInputs.has('MAIL_PROVIDER') || secrets.has('MAIL_API_KEY') || selected.length > 0,
   senderIssue,
   fixtureSender: fixtureSender(bindings.MAIL_FROM),

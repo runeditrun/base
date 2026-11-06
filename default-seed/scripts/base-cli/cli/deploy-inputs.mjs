@@ -79,7 +79,7 @@ export async function withDeployEnvironment(project, options, out, run) {
  const redaction = createRedaction();
  // Provider names are public enum values. Masking "resend" would also hide
  // RESEND_API_KEY in the preflight's instruction for the missing credential.
- const publicProvider = (key, value) => key === 'MAIL_PROVIDER' && /^(resend|sendgrid|cloudflare|rer|later)$/.test(value);
+ const publicProvider = (key, value) => key === 'MAIL_PROVIDER' && /^(resend|sendgrid|cloudflare|rer|later|none)$/.test(value);
  const supplied = Object.entries(env).filter(([key, value]) => saved[key] !== value);
  redaction.addSecrets([...kinds.privateValues(env), ...supplied.filter(([key, value]) => !kinds.shown(key, value) && !publicProvider(key, value)).map(([, value]) => value)]);
  const undeclared = declared.declaration ? kinds.undeclared(supplied.map(([key]) => key)) : [];
