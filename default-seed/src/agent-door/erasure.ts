@@ -7,25 +7,30 @@ import { portabilityPolicy } from '../core/platform/portability-policy.mjs'
 // not mentions. Source IDs and recorded names can be only one character long.
 const sourceId = "CASE WHEN subject.type='object' THEN json_extract(subject.value,'$.sourceUserId') END"
 const recordedName = "CASE WHEN subject.type='object' THEN json_extract(subject.value,'$.name') END"
-const textValue = `coalesce((${sourceId}),(${recordedName}))`
-const tokenCharacter = "'[A-Za-z0-9_@.+/:-]'"
-// Preserve identifier/URI/version tokens. A sentence's final period delimits a
-// name, but the period within version 1.0 or another token does not. Colons
-// delimit recorded names while remaining part of source identifiers. Non-ASCII
-// letters also continue a name; Unicode spaces/punctuation delimit it.
+const textValue = `CASE WHEN subject.type='text' THEN CAST(subject.value AS TEXT) ELSE coalesce((${sourceId}),(${recordedName})) END`
+const strictTokenCharacter = "'[A-Za-z0-9_@.+/:-]'"
+const separatorTokenCharacter = "'[A-Za-z0-9_@.+-]'"
+const minimumSeparatorLength = 8
+const tokenCharacter = `CASE WHEN length((${textValue}))<${minimumSeparatorLength} AND instr((${textValue}),'@')=0 THEN ${strictTokenCharacter} ELSE ${separatorTokenCharacter} END`
+// Short identifiers preserve URI/version tokens; longer IDs and emails can
+// occur in path segments. A period delimits a sentence when its outward
+// neighbor is not an identifier character. Recorded names also delimit at
+// colons. Non-ASCII letters continue names; Unicode punctuation does not.
 const boundary = (position: string, outward: number) => {
   const char = `substr(text,${position},1)`, next = `substr(text,(${position})+(${outward}),1)`
-  return `(${char} NOT GLOB ${tokenCharacter} OR ((${recordedName}) IS NOT NULL AND (${char}=':' OR (${char}='.' AND ${next} NOT GLOB ${tokenCharacter}))))
-    AND NOT ((${recordedName}) IS NOT NULL AND coalesce(unicode(${char}),0)>127 AND ${char} NOT GLOB '[\u00a0\u2000-\u206f\u2e00-\u2e7f\u3000-\u303f]')`
+  return `(${char} NOT GLOB token OR (${char}='.' AND ${next} NOT GLOB token) OR (named AND ${char}=':'))
+    AND NOT (named AND coalesce(unicode(${char}),0)>127 AND ${char} NOT GLOB '[\u00a0\u2000-\u206f\u2e00-\u2e7f\u3000-\u303f]')`
 }
-// Check every literal occurrence, including one after an embedded occurrence.
+// Search decoded string values, never JSON keys or numbers. Seed recursion
+// only with literal hits and carry selector facts through subsequent hits.
+// A bounded occurrence can follow an embedded one in the same string.
 const textMention = (column: string) => `EXISTS(
-  WITH RECURSIVE hits(text,source,pos) AS (
-    SELECT content.value,(${textValue}),instr(content.value,(${textValue}))
+  WITH RECURSIVE hits(text,source,pos,token,named) AS (
+    SELECT content.value,(${textValue}),instr(content.value,(${textValue})),(${tokenCharacter}),(${recordedName}) IS NOT NULL
     FROM json_tree(CASE WHEN json_valid(${column}) THEN ${column} ELSE json_quote(${column}) END) content
-    WHERE content.type='text'
+    WHERE content.type='text' AND instr(content.value,(${textValue}))>0
     UNION ALL
-    SELECT text,source,pos+instr(substr(text,pos+1),source) FROM hits
+    SELECT text,source,pos+instr(substr(text,pos+1),source),token,named FROM hits
     WHERE pos>0 AND instr(substr(text,pos+1),source)>0
   )
   SELECT 1 FROM hits WHERE pos>0
@@ -34,7 +39,7 @@ const textMention = (column: string) => `EXISTS(
 )`
 const mentions = (table: string, columns: string[]) => 'EXISTS(SELECT 1 FROM json_each(?1) subject WHERE ' + columns.map(name => {
   const column = table + '.' + name
-  return "(subject.type='text' AND instr(CAST(" + column + " AS TEXT),CAST(subject.value AS TEXT))>0) OR (subject.type='object' AND (CAST(" + column + " AS TEXT)=(" + sourceId + ') OR ' + textMention(column) + '))'
+  return "((subject.type='text' OR subject.type='object') AND (CAST(" + column + " AS TEXT)=(" + sourceId + ') OR ' + textMention(column) + '))'
 }).join(' OR ') + ')'
 const calls = mentions('agent_door_calls', ['key', 'outcome']), approvals = mentions('agent_door_approvals', ['saved', 'approvals', 'result']), reviews = mentions('agent_door_reviews', ['saved', 'marked_by']), audits = mentions('agent_door_audit', ['row', 'evidence'])
 const decisions = "SELECT decision_id FROM agent_door_calls WHERE " + calls + " UNION SELECT json_extract(saved,'$.decision_id') FROM agent_door_approvals WHERE " + approvals + " UNION SELECT json_extract(saved,'$.decision_id') FROM agent_door_reviews WHERE " + reviews + " UNION SELECT id FROM agent_door_audit WHERE " + audits + " UNION SELECT json_extract(details,'$.operationId') FROM audit_events WHERE (entity_type='person' AND entity_id IN (SELECT value FROM json_each(?1))) OR (entity_type='note' AND entity_id IN (SELECT id FROM person_notes WHERE person_id IN (SELECT value FROM json_each(?1))))"
@@ -45,7 +50,8 @@ export const personAgentArtifacts: AgentArtifactMap = { artifacts: [
   { table: 'agent_door_state', columns: ['id','envelope','local_document','local_revision','local_paused','decision_lock','decision_until'], unrelated: 'Installation policy and admission leases; customer subjects are not policy principals.' },
   { table: 'agent_door_agents', columns: ['id','name','specialist','sponsor','sponsor_name','revoked','window','requests','tombstone'], unrelated: 'Non-person agent identities and native operator sponsors; customer subjects are not operators.' },
   { table: 'agent_door_calls', columns: ['agent','key','digest','decision_id','created_at','state','outcome','expires_at'], match: match('decision_id IN (' + decisions + ')') },
-  { table: 'agent_door_audit', columns: ['sequence','id','at','agent','classes','row','evidence'], match: match('id IN (' + decisions + ') OR json_extract(row,\'$.decision_id\') IN (' + decisions + ') OR json_extract(row,\'$.replay_of\') IN (' + decisions + ')') },
+  // Resolve the same decision set once for the audit row's multiple links.
+  { table: 'agent_door_audit', columns: ['sequence','id','at','agent','classes','row','evidence'], match: match(`rowid IN (WITH selected(decision_id) AS MATERIALIZED (${decisions}) SELECT rowid FROM agent_door_audit WHERE id IN (SELECT decision_id FROM selected) OR json_extract(row,'$.decision_id') IN (SELECT decision_id FROM selected) OR json_extract(row,'$.replay_of') IN (SELECT decision_id FROM selected))`) },
   { table: 'agent_door_approvals', columns: ['id','state','saved','approvals','result','version'], match: match('json_extract(saved,\'$.decision_id\') IN (' + decisions + ') OR ' + approvals) },
   { table: 'agent_door_reviews', columns: ['id','state','saved','marked_by','marked_at'], match: match('json_extract(saved,\'$.decision_id\') IN (' + decisions + ') OR ' + reviews) },
   { table: 'agent_door_events', columns: ['sequence','id','uri','event'], match: match(mentions('agent_door_events', ['uri','event']) + ' OR json_extract(event,\'$.decision_id\') IN (' + decisions + ')') },
