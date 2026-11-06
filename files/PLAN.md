@@ -1,0 +1,9 @@
+# Bounded timeout diagnosis
+
+1. Read the supplied RULES/STACK-GATES, launcher AGENTS and repository AGENTS. Record the workflow command/setup and exact intake baseline, candidate and fresh main separately.
+2. Use this dedicated Linux runner with exact Node 22.20.0 and pnpm 10.12.4, frozen workspace dependencies and locked native workerd. Keep real HOME, loopback proxy exclusions and a child subreaper. No provider credentials are needed or injected into test fixtures.
+3. Compare exact trees for the failed case and affected source, retaining the complete candidate diff as well as the case/source diff. Build the actual reference Worker using the workflow build command.
+4. Run only the named failed top-level public-door test registration once on candidate, with its ten nested subcases, original 180000ms timeout and concurrency=1. Retain stdout/stderr, exact command, exit, monotonic duration, timestamps and non-secret runtime metadata.
+5. Switch the same checkout and runner to the exact baseline, retaining identical frozen dependencies/settings; build from baseline and run precisely the same case once. No whole suites, stress, retries, assertion/timeout edits or alternative environments.
+6. Classify the observation. A baseline failure or proven infrastructure goes to FV. A candidate-only regression goes to GR with its minimal proposed correction. If both pass, retain UNKNOWN for the original timeout and report non-reproduction, without a FIX verdict.
+7. Preserve reports/actual receipts under packet, publish the explicitly selected non-secret files only to the evidence ref, then remove the owned checkout/dependencies and scratch. Do not change source/tests/contracts, make product commits/pushes, dispatch/rerun workflows, scan, release, or land. Relay via final POST lines only.

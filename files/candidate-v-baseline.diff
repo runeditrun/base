@@ -1,0 +1,1371 @@
+diff --git a/default-seed/scripts/base-cli/inventory.json b/default-seed/scripts/base-cli/inventory.json
+index a45e344..f4d4a92 100644
+--- a/default-seed/scripts/base-cli/inventory.json
++++ b/default-seed/scripts/base-cli/inventory.json
+@@ -5135,11 +5135,11 @@
+     },
+     "scripts/publish-check.mjs": {
+       "source": "scripts/publish-check.mjs",
+-      "sha256": "e10925c794c9302538c747e78dd7c61e18513bd90de3a77c1d4e4c4ba11bc585"
++      "sha256": "a3b1636b5276df04f746e79fd4fc79b4140f7873e307a7883bec141843288bfd"
+     },
+     "scripts/publish-check/README.md": {
+       "source": "scripts/publish-check/README.md",
+-      "sha256": "c2d8fe8392fd2163cdd4e97c03b07ab683e067d8e1e1581e32c3c5ebfada0861"
++      "sha256": "2bb4f4baca211c145872f8f1d48d4ba195fd7222168d344562c5f2c156707195"
+     },
+     "scripts/publish-check/assignment.py": {
+       "source": "scripts/publish-check/assignment.py",
+@@ -5155,7 +5155,7 @@
+     },
+     "scripts/publish-check/cli.py": {
+       "source": "scripts/publish-check/cli.py",
+-      "sha256": "fda6c8c6938d7a9b35c1f11c7ede83a32ee17c556466ba61e16095a0cf646f17"
++      "sha256": "ffcc5d5b39244ef4ac57f7ad23d6ef39ae62171c2580eacfa5678ec73f4c2d2e"
+     },
+     "scripts/publish-check/command_arguments.py": {
+       "source": "scripts/publish-check/command_arguments.py",
+@@ -5219,15 +5219,15 @@
+     },
+     "scripts/publish-check/git_history.py": {
+       "source": "scripts/publish-check/git_history.py",
+-      "sha256": "8a9cacce7ed7fe65befc823ea622573cd9d2ba9c09014f0b2f0e5ece89cb71a1"
++      "sha256": "8c73a790c2608e392635e2b6414eecc89cbf8ffd4b1fb54fea9cbc92dbed34b0"
+     },
+     "scripts/publish-check/github_refs.py": {
+       "source": "scripts/publish-check/github_refs.py",
+-      "sha256": "2cdf8b05242aacb508d8d0131063782eea85ab710b9dd510b7b052c2cdf2bab7"
++      "sha256": "d1b29cf346ddbd09009d309ab2477c3049382993043a85acece74a1af97e1224"
+     },
+     "scripts/publish-check/gitleaks.py": {
+       "source": "scripts/publish-check/gitleaks.py",
+-      "sha256": "e0132616953c8a7380b186f2665fbf6f84837698be17f9dbf370251018dd526e"
++      "sha256": "07bb4ed2aee77a700c80f1f22bcc260a61232aa2fd6acf209d9459463ea8b83a"
+     },
+     "scripts/publish-check/gitleaks.toml": {
+       "source": "scripts/publish-check/gitleaks.toml",
+@@ -5235,11 +5235,11 @@
+     },
+     "scripts/publish-check/history_hydration.py": {
+       "source": "scripts/publish-check/history_hydration.py",
+-      "sha256": "6d5da8b9bf0c2d21df05f79bed028f92208f478f34c43627af081c0edf7104eb"
++      "sha256": "08735fe964c5150159157508aa776b129de36f344731dc74bd6cf1a45a2f26db"
+     },
+     "scripts/publish-check/history_scan.py": {
+       "source": "scripts/publish-check/history_scan.py",
+-      "sha256": "f7375219eb58458843797753a9922b875090cf8ffd57f986d92d8f8f9c5a7762"
++      "sha256": "c08f8dbece7fcda99e284e30aff6284d8d9b65f0eb4470ed6238ef164dd506d4"
+     },
+     "scripts/publish-check/hit_location.py": {
+       "source": "scripts/publish-check/hit_location.py",
+@@ -5289,6 +5289,14 @@
+       "source": "scripts/publish-check/policy.py",
+       "sha256": "02166aca1594dcd590cdfdfc402c46af9792d38298eda3d224ca19cd162457bb"
+     },
++    "scripts/publish-check/progress.mjs": {
++      "source": "scripts/publish-check/progress.mjs",
++      "sha256": "0dbaba0e15a394a8230ba1758e14399786b896faf808eb7258223c763fae437f"
++    },
++    "scripts/publish-check/progress.py": {
++      "source": "scripts/publish-check/progress.py",
++      "sha256": "da0267e2c0a64be46e0d76188ab14f3f7cf5e01cf7c5d75321ba13c490d87ea5"
++    },
+     "scripts/publish-check/project_identity.py": {
+       "source": "scripts/publish-check/project_identity.py",
+       "sha256": "69c66600a94565a8956459c425cf185e4fcf0d48ecddac1a7d7443521f9a2b8e"
+@@ -5339,7 +5347,7 @@
+     },
+     "scripts/publish-check/slots.py": {
+       "source": "scripts/publish-check/slots.py",
+-      "sha256": "dc53368b158d4c7a5981816998b7bd13dfc880930123ec4c501a1455368fce33"
++      "sha256": "a47681aee5b4e465ec317a129b97ae595d850e6fa48bd340757d8a847b47ad7a"
+     },
+     "scripts/publish-check/source_metadata.py": {
+       "source": "scripts/publish-check/source_metadata.py",
+diff --git a/default-seed/scripts/base-cli/scripts/publish-check.mjs b/default-seed/scripts/base-cli/scripts/publish-check.mjs
+index d1c32cf..c89072f 100644
+--- a/default-seed/scripts/base-cli/scripts/publish-check.mjs
++++ b/default-seed/scripts/base-cli/scripts/publish-check.mjs
+@@ -1,11 +1,12 @@
+ #!/usr/bin/env node
+ import { spawn } from 'node:child_process';
+-import { mkdtempSync, openSync, closeSync, rmSync } from 'node:fs';
++import { mkdtempSync, openSync, closeSync, rmSync, ftruncateSync } from 'node:fs';
+ import { tmpdir } from 'node:os';
+ import { join } from 'node:path';
+ import { runningVersion } from '../cli/version.mjs';
+ import { parseTimeoutSeconds, timeoutBounds } from './publish-check/timeout.mjs';
+ import { controlReader, diagnosticLimit, incompleteReport, osFailure, processFact, readReport, workerFact } from './publish-check/diagnostics.mjs';
++import { progressBytes, readProgress } from './publish-check/progress.mjs';
+ 
+ const args = process.argv.slice(2);
+ let seconds = timeoutBounds.default;
+@@ -15,11 +16,13 @@ for (let i = 0; i < args.length; i++) {
+     try { seconds = parseTimeoutSeconds(raw); } catch { /* Python reports invalid arguments. */ }
+   }
+ }
+-let scratch, fd, child, reason, timer;
++let scratch, fd, progressFd, child, reason, timer, acquiredAt, stoppedAt, progress;
++const queuedAt = performance.now();
+ const diagnostics = [];
+ const record = fact => { if (fact && diagnostics.length < diagnosticLimit) diagnostics.push(fact); };
+ const stop = value => {
+   reason ??= value;
++  stoppedAt ??= performance.now();
+   // The child remains unreaped until its close handler; descendants (native
+   // Git and Gitleaks) share the private process group and this total deadline.
+   if (child?.pid) {
+@@ -34,10 +37,14 @@ try {
+   scratch = mkdtempSync(join(tmpdir(), 'publish-check-'));
+   const output = join(scratch, 'report.json');
+   fd = openSync(output, 'wx', 0o600);
++  try {
++    progressFd = openSync(join(scratch, 'progress'), 'wx+', 0o600);
++    ftruncateSync(progressFd, progressBytes);
++  } catch { /* Missing progress is diagnostic unavailability only. */ }
+   stage = 'slot';
+   child = spawn('python3', ['-B', new URL('./publish-check/slots.py', import.meta.url).pathname, ...args], {
+     // Neither holder tracebacks nor worker stderr are safe public diagnostics.
+-    detached: true, stdio: ['pipe', fd, 'ignore', 'pipe'], env: { ...process.env, TMPDIR: scratch },
++    detached: true, stdio: ['pipe', fd, 'ignore', 'pipe', progressFd ?? 'ignore'], env: { ...process.env, TMPDIR: scratch },
+   });
+   const finished = new Promise(resolve => {
+     let error;
+@@ -48,12 +55,22 @@ try {
+   fd = undefined;
+   child.stdio[3]?.setEncoding('utf8');
+   child.stdio[3]?.on('data', controlReader(message => {
+-    if (message === 'acquired' && !timer) timer = setTimeout(() => stop('scan.deadline-exceeded'), seconds * 1000);
++    if (message === 'acquired' && !timer) {
++      acquiredAt = performance.now();
++      timer = setTimeout(() => stop('scan.deadline-exceeded'), seconds * 1000);
++    }
+     else if (message === 'waiting') process.stderr.write('waiting for a scan slot\n');
+     else if (['scan.slot-timeout', 'scan.slot-configuration'].includes(message)) reason ??= message;
+     else record(workerFact(message));
+   }));
+   const result = await finished;
++  const observedAt = performance.now();
++  progress = {
++    slot: acquiredAt === undefined ? 'queued' : 'acquired',
++    queuedMs: Math.floor((acquiredAt ?? observedAt) - queuedAt),
++    elapsedMs: acquiredAt === undefined ? null : Math.max(0, Math.floor((stoppedAt ?? observedAt) - acquiredAt)),
++    worker: readProgress(progressFd),
++  };
+   const parsed = readReport(output);
+   // Report errors are secondary facts even when the process failed first.
+   if (reason || result.error || result.signal || ![0, 1, 2].includes(result.exitCode) || parsed.diagnostic) {
+@@ -75,6 +92,10 @@ try {
+     try { closeSync(fd); }
+     catch (error) { record(osFailure('cleanup', 'cleanup.close-error', error)); }
+   }
++  if (progressFd !== undefined) {
++    try { closeSync(progressFd); }
++    catch (error) { record(osFailure('cleanup', 'cleanup.close-error', error)); }
++  }
+   if (scratch) {
+     try { rmSync(scratch, { recursive: true, force: true }); }
+     catch (error) {
+@@ -102,6 +123,9 @@ else {
+     }
+     report.diagnostics = diagnostics;
+   }
++  // Report JSON is not a trusted progress transport, including on exit 2.
++  delete report.progress;
++  if (progress) report.progress = progress;
+   process.stdout.write(JSON.stringify(report) + '\n');
+ }
+ process.exitCode = code;
+diff --git a/default-seed/scripts/base-cli/scripts/publish-check/README.md b/default-seed/scripts/base-cli/scripts/publish-check/README.md
+index e83f0cf..2a291d8 100644
+--- a/default-seed/scripts/base-cli/scripts/publish-check/README.md
++++ b/default-seed/scripts/base-cli/scripts/publish-check/README.md
+@@ -54,6 +54,29 @@ its worker inherits the lock so it cannot outlive its slot. Queueing has its
+ own one-hour cap. `timeout.json` supplies the shared default and upper bound
+ to Python and the Node/release validator.
+ 
++`progress.py` retains the latest worker observation in a private 1024-byte
++frame on fd 4. Native subprocesses do not inherit that descriptor. The frame
++has an integrity digest to reject partial writes; `progress.mjs` checks its
++size and exact fixed enum/numeric shape before constructing public `progress`.
++Report JSON cannot supply progress. Invalid or missing frames yield
++`progress.worker: null`, without changing the scan verdict.
++
++The public observation separates slot queue time (`queuedMs`) from monotonic
++post-acquisition time (`elapsedMs`, sampled at interruption when interrupted).
++`slot` is `queued` or `acquired`. The worker's `observedElapsedMs` is monotonic
++time at its last observation, not a live clock or a completion claim.
++`lastEnteredPhase` and `lastCompletedPhase` distinguish preparation, public-base
++fetch, promised-object hydration, history/text, Gitleaks and reference work.
++`activeOperation` is a fixed Git, Gitleaks or gh operation enum, or `none` when
++no instrumented native call is active. Selected/public revision counts describe
++revision roots; `historyCommits` and `publicCommits` retain the actual native
++revision-list counts once available, not a count of completed inspections.
++Hydration's `missingBefore`, `missingAfter`
++and completed `fetches` counts become available only when measured. Counts and
++phase fields that have not been measured stay null; numeric fields are bounded
++to nonnegative JavaScript safe integers. A deadline still returns INCOMPLETE,
++source null, unscanned history and exit 2, regardless of retained progress.
++
+ Process failures keep the v3 INCOMPLETE/exit-2 refusal. Its optional
+ `diagnostics` array identifies worker or slot launch errors, exits and signals,
+ report read/empty/parse/shape failures, version-metadata failures and scratch
+diff --git a/default-seed/scripts/base-cli/scripts/publish-check/cli.py b/default-seed/scripts/base-cli/scripts/publish-check/cli.py
+index ad6f65a..b9b805e 100644
+--- a/default-seed/scripts/base-cli/scripts/publish-check/cli.py
++++ b/default-seed/scripts/base-cli/scripts/publish-check/cli.py
+@@ -6,6 +6,7 @@ from pathlib import Path
+ from history_scan import scan
+ from public_base import parse as parse_public_base, PublicBaseError
+ from report import new_report
++import progress
+ 
+ 
+ def flag_name(value):
+@@ -55,6 +56,7 @@ def seconds(value):
+ 
+ 
+ def main():
++    progress.start()
+     parser = SafeParser(description='Scan working files and full history with system Git and pinned Gitleaks.')
+     parser.add_argument('--repo', required=True)
+     parser.add_argument('--ref', default='HEAD')
+diff --git a/default-seed/scripts/base-cli/scripts/publish-check/git_history.py b/default-seed/scripts/base-cli/scripts/publish-check/git_history.py
+index 2d9e13f..9424f3e 100644
+--- a/default-seed/scripts/base-cli/scripts/publish-check/git_history.py
++++ b/default-seed/scripts/base-cli/scripts/publish-check/git_history.py
+@@ -2,6 +2,7 @@
+ import os
+ from pathlib import Path
+ import subprocess
++import progress
+ from public_base import parse, display, PublicBaseError
+ 
+ 
+@@ -23,10 +24,13 @@ class History:
+         self.public_tags = set()
+         self.reader = None
+         self.commit = self.run('rev-parse', '--verify', '--end-of-options', ref + '^{commit}').decode().strip()
++        progress.counts(selectedRevisions=1)
+         if self.run('rev-parse', '--is-shallow-repository').strip() != b'false':
+             raise InspectionError('history.shallow')
+         if public_base is not None:
+             url, branch = parse(public_base, self.repo)
++            progress.completed('preparation')
++            progress.enter('fetch')
+             try:
+                 self.run('fetch', '--quiet', '--prune', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', '--',
+                          url, 'refs/heads/' + branch + ':refs/publish-check/public/base',
+@@ -35,14 +39,24 @@ class History:
+                 self.public_label = display(url) + '#' + branch
+                 self.public_tags = set(self.run('for-each-ref', '--format=%(objectname)',
+                                                'refs/publish-check/public/tags').decode().splitlines())
++                progress.counts(publicRevisions=1 + len(self.public_tags))
++                progress.completed('fetch')
+             except InspectionError:
+                 raise PublicBaseError('public-base.fetch-failed') from None
+         public_revisions = [self.public_commit, *sorted(self.public_tags)] if public_base else []
++        if not public_base:
++            progress.counts(publicRevisions=0)
++            progress.completed('preparation')
+         self.revisions = [self.commit, *public_revisions] if public_base else ['--all', self.commit]
+         from history_hydration import prepare
++        progress.enter('hydration')
+         self.hydration = prepare(self)
++        progress.completed('hydration')
++        progress.enter('history-text')
+         self.commits = self.run('rev-list', *self.revisions).decode().splitlines()
++        progress.counts(historyCommits=len(self.commits))
+         self.public_commits = set(self.run('rev-list', *public_revisions).decode().splitlines()) if public_base else set()
++        progress.counts(publicCommits=len(self.public_commits))
+         self.trees = {}
+         self.tree_ids = dict(line.split() for line in self.run('log', '--format=%H %T', *self.revisions).decode().splitlines())
+         self.reader = subprocess.Popen(['git', '-C', self.repo, 'cat-file', '--batch'],
+@@ -50,8 +64,11 @@ class History:
+ 
+     def run(self, *args, input=None):
+         try:
+-            result = subprocess.run(['git', '-C', self.repo, '-c', 'core.quotePath=false', *args],
+-                                    env=self.env, input=input, capture_output=True, timeout=120)
++            operation = args[0] if args[0] in ('rev-parse', 'fetch', 'rev-list', 'log', 'config',
++                                             'ls-tree', 'for-each-ref', 'cat-file') else 'other'
++            with progress.operation('git.' + operation):
++                result = subprocess.run(['git', '-C', self.repo, '-c', 'core.quotePath=false', *args],
++                                        env=self.env, input=input, capture_output=True, timeout=120)
+             if result.returncode:
+                 raise InspectionError('history.git-failed')
+             return result.stdout
+@@ -82,6 +99,10 @@ class History:
+         return self.entries(commit, False)
+ 
+     def blob(self, oid):
++        with progress.operation('git.cat-file'):
++            return self.read_blob(oid)
++
++    def read_blob(self, oid):
+         if not oid or any(c not in '0123456789abcdef' for c in oid):
+             raise InspectionError('history.invalid-object')
+         self.reader.stdin.write(oid.encode() + b'\n')
+diff --git a/default-seed/scripts/base-cli/scripts/publish-check/github_refs.py b/default-seed/scripts/base-cli/scripts/publish-check/github_refs.py
+index 4e3e299..5ba027d 100644
+--- a/default-seed/scripts/base-cli/scripts/publish-check/github_refs.py
++++ b/default-seed/scripts/base-cli/scripts/publish-check/github_refs.py
+@@ -3,6 +3,7 @@ import json
+ import os
+ import re
+ import subprocess
++import progress
+ from repository_intent import declarations, commands
+ 
+ SLUG = r'[A-Za-z0-9][A-Za-z0-9_.-]{0,99}'
+@@ -299,8 +300,9 @@ def gh(arguments):
+     # Disable gh debug logging even if inherited from the calling shell.
+     env = {k: v for k, v in os.environ.items() if k not in ('GH_DEBUG', 'DEBUG')}
+     env['GH_PROMPT_DISABLED'] = '1'
+-    response = subprocess.run(['gh', 'api', '--hostname', 'github.com', '--include', *arguments],
+-                              env=env, capture_output=True, timeout=60)
++    with progress.operation('gh.graphql' if arguments[0] == 'graphql' else 'gh.rest'):
++        response = subprocess.run(['gh', 'api', '--hostname', 'github.com', '--include', *arguments],
++                                  env=env, capture_output=True, timeout=60)
+     return response.stdout.decode('utf-8'), response.returncode
+ 
+ 
+diff --git a/default-seed/scripts/base-cli/scripts/publish-check/gitleaks.py b/default-seed/scripts/base-cli/scripts/publish-check/gitleaks.py
+index 3e946a7..11767d1 100644
+--- a/default-seed/scripts/base-cli/scripts/publish-check/gitleaks.py
++++ b/default-seed/scripts/base-cli/scripts/publish-check/gitleaks.py
+@@ -5,6 +5,7 @@ from pathlib import Path
+ import shutil
+ import subprocess
+ import tempfile
++import progress
+ from git_history import InspectionError
+ 
+ VERSION = '8.30.1'
+@@ -14,7 +15,8 @@ CONFIG = Path(__file__).with_name('gitleaks.toml')
+ def executable():
+     binary = shutil.which('gitleaks') or str(Path.home() / '.local/bin/gitleaks')
+     try:
+-        version = subprocess.run([binary, 'version'], capture_output=True, timeout=10)
++        with progress.operation('gitleaks.version'):
++            version = subprocess.run([binary, 'version'], capture_output=True, timeout=10)
+         if version.returncode or version.stdout.decode().strip() != VERSION:
+             raise InspectionError('scan.gitleaks-version')
+     except OSError:
+@@ -43,7 +45,8 @@ def inspect(binary, mode, repo=None, revisions=None, data=None, timeout=300, red
+         env = {k: v for k, v in os.environ.items() if not k.startswith(('GITLEAKS_', 'GIT_'))}
+         env.update(GIT_NO_REPLACE_OBJECTS='1', GIT_TERMINAL_PROMPT='0', GIT_NO_LAZY_FETCH='1')
+         try:
+-            result = subprocess.run(args, input=data, capture_output=True, env=env, timeout=timeout)
++            with progress.operation('gitleaks.' + mode):
++                result = subprocess.run(args, input=data, capture_output=True, env=env, timeout=timeout)
+             if result.returncode not in (0, 1):
+                 raise InspectionError('scan.gitleaks-failed')
+             # Native reports may contain raw matches for location-bound proof.
+diff --git a/default-seed/scripts/base-cli/scripts/publish-check/history_hydration.py b/default-seed/scripts/base-cli/scripts/publish-check/history_hydration.py
+index 1b3bdc1..b7c0870 100644
+--- a/default-seed/scripts/base-cli/scripts/publish-check/history_hydration.py
++++ b/default-seed/scripts/base-cli/scripts/publish-check/history_hydration.py
+@@ -1,6 +1,7 @@
+ """Fetch missing promised history in one pack before inspecting any blobs."""
+ from time import monotonic
+ from git_history import InspectionError
++import progress
+ 
+ 
+ def missing_blob(history, oid):
+@@ -22,6 +23,7 @@ def prepare(history):
+                       history.run('rev-list', '--objects', '--missing=print', *history.revisions).splitlines()
+                       if line.startswith(b'?'))
+     before = missing()
++    progress.counts(hydration=True, missingBefore=len(before), fetches=0)
+     fetches = 0
+     if before:
+         # A blob:none clone already owns the commits and trees. ls-tree -l and
+@@ -47,7 +49,9 @@ def prepare(history):
+         except InspectionError:
+             raise missing_blob(history, before[0].decode()) from None
+         fetches = 1
++        progress.counts(hydration=True, fetches=fetches)
+     after = missing() if before else []
++    progress.counts(hydration=True, missingAfter=len(after), fetches=fetches)
+     if after:
+         raise missing_blob(history, after[0].decode())
+     return dict(missingBefore=len(before), missingAfter=len(after), fetches=fetches,
+diff --git a/default-seed/scripts/base-cli/scripts/publish-check/history_scan.py b/default-seed/scripts/base-cli/scripts/publish-check/history_scan.py
+index 58f5126..43217d5 100644
+--- a/default-seed/scripts/base-cli/scripts/publish-check/history_scan.py
++++ b/default-seed/scripts/base-cli/scripts/publish-check/history_scan.py
+@@ -1,6 +1,7 @@
+ """Scan current files and full history using native Git and pinned Gitleaks."""
+ from pathlib import Path
+ from scan_timings import Timings
++import progress
+ import staged_annotation
+ from git_history import History, InspectionError
+ from public_base import PublicBaseError
+@@ -122,6 +123,8 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
+         identities = {'working-tree': timings.call('identities.prepare', ContentIdentities, working_identities,
+             lambda path: working_regular(Path(history.repo), path))}
+         checksums = {}
++        progress.completed('history-text')
++        progress.enter('gitleaks')
+         for mode in ('git', 'dir'):
+             for hit in timings.call('gitleaks.' + mode, secrets, binary, mode, history.repo, history.revisions, timeout=timeout, redact=False):
+                 path, commit = hit.get('File', '.'), hit.get('Commit') or history.commit
+@@ -160,6 +163,8 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
+                         if held and checksums[identity_scope].matches(held[0], hit):
+                             continue
+                 add(secret_rule(hit['RuleID']), path, commit, oid, scope, scanner_rule=hit['RuleID'])
++        progress.completed('gitleaks')
++        progress.enter('history-text')
+         messages, lines = [], []
+         count = 1
+         all_paths = dict.fromkeys(working_paths, history.commit)
+@@ -188,17 +193,22 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
+             lines.append((count, count + length, path, commit, scope))
+             count += length
+         message_data = b''.join(messages)
++        progress.completed('history-text')
++        progress.enter('gitleaks')
+         for hit in timings.call('gitleaks.messages', secrets, binary, 'stdin', data=message_data, timeout=timeout, redact=False):
+             if not is_assignment(message_data, hit):
+                 continue
+             line = hit.get('StartLine', 0)
+             location = next(((p, c, s) for start, end, p, c, s in lines if start <= line < end), ('@message', None, 'newly-public'))
+             add(secret_rule(hit['RuleID']), location[0], location[1], scope=location[2], scanner_rule=hit['RuleID'])
++        progress.completed('gitleaks')
++        progress.enter('references')
+         states = timings.call('github.references', GitHubResolver().resolve_all,
+                               {repository for references, *_ in deferred for repository, _, _ in references})
+         for references, path, commit, oid, scope in deferred:
+             for rule in reference_rules(references, states):
+                 add(rule, path, commit, oid, scope)
++        progress.completed('references')
+     except PublicBaseError:
+         add('scan.public-base-rejected', '.')
+     except InspectionError as error:
+diff --git a/default-seed/scripts/base-cli/scripts/publish-check/progress.mjs b/default-seed/scripts/base-cli/scripts/publish-check/progress.mjs
+new file mode 100644
+index 0000000..7dcf225
+--- /dev/null
++++ b/default-seed/scripts/base-cli/scripts/publish-check/progress.mjs
+@@ -0,0 +1,40 @@
++// A worker observation is never a report or evidence of scan completion.
++import { createHash } from 'node:crypto';
++import { fstatSync, readSync } from 'node:fs';
++
++export const progressBytes = 1024;
++const phases = new Set(['preparation', 'fetch', 'hydration', 'history-text', 'gitleaks', 'references']);
++const operations = new Set(['none', 'git.rev-parse', 'git.fetch', 'git.rev-list', 'git.log', 'git.config',
++  'git.ls-tree', 'git.for-each-ref', 'git.cat-file', 'git.other',
++  'gitleaks.version', 'gitleaks.git', 'gitleaks.dir', 'gitleaks.stdin', 'gh.graphql', 'gh.rest']);
++const keys = (value, expected) => value && typeof value === 'object' && !Array.isArray(value) &&
++  Object.keys(value).length === expected.length && expected.every(key => Object.hasOwn(value, key));
++const number = value => Number.isSafeInteger(value) && value >= 0;
++const count = value => value === null || number(value);
++
++export function readProgress(fd) {
++  try {
++    if (fd === undefined || fstatSync(fd).size !== progressBytes) return null;
++    const frame = Buffer.alloc(progressBytes);
++    if (readSync(fd, frame, 0, frame.length, 0) !== frame.length || frame[64] !== 10) return null;
++    const body = frame.subarray(65);
++    if (createHash('sha256').update(body).digest('hex') !== frame.subarray(0, 64).toString('ascii')) return null;
++    const value = JSON.parse(body.toString('utf8'));
++    if (!keys(value, ['lastEnteredPhase', 'lastCompletedPhase', 'observedElapsedMs', 'activeOperation',
++      'selectedRevisions', 'publicRevisions', 'historyCommits', 'publicCommits', 'hydration']) ||
++      ![value.lastEnteredPhase, value.lastCompletedPhase].every(phase => phase === null || phases.has(phase)) ||
++      !operations.has(value.activeOperation) || !number(value.observedElapsedMs) ||
++      ![value.selectedRevisions, value.publicRevisions, value.historyCommits, value.publicCommits].every(count) ||
++      !keys(value.hydration, ['missingBefore', 'missingAfter', 'fetches']) ||
++      !Object.values(value.hydration).every(count)) return null;
++    // Construct the public shape explicitly. Never merge worker objects.
++    return {
++      lastEnteredPhase: value.lastEnteredPhase, lastCompletedPhase: value.lastCompletedPhase,
++      observedElapsedMs: value.observedElapsedMs, activeOperation: value.activeOperation,
++      selectedRevisions: value.selectedRevisions, publicRevisions: value.publicRevisions,
++      historyCommits: value.historyCommits, publicCommits: value.publicCommits,
++      hydration: { missingBefore: value.hydration.missingBefore, missingAfter: value.hydration.missingAfter,
++        fetches: value.hydration.fetches },
++    };
++  } catch { return null; }
++}
+diff --git a/default-seed/scripts/base-cli/scripts/publish-check/progress.py b/default-seed/scripts/base-cli/scripts/publish-check/progress.py
+new file mode 100644
+index 0000000..ccb9471
+--- /dev/null
++++ b/default-seed/scripts/base-cli/scripts/publish-check/progress.py
+@@ -0,0 +1,81 @@
++"""Latest value-free worker observation in one private, fixed-size frame."""
++from contextlib import contextmanager
++import hashlib
++import json
++import os
++import stat
++from time import monotonic
++
++FRAME_BYTES = 1024
++MAX_NUMBER = 2**53 - 1
++_current = None
++
++
++class Progress:
++    def __init__(self):
++        self.started = monotonic()
++        self.value = dict(lastEnteredPhase=None, lastCompletedPhase=None, observedElapsedMs=0,
++                          activeOperation='none', selectedRevisions=None, publicRevisions=None,
++                          historyCommits=None, publicCommits=None,
++                          hydration=dict(missingBefore=None, missingAfter=None, fetches=None))
++
++    def publish(self):
++        self.value['observedElapsedMs'] = min(MAX_NUMBER, int((monotonic() - self.started) * 1000))
++        body = json.dumps(self.value, separators=(',', ':'), allow_nan=False).encode()
++        if len(body) > FRAME_BYTES - 65:
++            return
++        body = body.ljust(FRAME_BYTES - 65)
++        frame = hashlib.sha256(body).hexdigest().encode() + b'\n' + body
++        try:
++            # fd 4 is opened by Node, passed only to this worker, and never
++            # inherited by native commands. No source-controlled path is read.
++            os.pwrite(4, frame, 0)
++        except OSError:
++            pass  # Observations cannot change scan success or refusal.
++
++
++def start():
++    global _current
++    try:
++        descriptor = os.fstat(4)
++        if not stat.S_ISREG(descriptor.st_mode) or descriptor.st_size != FRAME_BYTES:
++            return
++    except OSError:
++        return
++    _current = Progress()
++    enter('preparation')
++
++
++def enter(phase):
++    if _current:
++        _current.value['lastEnteredPhase'] = phase
++        _current.publish()
++
++
++def completed(phase):
++    if _current:
++        _current.value['lastCompletedPhase'] = phase
++        _current.publish()
++
++
++def counts(*, hydration=False, **values):
++    if _current:
++        target = _current.value['hydration'] if hydration else _current.value
++        target.update({key: value if type(value) is int and 0 <= value <= MAX_NUMBER else None
++                       for key, value in values.items()})
++        _current.publish()
++
++
++@contextmanager
++def operation(name):
++    if not _current:
++        yield
++        return
++    previous = _current.value['activeOperation']
++    _current.value['activeOperation'] = name
++    _current.publish()
++    try:
++        yield
++    finally:
++        _current.value['activeOperation'] = previous
++        _current.publish()
+diff --git a/default-seed/scripts/base-cli/scripts/publish-check/slots.py b/default-seed/scripts/base-cli/scripts/publish-check/slots.py
+index 783dd91..28f1bd6 100644
+--- a/default-seed/scripts/base-cli/scripts/publish-check/slots.py
++++ b/default-seed/scripts/base-cli/scripts/publish-check/slots.py
+@@ -53,7 +53,7 @@ def hold_slot(*, wait_seconds):
+                 try:
+                     worker = subprocess.Popen([sys.executable, '-B', str(Path(__file__).with_name('cli.py')),
+                                                *sys.argv[1:]], stdin=subprocess.DEVNULL,
+-                                              stderr=subprocess.DEVNULL, pass_fds=(fd,))
++                                              stderr=subprocess.DEVNULL, pass_fds=(fd, 4))
+                 except OSError as error:
+                     return failure('worker.launch', error)
+                 # Node's pipe closes even on SIGKILL. Stop only this private
+diff --git a/scripts/publish-check.mjs b/scripts/publish-check.mjs
+index d1c32cf..c89072f 100644
+--- a/scripts/publish-check.mjs
++++ b/scripts/publish-check.mjs
+@@ -1,11 +1,12 @@
+ #!/usr/bin/env node
+ import { spawn } from 'node:child_process';
+-import { mkdtempSync, openSync, closeSync, rmSync } from 'node:fs';
++import { mkdtempSync, openSync, closeSync, rmSync, ftruncateSync } from 'node:fs';
+ import { tmpdir } from 'node:os';
+ import { join } from 'node:path';
+ import { runningVersion } from '../cli/version.mjs';
+ import { parseTimeoutSeconds, timeoutBounds } from './publish-check/timeout.mjs';
+ import { controlReader, diagnosticLimit, incompleteReport, osFailure, processFact, readReport, workerFact } from './publish-check/diagnostics.mjs';
++import { progressBytes, readProgress } from './publish-check/progress.mjs';
+ 
+ const args = process.argv.slice(2);
+ let seconds = timeoutBounds.default;
+@@ -15,11 +16,13 @@ for (let i = 0; i < args.length; i++) {
+     try { seconds = parseTimeoutSeconds(raw); } catch { /* Python reports invalid arguments. */ }
+   }
+ }
+-let scratch, fd, child, reason, timer;
++let scratch, fd, progressFd, child, reason, timer, acquiredAt, stoppedAt, progress;
++const queuedAt = performance.now();
+ const diagnostics = [];
+ const record = fact => { if (fact && diagnostics.length < diagnosticLimit) diagnostics.push(fact); };
+ const stop = value => {
+   reason ??= value;
++  stoppedAt ??= performance.now();
+   // The child remains unreaped until its close handler; descendants (native
+   // Git and Gitleaks) share the private process group and this total deadline.
+   if (child?.pid) {
+@@ -34,10 +37,14 @@ try {
+   scratch = mkdtempSync(join(tmpdir(), 'publish-check-'));
+   const output = join(scratch, 'report.json');
+   fd = openSync(output, 'wx', 0o600);
++  try {
++    progressFd = openSync(join(scratch, 'progress'), 'wx+', 0o600);
++    ftruncateSync(progressFd, progressBytes);
++  } catch { /* Missing progress is diagnostic unavailability only. */ }
+   stage = 'slot';
+   child = spawn('python3', ['-B', new URL('./publish-check/slots.py', import.meta.url).pathname, ...args], {
+     // Neither holder tracebacks nor worker stderr are safe public diagnostics.
+-    detached: true, stdio: ['pipe', fd, 'ignore', 'pipe'], env: { ...process.env, TMPDIR: scratch },
++    detached: true, stdio: ['pipe', fd, 'ignore', 'pipe', progressFd ?? 'ignore'], env: { ...process.env, TMPDIR: scratch },
+   });
+   const finished = new Promise(resolve => {
+     let error;
+@@ -48,12 +55,22 @@ try {
+   fd = undefined;
+   child.stdio[3]?.setEncoding('utf8');
+   child.stdio[3]?.on('data', controlReader(message => {
+-    if (message === 'acquired' && !timer) timer = setTimeout(() => stop('scan.deadline-exceeded'), seconds * 1000);
++    if (message === 'acquired' && !timer) {
++      acquiredAt = performance.now();
++      timer = setTimeout(() => stop('scan.deadline-exceeded'), seconds * 1000);
++    }
+     else if (message === 'waiting') process.stderr.write('waiting for a scan slot\n');
+     else if (['scan.slot-timeout', 'scan.slot-configuration'].includes(message)) reason ??= message;
+     else record(workerFact(message));
+   }));
+   const result = await finished;
++  const observedAt = performance.now();
++  progress = {
++    slot: acquiredAt === undefined ? 'queued' : 'acquired',
++    queuedMs: Math.floor((acquiredAt ?? observedAt) - queuedAt),
++    elapsedMs: acquiredAt === undefined ? null : Math.max(0, Math.floor((stoppedAt ?? observedAt) - acquiredAt)),
++    worker: readProgress(progressFd),
++  };
+   const parsed = readReport(output);
+   // Report errors are secondary facts even when the process failed first.
+   if (reason || result.error || result.signal || ![0, 1, 2].includes(result.exitCode) || parsed.diagnostic) {
+@@ -75,6 +92,10 @@ try {
+     try { closeSync(fd); }
+     catch (error) { record(osFailure('cleanup', 'cleanup.close-error', error)); }
+   }
++  if (progressFd !== undefined) {
++    try { closeSync(progressFd); }
++    catch (error) { record(osFailure('cleanup', 'cleanup.close-error', error)); }
++  }
+   if (scratch) {
+     try { rmSync(scratch, { recursive: true, force: true }); }
+     catch (error) {
+@@ -102,6 +123,9 @@ else {
+     }
+     report.diagnostics = diagnostics;
+   }
++  // Report JSON is not a trusted progress transport, including on exit 2.
++  delete report.progress;
++  if (progress) report.progress = progress;
+   process.stdout.write(JSON.stringify(report) + '\n');
+ }
+ process.exitCode = code;
+diff --git a/scripts/publish-check/README.md b/scripts/publish-check/README.md
+index e83f0cf..2a291d8 100644
+--- a/scripts/publish-check/README.md
++++ b/scripts/publish-check/README.md
+@@ -54,6 +54,29 @@ its worker inherits the lock so it cannot outlive its slot. Queueing has its
+ own one-hour cap. `timeout.json` supplies the shared default and upper bound
+ to Python and the Node/release validator.
+ 
++`progress.py` retains the latest worker observation in a private 1024-byte
++frame on fd 4. Native subprocesses do not inherit that descriptor. The frame
++has an integrity digest to reject partial writes; `progress.mjs` checks its
++size and exact fixed enum/numeric shape before constructing public `progress`.
++Report JSON cannot supply progress. Invalid or missing frames yield
++`progress.worker: null`, without changing the scan verdict.
++
++The public observation separates slot queue time (`queuedMs`) from monotonic
++post-acquisition time (`elapsedMs`, sampled at interruption when interrupted).
++`slot` is `queued` or `acquired`. The worker's `observedElapsedMs` is monotonic
++time at its last observation, not a live clock or a completion claim.
++`lastEnteredPhase` and `lastCompletedPhase` distinguish preparation, public-base
++fetch, promised-object hydration, history/text, Gitleaks and reference work.
++`activeOperation` is a fixed Git, Gitleaks or gh operation enum, or `none` when
++no instrumented native call is active. Selected/public revision counts describe
++revision roots; `historyCommits` and `publicCommits` retain the actual native
++revision-list counts once available, not a count of completed inspections.
++Hydration's `missingBefore`, `missingAfter`
++and completed `fetches` counts become available only when measured. Counts and
++phase fields that have not been measured stay null; numeric fields are bounded
++to nonnegative JavaScript safe integers. A deadline still returns INCOMPLETE,
++source null, unscanned history and exit 2, regardless of retained progress.
++
+ Process failures keep the v3 INCOMPLETE/exit-2 refusal. Its optional
+ `diagnostics` array identifies worker or slot launch errors, exits and signals,
+ report read/empty/parse/shape failures, version-metadata failures and scratch
+diff --git a/scripts/publish-check/cli.py b/scripts/publish-check/cli.py
+index ad6f65a..b9b805e 100644
+--- a/scripts/publish-check/cli.py
++++ b/scripts/publish-check/cli.py
+@@ -6,6 +6,7 @@ from pathlib import Path
+ from history_scan import scan
+ from public_base import parse as parse_public_base, PublicBaseError
+ from report import new_report
++import progress
+ 
+ 
+ def flag_name(value):
+@@ -55,6 +56,7 @@ def seconds(value):
+ 
+ 
+ def main():
++    progress.start()
+     parser = SafeParser(description='Scan working files and full history with system Git and pinned Gitleaks.')
+     parser.add_argument('--repo', required=True)
+     parser.add_argument('--ref', default='HEAD')
+diff --git a/scripts/publish-check/git_history.py b/scripts/publish-check/git_history.py
+index 2d9e13f..9424f3e 100644
+--- a/scripts/publish-check/git_history.py
++++ b/scripts/publish-check/git_history.py
+@@ -2,6 +2,7 @@
+ import os
+ from pathlib import Path
+ import subprocess
++import progress
+ from public_base import parse, display, PublicBaseError
+ 
+ 
+@@ -23,10 +24,13 @@ class History:
+         self.public_tags = set()
+         self.reader = None
+         self.commit = self.run('rev-parse', '--verify', '--end-of-options', ref + '^{commit}').decode().strip()
++        progress.counts(selectedRevisions=1)
+         if self.run('rev-parse', '--is-shallow-repository').strip() != b'false':
+             raise InspectionError('history.shallow')
+         if public_base is not None:
+             url, branch = parse(public_base, self.repo)
++            progress.completed('preparation')
++            progress.enter('fetch')
+             try:
+                 self.run('fetch', '--quiet', '--prune', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head', '--',
+                          url, 'refs/heads/' + branch + ':refs/publish-check/public/base',
+@@ -35,14 +39,24 @@ class History:
+                 self.public_label = display(url) + '#' + branch
+                 self.public_tags = set(self.run('for-each-ref', '--format=%(objectname)',
+                                                'refs/publish-check/public/tags').decode().splitlines())
++                progress.counts(publicRevisions=1 + len(self.public_tags))
++                progress.completed('fetch')
+             except InspectionError:
+                 raise PublicBaseError('public-base.fetch-failed') from None
+         public_revisions = [self.public_commit, *sorted(self.public_tags)] if public_base else []
++        if not public_base:
++            progress.counts(publicRevisions=0)
++            progress.completed('preparation')
+         self.revisions = [self.commit, *public_revisions] if public_base else ['--all', self.commit]
+         from history_hydration import prepare
++        progress.enter('hydration')
+         self.hydration = prepare(self)
++        progress.completed('hydration')
++        progress.enter('history-text')
+         self.commits = self.run('rev-list', *self.revisions).decode().splitlines()
++        progress.counts(historyCommits=len(self.commits))
+         self.public_commits = set(self.run('rev-list', *public_revisions).decode().splitlines()) if public_base else set()
++        progress.counts(publicCommits=len(self.public_commits))
+         self.trees = {}
+         self.tree_ids = dict(line.split() for line in self.run('log', '--format=%H %T', *self.revisions).decode().splitlines())
+         self.reader = subprocess.Popen(['git', '-C', self.repo, 'cat-file', '--batch'],
+@@ -50,8 +64,11 @@ class History:
+ 
+     def run(self, *args, input=None):
+         try:
+-            result = subprocess.run(['git', '-C', self.repo, '-c', 'core.quotePath=false', *args],
+-                                    env=self.env, input=input, capture_output=True, timeout=120)
++            operation = args[0] if args[0] in ('rev-parse', 'fetch', 'rev-list', 'log', 'config',
++                                             'ls-tree', 'for-each-ref', 'cat-file') else 'other'
++            with progress.operation('git.' + operation):
++                result = subprocess.run(['git', '-C', self.repo, '-c', 'core.quotePath=false', *args],
++                                        env=self.env, input=input, capture_output=True, timeout=120)
+             if result.returncode:
+                 raise InspectionError('history.git-failed')
+             return result.stdout
+@@ -82,6 +99,10 @@ class History:
+         return self.entries(commit, False)
+ 
+     def blob(self, oid):
++        with progress.operation('git.cat-file'):
++            return self.read_blob(oid)
++
++    def read_blob(self, oid):
+         if not oid or any(c not in '0123456789abcdef' for c in oid):
+             raise InspectionError('history.invalid-object')
+         self.reader.stdin.write(oid.encode() + b'\n')
+diff --git a/scripts/publish-check/github_refs.py b/scripts/publish-check/github_refs.py
+index 4e3e299..5ba027d 100644
+--- a/scripts/publish-check/github_refs.py
++++ b/scripts/publish-check/github_refs.py
+@@ -3,6 +3,7 @@ import json
+ import os
+ import re
+ import subprocess
++import progress
+ from repository_intent import declarations, commands
+ 
+ SLUG = r'[A-Za-z0-9][A-Za-z0-9_.-]{0,99}'
+@@ -299,8 +300,9 @@ def gh(arguments):
+     # Disable gh debug logging even if inherited from the calling shell.
+     env = {k: v for k, v in os.environ.items() if k not in ('GH_DEBUG', 'DEBUG')}
+     env['GH_PROMPT_DISABLED'] = '1'
+-    response = subprocess.run(['gh', 'api', '--hostname', 'github.com', '--include', *arguments],
+-                              env=env, capture_output=True, timeout=60)
++    with progress.operation('gh.graphql' if arguments[0] == 'graphql' else 'gh.rest'):
++        response = subprocess.run(['gh', 'api', '--hostname', 'github.com', '--include', *arguments],
++                                  env=env, capture_output=True, timeout=60)
+     return response.stdout.decode('utf-8'), response.returncode
+ 
+ 
+diff --git a/scripts/publish-check/gitleaks.py b/scripts/publish-check/gitleaks.py
+index 3e946a7..11767d1 100644
+--- a/scripts/publish-check/gitleaks.py
++++ b/scripts/publish-check/gitleaks.py
+@@ -5,6 +5,7 @@ from pathlib import Path
+ import shutil
+ import subprocess
+ import tempfile
++import progress
+ from git_history import InspectionError
+ 
+ VERSION = '8.30.1'
+@@ -14,7 +15,8 @@ CONFIG = Path(__file__).with_name('gitleaks.toml')
+ def executable():
+     binary = shutil.which('gitleaks') or str(Path.home() / '.local/bin/gitleaks')
+     try:
+-        version = subprocess.run([binary, 'version'], capture_output=True, timeout=10)
++        with progress.operation('gitleaks.version'):
++            version = subprocess.run([binary, 'version'], capture_output=True, timeout=10)
+         if version.returncode or version.stdout.decode().strip() != VERSION:
+             raise InspectionError('scan.gitleaks-version')
+     except OSError:
+@@ -43,7 +45,8 @@ def inspect(binary, mode, repo=None, revisions=None, data=None, timeout=300, red
+         env = {k: v for k, v in os.environ.items() if not k.startswith(('GITLEAKS_', 'GIT_'))}
+         env.update(GIT_NO_REPLACE_OBJECTS='1', GIT_TERMINAL_PROMPT='0', GIT_NO_LAZY_FETCH='1')
+         try:
+-            result = subprocess.run(args, input=data, capture_output=True, env=env, timeout=timeout)
++            with progress.operation('gitleaks.' + mode):
++                result = subprocess.run(args, input=data, capture_output=True, env=env, timeout=timeout)
+             if result.returncode not in (0, 1):
+                 raise InspectionError('scan.gitleaks-failed')
+             # Native reports may contain raw matches for location-bound proof.
+diff --git a/scripts/publish-check/history_hydration.py b/scripts/publish-check/history_hydration.py
+index 1b3bdc1..b7c0870 100644
+--- a/scripts/publish-check/history_hydration.py
++++ b/scripts/publish-check/history_hydration.py
+@@ -1,6 +1,7 @@
+ """Fetch missing promised history in one pack before inspecting any blobs."""
+ from time import monotonic
+ from git_history import InspectionError
++import progress
+ 
+ 
+ def missing_blob(history, oid):
+@@ -22,6 +23,7 @@ def prepare(history):
+                       history.run('rev-list', '--objects', '--missing=print', *history.revisions).splitlines()
+                       if line.startswith(b'?'))
+     before = missing()
++    progress.counts(hydration=True, missingBefore=len(before), fetches=0)
+     fetches = 0
+     if before:
+         # A blob:none clone already owns the commits and trees. ls-tree -l and
+@@ -47,7 +49,9 @@ def prepare(history):
+         except InspectionError:
+             raise missing_blob(history, before[0].decode()) from None
+         fetches = 1
++        progress.counts(hydration=True, fetches=fetches)
+     after = missing() if before else []
++    progress.counts(hydration=True, missingAfter=len(after), fetches=fetches)
+     if after:
+         raise missing_blob(history, after[0].decode())
+     return dict(missingBefore=len(before), missingAfter=len(after), fetches=fetches,
+diff --git a/scripts/publish-check/history_scan.py b/scripts/publish-check/history_scan.py
+index 58f5126..43217d5 100644
+--- a/scripts/publish-check/history_scan.py
++++ b/scripts/publish-check/history_scan.py
+@@ -1,6 +1,7 @@
+ """Scan current files and full history using native Git and pinned Gitleaks."""
+ from pathlib import Path
+ from scan_timings import Timings
++import progress
+ import staged_annotation
+ from git_history import History, InspectionError
+ from public_base import PublicBaseError
+@@ -122,6 +123,8 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
+         identities = {'working-tree': timings.call('identities.prepare', ContentIdentities, working_identities,
+             lambda path: working_regular(Path(history.repo), path))}
+         checksums = {}
++        progress.completed('history-text')
++        progress.enter('gitleaks')
+         for mode in ('git', 'dir'):
+             for hit in timings.call('gitleaks.' + mode, secrets, binary, mode, history.repo, history.revisions, timeout=timeout, redact=False):
+                 path, commit = hit.get('File', '.'), hit.get('Commit') or history.commit
+@@ -160,6 +163,8 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
+                         if held and checksums[identity_scope].matches(held[0], hit):
+                             continue
+                 add(secret_rule(hit['RuleID']), path, commit, oid, scope, scanner_rule=hit['RuleID'])
++        progress.completed('gitleaks')
++        progress.enter('history-text')
+         messages, lines = [], []
+         count = 1
+         all_paths = dict.fromkeys(working_paths, history.commit)
+@@ -188,17 +193,22 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
+             lines.append((count, count + length, path, commit, scope))
+             count += length
+         message_data = b''.join(messages)
++        progress.completed('history-text')
++        progress.enter('gitleaks')
+         for hit in timings.call('gitleaks.messages', secrets, binary, 'stdin', data=message_data, timeout=timeout, redact=False):
+             if not is_assignment(message_data, hit):
+                 continue
+             line = hit.get('StartLine', 0)
+             location = next(((p, c, s) for start, end, p, c, s in lines if start <= line < end), ('@message', None, 'newly-public'))
+             add(secret_rule(hit['RuleID']), location[0], location[1], scope=location[2], scanner_rule=hit['RuleID'])
++        progress.completed('gitleaks')
++        progress.enter('references')
+         states = timings.call('github.references', GitHubResolver().resolve_all,
+                               {repository for references, *_ in deferred for repository, _, _ in references})
+         for references, path, commit, oid, scope in deferred:
+             for rule in reference_rules(references, states):
+                 add(rule, path, commit, oid, scope)
++        progress.completed('references')
+     except PublicBaseError:
+         add('scan.public-base-rejected', '.')
+     except InspectionError as error:
+diff --git a/scripts/publish-check/progress.mjs b/scripts/publish-check/progress.mjs
+new file mode 100644
+index 0000000..7dcf225
+--- /dev/null
++++ b/scripts/publish-check/progress.mjs
+@@ -0,0 +1,40 @@
++// A worker observation is never a report or evidence of scan completion.
++import { createHash } from 'node:crypto';
++import { fstatSync, readSync } from 'node:fs';
++
++export const progressBytes = 1024;
++const phases = new Set(['preparation', 'fetch', 'hydration', 'history-text', 'gitleaks', 'references']);
++const operations = new Set(['none', 'git.rev-parse', 'git.fetch', 'git.rev-list', 'git.log', 'git.config',
++  'git.ls-tree', 'git.for-each-ref', 'git.cat-file', 'git.other',
++  'gitleaks.version', 'gitleaks.git', 'gitleaks.dir', 'gitleaks.stdin', 'gh.graphql', 'gh.rest']);
++const keys = (value, expected) => value && typeof value === 'object' && !Array.isArray(value) &&
++  Object.keys(value).length === expected.length && expected.every(key => Object.hasOwn(value, key));
++const number = value => Number.isSafeInteger(value) && value >= 0;
++const count = value => value === null || number(value);
++
++export function readProgress(fd) {
++  try {
++    if (fd === undefined || fstatSync(fd).size !== progressBytes) return null;
++    const frame = Buffer.alloc(progressBytes);
++    if (readSync(fd, frame, 0, frame.length, 0) !== frame.length || frame[64] !== 10) return null;
++    const body = frame.subarray(65);
++    if (createHash('sha256').update(body).digest('hex') !== frame.subarray(0, 64).toString('ascii')) return null;
++    const value = JSON.parse(body.toString('utf8'));
++    if (!keys(value, ['lastEnteredPhase', 'lastCompletedPhase', 'observedElapsedMs', 'activeOperation',
++      'selectedRevisions', 'publicRevisions', 'historyCommits', 'publicCommits', 'hydration']) ||
++      ![value.lastEnteredPhase, value.lastCompletedPhase].every(phase => phase === null || phases.has(phase)) ||
++      !operations.has(value.activeOperation) || !number(value.observedElapsedMs) ||
++      ![value.selectedRevisions, value.publicRevisions, value.historyCommits, value.publicCommits].every(count) ||
++      !keys(value.hydration, ['missingBefore', 'missingAfter', 'fetches']) ||
++      !Object.values(value.hydration).every(count)) return null;
++    // Construct the public shape explicitly. Never merge worker objects.
++    return {
++      lastEnteredPhase: value.lastEnteredPhase, lastCompletedPhase: value.lastCompletedPhase,
++      observedElapsedMs: value.observedElapsedMs, activeOperation: value.activeOperation,
++      selectedRevisions: value.selectedRevisions, publicRevisions: value.publicRevisions,
++      historyCommits: value.historyCommits, publicCommits: value.publicCommits,
++      hydration: { missingBefore: value.hydration.missingBefore, missingAfter: value.hydration.missingAfter,
++        fetches: value.hydration.fetches },
++    };
++  } catch { return null; }
++}
+diff --git a/scripts/publish-check/progress.py b/scripts/publish-check/progress.py
+new file mode 100644
+index 0000000..ccb9471
+--- /dev/null
++++ b/scripts/publish-check/progress.py
+@@ -0,0 +1,81 @@
++"""Latest value-free worker observation in one private, fixed-size frame."""
++from contextlib import contextmanager
++import hashlib
++import json
++import os
++import stat
++from time import monotonic
++
++FRAME_BYTES = 1024
++MAX_NUMBER = 2**53 - 1
++_current = None
++
++
++class Progress:
++    def __init__(self):
++        self.started = monotonic()
++        self.value = dict(lastEnteredPhase=None, lastCompletedPhase=None, observedElapsedMs=0,
++                          activeOperation='none', selectedRevisions=None, publicRevisions=None,
++                          historyCommits=None, publicCommits=None,
++                          hydration=dict(missingBefore=None, missingAfter=None, fetches=None))
++
++    def publish(self):
++        self.value['observedElapsedMs'] = min(MAX_NUMBER, int((monotonic() - self.started) * 1000))
++        body = json.dumps(self.value, separators=(',', ':'), allow_nan=False).encode()
++        if len(body) > FRAME_BYTES - 65:
++            return
++        body = body.ljust(FRAME_BYTES - 65)
++        frame = hashlib.sha256(body).hexdigest().encode() + b'\n' + body
++        try:
++            # fd 4 is opened by Node, passed only to this worker, and never
++            # inherited by native commands. No source-controlled path is read.
++            os.pwrite(4, frame, 0)
++        except OSError:
++            pass  # Observations cannot change scan success or refusal.
++
++
++def start():
++    global _current
++    try:
++        descriptor = os.fstat(4)
++        if not stat.S_ISREG(descriptor.st_mode) or descriptor.st_size != FRAME_BYTES:
++            return
++    except OSError:
++        return
++    _current = Progress()
++    enter('preparation')
++
++
++def enter(phase):
++    if _current:
++        _current.value['lastEnteredPhase'] = phase
++        _current.publish()
++
++
++def completed(phase):
++    if _current:
++        _current.value['lastCompletedPhase'] = phase
++        _current.publish()
++
++
++def counts(*, hydration=False, **values):
++    if _current:
++        target = _current.value['hydration'] if hydration else _current.value
++        target.update({key: value if type(value) is int and 0 <= value <= MAX_NUMBER else None
++                       for key, value in values.items()})
++        _current.publish()
++
++
++@contextmanager
++def operation(name):
++    if not _current:
++        yield
++        return
++    previous = _current.value['activeOperation']
++    _current.value['activeOperation'] = name
++    _current.publish()
++    try:
++        yield
++    finally:
++        _current.value['activeOperation'] = previous
++        _current.publish()
+diff --git a/scripts/publish-check/slots.py b/scripts/publish-check/slots.py
+index 783dd91..28f1bd6 100644
+--- a/scripts/publish-check/slots.py
++++ b/scripts/publish-check/slots.py
+@@ -53,7 +53,7 @@ def hold_slot(*, wait_seconds):
+                 try:
+                     worker = subprocess.Popen([sys.executable, '-B', str(Path(__file__).with_name('cli.py')),
+                                                *sys.argv[1:]], stdin=subprocess.DEVNULL,
+-                                              stderr=subprocess.DEVNULL, pass_fds=(fd,))
++                                              stderr=subprocess.DEVNULL, pass_fds=(fd, 4))
+                 except OSError as error:
+                     return failure('worker.launch', error)
+                 # Node's pipe closes even on SIGKILL. Stop only this private
+diff --git a/scripts/publish-check/test_progress.py b/scripts/publish-check/test_progress.py
+new file mode 100644
+index 0000000..a0392c7
+--- /dev/null
++++ b/scripts/publish-check/test_progress.py
+@@ -0,0 +1,221 @@
++"""Public scanner observations at real Git, native process and OS edges."""
++import json
++import os
++from pathlib import Path
++import secrets
++import shutil
++import subprocess
++import sys
++import tempfile
++import time
++import unittest
++
++from test_repo import ROOT, RepositoryFixture
++
++
++class ProgressTests(RepositoryFixture, unittest.TestCase):
++    def public(self, repo=None, *, env=None, args=()):
++        return subprocess.run(['node', str(ROOT / 'scripts/publish-check.mjs'), '--repo', str(repo or self.repo),
++                               *args], capture_output=True, text=True, timeout=15, env=env)
++
++    def isolated(self, directory):
++        subprocess.run(['git', 'config', '--file', str(directory / '.gitconfig'),
++                        '--add', 'safe.directory', str(ROOT)], check=True)
++        return {**os.environ, 'HOME': str(directory), 'RER_SCAN_SLOTS': '1'}
++
++    def delay(self, path, native, marker, *, version=False):
++        # Delay an actual native entry, never substitute its answer. The child
++        # also proves the scanner's process-group kill reaches descendants.
++        path.write_text(f'#!{sys.executable}\nimport json, os, pathlib, subprocess, sys, time\n'
++                        + (f'if sys.argv[1:] == ["version"]: os.execv({native!r}, [{native!r}, *sys.argv[1:]])\n'
++                           if version else '') +
++                        'child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])\n'
++                        f'pathlib.Path({str(marker)!r}).write_text(json.dumps([os.getpid(), child.pid, os.environ["TMPDIR"]]))\n'
++                        'time.sleep(60)\n'
++                        f'os.execv({native!r}, [{native!r}, *sys.argv[1:]])\n')
++        path.chmod(0o755)
++
++    def refused_deadline(self, result):
++        self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
++        report = json.loads(result.stdout)
++        self.assertEqual(report['status'], 'INCOMPLETE')
++        self.assertFalse(report['complete'])
++        self.assertFalse(report['guarantees']['historyScanned'])
++        self.assertIsNone(report['source'])
++        self.assertEqual(report['history'], dict(commits=0, trees=0, blobs=0))
++        self.assertEqual([item['rule'] for item in report['findings']], ['scan.deadline-exceeded'])
++        self.assertEqual(report['progress']['slot'], 'acquired')
++        self.assertGreater(report['progress']['elapsedMs'], 0)
++        self.assertEqual(result.stderr, '')
++        return report['progress']['worker']
++
++    def cleaned(self, marker):
++        self.assertTrue(marker.exists(), 'real native process reached its delay')
++        parent, child, scratch = json.loads(marker.read_text())
++        self.assertFalse(Path(scratch).exists(), 'private scanner scratch is removed')
++        for pid in (parent, child):
++            # An unreaped orphan may briefly be a zombie; it cannot run or hold
++            # the slot. Never signal a PID after the scanner has reaped it.
++            end = time.monotonic() + 3
++            while True:
++                state = subprocess.run(['ps', '-o', 'stat=', '-p', str(pid)], capture_output=True, text=True)
++                if not state.stdout.strip() or state.stdout.strip().startswith('Z'):
++                    break
++                self.assertLess(time.monotonic(), end, 'native descendant survived scanner deadline')
++                time.sleep(0.05)
++
++    def test_hydration_deadline_and_resumed_clean_and_finding_scans(self):
++        self.write('removed.txt', 'A historical note.\n')
++        self.commit()
++        self.git('rm', '-q', 'removed.txt')
++        self.commit()
++        self.git('tag', '-a', 'public-note', '-m', 'Public note')
++        self.git('config', 'uploadpack.allowFilter', 'true')
++        self.git('config', 'uploadpack.allowAnySHA1InWant', 'true')
++        with tempfile.TemporaryDirectory(prefix='scan-progress-hydration-') as temporary:
++            directory = Path(temporary)
++            clone = directory / 'clone'
++            subprocess.run(['git', 'clone', '-q', '--filter=blob:none', self.repo.as_uri(), str(clone)],
++                           check=True, capture_output=True)
++            missing = subprocess.check_output(['git', '-C', str(clone), 'rev-list', '--objects',
++                                               '--all', '--missing=print']).splitlines()
++            missing_count = sum(line.startswith(b'?') for line in missing)
++            self.assertGreater(missing_count, 0)
++            marker = directory / 'native'
++            upload = directory / 'upload-pack'
++            self.delay(upload, shutil.which('git-upload-pack'), marker)
++            subprocess.run(['git', '-C', str(clone), 'config', 'remote.origin.uploadpack', str(upload)], check=True)
++            env = self.isolated(directory)
++            worker = self.refused_deadline(self.public(clone, env=env, args=('--timeout-seconds', '2')))
++            self.assertEqual(worker['lastEnteredPhase'], 'hydration')
++            self.assertEqual(worker['lastCompletedPhase'], 'preparation')
++            self.assertEqual(worker['activeOperation'], 'git.fetch')
++            self.assertEqual(worker['selectedRevisions'], 1)
++            self.assertEqual(worker['publicRevisions'], 0)
++            self.assertEqual(worker['hydration']['missingBefore'], missing_count)
++            self.assertIsNone(worker['hydration']['missingAfter'])
++            self.assertIsNone(worker['historyCommits'])
++            self.assertIsNone(worker['publicCommits'])
++            self.assertGreaterEqual(worker['observedElapsedMs'], 0)
++            self.cleaned(marker)
++            subprocess.run(['git', '-C', str(clone), 'config', '--unset', 'remote.origin.uploadpack'], check=True)
++            clean = self.public(clone, env=env, args=('--public-base', self.repo.as_uri() + '#main'))
++            self.assertEqual(clean.returncode, 0, clean.stderr + clean.stdout)
++            report = json.loads(clean.stdout)
++            self.assertEqual(report['status'], 'PASS')
++            self.assertTrue(report['complete'])
++            self.assertTrue(report['guarantees']['historyScanned'])
++            self.assertEqual(report['history']['commits'], int(self.git('rev-list', '--all', '--count')))
++            self.assertEqual(report['history']['hydration']['missingBefore'], missing_count)
++            self.assertEqual(report['history']['hydration']['missingAfter'], 0)
++            self.assertEqual(report['progress']['worker']['publicRevisions'], 2)
++            self.assertEqual(report['progress']['worker']['historyCommits'], report['history']['commits'])
++            self.assertEqual(report['progress']['worker']['publicCommits'], len(report['history']['preExistingCommits']))
++            self.assertEqual(report['progress']['worker']['lastCompletedPhase'], 'references')
++            # Same public door and slot after a deadline; inspect a real deleted
++            # credential too, rather than only a clean current tree.
++            value = 'ghp_' + secrets.token_hex(20)
++            self.write('secret.txt', value)
++            held = self.commit()
++            self.git('rm', '-q', 'secret.txt')
++            self.commit()
++            finding = self.public(env=env)
++            self.assertEqual(finding.returncode, 1, finding.stderr + finding.stdout)
++            report = json.loads(finding.stdout)
++            self.assertTrue(report['complete'])
++            self.assertTrue(report['guarantees']['historyScanned'])
++            self.assertEqual(report['history']['commits'], int(self.git('rev-list', '--all', '--count')))
++            self.assertTrue(any(item['rule'] == 'secret.provider-token' and held in item['commits']
++                                for item in report['findings']))
++            self.assertNotIn(value, finding.stdout + finding.stderr)
++
++    def test_later_native_deadlines(self):
++        for phase, binary, operation, completed in (
++                ('preparation', 'gitleaks', 'gitleaks.version', None),
++                ('gitleaks', 'gitleaks', 'gitleaks.git', 'history-text'),
++                ('references', 'gh', 'gh.graphql', 'gitleaks')):
++            with self.subTest(phase=phase), tempfile.TemporaryDirectory(prefix='scan-progress-native-') as temporary:
++                directory = Path(temporary)
++                if phase == 'references':
++                    self.write('README.md', 'Source: https://github.com/octocat/Hello-World\n')
++                    self.commit()
++                binaries = directory / 'bin'
++                binaries.mkdir()
++                marker = directory / 'native'
++                self.delay(binaries / binary, shutil.which(binary), marker, version=phase == 'gitleaks')
++                env = self.isolated(directory)
++                env['PATH'] = str(binaries) + os.pathsep + env['PATH']
++                worker = self.refused_deadline(self.public(env=env, args=('--timeout-seconds', '6')))
++                self.assertEqual(worker['lastEnteredPhase'], phase)
++                self.assertEqual(worker['lastCompletedPhase'], completed)
++                self.assertEqual(worker['activeOperation'], operation)
++                if phase == 'preparation':
++                    self.assertIsNone(worker['selectedRevisions'])
++                    self.assertIsNone(worker['publicRevisions'])
++                    self.assertTrue(all(value is None for value in worker['hydration'].values()))
++                else:
++                    self.assertEqual(worker['hydration']['missingAfter'], 0)
++                    self.assertEqual(worker['historyCommits'], int(self.git('rev-list', '--all', '--count')))
++                self.cleaned(marker)
++
++    def test_untrusted_progress_and_report_injection_are_unavailable(self):
++        canary = 'synthetic-private-' + secrets.token_hex(16)
++        corruptions = [
++            f'value["lastEnteredPhase"] = {canary!r}',
++            f'value["activeOperation"] = {canary!r}',
++            f'value["hydration"]["path"] = {canary!r}',
++            f'value["source"] = {canary!r}',
++            'value["selectedRevisions"] = True',
++            'value["selectedRevisions"] = 2**53',
++            'value["hydration"]["missingBefore"] = -1',
++            'del value["lastCompletedPhase"]',
++            'value["hydration"] = []',
++            'os.ftruncate(4, 2048); return',
++            'os.ftruncate(4, 0); return',
++            'os.pwrite(4, b"partial", 0); return',
++        ]
++        with tempfile.TemporaryDirectory(prefix='scan-progress-untrusted-') as temporary:
++            directory = Path(temporary)
++            env = self.isolated(directory)
++            env['PYTHONPATH'] = str(directory)
++            for corruption in corruptions:
++                with self.subTest(corruption=corruption):
++                    # The real worker produces an INCOMPLETE report for an
++                    # invalid ref. Corrupt only its diagnostic transport and
++                    # add an untrusted progress field to that actual report.
++                    (directory / 'sitecustomize.py').write_text(
++                        'import atexit, hashlib, json, os, pathlib, sys\n'
++                        'if sys.argv[0].endswith("/cli.py"):\n'
++                        ' def corrupt():\n'
++                        '  report = pathlib.Path(os.environ["TMPDIR"], "report.json")\n'
++                        '  document = json.loads(report.read_text())\n'
++                        f'  document["progress"] = {{"path": {canary!r}}}\n'
++                        '  report.write_text(json.dumps(document))\n'
++                        '  value = json.loads(os.pread(4, 1024, 0)[65:])\n'
++                        '  ' + corruption + '\n'
++                        '  body = json.dumps(value).encode().ljust(959)\n'
++                        '  os.pwrite(4, hashlib.sha256(body).hexdigest().encode() + b"\\n" + body, 0)\n'
++                        ' atexit.register(corrupt)\n')
++                    result = self.public(env=env, args=('--ref', 'refs/heads/absent'))
++                    self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
++                    report = json.loads(result.stdout)
++                    self.assertEqual(report['status'], 'INCOMPLETE')
++                    self.assertFalse(report['complete'])
++                    self.assertFalse(report['guarantees']['historyScanned'])
++                    self.assertIsNone(report['source'])
++                    self.assertEqual(report['findings'][0]['rule'], 'scan.history-incomplete')
++                    self.assertIsNone(report['progress']['worker'])
++                    self.assertNotIn(canary, result.stdout + result.stderr)
++            # An interrupted process may leave a partial frame and a partial
++            # report. The real public deadline still owns the refusal.
++            (directory / 'sitecustomize.py').write_text(
++                'import os, sys, time\n'
++                'if sys.argv[0].endswith("/cli.py"):\n'
++                f' os.pwrite(4, {canary.encode()!r}, 0)\n'
++                ' time.sleep(60)\n')
++            worker = self.refused_deadline(self.public(env=env, args=('--timeout-seconds', '0.3')))
++            self.assertIsNone(worker)
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/scripts/publish-check/tests.py b/scripts/publish-check/tests.py
+index f316ea5..d77f286 100644
+--- a/scripts/publish-check/tests.py
++++ b/scripts/publish-check/tests.py
+@@ -17,6 +17,7 @@ from history_scan import scan
+ from test_partial_clone import PartialCloneTests
+ from test_copy_digests import CopyDigestTests
+ from test_lockfile_metadata import LockfileMetadataTests
++from test_progress import ProgressTests
+ 
+ 
+ class HistoryTests(RepositoryFixture, unittest.TestCase):
+@@ -577,9 +578,9 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
+                             "pathlib.Path(os.environ['TMPDIR']).chmod(0o500)")
+                 cases.extend([
+                     ("if worker:\n import atexit\n def restrict():\n  " + restrict + "\n atexit.register(restrict)",
+-                     dict(stage='cleanup', code='cleanup.remove-error', errno='EACCES')),
++                     dict(stage='cleanup', code='cleanup.remove-error')),
+                     ("if worker:\n " + restrict + "\n os._exit(7)",
+-                     dict(stage='cleanup', code='cleanup.remove-error', errno='EACCES')),
++                     dict(stage='cleanup', code='cleanup.remove-error')),
+                 ])
+             for source, fact in cases:
+                 with self.subTest(fact=fact):
+@@ -604,7 +605,16 @@ print('HTTP/2.0 200 OK\\n\\n' + json.dumps(dict(private=state == 'private')))
+                     self.assertIsNone(report['source'])
+                     self.assertEqual(report['history'], dict(commits=0, trees=0, blobs=0))
+                     self.assertEqual([finding['rule'] for finding in report['findings']], ['scan.worker-incomplete'])
+-                    self.assertIn(fact, report['diagnostics'])
++                    if fact['stage'] == 'cleanup':
++                        # Node's recursive remover surfaces different OS errors
++                        # across supported runtimes. It must still prove the
++                        # failed cleanup and refuse a clean scan.
++                        matched = next((item for item in report['diagnostics']
++                                        if fact.items() <= item.items()), None)
++                        self.assertIsNotNone(matched, report['diagnostics'])
++                        self.assertIn(matched['errno'], __import__('errno').errorcode.values())
++                    else:
++                        self.assertIn(fact, report['diagnostics'])
+                     self.assertNotIn(canary, result.stdout + result.stderr)
+                     self.assertEqual(result.stderr, '')
+                     self.assertLess(len(result.stdout), 2000)

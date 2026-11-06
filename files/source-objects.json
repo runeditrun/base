@@ -1,0 +1,114 @@
+[
+  {
+    "path": "default-seed/tests/e2e/agent-person-erasure.test.mjs",
+    "baseline_object": "369ae8ff3919b44991f30018f58f9fe6d9ef6bcf",
+    "candidate_object": "369ae8ff3919b44991f30018f58f9fe6d9ef6bcf",
+    "same": true,
+    "present_in_both": true
+  },
+  {
+    "path": "default-seed/tests/operator-auth/emitted-runtime.mjs",
+    "baseline_object": "5a0d57189ccba7cf3c5b9a1cdac13e813075d4d2",
+    "candidate_object": "5a0d57189ccba7cf3c5b9a1cdac13e813075d4d2",
+    "same": true,
+    "present_in_both": true
+  },
+  {
+    "path": "default-seed/src",
+    "baseline_object": "5bdbe3f9cdb752b8b0117d7db626587ea814231f",
+    "candidate_object": "5bdbe3f9cdb752b8b0117d7db626587ea814231f",
+    "same": true,
+    "present_in_both": true
+  },
+  {
+    "path": "default-seed/modules",
+    "baseline_object": null,
+    "candidate_object": null,
+    "same": true,
+    "present_in_both": false
+  },
+  {
+    "path": "default-seed/migrations",
+    "baseline_object": "02b3320640bcf639c879a82e25a33d65a470d3d2",
+    "candidate_object": "02b3320640bcf639c879a82e25a33d65a470d3d2",
+    "same": true,
+    "present_in_both": true
+  },
+  {
+    "path": "modules/erasure",
+    "baseline_object": "20de4813f8ceeef7734ed053bb4e045313c2b270",
+    "candidate_object": "20de4813f8ceeef7734ed053bb4e045313c2b270",
+    "same": true,
+    "present_in_both": true
+  },
+  {
+    "path": "modules/agent-door",
+    "baseline_object": "4bce85f838e9497e239e26f8edd2f49854beeb87",
+    "candidate_object": "4bce85f838e9497e239e26f8edd2f49854beeb87",
+    "same": true,
+    "present_in_both": true
+  },
+  {
+    "path": "modules/portability",
+    "baseline_object": "25c3090a61fd1c48076af7d78e4a8a00114d355f",
+    "candidate_object": "25c3090a61fd1c48076af7d78e4a8a00114d355f",
+    "same": true,
+    "present_in_both": true
+  },
+  {
+    "path": "pnpm-lock.yaml",
+    "baseline_object": "d0192c8e5ee1358ded9a406752215467e3770e2e",
+    "candidate_object": "d0192c8e5ee1358ded9a406752215467e3770e2e",
+    "same": true,
+    "present_in_both": true
+  },
+  {
+    "path": "default-seed/scripts/base-cli/modules",
+    "baseline_object": "2a7f0f60028f6159edf7e8c9a1d17003fac2d74e",
+    "candidate_object": "2a7f0f60028f6159edf7e8c9a1d17003fac2d74e",
+    "same": true,
+    "present_in_both": true
+  },
+  {
+    "path": "default-seed/scripts/base-onboarding",
+    "baseline_object": "0a8146dc98cf7471900ea47252a539667fadab34",
+    "candidate_object": "0a8146dc98cf7471900ea47252a539667fadab34",
+    "same": true,
+    "present_in_both": true
+  },
+  {
+    "path": "default-seed/scripts/base-cli/onboarding",
+    "baseline_object": null,
+    "candidate_object": null,
+    "same": true,
+    "present_in_both": false
+  },
+  {
+    "path": "default-seed/scripts/base-cli/cli",
+    "baseline_object": "76ce2beab851748c100f07b3d197d9b31352791e",
+    "candidate_object": "76ce2beab851748c100f07b3d197d9b31352791e",
+    "same": true,
+    "present_in_both": true
+  },
+  {
+    "path": "default-seed/scripts/base-cli/default-seed",
+    "baseline_object": "fdf6f63608090178df5e7af52b5c5073547de837",
+    "candidate_object": "fdf6f63608090178df5e7af52b5c5073547de837",
+    "same": true,
+    "present_in_both": true
+  },
+  {
+    "path": "default-seed/scripts/verify-app.mjs",
+    "baseline_object": "87b1e16d080d7350b15dc509b09178ed32aa1b30",
+    "candidate_object": "87b1e16d080d7350b15dc509b09178ed32aa1b30",
+    "same": true,
+    "present_in_both": true
+  },
+  {
+    "path": ".github/workflows/verify.yml",
+    "baseline_object": "09898c8479f8fd006281c81aa1366b63bcc86d8a",
+    "candidate_object": "09898c8479f8fd006281c81aa1366b63bcc86d8a",
+    "same": true,
+    "present_in_both": true
+  }
+]

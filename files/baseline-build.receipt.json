@@ -1,0 +1,27 @@
+{
+  "label": "baseline-build",
+  "pid": 1590,
+  "command": [
+    "pnpm",
+    "--dir",
+    "default-seed",
+    "run",
+    "build"
+  ],
+  "cwd": "/home/agent/rer-consolidation/work/gr-publish-progress-reference-triage-1/base",
+  "started_utc": "2026-11-06T14:28:52.494240+00:00",
+  "exit_code": 0,
+  "duration_seconds": 5.5959101320000855,
+  "ended_utc": "2026-11-06T14:28:58.090168+00:00",
+  "head": "601a56e0a5e8e21507003b902949e12723036148",
+  "outputs": {
+    ".stdout.log": {
+      "bytes": 199,
+      "sha256": "a3883ccbdffcdd507abfd1310b49493ca4219f062ca6edb3485f9c89cae80d7c"
+    },
+    ".stderr.log": {
+      "bytes": 5337,
+      "sha256": "2666060649de941a06f63fa19f3b5c277b2b80a0c6753cfe20be738360963c46"
+    }
+  }
+}

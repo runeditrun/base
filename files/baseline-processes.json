@@ -1,0 +1,31 @@
+{
+  "observed_unix": 1793975394.5518024,
+  "root_pid": 1771,
+  "processes": {
+    "1771": {
+      "ppid": 1770,
+      "name": "node",
+      "state": "S (sleeping)"
+    },
+    "1777": {
+      "ppid": 1771,
+      "name": "node",
+      "state": "S (sleeping)"
+    },
+    "1789": {
+      "ppid": 1777,
+      "name": "esbuild",
+      "state": "S (sleeping)"
+    },
+    "1794": {
+      "ppid": 1777,
+      "name": "workerd",
+      "state": "S (sleeping)"
+    },
+    "1799": {
+      "ppid": 1777,
+      "name": "workerd",
+      "state": "R (running)"
+    }
+  }
+}

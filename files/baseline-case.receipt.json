@@ -1,0 +1,31 @@
+{
+  "label": "baseline-case",
+  "pid": 1771,
+  "command": [
+    "env",
+    "TZ=UTC",
+    "RER_VERIFY_WORKERS=1",
+    "WRANGLER_SEND_METRICS=false",
+    "node",
+    "--test",
+    "--test-concurrency=1",
+    "--test-name-pattern=recorded names in proposal or audit free text erase with word boundaries and preserve peers",
+    "tests/e2e/agent-person-erasure.test.mjs"
+  ],
+  "cwd": "/home/agent/rer-consolidation/work/gr-publish-progress-reference-triage-1/base/default-seed",
+  "started_utc": "2026-11-06T14:29:09.845413+00:00",
+  "exit_code": 0,
+  "duration_seconds": 155.29601741599993,
+  "ended_utc": "2026-11-06T14:31:45.141446+00:00",
+  "head": "601a56e0a5e8e21507003b902949e12723036148",
+  "outputs": {
+    ".stdout.log": {
+      "bytes": 3446,
+      "sha256": "5e44226dc0c8de2a318d6d9b1907cebc904cc83de2efe6b26ce381fbc4490540"
+    },
+    ".stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

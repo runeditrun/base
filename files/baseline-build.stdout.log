@@ -1,0 +1,5 @@
+
+> @run-edit-run/default-seed-reference@0.1.0 build /home/agent/rer-consolidation/work/gr-publish-progress-reference-triage-1/base/default-seed
+> node scripts/rer.mjs build
+
+build: complete (exit 0)

@@ -1,0 +1,44 @@
+{
+  "observed_utc": "2026-11-06T14:25:29.200970+00:00",
+  "runner": "dedicated cloud VM; same checkout path used sequentially",
+  "system": "Linux",
+  "machine": "x86_64",
+  "kernel": "6.18.57",
+  "os_release": "PRETTY_NAME=\"Debian GNU/Linux 13 (trixie)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"13\"\nVERSION=\"13 (trixie)\"\nVERSION_CODENAME=trixie\nDEBIAN_VERSION_FULL=13.6\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"\n",
+  "node": "v22.20.0",
+  "node_path": "/home/agent/.rer/toolchain/node-22.20.0/node_modules/node/bin/node",
+  "pnpm": "10.12.4",
+  "pnpm_path": "/home/agent/.rer/toolchain/pnpm-10.12.4/node_modules/.bin/pnpm",
+  "cpu_count": 5,
+  "memory_limit": "17179869184",
+  "pids_limit": "max",
+  "pid1_comm": "tail",
+  "settings": {
+    "TZ": "UTC",
+    "RER_VERIFY_WORKERS": "1",
+    "NODE_USE_ENV_PROXY": "1",
+    "NO_PROXY": "localhost,127.0.0.1,::1",
+    "no_proxy": "localhost,127.0.0.1,::1",
+    "WRANGLER_SEND_METRICS": "false",
+    "test_concurrency": 1,
+    "test_timeout_ms": 180000,
+    "test_name_pattern": "recorded names in proposal or audit free text erase with word boundaries and preserve peers",
+    "browser": "not used by this selected case",
+    "subreaper": "cloud_run wraps the complete command; PR_SET_CHILD_SUBREAPER=1",
+    "HOME": "real user HOME; not replaced",
+    "provider_bindings": "test fixture creates disposable local bindings; no held-key injector"
+  },
+  "hashes": {
+    "pnpm-lock.yaml": "2b1b50bfd419be27078fda2c160313562aec98ba9974090e856eaa3534d3d05f",
+    "package.json": "9d1c7ae18ea5e45bbaeca0fa82f8430b3e0d45238ea694d9f23a0d7c4ad1b681",
+    "default-seed/package.json": "bbfc32b2548a63d9f9b47dcea3b768d04d8429327981b4b7bcb129bcbf70552a",
+    "default-seed/verification.json": "37bc1cb895c629e76e882b21bf795e31f9cd3095ac66eb14b03e5662bc6fe2ab",
+    "default-seed/tests/e2e/agent-person-erasure.test.mjs": "d282732afea63ad878185d56a174e7fefef2a0e83df55bcdc12da66eaef0c1a5"
+  },
+  "differences_from_actions": [
+    "Debian 13 cloud VM rather than Ubuntu 24.04 container; repository documents Ubuntu/Debian support",
+    "Pinned Node supplied by npm node@22.20.0 rather than bootstrap tarball",
+    "Only frozen workspace dependencies and workerd required for this case; no Chromium, mail dependency workspace, gitleaks, actionlint or full verify installation/run",
+    "Only the named registration runs, after building, rather than its entire reference shard"
+  ]
+}

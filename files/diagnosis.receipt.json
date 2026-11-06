@@ -1,0 +1,168 @@
+{
+  "schema": 1,
+  "tag": "gr-publish-progress-reference-triage-1",
+  "repository": "runeditrun/base",
+  "candidate": {
+    "label": "candidate-case",
+    "pid": 1404,
+    "command": [
+      "env",
+      "TZ=UTC",
+      "RER_VERIFY_WORKERS=1",
+      "WRANGLER_SEND_METRICS=false",
+      "node",
+      "--test",
+      "--test-concurrency=1",
+      "--test-name-pattern=recorded names in proposal or audit free text erase with word boundaries and preserve peers",
+      "tests/e2e/agent-person-erasure.test.mjs"
+    ],
+    "cwd": "/home/agent/rer-consolidation/work/gr-publish-progress-reference-triage-1/base/default-seed",
+    "started_utc": "2026-11-06T14:25:44.300638+00:00",
+    "exit_code": 0,
+    "duration_seconds": 170.93834470299998,
+    "ended_utc": "2026-11-06T14:28:35.239000+00:00",
+    "head": "5d67855b3a32d51722ef57fa12c1288317803c57",
+    "outputs": {
+      ".stdout.log": {
+        "bytes": 3445,
+        "sha256": "6ed4e42b4d0c74639e5ffc958f4d3220f114ce821759e9bdb307815c38874eca"
+      },
+      ".stderr.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "baseline": {
+    "label": "baseline-case",
+    "pid": 1771,
+    "command": [
+      "env",
+      "TZ=UTC",
+      "RER_VERIFY_WORKERS=1",
+      "WRANGLER_SEND_METRICS=false",
+      "node",
+      "--test",
+      "--test-concurrency=1",
+      "--test-name-pattern=recorded names in proposal or audit free text erase with word boundaries and preserve peers",
+      "tests/e2e/agent-person-erasure.test.mjs"
+    ],
+    "cwd": "/home/agent/rer-consolidation/work/gr-publish-progress-reference-triage-1/base/default-seed",
+    "started_utc": "2026-11-06T14:29:09.845413+00:00",
+    "exit_code": 0,
+    "duration_seconds": 155.29601741599993,
+    "ended_utc": "2026-11-06T14:31:45.141446+00:00",
+    "head": "601a56e0a5e8e21507003b902949e12723036148",
+    "outputs": {
+      ".stdout.log": {
+        "bytes": 3446,
+        "sha256": "5e44226dc0c8de2a318d6d9b1907cebc904cc83de2efe6b26ce381fbc4490540"
+      },
+      ".stderr.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "candidate_stats": {
+    "tests": 11,
+    "suites": 0,
+    "pass": 11,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "duration_ms": 170909.88664,
+    "parent_duration_ms": 170072.645778,
+    "probe_lines": [
+      "PROBE NAME \"Recorded Name b4b5477d-8148-4e06-bb26-1e2cb49eb65b\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 3/4/4/1 -> 3/4/4/1",
+      "PROBE NAME \"a\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 6/8/8/2 -> 6/8/8/2",
+      "PROBE NAME \"Al\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 9/12/12/3 -> 9/12/12/3",
+      "PROBE NAME \"1\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 12/16/16/4 -> 12/16/16/4",
+      "PROBE NAME \"Zo\u00eb\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 15/20/20/5 -> 15/20/20/5",
+      "PROBE NAME \"Name[*]?\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 18/24/24/6 -> 18/24/24/6",
+      "PROBE NAME \"Al: please follow up tomorrow\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 21/28/28/7 -> 21/28/28/7",
+      "PROBE NAME \"Please follow up tomorrow:Al\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 24/32/32/8 -> 24/32/32/8",
+      "PROBE NAME \"Follow up:Al:tomorrow\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 27/36/36/9 -> 27/36/36/9",
+      "PROBE NAME \"Al: value; key:Al\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 30/40/40/10 -> 30/40/40/10",
+      "PROBE NAME RESTORE: 20 non-personal proposal and audit stubs preserved; older archives HTTP 400 erasure_epoch"
+    ]
+  },
+  "baseline_stats": {
+    "tests": 11,
+    "suites": 0,
+    "pass": 11,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "duration_ms": 155263.505967,
+    "parent_duration_ms": 154481.137885,
+    "probe_lines": [
+      "PROBE NAME \"Recorded Name 9fddf623-a820-4cd4-860f-7ef07d965b7a\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 3/4/4/1 -> 3/4/4/1",
+      "PROBE NAME \"a\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 6/8/8/2 -> 6/8/8/2",
+      "PROBE NAME \"Al\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 9/12/12/3 -> 9/12/12/3",
+      "PROBE NAME \"1\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 12/16/16/4 -> 12/16/16/4",
+      "PROBE NAME \"Zo\u00eb\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 15/20/20/5 -> 15/20/20/5",
+      "PROBE NAME \"Name[*]?\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 18/24/24/6 -> 18/24/24/6",
+      "PROBE NAME \"Al: please follow up tomorrow\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 21/28/28/7 -> 21/28/28/7",
+      "PROBE NAME \"Please follow up tomorrow:Al\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 24/32/32/8 -> 24/32/32/8",
+      "PROBE NAME \"Follow up:Al:tomorrow\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 27/36/36/9 -> 27/36/36/9",
+      "PROBE NAME \"Al: value; key:Al\": personal proposal/audit payloads 2 -> 0; peer byte-identical; counts 30/40/40/10 -> 30/40/40/10",
+      "PROBE NAME RESTORE: 20 non-personal proposal and audit stubs preserved; older archives HTTP 400 erasure_epoch"
+    ]
+  },
+  "disposition": "UNKNOWN \u2014 original timeout did not reproduce in either isolated run",
+  "source_comparison": {
+    "baseline": "601a56e0a5e8e21507003b902949e12723036148",
+    "candidate": "5d67855b3a32d51722ef57fa12c1288317803c57",
+    "fresh_main": "601a56e0a5e8e21507003b902949e12723036148",
+    "diff_scope": [
+      ".github/workflows/verify.yml",
+      "scripts/agent-bootstrap.sh",
+      "scripts/ci/reference-shard.mjs",
+      "scripts/ci/verify.mjs",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "package.json",
+      "patches",
+      "default-seed/tests",
+      "default-seed/verification.json",
+      "default-seed/package.json",
+      "default-seed/src",
+      "default-seed/modules",
+      "default-seed/migrations",
+      "modules/erasure",
+      "modules/agent-door",
+      "modules/portability",
+      "default-seed/scripts/rer.mjs",
+      "default-seed/scripts/verify-app.mjs",
+      "default-seed/scripts/verify-ci.mjs"
+    ],
+    "case_source_diff_bytes": 0
+  },
+  "build_comparison": {
+    "candidate_files": 56,
+    "baseline_files": 56,
+    "same_hashes": false,
+    "changed_files": [
+      "client/reference/index.html"
+    ],
+    "baseline_test_source_sha256": "d282732afea63ad878185d56a174e7fefef2a0e83df55bcdc12da66eaef0c1a5",
+    "remaining_test_scratch": []
+  },
+  "api_calls": 2,
+  "product_commits": 0,
+  "product_pushes": 0,
+  "prs_created": 0,
+  "clause_status_changes": [],
+  "assertions_changed": 0,
+  "timeouts_changed": 0,
+  "original_ci": {
+    "ordinary": 42216473958,
+    "journeys_true": 42226188314,
+    "failed_job": 127920266857,
+    "known_failure": "testTimeoutFailure after 180000ms; reported 180269ms; ten nested cases ok; totals13pass/0fail/1cancel",
+    "original_failure_source": "assignment-provided already-read log; not newly downloaded"
+  }
+}

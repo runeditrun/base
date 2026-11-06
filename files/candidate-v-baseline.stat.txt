@@ -1,0 +1,26 @@
+ default-seed/scripts/base-cli/inventory.json       |  26 ++-
+ .../scripts/base-cli/scripts/publish-check.mjs     |  32 ++-
+ .../base-cli/scripts/publish-check/README.md       |  23 +++
+ .../scripts/base-cli/scripts/publish-check/cli.py  |   2 +
+ .../base-cli/scripts/publish-check/git_history.py  |  25 ++-
+ .../base-cli/scripts/publish-check/github_refs.py  |   6 +-
+ .../base-cli/scripts/publish-check/gitleaks.py     |   7 +-
+ .../scripts/publish-check/history_hydration.py     |   4 +
+ .../base-cli/scripts/publish-check/history_scan.py |  10 +
+ .../base-cli/scripts/publish-check/progress.mjs    |  40 ++++
+ .../base-cli/scripts/publish-check/progress.py     |  81 ++++++++
+ .../base-cli/scripts/publish-check/slots.py        |   2 +-
+ scripts/publish-check.mjs                          |  32 ++-
+ scripts/publish-check/README.md                    |  23 +++
+ scripts/publish-check/cli.py                       |   2 +
+ scripts/publish-check/git_history.py               |  25 ++-
+ scripts/publish-check/github_refs.py               |   6 +-
+ scripts/publish-check/gitleaks.py                  |   7 +-
+ scripts/publish-check/history_hydration.py         |   4 +
+ scripts/publish-check/history_scan.py              |  10 +
+ scripts/publish-check/progress.mjs                 |  40 ++++
+ scripts/publish-check/progress.py                  |  81 ++++++++
+ scripts/publish-check/slots.py                     |   2 +-
+ scripts/publish-check/test_progress.py             | 221 +++++++++++++++++++++
+ scripts/publish-check/tests.py                     |  16 +-
+ 25 files changed, 693 insertions(+), 34 deletions(-)

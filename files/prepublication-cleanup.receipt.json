@@ -1,0 +1,23 @@
+{
+  "observed_utc": "2026-11-06T14:33:27.575976+00:00",
+  "recorded_process_pids": [
+    1404,
+    1410,
+    1422,
+    1427,
+    1432,
+    1771,
+    1777,
+    1789,
+    1794,
+    1799
+  ],
+  "remaining_recorded_pids": [],
+  "test_scratch_before": [],
+  "test_scratch_after": [],
+  "processes_killed": [],
+  "git_status_before_deletion": "",
+  "product_branch": "cloud/gr-publish-progress-reference-triage-1",
+  "product_head": "601a56e0a5e8e21507003b902949e12723036148",
+  "clone_cleanup": "Owned clone and its dependencies will be removed after evidence publication; local cleanup.receipt.json outside packet records completion"
+}

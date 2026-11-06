@@ -1,0 +1,28 @@
+{
+  "baseline": "601a56e0a5e8e21507003b902949e12723036148",
+  "candidate": "5d67855b3a32d51722ef57fa12c1288317803c57",
+  "fresh_main": "601a56e0a5e8e21507003b902949e12723036148",
+  "diff_scope": [
+    ".github/workflows/verify.yml",
+    "scripts/agent-bootstrap.sh",
+    "scripts/ci/reference-shard.mjs",
+    "scripts/ci/verify.mjs",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "package.json",
+    "patches",
+    "default-seed/tests",
+    "default-seed/verification.json",
+    "default-seed/package.json",
+    "default-seed/src",
+    "default-seed/modules",
+    "default-seed/migrations",
+    "modules/erasure",
+    "modules/agent-door",
+    "modules/portability",
+    "default-seed/scripts/rer.mjs",
+    "default-seed/scripts/verify-app.mjs",
+    "default-seed/scripts/verify-ci.mjs"
+  ],
+  "case_source_diff_bytes": 0
+}

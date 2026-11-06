@@ -1,0 +1,31 @@
+{
+  "label": "candidate-case",
+  "pid": 1404,
+  "command": [
+    "env",
+    "TZ=UTC",
+    "RER_VERIFY_WORKERS=1",
+    "WRANGLER_SEND_METRICS=false",
+    "node",
+    "--test",
+    "--test-concurrency=1",
+    "--test-name-pattern=recorded names in proposal or audit free text erase with word boundaries and preserve peers",
+    "tests/e2e/agent-person-erasure.test.mjs"
+  ],
+  "cwd": "/home/agent/rer-consolidation/work/gr-publish-progress-reference-triage-1/base/default-seed",
+  "started_utc": "2026-11-06T14:25:44.300638+00:00",
+  "exit_code": 0,
+  "duration_seconds": 170.93834470299998,
+  "ended_utc": "2026-11-06T14:28:35.239000+00:00",
+  "head": "5d67855b3a32d51722ef57fa12c1288317803c57",
+  "outputs": {
+    ".stdout.log": {
+      "bytes": 3445,
+      "sha256": "6ed4e42b4d0c74639e5ffc958f4d3220f114ce821759e9bdb307815c38874eca"
+    },
+    ".stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

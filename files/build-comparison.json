@@ -1,0 +1,10 @@
+{
+  "candidate_files": 56,
+  "baseline_files": 56,
+  "same_hashes": false,
+  "changed_files": [
+    "client/reference/index.html"
+  ],
+  "baseline_test_source_sha256": "d282732afea63ad878185d56a174e7fefef2a0e83df55bcdc12da66eaef0c1a5",
+  "remaining_test_scratch": []
+}

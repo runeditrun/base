@@ -1,0 +1,53 @@
+{
+  "api_calls": 2,
+  "runs": [
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/runeditrun/base/actions/runs/42216473958",
+        "--jq",
+        "{id,status,conclusion,head_sha,event,head_branch,html_url,run_started_at,updated_at}"
+      ],
+      "requested_run_id": 42216473958,
+      "observed_utc": "2026-11-06T14:26:49.524676+00:00",
+      "exit_code": 0,
+      "run": {
+        "conclusion": "success",
+        "event": "workflow_dispatch",
+        "head_branch": "cloud/gr-publish-scan-progress-1",
+        "head_sha": "5d67855b3a32d51722ef57fa12c1288317803c57",
+        "html_url": "https://github.com/runeditrun/base/actions/runs/42216473958",
+        "id": 42216473958,
+        "run_started_at": "2026-11-06T12:17:00Z",
+        "status": "completed",
+        "updated_at": "2026-11-06T12:41:09Z"
+      }
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/runeditrun/base/actions/runs/42226188314",
+        "--jq",
+        "{id,status,conclusion,head_sha,event,head_branch,html_url,run_started_at,updated_at}"
+      ],
+      "requested_run_id": 42226188314,
+      "observed_utc": "2026-11-06T14:26:49.985820+00:00",
+      "exit_code": 0,
+      "run": {
+        "conclusion": "failure",
+        "event": "workflow_dispatch",
+        "head_branch": "cloud/gr-publish-scan-progress-land-3",
+        "head_sha": "5d67855b3a32d51722ef57fa12c1288317803c57",
+        "html_url": "https://github.com/runeditrun/base/actions/runs/42226188314",
+        "id": 42226188314,
+        "run_started_at": "2026-11-06T13:31:34Z",
+        "status": "completed",
+        "updated_at": "2026-11-06T13:53:49Z"
+      }
+    }
+  ],
+  "input_note": "journeys=true versus ordinary qualification supplied by brief; REST run metadata does not expose workflow-dispatch inputs",
+  "log_note": "No new log read; failed job 127920266857 and assertion transcript supplied in brief"
+}
