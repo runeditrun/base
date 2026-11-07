@@ -5,6 +5,10 @@ import { importDiagnostic } from './d1-import-diagnostics.mjs';
 
 export const D1_IMPORT_POLL_LIMIT = 100;
 
+// D1 answers a poll with this once the import it was running has finished: a
+// short import can commit, completion marker included, before the next poll.
+const NOT_IMPORTING = 'Not currently importing anything.';
+
 // Wrangler's remote --file protocol. D1 imports execute the whole file atomically,
 // including trigger bodies; the query endpoint's semicolon splitting cannot.
 // Cloudflare's own reason for an import that failed or did not finish, kept on the
@@ -47,7 +51,13 @@ export async function importD1({ envelope, upload, redact = String }, id, sql) {
   }
   for (let polls = 0; polls < D1_IMPORT_POLL_LIMIT; polls++) {
     // REST places errors on the envelope; validate nested errors when supplied.
-    if (!(response?.success === true && response.type === 'import' && response.status !== 'error' && (!Object.hasOwn(response, 'errors') || Array.isArray(response.errors) && !response.errors.length))) throw fail('d1-import-failed');
+    if (!(response?.success === true && response.type === 'import' && response.status !== 'error' && (!Object.hasOwn(response, 'errors') || Array.isArray(response.errors) && !response.errors.length))) {
+      const failure = fail('d1-import-failed');
+      // Only a poll that follows an active import can mean it finished; the caller
+      // that knows the migration decides from the D1 ledger, never from this answer.
+      if (step === 'poll' && response?.success === false && response.error === NOT_IMPORTING && !response.errors?.length) failure.importNotActive = true;
+      throw failure;
+    }
     if (response.status === 'complete') {
       if (!(Number.isSafeInteger(response.result?.num_queries) && response.result.num_queries > 0 && typeof response.result.final_bookmark === 'string' && response.result.final_bookmark.length > 0)) throw fail('d1-import-invalid-result');
       return;

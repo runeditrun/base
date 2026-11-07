@@ -53,6 +53,16 @@ export async function query(api, id, sql) {
   assert(Array.isArray(rows) && rows.length > 0 && rows.every(x => x.success === true && Array.isArray(x.results)), 'd1-query-failed');
   return rows;
 }
+/** D1 answered a poll "not currently importing" after an active ingest: the import may
+ * have committed before the poll. Complete only when the ledger holds this migration
+ * applied on exactly its bytes; any other answer, or a read that fails, leaves the
+ * import's own failure standing. */
+async function ledgerAppliesMigration(api, id, migration) {
+  try {
+    const rows = (await query(api,id,`SELECT name, sha256, state FROM ${ledger} WHERE name=${literal(migration.name)}`))[0].results;
+    return rows.length === 1 && rows[0].state === 'applied' && rows[0].sha256 === migration.sha256;
+  } catch { return false; }
+}
 /** `locked`: the caller holds the install's deploy lock (owner.mjs withStateLock). */
 export async function migrate(api, id, migrations, { apply = true, upgrade = apply, locked = false } = {}) {
   validateMigrations(migrations);
@@ -80,7 +90,10 @@ export async function migrate(api, id, migrations, { apply = true, upgrade = app
       ? `UPDATE ${ledger} SET sha256=${literal(migration.sha256)}, state='applied' WHERE name=${literal(migration.name)} AND sha256=${literal(claimedFrom)} AND state='applying'`
       : `UPDATE ${ledger} SET state='applied' WHERE name=${literal(migration.name)} AND sha256=${literal(migration.sha256)}`;
     await api.importSql(id,`${migration.sql}\n${separator}${done};`)
-      .catch(error => { error.migration ??= migration.name; throw error; });
+      .catch(async error => {
+        if (error?.importNotActive && await ledgerAppliesMigration(api,id,migration)) return;
+        error.migration ??= migration.name; throw error;
+      });
   }
   if (pending.length) {
     // By name and bytes: rows applied after ones that sort above them keep their ids.

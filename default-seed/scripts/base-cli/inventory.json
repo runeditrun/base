@@ -2623,7 +2623,7 @@
     },
     "modules/deploy-kit/d1-import.mjs": {
       "source": "modules/deploy-kit/d1-import.mjs",
-      "sha256": "756ddc26c3323bcec0325e2e2a483e1826729d746ed7f5792741c45b0137d428"
+      "sha256": "0d6333ca0b5179406ab585d6a8a9705a98bcc09483e8443bfdb48a1df559ae71"
     },
     "modules/deploy-kit/default-stage.mjs": {
       "source": "modules/deploy-kit/default-stage.mjs",
@@ -2675,7 +2675,7 @@
     },
     "modules/deploy-kit/migrations.mjs": {
       "source": "modules/deploy-kit/migrations.mjs",
-      "sha256": "d7cd1782e60c1fc7484474bcbe36cee742b9681945c18dfb8cddcf69058a38cb"
+      "sha256": "0c938f70d260d42c118ea4173f345888498d7b29ab8be7d03b3ae7ee01203d6b"
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
