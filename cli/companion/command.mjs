@@ -5,6 +5,7 @@ import { loadState, saveState } from './state.mjs';
 import { map, commands, pair, pairUsage } from './setup.mjs';
 import { codexAuth, claudeAuth } from './auth.mjs';
 import { assertSandboxPlatform } from './providers/sandbox.mjs';
+import { appSignInHelp } from '../app-address.mjs';
 
 export const usage = `Usage: rer companion VERB
 Pairs this computer with a Run Edit Run app, then runs the app's change
@@ -35,6 +36,7 @@ State: ~/.rer-local (RER_LOCAL_HOME picks another private folder). The device ke
 is kept there (0600); the app keeps only its hash.
 Revoke: in the app, Settings > Devices > Revoke. A running companion stops at its
 next request. Then delete the state folder on this computer.
+${appSignInHelp}
 `;
 
 async function locked(root,work) {

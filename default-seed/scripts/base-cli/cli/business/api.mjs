@@ -1,7 +1,8 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { redact } from './errors.mjs';
+import { appAddress } from '../app-address.mjs';
 
-export function originUrl(value = 'https://app.runeditrun.com') {
+export function originUrl(value = appAddress) {
  let url;
  try { url = new URL(value); } catch { throw Error('Business origin must be an HTTPS origin.'); }
  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);

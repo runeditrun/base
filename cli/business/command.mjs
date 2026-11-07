@@ -6,6 +6,7 @@ import { next, answer, done, token } from './questions.mjs';
 import { run } from './supervisor.mjs';
 import { describe } from './errors.mjs';
 import { identifier, originUrl } from './api.mjs';
+import { appAddress, appSignInHelp } from '../app-address.mjs';
 
 const usage = `Set up your business: rer business connect
 Business keeps your business name, logo and brand colour together for the apps
@@ -36,6 +37,7 @@ Advanced commands (Usage: rer business VERB)
                                  inside an agent sandbox it names the one command that finishes
 State lives in $RER_BUSINESS_STATE_DIR when set, otherwise in ~/.rer/business.
 In an agent sandbox that writes only inside its working folder, use RER_BUSINESS_STATE_DIR="$PWD/.rer-business".
+${appSignInHelp}
 `;
 
 const verbHelp = {
@@ -54,6 +56,7 @@ changes nothing when its profile already matches. It provisions no seeds.
   --json                Print the JSON receipt (also the default).
   --help, -h            Show this help without reading the session file.
 Exits 0 when the Business exists with that profile; 1 with a named {code} on stderr.
+${appSignInHelp}
 `,
  run: `Usage: rer business run [--once]
 Work this computer's tasks (the folder scan the owner allows) and check in every
@@ -66,7 +69,7 @@ Pair this computer with a Business. Prints a code and a link: the owner opens th
 link in a signed-in browser, checks the code and approves. Waits for that (up to
 the code's 10 minutes), then keeps the credential in OS credential storage.
   --business ID      The Business to join; the Connect prompt names it.
-  --origin URL       Business platform address (default: https://app.runeditrun.com).
+  --origin URL       Business platform address (default: ${appAddress}).
   --timeout SECONDS  Wait at most this long, then exit 75 with the pairing kept;
                      run the same command again to keep waiting (same code).
   --code CODE        Older Business pages: redeem a code made in the browser.

@@ -3,6 +3,7 @@ import { authoringVerbs, commonFlags, serverDefaults, signinVerb, verbs } from '
 import { invalid, refuse } from './errors.mjs';
 import { isLoopbackHost } from '../modules/operator-auth/loopback.mjs';
 import { normalizeEmail } from '../modules/operator-auth/policy.mjs';
+import { appSignInHelp } from './app-address.mjs';
 const booleans = new Set(['--help', '--json', '--non-interactive', '--yes', '--dry-run', '--stop', '--detach', '--foreground', '--no-queue', '--login', '--legacy-v1', '--acknowledge-unverified-metadata', '--acknowledge-unverified-schema-objects', '--door', '--direct', '--site', '--remove', '--demo', '--offline', '--from-api']);
 export const mailbox = value => typeof value === 'string' && value.length <= 254 && /^[a-zA-Z0-9.!+_%\-]+@[a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)+$/.test(value);
 export const validOwnerName = value => typeof value === 'string' && Boolean(value.trim()) && value.length <= 200 && !/[\p{Cc}\p{Cf}]/u.test(value);
@@ -108,7 +109,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
 }
 
 export function help(verb) {
- if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys({...verbs, ...authoringVerbs}).join(', ')}, signin, release, listing\nRun rer VERB --help for flags.\n`;
+ if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys({...verbs, ...authoringVerbs}).join(', ')}, signin, release, listing\nRun rer VERB --help for flags.\n${appSignInHelp}\n`;
  const known = verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : undefined);
  const door = ['export', 'import'].includes(verb) ? 'To move records, start the app and open its signed-in owner import door:\n\n  rer dev\n\nOpen /app/import, then export or upload and review supported records there.\n\nTo back up or restore this installation:\n' : '';
  return `${door}Usage: rer ${verb}${verb === 'refresh-base' ? ' --ref FULL_COMMIT' : ''} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;

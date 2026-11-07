@@ -14,6 +14,7 @@ import { readPackage, writePackage } from '../global/update/archive.mjs';
 import { userInfo } from 'node:os';
 import { realpath } from 'node:fs/promises';
 import { identity } from '../modules/job-queue/identity.mjs';
+import { appSignInHelp } from './app-address.mjs';
 
 const base = resolve(import.meta.dirname, '..');
 const fixture = join(import.meta.dirname, 'fixtures/business');
@@ -50,9 +51,10 @@ async function cli(home, args, { terminal = false, npx = false, installed = fals
 }
 test('Business entry points expose setup before advanced commands and preserve the selected pairing destination', async t => {
  const home = join(directory, 'handoff-home');
- const outputs = await Promise.all([['business'], ['business', '--help']].map(args => cli(home, args)));
+ const outputs = await Promise.all([['business'], ['business', '--help'], ['business', 'next', '--help'], ['business', 'done', '--help']].map(args => cli(home, args)));
  for (const result of outputs) {
   assert.equal(result.code, 0);
+  assert.equal(result.stdout.split('\n').filter(line => line === appSignInHelp).length, 1);
   const [lead, ...secondary] = result.stdout.trim().split(/\n\s*\n/);
   assert.equal(lead.match(/\brer business connect\b/g)?.length, 1, 'one setup action leads help');
   assert.ok(!/^\s*token(?:\s|$)/m.test(lead), 'advanced commands stay out of the lead');
@@ -79,6 +81,7 @@ test('Business verb help explains each command without pairing or reading a sess
   assert.equal(result.code, 0, result.stderr);
   assert.match(result.stdout, new RegExp(`Usage: rer business ${verb}(?:\\s|$)`));
   if (verb === 'setup') {
+   assert.equal(result.stdout.split('\n').filter(line => line === appSignInHelp).length, 1);
    assert.match(result.stdout, /--session-file FILE[^\n]*signed-in session/i);
    assert.match(result.stdout, /Create the Business[^\n]*demo company/i);
   }
