@@ -32,7 +32,8 @@ export async function prepareNative(folder) {
   modules['_rer/isolate.js'] = { js: (await readFile(new URL('./isolate.mjs', import.meta.url), 'utf8')).replace('__RER_APP_ENTRY__', entry)
     + objectExports(bindings) };
   for (const file of ISOLATE_FILES) modules[`_rer/${file}.js`] = { js: (await readFile(new URL(`./${file}.mjs`, import.meta.url), 'utf8')).replace('../../container/adapters/d1-limits.mjs', './d1-limits.js') };
-  modules['_rer/d1-limits.js'] = { js: await readFile(new URL('../../container/adapters/d1-limits.mjs', import.meta.url), 'utf8') };
+  modules['_rer/d1-native-limits.js'] = { js: await readFile(new URL('../../d1-transport/limits.mjs', import.meta.url), 'utf8') };
+  modules['_rer/d1-limits.js'] = { js: (await readFile(new URL('../../container/adapters/d1-limits.mjs', import.meta.url), 'utf8')).replaceAll('../../d1-transport/limits.mjs', './d1-native-limits.js') };
   const assets = await collectFiles(join(app, 'dist/client'));
   await cp(join(app, 'dist/client'), join(folder, 'assets'), { recursive: true });
   const theme = await prepareTheme(folder, assets);

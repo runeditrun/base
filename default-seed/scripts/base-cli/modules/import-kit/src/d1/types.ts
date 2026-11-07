@@ -34,11 +34,22 @@ export interface D1TargetAdapter extends Partial<D1PreservedUndoAdapter> {
   /** Optional transport staging support. Guards must fence every native field
    * from before the first read, including same-revision edits and absence. */
   stagingRead?(db: D1Database, destination: string, kind: string, id: string): Promise<{ row: TargetRow | undefined; guards: D1Sql[] }>;
+  /** Optional selected-key equivalent of N stagingRead calls. Return exactly one
+   * {row, guards} per key in input order, repeating duplicate keys and preserving
+   * absence. Fence every native field from before its first read, including
+   * same-revision edits. Read only selected keys, never list the destination.
+   * Preserve overridden stagingRead/read behavior or throw for single-read fallback. */
+  stagingReadMany?(db: D1Database, destination: string, keys: readonly { kind: string; id: string }[]): Promise<{ row: TargetRow | undefined; guards: D1Sql[] }[]>;
   /** Protect exact post-state during cleanup, install a known invalidatable
    * receipt after exact checks, then release. Final scalar predicates run
    * read-only after every mutation and must bind the expected post-state. */
   stagingPublication?(stageId: string, destination: string, targets: { kind: string; id: string; present: boolean }[]): { protect: D1Sql[]; seal: D1Sql[]; release: D1Sql[]; final: D1Sql[] };
   read(db: D1Database, destination: string, kind: string, id: string): Promise<TargetRow | undefined>;
+  /** Optional selected-key equivalent of N read calls. Return exactly one result
+   * per key in input order, repeating duplicate keys and preserving undefined
+   * for absence. Read only selected keys, never list the destination. Preserve
+   * overridden read behavior or throw so the caller can fall back to singles. */
+  readMany?(db: D1Database, destination: string, keys: readonly { kind: string; id: string }[]): Promise<(TargetRow | undefined)[]>;
   matches(row: TargetRow | null, destination: string, kind: string, id: string): D1Sql;
   /** Optional exact row snapshot split into conjunctive predicates. All parts,
    * including absence/cardinality, commit in the same native transaction. */

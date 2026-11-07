@@ -15,6 +15,19 @@ export function sqlitePort(native: DatabaseSync): D1Database {
 }
 export const sqliteTargets: D1TargetAdapter = {
   async read(db, destination, kind, id) { const r = await db.prepare('SELECT * FROM native_records WHERE destination=? AND kind=? AND id=?').bind(destination, kind, id).first(); return r ? { destination, targetKind: kind, targetId: id, revision: r.revision, value: JSON.parse(r.value_json) } : undefined; },
+  async readMany(db, destination, keys) {
+    if (this.read !== sqliteTargets.read) throw new Error('IMPORT_NATIVE_BULK_READ_OVERRIDE');
+    const rows = new Map<string, Record<string, any>>(), size = Math.floor((d1NativeLimits.variableNumber - 1) / 2);
+    for (let offset = 0; offset < keys.length; offset += size) {
+      const chunk = keys.slice(offset, offset + size);
+      const { results } = await db.prepare(`SELECT * FROM native_records WHERE destination=? AND (kind,id) IN (VALUES ${chunk.map(() => '(?,?)').join(',')})`).bind(destination, ...chunk.flatMap(key => [key.kind, key.id])).all();
+      for (const row of results) rows.set(JSON.stringify([row.kind, row.id]), row);
+    }
+    return keys.map(({ kind, id }) => {
+      const row = rows.get(JSON.stringify([kind, id]));
+      return row ? { destination, targetKind: kind, targetId: id, revision: row.revision, value: JSON.parse(row.value_json) } : undefined;
+    });
+  },
   matches(row, destination, kind, id) { return row ? sql('EXISTS(SELECT 1 FROM native_records WHERE destination=? AND kind=? AND id=? AND revision=? AND value_json=?)', destination, kind, id, row.revision, canonicalJson(row.value)) : sql('NOT EXISTS(SELECT 1 FROM native_records WHERE destination=? AND kind=? AND id=?)', destination, kind, id); },
   write(row) { return [sql('INSERT INTO native_records VALUES(?,?,?,?,?) ON CONFLICT(destination,kind,id) DO UPDATE SET revision=excluded.revision,value_json=excluded.value_json', row.destination, row.targetKind, row.targetId, row.revision, canonicalJson(row.value))]; },
   remove(destination, kind, id) { return [sql('DELETE FROM native_records WHERE destination=? AND kind=? AND id=?', destination, kind, id)]; },

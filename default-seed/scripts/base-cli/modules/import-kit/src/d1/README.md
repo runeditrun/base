@@ -153,6 +153,14 @@ are local runtime receipts, not hosted capacity evidence.
 The product implements `D1TargetAdapter`:
 
 - `read(database, destination, kind, id)` returns the complete native `TargetRow`.
+- Optional `readMany(database, destination, keys)` returns the same complete rows
+  as individual reads, in key order, including duplicate keys and missing rows.
+  Query only selected keys and preserve native decoding. With private transport,
+  adapters that implement `stagingRead` can also provide `stagingReadMany`, with
+  the same exact before-read guards for each key. Missing bulk methods retain
+  individual reads; any bulk-read error discards the snapshot and uses that path.
+  An inherited bulk method must preserve an overridden single read or throw.
+  Bulk observations belong only to the current publication.
 - `matches(rowOrNull, destination, kind, id)` returns an exact SQL boolean snapshot
   predicate covering the native values, revision, attachment and related evidence,
   or complete absence for null. This is the optimistic concurrency fence. Checking
@@ -193,6 +201,11 @@ count, D1 binding/statement limits and Worker CPU budget. `maxBatches` bounds wo
 per request. The port does not retry failed SQL, conflicts or revoked authority.
 A failed batch leaves its prior committed checkpoint intact; the product can fix
 the condition and explicitly call `resumeD1Import`, or `rollbackD1Import`.
+
+Saved read budget can advance a budget-limited call's checkpoint or surface a
+later entry's refusal one call earlier, with the same error code and text.
+Such a refusal publishes none of the gathered entries and leaves the job at its
+last consistent durable checkpoint.
 
 Each batch guards the immutable plan, actor binding, checkpoint and durable fence
 inside the same D1 transaction as native rows, originals, source ownership,
