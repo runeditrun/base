@@ -2,10 +2,29 @@
 
 ## Unreleased
 
-- Top-level, companion pairing and Business setup/next/done help now name the app sign-in address for invited people.
+## 0.2.101
+
+### Person erasure keeps other people's agent-door records
+
+- Data-safety fix: erasing a person could also remove agent-door records that belong to other people. The agent-door erasure matcher in the default seed and the Penny artifact map matched a person's identifiers and personal text literals as bare substrings (Penny's map for every subject, the default seed for text literals), so a short identifier, or one that occurs inside a longer identifier, a path segment or another person's text, selected unrelated calls, approvals, reviews, audit rows and events. The matcher now searches only decoded string values (never JSON keys or numbers) and requires a token boundary on both sides of every hit, including a later hit after an embedded one. Short identifiers keep version and URI tokens such as `1.0` whole; identifiers of eight or more characters, and email addresses, can also be separated at path segments. The selected decision set is resolved once per audit row. A seed or edition receives the fix only by taking this source: do not use People erase on live data with an earlier release.
+
+### Import apply reads in sets
+
+- `D1TargetAdapter` gains optional `readMany(database, destination, keys)` and, for private-transport adapters, `stagingReadMany`. Each returns what the same number of single reads would, in key order, including duplicate keys and missing rows; reads only the selected keys; and keeps the adapter's native decoding and exact before-read guards. An adapter without them keeps individual reads, any bulk-read error discards the snapshot and uses that path, and an inherited bulk method must preserve an overridden single read or throw. The default seed's people target implements `readMany`.
+- Each apply transaction reads its entries' source ownership, native rows and predecessor provenance as three set reads, chunked to the D1 variable limit, instead of reading per entry. On the 14,770-entry replay, apply round trips fall from 61,695 to 19,764 and entry reads from 44,310 to 2,379. One documented difference at the budget boundary: saved read budget can advance a budget-limited call's checkpoint, or surface a later entry's refusal one call earlier, with the same error code and text; such a refusal publishes none of the gathered entries and leaves the job at its last consistent durable checkpoint (`modules/import-kit/src/d1/README.md`). The D1 query limits now live in `modules/d1-transport/limits.mjs`, and the native demo bundle carries that module.
+- The import credential check no longer stops a whole import on free text that merely starts like a URL (for example `http:// see below`). A string that does not parse yields no user name and still goes through the raw query-key scans; strings that parse are checked exactly as before.
+
+### Business is light
+
 - Business is light: `rer business` keeps pairing, token, scan, setup, run, next, answer, status and disconnect, and no longer exports from old tools. `vendor-key` and `legacy-package` are gone with the Sentry, PagerDuty, Sorry, UptimeRobot, Calendly and Zendesk exporters and the export, catch-up and archive tasks: each seed imports in its own Move in page. `rer business next` names a seed's Move in page, what it takes and how to export, `rer business done ID --note TEXT` finishes the step, and `run` reports a step kind it does not know instead of failing. A read-only key stored by an earlier rer is still removed by `disconnect`.
-- `importers.json` has a version 2: each row declares the seed's Move in path (`moveIn`), what it takes (`accepts`: file, key, address) and how to export (`export`), with `status` and `evidence` optional, and the file may name the seed's own import format. Version 1 files stay valid.
+- This removes what 0.2.100 added to the import door and Business: the logical package transport (`rer-door-package/1`, the `package` source option and segment assembly), the opt-in bounded-wave protocol with its grant actions and schema, the local legacy package registration and transfer, and the Zendesk exporter. This release carries no migration for the bounded-wave schema an adopter may have taken from 0.2.100.
+- `importers.json` has a version 2: each row declares the seed's Move in path (`moveIn`), what it takes (`accepts`: file, key, address) and how to export (`export`), with `status` and `evidence` optional, and the file may name the seed's own import format. Version 1 files stay valid. `rer business next` prints that format link, including a GitHub link pinned to a commit.
 - `rer business setup --confirm-demo` now only creates (or reuses) the synthetic demo company's Business and saves its profile; it provisions no seeds and calls no demo routes, and `--wait-seconds` is gone. Its receipt is `{business_id, name, default_hosting, created, profile}`.
+- The computer-awake choice is still recorded, and the CLI now says plainly that nothing keeps the computer awake because rer runs no exports.
+
+### Sign-in address in help
+
+- Top-level, companion pairing and Business setup, next and done help now name the app sign-in address for invited people, https://app.runeditrun.com, which is also the default Business origin.
 
 ## 0.2.100
 
