@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.100-dev.gf6464948",
+  "cliVersion": "0.2.100-dev.g074465ac",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3579,7 +3579,7 @@
     },
     "modules/import-kit/src/provenance/credentials.ts": {
       "source": "modules/import-kit/src/provenance/credentials.ts",
-      "sha256": "13cc5d10682ad95763d6056c80deb89f6576cdc7c83d19f201102d6ed9641eaa"
+      "sha256": "42572e8c789b7e3ac264d581e778d979f8dad01e8be79c872854e38fd3cafa2a"
     },
     "modules/import-kit/src/provenance/identity.ts": {
       "source": "modules/import-kit/src/provenance/identity.ts",
