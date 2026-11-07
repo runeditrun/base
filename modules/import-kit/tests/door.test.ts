@@ -1,4 +1,6 @@
 import test from 'node:test';
+import nodeCrypto from 'node:crypto';
+import { syncBuiltinESMExports } from 'node:module';
 import assert from 'node:assert/strict';
 import { door, documents } from './door/fixture.ts';
 import { createImportDoorHandler, DoorError, enableDoorAtFirstClaim, importDoorApplyFailureMigration, importDoorSchema, readImportDoorHistory, verifyRerGrant, writeImportDoorSettings } from '../src/door/index.ts';
@@ -512,6 +514,38 @@ test('Erasing a person unchanged in a door catch-up leaves no copy in the catch-
       :await retireD1ImportCustody({target:{kind:'record',id:'kept'}},keep,d.runtime.context(),checkpoint);
     assert.equal(next.phase,'complete');assertNowhere(native,['catchup-kept']);
   }
+});
+
+test('Erasing a person severs a lineage whose last request cannot take another attempt, and finishes in a fresh request',async t=>{
+  // Pending jobs are read in id order. The ids are fixed so that the 3-entry catch-up sorts late and the 2-entry baseline early:
+  // the last request then starts with three pending jobs and little budget left, and its smaller attempts spend the rest
+  // before one job alone is tried. That job fits a fresh request, so the erasure goes on there instead of failing.
+  const days=12,limit=200,positions=[1,11,...[0,2,3,4,5,6,7,8,9,10,12,13]];
+  const ids=positions.map(position=>`00000000-0000-4000-8000-${String(position).padStart(12,'0')}`);
+  const queue=[...ids];
+  const realUUID=nodeCrypto.randomUUID,mocked=t.mock.method(nodeCrypto,'randomUUID',()=>(new Error().stack??'').includes('/src/d1/jobs.ts')&&queue.length?queue.shift()!:realUUID());
+  syncBuiltinESMExports();t.after(()=>{mocked.mock.restore();syncBuiltinESMExports();});
+  const d=await door(t);await d.enable();
+  const native=d.runtime.native(),secret=['catchup','unchanged','deferred'].join('-');
+  const base=[{id:'person',title:secret},{id:'kept',title:'catchup-kept'}];
+  const baseline=await d.plan(base);assert.equal(baseline.status,200,JSON.stringify(baseline.body));await d.apply(baseline.body);
+  let catchup=await d.plan([...base,{id:'new',title:'catchup-new'}],{catchup:true});assert.equal(catchup.status,200,JSON.stringify(catchup.body));
+  await d.apply(catchup.body);
+  for (let day=1;day<=days;day++) {
+    catchup=await d.plan([...base,{id:'new',title:'catchup-new'},{id:'day-'+day,title:'catchup-day-'+day}],{catchup:true});
+    assert.equal(catchup.status,200,JSON.stringify(catchup.body));await d.apply(catchup.body);
+  }
+  assert.deepEqual(native.prepare('SELECT id FROM ik_jobs ORDER BY id').all().map(row=>row.id),[...ids].sort(),'the jobs hold the fixed ids');
+  assert.equal(native.prepare('SELECT j.total n FROM ik_jobs j WHERE j.id=?').get(ids[1])!.n,3,'the catch-up job has three entries');
+  const who={target:{kind:'record',id:'person'},values:['person@example.test'],related:{fields:[{path:['details','reactions','*','users','*'],value:'person',optional:true}]}};
+  let erased,continuation:string|undefined,calls=0;
+  do {
+    erased=await retireD1ImportCustody(who,[{sql:"DELETE FROM native_records WHERE id='person'"}],limitStatements(d1RequestContext(d.runtime.context()),limit),checkpoint,{resumable:true,continuation});
+    continuation=erased.continuation;calls++;
+  } while(erased.phase==='redacting');
+  assert.equal(erased.phase,'complete');assert.ok(calls>2,`severed in bounded steps (${calls} calls)`);
+  assert.equal(native.prepare("SELECT count(*) n FROM native_records WHERE id='person'").get()!.n,0);
+  assertNowhere(native,[secret]);
 });
 
 test('A door upload in flight across an erasure, or holding an erased person, leaves nothing of them behind',async t=>{
