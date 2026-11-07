@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.101-dev.g543754db",
+  "cliVersion": "0.2.101-dev.g19583596",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3223,7 +3223,7 @@
     },
     "modules/import-kit/src/d1/redaction-step.ts": {
       "source": "modules/import-kit/src/d1/redaction-step.ts",
-      "sha256": "f80c6181f3941e5c2e9ac9c7618c4b4c87b959eb61aa912e36936c19266d5edd"
+      "sha256": "4d3e902917e9d7baddc16edb91fc678b1529f42b1b00320b19f664d1998fa3ee"
     },
     "modules/import-kit/src/d1/referenced-plans.ts": {
       "source": "modules/import-kit/src/d1/referenced-plans.ts",
