@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readApiSource } from '../../src/readers/index.ts';
+import { assertNoCredentials } from '../../src/provenance/credentials.ts';
 import { createD1ImportJob, planD1Import, readD1ImportOriginals } from '../../src/d1/index.ts';
 import { sqliteMapping, sqliteRuntime } from '../d1/sqlite-runtime.ts';
 import type { Json } from '../../src/types.ts';
@@ -48,6 +49,11 @@ test('credential URLs are rejected intact; no stripping, metadata leakage or sec
   let calls = 0;
   await assert.rejects(readApiSource(apiInput({ url: 'https://import.example.test/items?token=synthetic-secret' }), async () => { calls++; return jsonResponse([]); }));
   assert.equal(calls, 0);
+});
+
+test('URL-shaped prose that does not parse is text; real credential URLs are still refused', () => {
+  for (const prose of ['http:// see below', 'https:// the customer wrote this', '/ not a link', '? what now']) assert.doesNotThrow(() => assertNoCredentials({ description: prose }));
+  for (const bad of ['https://user:pass@import.example.test/x', '/download?api_key=abc', 'http:// see below ?api_key=abc']) assert.throws(() => assertNoCredentials({ link: bad }), { name: 'CredentialError' });
 });
 
 test('credentials in response originals, parser output or thrown errors cannot reach a bundle or diagnostics', async () => {
