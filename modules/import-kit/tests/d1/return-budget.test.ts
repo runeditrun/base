@@ -99,3 +99,13 @@ test('real D1: adapter errors with a budget-shaped message still reject after pr
   assert.equal((await r.db().prepare('SELECT COUNT(*) AS n FROM ik_provenance WHERE job_id=? AND reversed=1').bind(job.id).first())?.n, 1);
   assert.equal((await resumeD1Import(job.id, ctx)).state, 'undone');
 });
+
+test('real D1: a batch window larger than the request budget publishes what its reads can afford', async t => {
+  const r = await runtime(t), batchSize = 900, ctx = { ...r.context(), batchSize };
+  const perKey: D1TargetAdapter = { ...targets, async readMany(db, destination, keys) { const rows = []; for (const { kind, id } of keys) rows.push(await targets.read(db, destination, kind, id)); return rows; } };
+  const plan = await planD1Import(source(batchSize), mapping, ctx);
+  const job = await createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint });
+  const context = { ...ctx, storage: { ...ctx.storage, targets: perKey } };
+  const first = await resumeD1Import(job.id, context);
+  assert.equal((await resumeD1Import(job.id, context)).state, 'completed', `first call stopped at ${first.checkpoint}`);
+});

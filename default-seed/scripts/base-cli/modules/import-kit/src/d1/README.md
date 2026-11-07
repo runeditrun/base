@@ -158,7 +158,8 @@ The product implements `D1TargetAdapter`:
   Query only selected keys and preserve native decoding. With private transport,
   adapters that implement `stagingRead` can also provide `stagingReadMany`, with
   the same exact before-read guards for each key. Missing bulk methods retain
-  individual reads; any bulk-read error discards the snapshot and uses that path.
+  individual reads; any bulk-read error except request-budget exhaustion discards the
+  snapshot and uses that path. Exhaustion ends the batch like the budget reserve does.
   An inherited bulk method must preserve an overridden single read or throw.
   Bulk observations belong only to the current publication.
 - `matches(rowOrNull, destination, kind, id)` returns an exact SQL boolean snapshot

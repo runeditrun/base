@@ -2895,7 +2895,7 @@
     },
     "modules/import-kit/src/d1/README.md": {
       "source": "modules/import-kit/src/d1/README.md",
-      "sha256": "fa76792ea5b3be07f7f095f001f6583dfdaed774ee11b782237e0f68d4f67f8b"
+      "sha256": "9d396bb71fa6b122bdac2cbfe670216ce478d0b77f720c16a10861477738f54a"
     },
     "modules/import-kit/src/d1/apply-effects.ts": {
       "source": "modules/import-kit/src/d1/apply-effects.ts",
@@ -2903,11 +2903,11 @@
     },
     "modules/import-kit/src/d1/apply-reads.ts": {
       "source": "modules/import-kit/src/d1/apply-reads.ts",
-      "sha256": "c6c22bf2e08852190a5b190496068516d499fee329c96f3faac142b4371b1896"
+      "sha256": "0d1a10552f2c1dd6a3b079969c60ca3050c52314262ff93ded0d2735a6733d51"
     },
     "modules/import-kit/src/d1/apply.ts": {
       "source": "modules/import-kit/src/d1/apply.ts",
-      "sha256": "a2a0138317e6cdeb883c44dd9e96d6c00092c7443034d94040be2cc9190f96d4"
+      "sha256": "361b671805d3fb08db5af59fba06cf28dde3938a82e23c9c12aee115797a9c9f"
     },
     "modules/import-kit/src/d1/atomic-prefix.ts": {
       "source": "modules/import-kit/src/d1/atomic-prefix.ts",
