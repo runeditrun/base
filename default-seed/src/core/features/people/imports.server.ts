@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { canonicalJson } from '../../../../../modules/import-kit/src/d1/index.ts'
+import { d1NativeLimits } from '../../../../../modules/d1-transport/limits.mjs'
 import { personRedaction } from './person-redaction.server.ts'
 import type { D1Database as KitDatabase, D1ImportContext, D1Sql, D1TargetAdapter, ImportMapping, Json, TargetRow } from '../../../../../modules/import-kit/src/d1/index.ts'
 import type { ParsedRecord } from '../../../../../modules/import-kit/src/types.ts'
@@ -42,6 +43,16 @@ export const personTargets: D1TargetAdapter = {
     if (kind !== PERSON) return undefined
     const row = await db.prepare('SELECT id,name,email,details,import_revision FROM people WHERE id=?').bind(id).first<PersonRow>()
     return row ? personRow(row) : undefined
+  },
+  async readMany(db, _destination, keys) {
+    if (this.read !== personTargets.read) throw new Error('IMPORT_NATIVE_BULK_READ_OVERRIDE')
+    const rows = new Map<string, PersonRow>(), selected = keys.filter(key => key.kind === PERSON)
+    for (let offset = 0; offset < selected.length; offset += d1NativeLimits.variableNumber) {
+      const chunk = selected.slice(offset, offset + d1NativeLimits.variableNumber)
+      const { results } = await db.prepare(`SELECT id,name,email,details,import_revision FROM people WHERE id IN (${chunk.map(() => '?').join(',')})`).bind(...chunk.map(key => key.id)).all<PersonRow>()
+      for (const row of results) rows.set(row.id, row)
+    }
+    return keys.map(({ kind, id }) => { const row = kind === PERSON ? rows.get(id) : undefined; return row ? personRow(row) : undefined })
   },
   matches(row, _destination, _kind, id) {
     return row

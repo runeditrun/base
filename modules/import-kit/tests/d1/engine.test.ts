@@ -2,8 +2,45 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { planD1Import, createD1ImportJob, applyD1ImportBatches, resumeD1Import, undoD1Import, rollbackD1Import, readD1ImportJob, readD1ImportOriginals, readD1PersistedImport } from '../../src/d1/index.ts';
 import { runtime, source, mapping, targets } from './fixtures.ts';
+import { captureD1Baseline } from '../../../../tests/support/d1-baseline.mjs';
 
 async function create(ctx: any, count = 3) { const plan = await planD1Import(source(count), mapping, ctx); return createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint }); }
+test('real D1: mixed apply entries preserve per-entry results with selected reads, singles and bulk failure', async t => {
+  const r = await runtime(t), ctx = { ...r.context(), batchSize: 4, maxBatches: 1 };
+  const first = await create(ctx, 2);
+  await applyD1ImportBatches(first.id, ctx);
+  const predecessor = await targets.read(r.db(), ctx.destination, 'contact', '1');
+  const input = source(4);
+  input.records[1].sourceId = 'replacement';
+  input.records.push(structuredClone(input.records[2]));
+  const mixed = { ...mapping, map(record: any) {
+    return record.sourceId === 'replacement'
+      ? { effects: [{ targetKind: 'contact', targetId: '1', value: record.payload, expectedRevision: predecessor!.revision }] }
+      : mapping.map(record);
+  } };
+  const plan = await planD1Import(input, mixed, ctx);
+  assert.equal(plan.counts.duplicates, 1);
+  const job = await createD1ImportJob(plan, { ...ctx, operationKey: 'mixed', reviewedFingerprint: plan.fingerprint });
+  const restore = await captureD1Baseline(r.db());
+  let expected: unknown;
+  for (const mode of ['single', 'bulk', 'throw']) {
+    await restore();
+    const adapter = { ...targets, ...(mode === 'single' ? { readMany: undefined, stagingReadMany: undefined } : mode === 'throw' ? {
+      async readMany() { throw new Error('IMPORT_D1_REQUEST_LIMIT'); },
+    } : {}) };
+    const context = { ...ctx, storage: { ...ctx.storage, targets: adapter } };
+    const completed = await applyD1ImportBatches(job.id, context);
+    assert.equal(completed.state, 'completed'); assert.equal(completed.checkpoint, 4); assert.equal(completed.fence, 1);
+    const persisted = await readD1PersistedImport(context);
+    const entries = (await r.db().prepare('SELECT * FROM ik_d1_entries WHERE job_id=? ORDER BY ordinal').bind(job.id).all()).results;
+    assert.deepEqual(entries.map(row => row.owner_job_id), [first.id, job.id, job.id, job.id]);
+    const history = (await r.db().prepare('SELECT * FROM ik_d1_history ORDER BY id').all()).results;
+    assert.equal(history.length, 1);
+    const result = JSON.stringify({ completed, persisted, entries, history });
+    if (mode === 'single') expected = result;
+    else assert.equal(result, expected);
+  }
+});
 test('real D1: bounded native contact + evidence publication, durable reopen/resume, originals, restartable undo', async t => {
   const r = await runtime(t), ctx = r.context(), job = await create(ctx);
   assert.equal((await applyD1ImportBatches(job, { ...ctx, maxBatches: 1 })).checkpoint, 1);

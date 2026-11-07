@@ -5,6 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Miniflare, convertV4MiniflareOptions } from '../../../container/adapters/d1-workerd.mjs';
+import { d1NativeLimits } from '../../../container/adapters/d1-limits.mjs';
 import { initializeD1ImportStorage, canonicalJson, sha256 } from '../../src/d1/index.ts';
 import type { D1TargetAdapter, D1ImportContext, SourceBundle, ImportMapping, TargetRow } from '../../src/d1/index.ts';
 
@@ -15,6 +16,19 @@ export const targets: D1TargetAdapter = {
     const row = await db.prepare('SELECT c.*,e.detail FROM contacts c JOIN evidence e ON e.id=c.id WHERE c.destination=? AND c.kind=? AND c.id=?').bind(destination, kind, id).first();
     if (!row) return undefined;
     return { destination, targetKind: kind, targetId: id, revision: row.revision, value: { email: row.email, evidence: row.detail } };
+  },
+  async readMany(db, destination, keys) {
+    if (this.read !== targets.read) throw new Error('IMPORT_NATIVE_BULK_READ_OVERRIDE');
+    const rows = new Map<string, Record<string, any>>(), size = Math.floor((d1NativeLimits.variableNumber - 1) / 2);
+    for (let offset = 0; offset < keys.length; offset += size) {
+      const chunk = keys.slice(offset, offset + size);
+      const { results } = await db.prepare(`SELECT c.*,e.detail FROM contacts c JOIN evidence e ON e.id=c.id WHERE c.destination=? AND (c.kind,c.id) IN (VALUES ${chunk.map(() => '(?,?)').join(',')})`).bind(destination, ...chunk.flatMap(key => [key.kind, key.id])).all();
+      for (const row of results) rows.set(JSON.stringify([row.kind, row.id]), row);
+    }
+    return keys.map(({ kind, id }) => {
+      const row = rows.get(JSON.stringify([kind, id]));
+      return row ? { destination, targetKind: kind, targetId: id, revision: row.revision, value: { email: row.email, evidence: row.detail } } : undefined;
+    });
   },
   matches(row, destination, kind, id) {
     return row ? sql('EXISTS(SELECT 1 FROM contacts c JOIN evidence e ON e.id=c.id WHERE c.destination=? AND c.kind=? AND c.id=? AND c.revision=? AND c.email=? AND e.detail=?)', destination, kind, id, row.revision, (row.value as any).email, (row.value as any).evidence) : sql('NOT EXISTS(SELECT 1 FROM contacts WHERE destination=? AND kind=? AND id=?) AND NOT EXISTS(SELECT 1 FROM evidence WHERE id=?)', destination, kind, id, id);

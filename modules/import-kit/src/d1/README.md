@@ -153,6 +153,17 @@ are local runtime receipts, not hosted capacity evidence.
 The product implements `D1TargetAdapter`:
 
 - `read(database, destination, kind, id)` returns the complete native `TargetRow`.
+- Optional `readMany(database, destination, keys)` returns the same complete rows
+  as individual reads, in key order, including duplicate keys and missing rows.
+  Query only selected keys and preserve native decoding. With private transport,
+  adapters that implement `stagingRead` can also provide `stagingReadMany`, with
+  the same exact before-read guards for each key. Missing bulk methods retain
+  individual reads; any bulk-read error discards the snapshot and uses that path.
+  An inherited bulk method must preserve an overridden single read or throw.
+  Bulk observations belong only to the current publication. Saved read budget
+  can advance its checkpoint further; if a later entry refuses during gathering,
+  the complete gathered prefix publishes and returns before that entry is checked
+  again at the start of the next call. A first-entry refusal rejects immediately.
 - `matches(rowOrNull, destination, kind, id)` returns an exact SQL boolean snapshot
   predicate covering the native values, revision, attachment and related evidence,
   or complete absence for null. This is the optimistic concurrency fence. Checking
