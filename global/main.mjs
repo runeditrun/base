@@ -6,6 +6,7 @@ import { localDefaults } from './launch/local-defaults.mjs';
 import { handleBrokenPipes } from './output.mjs';
 import { repositoryCommands, repositoryHelp } from './cli/repository-contract.mjs';
 import { repoArguments } from './cli/repository.mjs';
+import { appSignInHelp } from '../cli/app-address.mjs';
 
 const help = `Usage: rer VERB [FLAGS]
 
@@ -48,6 +49,7 @@ else its vendored scripts/rer.mjs.
                        of a checkout that pins the rer package use it).
 
 Checkout verbs: ${Object.keys(checkoutVerbs).join(', ')}, listing. Run rer VERB --help in a checkout for its flags.
+${appSignInHelp}
 `;
 
 export async function main(argv) {
