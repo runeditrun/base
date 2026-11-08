@@ -1,0 +1,18 @@
+{
+  "actionlint_exit": 0,
+  "bash_n_exit": 0,
+  "diff_check_exit": 0,
+  "workflows": [
+    ".github/workflows/deploy-stage.yml",
+    ".github/workflows/live-proof.yml",
+    ".github/workflows/mirror-ubuntu-image.yml",
+    ".github/workflows/rer-release.yml",
+    ".github/workflows/t016-linux-qualification.yml",
+    ".github/workflows/verify.yml"
+  ],
+  "syntax_paths": [
+    "scripts/install-actionlint.sh",
+    "scripts/install-gitleaks.sh",
+    "scripts/agent-bootstrap.sh"
+  ]
+}

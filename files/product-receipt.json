@@ -1,0 +1,19 @@
+{
+  "repository": "runeditrun/base",
+  "branch": "cloud/fv-base-asset-retry-1",
+  "head": "fd6d971af46b3aa88a8f6eb649153002a605e5a4",
+  "base": "1787bcce2348921f7cf2088188fe37c7c959910c",
+  "product_push": "successful first attempt",
+  "pr": "https://github.com/runeditrun/base/pull/836",
+  "candidate_commit_count": 1,
+  "author": "Run Edit Run fleet <fleet@runeditrun.com>",
+  "committer": "Run Edit Run fleet <fleet@runeditrun.com>",
+  "trailers": [],
+  "working_tree_clean": true,
+  "post_push_fetch": "main unchanged",
+  "publication_scan": "Fleet performs final publication scan and landing; local candidate Gitleaks scan passed",
+  "terminal_status": "PUSHED",
+  "verify_run_id": 42476381817,
+  "verify_status": "in_progress",
+  "ready": false
+}

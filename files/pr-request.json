@@ -1,0 +1,6 @@
+{
+  "title": "Bound retries for pinned CI tool downloads",
+  "head": "cloud/fv-base-asset-retry-1",
+  "base": "main",
+  "body": "GitHub release-asset 503/504 responses previously exhausted Gitleaks retries quickly and failed actionlint immediately. Both pinned installers now retry all curl errors within a 600-second retry window, cap each transfer at 60 seconds, and report the asset, last HTTP status and curl exit code on final failure.\n\nValidation: both unchanged installers recovered through a local 503, 503, 200 sequence using their real checksum-pinned archives; bash syntax checks and actionlint across all six workflows passed. Full-budget persistent-504 checks are running and receipts will be published separately. Version pins, checksums, upstream URLs, workflow files, cache keys and job shape are unchanged."
+}

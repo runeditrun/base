@@ -1,0 +1,33 @@
+{
+  "scripts": {
+    "actionlint": {
+      "version_before": "1.7.7",
+      "version_after": "1.7.7",
+      "checksums_unchanged": true,
+      "upstream_url_unchanged": true,
+      "retry_count_before": 0,
+      "retry_count_after": 120,
+      "retry_delay_seconds_after": 5,
+      "retry_max_time_seconds_after": 600,
+      "attempt_max_time_seconds_after": 60
+    },
+    "gitleaks": {
+      "version_before": "8.30.1",
+      "version_after": "8.30.1",
+      "checksums_unchanged": true,
+      "upstream_url_unchanged": true,
+      "retry_count_before": 5,
+      "retry_count_after": 120,
+      "retry_delay_seconds_after": 5,
+      "retry_max_time_seconds_after": 600,
+      "attempt_max_time_seconds_after": 60
+    }
+  },
+  "changed_files": [
+    "scripts/install-actionlint.sh",
+    "scripts/install-gitleaks.sh"
+  ],
+  "contract_clause_changes": 0,
+  "workflow_changes": 0,
+  "dependencies_added": 0
+}

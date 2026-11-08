@@ -1,0 +1,22 @@
+{
+  "limit": 10,
+  "initial_calls": [
+    {
+      "number": 1,
+      "operation": "POST pull request 836"
+    },
+    {
+      "number": 2,
+      "operation": "Actions discovery with an incorrect SHA filter; empty result, discarded"
+    },
+    {
+      "number": 3,
+      "operation": "Exact candidate SHA discovery; Verify 42476381817 in progress"
+    }
+  ],
+  "polling": "One watcher; at least 300 seconds between discovery and each run status call; at most five status polls; two calls reserved for failed jobs and one failed-job archive if needed",
+  "status_polls": 5,
+  "pr_update_calls": 1,
+  "total_calls": 9,
+  "unused_reserved_calls": 1
+}
