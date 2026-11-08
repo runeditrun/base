@@ -1,0 +1,3 @@
+(node:12680) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS: invalid fd-3 result uses the fixed failure message, retains stdout diagnostic on stderr and announces no listener.

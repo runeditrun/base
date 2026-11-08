@@ -1,0 +1,58 @@
+✔ preview resolves its plan and listens with quiet planner stdout (877.578683ms)
+✖ preview resolves its plan and listens with banners planner stdout (398.312871ms)
+✔ preview refuses failed planning (375.701475ms)
+✖ preview refuses empty planning (377.640481ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 2
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2138.55872
+
+✖ failing tests:
+
+test at onboarding/preview-plan.test.mjs:59:42
+✖ preview resolves its plan and listens with banners planner stdout (398.312871ms)
+  Error: Preview exited 1: <anonymous_script>:1
+  Using secrets defined in .dev.vars
+  ^
+  
+  SyntaxError: Unexpected token 'U', "Using secr"... is not valid JSON
+      at JSON.parse (<anonymous>)
+      at plan (file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/onboarding/production-runtime.mjs:21:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/onboarding/production-runtime.mjs:24:16
+  
+  Node.js v24.19.0
+  
+      at file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/onboarding/preview-plan.test.mjs:54:52
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+test at onboarding/preview-plan.test.mjs:75:41
+✖ preview refuses empty planning (377.640481ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Resolving the Worker configuration failed\./. Input:
+  
+  '<anonymous_script>:1\n' +
+    '\n' +
+    '\n' +
+    'SyntaxError: Unexpected end of JSON input\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at plan (file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/onboarding/production-runtime.mjs:21:14)\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n' +
+    '    at async file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/onboarding/production-runtime.mjs:24:16\n' +
+    '\n' +
+    'Node.js v24.19.0\n'
+  
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/onboarding/preview-plan.test.mjs:79:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '<anonymous_script>:1\n\n\nSyntaxError: Unexpected end of JSON input\n    at JSON.parse (<anonymous>)\n    at plan (file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/onboarding/production-runtime.mjs:21:14)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/onboarding/production-runtime.mjs:24:16\n\nNode.js v24.19.0\n',
+    expected: /Resolving the Worker configuration failed\./,
+    operator: 'match',
+    diff: 'simple'
+  }

@@ -1,0 +1,36 @@
+TAP version 13
+# (node:5241) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: preview resolves its plan and listens with quiet planner stdout
+ok 1 - preview resolves its plan and listens with quiet planner stdout
+  ---
+  duration_ms: 5679.215424
+  type: 'test'
+  ...
+# Subtest: preview resolves its plan and listens with banners planner stdout
+ok 2 - preview resolves its plan and listens with banners planner stdout
+  ---
+  duration_ms: 5707.538757
+  type: 'test'
+  ...
+# Subtest: preview refuses failed planning
+ok 3 - preview refuses failed planning
+  ---
+  duration_ms: 348.778911
+  type: 'test'
+  ...
+# Subtest: preview refuses empty planning
+ok 4 - preview refuses empty planning
+  ---
+  duration_ms: 382.474566
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 12205.359507

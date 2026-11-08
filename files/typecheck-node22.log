@@ -1,0 +1,4 @@
+
+> @run-edit-run/default-seed-reference@0.1.0 typecheck /home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/default-seed
+> tsc --build --incremental
+

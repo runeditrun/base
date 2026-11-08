@@ -1,0 +1,1703 @@
+TAP version 13
+# Subtest: guard runs immediately before every command, including custom owner and sign-in hooks
+ok 1 - guard runs immediately before every command, including custom owner and sign-in hooks
+  ---
+  duration_ms: 28.813498
+  type: 'test'
+  ...
+# Subtest: failure cleans up an isolated app before publishing failed
+ok 2 - failure cleans up an isolated app before publishing failed
+  ---
+  duration_ms: 15165.786073
+  type: 'test'
+  ...
+# Subtest: failure cleans up an isolated command before publishing failed
+ok 3 - failure cleans up an isolated command before publishing failed
+  ---
+  duration_ms: 58.723
+  type: 'test'
+  ...
+# Subtest: hosting registers its token and added secrets before output outside command environments
+ok 4 - hosting registers its token and added secrets before output outside command environments
+  ---
+  duration_ms: 7.156457
+  type: 'test'
+  ...
+# (node:4808) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: foundation features have one declaration shared by browser, server and kit validation
+ok 5 - foundation features have one declaration shared by browser, server and kit validation
+  ---
+  duration_ms: 1598.894062
+  type: 'test'
+  ...
+# Saving private local settings
+# Your application is running locally
+# Subtest: a dotenv rerun tightens a complete existing settings file without changing its bytes
+ok 6 - a dotenv rerun tightens a complete existing settings file without changing its bytes
+  ---
+  duration_ms: 91.206574
+  type: 'test'
+  ...
+# Saving private local settings
+# Your application is running locally
+# Subtest: a json rerun tightens a complete existing settings file without changing its bytes
+ok 7 - a json rerun tightens a complete existing settings file without changing its bytes
+  ---
+  duration_ms: 32.923648
+  type: 'test'
+  ...
+# Restored .dev.vars from an interrupted build or setup (/tmp/adapter-settings-n0Yvon/.wrangler/local-build/run-killed/original.dev.vars).
+# Saving private local settings
+# Applying database migrations
+# Your application is running locally
+# Subtest: recovery restores the saved origin before selecting the start address
+ok 8 - recovery restores the saved origin before selecting the start address
+  ---
+  duration_ms: 23.828648
+  type: 'test'
+  ...
+# Saving private local settings
+# Applying database migrations
+# Waiting to start (queue position 1/1): all job slots are in use (1 of 1; change slots in /home/agent/.rer/jobs/config.json).
+# Ahead of this job:
+#   running: base verify:onboarding:command [2a2b62e205ef] in [REDACTED]
+# Memory: 14.6 GiB available, floor 2.0 GiB. Change the floor with RER_JOBS_MIN_FREE_MEMORY_BYTES (bytes; 0 for no floor).
+# Run from the project root. Inspect the queue with: 'node' '../..[REDACTED]/modules/job-queue/cli.mjs' 'status' '--json'
+# Waiting to start (queue position 1/1): all job slots are in use (1 of 1; change slots in /home/agent/.rer/jobs/config.json).
+# Ahead of this job:
+#   running: base verify:onboarding:command [2a2b62e205ef] in [REDACTED]
+# Memory: 15.2 GiB available, floor 2.0 GiB. Change the floor with RER_JOBS_MIN_FREE_MEMORY_BYTES (bytes; 0 for no floor).
+# Run from the project root. Inspect the queue with: 'node' '../..[REDACTED]/modules/job-queue/cli.mjs' 'status' '--json'
+# Heavy job admitted: adapter-settings-crOj3L installer:command [f8d00f44e820]
+# [REDACTED]
+# [REDACTED]
+# [REDACTED]
+# Your application is running locally
+# Subtest: all credential-shaped saved settings are registered before a command emits bare values
+ok 9 - all credential-shaped saved settings are registered before a command emits bare values
+  ---
+  duration_ms: 19965.7055
+  type: 'test'
+  ...
+# Saving private local settings
+# Subtest: settings storage refuses a symlinked ancestor without changing the target
+ok 10 - settings storage refuses a symlinked ancestor without changing the target
+  ---
+  duration_ms: 12.936676
+  type: 'test'
+  ...
+# Saving private local settings
+# Your application is running locally
+# Subtest: reference preservation keeps deliberately removed setup tokens absent and private bytes exact
+ok 11 - reference preservation keeps deliberately removed setup tokens absent and private bytes exact
+  ---
+  duration_ms: 12.3358
+  type: 'test'
+  ...
+# Subtest: feature flags must describe the hooks the adapter really runs
+ok 12 - feature flags must describe the hooks the adapter really runs
+  ---
+  duration_ms: 2.443656
+  type: 'test'
+  ...
+# Saving private local settings
+# Building your application
+# Waiting to start (queue position 2/2): waiting behind 1 earlier queued job; all job slots are in use (1 of 1; change slots in /home/agent/.rer/jobs/config.json).
+# Ahead of this job:
+#   running: base verify:onboarding:command [2a2b62e205ef] in [REDACTED]
+#   queued: adapter-settings-crOj3L installer:command [f8d00f44e820] in /tmp/adapter-settings-crOj3L
+# Memory: 15.5 GiB available, floor 2.0 GiB. Change the floor with RER_JOBS_MIN_FREE_MEMORY_BYTES (bytes; 0 for no floor).
+# Run from the project root. Inspect the queue with: 'node' '../..[REDACTED]/modules/job-queue/cli.mjs' 'status' '--json'
+# Waiting to start (queue position 1/1): all job slots are in use (1 of 1; change slots in /home/agent/.rer/jobs/config.json).
+# Ahead of this job:
+#   running: adapter-settings-crOj3L installer:command [f8d00f44e820] in /tmp/adapter-settings-crOj3L
+# Memory: 15.3 GiB available, floor 2.0 GiB. Change the floor with RER_JOBS_MIN_FREE_MEMORY_BYTES (bytes; 0 for no floor).
+# Run from the project root. Inspect the queue with: 'node' '../..[REDACTED]/modules/job-queue/cli.mjs' 'status' '--json'
+# Heavy job admitted: adapter-kit-oQUsw2 installer:command [f05238bef572]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-oQUsw2 installer:command [f05238bef572]
+# Starting your application on this computer
+# Claiming the first owner
+# First owner claimed
+# Opening your application
+# Your application is running locally
+# Subtest: a complete install generates private settings, hides them from the build, claims the owner and opens the application
+ok 13 - a complete install generates private settings, hides them from the build, claims the owner and opens the application
+  ---
+  duration_ms: 11155.66953
+  type: 'test'
+  ...
+# 20 idle-close pairs; 40 distinct connections; 40 requests, no replay
+# Saving private local settings
+# Building your application
+# Heavy job admitted: adapter-kit-EJdwyX installer:command [4b5b6dcaeb91]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-EJdwyX installer:command [4b5b6dcaeb91]
+# Starting your application on this computer
+# Claiming the first owner
+# First owner claimed
+# Opening your application
+# Your application is running locally
+# Subtest: a declared startup budget includes readiness beyond sixty seconds
+ok 14 - a declared startup budget includes readiness beyond sixty seconds
+  ---
+  duration_ms: 4329.940863
+  type: 'test'
+  ...
+# Saving private local settings
+# Building your application
+# Heavy job admitted: adapter-kit-eEgNN4 installer:command [0290d7e3103f]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-eEgNN4 installer:command [0290d7e3103f]
+# Starting your application on this computer
+# Claiming the first owner
+# First owner claimed
+# Opening your application
+# Your application is running locally
+# Subtest: a devIdentity seed's install gives the temporary app the dev key and offers the key-gated way in
+ok 15 - a devIdentity seed's install gives the temporary app the dev key and offers the key-gated way in
+  ---
+  duration_ms: 4910.132899
+  type: 'test'
+  ...
+# Saving private local settings
+# Building your application
+# Heavy job admitted: adapter-kit-qGFY1t installer:command [339df445fefc]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-qGFY1t installer:command [339df445fefc]
+# Starting your application on this computer
+# Claiming the first owner
+# First owner claimed
+# Opening your application
+# Your application is running locally
+# Subtest: the CLI's local sign-in proof comes from the setting the adapter declares as its session secret
+ok 16 - the CLI's local sign-in proof comes from the setting the adapter declares as its session secret
+  ---
+  duration_ms: 5042.031143
+  type: 'test'
+  ...
+# Saving private local settings
+# Building your application
+# Heavy job admitted: adapter-kit-L4nl6C installer:command [f39f2bd07eb6]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-L4nl6C installer:command [f39f2bd07eb6]
+# Starting your application on this computer
+# Another process answered on port 43315; the application did not bind it. Listener PID 5176. Nothing was sent. Stop that process or choose another port, then run setup again.
+# Subtest: setup stops before the claim when another process answers on the port the application did not bind
+ok 17 - setup stops before the claim when another process answers on the port the application did not bind
+  ---
+  duration_ms: 3918.802021
+  type: 'test'
+  ...
+# Saving private local settings
+# Building your application
+# Heavy job admitted: adapter-kit-hheRaq installer:command [66122ea27576]
+# Applying database migrations
+# Waiting to start (queue position 2/2): waiting behind 1 earlier queued job.
+# Ahead of this job:
+#   queued: installer-secret-table-0kfLBd installer:command [50b5a03682eb] in /tmp/installer-secret-table-0kfLBd
+# Memory: 15.2 GiB available, floor 2.0 GiB. Change the floor with RER_JOBS_MIN_FREE_MEMORY_BYTES (bytes; 0 for no floor).
+# Run from the project root. Inspect the queue with: 'node' '../..[REDACTED]/modules/job-queue/cli.mjs' 'status' '--json'
+# Waiting to start (queue position 1/1): all job slots are in use (1 of 1; change slots in /home/agent/.rer/jobs/config.json).
+# Ahead of this job:
+#   running: installer-secret-table-0kfLBd installer:command [50b5a03682eb] in /tmp/installer-secret-table-0kfLBd
+# Memory: 15.5 GiB available, floor 2.0 GiB. Change the floor with RER_JOBS_MIN_FREE_MEMORY_BYTES (bytes; 0 for no floor).
+# Run from the project root. Inspect the queue with: 'node' '../..[REDACTED]/modules/job-queue/cli.mjs' 'status' '--json'
+# Heavy job admitted: adapter-kit-hheRaq installer:command [66122ea27576]
+# Starting your application on this computer
+# Claiming the first owner
+# First owner claimed
+# Opening your application
+# Your application is running locally
+# Saving private local settings
+# Building your application
+# Waiting to start (queue position 2/2): waiting behind 1 earlier queued job.
+# Ahead of this job:
+#   queued: installer-secret-table-0kfLBd installer:command [50b5a03682eb] in /tmp/installer-secret-table-0kfLBd
+# Memory: 14.9 GiB available, floor 2.0 GiB. Change the floor with RER_JOBS_MIN_FREE_MEMORY_BYTES (bytes; 0 for no floor).
+# Run from the project root. Inspect the queue with: 'node' '../..[REDACTED]/modules/job-queue/cli.mjs' 'status' '--json'
+# Waiting to start (queue position 1/1): all job slots are in use (1 of 1; change slots in /home/agent/.rer/jobs/config.json).
+# Ahead of this job:
+#   running: installer-secret-table-0kfLBd installer:command [50b5a03682eb] in /tmp/installer-secret-table-0kfLBd
+# Memory: 15.6 GiB available, floor 2.0 GiB. Change the floor with RER_JOBS_MIN_FREE_MEMORY_BYTES (bytes; 0 for no floor).
+# Run from the project root. Inspect the queue with: 'node' '../..[REDACTED]/modules/job-queue/cli.mjs' 'status' '--json'
+# Heavy job admitted: adapter-kit-hheRaq installer:command [66122ea27576]
+# Applying database migrations
+# Waiting to start (queue position 2/2): waiting behind 1 earlier queued job.
+# Ahead of this job:
+#   queued: installer-secret-table-Dp1OhJ installer:command [c9fd273041dc] in /tmp/installer-secret-table-Dp1OhJ
+# Memory: 15.7 GiB available, floor 2.0 GiB. Change the floor with RER_JOBS_MIN_FREE_MEMORY_BYTES (bytes; 0 for no floor).
+# Run from the project root. Inspect the queue with: 'node' '../..[REDACTED]/modules/job-queue/cli.mjs' 'status' '--json'
+# Waiting to start (queue position 1/1): all job slots are in use (1 of 1; change slots in /home/agent/.rer/jobs/config.json).
+# Ahead of this job:
+#   running: installer-secret-table-Dp1OhJ installer:command [c9fd273041dc] in /tmp/installer-secret-table-Dp1OhJ
+# Memory: 14.6 GiB available, floor 2.0 GiB. Change the floor with RER_JOBS_MIN_FREE_MEMORY_BYTES (bytes; 0 for no floor).
+# Run from the project root. Inspect the queue with: 'node' '../..[REDACTED]/modules/job-queue/cli.mjs' 'status' '--json'
+# Heavy job admitted: adapter-kit-hheRaq installer:command [66122ea27576]
+# Starting your application on this computer
+# Claiming the first owner
+# An owner is already claimed; the existing owner was kept
+# Opening your application
+# Your application is running locally
+# Subtest: a rerun keeps the owner's settings, origin and claimed owner
+ok 18 - a rerun keeps the owner's settings, origin and claimed owner
+  ---
+  duration_ms: 28397.896941
+  type: 'test'
+  ...
+# Saving private local settings
+# Your application is running locally
+# Subtest: missing settings are added after the owner's exact existing lines
+ok 19 - missing settings are added after the owner's exact existing lines
+  ---
+  duration_ms: 15.715128
+  type: 'test'
+  ...
+# Saving private local settings
+# Your application is running locally
+# Saving private local settings
+# Your application is running locally
+# Subtest: JSON settings files are generated with the requested encoding and kept on rerun
+ok 20 - JSON settings files are generated with the requested encoding and kept on rerun
+  ---
+  duration_ms: 29.511562
+  type: 'test'
+  ...
+# Saving private local settings
+# Building your application
+# Waiting to start (queue position 2/2): waiting behind 1 earlier queued job.
+# Ahead of this job:
+#   queued: installer-secret-table-Dp1OhJ installer:command [c9fd273041dc] in /tmp/installer-secret-table-Dp1OhJ
+# Memory: 15.2 GiB available, floor 2.0 GiB. Change the floor with RER_JOBS_MIN_FREE_MEMORY_BYTES (bytes; 0 for no floor).
+# Run from the project root. Inspect the queue with: 'node' '../..[REDACTED]/modules/job-queue/cli.mjs' 'status' '--json'
+# Heavy job admitted: adapter-kit-sPCKjW installer:command [7d27e698cc12]
+# build output before failure
+# Subtest: a failed build is a canned failure with the captured diagnostic, restores .dev.vars and starts nothing
+ok 21 - a failed build is a canned failure with the captured diagnostic, restores .dev.vars and starts nothing
+  ---
+  duration_ms: 4900.872196
+  type: 'test'
+  ...
+# Subtest: requirements fail with canned Node and tool messages before any command
+ok 22 - requirements fail with canned Node and tool messages before any command
+  ---
+  duration_ms: 35.154756
+  type: 'test'
+  ...
+# Saving private local settings
+# Building your application
+# Waiting to start (queue position 2/2): waiting behind 1 earlier queued job.
+# Ahead of this job:
+#   queued: hosting-contract-6j78qP installer:command [482ec74fc7b9] in /tmp/hosting-contract-6j78qP
+# Memory: 15.3 GiB available, floor 2.0 GiB. Change the floor with RER_JOBS_MIN_FREE_MEMORY_BYTES (bytes; 0 for no floor).
+# Run from the project root. Inspect the queue with: 'node' '../..[REDACTED]/modules/job-queue/cli.mjs' 'status' '--json'
+# Heavy job admitted: adapter-kit-sqrVkH installer:command [71b792101b3b]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-sqrVkH installer:command [71b792101b3b]
+# Starting your application on this computer
+# Claiming the first owner
+# Claiming the first owner: HTTP 400 (invalid_token).
+# Subtest: a rejected owner claim stops the started application before reporting failure
+ok 23 - a rejected owner claim stops the started application before reporting failure
+  ---
+  duration_ms: 8101.054665
+  type: 'test'
+  ...
+# Saving private local settings
+# Building your application
+# Heavy job admitted: adapter-kit-MqDCis installer:command [f9bef9258ed5]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-MqDCis installer:command [f9bef9258ed5]
+# Starting your application on this computer
+# Subtest: cancelling while the application starts stops it and reports a stop, not a failure
+ok 24 - cancelling while the application starts stops it and reports a stop, not a failure
+  ---
+  duration_ms: 4354.199913
+  type: 'test'
+  ...
+# Saving private local settings
+# Building your application
+# Heavy job admitted: adapter-kit-7omC6s installer:command [99c2e70d1286]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-7omC6s installer:command [99c2e70d1286]
+# Starting your application on this computer
+# Claiming the first owner
+# First owner claimed
+# Opening your application
+# Deploying to your Cloudflare account
+# Heavy job admitted: adapter-kit-7omC6s installer:command [99c2e70d1286]
+# {"ok":true,"command":"deploy","[REDACTED]}
+# Checking the deployed application
+# Heavy job admitted: adapter-kit-7omC6s installer:command [99c2e70d1286]
+# {"ok":true,"command":"health","[REDACTED]}
+# Deployed to https://fixture-production.example.workers.dev
+# Your application is running locally
+# Subtest: owner-account hosting deploys with the owner's account and token, checks health and keeps the token out of every sink
+ok 25 - owner-account hosting deploys with the owner's account and token, checks health and keeps the token out of every sink
+  ---
+  duration_ms: 9540.024491
+  type: 'test'
+  ...
+# Saving private local settings
+# Building your application
+# Heavy job admitted: adapter-kit-uWX9Rt installer:command [60ff1ac61de8]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-uWX9Rt installer:command [60ff1ac61de8]
+# Starting your application on this computer
+# Claiming the first owner
+# First owner claimed
+# Opening your application
+# Deploying to your Cloudflare account
+# Hosting was not requested; the application runs on this computer
+# Your application is running locally
+# Saving private local settings
+# Building your application
+# Heavy job admitted: adapter-kit-uWX9Rt installer:command [60ff1ac61de8]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-uWX9Rt installer:command [60ff1ac61de8]
+# Starting your application on this computer
+# Claiming the first owner
+# An owner is already claimed; the existing owner was kept
+# Opening your application
+# Deploying to your Cloudflare account
+# Deploying to your Cloudflare account: choose a Cloudflare account and supply its API token.
+# Saving private local settings
+# Building your application
+# Heavy job admitted: adapter-kit-uWX9Rt installer:command [60ff1ac61de8]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-uWX9Rt installer:command [60ff1ac61de8]
+# Starting your application on this computer
+# Claiming the first owner
+# An owner is already claimed; the existing owner was kept
+# Opening your application
+# Deploying to your Cloudflare account
+# Heavy job admitted: adapter-kit-uWX9Rt installer:command [60ff1ac61de8]
+# {"ok":false,"code":"resource-name-collision"}
+# Subtest: owner-account hosting keeps local work offline and refuses failed deployment
+ok 26 - owner-account hosting keeps local work offline and refuses failed deployment
+  ---
+  duration_ms: 18506.227953
+  type: 'test'
+  ...
+# Saving private local settings
+# Building your application
+# Heavy job admitted: adapter-kit-9AVvc0 installer:command [092da37a3a71]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-9AVvc0 installer:command [092da37a3a71]
+# Starting your application on this computer
+# Claiming the first owner
+# First owner claimed
+# Opening your application
+# Your application is running locally
+# Applying database migrations
+# Subtest: a dev start held by the machine-load queue says the computer is busy, not that migrations failed
+ok 27 - a dev start held by the machine-load queue says the computer is busy, not that migrations failed
+  ---
+  duration_ms: 5203.385683
+  type: 'test'
+  ...
+# Saving private local settings
+# Building your application
+# Heavy job admitted: adapter-kit-Pe1NVV installer:command [12fa95c825f5]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-Pe1NVV installer:command [12fa95c825f5]
+# Starting your application on this computer
+# Claiming the first owner
+# First owner claimed
+# Opening your application
+# Your application is running locally
+# Applying database migrations
+# Heavy job admitted: adapter-kit-Pe1NVV dev:command [12fa95c825f5]
+# no such table: widgets
+# Subtest: a dev start whose migration really fails keeps its own message with the command output
+ok 28 - a dev start whose migration really fails keeps its own message with the command output
+  ---
+  duration_ms: 7543.329162
+  type: 'test'
+  ...
+# Saving private local settings
+# Building your application
+# Heavy job admitted: adapter-kit-NgTI1v installer:command [e1e4f395db94]
+# Applying database migrations
+# Heavy job admitted: adapter-kit-NgTI1v installer:command [e1e4f395db94]
+# Starting your application on this computer
+# Claiming the first owner
+# First owner claimed
+# Opening your application
+# Your application is running locally
+# Applying database migrations
+# Heavy job admitted: adapter-kit-NgTI1v dev:command [e1e4f395db94]
+# Starting your application on this computer
+# Opening your application
+# Your application is running locally
+# Subtest: a dev start under the load limit applies migrations and starts the application
+ok 29 - a dev start under the load limit applies migrations and starts the application
+  ---
+  duration_ms: 8950.223761
+  type: 'test'
+  ...
+# Subtest: a partial browser answer leaves unrelated suggestions unanswered through resume
+ok 30 - a partial browser answer leaves unrelated suggestions unanswered through resume
+  ---
+  duration_ms: 43.056876
+  type: 'test'
+  ...
+# Subtest: a partial agent answer leaves unrelated suggestions unanswered through resume
+ok 31 - a partial agent answer leaves unrelated suggestions unanswered through resume
+  ---
+  duration_ms: 19.337413
+  type: 'test'
+  ...
+# Subtest: an explicitly empty persisted answer set stays empty and legacy owner answers survive
+ok 32 - an explicitly empty persisted answer set stays empty and legacy owner answers survive
+  ---
+  duration_ms: 14.054342
+  type: 'test'
+  ...
+# Subtest: API draft saves only submitted answers, resume retains them, and Start approves the full input
+ok 33 - API draft saves only submitted answers, resume retains them, and Start approves the full input
+  ---
+  duration_ms: 1691.609259
+  type: 'test'
+  ...
+# Probe
+# [REDACTED]
+# [REDACTED]
+# [REDACTED]
+# [REDACTED]
+# [REDACTED]
+# [REDACTED]
+# Subtest: HTTP capture retains cleared vault secrets, nested direct credentials, and session secrets
+ok 34 - HTTP capture retains cleared vault secrets, nested direct credentials, and session secrets
+  ---
+  duration_ms: 571.152843
+  type: 'test'
+  ...
+# Long operation
+# Subtest: owner Stop cancels captured running command and supports explicit retry
+ok 35 - owner Stop cancels captured running command and supports explicit retry
+  ---
+  duration_ms: 83.180848
+  type: 'test'
+  ...
+# Command group
+# DESCENDANT_READY
+# DESCENDANT_STOPPED
+# Subtest: Stop terminates the owned command group including its child while retaining final output
+ok 36 - Stop terminates the owned command group including its child while retaining final output
+  ---
+  duration_ms: 889.986224
+  type: 'test'
+  ...
+# Failed application
+# DESCENDANT_PID:5485
+# LEADER_FINAL_OUTPUT
+# FAILED_ATTEMPT_DESCENDANT_STOPPED
+# Retry command
+# RETRY_LOG_OUTPUT
+# Subtest: failed readiness cleans an exited command group before retry and keeps the log writable
+ok 37 - failed readiness cleans an exited command group before retry and keeps the log writable
+  ---
+  duration_ms: 1388.717389
+  type: 'test'
+  ...
+# Failed application
+# DESCENDANT_PID:5524
+# LEADER_FINAL_OUTPUT
+# FAILED_ATTEMPT_DESCENDANT_STOPPED
+# Retry command
+# RETRY_LOG_OUTPUT
+# Subtest: failed core failure cleans an exited command group before retry and keeps the log writable
+ok 38 - failed core failure cleans an exited command group before retry and keeps the log writable
+  ---
+  duration_ms: 1326.590451
+  type: 'test'
+  ...
+# Uncooperative application
+# ESCALATION_GROUP_READY
+# Retry after escalation
+# ESCALATION_RETRY_OUTPUT
+# Subtest: readiness exit cleans a group that ignores SIGTERM before permitting retry
+ok 39 - readiness exit cleans a group that ignores SIGTERM before permitting retry
+  ---
+  duration_ms: 2446.823938
+  type: 'test'
+  ...
+# Uncooperative application
+# ESCALATION_GROUP_READY
+# Retry after escalation
+# ESCALATION_RETRY_OUTPUT
+# Subtest: core failure cleans a group that ignores SIGTERM before permitting retry
+ok 40 - core failure cleans a group that ignores SIGTERM before permitting retry
+  ---
+  duration_ms: 2346.297717
+  type: 'test'
+  ...
+# Uncooperative application
+# ESCALATION_GROUP_READY
+# Retry after escalation
+# ESCALATION_RETRY_OUTPUT
+# Subtest: hard deadline cleans a group that ignores SIGTERM before permitting retry
+ok 41 - hard deadline cleans a group that ignores SIGTERM before permitting retry
+  ---
+  duration_ms: 2334.804076
+  type: 'test'
+  ...
+# Uncooperative application
+# ESCALATION_GROUP_READY
+# Retry after escalation
+# ESCALATION_RETRY_OUTPUT
+# Subtest: owner stop cleans a group that ignores SIGTERM before permitting retry
+ok 42 - owner stop cleans a group that ignores SIGTERM before permitting retry
+  ---
+  duration_ms: 2432.275107
+  type: 'test'
+  ...
+# Subtest: command capture strips ANSI and all split credentials and preserves final close output
+ok 43 - command capture strips ANSI and all split credentials and preserves final close output
+  ---
+  duration_ms: 47.926462
+  type: 'test'
+  ...
+# Subtest: redaction registry retains omitted and cleared vault secrets
+ok 44 - redaction registry retains omitted and cleared vault secrets
+  ---
+  duration_ms: 0.855922
+  type: 'test'
+  ...
+# Subtest: stream and page memory remain bounded for huge lines and token tails
+ok 45 - stream and page memory remain bounded for huge lines and token tails
+  ---
+  duration_ms: 112.555182
+  type: 'test'
+  ...
+# Subtest: log refuses permissive symlink without touching target
+ok 46 - log refuses permissive symlink without touching target
+  ---
+  duration_ms: 5.36978
+  type: 'test'
+  ...
+# Subtest: log refuses permissive hardlink without touching target
+ok 47 - log refuses permissive hardlink without touching target
+  ---
+  duration_ms: 9.696538
+  type: 'test'
+  ...
+# Subtest: 150-second readiness succeeds after soft progress without stopping child
+ok 48 - 150-second readiness succeeds after soft progress without stopping child
+  ---
+  duration_ms: 41.530083
+  type: 'test'
+  ...
+# Subtest: child exit at 40 seconds wins even during a hung health probe and includes final output
+ok 49 - child exit at 40 seconds wins even during a hung health probe and includes final output
+  ---
+  duration_ms: 12.524584
+  type: 'test'
+  ...
+# Subtest: hard limit names last health and cancellation interrupts an in-flight probe
+ok 50 - hard limit names last health and cancellation interrupts an in-flight probe
+  ---
+  duration_ms: 56.385143
+  type: 'test'
+  ...
+# Subtest: short newline output streams before child close while multiline secrets stay private
+ok 51 - short newline output streams before child close while multiline secrets stay private
+  ---
+  duration_ms: 14.8906
+  type: 'test'
+  ...
+# Subtest: soft progress continues while a health probe hangs
+ok 52 - soft progress continues while a health probe hangs
+  ---
+  duration_ms: 7.253393
+  type: 'test'
+  ...
+# Subtest: known provider token patterns stay redacted across character and buffer boundaries
+ok 53 - known provider token patterns stay redacted across character and buffer boundaries
+  ---
+  duration_ms: 9.396456
+  type: 'test'
+  ...
+# Subtest: readiness fails immediately on a child error without displaying its private error text
+ok 54 - readiness fails immediately on a child error without displaying its private error text
+  ---
+  duration_ms: 7.84155
+  type: 'test'
+  ...
+# Subtest: shared sinks redact a credential split between stdout and stderr
+ok 55 - shared sinks redact a credential split between stdout and stderr
+  ---
+  duration_ms: 8.76998
+  type: 'test'
+  ...
+# Subtest: append log refuses an already-private hardlink rather than modifying its other name
+ok 56 - append log refuses an already-private hardlink rather than modifying its other name
+  ---
+  duration_ms: 5.763205
+  type: 'test'
+  ...
+# Subtest: an already-cancelled attempt never starts its command
+ok 57 - an already-cancelled attempt never starts its command
+  ---
+  duration_ms: 7.287975
+  type: 'test'
+  ...
+# Subtest: exit diagnostics snapshot buffered output without flushing a partial held credential
+ok 58 - exit diagnostics snapshot buffered output without flushing a partial held credential
+  ---
+  duration_ms: 58.999467
+  type: 'test'
+  ...
+# Subtest: a buffered snapshot masks overlapping complete and incomplete held secrets
+ok 59 - a buffered snapshot masks overlapping complete and incomplete held secrets
+  ---
+  duration_ms: 0.575859
+  type: 'test'
+  ...
+# Subtest: provider prefix matching preserves pnpm diagnostics and still masks actual and held tokens
+ok 60 - provider prefix matching preserves pnpm diagnostics and still masks actual and held tokens
+  ---
+  duration_ms: 4.463433
+  type: 'test'
+  ...
+# Subtest: a snapshot keeps a partial JWT private until its signature arrives
+ok 61 - a snapshot keeps a partial JWT private until its signature arrives
+  ---
+  duration_ms: 0.277819
+  type: 'test'
+  ...
+# Subtest: closing a command after a buffered credential prefix keeps every sink private
+ok 62 - closing a command after a buffered credential prefix keeps every sink private
+  ---
+  duration_ms: 18.689921
+  type: 'test'
+  ...
+# Subtest: supervisor exit during descendant cancellation succeeds only after the owned group disappears
+ok 63 - supervisor exit during descendant cancellation succeeds only after the owned group disappears
+  ---
+  duration_ms: 1960.965632
+  type: 'test'
+  ...
+# Subtest: distinct seed accepts only declared public fields and never invents H2H modes
+ok 64 - distinct seed accepts only declared public fields and never invents H2H modes
+  ---
+  duration_ms: 1.621166
+  type: 'test'
+  ...
+# Subtest: saved details reject another product and strip undeclared or secret draft keys
+ok 65 - saved details reject another product and strip undeclared or secret draft keys
+  ---
+  duration_ms: 50.853728
+  type: 'test'
+  ...
+# Subtest: sparse seed rejects unsupported capabilities and requires authenticated same-origin writes
+ok 66 - sparse seed rejects unsupported capabilities and requires authenticated same-origin writes
+  ---
+  duration_ms: 86.605653
+  type: 'test'
+  ...
+# Subtest: custom credential stays private, follows its scope, and agent activity reflects actual reports
+ok 67 - custom credential stays private, follows its scope, and agent activity reflects actual reports
+  ---
+  duration_ms: 47.124863
+  type: 'test'
+  ...
+# Subtest: adapter rejection produces a safe failed state without exposing provider errors
+ok 68 - adapter rejection produces a safe failed state without exposing provider errors
+  ---
+  duration_ms: 22.883813
+  type: 'test'
+  ...
+# Subtest: agent inference preserves owner overrides and their provenance
+ok 69 - agent inference preserves owner overrides and their provenance
+  ---
+  duration_ms: 43.22549
+  type: 'test'
+  ...
+# Subtest: only explicit start invokes the seed adapter with its custom credential
+ok 70 - only explicit start invokes the seed adapter with its custom credential
+  ---
+  duration_ms: 36.062934
+  type: 'test'
+  ...
+# Subtest: a canned command failure keeps an approved captured diagnostic and ignores a forged one
+ok 71 - a canned command failure keeps an approved captured diagnostic and ignores a forged one
+  ---
+  duration_ms: 515.808716
+  type: 'test'
+  ...
+# Building application
+# Building application
+# Subtest: HTTP reports runtime safely and preserves a resumable draft
+ok 72 - HTTP reports runtime safely and preserves a resumable draft
+  ---
+  duration_ms: 263.845774
+  type: 'test'
+  ...
+# Building application
+# Building application
+# Subtest: HTTP reports missing npm safely and preserves a resumable draft
+ok 73 - HTTP reports missing npm safely and preserves a resumable draft
+  ---
+  duration_ms: 76.534545
+  type: 'test'
+  ...
+# Building application
+# Building application
+# Subtest: HTTP reports command exit safely and preserves a resumable draft
+ok 74 - HTTP reports command exit safely and preserves a resumable draft
+  ---
+  duration_ms: 589.269008
+  type: 'test'
+  ...
+# Building application
+# Building application
+# Subtest: HTTP reports unknown safely and preserves a resumable draft
+ok 75 - HTTP reports unknown safely and preserves a resumable draft
+  ---
+  duration_ms: 82.608479
+  type: 'test'
+  ...
+# Building application
+# Building application
+# Subtest: HTTP reports modified typed error safely and preserves a resumable draft
+ok 76 - HTTP reports modified typed error safely and preserves a resumable draft
+  ---
+  duration_ms: 80.696008
+  type: 'test'
+  ...
+# Subtest: failure contract rejects arbitrary diagnostic fields as display text
+ok 77 - failure contract rejects arbitrary diagnostic fields as display text
+  ---
+  duration_ms: 0.641527
+  type: 'test'
+  ...
+# Subtest: explicit retry clears the preceding failure in the same HTTP session
+ok 78 - explicit retry clears the preceding failure in the same HTTP session
+  ---
+  duration_ms: 36.557075
+  type: 'test'
+  ...
+# Subtest: approved public and entered replacements win over saved dotenv settings, generated values and exact reruns survive
+ok 79 - approved public and entered replacements win over saved dotenv settings, generated values and exact reruns survive
+  ---
+  duration_ms: 95.804021
+  type: 'test'
+  ...
+# Subtest: approved public and entered replacements win over saved json settings, generated values and exact reruns survive
+ok 80 - approved public and entered replacements win over saved json settings, generated values and exact reruns survive
+  ---
+  duration_ms: 34.252092
+  type: 'test'
+  ...
+# Subtest: startup answers permanently invalidate saved entered secrets even when dependencies change back
+ok 81 - startup answers permanently invalidate saved entered secrets even when dependencies change back
+  ---
+  duration_ms: 971.253681
+  type: 'test'
+  ...
+# Saving private local settings
+# Applying database migrations
+# Your application is running locally
+# Subtest: Start applies an approved replacement after saved credentials are invalidated
+ok 82 - Start applies an approved replacement after saved credentials are invalidated
+  ---
+  duration_ms: 869.450099
+  type: 'test'
+  ...
+# Subtest: saved manifest secrets are redacted before any seed artwork callback captures a command
+ok 83 - saved manifest secrets are redacted before any seed artwork callback captures a command
+  ---
+  duration_ms: 1271.042875
+  type: 'test'
+  ...
+# Subtest: valid manifest values at the shared limit survive defaults, answers files, drafts, secure input, transport and resume
+ok 84 - valid manifest values at the shared limit survive defaults, answers files, drafts, secure input, transport and resume
+  ---
+  duration_ms: 854.149528
+  type: 'test'
+  ...
+# Subtest: an existing valid external manifest is refused before adapter execution
+ok 85 - an existing valid external manifest is refused before adapter execution
+  ---
+  duration_ms: 24.193272
+  type: 'test'
+  ...
+# Subtest: table: generated, entered, saved and inherited manifest secrets stay out of build bindings and all installer success sinks
+ok 86 - table: generated, entered, saved and inherited manifest secrets stay out of build bindings and all installer success sinks
+  ---
+  duration_ms: 13009.157106
+  type: 'test'
+  ...
+# Subtest: table: generated, entered, saved and inherited manifest secrets stay out of build bindings and all installer failure sinks
+ok 87 - table: generated, entered, saved and inherited manifest secrets stay out of build bindings and all installer failure sinks
+  ---
+  duration_ms: 16151.368617
+  type: 'test'
+  ...
+# Deploying to your Cloudflare account
+# Waiting to start (queue position 2/2): waiting behind 1 earlier queued job.
+# Ahead of this job:
+#   queued: adapter-kit-sPCKjW installer:command [7d27e698cc12] in /tmp/adapter-kit-sPCKjW
+# Memory: 15.3 GiB available, floor 2.0 GiB. Change the floor with RER_JOBS_MIN_FREE_MEMORY_BYTES (bytes; 0 for no floor).
+# Run from the project root. Inspect the queue with: 'node' '../..[REDACTED]/modules/job-queue/cli.mjs' 'status' '--json'
+# Heavy job admitted: hosting-contract-6j78qP installer:command [482ec74fc7b9]
+# {"ok":false,"code":"missing-owner-declaration"}
+# Subtest: the hosting hook drives the real deploy-kit owner CLI with the chosen account and token
+ok 88 - the hosting hook drives the real deploy-kit owner CLI with the chosen account and token
+  ---
+  duration_ms: 5139.98885
+  type: 'test'
+  ...
+# Subtest: table: CLI manifest secrets are excluded from every command and redacted on a saved success rerun
+ok 89 - table: CLI manifest secrets are excluded from every command and redacted on a saved success rerun
+  ---
+  duration_ms: 1807.275403
+  type: 'test'
+  ...
+# Subtest: table: CLI manifest secrets are excluded from every command and redacted on a saved failure rerun
+ok 90 - table: CLI manifest secrets are excluded from every command and redacted on a saved failure rerun
+  ---
+  duration_ms: 922.437348
+  type: 'test'
+  ...
+# Subtest: table: CLI manifest secrets are excluded from every command and redacted on a saved success rerun including private path metadata
+ok 91 - table: CLI manifest secrets are excluded from every command and redacted on a saved success rerun including private path metadata
+  ---
+  duration_ms: 1788.715993
+  type: 'test'
+  ...
+# Subtest: table: CLI manifest secrets are excluded from every command and redacted on a saved failure rerun including private path metadata
+ok 92 - table: CLI manifest secrets are excluded from every command and redacted on a saved failure rerun including private path metadata
+  ---
+  duration_ms: 925.490007
+  type: 'test'
+  ...
+# Building the Worker and applying all local migrations…
+# Local setup ready. Private command log: /tmp/cli-manifest-E7Akn7/.wrangler/local-setup/run-zLv1K4/commands.log
+# Use Set up the first owner; BOOTSTRAP_KEY is in .dev.vars.
+# Next: node scripts/local-dev.mjs
+# Open: http://127.0.0.1:9999/signin
+# Building the Worker and applying all local migrations…
+# Local setup ready. Private command log: /tmp/cli-manifest-E7Akn7/.wrangler/local-setup/run-ChA5A9/commands.log
+# Use Set up the first owner; BOOTSTRAP_KEY is in .dev.vars.
+# Next: node scripts/local-dev.mjs
+# Open: http://127.0.0.1:9999/signin
+# Building the Worker and applying all local migrations…
+# Local setup failed during build: pnpm failed (exit 7).
+# Private command log: /tmp/cli-manifest-E7Akn7/.wrangler/local-setup/run-4re2C7/commands.log
+# Building the Worker and applying all local migrations…
+# Previous credentials saved privately: /tmp/cli-manifest-E7Akn7/.dev.vars.previous
+# Local setup ready. Private command log: /tmp/cli-manifest-E7Akn7/.wrangler/local-setup/run-jv1rSQ/commands.log
+# Use Set up the first owner; BOOTSTRAP_KEY is in .dev.vars.
+# Next: node scripts/local-dev.mjs
+# Open: http://127.0.0.1:9999/signin
+# Subtest: CLI owner email and generated names come from SETUP, retain exact reruns, rotate and roll back
+ok 93 - CLI owner email and generated names come from SETUP, retain exact reruns, rotate and roll back
+  ---
+  duration_ms: 129.880699
+  type: 'test'
+  ...
+# Subtest: real child output is redacted in browser state, log, terminal and failure while flags and trusted status survive
+ok 94 - real child output is redacted in browser state, log, terminal and failure while flags and trusted status survive
+  ---
+  duration_ms: 123.018822
+  type: 'test'
+  ...
+# Subtest: terminal EPIPE does not interrupt capture and cleanup
+ok 95 - terminal EPIPE does not interrupt capture and cleanup
+  ---
+  duration_ms: 15.451375
+  type: 'test'
+  ...
+# Subtest: terminal EAGAIN does not interrupt capture and cleanup
+ok 96 - terminal EAGAIN does not interrupt capture and cleanup
+  ---
+  duration_ms: 9.277476
+  type: 'test'
+  ...
+# Subtest: real pipe reader exits while installer retains cleanup custody of its detached child
+ok 97 - real pipe reader exits while installer retains cleanup custody of its detached child
+  ---
+  duration_ms: 924.747216
+  type: 'test'
+  ...
+# Subtest: private log starts a fresh session and caps output with exactly one marker
+ok 98 - private log starts a fresh session and caps output with exactly one marker
+  ---
+  duration_ms: 86.171343
+  type: 'test'
+  ...
+# Subtest: 100 MiB real command output stays within a small heap and bounded browser and disk logs
+ok 99 - 100 MiB real command output stays within a small heap and bounded browser and disk logs
+  ---
+  duration_ms: 24423.681223
+  type: 'test'
+  ...
+# Subtest: private directory self-ignore covers new .seed storage
+ok 100 - private directory self-ignore covers new .seed storage
+  ---
+  duration_ms: 5.427348
+  type: 'test'
+  ...
+# Subtest: private directory self-ignore covers existing .seed storage
+ok 101 - private directory self-ignore covers existing .seed storage
+  ---
+  duration_ms: 12.638802
+  type: 'test'
+  ...
+# Subtest: self-ignore refuses a permissive symlink without modifying its target
+ok 102 - self-ignore refuses a permissive symlink without modifying its target
+  ---
+  duration_ms: 3.873824
+  type: 'test'
+  ...
+# Subtest: self-ignore refuses a permissive hardlink without modifying its target
+ok 103 - self-ignore refuses a permissive hardlink without modifying its target
+  ---
+  duration_ms: 7.051178
+  type: 'test'
+  ...
+# Subtest: self-ignore replaces an owned private hardlink without mutating its other name
+ok 104 - self-ignore replaces an owned private hardlink without mutating its other name
+  ---
+  duration_ms: 4.550775
+  type: 'test'
+  ...
+# Subtest: log revalidates replacement links before appending or changing permissions
+ok 105 - log revalidates replacement links before appending or changing permissions
+  ---
+  duration_ms: 4.738389
+  type: 'test'
+  ...
+# Subtest: a partially received answer request cannot cross the explicit Start boundary
+ok 106 - a partially received answer request cannot cross the explicit Start boundary
+  ---
+  duration_ms: 156.348316
+  type: 'test'
+  ...
+# (node:7970) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: preview resolves its plan and listens with quiet planner stdout
+ok 107 - preview resolves its plan and listens with quiet planner stdout
+  ---
+  duration_ms: 6406.208179
+  type: 'test'
+  ...
+# Subtest: preview resolves its plan and listens with banners planner stdout
+ok 108 - preview resolves its plan and listens with banners planner stdout
+  ---
+  duration_ms: 6459.26215
+  type: 'test'
+  ...
+# Subtest: preview refuses failed planning
+ok 109 - preview refuses failed planning
+  ---
+  duration_ms: 1082.168968
+  type: 'test'
+  ...
+# Subtest: preview refuses empty planning
+ok 110 - preview refuses empty planning
+  ---
+  duration_ms: 1125.10703
+  type: 'test'
+  ...
+# Subtest: resume tightens private directories and receipts without losing credentials or unknown outcome
+ok 111 - resume tightens private directories and receipts without losing credentials or unknown outcome
+  ---
+  duration_ms: 47.40974
+  type: 'test'
+  ...
+# Subtest: local email updates and reads tighten existing credentials and preserve unrelated content
+ok 112 - local email updates and reads tighten existing credentials and preserve unrelated content
+  ---
+  duration_ms: 4.720823
+  type: 'test'
+  ...
+# Subtest: state resume and preexisting temporary files are private without losing interrupted state
+ok 113 - state resume and preexisting temporary files are private without losing interrupted state
+  ---
+  duration_ms: 20.35389
+  type: 'test'
+  ...
+# Subtest: credential writes reject symlinks and hard links without touching unrelated files
+ok 114 - credential writes reject symlinks and hard links without touching unrelated files
+  ---
+  duration_ms: 7.002905
+  type: 'test'
+  ...
+# Subtest: concurrent first receipt creation publishes one complete credential without replacement
+ok 115 - concurrent first receipt creation publishes one complete credential without replacement
+  ---
+  duration_ms: 1498.51089
+  type: 'test'
+  ...
+# Subtest: already-private hard links remain readable and atomic updates preserve other links
+ok 116 - already-private hard links remain readable and atomic updates preserve other links
+  ---
+  duration_ms: 3.703457
+  type: 'test'
+  ...
+# Subtest: a receipt remains resumable after interruption between publication and staging unlink
+ok 117 - a receipt remains resumable after interruption between publication and staging unlink
+  ---
+  duration_ms: 10.617325
+  type: 'test'
+  ...
+# Building
+# Build
+# Subtest: cancelling the installer mid-build leaves no child running
+ok 118 - cancelling the installer mid-build leaves no child running
+  ---
+  duration_ms: 1067.533666
+  type: 'test'
+  ...
+# Building
+# Build
+# Subtest: a process the installer did not start survives cleanup
+ok 119 - a process the installer did not start survives cleanup
+  ---
+  duration_ms: 1569.674354
+  type: 'test'
+  ...
+# Subtest: SIGTERM ends the installer promptly while a browser holds connections open
+ok 120 - SIGTERM ends the installer promptly while a browser holds connections open
+  ---
+  duration_ms: 3192.863291
+  type: 'test'
+  ...
+# Subtest: a transient process-table read is retried until it succeeds
+ok 121 - a transient process-table read is retried until it succeeds
+  ---
+  duration_ms: 32.917107
+  type: 'test'
+  ...
+# (node:8727) [RER_PROCESS_INSPECTION_SLOW] Warning: Process inspection is taking longer than 100 ms on a busy machine; waiting up to 200 ms more.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: a process table that never reads fails after its bound and extension, not before
+ok 122 - a process table that never reads fails after its bound and extension, not before
+  ---
+  duration_ms: 299.786178
+  type: 'test'
+  ...
+# (node:8727) [RER_PROCESS_INSPECTION_SLOW] Warning: Process inspection is taking longer than 100 ms on a busy machine; waiting up to 10000 ms more.
+# (node:8727) [RER_PROCESS_INSPECTION_SLOW] Warning: Process inspection is taking longer than 100 ms on a busy machine; waiting up to 10000 ms more.
+# (node:8727) [RER_PROCESS_INSPECTION_SLOW] Warning: Process inspection is taking longer than 100 ms on a busy machine; waiting up to 10000 ms more.
+# Subtest: a slow process table does not fail a passing run and its stray child is still stopped
+ok 123 - a slow process table does not fail a passing run and its stray child is still stopped
+  ---
+  duration_ms: 1608.060135
+  type: 'test'
+  ...
+# Subtest: a failure that is not transient is reported at once
+ok 124 - a failure that is not transient is reported at once
+  ---
+  duration_ms: 0.406463
+  type: 'test'
+  ...
+# Subtest: hung HTTP request times out and a later healthy response retains the owned app
+ok 125 - hung HTTP request times out and a later healthy response retains the owned app
+  ---
+  duration_ms: 202.156522
+  type: 'test'
+  ...
+# Subtest: a callback ignoring its abort signal cannot block later probes
+ok 126 - a callback ignoring its abort signal cannot block later probes
+  ---
+  duration_ms: 25.980912
+  type: 'test'
+  ...
+# Subtest: cancel promptly aborts an active uncooperative probe
+ok 127 - cancel promptly aborts an active uncooperative probe
+  ---
+  duration_ms: 1.005928
+  type: 'test'
+  ...
+# Subtest: deadline promptly aborts an active uncooperative probe
+ok 128 - deadline promptly aborts an active uncooperative probe
+  ---
+  duration_ms: 30.395012
+  type: 'test'
+  ...
+# Subtest: exit promptly aborts an active uncooperative probe
+ok 129 - exit promptly aborts an active uncooperative probe
+  ---
+  duration_ms: 0.547016
+  type: 'test'
+  ...
+# Subtest: error promptly aborts an active uncooperative probe
+ok 130 - error promptly aborts an active uncooperative probe
+  ---
+  duration_ms: 0.237188
+  type: 'test'
+  ...
+# Subtest: probe, progress and deadline waits clean up with an injected clock
+ok 131 - probe, progress and deadline waits clean up with an injected clock
+  ---
+  duration_ms: 1.253512
+  type: 'test'
+  ...
+# Subtest: default probe timeout follows interval 1
+ok 132 - default probe timeout follows interval 1
+  ---
+  duration_ms: 0.623841
+  type: 'test'
+  ...
+# Subtest: default probe timeout follows interval 2000
+ok 133 - default probe timeout follows interval 2000
+  ---
+  duration_ms: 0.468187
+  type: 'test'
+  ...
+# Subtest: JWT short after session-: whole text
+ok 134 - JWT short after session-: whole text
+  ---
+  duration_ms: 4.668503
+  type: 'test'
+  ...
+# Subtest: JWT short after session-: 1-byte stream
+ok 135 - JWT short after session-: 1-byte stream
+  ---
+  duration_ms: 5.134288
+  type: 'test'
+  ...
+# Subtest: JWT short after session-: 3-byte stream
+ok 136 - JWT short after session-: 3-byte stream
+  ---
+  duration_ms: 0.711413
+  type: 'test'
+  ...
+# Subtest: JWT short after session-: 4096-byte stream
+ok 137 - JWT short after session-: 4096-byte stream
+  ---
+  duration_ms: 0.249877
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after session-: whole text
+ok 138 - JWT 1.5 KB after session-: whole text
+  ---
+  duration_ms: 0.58358
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after session-: 1-byte stream
+ok 139 - JWT 1.5 KB after session-: 1-byte stream
+  ---
+  duration_ms: 122.896447
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after session-: 3-byte stream
+ok 140 - JWT 1.5 KB after session-: 3-byte stream
+  ---
+  duration_ms: 38.168082
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after session-: 4096-byte stream
+ok 141 - JWT 1.5 KB after session-: 4096-byte stream
+  ---
+  duration_ms: 0.67619
+  type: 'test'
+  ...
+# Subtest: JWT short after session_: whole text
+ok 142 - JWT short after session_: whole text
+  ---
+  duration_ms: 0.401005
+  type: 'test'
+  ...
+# Subtest: JWT short after session_: 1-byte stream
+ok 143 - JWT short after session_: 1-byte stream
+  ---
+  duration_ms: 1.360132
+  type: 'test'
+  ...
+# Subtest: JWT short after session_: 3-byte stream
+ok 144 - JWT short after session_: 3-byte stream
+  ---
+  duration_ms: 0.693566
+  type: 'test'
+  ...
+# Subtest: JWT short after session_: 4096-byte stream
+ok 145 - JWT short after session_: 4096-byte stream
+  ---
+  duration_ms: 0.181094
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after session_: whole text
+ok 146 - JWT 1.5 KB after session_: whole text
+  ---
+  duration_ms: 0.320423
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after session_: 1-byte stream
+ok 147 - JWT 1.5 KB after session_: 1-byte stream
+  ---
+  duration_ms: 127.195103
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after session_: 3-byte stream
+ok 148 - JWT 1.5 KB after session_: 3-byte stream
+  ---
+  duration_ms: 36.23249
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after session_: 4096-byte stream
+ok 149 - JWT 1.5 KB after session_: 4096-byte stream
+  ---
+  duration_ms: 0.526034
+  type: 'test'
+  ...
+# Subtest: JWT short after x: whole text
+ok 150 - JWT short after x: whole text
+  ---
+  duration_ms: 0.101633
+  type: 'test'
+  ...
+# Subtest: JWT short after x: 1-byte stream
+ok 151 - JWT short after x: 1-byte stream
+  ---
+  duration_ms: 0.767238
+  type: 'test'
+  ...
+# Subtest: JWT short after x: 3-byte stream
+ok 152 - JWT short after x: 3-byte stream
+  ---
+  duration_ms: 0.37767
+  type: 'test'
+  ...
+# Subtest: JWT short after x: 4096-byte stream
+ok 153 - JWT short after x: 4096-byte stream
+  ---
+  duration_ms: 0.118809
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after x: whole text
+ok 154 - JWT 1.5 KB after x: whole text
+  ---
+  duration_ms: 0.247684
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after x: 1-byte stream
+ok 155 - JWT 1.5 KB after x: 1-byte stream
+  ---
+  duration_ms: 110.63723
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after x: 3-byte stream
+ok 156 - JWT 1.5 KB after x: 3-byte stream
+  ---
+  duration_ms: 42.824407
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after x: 4096-byte stream
+ok 157 - JWT 1.5 KB after x: 4096-byte stream
+  ---
+  duration_ms: 0.555148
+  type: 'test'
+  ...
+# Subtest: JWT short after x-: whole text
+ok 158 - JWT short after x-: whole text
+  ---
+  duration_ms: 0.168925
+  type: 'test'
+  ...
+# Subtest: JWT short after x-: 1-byte stream
+ok 159 - JWT short after x-: 1-byte stream
+  ---
+  duration_ms: 0.790273
+  type: 'test'
+  ...
+# Subtest: JWT short after x-: 3-byte stream
+ok 160 - JWT short after x-: 3-byte stream
+  ---
+  duration_ms: 0.389227
+  type: 'test'
+  ...
+# Subtest: JWT short after x-: 4096-byte stream
+ok 161 - JWT short after x-: 4096-byte stream
+  ---
+  duration_ms: 0.120832
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after x-: whole text
+ok 162 - JWT 1.5 KB after x-: whole text
+  ---
+  duration_ms: 0.252401
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after x-: 1-byte stream
+ok 163 - JWT 1.5 KB after x-: 1-byte stream
+  ---
+  duration_ms: 110.177877
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after x-: 3-byte stream
+ok 164 - JWT 1.5 KB after x-: 3-byte stream
+  ---
+  duration_ms: 36.036906
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after x-: 4096-byte stream
+ok 165 - JWT 1.5 KB after x-: 4096-byte stream
+  ---
+  duration_ms: 0.519765
+  type: 'test'
+  ...
+# Subtest: JWT short after 9: whole text
+ok 166 - JWT short after 9: whole text
+  ---
+  duration_ms: 0.095885
+  type: 'test'
+  ...
+# Subtest: JWT short after 9: 1-byte stream
+ok 167 - JWT short after 9: 1-byte stream
+  ---
+  duration_ms: 0.779176
+  type: 'test'
+  ...
+# Subtest: JWT short after 9: 3-byte stream
+ok 168 - JWT short after 9: 3-byte stream
+  ---
+  duration_ms: 0.333242
+  type: 'test'
+  ...
+# Subtest: JWT short after 9: 4096-byte stream
+ok 169 - JWT short after 9: 4096-byte stream
+  ---
+  duration_ms: 0.147152
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after 9: whole text
+ok 170 - JWT 1.5 KB after 9: whole text
+  ---
+  duration_ms: 0.23827
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after 9: 1-byte stream
+ok 171 - JWT 1.5 KB after 9: 1-byte stream
+  ---
+  duration_ms: 112.437776
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after 9: 3-byte stream
+ok 172 - JWT 1.5 KB after 9: 3-byte stream
+  ---
+  duration_ms: 36.797043
+  type: 'test'
+  ...
+# Subtest: JWT 1.5 KB after 9: 4096-byte stream
+ok 173 - JWT 1.5 KB after 9: 4096-byte stream
+  ---
+  duration_ms: 0.525183
+  type: 'test'
+  ...
+# Subtest: table: secret-bearing shapes redact in complete text, byte-split streams and long lines
+ok 174 - table: secret-bearing shapes redact in complete text, byte-split streams and long lines
+  ---
+  duration_ms: 4343.311219
+  type: 'test'
+  ...
+# Subtest: table: re-encodings and parts of registered values redact
+ok 175 - table: re-encodings and parts of registered values redact
+  ---
+  duration_ms: 35.578071
+  type: 'test'
+  ...
+# Subtest: table: diagnostic prose stays intact as complete text and as a final unterminated line
+ok 176 - table: diagnostic prose stays intact as complete text and as a final unterminated line
+  ---
+  duration_ms: 192.784209
+  type: 'test'
+  ...
+# Subtest: step labels, reports and a final unterminated child line reach every sink unchanged
+ok 177 - step labels, reports and a final unterminated child line reach every sink unchanged
+  ---
+  duration_ms: 23.619413
+  type: 'test'
+  ...
+# Subtest: credential variable names are whole word parts, so ordinary variables are not registered
+ok 178 - credential variable names are whole word parts, so ordinary variables are not registered
+  ---
+  duration_ms: 0.430249
+  type: 'test'
+  ...
+# Subtest: 4 MiB pathological inputs redact in time comparable to ordinary output
+ok 179 - 4 MiB pathological inputs redact in time comparable to ordinary output
+  ---
+  duration_ms: 5930.450059
+  type: 'test'
+  ...
+# Subtest: acronym-prefixed credential variables register their values
+ok 180 - acronym-prefixed credential variables register their values
+  ---
+  duration_ms: 0.262436
+  type: 'test'
+  ...
+# Subtest: camelCase prefix and JWT holds protect long values split beyond the output window
+ok 181 - camelCase prefix and JWT holds protect long values split beyond the output window
+  ---
+  duration_ms: 2.041971
+  type: 'test'
+  ...
+# Subtest: oversized quoted credentials stay bounded and private until their closing quote
+ok 182 - oversized quoted credentials stay bounded and private until their closing quote
+  ---
+  duration_ms: 32.91931
+  type: 'test'
+  ...
+# Subtest: environment credential names and URL userinfo register long values without registering flags
+ok 183 - environment credential names and URL userinfo register long values without registering flags
+  ---
+  duration_ms: 9.02024
+  type: 'test'
+  ...
+# Subtest: raw, base64, base64url and percent-encoded registered credentials survive every split byte
+ok 184 - raw, base64, base64url and percent-encoded registered credentials survive every split byte
+  ---
+  duration_ms: 128.190881
+  type: 'test'
+  ...
+# Subtest: credential shapes redact in one buffer and across individual bytes with nearby diagnostics intact
+ok 185 - credential shapes redact in one buffer and across individual bytes with nearby diagnostics intact
+  ---
+  duration_ms: 24.622243
+  type: 'test'
+  ...
+# Subtest: snapshot and EOF never expose an incomplete secret, PEM header, body, Basic value or URL userinfo
+ok 186 - snapshot and EOF never expose an incomplete secret, PEM header, body, Basic value or URL userinfo
+  ---
+  duration_ms: 9.000932
+  type: 'test'
+  ...
+# Subtest: oversized PEM bodies stay bounded and private through a split end marker
+ok 187 - oversized PEM bodies stay bounded and private through a split end marker
+  ---
+  duration_ms: 27.374104
+  type: 'test'
+  ...
+# Subtest: C1, DEL, bidi and control-string payloads are removed across UTF-8 byte boundaries
+ok 188 - C1, DEL, bidi and control-string payloads are removed across UTF-8 byte boundaries
+  ---
+  duration_ms: 1.936211
+  type: 'test'
+  ...
+# Subtest: unterminated OSC and DCS recover on newline, at 4 KiB, and after end resets state
+ok 189 - unterminated OSC and DCS recover on newline, at 4 KiB, and after end resets state
+  ---
+  duration_ms: 109.299161
+  type: 'test'
+  ...
+# Subtest: deploy secret binding recovery commands remain usable while values remain private
+ok 190 - deploy secret binding recovery commands remain usable while values remain private
+  ---
+  duration_ms: 2.767115
+  type: 'test'
+  ...
+# Subtest: capture keeps text tails and redacted JSON lines in write order
+ok 191 - capture keeps text tails and redacted JSON lines in write order
+  ---
+  duration_ms: 16.335369
+  type: 'test'
+  ...
+# F2 capture output: "Listening on port 8787\\n{\\"event\\":\\"ready\\",\\"opaque\\":\\"[REDACTED]\\",\\"url\\":\\"http://localhost/\#rer-dev=[REDACTED]\\"}\\nAFTER_MARKER\\n"
+# Subtest: manifest model preserves names, group order, defaults, options and conditional presentation
+ok 192 - manifest model preserves names, group order, defaults, options and conditional presentation
+  ---
+  duration_ms: 3.799362
+  type: 'test'
+  ...
+# Subtest: browser-rejected values are refused by the server before any adapter code
+ok 193 - browser-rejected values are refused by the server before any adapter code
+  ---
+  duration_ms: 846.450643
+  type: 'test'
+  ...
+# Subtest: missing, invalid, linked and unsafe selections fail naming the file before commands
+ok 194 - missing, invalid, linked and unsafe selections fail naming the file before commands
+  ---
+  duration_ms: 30.380269
+  type: 'test'
+  ...
+# Subtest: seed and browser refuse handwritten shapes naming rer-setup.json
+ok 195 - seed and browser refuse handwritten shapes naming rer-setup.json
+  ---
+  duration_ms: 8.025114
+  type: 'test'
+  ...
+# Subtest: managed secrets without a generator require declared adapter supply
+ok 196 - managed secrets without a generator require declared adapter supply
+  ---
+  duration_ms: 1.022052
+  type: 'test'
+  ...
+# Subtest: entered secrets follow presentation dependencies, stay private, and settings prefill by name
+ok 197 - entered secrets follow presentation dependencies, stay private, and settings prefill by name
+  ---
+  duration_ms: 844.169089
+  type: 'test'
+  ...
+# Saving private local settings
+# Your application is running locally
+# Saving private local settings
+# Your application is running locally
+# Subtest: settings use manifest answer names and 32-byte hex and padded base64; rerun preserves exact bytes
+ok 198 - settings use manifest answer names and 32-byte hex and padded base64; rerun preserves exact bytes
+  ---
+  duration_ms: 55.77854
+  type: 'test'
+  ...
+# Subtest: legacy drafts resume and drop keys absent from the manifest
+ok 199 - legacy drafts resume and drop keys absent from the manifest
+  ---
+  duration_ms: 764.284962
+  type: 'test'
+  ...
+# Subtest: owner hook uses manifest token names and the sign-in hook keeps a plain destination
+ok 200 - owner hook uses manifest token names and the sign-in hook keeps a plain destination
+  ---
+  duration_ms: 3.017383
+  type: 'test'
+  ...
+# Subtest: Start reserves the session before persistence/artwork and persists running before adapter execution
+ok 201 - Start reserves the session before persistence/artwork and persists running before adapter execution
+  ---
+  duration_ms: 131.814566
+  type: 'test'
+  ...
+# Starting your application on this computer
+# Your application is running locally
+# Subtest: startup waits for the application without connecting to an auxiliary runtime listener
+ok 202 - startup waits for the application without connecting to an auxiliary runtime listener
+  ---
+  duration_ms: 1550.73683
+  type: 'test'
+  ...
+# Starting your application on this computer
+# Application listened on port 39849; readiness failed for GET http://127.0.0.1:42257/health through expected internal port 42257. Check application health and the runtime target's port binding.
+# Starting your application on this computer
+# Subtest: a declared misbound application is diagnosed without probing it or a workerd helper
+ok 203 - a declared misbound application is diagnosed without probing it or a workerd helper
+  ---
+  duration_ms: 3573.355101
+  type: 'test'
+  ...
+# Installing locked dependencies
+# child output
+# Starting your application
+# Subtest: a step announced and then run under the same label appears once in the page and the log
+ok 204 - a step announced and then run under the same label appears once in the page and the log
+  ---
+  duration_ms: 696.839183
+  type: 'test'
+  ...
+# Subtest: a seed theme dresses the installer from files the app serves, and an unthemed seed keeps the current page
+ok 205 - a seed theme dresses the installer from files the app serves, and an unthemed seed keeps the current page
+  ---
+  duration_ms: 177.005507
+  type: 'test'
+  ...
+# Subtest: a theme outside the grammar, naming files the app does not serve, or failing contrast is refused before the installer starts
+ok 206 - a theme outside the grammar, naming files the app does not serve, or failing contrast is refused before the installer starts
+  ---
+  duration_ms: 42.17005
+  type: 'test'
+  ...
+# Subtest: concurrent browser checks get separate output directories and keep each other's files
+ok 207 - concurrent browser checks get separate output directories and keep each other's files
+  ---
+  duration_ms: 43.136409
+  type: 'test'
+  ...
+# Subtest: a passing check removes its output; a failing or kept check retains it
+ok 208 - a passing check removes its output; a failing or kept check retains it
+  ---
+  duration_ms: 8.465542
+  type: 'test'
+  ...
+# Subtest: the browser-check command removes successful output and preserves failed output
+ok 209 - the browser-check command removes successful output and preserves failed output
+  ---
+  duration_ms: 34262.975466
+  type: 'test'
+  ...
+# Subtest: agent answer changes clear every dependent browser-held secret before submission and change-back
+ok 210 - agent answer changes clear every dependent browser-held secret before submission and change-back
+  ---
+  duration_ms: 3937.030309
+  type: 'test'
+  ...
+# Subtest: declared group IDs cannot collide with generated ungrouped, hosting or local-owner groups
+ok 211 - declared group IDs cannot collide with generated ungrouped, hosting or local-owner groups
+  ---
+  duration_ms: 987.783608
+  type: 'test'
+  ...
+# Subtest: an optional-only group without defaults can be edited from review
+ok 212 - an optional-only group without defaults can be edited from review
+  ---
+  duration_ms: 895.079983
+  type: 'test'
+  ...
+# Subtest: manifest alone controls required fields without hosting, owner or artwork
+ok 213 - manifest alone controls required fields without hosting, owner or artwork
+  ---
+  duration_ms: 2.735927
+  type: 'test'
+  ...
+# Subtest: agent updates preserve pending local answers and never merge unknown fields
+ok 214 - agent updates preserve pending local answers and never merge unknown fields
+  ---
+  duration_ms: 0.452203
+  type: 'test'
+  ...
+# Subtest: saved answers override defaults and edition secrets use declared readiness bindings
+ok 215 - saved answers override defaults and edition secrets use declared readiness bindings
+  ---
+  duration_ms: 0.600306
+  type: 'test'
+  ...
+# Subtest: local hosting choices are preselected only by an explicit edition feature
+ok 216 - local hosting choices are preselected only by an explicit edition feature
+  ---
+  duration_ms: 0.810162
+  type: 'test'
+  ...
+# Subtest: summary includes answered values and only manifest defaults
+ok 217 - summary includes answered values and only manifest defaults
+  ---
+  duration_ms: 0.745855
+  type: 'test'
+  ...
+# Subtest: failed-install details use the actual command output and installer log path
+ok 218 - failed-install details use the actual command output and installer log path
+  ---
+  duration_ms: 0.453804
+  type: 'test'
+  ...
+# Subtest: failed-install details do not invent output when the command recorded none
+ok 219 - failed-install details do not invent output when the command recorded none
+  ---
+  duration_ms: 0.335476
+  type: 'test'
+  ...
+# Subtest: a child log marker cannot replace the final installer path or truncate output
+ok 220 - a child log marker cannot replace the final installer path or truncate output
+  ---
+  duration_ms: 0.204599
+  type: 'test'
+  ...
+# Subtest: a failure without command capture still gives the actual last-step guidance
+ok 221 - a failure without command capture still gives the actual last-step guidance
+  ---
+  duration_ms: 0.482829
+  type: 'test'
+  ...
+1..221
+# tests 221
+# suites 0
+# pass 221
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 194317.227342

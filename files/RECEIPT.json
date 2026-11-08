@@ -1,0 +1,164 @@
+{
+  "tag": "gr-base-preview-plan-channel-1",
+  "repository": "runeditrun/base",
+  "branch": "cloud/gr-base-preview-plan-channel-1",
+  "base_main": "055cf2c085cf720371a050be5999d85d95a3b39f",
+  "head": "ba5686bf8091b1425b01302b100908a89d3c3eda",
+  "product_commit_count": 1,
+  "files_changed": [
+    "default-seed/scripts/base-cli/inventory.json",
+    "default-seed/scripts/base-onboarding/production-plan.mjs",
+    "default-seed/scripts/base-onboarding/production-runtime.mjs",
+    "global/CHANGELOG.md",
+    "onboarding/preview-plan.test.mjs",
+    "onboarding/production-plan.mjs",
+    "onboarding/production-runtime.mjs"
+  ],
+  "checks": [
+    {
+      "command": "node --test onboarding/preview-plan.test.mjs (original main implementation)",
+      "result": "expected regression failure",
+      "tests": 4,
+      "pass": 2,
+      "fail": 2,
+      "log": "regression-before.log",
+      "details": "Quiet preview and non-zero exit controls pass; stdout banner causes Unexpected token U; empty output exposes raw parse error."
+    },
+    {
+      "command": "node --test onboarding/preview-plan.test.mjs (fixed, Node 22.20.0)",
+      "result": "pass",
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "log": "regression-after-node22.log"
+    },
+    {
+      "command": "node --test --test-concurrency=2 onboarding/*.test.mjs onboarding/local/*.test.mjs onboarding/ui/*.test.mjs",
+      "result": "pass",
+      "tests": 221,
+      "pass": 221,
+      "fail": 0,
+      "log": "onboarding-tests-node22.log",
+      "details": "Node 22.20.0, standard umask 0022, external launch adapter supplies system Chromium and --no-sandbox; tests unchanged."
+    },
+    {
+      "command": "node --test --test-name-pattern='rer preview' cli/managed-flows.test.mjs",
+      "result": "pass",
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "log": "preview-existing-tests-node22.log"
+    },
+    {
+      "command": "pnpm --dir default-seed typecheck",
+      "result": "pass",
+      "log": "typecheck-node22.log"
+    },
+    {
+      "command": "node --test --test-name-pattern='portable CLI source inventory is deterministic' cli/cli.test.mjs",
+      "result": "pass",
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "log": "cli-copy-tests.log"
+    },
+    {
+      "command": "node scripts/export-cli.mjs default-seed",
+      "result": "pass",
+      "log": "export-cli.log"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    },
+    {
+      "command": "all-candidate author, committer and trailer audit including side parents",
+      "result": "pass",
+      "commits": 1,
+      "log": "identity-audit.log"
+    },
+    {
+      "command": "python3 fleet cloud-push.py origin cloud/gr-base-preview-plan-channel-1",
+      "result": "pass",
+      "attempts": 1,
+      "log": "product-push.log"
+    },
+    {
+      "command": "node check-invalid-plan.mjs <checkout>",
+      "result": "pass",
+      "log": "invalid-plan-check.log",
+      "details": "Isolated runtime copy with malformed fd-3 result: fixed error, no listener or raw JSON diagnostic; product checkout unchanged."
+    },
+    {
+      "command": "node scripts/publish-check.mjs --repo <checkout> --ref ba5686bf8091b1425b01302b100908a89d3c3eda --public-base https://github.com/runeditrun/base#main --project runeditrun/base --repository https://github.com/runeditrun/base --timeout-seconds 1800",
+      "result": "PASS",
+      "complete": true,
+      "source_commit": "ba5686bf8091b1425b01302b100908a89d3c3eda",
+      "history": {
+        "commits": 1526,
+        "trees": 1506,
+        "blobs": 10295,
+        "commitMessages": 1526,
+        "tagMessages": 99,
+        "hydration": {
+          "missingBefore": 7050,
+          "missingAfter": 0,
+          "fetches": 1,
+          "seconds": 8.840701
+        }
+      },
+      "log": "publication-scan.json"
+    }
+  ],
+  "clause_status_changes": [],
+  "before_after_counts": {
+    "regression": {
+      "before": {
+        "pass": 2,
+        "fail": 2
+      },
+      "after": {
+        "pass": 4,
+        "fail": 0
+      }
+    },
+    "existing_onboarding": {
+      "pass": 221,
+      "fail": 0
+    },
+    "existing_preview": {
+      "pass": 3,
+      "fail": 0
+    },
+    "clause_promotions": {
+      "before": 0,
+      "after": 0
+    }
+  },
+  "initial_environment_attempts": [
+    {
+      "log": "onboarding-tests.log",
+      "result": "superseded and terminated after environment failures",
+      "reason": "Inherited umask 0077 disagreed with existing 0644 fixture assertions; default browser executable was absent."
+    },
+    {
+      "log": "preview-existing-tests.log",
+      "result": "setup hook failed before preview assertions",
+      "reason": "VM default Node 24 attempted unavailable official Node 22 acquisition; installed exact Node via registry and reran successfully."
+    }
+  ],
+  "pr_url": "https://github.com/runeditrun/base/pull/838",
+  "verify_run_id": 42508769042,
+  "product_status": "READY",
+  "verify": {
+    "run_id": 42508769042,
+    "observed_at": "2026-11-08T18:37:29.851550+00:00",
+    "conclusion": "success",
+    "head_sha": "ba5686bf8091b1425b01302b100908a89d3c3eda",
+    "html_url": "https://github.com/runeditrun/base/actions/runs/42508769042",
+    "status": "completed"
+  },
+  "manual_github_calls": 9,
+  "finalized_at": "2026-11-08T18:38:05.265247+00:00",
+  "blockers": []
+}

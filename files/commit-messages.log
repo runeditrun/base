@@ -1,0 +1,7 @@
+commit ba5686bf8091b1425b01302b100908a89d3c3eda
+Author:     Run Edit Run fleet <fleet@runeditrun.com>
+AuthorDate: Sun Nov 8 18:11:33 2026 +0000
+Commit:     Run Edit Run fleet <fleet@runeditrun.com>
+CommitDate: Sun Nov 8 18:11:33 2026 +0000
+
+    Fix preview planner result transport [skip ci]

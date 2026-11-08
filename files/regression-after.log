@@ -1,0 +1,12 @@
+✔ preview resolves its plan and listens with quiet planner stdout (980.549238ms)
+✔ preview resolves its plan and listens with banners planner stdout (921.408776ms)
+✔ preview refuses failed planning (391.572914ms)
+✔ preview refuses empty planning (431.16114ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2854.215427

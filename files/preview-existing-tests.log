@@ -1,0 +1,73 @@
+✖ rer preview runs the declared scheduled triggers on their schedule, reports each run, and stops them with preview (6592.032576ms)
+✖ rer preview serves one fixed production workerd at the saved origin and keeps canonical local data (0.892163ms)
+✖ rer preview refuses build-time rewrites by name until the project declares its generated outputs (0.060391ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7070.384826
+
+✖ failing tests:
+
+test at cli/managed-flows.test.mjs:216:40
+✖ rer preview runs the declared scheduled triggers on their schedule, reports each run, and stops them with preview (6592.032576ms)
+  AssertionError [ERR_ASSERTION]: Safe command outcome: install exited 3; {"exitCode":3,"signalCode":null,"events":[{"event":"error","code":"missing_input","exitCode":3},{"event":"result","exitCode":3}]}
+  {"version":1,"verb":"install","event":"error","code":"missing_input","message":"Node 22.20.0 is required. The exact official release could not be acquired within 60 seconds; check the connection and available disk space. With network access, run: npm exec --yes --package=node@22.20.0 -- node '/tmp/rer-real-journey-sURaye/seed with spaces/scripts/rer.mjs' 'install' '--cwd' '/tmp/rer-real-journey-sURaye/seed with spaces' (repeat any original options privately).","exitCode":3}
+  {"version":1,"verb":"install","event":"result","ok":false,"exitCode":3}
+  
+  
+  3 !== 0
+  
+      at Object.run (file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/cli/fixtures/reference.mjs:105:10)
+      at async before.timeout (file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/cli/managed-flows.test.mjs:23:2)
+      at async TestHook.run (node:internal/test_runner/test:1389:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 3,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at cli/managed-flows.test.mjs:404:1
+✖ rer preview serves one fixed production workerd at the saved origin and keeps canonical local data (0.892163ms)
+  AssertionError [ERR_ASSERTION]: Safe command outcome: install exited 3; {"exitCode":3,"signalCode":null,"events":[{"event":"error","code":"missing_input","exitCode":3},{"event":"result","exitCode":3}]}
+  {"version":1,"verb":"install","event":"error","code":"missing_input","message":"Node 22.20.0 is required. The exact official release could not be acquired within 60 seconds; check the connection and available disk space. With network access, run: npm exec --yes --package=node@22.20.0 -- node '/tmp/rer-real-journey-sURaye/seed with spaces/scripts/rer.mjs' 'install' '--cwd' '/tmp/rer-real-journey-sURaye/seed with spaces' (repeat any original options privately).","exitCode":3}
+  {"version":1,"verb":"install","event":"result","ok":false,"exitCode":3}
+  
+  
+  3 !== 0
+  
+      at Object.run (file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/cli/fixtures/reference.mjs:105:10)
+      at async before.timeout (file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/cli/managed-flows.test.mjs:23:2)
+      at async TestHook.run (node:internal/test_runner/test:1389:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 3,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at cli/managed-flows.test.mjs:456:1
+✖ rer preview refuses build-time rewrites by name until the project declares its generated outputs (0.060391ms)
+  AssertionError [ERR_ASSERTION]: Safe command outcome: install exited 3; {"exitCode":3,"signalCode":null,"events":[{"event":"error","code":"missing_input","exitCode":3},{"event":"result","exitCode":3}]}
+  {"version":1,"verb":"install","event":"error","code":"missing_input","message":"Node 22.20.0 is required. The exact official release could not be acquired within 60 seconds; check the connection and available disk space. With network access, run: npm exec --yes --package=node@22.20.0 -- node '/tmp/rer-real-journey-sURaye/seed with spaces/scripts/rer.mjs' 'install' '--cwd' '/tmp/rer-real-journey-sURaye/seed with spaces' (repeat any original options privately).","exitCode":3}
+  {"version":1,"verb":"install","event":"result","ok":false,"exitCode":3}
+  
+  
+  3 !== 0
+  
+      at Object.run (file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/cli/fixtures/reference.mjs:105:10)
+      at async before.timeout (file:///home/agent/rer-consolidation/work/gr-base-preview-plan-channel-1/base/cli/managed-flows.test.mjs:23:2)
+      at async TestHook.run (node:internal/test_runner/test:1389:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 3,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
