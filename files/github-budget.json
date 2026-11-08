@@ -1,0 +1,46 @@
+{
+  "github_calls_used": 10,
+  "github_calls_remaining": 0,
+  "calls": [
+    {
+      "n": 1,
+      "purpose": "prior run latest jobs, default page; no failures returned"
+    },
+    {
+      "n": 2,
+      "purpose": "prior run latest jobs, 100 rows; no failures returned"
+    },
+    {
+      "n": 3,
+      "purpose": "prior run latest jobs with pagination; 23 jobs, no failures"
+    },
+    {
+      "n": 4,
+      "purpose": "prior run attempt 1 jobs; cli 5/5 failure"
+    },
+    {
+      "n": 5,
+      "purpose": "prescribed failed-job archive; exit 0, empty output"
+    },
+    {
+      "n": 6,
+      "purpose": "prior run receipt; cancelled attempt 2"
+    },
+    {
+      "n": 7,
+      "purpose": "attempt-1 failed-job archive; exit 0, empty output"
+    },
+    {
+      "n": 8,
+      "purpose": "create PR 837"
+    },
+    {
+      "n": 9,
+      "purpose": "exact candidate SHA run discovery; Verify 42489627168 running"
+    },
+    {
+      "n": 10,
+      "purpose": "final exact-SHA Verify run 42489627168 status receipt"
+    }
+  ]
+}

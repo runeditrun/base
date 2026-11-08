@@ -1,0 +1,13 @@
+✔ Base and delivered workflow templates parse with their local reusable workflows (38.564827ms)
+✔ main duplicate lookup authorizes only the newest complete green push of the SHA elsewhere and fails open (109.27407ms)
+✔ a workflow calling Verify must grant every token permission its jobs request (368.252381ms)
+Planning flows passed: push wait, newest failure/latest attempt, merge trees, direct parent, light refusals, pagination, nightly marker, matrices and schedule rendering.
+✔ verification planning requires the newest push proof, identical trees and complete reviewed coverage (734.575672ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1358.998502

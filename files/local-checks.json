@@ -1,0 +1,59 @@
+{
+  "repository": "runeditrun/base",
+  "branch": "cloud/fv-base-asset-retry-1-pc1",
+  "head": "055cf2c085cf720371a050be5999d85d95a3b39f",
+  "saved_head": "fd6d971af46b3aa88a8f6eb649153002a605e5a4",
+  "preserved_saved_commit": true,
+  "checks": {
+    "bash-n": {
+      "command": [
+        "bash",
+        "-n",
+        "scripts/install-actionlint.sh",
+        "scripts/install-gitleaks.sh",
+        "scripts/agent-bootstrap.sh"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "actionlint": {
+      "command": [
+        "/home/agent/.local/bin/actionlint",
+        ".github/workflows/verify.yml",
+        ".github/workflows/rer-release.yml"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "diff-check": {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  "pins": {
+    "actionlint": {
+      "url_version_checksum_verification_unchanged": true,
+      "retry_budget_seconds": 600,
+      "retry_count": 120,
+      "retry_delay_seconds": 5,
+      "attempt_max_seconds": 60
+    },
+    "gitleaks": {
+      "url_version_checksum_verification_unchanged": true,
+      "retry_budget_seconds": 600,
+      "retry_count": 120,
+      "retry_delay_seconds": 5,
+      "attempt_max_seconds": 60
+    }
+  },
+  "identity_audit": "055cf2c085cf720371a050be5999d85d95a3b39f\nRun Edit Run fleet <fleet@runeditrun.com>\nRun Edit Run fleet <fleet@runeditrun.com>\n\nfd6d971af46b3aa88a8f6eb649153002a605e5a4\nRun Edit Run fleet <fleet@runeditrun.com>\nRun Edit Run fleet <fleet@runeditrun.com>\n\n",
+  "status": ""
+}

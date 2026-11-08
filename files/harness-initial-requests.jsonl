@@ -1,0 +1,10 @@
+{"asset": "actionlint_1.7.7_linux_amd64.tar.gz", "attempt": 1, "status": 503, "time": 1794147874.2708805}
+{"asset": "actionlint_1.7.7_linux_amd64.tar.gz", "attempt": 2, "status": 503, "time": 1794147879.27935}
+{"asset": "actionlint_1.7.7_linux_amd64.tar.gz", "attempt": 3, "status": 200, "time": 1794147884.2913954}
+{"asset": "actionlint_1.7.7_linux_amd64.tar.gz", "attempt": 4, "status": 200, "time": 1794147889.3030622}
+{"asset": "actionlint_1.7.7_linux_amd64.tar.gz", "attempt": 5, "status": 200, "time": 1794147894.3137174}
+{"asset": "actionlint_1.7.7_linux_amd64.tar.gz", "attempt": 6, "status": 200, "time": 1794147899.325258}
+{"asset": "actionlint_1.7.7_linux_amd64.tar.gz", "attempt": 7, "status": 200, "time": 1794147904.3370502}
+{"asset": "probe", "attempt": 1, "status": 503, "time": 1794147904.8739932}
+{"asset": "actionlint_1.7.7_linux_amd64.tar.gz", "attempt": 8, "status": 200, "time": 1794147909.3478734}
+{"asset": "actionlint_1.7.7_linux_amd64.tar.gz", "attempt": 9, "status": 200, "time": 1794147914.3584018}

@@ -1,0 +1,36 @@
+[
+  {
+    "tool": "actionlint",
+    "scenario": "503,503,200",
+    "exit": 0,
+    "seconds": 10.1,
+    "stdout": "Installed actionlint 1.7.7 (linux_amd64), SHA-256 verified\n",
+    "stderr": "curl: (22) The requested URL returned error: 503\ncurl: (22) The requested URL returned error: 503\n",
+    "requests": {
+      "actionlint_1.7.7_linux_amd64.tar.gz": 3
+    }
+  },
+  {
+    "tool": "gitleaks",
+    "scenario": "503,503,200",
+    "exit": 0,
+    "seconds": 10.28,
+    "stdout": "Installed Gitleaks 8.30.1 (linux_x64), SHA-256 verified\n",
+    "stderr": "curl: (22) The requested URL returned error: 503\ncurl: (22) The requested URL returned error: 503\n",
+    "requests": {
+      "actionlint_1.7.7_linux_amd64.tar.gz": 3,
+      "gitleaks_8.30.1_linux_x64.tar.gz": 3
+    }
+  },
+  {
+    "tool": "actionlint",
+    "scenario": "always 504; production 600-second budget",
+    "exit": 22,
+    "seconds": 601.07,
+    "stdout": "",
+    "stderr": "curl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\ncurl: (22) The requested URL returned error: 504\nDownload failed for actionlint_1.7.7_linux_amd64.tar.gz (last HTTP status: 504; curl exit: 22)\n",
+    "requests": {
+      "actionlint_1.7.7_linux_amd64.tar.gz": 121
+    }
+  }
+]
