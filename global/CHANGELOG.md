@@ -2,7 +2,15 @@
 
 ## Unreleased
 
-- Preview keeps its resolved Worker configuration on a dedicated pipe, so Wrangler's stdout banners about `.dev.vars` or experimental features cannot prevent the application from starting.
+## 0.2.103
+
+### Fixes
+
+- Preview no longer fails to start when Wrangler prints stdout banners about `.dev.vars` or experimental features. The preview runtime reads its resolved Worker configuration from a dedicated pipe instead of parsing the planner child's entire stdout as JSON.
+
+### Repository tooling
+
+- Base CI's actionlint and Gitleaks installers retry failed downloads within a ten-minute retry window, cap each attempt at 60 seconds, and report the last HTTP status and curl exit code on failure. Pinned versions and checksum verification are unchanged. These repository-only scripts are not shipped in the rer package.
 
 ## 0.2.102
 
