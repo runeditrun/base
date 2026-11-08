@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.2.102
+
+### Fixes
+
+- Deploy no longer reports a completed D1 migration as failed when a poll after an active ingest answers "Not currently importing anything." It accepts that answer only when the migration ledger has exactly one row for that migration, marked `applied` with the expected SHA-256. A missing, unapplied or mismatched row, or a failed ledger read, keeps the `d1-import-failed` refusal.
+- Import apply prefetch reads bounded windows of entries that can still publish in the current call, sizing each window against the 1,000-effect cap and a quarter of the remaining publication budget, always including the next entry. It resizes later windows against actual read usage. Request-budget exhaustion inside a bulk read ends the gather like the existing reserve stop; other bulk-read errors still discard the snapshot and use individual reads. The documented budget-boundary behavior from 0.2.101 is unchanged: saved reads can advance a call's checkpoint or surface a later entry's refusal one call earlier, with the same error code and text; that refusal publishes none of the gathered entries and leaves the last consistent durable checkpoint (`modules/import-kit/src/d1/README.md`).
+- Resumable erasure defers a redaction step to a fresh request when earlier attempts have spent the current request's budget and the step cannot shrink further. It returns a `redacting` continuation instead of throwing `IMPORT_D1_REQUEST_LIMIT`, so a People erasure whose step fits a fresh request can continue. A smallest step that cannot fit on its first attempt still refuses.
+
 ## 0.2.101
 
 ### Person erasure keeps other people's agent-door records
