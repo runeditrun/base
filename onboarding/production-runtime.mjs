@@ -13,12 +13,12 @@ const stop=()=>stopping??=(async()=>{planner?.kill('SIGTERM');await closeAssets?
 process.on('SIGINT',()=>void stop());process.on('SIGTERM',()=>void stop());
 async function plan(){
  let text='';
- planner=spawn(process.execPath,[fileURLToPath(new URL('./production-plan.mjs',import.meta.url))],{cwd:process.cwd(),env:process.env,stdio:['ignore','pipe','inherit']});
- planner.stdout.setEncoding('utf8').on('data',chunk=>{text+=chunk;});
+ planner=spawn(process.execPath,[fileURLToPath(new URL('./production-plan.mjs',import.meta.url))],{cwd:process.cwd(),env:process.env,stdio:['ignore',2,'inherit','pipe']});
+ planner.stdio[3].setEncoding('utf8').on('data',chunk=>{text+=chunk;});
  const code=await new Promise((done,fail)=>{planner.once('error',fail);planner.once('close',done);});
  if(stopping)return undefined;
  if(code!==0)throw Error('Resolving the Worker configuration failed.');
- return JSON.parse(text);
+ try{return JSON.parse(text);}catch{throw Error('Resolving the Worker configuration failed.');}
 }
 try{
  const options=await plan();

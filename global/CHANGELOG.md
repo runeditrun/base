@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preview keeps its resolved Worker configuration on a dedicated pipe, so Wrangler's stdout banners about `.dev.vars` or experimental features cannot prevent the application from starting.
+
 ## 0.2.102
 
 ### Fixes

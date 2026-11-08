@@ -241,11 +241,11 @@
     },
     "production-plan.mjs": {
       "source": "onboarding/production-plan.mjs",
-      "sha256": "dfdfdf9a551c76221db40180e5ecf02de48aafc0319850d493002c58af6b52e2"
+      "sha256": "f8365e8372460c09ebbff1fb48a0e7843241b5c61f08c7f45e09a5ef7b6ffeb9"
     },
     "production-runtime.mjs": {
       "source": "onboarding/production-runtime.mjs",
-      "sha256": "dcdb0a44ab6fd64c9faf6457d1bb5e3431a13618fec515c9551fc4c62f74a8be"
+      "sha256": "ca8b0827c1cec97d5eea2b6a106f9b0f2e3a9e03b887580b9ed5e617cc07f1aa"
     },
     "project-vite.mjs": {
       "source": "onboarding/project-vite.mjs",
