@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Privacy: Business tokens, person/role references and held calls now fail closed unless the stop reader positively returns false, sharing the relay check; conformance covers each path after signed detachment.
+
 - Privacy: the Business decision relay now requires a stop reader and returns empty 404 unless it positively confirms the Business is active, including after signed detachment. Adoption conformance checks the stopped feed.
 - Privacy: approval execution audits inherit their original decision’s Business relay membership, including no membership. A forward migration replaces the old triggers and removes provable cross-Business execution memberships while preserving audits.
 

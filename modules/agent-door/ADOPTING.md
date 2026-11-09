@@ -221,15 +221,12 @@ email never selects a local account. Implement `people.person(id)` to re-read
 native ids for approval execution, Undo, embedded agents and subscriptions.
 Expose `businessMember(person)` from the same mapping for paired policy refs:
 Business owner is owner, Business team admin is editor, member has no policy
-role. The native role may differ. A custom adapter must also expose
-`businessStopped()`, true once Business is stopped or detached: the door then
-admits no Business token, refuses calls held or waiting from one, and matches no
-`person:` or `role:` ref, while `sponsor()` keeps resolving subjects so signed
-policy naming Business people is still adopted. The relay requires this method
-and serves only when it returns exactly `false`; a missing method, failed read or
-nonboolean result gives empty 404. Adoption conformance names
-`people.businessStopped()` when paired relay access fails and tests signed
-detachment with the old policy and trust retained. Local credentials return `sponsor: { id }`,
+role. The native role may differ. A custom adapter must expose `businessStopped()` according to the
+[Business stop contract](README.md#wire-and-authority): the shared runtime uses that one
+positive-false rule for token admission, Business references, held calls and relay pulls.
+Adopt the runtime update without a migration; `operatorAuthPeople` already supplies the reader.
+Keep `sponsor()` resolving subjects after a stop so signed policy naming Business people is still adopted.
+Local credentials return `sponsor: { id }`,
 read by `people.person`, rather than an address. Sponsorship is resolved from
 current native people on each request; an unknown or inactive sponsor cannot
 act. A saved token never replaces this account check. Keep native permissions,

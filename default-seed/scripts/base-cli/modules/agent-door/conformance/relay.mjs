@@ -1,3 +1,4 @@
+import { prepareStoppedCalls, stoppedCallsPhase } from './business-stop.mjs';
 import { randomUUID, webcrypto } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { seconds, signJws } from './crypto.mjs';
@@ -64,6 +65,8 @@ export async function relayPhase(c) {
 
 /** Detach while relay trust and the old policy remain, then probe without renewal. */
 export async function relayStoppedPhase(c) {
+ let held = [];
+ await c.phase('BASE-AGENT-004.stop.prepare', async () => { held = await prepareStoppedCalls(c); });
  const iat = seconds(c.now);
  const signed = (typ, payload) => signJws(c.signer.privateKey, c.signer.kid, typ, payload);
  const request = (path, body) => c.fetch(new URL(path, c.origin).href, {
@@ -86,6 +89,7 @@ export async function relayStoppedPhase(c) {
  c.add('BASE-AGENT-009.relay.detach', detached.status === 200, `Signed Business detachment must be accepted before the stopped relay probe, got ${detached.status}.`);
  await detached.body?.cancel();
  if (detached.status !== 200) return;
+ await c.phase('BASE-AGENT-004.stop', () => stoppedCallsPhase(c, held));
  const stopped = await request('/api/rer/agent-decisions', {pull});
  c.add('BASE-AGENT-009.relay.stopped', stopped.status === 404 && await stopped.text() === '',
   'A detached Business must receive empty 404 with its old policy and relay trust retained; people.businessStopped() must read the durable stop.');

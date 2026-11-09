@@ -10,6 +10,8 @@ const object = (properties: Record<string, unknown>, required = Object.keys(prop
 const text = { type: 'string', minLength: 1 }, idInput = object({ id: text })
 const output = object({ id: text, value: text, version: { type: 'integer' } })
 let time: number | null = null
+let stopReader: string | undefined
+let retainedMember: { id: string; role: 'owner' | 'editor' | null } | null = null
 let allowList: string[] | undefined
 interface Env { DB: D1Database; CONFIG: string; TRUST: string; BUSINESS_TRUST: string; LOCAL_TOKEN: string }
 export default {
@@ -106,9 +108,24 @@ export default {
     }
     if (config.sponsorSurface) tools.push(...sponsorTools(env.DB, auth))
     const people = operatorAuthPeople({ db: env.DB, allowList, session: request => auth.getSession(request) })
-    if (config.businessStopped === 'missing') Reflect.deleteProperty(people, 'businessStopped')
-    if (config.businessStopped === 'undefined') Reflect.set(people, 'businessStopped', async () => undefined)
-    if (config.businessStopped === 'nonboolean') Reflect.set(people, 'businessStopped', async () => 0)
+    if (path === '/__business-stop-reader') {
+      const person = await doorPerson(auth, request)
+      if (!person) return new Response(null, { status: 401 })
+      // Model a JS adopter whose subject mapping survives detachment independently of its reader.
+      retainedMember = await people.businessMember!(person) ?? retainedMember
+      stopReader = (await request.json() as { mode: string }).mode
+      return Response.json({ ok: true })
+    }
+    const mode = stopReader ?? config.businessStopped
+    if (mode === 'missing') Reflect.deleteProperty(people, 'businessStopped')
+    if (mode === 'nonfunction') Reflect.set(people, 'businessStopped', false)
+    if (mode === 'undefined') Reflect.set(people, 'businessStopped', async () => undefined)
+    if (mode === 'nonboolean') Reflect.set(people, 'businessStopped', async () => 0)
+    if (mode === 'true') Reflect.set(people, 'businessStopped', () => true)
+    if (mode === 'false') Reflect.set(people, 'businessStopped', () => false)
+    if (mode === 'throwing') Reflect.set(people, 'businessStopped', () => { throw new Error('unreadable stop') })
+    if (mode === 'rejecting') Reflect.set(people, 'businessStopped', async () => { throw new Error('unreadable stop') })
+    if (retainedMember) people.businessMember = async () => retainedMember
     const door = createAgentDoor({ seed: config.seed, name: 'Synthetic Base', specialist: 'operations', origin: config.origin, db: env.DB, trust: JSON.parse(env.TRUST), now,
       companyPolicy: config.companyPolicy ? { async decide(input, ctx) {
         if (!Object.isFrozen(input) || !Object.isFrozen(input.args) || !Object.isFrozen(input.classes[0].facts) || !Object.isFrozen(input.policy) || !Object.isFrozen(ctx) || !Object.isFrozen(ctx.person) || !Object.isFrozen(ctx.scopes) || 'emit' in ctx || 'approvers' in ctx || 'idempotency_key' in input.args || !ctx.person.active) throw new Error('invalid native policy context')

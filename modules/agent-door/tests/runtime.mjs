@@ -57,8 +57,9 @@ export async function runtime({ outboundService, paired = true, limits, resource
    if (response.status !== 303) throw new Error(`Native confirmation ${response.status}: ${await response.text()}`);
    const signedCookie = response.headers.get('set-cookie').split(';')[0]; await response.body?.cancel(); return signedCookie;
   };
+  const setBusinessStopped = async mode => { const response = await post('/__business-stop-reader', { mode }, { cookie }); if (response.status !== 200) throw new Error('Stop reader fixture update failed'); await response.body?.cancel(); };
   const setNow = async now => { c.now = now; await post('/__clock', { now }); };
   await setNow(c.now);
-  return { mf, db, c, secret: config.SESSION_SECRET, localToken, fetch, post, mcp, person, adopt, setNow, settings, signIn, tool: (name, args, options) => mcp('tools/call', { name: `synthetic.${name}`, arguments: args }, options), token: overrides => accessToken(c, overrides), sign: (typ, payload, otherKid = kid) => signJws(keys.privateKey, otherKid, typ, payload), close: () => mf.dispose() };
+  return { mf, db, c, secret: config.SESSION_SECRET, localToken, fetch, post, mcp, person, adopt, setNow, settings, setBusinessStopped, signIn, tool: (name, args, options) => mcp('tools/call', { name: `synthetic.${name}`, arguments: args }, options), token: overrides => accessToken(c, overrides), sign: (typ, payload, otherKid = kid) => signJws(keys.privateKey, otherKid, typ, payload), close: () => mf.dispose() };
  } catch (error) { await mf.dispose(); throw error; }
 }
