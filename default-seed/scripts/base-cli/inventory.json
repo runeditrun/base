@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.103-dev.g32fa54a9",
+  "cliVersion": "0.2.103-dev.g6957ce1e",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -717,9 +717,13 @@
       "source": "cli/companion/workspace.mjs",
       "sha256": "c2e25de13e5270a6cb698c88115fe899ef6908bea1f8624f60685165a863b4aa"
     },
+    "cli/container-policy-worker.mjs": {
+      "source": "cli/container-policy-worker.mjs",
+      "sha256": "bf22439c3be62f2de990a8e395986e0de23ffee1cb6ee2ad32ebb422dbbbecec"
+    },
     "cli/container-transfer.mjs": {
       "source": "cli/container-transfer.mjs",
-      "sha256": "afd9849a7623a4f676e9da128d82938f25dfa25a35efe42e18d396ad5e3f311e"
+      "sha256": "9497d022946af7b2ebd596a0481c924be1ec7307ad6ff7090f2cb98264653f49"
     },
     "cli/container.mjs": {
       "source": "cli/container.mjs",
@@ -1099,7 +1103,7 @@
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
-      "sha256": "01a2802456dae1704c9596e3aba3b204f5006bfaecca2c2e4dc31bb9f6e714c9"
+      "sha256": "e455058c5ead0d2668be8b4de9f01a910c5d561c6e997ab9d9e13172dd4563b5"
     },
     "cli/preview-cache.mjs": {
       "source": "cli/preview-cache.mjs",
@@ -2191,7 +2195,7 @@
     },
     "modules/container/build.mjs": {
       "source": "modules/container/build.mjs",
-      "sha256": "f1430ffeb7d206d9d7ed4dc28d8f379cc47769ea3f1fcdd079eb73b18e3a2c80"
+      "sha256": "40a24c1e3cf2b7383e7c3a83b907e57810587235fd8c5d465b45e44d8eb67f11"
     },
     "modules/container/demo-egress.mjs": {
       "source": "modules/container/demo-egress.mjs",
@@ -2271,7 +2275,7 @@
     },
     "modules/container/transfer.mjs": {
       "source": "modules/container/transfer.mjs",
-      "sha256": "87d1fd0e21dd9b83b3a01af3b3b0280035ef6f3bc0600cc35707debec5b6e3ad"
+      "sha256": "323d1431528115c9ff0c4c925fe6665414f7d6a1a2d8ba939e1db27b40db7181"
     },
     "modules/container/websockets.mjs": {
       "source": "modules/container/websockets.mjs",
@@ -4603,7 +4607,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "7de8ce3150b387774dce7534a7a6bebd90593b35a8ccfe9d791b3b59a6f77386"
+      "sha256": "9eac6c61ee7a61ee514df74bcd895ffe01679003e194801756ea1d438aa13d44"
     },
     "modules/portability/backfills.mjs": {
       "source": "modules/portability/backfills.mjs",

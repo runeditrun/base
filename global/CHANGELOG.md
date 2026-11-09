@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Container installation export and import now honour seed-owned `policyModule` policies, including executable redaction and restore validation, in the isolated transfer process. After upgrading rer, rebuild a container image built by an earlier rer with `rer build --platform container` before using `rer export --platform container` with a `policyModule`.
 - Privacy: Business tokens, person/role references and held calls now fail closed unless the stop reader positively returns false, sharing the relay check; conformance covers each path after signed detachment.
 
 - Privacy: the Business decision relay now requires a stop reader and returns empty 404 unless it positively confirms the Business is active, including after signed detachment. Adoption conformance checks the stopped feed.
