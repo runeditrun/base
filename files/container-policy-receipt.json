@@ -1,0 +1,7 @@
+{
+  "command": "node --test cli/container-policy.test.mjs",
+  "head": "ff4626ffbc43b29846644f955fd3926af93fb571",
+  "exit_code": 0,
+  "started_at": "2026-11-09T02:46:07Z",
+  "finished_at": "2026-11-09T02:51:16.632775+00:00"
+}

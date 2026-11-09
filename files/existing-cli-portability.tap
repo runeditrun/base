@@ -1,0 +1,303 @@
+TAP version 13
+# Unnamed oc_ export: exit=4; explicit inclusion restores its product row
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: default-seed moves exclude authentication identities; explicit inclusion still refuses dev sessions
+ok 1 - default-seed moves exclude authentication identities; explicit inclusion still refuses dev sessions
+  ---
+  duration_ms: 438020.26727
+  type: 'test'
+  ...
+# Subtest: public local export/import/export preserves commented migration schemas and recomputes generated columns in a fresh installation
+ok 2 - public local export/import/export preserves commented migration schemas and recomputes generated columns in a fresh installation
+  ---
+  duration_ms: 314143.551439
+  type: 'test'
+  ...
+# Subtest: public import uses Platform file hashes without replaying them, admits declared seeds, and places name-only Platform archives
+ok 3 - public import uses Platform file hashes without replaying them, admits declared seeds, and places name-only Platform archives
+  ---
+  duration_ms: 361842.351676
+  type: 'test'
+  ...
+# (a) no file: exit=0; content hash and every visible cell/label byte match
+# (b) file with no tables: exit=0; content hash and every visible cell/label byte match
+# (b) file with only Wrangler engine internals: exit=0; content hash and every visible cell/label byte match
+# (c) occupied: exit=4; restore_refused; existing rows unchanged
+# (c) foreign table: exit=4; policy_table_missing:computed_entries; no migrations or row changes
+# (d) product schema with no rows: exit=0; content hash and every visible cell/label byte match
+# Subtest: public import restores into absent or engine-only D1 files and preserves occupied destination refusals
+ok 4 - public import restores into absent or engine-only D1 files and preserves occupied destination refusals
+  ---
+  duration_ms: 545293.245574
+  type: 'test'
+  ...
+# hosted export: Exported the hosted install at http://127.0.0.1:35365 to exports/hosted.rer (exit 0)
+# snapshot tables after download: 0
+# same-revision import: import: complete (exit 0)
+# different definition: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 1.9 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# The portability module refused or failed the archive operation (schema_mismatch).
+# different definition: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 1.9 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# The portability module refused or failed the archive operation (schema_mismatch).
+# different definition: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 1.9 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# The portability module refused or failed the archive operation (schema_mismatch).
+# Subtest: rer hosted export restores locally across DDL formatting, cleans snapshots, and refuses changed definitions
+ok 5 - rer hosted export restores locally across DDL formatting, cleans snapshots, and refuses changed definitions
+  ---
+  duration_ms: 154493.66341
+  type: 'test'
+  ...
+# Subtest: local archives preserve bytes with legacy bookkeeping and refuse competing histories
+ok 6 - local archives preserve bytes with legacy bookkeeping and refuse competing histories
+  ---
+  duration_ms: 559072.418978
+  type: 'test'
+  ...
+# legacy pair: rer export exit 0; rer import into empty legacy-pair destination exit 0; text/BLOB/NULL bytes and re-export content hash match
+# disagreeing hashed native pair: export exit 4 and import exit 4, migration_ledger:multiple; histories and product rows preserved
+# legacy incomplete claim and pending checkout file: exit 4 with migration_ledger:uncertain and migration_ledger:unapplied
+# rer_migrations only: export exit 0 and import exit 0; exact restored values, no Wrangler ledger created
+# Subtest: public local restore retains seed policy closures, refuses forbidden rows and diagnoses malformed archives before migrations
+ok 7 - public local restore retains seed policy closures, refuses forbidden rows and diagnoses malformed archives before migrations
+  ---
+  duration_ms: 371039.039701
+  type: 'test'
+  ...
+# trigger body: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 2.4 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# The portability module refused or failed the archive operation (schema_mismatch).
+# Subtest: CLI restore checks behavioral schema objects and authenticates older schema identities
+    # Subtest: trigger body
+    ok 1 - trigger body
+      ---
+      duration_ms: 26672.50013
+      type: 'test'
+      ...
+# view body: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 2.4 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# The portability module refused or failed the archive operation (schema_mismatch).
+    # Subtest: view body
+    ok 2 - view body
+      ---
+      duration_ms: 31147.696211
+      type: 'test'
+      ...
+# unique index: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 2.4 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# The portability module refused or failed the archive operation (schema_mismatch).
+    # Subtest: unique index
+    ok 3 - unique index
+      ---
+      duration_ms: 32889.0175
+      type: 'test'
+      ...
+# CHECK: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 2.4 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# The portability module refused or failed the archive operation (schema_mismatch).
+    # Subtest: CHECK
+    ok 4 - CHECK
+      ---
+      duration_ms: 30415.326311
+      type: 'test'
+      ...
+# quoted default: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 2.4 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# The portability module refused or failed the archive operation (schema_mismatch).
+    # Subtest: quoted default
+    ok 5 - quoted default
+      ---
+      duration_ms: 28110.520276
+      type: 'test'
+      ...
+# generated column: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 2.4 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# The portability module refused or failed the archive operation (schema_mismatch).
+    # Subtest: generated column
+    ok 6 - generated column
+      ---
+      duration_ms: 30678.404775
+      type: 'test'
+      ...
+# equivalent schema: import: complete (exit 0)
+    # Subtest: comments and whitespace in every object
+    ok 7 - comments and whitespace in every object
+      ---
+      duration_ms: 35518.949373
+      type: 'test'
+      ...
+# old identity trigger body: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 2.3 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# The portability module refused or failed the archive operation (schema_mismatch).
+# old identity view body: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 2.3 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# The portability module refused or failed the archive operation (schema_mismatch).
+# old identity unique index: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 2.3 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# The portability module refused or failed the archive operation (schema_mismatch).
+    # Subtest: old table-only identity with complete definitions
+    ok 8 - old table-only identity with complete definitions
+      ---
+      duration_ms: 120961.982792
+      type: 'test'
+      ...
+# missing old definitions: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 1.8 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# Restore refused (schema_mismatch): the schema definitions cannot be safely verified by this version. Re-export from the original installation with rer export --output exports/recovered.rer (add --target remote for a hosted installation), then retry rer import --input exports/recovered.rer --yes. Keep the original archive until recovery succeeds.
+# missing old definitions: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 1.8 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# Restore refused (schema_mismatch): the schema definitions cannot be safely verified by this version. Re-export from the original installation with rer export --output exports/recovered.rer (add --target remote for a hosted installation), then retry rer import --input exports/recovered.rer --yes. Keep the original archive until recovery succeeds.
+# missing old definitions: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 1.8 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Restore refused (schema_mismatch): the schema definitions cannot be safely verified by this version. Re-export from the original installation with rer export --output exports/recovered.rer (add --target remote for a hosted installation), then retry rer import --input exports/recovered.rer --yes. Keep the original archive until recovery succeeds.
+# missing old definitions: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 1.8 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# Restore refused (schema_mismatch): the schema definitions cannot be safely verified by this version. Re-export from the original installation with rer export --output exports/recovered.rer (add --target remote for a hosted installation), then retry rer import --input exports/recovered.rer --yes. Keep the original archive until recovery succeeds.
+# missing old definitions: Checking pinned pnpm
+# 10.12.4
+# Local import
+# Checking migration history for local installation data
+# Applying local data migrations
+# Restoring local installation data
+# Restoring a 1.8 KB archive. This takes under a minute.
+# Checking the whole archive before anything is restored.
+# Checking the whole archive before anything is restored.
+# Restore refused (schema_mismatch): the schema definitions cannot be safely verified by this version. Re-export from the original installation with rer export --output exports/recovered.rer (add --target remote for a hosted installation), then retry rer import --input exports/recovered.rer --yes. Keep the original archive until recovery succeeds.
+    # Subtest: unrecorded old archive without definitions refuses unverifiable objects with recovery guidance
+    ok 9 - unrecorded old archive without definitions refuses unverifiable objects with recovery guidance
+      ---
+      duration_ms: 157827.736874
+      type: 'test'
+      ...
+    1..9
+ok 8 - CLI restore checks behavioral schema objects and authenticates older schema identities
+  ---
+  duration_ms: 572536.800643
+  type: 'test'
+  ...
+# schema generative sweep: {"statements":581,"boundaries":20549,"insignificant":9583,"significant":10966,"formatting":91779,"refusedRemovals":10966,"mutations":21130,"literals":658,"unsupported":5229}
+# Subtest: archive schema identity preserves SQLite token boundaries generatively
+ok 9 - archive schema identity preserves SQLite token boundaries generatively
+  ---
+  duration_ms: 84108.033767
+  type: 'test'
+  ...
+1..9
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1878169.248964

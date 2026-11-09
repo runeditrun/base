@@ -1,0 +1,1623 @@
+TAP version 13
+# Subtest: container admission rejects Cloudflare imports and APIs outside the platform boundary
+ok 1 - container admission rejects Cloudflare imports and APIs outside the platform boundary
+  ---
+  duration_ms: 545.793721
+  type: 'test'
+  ...
+# Subtest: the boundary admits an exported seed's demo guard and no other file or import like it
+ok 2 - the boundary admits an exported seed's demo guard and no other file or import like it
+  ---
+  duration_ms: 42.037971
+  type: 'test'
+  ...
+# Subtest: container admission permits HTMLRewriter only for workerd and keeps other API boundaries
+ok 3 - container admission permits HTMLRewriter only for workerd and keeps other API boundaries
+  ---
+  duration_ms: 56.113731
+  type: 'test'
+  ...
+# Subtest: container boundary follows reachable source and fresh output graphs, leaving dormant source alone
+ok 4 - container boundary follows reachable source and fresh output graphs, leaving dormant source alone
+  ---
+  duration_ms: 568.778002
+  type: 'test'
+  ...
+# Subtest: ordinary calls with cloudflare strings are not module imports
+ok 5 - ordinary calls with cloudflare strings are not module imports
+  ---
+  duration_ms: 8.848019
+  type: 'test'
+  ...
+# Subtest: workerd admits exact workers imports and re-exports while Node retains its contracts
+ok 6 - workerd admits exact workers imports and re-exports while Node retains its contracts
+  ---
+  duration_ms: 44.950306
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: workerd admits Durable Object definitions and builds only local exported bindings
+ok 7 - workerd admits Durable Object definitions and builds only local exported bindings
+  ---
+  duration_ms: 2649.120318
+  type: 'test'
+  ...
+# Packaged real Vite Worker with Counter export alias and imported base class
+# Built container Worker does not export configured Durable Object class: Counter
+# Container Durable Object bindings do not support script_name or environment
+# Container Durable Object bindings do not support script_name or environment
+# Subtest: workerd admits WebSocketPair while Node refuses it
+ok 8 - workerd admits WebSocketPair while Node refuses it
+  ---
+  duration_ms: 7.759162
+  type: 'test'
+  ...
+# Subtest: workerd admits crypto.subtle.timingSafeEqual while Node refuses it
+ok 9 - workerd admits crypto.subtle.timingSafeEqual while Node refuses it
+  ---
+  duration_ms: 8.175202
+  type: 'test'
+  ...
+# Subtest: workerd admits ctx.passThroughOnException while Node refuses it
+ok 10 - workerd admits ctx.passThroughOnException while Node refuses it
+  ---
+  duration_ms: 6.084327
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# MAIL_PROVIDER are public mail configuration, not secrets. Remove these bindings from deploy.json secrets; keep them in the mail spec public variables and Wrangler vars. Accepting the legacy declaration; runtime demo settings override the image defaults.
+# Subtest: managed mail public image defaults tolerate legacy deploy secrets, runtime settings win, empty runtime-secret placeholders drop, and credentials stay private
+ok 11 - managed mail public image defaults tolerate legacy deploy secrets, runtime settings win, empty runtime-secret placeholders drop, and credentials stay private
+  ---
+  duration_ms: 3469.081086
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: built container applies the same complete ordered migration inventory as delivery packaging and resumes it
+ok 12 - built container applies the same complete ordered migration inventory as delivery packaging and resumes it
+  ---
+  duration_ms: 4013.452515
+  type: 'test'
+  ...
+# Subtest: archive diff validates native archives and identifies a write made during a move
+ok 13 - archive diff validates native archives and identifies a write made during a move
+  ---
+  duration_ms: 317.360134
+  type: 'test'
+  ...
+# Subtest: container deploy refuses development secrets and unsafe private input before any image or host operation
+ok 14 - container deploy refuses development secrets and unsafe private input before any image or host operation
+  ---
+  duration_ms: 261.179367
+  type: 'test'
+  ...
+# Subtest: public ingress trusts forwarded facts only from the configured socket peer
+ok 15 - public ingress trusts forwarded facts only from the configured socket peer
+  ---
+  duration_ms: 57.840013
+  type: 'test'
+  ...
+# Subtest: migration claims survive failed application and forbid changed or uncertain replay
+ok 16 - migration claims survive failed application and forbid changed or uncertain replay
+  ---
+  duration_ms: 4027.551727
+  type: 'test'
+  ...
+# (node:2068) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: persistent objects retain conditional writes, ranges and multipart uploads across reopening
+ok 17 - persistent objects retain conditional writes, ranges and multipart uploads across reopening
+  ---
+  duration_ms: 43.200875
+  type: 'test'
+  ...
+# (node:2096) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: durable queue reclaims an interrupted consumer, respects retries and reports dead jobs
+ok 18 - durable queue reclaims an interrupted consumer, respects retries and reports dead jobs
+  ---
+  duration_ms: 10.773827
+  type: 'test'
+  ...
+# Subtest: two public HTTPS CLI installs route through distinct real TLS listeners and preserve trusted ingress
+ok 19 - two public HTTPS CLI installs route through distinct real TLS listeners and preserve trusted ingress # SKIP
+  ---
+  duration_ms: 0.770284
+  type: 'test'
+  ...
+# Subtest: public source and packaged SSH deploy isolate full identity and preserve their own data
+ok 20 - public source and packaged SSH deploy isolate full identity and preserve their own data # SKIP
+  ---
+  duration_ms: 1.20566
+  type: 'test'
+  ...
+# Subtest: public SSH deploy refuses unsafe paths and Docker ownership before destructive work
+ok 21 - public SSH deploy refuses unsafe paths and Docker ownership before destructive work # SKIP
+  ---
+  duration_ms: 0.293724
+  type: 'test'
+  ...
+# Subtest: container upgrades preserve app sends, text/binary echo, protocol, cookies and close in both directions
+ok 22 - container upgrades preserve app sends, text/binary echo, protocol, cookies and close in both directions
+  ---
+  duration_ms: 1235.266679
+  type: 'test'
+  ...
+# Subtest: container upgrade refusals retain HTTP status and use HTTP ingress/auth checks
+ok 23 - container upgrade refusals retain HTTP status and use HTTP ingress/auth checks
+  ---
+  duration_ms: 571.681941
+  type: 'test'
+  ...
+# Subtest: a socket authenticated for one visitor cannot enter another container
+ok 24 - a socket authenticated for one visitor cannot enter another container
+  ---
+  duration_ms: 1003.926081
+  type: 'test'
+  ...
+# Subtest: README runtime list copies a self-contained module into a fixture seed with real Worker and CLI round trip
+ok 25 - README runtime list copies a self-contained module into a fixture seed with real Worker and CLI round trip
+  ---
+  duration_ms: 6666.983234
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# (node:2228) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: an archive predating a journal backfill restores to the live upgrade, and a failed apply leaves no replayed row
+ok 26 - an archive predating a journal backfill restores to the live upgrade, and a failed apply leaves no replayed row
+  ---
+  duration_ms: 10689.411968
+  type: 'test'
+  ...
+# Subtest: a carried journal replays INSERT or REPLACE over its archived rows exactly like a live upgrade
+ok 27 - a carried journal replays INSERT or REPLACE over its archived rows exactly like a live upgrade
+  ---
+  duration_ms: 10620.658889
+  type: 'test'
+  ...
+# Subtest: excluded writes are admitted; carried UPDATE/DELETE, another writer and non-archived reads stay refused
+    # Subtest: 0002_update.sql
+    ok 1 - 0002_update.sql
+      ---
+      duration_ms: 1174.719577
+      type: 'test'
+      ...
+    # Subtest: 0002_delete.sql
+    ok 2 - 0002_delete.sql
+      ---
+      duration_ms: 1211.098752
+      type: 'test'
+      ...
+    # Subtest: 0002_second_writer.sql
+    ok 3 - 0002_second_writer.sql
+      ---
+      duration_ms: 1169.784041
+      type: 'test'
+      ...
+    # Subtest: 0002_baseline.sql
+    ok 4 - 0002_baseline.sql
+      ---
+      duration_ms: 1540.641873
+      type: 'test'
+      ...
+    # Subtest: 0002_from_excluded.sql
+    ok 5 - 0002_from_excluded.sql
+      ---
+      duration_ms: 1546.319492
+      type: 'test'
+      ...
+    # Subtest: 0002_positional.sql
+    ok 6 - 0002_positional.sql
+      ---
+      duration_ms: 1528.572417
+      type: 'test'
+      ...
+    # Subtest: 0002_star.sql
+    ok 7 - 0002_star.sql
+      ---
+      duration_ms: 1737.999153
+      type: 'test'
+      ...
+    # Subtest: 0002_secret.sql
+    ok 8 - 0002_secret.sql
+      ---
+      duration_ms: 1591.411887
+      type: 'test'
+      ...
+    # Subtest: 0002_secret_view.sql
+    ok 9 - 0002_secret_view.sql
+      ---
+      duration_ms: 1571.658245
+      type: 'test'
+      ...
+    # Subtest: 0002_autoincrement.sql
+    ok 10 - 0002_autoincrement.sql
+      ---
+      duration_ms: 1651.761674
+      type: 'test'
+      ...
+    # Subtest: 0002_physical_rowid.sql
+    ok 11 - 0002_physical_rowid.sql
+      ---
+      duration_ms: 1582.827493
+      type: 'test'
+      ...
+    # Subtest: 0002_physical_rowid_view.sql
+    ok 12 - 0002_physical_rowid_view.sql
+      ---
+      duration_ms: 1818.363643
+      type: 'test'
+      ...
+    # Subtest: 0002_titles.sql
+    ok 13 - 0002_titles.sql
+      ---
+      duration_ms: 1448.317085
+      type: 'test'
+      ...
+    # Subtest: 0002_journal.sql
+    ok 14 - 0002_journal.sql
+      ---
+      duration_ms: 1492.656487
+      type: 'test'
+      ...
+    # Subtest: 0002_from_excluded.sql
+    ok 15 - 0002_from_excluded.sql
+      ---
+      duration_ms: 1878.348191
+      type: 'test'
+      ...
+    1..15
+ok 28 - excluded writes are admitted; carried UPDATE/DELETE, another writer and non-archived reads stay refused
+  ---
+  duration_ms: 34045.754936
+  type: 'test'
+  ...
+# Subtest: import reconstructs a transient backfill from archived evidence and drops it atomically
+ok 29 - import reconstructs a transient backfill from archived evidence and drops it atomically
+  ---
+  duration_ms: 30115.888601
+  type: 'test'
+  ...
+# Subtest: migrated export restores into a fresh migrated target and leaves its bookkeeping intact
+ok 30 - migrated export restores into a fresh migrated target and leaves its bookkeeping intact
+  ---
+  duration_ms: 4373.037223
+  type: 'test'
+  ...
+# Subtest: includeTables cannot reintroduce platform tables, including SQLite case aliases
+ok 31 - includeTables cannot reintroduce platform tables, including SQLite case aliases
+  ---
+  duration_ms: 640.178937
+  type: 'test'
+  ...
+# Subtest: an old schema identity needs complete definitions, then skips platform rows and restores only seed data
+ok 32 - an old schema identity needs complete definitions, then skips platform rows and restores only seed data
+  ---
+  duration_ms: 2933.59949
+  type: 'test'
+  ...
+# Subtest: a non-empty seed target still refuses restore with its table name
+ok 33 - a non-empty seed target still refuses restore with its table name
+  ---
+  duration_ms: 3365.688864
+  type: 'test'
+  ...
+# Subtest: export and import resume after client interruption and Miniflare reopen
+ok 34 - export and import resume after client interruption and Miniflare reopen
+  ---
+  duration_ms: 42896.158881
+  type: 'test'
+  ...
+# {"capacity":{"rows":300,"tables":5,"parts":10,"archiveBytes":33214,"elapsedMilliseconds":16383}}
+# Subtest: multiple pages across five tables restore in one atomic batch
+ok 35 - multiple pages across five tables restore in one atomic batch
+  ---
+  duration_ms: 18112.673223
+  type: 'test'
+  ...
+# Subtest: payload bytes and hashes round trip through optional producers and consumers
+ok 36 - payload bytes and hashes round trip through optional producers and consumers
+  ---
+  duration_ms: 8721.355331
+  type: 'test'
+  ...
+# Subtest: objects beyond five MiB restore through multipart upload with exact metadata
+ok 37 - objects beyond five MiB restore through multipart upload with exact metadata
+  ---
+  duration_ms: 35183.767757
+  type: 'test'
+  ...
+# Subtest: CLI entry detection follows filesystem aliases instead of silently doing nothing
+ok 38 - CLI entry detection follows filesystem aliases instead of silently doing nothing
+  ---
+  duration_ms: 98.489473
+  type: 'test'
+  ...
+# Subtest: CLI real Worker export, import, export keeps hashes, modes and cookies private
+ok 39 - CLI real Worker export, import, export keeps hashes, modes and cookies private
+  ---
+  duration_ms: 7641.257575
+  type: 'test'
+  ...
+# Subtest: CLI truncated download stays partial and resume verifies before promotion
+ok 40 - CLI truncated download stays partial and resume verifies before promotion
+  ---
+  duration_ms: 6417.90452
+  type: 'test'
+  ...
+# Subtest: CLI refuses non-loopback HTTP origins, credentials and relative paths
+ok 41 - CLI refuses non-loopback HTTP origins, credentials and relative paths
+  ---
+  duration_ms: 1.416784
+  type: 'test'
+  ...
+# Subtest: CLI session input is one small regular cookie file
+ok 42 - CLI session input is one small regular cookie file
+  ---
+  duration_ms: 909.564277
+  type: 'test'
+  ...
+# Subtest: restore checks local and supplied erasure journals before occupied rows and buckets
+ok 43 - restore checks local and supplied erasure journals before occupied rows and buckets
+  ---
+  duration_ms: 4313.67427
+  type: 'test'
+  ...
+# Subtest: direct file export records seed audit atomically and refuses callback or audit SQL failure
+ok 44 - direct file export records seed audit atomically and refuses callback or audit SQL failure
+  ---
+  duration_ms: 7965.438999
+  type: 'test'
+  ...
+# Subtest: snapshot stays consistent while writes land between create and advance
+ok 45 - snapshot stays consistent while writes land between create and advance
+  ---
+  duration_ms: 6550.172797
+  type: 'test'
+  ...
+# Subtest: export fails when an object changes
+ok 46 - export fails when an object changes
+  ---
+  duration_ms: 3822.992076
+  type: 'test'
+  ...
+# Subtest: export fails when an object disappears
+ok 47 - export fails when an object disappears
+  ---
+  duration_ms: 3913.67984
+  type: 'test'
+  ...
+# Subtest: object references refuse missing objects
+ok 48 - object references refuse missing objects
+  ---
+  duration_ms: 1582.369162
+  type: 'test'
+  ...
+# Subtest: object references refuse unreferenced objects
+ok 49 - object references refuse unreferenced objects
+  ---
+  duration_ms: 1478.4184
+  type: 'test'
+  ...
+# Subtest: unlisted virtual tables fail by name; listed derived FTS tables are excluded
+ok 50 - unlisted virtual tables fail by name; listed derived FTS tables are excluded
+  ---
+  duration_ms: 6553.740432
+  type: 'test'
+  ...
+# Subtest: foreign keys into excluded tables fail by table name
+ok 51 - foreign keys into excluded tables fail by table name
+  ---
+  duration_ms: 1129.019171
+  type: 'test'
+  ...
+# Subtest: normalisation disables tokens and parks sends idempotently
+ok 52 - normalisation disables tokens and parks sends idempotently
+  ---
+  duration_ms: 5153.999392
+  type: 'test'
+  ...
+# Subtest: non-idempotent export transformations are refused
+ok 53 - non-idempotent export transformations are refused
+  ---
+  duration_ms: 2460.237214
+  type: 'test'
+  ...
+# Subtest: lost advance acknowledgement cannot duplicate or replay a part
+ok 54 - lost advance acknowledgement cannot duplicate or replay a part
+  ---
+  duration_ms: 1573.334482
+  type: 'test'
+  ...
+# Subtest: export abort drops every snapshot and part
+ok 55 - export abort drops every snapshot and part
+  ---
+  duration_ms: 1561.552737
+  type: 'test'
+  ...
+# Subtest: export is refused while an import applies
+ok 56 - export is refused while an import applies
+  ---
+  duration_ms: 468.92273
+  type: 'test'
+  ...
+# Subtest: INTEGER affinity export refuses values beyond safe precision
+ok 57 - INTEGER affinity export refuses values beyond safe precision
+  ---
+  duration_ms: 1063.197605
+  type: 'test'
+  ...
+# Subtest: invalid policies fail at construction, including NOT NULL secrets
+ok 58 - invalid policies fail at construction, including NOT NULL secrets
+  ---
+  duration_ms: 572.551685
+  type: 'test'
+  ...
+# Subtest: Base auth, module bookkeeping and development outbox are excluded by default
+ok 59 - Base auth, module bookkeeping and development outbox are excluded by default
+  ---
+  duration_ms: 20690.684712
+  type: 'test'
+  ...
+# Subtest: bounded reader rejects an over-long line
+ok 60 - bounded reader rejects an over-long line
+  ---
+  duration_ms: 6.925698
+  type: 'test'
+  ...
+# Subtest: bounded reader rejects invalid UTF-8 as malformed archive text
+ok 61 - bounded reader rejects invalid UTF-8 as malformed archive text
+  ---
+  duration_ms: 0.916217
+  type: 'test'
+  ...
+# Subtest: bounded reader accepts fragmented UTF-8, CRLF and final unterminated lines
+ok 62 - bounded reader accepts fragmented UTF-8, CRLF and final unterminated lines
+  ---
+  duration_ms: 2.617288
+  type: 'test'
+  ...
+# Subtest: archive reader refuses a missing part
+ok 63 - archive reader refuses a missing part
+  ---
+  duration_ms: 15.195762
+  type: 'test'
+  ...
+# Subtest: archive reader refuses an extra part
+ok 64 - archive reader refuses an extra part
+  ---
+  duration_ms: 5.339378
+  type: 'test'
+  ...
+# Subtest: archive reader refuses a part out of order
+ok 65 - archive reader refuses a part out of order
+  ---
+  duration_ms: 12.787576
+  type: 'test'
+  ...
+# Subtest: archive reader refuses a checksum mismatch
+ok 66 - archive reader refuses a checksum mismatch
+  ---
+  duration_ms: 24.5752
+  type: 'test'
+  ...
+# Subtest: archive reader refuses data after closing
+ok 67 - archive reader refuses data after closing
+  ---
+  duration_ms: 27.363666
+  type: 'test'
+  ...
+# Subtest: archive reader refuses missing closing and content mismatch
+ok 68 - archive reader refuses missing closing and content mismatch
+  ---
+  duration_ms: 29.30535
+  type: 'test'
+  ...
+# Subtest: unsafe integers are refused by column name
+ok 69 - unsafe integers are refused by column name
+  ---
+  duration_ms: 20.639691
+  type: 'test'
+  ...
+# Subtest: BLOB cells round trip without string coercion
+ok 70 - BLOB cells round trip without string coercion
+  ---
+  duration_ms: 17.674825
+  type: 'test'
+  ...
+# Subtest: content equivalence ignores boundaries and source metadata while archive integrity binds them
+ok 71 - content equivalence ignores boundaries and source metadata while archive integrity binds them
+  ---
+  duration_ms: 48.575896
+  type: 'test'
+  ...
+# Subtest: streaming SHA-256 agrees with Web Crypto across block boundaries
+ok 72 - streaming SHA-256 agrees with Web Crypto across block boundaries
+  ---
+  duration_ms: 36.593602
+  type: 'test'
+  ...
+# Subtest: content and archive digests agree with independent canonical JSON hashing
+ok 73 - content and archive digests agree with independent canonical JSON hashing
+  ---
+  duration_ms: 31.377256
+  type: 'test'
+  ...
+# Subtest: manifest format, version and schema checksums are required
+ok 74 - manifest format, version and schema checksums are required
+  ---
+  duration_ms: 61.222546
+  type: 'test'
+  ...
+# Subtest: row parts cannot exceed one thousand records
+ok 75 - row parts cannot exceed one thousand records
+  ---
+  duration_ms: 37.960818
+  type: 'test'
+  ...
+# Subtest: row order is verified independently of the part checksum
+ok 76 - row order is verified independently of the part checksum
+  ---
+  duration_ms: 12.592632
+  type: 'test'
+  ...
+# Subtest: object and payload hashes are checked independently of part checksums
+ok 77 - object and payload hashes are checked independently of part checksums
+  ---
+  duration_ms: 4.39503
+  type: 'test'
+  ...
+# (node:4241) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: hosted archives refuse uncertain data migrations and retain legacy and Wrangler restore history
+ok 78 - hosted archives refuse uncertain data migrations and retain legacy and Wrangler restore history
+  ---
+  duration_ms: 522.404167
+  type: 'test'
+  ...
+# Subtest: HTTP returns null for paths owned by other dispatchers
+ok 79 - HTTP returns null for paths owned by other dispatchers
+  ---
+  duration_ms: 1590.251351
+  type: 'test'
+  ...
+# Subtest: HTTP checks authorization on every route; null actors receive 401 and no-store
+ok 80 - HTTP checks authorization on every route; null actors receive 401 and no-store
+  ---
+  duration_ms: 8896.780719
+  type: 'test'
+  ...
+# direct 403 => 403 {"error":"operation_failed"}
+# direct 403 => 403 {"error":"operation_failed"}
+# direct 403 => 403 {"error":"forbidden"}
+# direct 401 => 401 {"error":"unauthenticated"}
+# Error cause 403 => 403 {"error":"operation_failed"}
+# Error cause 403 => 403 {"error":"operation_failed"}
+# Error cause 403 => 403 {"error":"forbidden"}
+# Error cause 401 => 401 {"error":"unauthenticated"}
+# structural cause 403 => 403 {"error":"operation_failed"}
+# structural cause 403 => 403 {"error":"operation_failed"}
+# structural cause 403 => 403 {"error":"forbidden"}
+# structural cause 401 => 401 {"error":"unauthenticated"}
+# nested cause 403 => 403 {"error":"operation_failed"}
+# nested cause 403 => 403 {"error":"operation_failed"}
+# nested cause 403 => 403 {"error":"forbidden"}
+# nested cause 401 => 401 {"error":"unauthenticated"}
+# Subtest: HTTP redacts arbitrary typed codes and unwraps authority causes
+    # Subtest: direct
+        # Subtest: Error: operation_failed
+        ok 1 - Error: operation_failed
+          ---
+          duration_ms: 1.38759
+          type: 'test'
+          ...
+        # Subtest: PortabilityError: operation_failed
+        ok 2 - PortabilityError: operation_failed
+          ---
+          duration_ms: 0.578641
+          type: 'test'
+          ...
+        # Subtest: AuthError: forbidden
+        ok 3 - AuthError: forbidden
+          ---
+          duration_ms: 0.660081
+          type: 'test'
+          ...
+        # Subtest: AuthError: unauthenticated
+        ok 4 - AuthError: unauthenticated
+          ---
+          duration_ms: 0.711086
+          type: 'test'
+          ...
+        1..4
+    ok 1 - direct
+      ---
+      duration_ms: 4.302225
+      type: 'test'
+      ...
+    # Subtest: Error cause
+        # Subtest: Error: operation_failed
+        ok 1 - Error: operation_failed
+          ---
+          duration_ms: 0.762093
+          type: 'test'
+          ...
+        # Subtest: PortabilityError: operation_failed
+        ok 2 - PortabilityError: operation_failed
+          ---
+          duration_ms: 0.622664
+          type: 'test'
+          ...
+        # Subtest: AuthError: forbidden
+        ok 3 - AuthError: forbidden
+          ---
+          duration_ms: 0.513247
+          type: 'test'
+          ...
+        # Subtest: AuthError: unauthenticated
+        ok 4 - AuthError: unauthenticated
+          ---
+          duration_ms: 0.768091
+          type: 'test'
+          ...
+        1..4
+    ok 2 - Error cause
+      ---
+      duration_ms: 3.43776
+      type: 'test'
+      ...
+    # Subtest: structural cause
+        # Subtest: Error: operation_failed
+        ok 1 - Error: operation_failed
+          ---
+          duration_ms: 0.789368
+          type: 'test'
+          ...
+        # Subtest: PortabilityError: operation_failed
+        ok 2 - PortabilityError: operation_failed
+          ---
+          duration_ms: 0.421023
+          type: 'test'
+          ...
+        # Subtest: AuthError: forbidden
+        ok 3 - AuthError: forbidden
+          ---
+          duration_ms: 0.379043
+          type: 'test'
+          ...
+        # Subtest: AuthError: unauthenticated
+        ok 4 - AuthError: unauthenticated
+          ---
+          duration_ms: 1.04462
+          type: 'test'
+          ...
+        1..4
+    ok 3 - structural cause
+      ---
+      duration_ms: 3.07703
+      type: 'test'
+      ...
+    # Subtest: nested cause
+        # Subtest: Error: operation_failed
+        ok 1 - Error: operation_failed
+          ---
+          duration_ms: 0.500304
+          type: 'test'
+          ...
+        # Subtest: PortabilityError: operation_failed
+        ok 2 - PortabilityError: operation_failed
+          ---
+          duration_ms: 0.458063
+          type: 'test'
+          ...
+        # Subtest: AuthError: forbidden
+        ok 3 - AuthError: forbidden
+          ---
+          duration_ms: 0.405064
+          type: 'test'
+          ...
+        # Subtest: AuthError: unauthenticated
+        ok 4 - AuthError: unauthenticated
+          ---
+          duration_ms: 0.660124
+          type: 'test'
+          ...
+        1..4
+    ok 4 - nested cause
+      ---
+      duration_ms: 2.450186
+      type: 'test'
+      ...
+    1..4
+ok 81 - HTTP redacts arbitrary typed codes and unwraps authority causes
+  ---
+  duration_ms: 702.953318
+  type: 'test'
+  ...
+# authority lease: PortabilityError direct 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: PortabilityError Error 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: PortabilityError structural 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: PortabilityError nested 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: AuthError direct 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: AuthError Error 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: AuthError structural 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: AuthError nested 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: Error direct 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: Error Error 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: Error structural 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: Error nested 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: non-Error direct 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: non-Error Error 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: non-Error structural 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: non-Error nested 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: prototype direct 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: prototype Error 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: prototype structural 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: prototype nested 403 => 403 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: PortabilityError direct 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: PortabilityError Error 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: PortabilityError structural 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: PortabilityError nested 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: AuthError direct 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: AuthError Error 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: AuthError structural 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: AuthError nested 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: Error direct 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: Error Error 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: Error structural 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: Error nested 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: non-Error direct 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: non-Error Error 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: non-Error structural 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: non-Error nested 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: prototype direct 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: prototype Error 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: prototype structural 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# authority lease: prototype nested 401 => 401 {"error":"import_running"} [["cache-control","no-store"],["content-type","application/json"]]
+# Subtest: HTTP authorization failures cannot impersonate import lease metadata
+ok 82 - HTTP authorization failures cannot impersonate import lease metadata
+  ---
+  duration_ms: 391.066561
+  type: 'test'
+  ...
+# another actor lease: 409 {"error":"import_running"}
+# replayed lease: owner 409 {"error":"import_running"}
+# replayed lease: owner 409 {"error":"import_running"}
+# replayed lease: owner 409 {"error":"import_running"}
+# replayed lease: owner 409 {"error":"import_running"}
+# replayed lease: other 409 {"error":"import_running"}
+# replayed lease: other 409 {"error":"import_running"}
+# replayed lease: other 409 {"error":"import_running"}
+# replayed lease: other 409 {"error":"import_running"}
+# untrusted staged lease: 409 {"error":"import_running"}
+# untrusted staged lease: 409 {"error":"import_running"}
+# untrusted staged lease: 409 {"error":"import_running"}
+# Subtest: HTTP publishes genuine import lease details after authorization and suppresses replays during authorization
+ok 83 - HTTP publishes genuine import lease details after authorization and suppresses replays during authorization
+  ---
+  duration_ms: 5845.392619
+  type: 'test'
+  ...
+# Subtest: HTTP hides another actors jobs with 404
+ok 84 - HTTP hides another actors jobs with 404
+  ---
+  duration_ms: 2879.820171
+  type: 'test'
+  ...
+# Subtest: HTTP rejects wrong and missing Origin on unsafe methods
+ok 85 - HTTP rejects wrong and missing Origin on unsafe methods
+  ---
+  duration_ms: 943.095027
+  type: 'test'
+  ...
+# Subtest: HTTP bounds streamed bodies before JSON parsing
+ok 86 - HTTP bounds streamed bodies before JSON parsing
+  ---
+  duration_ms: 345.342536
+  type: 'test'
+  ...
+# Subtest: HTTP requires explicit import confirmation
+ok 87 - HTTP requires explicit import confirmation
+  ---
+  duration_ms: 1794.812522
+  type: 'test'
+  ...
+# Subtest: HTTP success, download and error responses all prevent caching
+ok 88 - HTTP success, download and error responses all prevent caching
+  ---
+  duration_ms: 1285.555242
+  type: 'test'
+  ...
+# export failure: Error unauthorized => 401 unauthorized
+# export failure: Error step_up_required => 403 step_up_required
+# export failure: Error rate_limited => 429 rate_limited
+# export failure: Error operation_failed => 403 step_up_required
+# export failure: undefined native => 401 unauthenticated
+# export failure: Error confirmation_required:private => 400 confirmation_required
+# export failure: undefined confirmation_required:private => 400 confirmation_required
+# export failure: Error native => 503 operation_failed
+# export failure: TimeoutError native => 504 operation_failed
+# export failure: Error native => 500 operation_failed
+# export failure: TypeError native => 500 operation_failed
+# Subtest: HTTP preserves typed authority refusals and distinguishes transient storage failures without leaking diagnostics
+ok 89 - HTTP preserves typed authority refusals and distinguishes transient storage failures without leaking diagnostics
+  ---
+  duration_ms: 648.609785
+  type: 'test'
+  ...
+# Subtest: constructor-issued refusals cross installed and copied runtimes without recognizing arbitrary errors
+ok 90 - constructor-issued refusals cross installed and copied runtimes without recognizing arbitrary errors
+  ---
+  duration_ms: 1.431479
+  type: 'test'
+  ...
+# Subtest: a new import reclaims expired staging and can restore the archive
+ok 91 - a new import reclaims expired staging and can restore the archive
+  ---
+  duration_ms: 4645.315577
+  type: 'test'
+  ...
+# Subtest: a fresh lease blocks another import and reports when the owner can abort it
+ok 92 - a fresh lease blocks another import and reports when the owner can abort it
+  ---
+  duration_ms: 2552.95237
+  type: 'test'
+  ...
+# Subtest: expired uploads and finalize cannot revive or publish an abandoned import
+ok 93 - expired uploads and finalize cannot revive or publish an abandoned import
+  ---
+  duration_ms: 3103.604231
+  type: 'test'
+  ...
+# Subtest: a worker lost after object apply is reclaimed through owned-object abort, preserving foreign data
+ok 94 - a worker lost after object apply is reclaimed through owned-object abort, preserving foreign data
+  ---
+  duration_ms: 3986.831856
+  type: 'test'
+  ...
+# Subtest: the authenticated owner can discover, inspect and abort a stale import through HTTP
+ok 95 - the authenticated owner can discover, inspect and abort a stale import through HTTP
+  ---
+  duration_ms: 3766.088341
+  type: 'test'
+  ...
+# Subtest: an active finalize renews across a long callback and excludes concurrent abort and finalize
+ok 96 - an active finalize renews across a long callback and excludes concurrent abort and finalize
+  ---
+  duration_ms: 5502.70432
+  type: 'test'
+  ...
+# Subtest: a request that lost its lease cannot publish after its replacement restores
+ok 97 - a request that lost its lease cannot publish after its replacement restores
+  ---
+  duration_ms: 8629.111602
+  type: 'test'
+  ...
+# Subtest: archive import normalizes staged automations, journals actual changes and returns a secret-free receipt
+ok 98 - archive import normalizes staged automations, journals actual changes and returns a secret-free receipt
+  ---
+  duration_ms: 12697.722259
+  type: 'test'
+  ...
+# Subtest: normalization survives a refused validation and a new service without double counting
+ok 99 - normalization survives a refused validation and a new service without double counting
+  ---
+  duration_ms: 5826.008405
+  type: 'test'
+  ...
+# Subtest: archive import refuses escalation, undeclared or structural edits, key edits and impure hooks before publishing
+ok 100 - archive import refuses escalation, undeclared or structural edits, key edits and impure hooks before publishing
+  ---
+  duration_ms: 20476.908957
+  type: 'test'
+  ...
+# Subtest: a policy without import normalization restores the original activation and token values
+ok 101 - a policy without import normalization restores the original activation and token values
+  ---
+  duration_ms: 6123.10277
+  type: 'test'
+  ...
+# Subtest: a large escaped UTF-8 part resumes mid-upload without publishing partial rows
+ok 102 - a large escaped UTF-8 part resumes mid-upload without publishing partial rows
+  ---
+  duration_ms: 51233.498864
+  type: 'test'
+  ...
+# Subtest: import refuses a non-empty destination
+ok 103 - import refuses a non-empty destination
+  ---
+  duration_ms: 24439.718945
+  type: 'test'
+  ...
+# Subtest: import refuses a non-empty bucket without claiming or deleting keys
+ok 104 - import refuses a non-empty bucket without claiming or deleting keys
+  ---
+  duration_ms: 21694.262698
+  type: 'test'
+  ...
+# Subtest: wrong products are refused
+ok 105 - wrong products are refused
+  ---
+  duration_ms: 9486.42275
+  type: 'test'
+  ...
+# ordinary => schema_mismatch:legacy_schema; rows 0 -> 0; jobs 0 -> 0
+# Subtest: schema mismatches are refused and an explicit earlier schema upgrades rows
+    # Subtest: acknowledged table-only v2 recovery
+        # Subtest: ordinary refusal writes nothing
+        ok 1 - ordinary refusal writes nothing
+          ---
+          duration_ms: 1662.926608
+          type: 'test'
+          ...
+# (node:5716) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# maintenance => competing export refused during staging; released after completion
+# acknowledged => rows 0 -> 2; assets 0 -> 1; original bytes match; receipt {"acknowledgedAt":"2026-11-09T02:33:50.357Z","archiveHash":"f97d075fa3e37c675a2018bb921cdc09f61158c6eed090a1941a0ac020ed17da","exportedAt":"2026-11-09T02:33:44.388Z","reason":"acknowledged recovery of a version 2 archive without schemaObjects","sourceIdentity":"a62754c9-c91d-4fbb-b11c-7f5d12576635"}
+        # Subtest: acknowledged rows, bytes, destination structure and durable receipt
+        ok 2 - acknowledged rows, bytes, destination structure and durable receipt
+          ---
+          duration_ms: 5101.065454
+          type: 'test'
+          ...
+# nonempty => target_not_empty:items ; destination unchanged
+        # Subtest: nonempty and incompatible schemas refuse before staging
+            # Subtest: nonempty
+            ok 1 - nonempty
+              ---
+              duration_ms: 1298.836235
+              type: 'test'
+              ...
+# table => schema_mismatch:table:synthetic-base-12 ; destination unchanged
+            # Subtest: table
+            ok 2 - table
+              ---
+              duration_ms: 1622.177881
+              type: 'test'
+              ...
+# column => schema_mismatch:column:items:synthetic-base-13 ; destination unchanged
+            # Subtest: column
+            ok 3 - column
+              ---
+              duration_ms: 1132.547848
+              type: 'test'
+              ...
+# ledger => migration_ledger:unknown:synthetic-base-14 ; destination unchanged
+            # Subtest: ledger
+            ok 4 - ledger
+              ---
+              duration_ms: 1053.909152
+              type: 'test'
+              ...
+            1..4
+        ok 3 - nonempty and incompatible schemas refuse before staging
+          ---
+          duration_ms: 5111.040036
+          type: 'test'
+          ...
+# unrecorded prefix => 2 rows restored; later columns use destination defaults
+        # Subtest: unrecorded prefix and later destination columns restore
+        ok 4 - unrecorded prefix and later destination columns restore
+          ---
+          duration_ms: 3258.219035
+          type: 'test'
+          ...
+# rer_migrations name-only => restored 2 rows; destination ledger retained
+        # Subtest: older name-only ledgers remain bound to the archive
+            # Subtest: rer_migrations
+            ok 1 - rer_migrations
+              ---
+              duration_ms: 3350.435647
+              type: 'test'
+              ...
+# d1_migrations name-only => restored 2 rows; destination ledger retained
+            # Subtest: d1_migrations
+            ok 2 - d1_migrations
+              ---
+              duration_ms: 3062.306134
+              type: 'test'
+              ...
+            1..2
+        ok 5 - older name-only ledgers remain bound to the archive
+          ---
+          duration_ms: 6413.312967
+          type: 'test'
+          ...
+# acknowledged => erasure_epoch; rows 0 -> 0; assets 0 -> 0
+        # Subtest: stale epoch still refuses at finalization
+        ok 6 - stale epoch still refuses at finalization
+          ---
+          duration_ms: 3114.899194
+          type: 'test'
+          ...
+# current => rows 0 -> 2; assets 0 -> 1; schemaUnverified absent
+        # Subtest: current inventory restores without acknowledgment or unverified receipt
+        ok 7 - current inventory restores without acknowledgment or unverified receipt
+          ---
+          duration_ms: 4336.573429
+          type: 'test'
+          ...
+        1..7
+    ok 1 - acknowledged table-only v2 recovery
+      ---
+      duration_ms: 32148.775917
+      type: 'test'
+      ...
+    1..1
+ok 106 - schema mismatches are refused and an explicit earlier schema upgrades rows
+  ---
+  duration_ms: 54763.145477
+  type: 'test'
+  ...
+# Subtest: table and column inventories cannot omit destination data
+ok 107 - table and column inventories cannot omit destination data
+  ---
+  duration_ms: 9456.215804
+  type: 'test'
+  ...
+# Subtest: duplicate uploads are no-ops, different contents return 409
+ok 108 - duplicate uploads are no-ops, different contents return 409
+  ---
+  duration_ms: 8814.546391
+  type: 'test'
+  ...
+# Subtest: uploads enforce order, checksums, declared columns, types and NOT NULL
+ok 109 - uploads enforce order, checksums, declared columns, types and NOT NULL
+  ---
+  duration_ms: 9506.554731
+  type: 'test'
+  ...
+# Subtest: finalize requires all parts and the archive binding before publishing
+ok 110 - finalize requires all parts and the archive binding before publishing
+  ---
+  duration_ms: 23058.295605
+  type: 'test'
+  ...
+# Subtest: foreign-key failure rolls back rows and triggers, removing every owned object
+ok 111 - foreign-key failure rolls back rows and triggers, removing every owned object
+  ---
+  duration_ms: 26748.864881
+  type: 'test'
+  ...
+# Subtest: fault after R2 writes cleans only owned keys
+ok 112 - fault after R2 writes cleans only owned keys
+  ---
+  duration_ms: 19509.160618
+  type: 'test'
+  ...
+# Subtest: lost response after D1 commit preserves objects and reports complete
+ok 113 - lost response after D1 commit preserves objects and reports complete
+  ---
+  duration_ms: 17585.851672
+  type: 'test'
+  ...
+# Subtest: staged product validation can refuse before any R2 write
+ok 114 - staged product validation can refuse before any R2 write
+  ---
+  duration_ms: 18256.277446
+  type: 'test'
+  ...
+# Subtest: restore refuses file references outside the declared prefix before any write
+ok 115 - restore refuses file references outside the declared prefix before any write
+  ---
+  duration_ms: 24574.306766
+  type: 'test'
+  ...
+# Subtest: restore refuses file references that differ from the archived objects
+ok 116 - restore refuses file references that differ from the archived objects
+  ---
+  duration_ms: 42693.61772
+  type: 'test'
+  ...
+# Subtest: replaceable rows, suppressed triggers, NULL secrets and configuration survive restore
+ok 117 - replaceable rows, suppressed triggers, NULL secrets and configuration survive restore
+  ---
+  duration_ms: 39410.041787
+  type: 'test'
+  ...
+# Subtest: only one import runs and abort releases its durable lock and staging
+ok 118 - only one import runs and abort releases its durable lock and staging
+  ---
+  duration_ms: 18293.315595
+  type: 'test'
+  ...
+# Subtest: direct bindings export, import, export gives equal rows, objects and contentHash
+ok 119 - direct bindings export, import, export gives equal rows, objects and contentHash
+  ---
+  duration_ms: 29749.322749
+  type: 'test'
+  ...
+# Subtest: an independently corrupted R2 write is refused before D1 commit
+ok 120 - an independently corrupted R2 write is refused before D1 commit
+  ---
+  duration_ms: 19254.105126
+  type: 'test'
+  ...
+# Subtest: applying ownership resumes after restart and abort deletes only owned keys
+ok 121 - applying ownership resumes after restart and abort deletes only owned keys
+  ---
+  duration_ms: 30223.845214
+  type: 'test'
+  ...
+# Subtest: pre-schemaObjects v2 owner backup restores through file and HTTP doors only with proven recorded history
+    # Subtest: recorded legacy schema precedes additive migrations
+    ok 1 - recorded legacy schema precedes additive migrations
+      ---
+      duration_ms: 4326.956206
+      type: 'test'
+      ...
+    # Subtest: recorded legacy schema has a declared row upgrade
+    ok 2 - recorded legacy schema has a declared row upgrade
+      ---
+      duration_ms: 3598.891785
+      type: 'test'
+      ...
+    # Subtest: older object inventories account for excluded-table objects by replay
+    ok 3 - older object inventories account for excluded-table objects by replay
+      ---
+      duration_ms: 4087.313293
+      type: 'test'
+      ...
+    1..3
+ok 122 - pre-schemaObjects v2 owner backup restores through file and HTTP doors only with proven recorded history
+  ---
+  duration_ms: 29589.934914
+  type: 'test'
+  ...
+# legacy file restore: issues 0 -> 1, events 0 -> 1; UTF-8 and 0001FF0A80 bytes match; no acknowledgment
+# legacy additive file restore: issues 0 -> 1 with default status; recorded excluded-table index accounted for
+# legacy verified prior-schema row upgrade: title -> summary; issues 0 -> 1
+# older object inventory: replay accounts for excluded index; unrecorded excluded index refuses before staging
+# authenticated, confirmed HTTP restore: issues 0 -> 1, events 0 -> 1; same bytes and replay verification
+# Subtest: library restore verifies a carried legacy ledger before creating a durable import
+ok 123 - library restore verifies a carried legacy ledger before creating a durable import
+  ---
+  duration_ms: 6760.091074
+  type: 'test'
+  ...
+# Subtest: fresh archives with absent policy-excluded snapshots retain durable schema verification
+    # Subtest: in-process door without a replayer
+    ok 1 - in-process door without a replayer
+      ---
+      duration_ms: 4784.49299
+      type: 'test'
+      ...
+    # in-process: complete; notes 0 -> 2, events 0 -> 1, audit 0 -> 1, objects 0 -> 1; snapshot absent; no acknowledgment or schemaUnverified
+    # Subtest: file door with migration replay
+    ok 2 - file door with migration replay
+      ---
+      duration_ms: 4517.286669
+      type: 'test'
+      ...
+    # file: complete; notes 0 -> 2, events 0 -> 1, audit 0 -> 1, objects 0 -> 1; snapshot absent; no acknowledgment or schemaUnverified
+    # Subtest: missing durable index
+    ok 3 - missing durable index
+      ---
+      duration_ms: 1571.325584
+      type: 'test'
+      ...
+    # schema_mismatch before writes; schema, ledger, jobs, lock and rows unchanged; bucket empty
+    # Subtest: changed durable index column
+    ok 4 - changed durable index column
+      ---
+      duration_ms: 1356.515048
+      type: 'test'
+      ...
+    # schema_mismatch before writes; schema, ledger, jobs, lock and rows unchanged; bucket empty
+    # Subtest: changed durable index uniqueness
+    ok 5 - changed durable index uniqueness
+      ---
+      duration_ms: 1358.694272
+      type: 'test'
+      ...
+    # schema_mismatch before writes; schema, ledger, jobs, lock and rows unchanged; bucket empty
+    # Subtest: changed durable index predicate
+    ok 6 - changed durable index predicate
+      ---
+      duration_ms: 1313.108193
+      type: 'test'
+      ...
+    # schema_mismatch before writes; schema, ledger, jobs, lock and rows unchanged; bucket empty
+    # Subtest: changed durable trigger
+    ok 7 - changed durable trigger
+      ---
+      duration_ms: 1552.616764
+      type: 'test'
+      ...
+    # schema_mismatch before writes; schema, ledger, jobs, lock and rows unchanged; bucket empty
+    # Subtest: changed index on present excluded table
+    ok 8 - changed index on present excluded table
+      ---
+      duration_ms: 1099.234808
+      type: 'test'
+      ...
+    # schema_mismatch before writes; schema, ledger, jobs, lock and rows unchanged; bucket empty
+    # Subtest: object table missing from archived exclusions
+    ok 9 - object table missing from archived exclusions
+      ---
+      duration_ms: 1862.691158
+      type: 'test'
+      ...
+    # valid remade digests: schema_mismatch before writes; bucket empty
+    # Subtest: object table not excluded by destination
+    ok 10 - object table not excluded by destination
+      ---
+      duration_ms: 1185.38952
+      type: 'test'
+      ...
+    # valid remade digests: schema_mismatch before writes; bucket empty
+    # Subtest: altered restorable object listed as excluded
+    ok 11 - altered restorable object listed as excluded
+      ---
+      duration_ms: 1453.6481
+      type: 'test'
+      ...
+    # valid remade digests: schema_mismatch before writes; bucket empty
+    # Subtest: malformed excluded-table inventory refuses before writes
+    ok 12 - malformed excluded-table inventory refuses before writes
+      ---
+      duration_ms: 1437.431548
+      type: 'test'
+      ...
+    1..12
+ok 124 - fresh archives with absent policy-excluded snapshots retain durable schema verification
+  ---
+  duration_ms: 26087.33385
+  type: 'test'
+  ...
+# Subtest: archive journal refuses a tombstoned archived row
+ok 125 - archive journal refuses a tombstoned archived row
+  ---
+  duration_ms: 26152.59278
+  type: 'test'
+  ...
+# Subtest: destination tombstones survive an import and refuse matching rows
+ok 126 - destination tombstones survive an import and refuse matching rows
+  ---
+  duration_ms: 35491.059229
+  type: 'test'
+  ...
+# Subtest: separately supplied later journal is enforced and merged at commit
+ok 127 - separately supplied later journal is enforced and merged at commit
+  ---
+  duration_ms: 31681.666176
+  type: 'test'
+  ...
+# Subtest: archives older than the recorded source epoch are refused
+ok 128 - archives older than the recorded source epoch are refused
+  ---
+  duration_ms: 17143.253318
+  type: 'test'
+  ...
+# Subtest: erasure invalidation removes every snapshot, staging copy and stored part
+ok 129 - erasure invalidation removes every snapshot, staging copy and stored part
+  ---
+  duration_ms: 9459.089984
+  type: 'test'
+  ...
+# Subtest: keyless rowids with gaps restore exactly and are erasure-fenced
+ok 130 - keyless rowids with gaps restore exactly and are erasure-fenced
+  ---
+  duration_ms: 38935.426629
+  type: 'test'
+  ...
+# Subtest: a tombstone added after staging is checked again inside the restore commit
+ok 131 - a tombstone added after staging is checked again inside the restore commit
+  ---
+  duration_ms: 21712.202157
+  type: 'test'
+  ...
+# (node:9521) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: an old archive carrying its Platform ledger restores into a Platform-installed destination whose history orders a new migration mid-way
+ok 132 - an old archive carrying its Platform ledger restores into a Platform-installed destination whose history orders a new migration mid-way
+  ---
+  duration_ms: 8306.415877
+  type: 'test'
+  ...
+# Subtest: an archived ledger whose hash differs from the applied migration refuses, naming it, and leaves the destination untouched
+ok 133 - an archived ledger whose hash differs from the applied migration refuses, naming it, and leaves the destination untouched
+  ---
+  duration_ms: 4665.140657
+  type: 'test'
+  ...
+# Subtest: a later UPDATE refuses when the archive holds rows of its table
+ok 134 - a later UPDATE refuses when the archive holds rows of its table
+  ---
+  duration_ms: 3749.075734
+  type: 'test'
+  ...
+# Subtest: Platform-prefixed and native ledgers place the same files in either direction, including native to native
+    # Subtest: Platform to Platform
+    ok 1 - Platform to Platform
+      ---
+      duration_ms: 6056.73592
+      type: 'test'
+      ...
+    # Subtest: Platform to native
+    ok 2 - Platform to native
+      ---
+      duration_ms: 5926.175516
+      type: 'test'
+      ...
+    # Subtest: native to Platform
+    ok 3 - native to Platform
+      ---
+      duration_ms: 5592.578654
+      type: 'test'
+      ...
+    # Subtest: native to native
+    ok 4 - native to native
+      ---
+      duration_ms: 6324.953203
+      type: 'test'
+      ...
+    1..4
+ok 135 - Platform-prefixed and native ledgers place the same files in either direction, including native to native
+  ---
+  duration_ms: 23901.833362
+  type: 'test'
+  ...
+# Subtest: ambiguous file hashes, conflicting names and the first unknown hashless entry refuse without staging rows
+    # Subtest: ambiguous
+    ok 1 - ambiguous
+      ---
+      duration_ms: 3697.256383
+      type: 'test'
+      ...
+    # Subtest: conflict
+    ok 2 - conflict
+      ---
+      duration_ms: 3659.163845
+      type: 'test'
+      ...
+    # Subtest: unknown
+    ok 3 - unknown
+      ---
+      duration_ms: 3299.001446
+      type: 'test'
+      ...
+    1..3
+ok 136 - ambiguous file hashes, conflicting names and the first unknown hashless entry refuse without staging rows
+  ---
+  duration_ms: 10656.39062
+  type: 'test'
+  ...
+# Subtest: name-only archives use declared deployment names and refuse an ambiguous alias before staging
+    # Subtest: declared
+    ok 1 - declared
+      ---
+      duration_ms: 6164.171502
+      type: 'test'
+      ...
+    # Subtest: ambiguous
+    ok 2 - ambiguous
+      ---
+      duration_ms: 3367.395668
+      type: 'test'
+      ...
+    1..2
+ok 137 - name-only archives use declared deployment names and refuse an ambiguous alias before staging
+  ---
+  duration_ms: 9532.303164
+  type: 'test'
+  ...
+# Subtest: normalized attachment keys must resolve before an export completes
+ok 138 - normalized attachment keys must resolve before an export completes
+  ---
+  duration_ms: 4539.281245
+  type: 'test'
+  ...
+# Subtest: idempotent primary-key normalization preserves canonical row bytes and contentHash
+ok 139 - idempotent primary-key normalization preserves canonical row bytes and contentHash
+  ---
+  duration_ms: 5029.603417
+  type: 'test'
+  ...
+# Subtest: attachment reference columns cannot be omitted as secrets
+ok 140 - attachment reference columns cannot be omitted as secrets
+  ---
+  duration_ms: 621.727215
+  type: 'test'
+  ...
+# Subtest: oversized checksummed uploads are refused before any staging or part write
+ok 141 - oversized checksummed uploads are refused before any staging or part write
+  ---
+  duration_ms: 3050.702764
+  type: 'test'
+  ...
+# Subtest: byte bounds count canonical UTF-8 and accept the exact inclusive limit
+ok 142 - byte bounds count canonical UTF-8 and accept the exact inclusive limit
+  ---
+  duration_ms: 3.224558
+  type: 'test'
+  ...
+# Subtest: the default reader refuses the checksummed 700-row part above 16 MiB
+ok 143 - the default reader refuses the checksummed 700-row part above 16 MiB
+  ---
+  duration_ms: 2381.30426
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: session admission records durable sign-in history through OIDC session scrubbing and restore
+ok 144 - session admission records durable sign-in history through OIDC session scrubbing and restore
+  ---
+  duration_ms: 10319.058933
+  type: 'test'
+  ...
+# Subtest: export revokes copied delegations while preserving source authority, provenance and run references; import refuses a re-signed live approval
+ok 145 - export revokes copied delegations while preserving source authority, provenance and run references; import refuses a re-signed live approval
+  ---
+  duration_ms: 12134.228442
+  type: 'test'
+  ...
+# Subtest: an export row transform cannot revive a scrubbed policy approval
+ok 146 - an export row transform cannot revive a scrubbed policy approval
+  ---
+  duration_ms: 1708.120292
+  type: 'test'
+  ...
+# Subtest: replacement refuses excluded destination dependents with CASCADE
+ok 147 - replacement refuses excluded destination dependents with CASCADE
+  ---
+  duration_ms: 3877.979836
+  type: 'test'
+  ...
+# Subtest: replacement refuses excluded destination dependents with SET NULL
+ok 148 - replacement refuses excluded destination dependents with SET NULL
+  ---
+  duration_ms: 4910.211654
+  type: 'test'
+  ...
+# Subtest: replacement refuses excluded destination dependents with SET DEFAULT
+ok 149 - replacement refuses excluded destination dependents with SET DEFAULT
+  ---
+  duration_ms: 4186.138063
+  type: 'test'
+  ...
+# Subtest: excluded dependents added during staged validation are protected by the commit guard
+ok 150 - excluded dependents added during staged validation are protected by the commit guard
+  ---
+  duration_ms: 7252.995751
+  type: 'test'
+  ...
+# Subtest: replacement still succeeds when excluded FK dependents are empty
+ok 151 - replacement still succeeds when excluded FK dependents are empty
+  ---
+  duration_ms: 5344.612477
+  type: 'test'
+  ...
+# Subtest: transitive cascades cannot remove excluded auth rows through replaceable children
+ok 152 - transitive cascades cannot remove excluded auth rows through replaceable children
+  ---
+  duration_ms: 6175.316726
+  type: 'test'
+  ...
+# Subtest: compatible NO ACTION auth dependents survive replacing their parent
+ok 153 - compatible NO ACTION auth dependents survive replacing their parent
+  ---
+  duration_ms: 6855.340014
+  type: 'test'
+  ...
+# Subtest: large Unicode values survive durable segment boundaries and a full round trip
+ok 154 - large Unicode values survive durable segment boundaries and a full round trip
+  ---
+  duration_ms: 31447.319463
+  type: 'test'
+  ...
+# Subtest: default exclusions cover SQLite identifier case variants
+ok 155 - default exclusions cover SQLite identifier case variants
+  ---
+  duration_ms: 2727.421194
+  type: 'test'
+  ...
+# Subtest: foreign keys into excluded parents are refused through SQLite case aliases
+ok 156 - foreign keys into excluded parents are refused through SQLite case aliases
+  ---
+  duration_ms: 939.37624
+  type: 'test'
+  ...
+# (node:12520) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: trigger-only migrations admit archives that predate them and restore every row exactly
+ok 157 - trigger-only migrations admit archives that predate them and restore every row exactly
+  ---
+  duration_ms: 2520.164882
+  type: 'test'
+  ...
+# Subtest: later migrations that rewrite archived rows, directly, through a trigger or past an unbounded trigger, stay refused
+ok 158 - later migrations that rewrite archived rows, directly, through a trigger or past an unbounded trigger, stay refused
+  ---
+  duration_ms: 1250.750104
+  type: 'test'
+  ...
+# Subtest: an archive predating a guard and a view restores past triggers holding CASE ... END; archived rewrites and unreadable chunks stay refused
+    # Subtest: a row-less target may read carried rows
+    ok 1 - a row-less target may read carried rows
+      ---
+      duration_ms: 214.48295
+      type: 'test'
+      ...
+    # Subtest: a replay resolves every view dependency
+    ok 2 - a replay resolves every view dependency
+      ---
+      duration_ms: 352.357006
+      type: 'test'
+      ...
+    1..2
+ok 159 - an archive predating a guard and a view restores past triggers holding CASE ... END; archived rewrites and unreadable chunks stay refused
+  ---
+  duration_ms: 2506.992012
+  type: 'test'
+  ...
+# Subtest: a five-statement CHECK widening rebuild preserves the destination definition and every archived rowid
+ok 160 - a five-statement CHECK widening rebuild preserves the destination definition and every archived rowid
+  ---
+  duration_ms: 2997.91614
+  type: 'test'
+  ...
+# Subtest: 98-column D1 tables export, restore and export within D1 limits
+ok 161 - 98-column D1 tables export, restore and export within D1 limits
+  ---
+  duration_ms: 5691.000114
+  type: 'test'
+  ...
+# Subtest: 99-column D1 tables export, restore and export within D1 limits
+ok 162 - 99-column D1 tables export, restore and export within D1 limits
+  ---
+  duration_ms: 5597.565474
+  type: 'test'
+  ...
+# Subtest: 100-column D1 tables export, restore and export within D1 limits
+ok 163 - 100-column D1 tables export, restore and export within D1 limits
+  ---
+  duration_ms: 5217.963494
+  type: 'test'
+  ...
+# Subtest: a 100-column keyless table retains negative rowids and gaps through restore
+ok 164 - a 100-column keyless table retains negative rowids and gaps through restore
+  ---
+  duration_ms: 5046.488432
+  type: 'test'
+  ...
+# Subtest: normalizing every cell of a 100-column table stays within the binding limit
+ok 165 - normalizing every cell of a 100-column table stays within the binding limit
+  ---
+  duration_ms: 5000.397566
+  type: 'test'
+  ...
+# Subtest: wide tables with long column names stay within the D1 SQL statement limit
+ok 166 - wide tables with long column names stay within the D1 SQL statement limit
+  ---
+  duration_ms: 15686.913174
+  type: 'test'
+  ...
+# Long-name export and restore PASS at 334 padding characters
+# Long-name export and restore PASS at 335 padding characters
+# Long-name export and restore PASS at 550 padding characters
+# Subtest: an encoded projection beyond D1 SQL limits refuses export up front by table name
+ok 167 - an encoded projection beyond D1 SQL limits refuses export up front by table name
+  ---
+  duration_ms: 618.957011
+  type: 'test'
+  ...
+# (node:13389) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: declared Worker evidence restores a carried legacy ledger through the shared library validator
+ok 168 - declared Worker evidence restores a carried legacy ledger through the shared library validator
+  ---
+  duration_ms: 26490.203635
+  type: 'test'
+  ...
+# library and built Worker restore the same rows; eleven negative variants preserve hashed and native destination state; native live-history refusals, ledger bytes, authority and current-format control checked; seeded hashes reject edits; absent evidence fails closed
+1..168
+# tests 243
+# suites 0
+# pass 240
+# fail 0
+# cancelled 0
+# skipped 3
+# todo 0
+# duration_ms 744904.993428

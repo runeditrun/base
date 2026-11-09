@@ -1,0 +1,56 @@
+{
+  "direct_calls": [
+    {
+      "ordinal": 1,
+      "kind": "reference",
+      "command": "gh api repos/just-every/run-crank/git/trees/main?recursive=1"
+    },
+    {
+      "ordinal": 2,
+      "kind": "reference",
+      "command": "gh api repos/just-every/run-crank/contents/src/crank/archive-policy.mjs"
+    },
+    {
+      "ordinal": 3,
+      "kind": "reference",
+      "command": "gh api repos/just-every/run-crank/contents/rer-project.json"
+    },
+    {
+      "ordinal": 4,
+      "kind": "reference",
+      "command": "gh api repos/just-every/run-crank/contents/scripts/installer/local.mjs"
+    },
+    {
+      "ordinal": 5,
+      "kind": "dispatch",
+      "command": "gh api --method POST repos/runeditrun/base/actions/workflows/verify.yml/dispatches"
+    },
+    {
+      "ordinal": 6,
+      "kind": "discovery",
+      "command": "gh api repos/runeditrun/base/actions/runs?head_sha=ff4626ffbc43b29846644f955fd3926af93fb571&per_page=100"
+    },
+    {
+      "ordinal": 7,
+      "kind": "status",
+      "command": "gh api repos/runeditrun/base/actions/runs/42552700415"
+    },
+    {
+      "ordinal": 8,
+      "kind": "pull-request",
+      "command": "gh api --method POST repos/runeditrun/base/pulls"
+    },
+    {
+      "ordinal": 9,
+      "kind": "status",
+      "command": "gh api repos/runeditrun/base/actions/runs/42552700415"
+    },
+    {
+      "ordinal": 10,
+      "kind": "status",
+      "command": "gh api repos/runeditrun/base/actions/runs/42552700415"
+    }
+  ],
+  "scanner_note": "The required maintained publication scanner performs its own batched visibility resolution; its complete report is retained separately.",
+  "total_direct_calls": 10
+}

@@ -1,0 +1,64 @@
+{
+  "repository": "runeditrun/base",
+  "head": "ff4626ffbc43b29846644f955fd3926af93fb571",
+  "checks": [
+    {
+      "command": "node --test cli/container-policy.test.mjs",
+      "exit_code": 0,
+      "log": "container-policy.tap",
+      "sha256": "5d43074358f2a8dede3071d7391bac02cba5e7d07b73f2770fb8eb6a10e5ff39",
+      "bytes": 2027,
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0
+    },
+    {
+      "command": "node --test --test-concurrency=2 modules/portability/tests/*.test.mjs modules/container/tests/*.test.mjs",
+      "exit_code": 0,
+      "log": "existing-modules.tap",
+      "sha256": "6bfa08fe626cdafb1878a6bcd7f6f862d94cc8722a7dd33961a3f175c32498e7",
+      "bytes": 63848,
+      "tests": 243,
+      "pass": 240,
+      "fail": 0,
+      "skipped": 3
+    },
+    {
+      "command": "node --test --test-concurrency=2 cli/*portability*.test.mjs",
+      "exit_code": 0,
+      "log": "existing-cli-portability.tap",
+      "sha256": "bc41a01e2e58ebf013bde9530bfdede828fc0413466f09ddab4c7d66260aedeb",
+      "bytes": 14566,
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "skipped": 0
+    },
+    {
+      "command": "pnpm typecheck:modules",
+      "exit_code": 0,
+      "log": "typecheck.txt",
+      "sha256": "6a1f43bf58cc7da51934a16dce7966a07af08121bccd867b0062fb2359cb3bb1",
+      "bytes": 986
+    },
+    {
+      "command": "tsc portability public types (verify:portability command)",
+      "exit_code": 0,
+      "log": "portability-types.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "command": "node --test --test-name-pattern=portable CLI source inventory cli/cli.test.mjs",
+      "exit_code": 0,
+      "log": "cli-copy-check.tap",
+      "sha256": "cd85254cf2daadcc4e62cb610861fa32fd47cfd8829ddb319f3c8182f4b2e01f",
+      "bytes": 376,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0
+    }
+  ]
+}

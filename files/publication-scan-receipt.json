@@ -1,0 +1,25 @@
+{
+  "command": "node scripts/publish-check.mjs --repo /workspace/base --ref ff4626ffbc43b29846644f955fd3926af93fb571 --public-base https://github.com/runeditrun/base#main --project runeditrun/base --repository https://github.com/runeditrun/base --timeout-seconds 1200",
+  "exit_code": 0,
+  "status": "PASS",
+  "complete": true,
+  "findings": 0,
+  "report_sha256": "f71d8570032bb1bc35938b6dab32a448824653d116ff7bd410f8b1976c5f472f",
+  "report_bytes": 1094082,
+  "scanner": {
+    "name": "gitleaks",
+    "version": "8.30.1"
+  },
+  "source": {
+    "commit": "ff4626ffbc43b29846644f955fd3926af93fb571",
+    "tree": "d38a019f0ac7760e1050b60aa6fc30e41f8b4b3b"
+  },
+  "history": {
+    "scope": "selected-and-public-base",
+    "commits": 1529,
+    "trees": 1509,
+    "blobs": 10309,
+    "commitMessages": 1529,
+    "tagMessages": 100
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "repository": "runeditrun/base",
+  "branch": "cloud/gr-base-container-policy-module-1",
+  "head": "ff4626ffbc43b29846644f955fd3926af93fb571",
+  "base_head": "e82790b601c62e077a1a09380fc787531d9cded5",
+  "product_commits": 1,
+  "custody_status": "PUSHED",
+  "pr": "https://github.com/runeditrun/base/pull/840",
+  "verify": {
+    "observed_at": "2026-11-09T03:08:57.599611+00:00",
+    "conclusion": null,
+    "head_sha": "ff4626ffbc43b29846644f955fd3926af93fb571",
+    "html_url": "https://github.com/runeditrun/base/actions/runs/42552700415",
+    "status": "in_progress",
+    "id": 42552700415
+  },
+  "publication_scan": {
+    "command": "node scripts/publish-check.mjs --repo /workspace/base --ref ff4626ffbc43b29846644f955fd3926af93fb571 --public-base https://github.com/runeditrun/base#main --project runeditrun/base --repository https://github.com/runeditrun/base --timeout-seconds 1200",
+    "exit_code": 0,
+    "status": "PASS",
+    "complete": true,
+    "findings": 0,
+    "report_sha256": "f71d8570032bb1bc35938b6dab32a448824653d116ff7bd410f8b1976c5f472f",
+    "report_bytes": 1094082,
+    "scanner": {
+      "name": "gitleaks",
+      "version": "8.30.1"
+    },
+    "source": {
+      "commit": "ff4626ffbc43b29846644f955fd3926af93fb571",
+      "tree": "d38a019f0ac7760e1050b60aa6fc30e41f8b4b3b"
+    },
+    "history": {
+      "scope": "selected-and-public-base",
+      "commits": 1529,
+      "trees": 1509,
+      "blobs": 10309,
+      "commitMessages": 1529,
+      "tagMessages": 100
+    }
+  },
+  "source_clause_judgments_changed": [],
+  "functional_status_change": "container policyModule refusal replaced by isolated seed-policy execution with native-compatible archives",
+  "local_checks_complete": true,
+  "direct_api_calls": 10,
+  "pending": [
+    "Verify completion on the exact published SHA"
+  ],
+  "blockers": [],
+  "written_at": "2026-11-09T03:09:54.650579+00:00"
+}

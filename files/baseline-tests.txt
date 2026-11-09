@@ -1,0 +1,67 @@
+TAP version 13
+# (node:1310) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: public container policy modules round trip and cross restore with native archives
+not ok 1 - public container policy modules round trip and cross restore with native archives
+  ---
+  duration_ms: 13433.183172
+  type: 'test'
+  location: '/workspace/base/cli/container-policy.test.mjs:55:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Fixture command scripts/rer.mjs exited 4: {"version":1,"verb":"export","event":"error","code":"safety_refusal","message":"Local portability policy refused (container_policy_module_unsupported). Executable policies require a seed-owned policyModule with a valid default policy export; policyModule requires native local transport.","exitCode":4}
+    {"version":1,"verb":"export","event":"result","ok":false,"exitCode":4}
+    
+    Checking pinned pnpm
+    10.12.4
+    Local export
+    
+    
+    4 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 4
+  operator: 'strictEqual'
+  stack: |-
+    command (file:///workspace/base/cli/fixtures/portability.mjs:52:10)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Object.run (file:///workspace/base/cli/fixtures/portability.mjs:55:53)
+    async TestContext.<anonymous> (file:///workspace/base/cli/container-policy.test.mjs:63:2)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: public container policy refusals precede migrations and preserve native codes
+not ok 2 - public container policy refusals precede migrations and preserve native codes
+  ---
+  duration_ms: 4908.76126
+  type: 'test'
+  location: '/workspace/base/cli/container-policy.test.mjs:86:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /invalid_policy_module/. Input:
+    
+    'Local portability policy refused (container_policy_module_unsupported). Executable policies require a seed-owned policyModule with a valid default policy export; policyModule requires native local transport.'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: 'Local portability policy refused (container_policy_module_unsupported). Executable policies require a seed-owned policyModule with a valid default policy export; policyModule requires native local transport.'
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/base/cli/container-policy.test.mjs:101:10)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 18448.196976
