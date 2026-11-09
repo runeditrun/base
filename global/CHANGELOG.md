@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Privacy: a Business-sponsored approval held by a seed that ran rer 0.2.95 or earlier carries no `source` on its saved principal, and was executed after its Business stopped. Approval execution now treats a saved principal with no source, a non-embedded door and a consent id as Business-admitted, so it is refused as `sponsor_unavailable` like a tagged one; an untagged principal without a consent id (a local credential) and embedded calls are unchanged. Code only, no migration, no seed change.
+
 ## 0.2.104
 
 ### Business authority and relay privacy

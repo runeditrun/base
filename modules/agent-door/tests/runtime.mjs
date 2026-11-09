@@ -1,5 +1,7 @@
 import { createRequire } from 'node:module';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, webcrypto } from 'node:crypto';
 import { signJws, policyEnvelope, autonomousPolicy, accessToken } from '../conformance/crypto.mjs';
@@ -7,8 +9,11 @@ const require = createRequire(new URL('../../../default-seed/package.json', impo
 const { build } = require('esbuild');
 const { Miniflare, convertV4MiniflareOptions } = require('miniflare');
 const { unstable_splitSqlQuery: split } = require('wrangler');
-const output = await build({ entryPoints: [fileURLToPath(new URL('./seed.ts', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', external: ['node:*'] });
-export async function runtime({ outboundService, paired = true, limits, resourceScope = 'records:read', ring, seed = 'synthetic', toolNames, revisionType, nativeTargets = false, sponsorSurface = false, queueContext = false, aggregateRead = false, mutationReplay = false, nativePeople = false, companyPolicy = false, erasure = false, businessStopped = 'native' } = {}) {
+const bundle = async (plugins = []) => (await build({ entryPoints: [fileURLToPath(new URL('./seed.ts', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', external: ['node:*'], plugins })).outputFiles[0].text;
+const output = { outputFiles: [{ text: await bundle() }] };
+// A frozen release's credentials module, bundled in place of the current one: the pre-0.2.96 door built principals without `source`.
+const frozenCredentials = { name: 'frozen-credentials', setup(b) { b.onLoad({ filter: /\/agent-door\/credentials\.ts$/ }, async args => ({ contents: await readFile(new URL('./fixtures/credentials-0.2.95.ts', import.meta.url), 'utf8'), loader: 'ts', resolveDir: dirname(args.path) })) } };
+export async function runtime({ outboundService, paired = true, limits, resourceScope = 'records:read', ring, seed = 'synthetic', toolNames, revisionType, nativeTargets = false, sponsorSurface = false, queueContext = false, aggregateRead = false, mutationReplay = false, nativePeople = false, companyPolicy = false, erasure = false, businessStopped = 'native', legacyCredentials = false } = {}) {
  const origin = 'https://synthetic-base-1.invalid', issuer = 'https://synthetic-base-2.invalid', installationId = 'synthetic-base-1', kid = 'synthetic-base-1';
  const keys = ring ?? await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign','verify']);
  const publicKey = await webcrypto.subtle.exportKey('jwk', keys.publicKey);
@@ -16,9 +21,11 @@ export async function runtime({ outboundService, paired = true, limits, resource
  const signer = { issuer, installationId, kid, privateKey: keys.privateKey };
  const localToken = randomBytes(32).toString('hex');
  const config = { origin, limits, resourceScope, seed, toolNames, revisionType, nativeTargets, sponsorSurface, queueContext, aggregateRead, mutationReplay, nativePeople, companyPolicy, erasure, businessStopped, OWNER_EMAIL: 'synthetic-base-1@example.com', SETUP_TOKEN: randomBytes(32).toString('hex'), SESSION_SECRET: randomBytes(32).toString('hex'), MAIL_FROM: 'synthetic-base-1@example.com', ipLimit: 1000, emailLimit: 1000 };
- const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, script: output.outputFiles[0].text, compatibilityDate: '2026-09-01', compatibilityFlags: ['nodejs_compat'], ...(outboundService ? {outboundService} : {}), d1Databases: { DB: 'synthetic-base-1' }, bindings: { LOCAL_TOKEN: localToken, CONFIG: JSON.stringify(config), BUSINESS_TRUST: JSON.stringify(businessTrust), TRUST: JSON.stringify(paired ? { issuer, installationId, appOrigin: origin, publicKeys: { [kid]: publicKey } } : null) } }));
+ const storage = legacyCredentials ? await mkdtemp(join(tmpdir(), 'base-legacy-')) : null;
+ const worker = script => convertV4MiniflareOptions({ modules: true, script, ...(storage ? { d1Persist: storage } : {}), compatibilityDate: '2026-09-01', compatibilityFlags: ['nodejs_compat'], ...(outboundService ? {outboundService} : {}), d1Databases: { DB: 'synthetic-base-1' }, bindings: { LOCAL_TOKEN: localToken, CONFIG: JSON.stringify(config), BUSINESS_TRUST: JSON.stringify(businessTrust), TRUST: JSON.stringify(paired ? { issuer, installationId, appOrigin: origin, publicKeys: { [kid]: publicKey } } : null) } });
+ const mf = new Miniflare(worker(legacyCredentials ? await bundle([frozenCredentials]) : output.outputFiles[0].text));
  try {
-  const db = await mf.getD1Database('DB');
+  let db = await mf.getD1Database('DB');
   for (const file of ['../../operator-auth/accounts/schema/operator-auth.sql','../schema/agent-door.sql','../../business-settings/schema/0001_business_settings.sql','../../business-settings/schema/0002_business_people.sql']) for (const sql of split(await readFile(new URL(file, import.meta.url), 'utf8'))) await db.prepare(sql).run();
   for (const sql of ['CREATE TABLE test_company_policy(tool TEXT PRIMARY KEY,answer TEXT)', 'CREATE TABLE test_client_grants(client TEXT PRIMARY KEY,granted INTEGER NOT NULL)', 'CREATE TABLE test_jobs(id TEXT PRIMARY KEY,saved TEXT)', 'CREATE TABLE test_effects(id TEXT PRIMARY KEY,saved TEXT)', 'CREATE TABLE test_grants(agent TEXT PRIMARY KEY,scopes TEXT)', 'CREATE TABLE test_mail(email TEXT,body TEXT)', 'CREATE TABLE test_records(id TEXT PRIMARY KEY,value TEXT,version INTEGER,exposure TEXT)', 'CREATE TABLE test_sent(id TEXT)', 'CREATE TABLE test_revisions(id TEXT PRIMARY KEY,token TEXT)', 'CREATE TABLE test_callbacks(id TEXT PRIMARY KEY,event TEXT)', 'CREATE TABLE test_contexts(kind TEXT,person TEXT,agent TEXT,actor TEXT,approvers TEXT,audit TEXT,consent TEXT)']) await db.prepare(sql).run();
   if (nativePeople) for (const file of ['0015_people.sql', '0019_people_imports.sql']) for (const sql of split(await readFile(new URL('../../../default-seed/migrations/core/' + file, import.meta.url), 'utf8'))) await db.prepare(sql).run();
@@ -60,6 +67,6 @@ export async function runtime({ outboundService, paired = true, limits, resource
   const setBusinessStopped = async mode => { const response = await post('/__business-stop-reader', { mode }, { cookie }); if (response.status !== 200) throw new Error('Stop reader fixture update failed'); await response.body?.cancel(); };
   const setNow = async now => { c.now = now; await post('/__clock', { now }); };
   await setNow(c.now);
-  return { mf, db, c, secret: config.SESSION_SECRET, localToken, fetch, post, mcp, person, adopt, setNow, settings, setBusinessStopped, signIn, tool: (name, args, options) => mcp('tools/call', { name: `synthetic.${name}`, arguments: args }, options), token: overrides => accessToken(c, overrides), sign: (typ, payload, otherKid = kid) => signJws(keys.privateKey, otherKid, typ, payload), close: () => mf.dispose() };
- } catch (error) { await mf.dispose(); throw error; }
+  return { mf, get db() { return db }, c, secret: config.SESSION_SECRET, localToken, fetch, post, mcp, person, adopt, setNow, settings, setBusinessStopped, signIn, tool: (name, args, options) => mcp('tools/call', { name: `synthetic.${name}`, arguments: args }, options), token: overrides => accessToken(c, overrides), sign: (typ, payload, otherKid = kid) => signJws(keys.privateKey, otherKid, typ, payload), upgrade: async () => { await mf.setOptions(worker(output.outputFiles[0].text)); db = await mf.getD1Database('DB'); await setNow(c.now) }, close: async () => { await mf.dispose(); if (storage) await rm(storage, { recursive: true, force: true }) } };
+ } catch (error) { await mf.dispose(); if (storage) await rm(storage, { recursive: true, force: true }); throw error; }
 }
