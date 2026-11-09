@@ -65,7 +65,9 @@ export async function relayDecisions(rt: Runtime, request: Request): Promise<Res
     !Number.isSafeInteger(value.limit) || Number(value.limit) < 1 || Number(value.limit) > 200 ||
     !Number.isSafeInteger(value.iat) || !Number.isSafeInteger(value.exp) || !Number.isFinite(seconds) ||
     Number(value.iat) > seconds + 30 || Number(value.exp) <= seconds || Number(value.exp) <= Number(value.iat) || Number(value.exp) - Number(value.iat) > 60) return error('relay_unauthenticated', 401)
-  if (await rt.options.people.businessStopped?.()) return new Response(null, { status: 404 })
+  let running = false
+  try { running = typeof rt.options.people.businessStopped === 'function' && await rt.options.people.businessStopped() === false } catch { /* An unreadable stop state cannot authorize a pull. */ }
+  if (!running) return new Response(null, { status: 404 })
   // One snapshot and one indexed feed range read, including empty pages and the
   // current pairing. Join only public state from approvals and reviews.
   const records = (await db.prepare(`SELECT context.business,head.head,feed.sequence,a.row,

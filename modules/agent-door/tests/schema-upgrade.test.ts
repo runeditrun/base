@@ -20,6 +20,7 @@ assert.ok(olderSql, 'the tested delta comes directly from the documented SQL blo
 const retiredSql = section.match(/<!-- schema-upgrade:retired-refs:begin -->\n```sql\n([\s\S]*?)\n```\n<!-- schema-upgrade:retired-refs:end -->/)?.[1]
 assert.ok(retiredSql, 'the retirement delta comes directly from the documented SQL block')
 const relaySql = await read('../../../default-seed/migrations/core/0040_agent_door_relay.sql')
+const privacySql = await read('../../../default-seed/migrations/core/0043_agent_door_relay_privacy.sql')
 const apply = async (db: D1Database, sql: string) => {
  if (sql.trim()) for (const statement of split(sql)) await db.prepare(statement).run()
 }
@@ -68,7 +69,7 @@ for (const [start, schema, delta] of [
   const row = section.split('\n').find(line => line.startsWith('| ' + version + ' |'))
   assert.ok(row, 'each starting release has a documented upgrade')
   const expected = delta ? 'The (?:same )?older-schema SQL below, then the relay SQL and retirement SQL below'
-   : start === '0.2.96' ? 'Only the retirement SQL below' : 'The relay SQL and retirement SQL below'
+   : start === '0.2.96' ? 'The retirement SQL below, then the relay privacy SQL below' : 'The relay SQL and retirement SQL below'
   assert.match(row, new RegExp(`\\| ${version.replaceAll('.', '\\.')} \\| ${expected}`), 'the documented row must prescribe every delta actually executed below')
  }
  const before = await inventory(db)
@@ -86,6 +87,7 @@ for (const [start, schema, delta] of [
  await apply(db, delta)
  if (start !== '0.2.96') await apply(db, relaySql)
  await apply(db, retiredSql)
+ await apply(db, privacySql)
  const after = await inventory(db)
  assert.deepEqual(after, await inventory(fresh), 'tables, PRAGMA columns, indexes and trigger definitions must all match')
  assert.equal(after.filter(object => object.type === 'table').length, 11)
@@ -123,6 +125,7 @@ test('0.2.93 plus relay alone returns 500 on tool admission and fails relay.coun
  assert.ok((await conformance()).some((point: { id: string }) => point.id === 'BASE-AGENT-009.relay.count'))
  await apply(r.db, olderSql)
  await apply(r.db, retiredSql)
+ await apply(r.db, privacySql)
  const written = await r.tool('records.write', { id: 'synthetic-upgrade', value: 'synthetic-value', idempotency_key: 'synthetic-upgrade' })
  assert.equal(written.status, 200)
  assert.equal(written.result.isError, false)

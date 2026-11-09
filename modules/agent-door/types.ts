@@ -19,8 +19,9 @@ export interface PeopleAdapter {
   businessMember?(person: Person): Promise<{ id: string; role: 'owner' | 'editor' | null } | null>
   /** True once Business is stopped or detached. Business tokens, and approver or reviewer refs that name Business people
    * (`person:`, `role:`), then stop applying; `sponsor` refs, seed credentials and native sessions do not. `sponsor()`
-   * must keep resolving subjects, so a signed policy that names Business people can still be adopted. Omitted: never stopped. */
-  businessStopped?(): Promise<boolean>
+   * must keep resolving subjects, so a signed policy that names Business people can still be adopted. Relay reads
+   * require an explicit false; a missing reader, failed read or any other answer refuses the pull. */
+  businessStopped(): Promise<boolean>
 }
 export interface Trust { issuer: string; installationId: string; appOrigin: string; publicKeys: Record<string, JsonWebKey> }
 export interface ClassAndFacts { class: ClassId; facts: ClassFacts }

@@ -30,7 +30,7 @@ export async function relayReader(relay, records) {
  const trust = { issuer: 'https://synthetic-business.invalid', appOrigin: 'https://synthetic-seed.invalid',
   installationId: 'synthetic-installation', publicKeys: { synthetic: await webcrypto.subtle.exportKey('jwk', keys.publicKey) } };
  const now = Date.parse('2026-11-02T00:00:00.000Z');
- const rt = { now: () => now, options: { trust, people: {},
+ const rt = { now: () => now, options: { trust, people: { businessStopped: async () => false },
   db: { prepare: () => ({ bind: (_business, _partition, after, limit) => ({
    all: async () => {
     const page = records.filter(row => row.sequence > after).slice(0, limit);

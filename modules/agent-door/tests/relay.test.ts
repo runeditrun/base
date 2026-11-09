@@ -165,15 +165,22 @@ test('R9 native erasure resends only the erased decision in its closed value-fre
 })
 
 test('R10 unreachable Business never delays calls or grows an outbox; changes retain 30 feed entries', async t => {
- const r=await fixture(t); await r.adopt(heldPolicy()); const reviews=[], durations=[]
+ let outbound=0, reachable=true
+ const r=await fixture(t,{outboundService:async()=>{outbound++; return new Response(null,{status:reachable?200:503})}})
+ await r.adopt(heldPolicy()); const reviews=[], baseline=[], durations=[]
+ for (let i=0;i<30;i++) { const start=performance.now(); await write(r); baseline.push(performance.now()-start) }
+ // Compare the same door and workload with the Business network edge unavailable.
+ reachable=false
  for (let i=0;i<30;i++) { const start=performance.now(), result=await write(r); durations.push(performance.now()-start); reviews.push(result.result._meta['com.runeditrun/review'].id) }
- assert.ok(durations.every(ms=>ms<2000),String(Math.max(...durations)))
+ const bound=Math.max(...baseline)+2000
+ assert.ok(durations.every(ms=>ms<bound),`unreachable max=${Math.max(...durations)}ms; reachable max=${Math.max(...baseline)}ms + 2000ms`)
+ assert.equal(outbound,0,'calls never wait on an outbound Business request')
  const before=(await pull(r)).body
  for (let i=0;i<70;i++) assert.equal((await r.person(`/agents/api/reviews/${reviews[i%30]}/${i%2?'reviewed':'flag'}`,{})).status,200)
- assert.equal(await r.db.prepare('SELECT COUNT(*) AS n FROM agent_door_relay').first('n'),30)
+ assert.equal(await r.db.prepare('SELECT COUNT(*) AS n FROM agent_door_relay').first('n'),60)
  const after=(await pull(r,{after:before.cursor})).body
  assert.equal(after.decisions.length,30); assert.equal(new Set(after.decisions.map((row:any)=>row.id)).size,30)
- t.diagnostic(`R10 unresolvable .invalid Business: 30 calls max=${Math.ceil(Math.max(...durations))}ms; 70 marks; feed=30; resent=30 unique`)
+ t.diagnostic(`R10 reachable baseline max=${Math.ceil(Math.max(...baseline))}ms; unreachable Business: 30 calls max=${Math.ceil(Math.max(...durations))}ms; 70 marks; feed=60 (30 baseline + 30 unreachable), no outbox growth; resent=30 unique`)
 })
 
 test('R11 byte and count bounds hold across chained pages at 200 and 7', async t => {

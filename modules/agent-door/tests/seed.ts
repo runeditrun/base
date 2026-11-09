@@ -105,6 +105,10 @@ export default {
       return Response.json({ ok: true })
     }
     if (config.sponsorSurface) tools.push(...sponsorTools(env.DB, auth))
+    const people = operatorAuthPeople({ db: env.DB, allowList, session: request => auth.getSession(request) })
+    if (config.businessStopped === 'missing') Reflect.deleteProperty(people, 'businessStopped')
+    if (config.businessStopped === 'undefined') Reflect.set(people, 'businessStopped', async () => undefined)
+    if (config.businessStopped === 'nonboolean') Reflect.set(people, 'businessStopped', async () => 0)
     const door = createAgentDoor({ seed: config.seed, name: 'Synthetic Base', specialist: 'operations', origin: config.origin, db: env.DB, trust: JSON.parse(env.TRUST), now,
       companyPolicy: config.companyPolicy ? { async decide(input, ctx) {
         if (!Object.isFrozen(input) || !Object.isFrozen(input.args) || !Object.isFrozen(input.classes[0].facts) || !Object.isFrozen(input.policy) || !Object.isFrozen(ctx) || !Object.isFrozen(ctx.person) || !Object.isFrozen(ctx.scopes) || 'emit' in ctx || 'approvers' in ctx || 'idempotency_key' in input.args || !ctx.person.active) throw new Error('invalid native policy context')
@@ -116,7 +120,7 @@ export default {
         return typeof args.id === 'string' && !!await env.DB.prepare("SELECT 1 FROM rer_erasure_operations WHERE entity='record' AND phase='deleting' AND json_extract(subject,'$.id')=?").bind(args.id).first()
       } } : undefined,
       currentScopes: async principal => { const grant = await env.DB.prepare('SELECT scopes FROM test_grants WHERE agent=?').bind(principal.agent.id).first<{ scopes: string }>(); return grant ? JSON.parse(grant.scopes) : principal.scopes },
-      tools: config.nativePeople ? tools.filter(tool => tool.name === 'base.people.create') : config.toolNames ? config.toolNames.map((name: string) => ({ ...tools[0], name })) : tools, limits: config.limits, people: operatorAuthPeople({ db: env.DB, allowList, session: request => auth.getSession(request) }),
+      tools: config.nativePeople ? tools.filter(tool => tool.name === 'base.people.create') : config.toolNames ? config.toolNames.map((name: string) => ({ ...tools[0], name })) : tools, limits: config.limits, people,
       localCredentials: async request => request.headers.get('authorization') === `Bearer ${env.LOCAL_TOKEN}` ? { sponsor: { id: (await env.DB.prepare('SELECT claim_id FROM oa_bootstrap WHERE singleton=1').first<{claim_id:string}>())!.claim_id }, agent: { id: 'synthetic-base-local', name: 'Synthetic Local' }, scopes: ['records:read','records:write','events:read'] } : null,
       resources: config.nativePeople ? [personResource] : [{ uriTemplate: 'synthetic://record/{id}', name: 'Record', scope: config.resourceScope, classes: ['sensitive'], classify: () => [{ class: 'sensitive', facts: { measure: 1, kind: 'tax' } }], read: async (uri, ctx) => { await env.DB.prepare("INSERT INTO test_contexts(kind) VALUES('read')").run(); const row = await read(uri.split('/').pop()!); return row && row.exposure !== 'hidden' && (!row.exposure.startsWith('service:') || ctx.scopes.includes(row.exposure) && ctx.clientId === row.exposure) ? { json: row, untrusted: true } : null } }],
       onEvent: async event => { await env.DB.prepare('INSERT INTO test_callbacks(id,event) VALUES(?,?)').bind(event.id, JSON.stringify(event)).run() },

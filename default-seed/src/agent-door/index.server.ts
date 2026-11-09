@@ -23,6 +23,7 @@ export function baseAgentDoor(bindings: Bindings) {
       }
       return false
     } },
+    // The shared adapter proves relay availability from durable bs_settings.stopped.
     people: operatorAuthPeople({ db: bindings.DB, allowList: authConfig(bindings).allowList, session: request => operatorAuth(bindings).getSession(request) }),
     tools: [...peopleTools(bindings), ...accessTools(bindings)], resources: [personResource, operatorResource(bindings)],
     notTools: [

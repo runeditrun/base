@@ -196,9 +196,16 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   // Handles taken before it (preparation, history) end; take any later ones from the hosted object again.
   rebind: async names => {
    const app = options.workers.find(worker => worker.name === 'app');
+   const removed = Object.fromEntries(names.filter(name => Object.hasOwn(app.bindings, name)).map(name => [name, app.bindings[name]]));
    for (const name of names) delete app.bindings[name];
    await mf.setOptions(convertV4MiniflareOptions(options));
    loopback = await mf.ready;
+   // A disposable conformance host can re-pair after proving unpaired behavior.
+   return async () => {
+    Object.assign(app.bindings, removed);
+    await mf.setOptions(convertV4MiniflareOptions(options));
+    loopback = await mf.ready;
+   };
   },
   close: () => { release(); return mf.dispose(); },
   fetch: (path, { headers, origin = HOSTED_ORIGIN, ...init } = {}) => {
