@@ -12,6 +12,8 @@
 
 - `rer export --platform container` and `rer import --platform container` now honour a seed-owned `policyModule`, including executable redaction and restore validation. The module and its imports are compiled without evaluating policy code in the CLI, then run in the isolated transfer process with real D1 and bucket adapters. Archives carry no executable policy or policy entry point. After upgrading rer, rebuild any container image built by an earlier rer with `rer build --platform container` before using container export or import with a `policyModule`.
 
+- Container installation export and import now honour seed-owned `policyModule` policies, including executable redaction and restore validation, in the isolated transfer process.
+
 ## 0.2.103
 
 ### Fixes
