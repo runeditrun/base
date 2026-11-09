@@ -1,8 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.2.105
 
-- Privacy: a Business-sponsored approval held by a seed that ran rer 0.2.95 or earlier carries no `source` on its saved principal, and was executed after its Business stopped. Approval execution now treats a saved principal with no source, a non-embedded door and a consent id as Business-admitted, so it is refused as `sponsor_unavailable` like a tagged one; an untagged principal without a consent id (a local credential) and embedded calls are unchanged. Code only, no migration, no seed change.
+### Business authority and relay privacy
+
+- A Business-sponsored approval saved by an agent door older than rer 0.2.96 (its persisted principal has no `source`) no longer executes after its Business stops. Approval execution now treats a saved principal with no `source`, a non-embedded door and a consent id as Business-admitted, so it is refused as `sponsor_unavailable` once the Business stops or its stop state is unreadable, like an approval saved with a `source`. Local approvals (no `consent`) and embedded approvals are unchanged.
+- Code only: no migration is added, and the 0.2.104 migration `0043` is unchanged. Seeds adopting 0.2.105 get this refusal without tagging their saved approval rows.
 
 ## 0.2.104
 
