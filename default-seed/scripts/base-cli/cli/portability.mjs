@@ -48,14 +48,13 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
   try {
    if (policyModule !== undefined) {
     if (policy !== undefined) throw new PortabilityError('ambiguous_policy', 409);
-    if (platform === 'container') throw new PortabilityError('container_policy_module_unsupported', 409);
     declaration = { policyModule: await policyModuleURL(root, policyModule) };
    } else declaration = { policy: serializablePolicy(policy) };
   } catch (error) {
    if (!(error instanceof PortabilityError)) throw error;
-   throw refuse(`Local portability policy refused (${error.code}). Executable policies require a seed-owned policyModule with a valid default policy export; policyModule requires native local transport.`);
+   throw refuse(`Local portability policy refused (${error.code}). Executable policies require a seed-owned policyModule with a valid default policy export.`);
   }
-  if(platform==='container') return (await import('./container-transfer.mjs')).containerTransfer({root,path,journal,store,signal,direction,binding,buckets,policy:declaration.policy,transient,acknowledgeUnverifiedSchemaObjects});
+  if(platform==='container') return (await import('./container-transfer.mjs')).containerTransfer({root,path,journal,store,signal,direction,binding,buckets,...declaration,transient,acknowledgeUnverifiedSchemaObjects});
   const input={ root, path, journal, binding, buckets, ...declaration, transient, legacyRecovery, acknowledgeUnverifiedSchemaObjects, platformMigrations };
   // Check the executable policy before migrations; the transfer worker imports
   // it again in its own process so module closures are retained during restore.

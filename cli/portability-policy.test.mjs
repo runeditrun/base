@@ -75,8 +75,9 @@ export default { ...portabilityPolicy, validateStaged: async ({ read }) =>
   assert.match((await target.run(input, 4)).find(event => event.event === 'error').message, /invalid_policy_module/);
   await noData();
  }
+ await declare("policyModule: '../outside.mjs'");
+ assert.match((await target.run([...input, '--platform', 'container'], 4)).find(event => event.event === 'error').message, /invalid_policy_module/);
  await declare("policyModule: 'scripts/installer/archive-policy.mjs'");
- assert.match((await target.run([...input, '--platform', 'container'], 4)).find(event => event.event === 'error').message, /container_policy_module_unsupported/);
  await noData();
 
  const records = (await readFile(join(source.root, 'exports/source.rer'), 'utf8')).trim().split('\n').map(JSON.parse);

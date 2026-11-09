@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Container installation export and import now honour seed-owned `policyModule` policies, including executable redaction and restore validation, in the isolated transfer process.
+
 ## 0.2.103
 
 ### Fixes
