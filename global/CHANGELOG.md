@@ -1,12 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.2.104
 
-- Container installation export and import now honour seed-owned `policyModule` policies, including executable redaction and restore validation, in the isolated transfer process. After upgrading rer, rebuild a container image built by an earlier rer with `rer build --platform container` before using `rer export --platform container` with a `policyModule`.
-- Privacy: Business tokens, person/role references and held calls now fail closed unless the stop reader positively returns false, sharing the relay check; conformance covers each path after signed detachment.
+### Business authority and relay privacy
 
-- Privacy: the Business decision relay now requires a stop reader and returns empty 404 unless it positively confirms the Business is active, including after signed detachment. Adoption conformance checks the stopped feed.
-- Privacy: approval execution audits inherit their original decision’s Business relay membership, including no membership. A forward migration replaces the old triggers and removes provable cross-Business execution memberships while preserving audits.
+- Business token admission, `person:`/`role:` approver and reviewer references, held Business calls and signed decision-relay pulls now share one fail-closed stop check. They require `people.businessStopped()` to positively return `false`; a missing or non-function reader, a thrown or rejected read, or any other answer refuses Business authority. Tokens receive 401, references match nobody, held calls refuse `sponsor_unavailable`, and relay pulls return empty 404. Adoption conformance covers all four paths after signed detachment with the old policy and trust retained.
+- Approval execution audits inherit their original decision's Business relay membership, including no membership, so an old Business's approval cannot enter a newly paired Business's feed. Forward migration `default-seed/migrations/core/0043_agent_door_relay_privacy.sql` replaces the old triggers and removes only provable cross-Business execution memberships while preserving every audit; the current schema in `modules/agent-door/schema/agent-door.sql` includes the corrected triggers.
+- Adopting seeds, including Pencil and HappyToHelp, must copy migration 0043 into their own forward migration sequence and implement `people.businessStopped()` from their durable Business stop state. Without a reader that positively returns `false` while running, every Business token, Business `person:`/`role:` reference, held Business call and relay pull is refused. Base's `operatorAuthPeople` already reads durable `bs_settings.stopped`; custom adapters must supply the equivalent reader. Keep `sponsor()` resolving subjects after a stop so signed policy remains adoptable.
+
+### Container archive policies
+
+- `rer export --platform container` and `rer import --platform container` now honour a seed-owned `policyModule`, including executable redaction and restore validation. The module and its imports are compiled without evaluating policy code in the CLI, then run in the isolated transfer process with real D1 and bucket adapters. Archives carry no executable policy or policy entry point. After upgrading rer, rebuild any container image built by an earlier rer with `rer build --platform container` before using container export or import with a `policyModule`.
 
 ## 0.2.103
 
