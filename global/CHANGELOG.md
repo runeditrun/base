@@ -1,15 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.2.106
 
-### Fixes
+### `rer deploy --dry-run`
 
 - `rer deploy --dry-run` no longer fails after a validated seed hook when the declaration the hook names is a stand-in (for example Lamp's `hosted-check.json`, which has no `version`). rer's own `local-plan` after the hook now runs only when the hook returned a kit `state`; a real deploy and the kit's `ownerPlan` are unchanged.
 - `rer deploy --dry-run` prints one rer completion line, `deploy: local dry run complete; ...`, only after rer's own plan step (or its skip) succeeded, so a hook's own completion line is no longer the last word before a failure. A failure in that step now says `Failed at plan the deploy locally` and, under `--dry-run`, no longer tells you to inspect a deployment record that does not exist.
 - A passing `rer deploy --dry-run` now lists `owner name (--owner-name or rer setup)` under what a real deploy needs, unless a saved answer or a held owner claim exists, because the first real deploy stops without one (exit 3).
+
+### Owner-mode deploys and sign-in
+
 - Retiring the setup token (or any `--unset-secret`/`--set-secret` change) no longer fails and leaves the change pending when Cloudflare's Worker deployments or versions answer is momentarily partial. Owner-mode settling now replays such a read within the same bounded window as account lists; a read that stays partial still fails with `provider-partial-list` and never records the change as settled. This also applies to `rer signin` and to the settle step before a deploy.
-- `rer deploy` with a custom deploy hook now settles a secret change an earlier run left pending, reading the live Worker version back, before it runs the hook, so the hook sees the true deployment record. If the change cannot be settled the deploy fails before the hook runs.
+- `rer deploy` with a custom deploy hook now settles a secret change an earlier run left pending, reading the live Worker version back, before it runs the hook, so the hook sees the true deployment record. This applies when an earlier deploy left a deployment record; a first deploy has nothing to settle. If the change cannot be settled the deploy fails before the hook runs.
 - `rer signin` prints the link at the deployment's recorded origin (a custom domain) instead of always the workers.dev address. The link stays single-use, valid for 15 minutes, and is printed once.
+- Code only: no migration is added. Seeds get these fixes by adopting 0.2.106.
 
 ## 0.2.105
 
