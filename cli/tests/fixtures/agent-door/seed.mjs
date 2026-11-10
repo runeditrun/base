@@ -13,6 +13,7 @@ const productionSchemas = [
  'modules/owner-claim/schema/owner-claim.sql',
  'modules/business-settings/schema/0001_business_settings.sql',
  'modules/business-settings/schema/0002_business_people.sql',
+ 'modules/business-settings/schema/0003_business_retired.sql',
  'modules/agent-door/schema/agent-door.sql',
 ];
 const nativeSchema = `
