@@ -46,7 +46,17 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   if(!closed)log.write(text);
   writeTerminal(text);
  };
- const report=text=>emit(redaction.redact(String(text))+'\n');
+ // A line that lists secret NAMES keeps each name whole: a name is not a secret, even when a value
+ // equals it or one of its parts. The text around the names is redacted exactly as any other line.
+ const redactBesideNames=(text,names)=>{
+  const listed=[...new Set((names??[]).filter(name=>typeof name==='string'&&name))].sort((a,b)=>b.length-a.length);
+  if(!listed.length)return redaction.redact(text);
+  const pattern=new RegExp(`(?<![A-Za-z0-9_])(?:${listed.map(name=>name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')})(?![A-Za-z0-9_])`,'g');
+  let result='',from=0;
+  for(const match of text.matchAll(pattern)){result+=redaction.redact(text.slice(from,match.index))+match[0];from=match.index+match[0].length;}
+  return result+redaction.redact(text.slice(from));
+ };
+ const report=(text,{names}={})=>emit(redactBesideNames(String(text),names)+'\n');
  const failure=(label,detail={},capture)=>{
   const outcome=`exit ${detail.code??'none'}, signal ${detail.signal??'none'}`;
   const status=detail.reason==='cancel'?`cancelled (${outcome})`:detail.reason==='deadline'?`readiness deadline exceeded (${outcome})`:detail.error?`could not start${detail.errorCode?` (${detail.errorCode})`:''} (${outcome})`:outcome;

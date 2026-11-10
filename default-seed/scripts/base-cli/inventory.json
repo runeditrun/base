@@ -65,7 +65,7 @@
     },
     "commands.mjs": {
       "source": "onboarding/commands.mjs",
-      "sha256": "fa27fc8e6feb2ffefefbf23bfd553ae3a675793ed9381531928079273af98bdb"
+      "sha256": "ea0aeae3441e1e3736fe8666faa47200472b376f7e701f894b715bcb8686bcb5"
     },
     "dependency-approval.mjs": {
       "source": "onboarding/dependency-approval.mjs",
@@ -791,7 +791,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "d4eaf50190a3fe63b5c67ee2f35809c2b82cb5528e2dfbcd509c5a91daeadc12"
+      "sha256": "d24ae9237bd9bd9ef934b237ca0f5e72257d2cccfc3f4d2d3224945853ffa63a"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -843,7 +843,7 @@
     },
     "cli/deploy-secrets.mjs": {
       "source": "cli/deploy-secrets.mjs",
-      "sha256": "1b19823ac3db8762eec5f111014569570378e6fe931d86ad73ea0021c2943ab1"
+      "sha256": "1f39cd4bca738025e03e00beeb2909068689caf149362b9718b1f98cd8654b45"
     },
     "cli/deploy-settings.mjs": {
       "source": "cli/deploy-settings.mjs",
@@ -863,7 +863,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "dc5ec1eb32909f8240817253a4eebf0104aee047717ab70558d237c7e700249a"
+      "sha256": "f765c1a683abc48faccc1ea4d4f659df1540a85c26004cced1d47b24610dca6c"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
@@ -1111,11 +1111,11 @@
     },
     "cli/production-auth.mjs": {
       "source": "cli/production-auth.mjs",
-      "sha256": "c07b0c9076e7db97e582ec1198291e9c9aee417d73c7b3fde56051f5603e460c"
+      "sha256": "210e2e29f8a635b67bee982ebd42355cc714a9cc970a240c983629b56a523bfa"
     },
     "cli/production-mail.mjs": {
       "source": "cli/production-mail.mjs",
-      "sha256": "f9941f3a34c97e8afcd1c82b7444d3144febb4328d68b316afa3f61e508d6f63"
+      "sha256": "6dc7abcdd8e9614e3f861d0f04992c907fd510fb481f4d0b36e085c849f91aa2"
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
@@ -2307,11 +2307,11 @@
     },
     "modules/delivery-producer/declarations.mjs": {
       "source": "modules/delivery-producer/declarations.mjs",
-      "sha256": "bf63076ba1c203c948fe57f41f28fe6ad06ec1e057eecf2b55aab5aeee7c5e2c"
+      "sha256": "2d44614db82aa0f7690269ced75c349a2321a4a9505920ea32c6589afe71b1fd"
     },
     "modules/delivery-producer/mail.mjs": {
       "source": "modules/delivery-producer/mail.mjs",
-      "sha256": "fbe18b3678e88db8f98d760d72d39f4a94552c4685e3b8ce27e15d761ed6a981"
+      "sha256": "e308b618ab9b702ad0025ad184e30607c2cb371d2661507468dfc294c797bf2e"
     },
     "modules/delivery-producer/migrations.mjs": {
       "source": "modules/delivery-producer/migrations.mjs",

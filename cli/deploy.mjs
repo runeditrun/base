@@ -97,7 +97,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
      }
      await owner('secret', ['--set', binding, ...(state ? ['--state', state] : [])]);
      await keepSecrets({ root, environment, kept, env, generated: [binding], reused: [], report: () => {} });
-     store.report(`Rotated ${binding} on this environment's Worker to a fresh value kept in .rer/deploy/${environment}.secrets.env, recorded its new version and verified hosted readiness.`);
+     store.report(`Rotated ${binding} on this environment's Worker to a fresh value kept in .rer/deploy/${environment}.secrets.env, recorded its new version and verified hosted readiness.`, { names: [binding] });
     }
     return { rotated, deployed: false };
    }
@@ -105,7 +105,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
     step = 'secrets';
     const bindings = (options.setSecret ?? options.unsetSecret).split(','), flag = options.setSecret ? '--set' : '--unset';
     await owner('secret', [...bindings.flatMap(binding => [flag, binding]), ...(state ? ['--state', state] : [])]);
-    store.report(`${options.setSecret ? 'Set' : 'Removed'} ${bindings.join(', ')} on this environment's Worker as one new version, recorded it and verified hosted readiness.`);
+    store.report(`${options.setSecret ? 'Set' : 'Removed'} ${bindings.join(', ')} on this environment's Worker as one new version, recorded it and verified hosted readiness.`, { names: bindings });
     return { bindings, present: Boolean(options.setSecret), deployed: false };
    }
    store.report(`Deploying the ${environment} environment to your Cloudflare account.`);
@@ -113,10 +113,10 @@ export function ownerDeploy(declarationPath, lifecycle) {
    deployed = await owner('deploy', [], env, { notice: line => store.report(line), onCreated: resource => created.push(redaction.redact(resource)) });
    // A generated value the kit did not send stays unknown: the Worker kept its own.
    const sent = supplied.filter(name => deployed.sentSecrets.includes(name)), keptSent = [...generated, ...reused].filter(name => sent.includes(name));
-   await keepSecrets({ root, environment, kept, env, generated: generated.filter(name => sent.includes(name)), reused: reused.filter(name => sent.includes(name)), report: line => store.report(line) });
+   await keepSecrets({ root, environment, kept, env, generated: generated.filter(name => sent.includes(name)), reused: reused.filter(name => sent.includes(name)), report: (line, more) => store.report(line, more) });
    const other = sent.filter(name => !keptSent.includes(name));
-   if (other.length) store.report(`rer supplied ${other.join(', ')} from the local setup owner and fresh generated values.`);
-   if (deployed.optionalUnset) store.report(`Optional secrets not set: ${deployed.optionalUnset.join(', ')}. The application runs without them; set one later with ${again} --set-secret NAME.`);
+   if (other.length) store.report(`rer supplied ${other.join(', ')} from the local setup owner and fresh generated values.`, { names: other });
+   if (deployed.optionalUnset) store.report(`Optional secrets not set: ${deployed.optionalUnset.join(', ')}. The application runs without them; set one later with ${again} --set-secret NAME.`, { names: deployed.optionalUnset });
    step = 'health';
    await owner('health', [], env, {propagation:deployed.propagation});
    step = 'claim owner';
@@ -132,8 +132,8 @@ export function ownerDeploy(declarationPath, lifecycle) {
    // The app claims the OWNER_EMAIL the Worker holds: the local one only when this run uploaded it.
    const email = declared(claim?.emailField);
    const named = !email ? '' : deployed.sentSecrets.includes(email.binding) && env[email.environment] ? ` (${env[email.environment]})` : ` (the ${email.binding} already set on the Worker)`;
-   if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${named}; the one-time setup token was removed. ${mailOff ? mailOffNotice(mailOff, environment) : `Sign in by email at ${deployed.origin}.`}`);
-   else if (mailOff) store.report(mailOffNotice(mailOff, environment));
+   if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${named}; the one-time setup token was removed. ${mailOff ? mailOffNotice(mailOff, environment, liveSecrets) : `Sign in by email at ${deployed.origin}.`}`, { names: mailOff?.credentialNames });
+   else if (mailOff) store.report(mailOffNotice(mailOff, environment, liveSecrets), { names: mailOff.credentialNames });
    return { deployed: true, origin: deployed.origin, ...(claimed ? { owner: claimed } : {}), dependenciesLinked: true };
   } catch (error) {
    if (error instanceof RerError) throw error;

@@ -86,7 +86,7 @@ export async function deployCommand(context) {
   const plan = result?.plan ?? (!planned ? undefined : (await owner(['local-plan', '--declaration', path, '--environment', options.environment ?? 'production', ...await deployProductArguments(root, deployProductDirectory(declaration))], production.env, { cwd: root, localOnlyKeys })).plan);
   result = { ...result, dryRun: true, deployed: false, providerChecked: false, plan };
   const { signIn, mailOff } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
-  if (mailOff) store.report(mailOffNotice(mailOff, options.environment ?? 'production'));
+  if (mailOff) store.report(mailOffNotice(mailOff, options.environment ?? 'production'), { names: mailOff.credentialNames });
   // The one completion line: rer's own plan step (or its deliberate skip) succeeded. A hook's own line says only that the hook finished.
   store.report('deploy: local dry run complete; no credentials were needed, no Cloudflare requests were made and nothing was changed remotely. Target secrets and remote readiness were not checked.');
   const needed = [...new Set([...neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false }), ...(result.neededForRealDeploy ?? []), ...(extraNeeded ?? [])])];
@@ -124,7 +124,7 @@ export async function deployCommand(context) {
  for (const value of [...kinds.privateValues(env), env.CLOUDFLARE_ACCOUNT_ID, ...(declaration.secrets ?? []).map(item => env[item.environment])].filter(Boolean)) addSecret(value);
  const environment = options.environment ?? 'production';
  // The hook uploads every value it is given: a generated secret it gets is the one the Worker keeps.
- if (!options.dryRun) await keepHookSecrets({ root, environment, declaration, setupManifest, env, generated, reused, rotated, again: deployAgain(options), report: line => store.report(line) });
+ if (!options.dryRun) await keepHookSecrets({ root, environment, declaration, setupManifest, env, generated, reused, rotated, again: deployAgain(options), report: (line, more) => store.report(line, more) });
  // A hook keeping the kit's record in its own state file named it; every kit
  // step after the hook (inspect, secret, record-owner) reads that record.
  let hookRecord = await hookState(root, environment);
@@ -187,7 +187,7 @@ export async function deployCommand(context) {
    const { setupToken: _, ...result } = deployed;
    return { ...result, ...(claimed ? { owner: claimed } : {}), dependenciesLinked: true };
   });
-  if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${recorded ? '; the one-time setup token was removed' : ''}. ${mailOff ? mailOffNotice(mailOff, environment) : `Sign in by email at ${result.origin}.`}`);
+  if (claimed) store.report(`${claimed === 'claimed' ? 'Claimed the hosted owner' : 'The hosted owner was already claimed and was kept'}${recorded ? '; the one-time setup token was removed' : ''}. ${mailOff ? mailOffNotice(mailOff, environment, recorded?.liveSecrets) : `Sign in by email at ${result.origin}.`}`, { names: mailOff?.credentialNames });
   return result;
  } catch (error) {
   if (error instanceof DeployProductError) throw error;

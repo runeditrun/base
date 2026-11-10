@@ -4,9 +4,17 @@ import { hookState } from './deploy-hook-record.mjs';
 import { savedSetupAnswers } from './setup-answers.mjs';
 import { productionMail, mailOffSignInCommand } from './production-mail.mjs';
 
-// What a deploy says when outbound email is deliberately off: the state and the way in.
-export function mailOffNotice({ signIn }, environment = 'production') {
- return `Outbound email is off (MAIL_PROVIDER=none): no mail credential is bound and this installation sends nothing. Sign in without mail with \`${signIn}\` for the ${environment} environment, from this checkout with the Cloudflare credentials that deployed it. Turn mail on later with rer deploy --environment ${environment} --set-secret and the provider inputs.`;
+// What a deploy says when outbound email is deliberately off: the state and the way in. A seed that
+// declares its mail credential secrets (`mail.credentialSecretNames`) gets this line only when it is
+// true: with the Worker's bound secret names in `live`, a bound mail secret is named instead, and
+// without them (a dry run reads no secrets) the line says the bound secrets were not read.
+export function mailOffNotice({ signIn, credentialNames = [] }, environment = 'production', live) {
+ if (credentialNames.length && Array.isArray(live)) {
+  const bound = credentialNames.filter(name => live.includes(name));
+  if (bound.length) return `Outbound email is configured by the secrets bound on this environment's Worker: ${bound.join(', ')} (names only; values are never printed). This deploy's MAIL_PROVIDER=none setting does not remove them; turn mail off with rer deploy --environment ${environment} --unset-secret and these names. Sign in without mail with \`${signIn}\` for the ${environment} environment, from this checkout with the Cloudflare credentials that deployed it.`;
+ }
+ const unread = credentialNames.length && !Array.isArray(live) ? ` The bound secrets were not read: if one of ${credentialNames.join(', ')} is bound on the Worker, outbound email is configured by it.` : '';
+ return `Outbound email is off (MAIL_PROVIDER=none): no mail credential is bound and this installation sends nothing. Sign in without mail with \`${signIn}\` for the ${environment} environment, from this checkout with the Cloudflare credentials that deployed it. Turn mail on later with rer deploy --environment ${environment} --set-secret and the provider inputs.${unread}`;
 }
 
 // Validate the shared email/identity contract using the bindings that will reach
@@ -23,7 +31,7 @@ export async function requireProductionAuth({ root, declaration, env, setupManif
  const mailOffSignIn = mail.off ? declaredSignIn : undefined;
  if (mailOffSignIn) {
   if (mail.offConflicts.length) throw refuse(`MAIL_PROVIDER=none turns outbound email off, and ${mail.offConflicts.join(', ')} would bind a way to send. Remove ${mail.offConflicts.length > 1 ? 'them' : 'it'} or choose a mail provider. Nothing was built or uploaded.`);
-  return { mailOff: { signIn: mailOffSignIn } };
+  return { mailOff: { signIn: mailOffSignIn, credentialNames: mail.credentialNames } };
  }
  if (mail.senderIssue && options.verb === 'deploy' && !(options.dryRun && mail.fixtureSender)) throw refuse(`${mail.senderIssue} Nothing was built or uploaded.`);
  if (mail.configured()) return;
