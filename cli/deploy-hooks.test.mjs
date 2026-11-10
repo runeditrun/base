@@ -11,7 +11,8 @@ import { runCommand } from './lifecycle.mjs';
 import { ownerProvider } from '../modules/deploy-kit/tests/owner-provider.mjs';
 import { main as ownerKit } from '../modules/deploy-kit/owner-cli.mjs';
 import { cloudflare } from '../modules/deploy-kit/provider.mjs';
-import { ownerTarget, ownerPlan, ownerDeploy } from '../modules/deploy-kit/owner.mjs';
+import { ownerTarget, ownerPlan, ownerDeploy, readOwnerState, writeOwnerState, sameDeployment } from '../modules/deploy-kit/owner.mjs';
+import { activeWorker } from '../modules/deploy-kit/worker.mjs';
 import { packageBuild } from '../modules/deploy-kit/prepare.mjs';
 import { owner } from '../onboarding/adapter-auth.mjs';
 import { finalizingDeploy } from './fixtures/finalizing-deploy.mjs';
@@ -377,6 +378,49 @@ test('custom deploy retries a queue create only when its connection failed befor
    assert.equal(f.provider.state.queues.length,0);
   }
  });
+});
+
+test('retiring the setup token survives two partial deployments reads and leaves no pending change', async t => {
+ const f = await fixture(t, { declared: true });
+ const inner = globalThis.fetch;
+ let retired = false, partial = 2;
+ t.mock.method(globalThis, 'fetch', async (input, init = {}) => {
+  const url = new URL(input), method = init.method ?? 'GET';
+  if (method === 'DELETE' && /\/secrets\/SETUP_TOKEN$/.test(url.pathname)) retired = true;
+  const response = await inner(input, init);
+  if (!retired || method !== 'GET' || !url.pathname.endsWith('/deployments') || partial <= 0) return response;
+  partial--;
+  const body = await response.json();
+  return Response.json({ ...body, result_info: { page: 1, per_page: 100, count: body.result.deployments.length + 1 } });
+ });
+ assert.equal((await f.run()).owner, 'claimed');
+ assert.equal(partial, 0, 'both partial answers were served and replayed');
+ assert.ok(!f.provider.state.secrets.some(item => item.name === 'SETUP_TOKEN'));
+ const saved = JSON.parse(await readFile(join(f.root, '.rer/deploy/production.json'), 'utf8'));
+ assert.equal(saved.pendingSecret, undefined);
+ assert.ok(saved.retiredSecrets.includes('SETUP_TOKEN'));
+});
+
+test('a deploy settles an interrupted secret change before its hook reads the record', async t => {
+ const f = await fixture(t, { declared: true, returnState: true });
+ await f.run();
+ const statePath = join(f.root, '.rer/deploy/production.json');
+ const api = cloudflare({ accountId: f.provider.accountId, token: f.provider.token, fetch: f.provider.fetch });
+ const target = await ownerTarget(api, { project: 'tests/fixture', environment: 'production' });
+ // The provider applied a secret change that rer never saw settle: the live version is the record's immediate successor.
+ const record = await readOwnerState(statePath, target);
+ const names = f.provider.state.secrets.map(item => item.name).filter(name => name !== 'MAIL_API_KEY').sort();
+ await api.request(`/workers/scripts/${target.worker}/secrets`, { method: 'PUT', body: { name: 'MAIL_API_KEY', text: 'rotated-mail-value', type: 'secret_text' } });
+ await writeOwnerState(statePath, { ...record, pendingSecret: { bindings: ['MAIL_API_KEY'], present: true, versionId: record.receipt.provider.versionId, names } });
+ const inner = f.adapter.deploy;
+ let hookSaw;
+ f.adapter.deploy = async context => {
+  const seen = JSON.parse(await readFile(statePath, 'utf8')), live = await activeWorker(api, target.worker);
+  hookSaw = { pending: seen.pendingSecret, current: sameDeployment(live, seen.receipt.provider) };
+  return inner(context);
+ };
+ await f.run();
+ assert.deepEqual(hookSaw, { pending: undefined, current: true }, 'the hook sees the settled record');
 });
 
 test('missing or ambiguous ownership records refuse success, and denied bootstrap is never retried', async t => {

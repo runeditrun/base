@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Retiring the setup token (or any `--unset-secret`/`--set-secret` change) no longer fails and leaves the change pending when Cloudflare's Worker deployments or versions answer is momentarily partial. Owner-mode settling now replays such a read within the same bounded window as account lists; a read that stays partial still fails with `provider-partial-list` and never records the change as settled. This also applies to `rer signin` and to the settle step before a deploy.
+- `rer deploy` with a custom deploy hook now settles a secret change an earlier run left pending, reading the live Worker version back, before it runs the hook, so the hook sees the true deployment record. If the change cannot be settled the deploy fails before the hook runs.
+- `rer signin` prints the link at the deployment's recorded origin (a custom domain) instead of always the workers.dev address. The link stays single-use, valid for 15 minutes, and is printed once.
+
 ## 0.2.105
 
 ### Business authority and relay privacy

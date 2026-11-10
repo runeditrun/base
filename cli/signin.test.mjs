@@ -160,3 +160,13 @@ test('rer signin directs native-auth owners to their declared page or setup reco
   t.diagnostic(failure.message);
  }
 });
+
+test('rer signin prints the link at the recorded custom-domain origin, not workers.dev', async t => {
+ const h = await hosted(t);
+ const statePath = join(h.root, '.rer/deploy/production.json'), saved = JSON.parse(await readFile(statePath, 'utf8'));
+ saved.receipt.origin = 'https://app.customer.example';
+ await writeFile(statePath, JSON.stringify(saved));
+ const lines = (await h.signin()).lines.join('\n');
+ assert.match(lines, /https:\/\/app\.customer\.example\/auth\/owner-signin\?token=/);
+ assert.doesNotMatch(lines, /workers\.dev/);
+});
