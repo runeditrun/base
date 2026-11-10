@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `rer deploy --dry-run` no longer plans a deploy declaration after a seed hook that returned no kit `state` when that declaration is not a kit declaration (no `version: 1`), such as the hosted-check stand-in Lamp names as its `deployDeclaration`: the hook has validated its own plan, and a real deploy never plans against that file, so the dry run no longer fails with `invalid-owner-declaration` after the hook passed. A kit declaration is still planned, and real deploys are unchanged.
+- `rer deploy --dry-run` prints one `deploy: rer dry run complete` line, only after rer's own plan step (or its skip above) succeeded. A failure in that plan step now reads `Failed at plan the dry run`, and a dry run failure no longer says to inspect a deployment record, which a dry run never makes. A seed hook's own completion line is the seed's to word.
+- The `Needed for a real deploy` list of a passing dry run now includes `owner name (--owner-name or rer setup)` when the installer asks for an owner name and no saved answer or held claim supplies one, so the warning no longer ends at the first real deploy stopping with exit 3. It is absent after `--owner-name`.
+
 ## 0.2.105
 
 ### Business authority and relay privacy

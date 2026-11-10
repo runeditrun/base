@@ -81,15 +81,20 @@ export async function deployCommand(context) {
  deployGuide(declaration);
  const settings = adapter.hooks?.secrets ?? adapter.settings;
  // Required secrets have been checked; retain the production sign-in guidance.
- const dryRun = async result => {
+ // `own` is set when rer itself ran, or deliberately skipped, the plan after the hook:
+ // a hook that planned by itself already reported its own completion.
+ const dryRun = async (result, own) => {
   const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
-  const plan = result?.plan ?? (await owner(['local-plan', '--declaration', path, '--environment', options.environment ?? 'production', ...await deployProductArguments(root, deployProductDirectory(declaration))], production.env, { cwd: root, localOnlyKeys })).plan;
-  result = { ...result, dryRun: true, deployed: false, providerChecked: false, plan };
+  const plan = result?.plan ?? (own ? undefined : (await owner(['local-plan', '--declaration', path, '--environment', options.environment ?? 'production', ...await deployProductArguments(root, deployProductDirectory(declaration))], production.env, { cwd: root, localOnlyKeys })).plan);
+  result = { ...result, dryRun: true, deployed: false, providerChecked: false, ...(plan ? { plan } : {}) };
   const { signIn, mailOff } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
   if (mailOff) store.report(mailOffNotice(mailOff, options.environment ?? 'production'));
   const needed = [...new Set([...neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false }), ...(result.neededForRealDeploy ?? [])])];
   reportNeeded(store, needed);
   if (declaration.secrets?.some(item => item.binding === 'INSTALLATION_KEY')) store.report('deploy: INSTALLATION_KEY is a private generated binding; INSTALLATION_KEY_PREVIOUS is optional and managed only during rotation or an explicit retired-key reopen. Values are withheld.');
+  if (own) store.report(plan
+   ? 'deploy: rer dry run complete; the deploy declaration plans, no deployment occurred and no provider request was made. Target secrets and remote readiness were not checked.'
+   : 'deploy: rer dry run complete; the hook validated its own plan and rer did not plan its declaration. No deployment occurred and no provider request was made.');
   return needed.length && result && typeof result === 'object' ? { ...result, neededForRealDeploy: needed } : result;
  };
  const runHook = hookContext => options.dryRun ? withLocalDeployPlan(async () => {
@@ -154,8 +159,11 @@ export async function deployCommand(context) {
    await deployProductArguments(root, productDirectory);
    await refuseLocalEnvOutput(root, adapter.devIdentity?.output, { uploaded: !options.dryRun });
    if (options.dryRun) {
-    const { plan } = await command('local-plan');
-    return dryRun({ ...deployed, plan });
+    // A hook that returned no kit state validated its own plan; its declaration
+    // may be a stand-in no real deploy plans against. A kit declaration is planned.
+    step = 'plan the dry run';
+    const plan = deployed?.state || declaration.version === 1 ? (await command('local-plan')).plan : undefined;
+    return dryRun({ ...deployed, ...(plan ? { plan } : {}), neededForRealDeploy: [...(deployed?.neededForRealDeploy ?? []), ...(ownerInput.neededForRealDeploy ?? [])] }, true);
    }
    await rememberHookState(root, environment, deployed?.state);
    hookRecord = await hookState(root, environment);
@@ -193,7 +201,7 @@ export async function deployCommand(context) {
   if (error.hookFailure) throw commandFailure(store.redact?.(redaction.redact(error.message)) ?? redaction.redact(error.message));
   if (error instanceof RerError && !deployed?.deployed && !recorded) { error.message = store.redact?.(redaction.redact(error.message)) ?? redaction.redact(error.message); throw error; }
   const outcome = error.owner ?? claimed ?? observedClaims.at(-1)?.outcome;
-  const state = deployed?.deployed || recorded ? `The application is deployed at ${deployed?.origin ?? recorded.origin}; ${outcome ? `owner ${outcome}` : 'owner claim is not confirmed'}${recorded ? '; setup token retirement is not confirmed' : ''}.` : 'The custom deploy did not finish; inspect its deployment record before recovery.';
+  const state = deployed?.deployed || recorded ? `The application is deployed at ${deployed?.origin ?? recorded.origin}; ${outcome ? `owner ${outcome}` : 'owner claim is not confirmed'}${recorded ? '; setup token retirement is not confirmed' : ''}.` : options.dryRun ? '' : 'The custom deploy did not finish; inspect its deployment record before recovery.';
   const redact = value => store.redact?.(redaction.redact(value)) ?? redaction.redact(value);
   const setup = hostedSetupFailure(error, { origin: deployed?.origin ?? recorded?.origin, again });
   if (setup) throw commandFailure(redact(setup));
@@ -203,6 +211,6 @@ export async function deployCommand(context) {
   const exchange = error.ownerExchange ?? (error.message === 'owner-claim-failed' ? observedClaims.lastExchange ?? observedClaims.at(-1) : undefined);
   const ownerCause = ownerExchangeFailure(exchange);
   const d1Import = deployDiagnostic(error,redact)?.d1Import;
-  throw commandFailure(redact(`${state} Failed at ${step}: ${error.message}${refused ? ` (${refused})` : ''}${ownerCause ? ` (${ownerCause})` : ''}${error.cause ? ` (${error.cause})` : ''}.${migration ? ` ${migration}` : ''} Fix the cause and run ${again} again using the same environment credentials. ${outcome && recorded ? `To retire the token without rebuilding: ${again} --unset-secret ${setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField ?? 'SETUP_TOKEN'}.` : ''}`), d1Import ? {d1Import} : {});
+  throw commandFailure(redact(`${state ? `${state} ` : ''}Failed at ${step}: ${error.message}${refused ? ` (${refused})` : ''}${ownerCause ? ` (${ownerCause})` : ''}${error.cause ? ` (${error.cause})` : ''}.${migration ? ` ${migration}` : ''} Fix the cause and run ${again} again using the same environment credentials. ${outcome && recorded ? `To retire the token without rebuilding: ${again} --unset-secret ${setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField ?? 'SETUP_TOKEN'}.` : ''}`), d1Import ? {d1Import} : {});
  }
 }
