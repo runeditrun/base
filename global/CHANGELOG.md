@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `rer deploy --dry-run` no longer fails after a validated seed hook when the declaration the hook names is a stand-in (for example Lamp's `hosted-check.json`, which has no `version`). rer's own `local-plan` after the hook now runs only when the hook returned a kit `state`; a real deploy and the kit's `ownerPlan` are unchanged.
+- `rer deploy --dry-run` prints one rer completion line, `deploy: local dry run complete; ...`, only after rer's own plan step (or its skip) succeeded, so a hook's own completion line is no longer the last word before a failure. A failure in that step now says `Failed at plan the deploy locally` and, under `--dry-run`, no longer tells you to inspect a deployment record that does not exist.
+- A passing `rer deploy --dry-run` now lists `owner name (--owner-name or rer setup)` under what a real deploy needs, unless a saved answer or a held owner claim exists, because the first real deploy stops without one (exit 3).
+
 ## 0.2.105
 
 ### Business authority and relay privacy

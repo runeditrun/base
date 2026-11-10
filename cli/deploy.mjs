@@ -70,7 +70,6 @@ export function ownerDeploy(declarationPath, lifecycle) {
    if (options.dryRun) {
     const {plan} = await owner('local-plan');
     store.report(`Would deploy: ${JSON.stringify(plan)}`);
-    store.report('deploy: local dry run complete; no credentials were needed, no Cloudflare requests were made and nothing was changed remotely. Target secrets and remote readiness were not checked.');
     return { dryRun: true, deployed: false, providerChecked: false, plan };
    }
    // A custom hook's own state file, when its deploy named one.

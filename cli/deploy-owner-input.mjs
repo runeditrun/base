@@ -22,11 +22,11 @@ export async function deployOwnerInput({ root, adapter, setupSeed, options, sign
  }
  const advice = 'Deploy needs your owner name; run rer deploy --owner-name "Your name" (or rer setup --owner-name "Your name"). Nothing was uploaded.';
  if (!displayName?.trim()) {
-  // A local plan never bootstraps an owner or asks for their name.
-  if (options.dryRun) return { input };
   // A recorded bootstrap keeps its owner; resolving inputs needs no provider read.
   const held = (await heldDeployments(root)).find(item => item.environment === (options.environment ?? 'production'));
   if (['claimed', 'kept'].includes(held?.record.ownerClaim?.outcome)) return { input };
+  // A local plan never bootstraps an owner or asks for their name, but the first real deploy stops without one.
+  if (options.dryRun) return { input, neededForRealDeploy: ['owner name (--owner-name or rer setup)'] };
   if (options.nonInteractive || options.json || !process.stdin.isTTY) throw missing(advice);
   const prompt = createInterface({ input: process.stdin, output: process.stderr });
   const closed = new Promise((_, reject) => prompt.once('close', () => reject(missing(advice))));

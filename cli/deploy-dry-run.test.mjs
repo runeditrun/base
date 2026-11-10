@@ -41,7 +41,9 @@ export const commandAdapter = {...lifecycle,deploy:${hook === 'none' ? "ownerDep
   if (hook !== 'none') assert.deepEqual(JSON.parse(await readFile(join(root, 'offline-hook.json'), 'utf8')), { dryRun: true }, `${hook} seed hook is reached`);
   else await assert.rejects(access(join(root, 'offline-hook.json')), { code: 'ENOENT' });
   assert.deepEqual([receipt.ok, receipt.dryRun, receipt.deployed, receipt.providerChecked], [true, true, false, false], `${hook} receipt`);
-  assert.equal(receipt.plan.worker, 'fixture-production', `${hook} keeps the local plan`);
+  // A hook that returned no kit state validated its own plan: rer does not plan against the declaration it names.
+  if (hook === 'legacy') assert.equal(receipt.plan, undefined, 'a stateless hook skips rer\'s own plan');
+  else assert.equal(receipt.plan.worker, 'fixture-production', `${hook} keeps the local plan`);
   if (hook === 'missing-owner') assert.match(receipt.neededForRealDeploy.join('\n'), /real OWNER_EMAIL/);
   assert.match(receipt.neededForRealDeploy.join('\n'), /\bEMAIL_API_KEY\b/);
   assert.equal(await readFile(requests, 'utf8'), '', `${hook} preflight makes no provider request`);

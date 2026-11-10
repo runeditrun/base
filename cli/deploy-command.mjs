@@ -81,13 +81,15 @@ export async function deployCommand(context) {
  deployGuide(declaration);
  const settings = adapter.hooks?.secrets ?? adapter.settings;
  // Required secrets have been checked; retain the production sign-in guidance.
- const dryRun = async result => {
+ const dryRun = async (result, { planned = true, extraNeeded } = {}) => {
   const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
-  const plan = result?.plan ?? (await owner(['local-plan', '--declaration', path, '--environment', options.environment ?? 'production', ...await deployProductArguments(root, deployProductDirectory(declaration))], production.env, { cwd: root, localOnlyKeys })).plan;
+  const plan = result?.plan ?? (!planned ? undefined : (await owner(['local-plan', '--declaration', path, '--environment', options.environment ?? 'production', ...await deployProductArguments(root, deployProductDirectory(declaration))], production.env, { cwd: root, localOnlyKeys })).plan);
   result = { ...result, dryRun: true, deployed: false, providerChecked: false, plan };
   const { signIn, mailOff } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
   if (mailOff) store.report(mailOffNotice(mailOff, options.environment ?? 'production'));
-  const needed = [...new Set([...neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false }), ...(result.neededForRealDeploy ?? [])])];
+  // The one completion line: rer's own plan step (or its deliberate skip) succeeded. A hook's own line says only that the hook finished.
+  store.report('deploy: local dry run complete; no credentials were needed, no Cloudflare requests were made and nothing was changed remotely. Target secrets and remote readiness were not checked.');
+  const needed = [...new Set([...neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false }), ...(result.neededForRealDeploy ?? []), ...(extraNeeded ?? [])])];
   reportNeeded(store, needed);
   if (declaration.secrets?.some(item => item.binding === 'INSTALLATION_KEY')) store.report('deploy: INSTALLATION_KEY is a private generated binding; INSTALLATION_KEY_PREVIOUS is optional and managed only during rotation or an explicit retired-key reopen. Values are withheld.');
   return needed.length && result && typeof result === 'object' ? { ...result, neededForRealDeploy: needed } : result;
@@ -154,8 +156,10 @@ export async function deployCommand(context) {
    await deployProductArguments(root, productDirectory);
    await refuseLocalEnvOutput(root, adapter.devIdentity?.output, { uploaded: !options.dryRun });
    if (options.dryRun) {
-    const { plan } = await command('local-plan');
-    return dryRun({ ...deployed, plan });
+    step = 'plan the deploy locally';
+    // A hook that returned no kit state validated its own plan, and the declaration it names may be a stand-in a real deploy never plans against.
+    const plan = deployed?.state ? (await command('local-plan')).plan : deployed?.plan;
+    return dryRun({ ...deployed, plan }, { planned: false, extraNeeded: ownerInput.neededForRealDeploy });
    }
    await rememberHookState(root, environment, deployed?.state);
    hookRecord = await hookState(root, environment);
@@ -193,7 +197,7 @@ export async function deployCommand(context) {
   if (error.hookFailure) throw commandFailure(store.redact?.(redaction.redact(error.message)) ?? redaction.redact(error.message));
   if (error instanceof RerError && !deployed?.deployed && !recorded) { error.message = store.redact?.(redaction.redact(error.message)) ?? redaction.redact(error.message); throw error; }
   const outcome = error.owner ?? claimed ?? observedClaims.at(-1)?.outcome;
-  const state = deployed?.deployed || recorded ? `The application is deployed at ${deployed?.origin ?? recorded.origin}; ${outcome ? `owner ${outcome}` : 'owner claim is not confirmed'}${recorded ? '; setup token retirement is not confirmed' : ''}.` : 'The custom deploy did not finish; inspect its deployment record before recovery.';
+  const state = deployed?.deployed || recorded ? `The application is deployed at ${deployed?.origin ?? recorded.origin}; ${outcome ? `owner ${outcome}` : 'owner claim is not confirmed'}${recorded ? '; setup token retirement is not confirmed' : ''}.` : options.dryRun ? 'The dry run did not finish; nothing was deployed.' : 'The custom deploy did not finish; inspect its deployment record before recovery.';
   const redact = value => store.redact?.(redaction.redact(value)) ?? redaction.redact(value);
   const setup = hostedSetupFailure(error, { origin: deployed?.origin ?? recorded?.origin, again });
   if (setup) throw commandFailure(redact(setup));
