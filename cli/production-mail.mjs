@@ -3,6 +3,7 @@ import { contained } from './project.mjs';
 import { refuse } from './errors.mjs';
 import { parseAddress } from '../modules/mail/src/core/validation.mjs';
 import { deliveryDeclarationSources } from './delivery-declarations.mjs';
+import { mailCredentialSecretNames } from '../modules/delivery-producer/declarations.mjs';
 import { validateRerConfig } from '../modules/mail/src/adapters/rer/contract.mjs';
 import { validateMailSenders } from '../modules/delivery-producer/mail.mjs';
 import { sourceMailSenders } from './deploy-variables.mjs';
@@ -40,7 +41,7 @@ export function mailOffSignInCommand(adapter) {
 // root declaration later. Read that source contract, never arbitrary ambient
 // keys or the adapter's executable source, before any build or provider write.
 export async function productionMail(root, declaration, env, declarationPath = 'deploy.json', adapter, mailOffSignIn = mailOffSignInCommand(adapter)) {
- const bindings = { ...declaration.vars }, secrets = new Set(), publicInputs = new Set(), declaredProviders = new Set();
+ const bindings = { ...declaration.vars }, secrets = new Set(), publicInputs = new Set(), declaredProviders = new Set(), credentialDeclarations = [];
  const senders = [{ source: `${declarationPath} vars.MAIL_FROM`, value: declaration.vars?.MAIL_FROM }];
  senders.push(...await sourceMailSenders(root, adapter));
  let senderFix = `Edit vars.MAIL_FROM in ${declarationPath}`;
@@ -79,7 +80,12 @@ export async function productionMail(root, declaration, env, declarationPath = '
    }
   }
   for (const provider of spec.mail?.providers ?? []) if (providers.includes(provider)) declaredProviders.add(provider);
+  try { credentialDeclarations.push(...mailCredentialSecretNames(spec.mail).map(name => ({ name, path }))); }
+  catch (error) { throw refuse(`Restore a valid mail credential declaration at ${path}: ${error.message}. Nothing was built or uploaded.`); }
  }
+ // The seed's declared mail credentials are secrets of this deployment, or the declaration is wrong.
+ for (const { name, path } of credentialDeclarations) if (!secrets.has(name)) throw refuse(`${path} mail.credentialSecretNames names ${name}, which the deployment does not declare as a secret. Declare it in ${declarationPath} secrets or in the secret names of ${path}, or remove it from the list. Nothing was built or uploaded.`);
+ const credentialNames = [...new Set(credentialDeclarations.map(item => item.name))];
  for (const name of publicInputs) if (present(env[name])) {
   if (name === 'MAIL_FROM') senders.push({ source: 'public MAIL_FROM (environment or --env-file)', value: env[name] });
   bindings[name] = env[name];
@@ -128,6 +134,7 @@ export async function productionMail(root, declaration, env, declarationPath = '
  });
  return {
   off,
+  credentialNames,
   offConflicts: off ? sendingBindings.filter(key => present(bindings[key])) : [],
   declared: 'MAIL_PROVIDER' in bindings || publicInputs.has('MAIL_PROVIDER') || secrets.has('MAIL_API_KEY') || selected.length > 0,
   senderIssue,

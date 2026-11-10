@@ -96,6 +96,6 @@ export async function keepHookSecrets({ root, environment, declaration, setupMan
 export async function keepSecrets({ root, environment, kept, env, generated, reused, report }) {
  await saveSecrets(root, environment, Object.fromEntries(kept.filter(item => generated.includes(item.binding)).map(item => [item.binding, env[item.environment]])));
  const file = savedSecretsFile(environment), them = names => names.length > 1 ? 'them' : 'it';
- if (generated.length) report(`rer generated ${generated.join(', ')} for this deployment and keeps ${them(generated)} in ${file} (private; Git ignores it), so a redeploy reuses ${them(generated)}. To deploy this environment from another checkout, copy that file there.`);
- if (reused.length) report(`rer reused ${reused.join(', ')} kept in ${file}.`);
+ if (generated.length) report(`rer generated ${generated.join(', ')} for this deployment and keeps ${them(generated)} in ${file} (private; Git ignores it), so a redeploy reuses ${them(generated)}. To deploy this environment from another checkout, copy that file there.`, { names: generated });
+ if (reused.length) report(`rer reused ${reused.join(', ')} kept in ${file}.`, { names: reused });
 }

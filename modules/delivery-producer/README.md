@@ -113,6 +113,19 @@ RER assigns the provider, sender and relay URL and provisions the private
 installation credential when Managed configuration is saved. No SendGrid key
 belongs in the app's configuration or build.
 
+A seed whose mail credentials are not the `MAIL_*` bindings (for example a
+Mailgun setup held in its own secrets) can list them in the optional
+`mail.credentialSecretNames`, beside `providers`: a non-empty list of secret
+binding names, no duplicates, no values. Each name must be a secret the
+deployment declares (in its deploy declaration's `secrets` or in the spec's
+`secretNames` / `optionalSecretNames`); `rer deploy` refuses a name that is not.
+rer never guesses mail secrets from their names. With the list declared,
+`rer deploy` prints its "Outbound email is off (MAIL_PROVIDER=none)" notice only
+when none of the listed names is bound on the Worker; when one is, it prints one
+line naming the bound names (never values) and saying outbound email is
+configured by them. A dry run reads no secrets and says so. Without the key
+nothing changes.
+
 `MAIL_FROM` is one public input, including when an existing deploy adapter
 supplies it through an environment-mapped deploy secret. Empty public defaults
 remain unconfigured; differing configured senders are refused with both source

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `rer deploy` no longer says "Outbound email is off (MAIL_PROVIDER=none): no mail credential is bound" when mail secrets are bound. A seed lists its mail credential secrets in the new optional `mail.credentialSecretNames` (beside `mail.providers` in its deployment-spec declaration; each name must be a secret the deployment declares, no duplicates, no values). When any listed name is bound on the Worker, the deploy prints one line naming the bound secret names (never values) and saying outbound email is configured by them; when none is, the off line is unchanged, and a dry run says it did not read the bound secrets. rer does not guess mail secrets from name patterns, and a seed without the key is unchanged.
+- rer's confirmation lines no longer redact secret names. `rer deploy --set-secret EMAIL_PROVIDER,...` printed `[REDACTED]_DOMAIN` when a secret's value (`mailgun`) or another name (`MAILGUN_SENDING_KEY`) matched part of a name. The lines that list names (set, unset, rotate, generated, reused, supplied, optional-unset, the mail notice) keep each name whole; values are still redacted everywhere, including in the text around the names.
+
 ## 0.2.106
 
 ### `rer deploy --dry-run`
