@@ -2,11 +2,16 @@ import { checkedLogo } from './logo.ts';
 import { ack, initialSettings, managed, settingsRow, snapshot } from './store.ts';
 import { SettingsError } from './types.ts';
 import { projectManaged, teamRows } from './team.ts';
+import { screenRoster } from './retire.ts';
 import type { Options, SettingsDocument } from './types.ts';
 
 /** The accepted revision and every native team write commit in one D1 transaction. */
-export async function apply(options: Options, document: SettingsDocument, suppliedLogo: unknown): Promise<Response> {
+export async function apply(options: Options, signed: SettingsDocument, suppliedLogo: unknown): Promise<Response> {
   const { db, business } = options;
+  // People this installation erased stay erased until the Business sends a larger invite number. They are
+  // removed before anything is stored, projected or handed to the team adapter, so nothing re-creates them.
+  const roster = !signed.detached && signed.team !== null ? await screenRoster(db, signed.team) : null;
+  const document: SettingsDocument = roster ? { ...signed, team: roster.kept } : signed;
   const before = await settingsRow(db) ?? initialSettings();
   if (before.stopped) throw new SettingsError('not_found', 404);
   if (document.rev <= before.rev) return Response.json(ack(await snapshot(db), business), { status: 409, headers: { 'cache-control': 'no-store' } });
@@ -43,6 +48,12 @@ export async function apply(options: Options, document: SettingsDocument, suppli
     for (const row of teamRows(team.rows, document.team!, projected)) statements.push(db.prepare(`INSERT INTO bs_team(email,operator_id,invite,state,business_id,business_role) SELECT ?,?,?,?,?,? WHERE ${guard.sql}`)
       .bind(row.email, row.operatorId ?? null, row.invite, row.state, row.businessId, row.businessRole, ...guard.args));
   }
+  if (roster?.checks.length) {
+    // An erasure committed after the screening above fails this batch instead of re-creating the person.
+    statements.push(db.prepare(`INSERT INTO bs_assert(value) SELECT CASE WHEN EXISTS(SELECT 1 FROM json_each(?) m JOIN bs_retired r ON r.digest=json_extract(m.value,'$.digest')
+      WHERE r.invite>=json_extract(m.value,'$.invite')) THEN NULL ELSE 1 END`).bind(JSON.stringify(roster.checks)));
+    if (roster.readmit.length) statements.push(db.prepare(`DELETE FROM bs_retired WHERE digest IN(SELECT value FROM json_each(?)) AND ${guard.sql}`).bind(JSON.stringify(roster.readmit), ...guard.args));
+  }
   statements.push(db.prepare(`INSERT INTO bs_audit(actor,action,changed_at) SELECT ?,?,? WHERE ${fence.sql}`)
     .bind(document.email, document.detached ? 'detached' : 'applied', now, ...fence.args));
   statements.push(db.prepare(`INSERT INTO bs_assert(value) VALUES(CASE WHEN ${fence.sql} THEN 1 ELSE NULL END)`).bind(...fence.args));
@@ -56,5 +67,6 @@ export async function apply(options: Options, document: SettingsDocument, suppli
   }
   try { await team?.afterCommit(); }
   catch { throw new SettingsError('invitation_delivery_failed', 503); }
-  return Response.json(ack(await snapshot(db), business), { headers: { 'cache-control': 'no-store' } });
+  const accepted = ack(await snapshot(db), business);
+  return Response.json(roster?.retired.length ? { ...accepted, retired: roster.retired } : accepted, { headers: { 'cache-control': 'no-store' } });
 }

@@ -21,17 +21,23 @@ history. The updated source supplies `auth.businessTeam` and the Business
 branding/stop integration. Native-account compositions need their own team
 adapter; passing `businessSettings` alone does not provide one.
 
-Copy `./modules/business-settings/schema/0001_business_settings.sql` and
-`./modules/business-settings/schema/0002_business_people.sql` into the
+Copy `./modules/business-settings/schema/0001_business_settings.sql`,
+`./modules/business-settings/schema/0002_business_people.sql` and
+`./modules/business-settings/schema/0003_business_retired.sql` into the
 seed's normal migration directory under consecutive unused migration numbers.
 The maintained reference uses `./default-seed/migrations/core/0033_business_settings.sql`.
 Do not replace an applied migration or assume 0033 is free in another seed.
-An installation that already applied the first schema adds only the second.
+An installation that already applied the first schema adds only the later ones.
 Apply it through the seed's existing local/deployment migration lifecycle,
 on the same D1 binding as the native accounts. The first creates settings storage and
 `bs_overrides`, `bs_logo`, `bs_team`, `bs_audit`, `bs_assert`. The second adds
 `bs_settings.owner_id`, `bs_team.business_id` and `bs_team.business_role`,
-including a unique index for non-null Business teammate IDs.
+including a unique index for non-null Business teammate IDs. The third adds
+`bs_retired`, the value-free tombstones that keep an erased person from being
+re-created by the Business's next revision (see
+[Erasing a person](README.md#erasing-a-person)). The reference migration
+`default-seed/migrations/core/0044_business_retired.sql` also purges roster rows of
+operators already erased; copy that tail too when the seed has `oa_operators`.
 Apply it before starting the runtime. The first document or owner stop creates
 the singleton row; a fresh installation stays empty for archive restore.
 

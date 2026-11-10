@@ -31,7 +31,8 @@ export interface TeamAdapter {
     roles: { admin: string; member: string }; guard: Guard;
   }): Promise<{ statements: Statement[]; rows: ManagedMember[]; afterCommit(): Promise<void> }>;
 }
-export interface Ack { rev: number; applied: Field[]; overrides: Field[]; logo: string | null; team: TeamState[] }
+/** `retired` appears only when the revision listed people this installation erased; they were not applied. */
+export interface Ack { rev: number; applied: Field[]; overrides: Field[]; logo: string | null; team: TeamState[]; retired?: string[] }
 export interface Snapshot {
   document: SettingsDocument | null; rev: number; appliedAt: string | null;
   stopped: boolean; overrides: Field[]; logo: string | null; team: TeamState[];
