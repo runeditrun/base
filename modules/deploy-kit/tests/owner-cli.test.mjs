@@ -106,6 +106,28 @@ test('a first deploy completes while the account lists its new D1 database up to
   }
 });
 
+test('a deployments read that stays partial fails after the settling window and never records the secret change', async t => {
+  const provider = ownerProvider(); t.after(() => provider.close());
+  const root = await seed(t), time = clock();
+  const argv = ['deploy','--declaration','deploy.json','--environment','production'];
+  const first = await main(argv,inputs(provider),{fetch:provider.fetch,cwd:root,settle:time.settle,notice:() => {}});
+  let removed = false, reads = 0;
+  const partial = async (input, init = {}) => {
+    const url = new URL(input), method = init.method ?? 'GET';
+    if (method === 'DELETE' && url.pathname.endsWith('/secrets/SESSION_SECRET')) removed = true;
+    const response = await provider.fetch(input,init);
+    if (!removed || method !== 'GET' || !url.pathname.endsWith('/deployments')) return response;
+    reads++;
+    const body = await response.json();
+    return Response.json({...body,result_info:{page:1,per_page:100,count:body.result.deployments.length + 1}});
+  };
+  await assert.rejects(main(['secret',...argv.slice(1),'--unset','SESSION_SECRET'],inputs(provider),{fetch:partial,cwd:root,settle:time.settle}),/provider-partial-list/);
+  assert.ok(reads > 2, 'the read was replayed within the window');
+  const saved = JSON.parse(await readFile(first.state,'utf8'));
+  assert.ok(saved.pendingSecret, 'the unconfirmed change stays pending');
+  assert.equal(saved.retiredSecrets, undefined);
+});
+
 test('a D1 database the account never lists is named, kept in the saved state, and found by the next run', async t => {
   for (const shape of ['count','omit']) {
     const provider = ownerProvider(); t.after(() => provider.close());

@@ -131,6 +131,8 @@ export async function deployCommand(context) {
  const command = async (verb, extra = [], values = env, more = {}) => owner([verb, '--declaration', path, '--environment', environment, ...(hookRecord ? ['--state', hookRecord] : []), ...(['dry-run', 'local-plan', 'deploy', 'health'].includes(verb) ? await deployProductArguments(root, productDirectory) : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
  // A hook that deployed through the kit's standard record lets rer issue and
  // retire the setup token; a hook keeping an unnamed record of its own keeps its token.
+ // The hook reads that record: settle a secret change an earlier run left pending first, and stop if it cannot be.
+ if (!options.dryRun && hookRecord) await command('settle');
  let recorded, hookReturned = false;
  const inspect = async (origin = deployed?.origin) => {
   try { return recorded = await command('inspect', [], env, hookReturned ? {} : {propagation:observedReadiness(origin)?.propagation}); }

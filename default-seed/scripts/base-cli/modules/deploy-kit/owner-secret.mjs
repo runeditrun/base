@@ -4,7 +4,7 @@ import { activeWorker } from './worker.mjs';
 import { secretNames, validSecretNames } from './owner-secret-names.mjs';
 import { waitHealth } from './health-request.mjs';
 import { definiteProviderRefusal } from './provider.mjs';
-import { readOwnerState, writeOwnerState, withStateLock, withScopeHints, sameDeployment, refuse, recordSecretChange, settlePendingSecret } from './owner.mjs';
+import { readOwnerState, writeOwnerState, withStateLock, withScopeHints, withSettledLists, sameDeployment, refuse, recordSecretChange, settlePendingSecret } from './owner.mjs';
 import { uploadSecretCopy, deploySecretCopy } from './owner-secret-copy.mjs';
 
 /** Set (each `value` given) or remove Worker secrets of the owner's last deployment as one
@@ -20,8 +20,8 @@ import { uploadSecretCopy, deploySecretCopy } from './owner-secret-copy.mjs';
  * deployment is still live. An ambiguous one-secret rotation
  * re-PUTs the value before accepting its successor as proof of the rotation.
  * A removed declared secret is retired: later plans omit it until it is set again. */
-export async function ownerSecret({api: provider, target, statePath, changes, fetch = globalThis.fetch, healthOptions = {}, windowMs = 30000, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))}) {
-  const api = withScopeHints(provider);
+export async function ownerSecret({api: provider, target, statePath, changes, fetch = globalThis.fetch, healthOptions = {}, settle = {}, windowMs = 30000, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))}) {
+  const api = withSettledLists(withScopeHints(provider),settle);
   const bindings = changes.map(change => change.binding), present = changes[0]?.value !== undefined;
   assert(bindings.length && bindings.every(identifier) && validSecretNames(bindings), 'invalid-secret-name');
   assert(changes.every(change => (change.value !== undefined) === present), 'mixed-secret-change');

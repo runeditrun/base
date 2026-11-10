@@ -20,7 +20,7 @@ import { validateMigrations } from './migrations.mjs';
 import { publicOrigin } from './public-origin.mjs';
 
 export const cronNotice = 'This Worker has a Cron Trigger. Cloudflare may take up to about two hours to start its first scheduled run on some accounts.';
-const usage = 'usage: owner-cli.mjs deploy|dry-run|local-plan|health|remove|inspect|record-owner|signin|rekey --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
+const usage = 'usage: owner-cli.mjs deploy|dry-run|local-plan|health|remove|inspect|record-owner|signin|rekey|settle --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
 
 // The public offline command also contains legacy hooks that call kit dry-run.
 // Keep their plan local without changing direct kit callers or real deploys.
@@ -42,7 +42,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   catch { throw new Error('usage'); }
   const {positionals:[requestedCommand,...rest],values} = parsed;
   const command = localPlans.getStore() && requestedCommand === 'dry-run' ? 'local-plan' : requestedCommand;
-  if (!['deploy','dry-run','local-plan','health','secret','remove','inspect','record-owner','signin','rekey'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
+  if (!['deploy','dry-run','local-plan','health','secret','remove','inspect','record-owner','signin','rekey','settle'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
   if (localPlans.getStore() && command !== 'local-plan') throw new Error('offline-deploy-refuses-provider-operation');
   if ((command === 'secret') !== (values.set !== undefined || values.unset !== undefined) || values.set !== undefined && values.unset !== undefined) throw new Error('usage');
   if (values.outcome !== undefined && command !== 'record-owner' || command === 'record-owner' && !['claimed','kept'].includes(values.outcome)) throw new Error('usage');
@@ -110,12 +110,14 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     const undeclared = named.filter(binding => !declared.some(entry => entry?.binding === binding));
     if (undeclared.length) { const error = new Error('undeclared-secret'); error.resource = undeclared.map(binding => `secret:${binding}`).join(', '); throw error; }
     const changes = named.map(binding => ({binding, value:values.set === undefined ? undefined : env[declared.find(entry => entry?.binding === binding).environment]}));
-    return {ok:true,...await ownerSecret({api,target,statePath,changes,fetch,healthOptions}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
+    return {ok:true,...await ownerSecret({api,target,statePath,changes,fetch,healthOptions,settle}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
   }
   // A secret rer retired (the spent setup token) is no longer part of the plan.
   // A dry run only reads state: settling an interrupted change may write it.
-  const state = command === 'dry-run' ? await readOwnerState(statePath,target) : await settleOwnerState({api,target,statePath});
+  const state = command === 'dry-run' ? await readOwnerState(statePath,target) : await settleOwnerState({api,target,statePath,settle});
   if (command === 'dry-run') assert(!state.pendingSecret, 'secret-change-unsettled');
+  // Settled or refused: a caller about to run foreign code never proceeds on an unsettled record.
+  if (command === 'settle') { assert(!state.pendingSecret, 'secret-change-unsettled'); return {ok:true}; }
   const {retiredSecrets = []} = state;
   if (command === 'record-owner') return withStateLock(statePath, async () => {
     const current = await readOwnerState(statePath, target);
@@ -127,7 +129,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     return {ok:true, owner:values.outcome};
   });
   // The link is a credential: returned to the caller once, never written to the state file.
-  if (command === 'signin') return {ok:true,...await ownerSignin({api,target,statePath}).catch(error => { throw api.annotateFailure(error,'signin'); })};
+  if (command === 'signin') return {ok:true,...await ownerSignin({api,target,statePath,settle}).catch(error => { throw api.annotateFailure(error,'signin'); })};
   if (command === 'inspect') {
     assert(!localOnlyBinding(declaration, localOnlyKeys), 'local-only-binding');
     assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');

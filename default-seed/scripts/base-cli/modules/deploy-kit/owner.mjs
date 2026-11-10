@@ -5,6 +5,7 @@ import { mkdir, open, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { assert, hash, identifier, resourceName, uuid, validatePlan } from './validation.mjs';
 import { definiteProviderRefusal } from './provider.mjs';
+import { providerListShape } from './pagination.mjs';
 import { regularBytes } from './artifact.mjs';
 import { resourceKinds, findResource, checkCronOwnership } from './resources.mjs';
 import { secretBindings, activeWorker, deployedFingerprint } from './worker.mjs';
@@ -68,19 +69,24 @@ export function withScopeHints(api) {
  * again from the start for up to `windowMs`; a partial listing is never accepted. */
 export const LIST_WINDOW_MS = 120000;
 const settleable = error => ['provider-partial-list','provider-pagination-changed'].includes(error.message);
+/** Owner mode replays a list read, and a GET of a path the provider reads as a list (a Worker's
+ * deployments or versions), until a complete snapshot arrives or the window closes. */
 export function withSettledLists(api, {windowMs = LIST_WINDOW_MS, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))} = {}) {
   if (api.settledLists) return api;
-  const list = async (...args) => {
+  const settled = read => async (...args) => {
     const start = clock();
     for (let delay = 500; ; delay = Math.min(delay * 2, 4000)) {
-      try { return await api.list(...args); }
+      try { return await read(...args); }
       catch (error) {
         if (!settleable(error) || clock() - start + delay > windowMs) throw error;
         await sleep(delay);
       }
     }
   };
-  return {...api, settledLists:true, unsettled:api, list};
+  const list = settled((...args) => api.list(...args));
+  const readRequest = settled((path, options) => api.request(path, options));
+  const request = (path, options = {}) => (!options.method || options.method === 'GET') && providerListShape(path) ? readRequest(path, options) : api.request(path, options);
+  return {...api, settledLists:true, unsettled:api, list, request};
 }
 /** Waits until the account's listing shows a resource this run just created, so no later
  * read mistakes it for a missing or replaced one. One that never appears is named. */
@@ -310,8 +316,8 @@ export async function settlePendingSecret(api, worker, state, {preflight = false
   return true;
 }
 /** Settle a pending secret change under the state lock, before a plan reads the retired list. */
-export async function settleOwnerState({api: provider, target, statePath}) {
-  const api = withScopeHints(provider);
+export async function settleOwnerState({api: provider, target, statePath, settle = {}}) {
+  const api = withSettledLists(withScopeHints(provider),settle);
   return withStateLock(statePath, async () => {
     const state = await readOwnerState(statePath, target);
     if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await writeOwnerState(statePath, state);

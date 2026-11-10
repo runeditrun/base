@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { assert } from './validation.mjs';
 import { query } from './migrations.mjs';
 import { literal } from './migration-ledger.mjs';
-import { readOwnerState, sameDeployment } from './owner.mjs';
+import { readOwnerState, sameDeployment, withScopeHints, withSettledLists } from './owner.mjs';
 import { activeWorker } from './worker.mjs';
 import { OWNER_SIGNIN_PATH, OWNER_SIGNIN_SECONDS, ownerSigninDigest } from '../operator-auth/owner-signin-grant.mjs';
 
@@ -10,7 +10,8 @@ import { OWNER_SIGNIN_PATH, OWNER_SIGNIN_SECONDS, ownerSigninDigest } from '../o
  * one-time grant for the claimed owner into the deployment's own auth D1 and return the
  * link. Only the token's SHA-256 reaches the database; the token itself exists only in
  * the returned link. Refuses unless the live Worker is the one this record deployed. */
-export async function ownerSignin({ api, target, statePath, clock = Date.now }) {
+export async function ownerSignin({ api: provider, target, statePath, clock = Date.now, settle = {} }) {
+  const api = withSettledLists(withScopeHints(provider), settle);
   const state = await readOwnerState(statePath, target);
   assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');
   const live = await activeWorker(api, target.worker);
@@ -18,7 +19,7 @@ export async function ownerSignin({ api, target, statePath, clock = Date.now }) 
   const ids = Object.values(state.owned.d1).filter(entry => entry.status === 'created' && entry.id).map(entry => entry.id);
   const holding = [];
   for (const id of ids) if ((await query(api, id, "SELECT name FROM sqlite_master WHERE type='table' AND name='oa_owner_signins'"))[0].results.length) holding.push(id);
-  if (!holding.length) throw Object.assign(new Error('owner-signin-unsupported'), { origin: target.origin });
+  if (!holding.length) throw Object.assign(new Error('owner-signin-unsupported'), { origin: state.receipt.origin ?? target.origin });
   assert(holding.length === 1, 'owner-signin-ambiguous');
   const token = randomBytes(32).toString('base64url'), id = randomUUID(), now = clock();
   // The recorded owner: the claimed (bootstrap) owner first, as operator-auth's own owner() reads it.
@@ -28,7 +29,8 @@ export async function ownerSignin({ api, target, statePath, clock = Date.now }) 
     ORDER BY b.claim_id IS NULL, o.created_at, o.id LIMIT 1`);
   const [owner] = (await query(api, holding[0], `SELECT o.email FROM oa_owner_signins g JOIN oa_operators o ON o.id=g.operator_id WHERE g.id=${literal(id)}`))[0].results;
   assert(owner, 'owner-not-claimed');
-  const link = new URL(OWNER_SIGNIN_PATH, target.origin);
+  // A deployment on a custom domain records the origin it serves; the account's workers.dev one is the fallback.
+  const link = new URL(OWNER_SIGNIN_PATH, state.receipt.origin ?? target.origin);
   link.searchParams.set('token', token);
   return { link: link.href, email: owner.email, expiresAt: now + OWNER_SIGNIN_SECONDS * 1000 };
 }
