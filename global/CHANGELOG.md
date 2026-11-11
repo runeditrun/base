@@ -1,10 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.2.109
 
-### Fixes
+### `rer check` in a managed copy
 
-- `rer check` no longer fails a managed copy for contract evidence under `.github/workflows` or `.github/dependabot.yml` (publisher automation the platform does not install). The copy is recognised only by the platform's committed `rer-upstream.json` release record, exactly as written; each such clause passes and says it was skipped in a managed copy, every other evidence path stays a hard check, and an authoring checkout checks all paths as before.
+- `rer check` no longer fails a managed copy for contract evidence it never carries. A managed copy is installed without the publisher's repository automation, so a `CONTRACT.md` clause citing a file under `.github/workflows/` or `.github/dependabot.yml` failed `CONTRACT.evidence.<ID>` with "is not in this checkout" (a first managed build of an installed seed failed this way on a workflow file). Those evidence paths are now skipped: the clause passes and its message says the path is publisher repository automation, skipped in a managed copy.
+- The skip applies only when the checkout is positively a managed copy: it carries the platform's `rer-upstream.json` release record exactly as written (a regular file of at most 4 KiB, schema 1, with exactly the keys `repository`, `tag` and `commit`, each well-formed). The platform writes that record only when the installed source commit is a published release, so a managed copy installed from an untagged commit has no record and keeps the hard existence check for every evidence path. Every other evidence path in a managed copy, and every path in an authoring checkout (no record), stays a hard check as before.
+- The seed command contract (`SEED-COMMAND-CONTRACT.md`, in the default seed and the export) describes the rule.
+- Code only: no migration is added. A seed gets this by adopting 0.2.109; nothing here is live in any deployed seed until that seed adopts and deploys it.
 
 ## 0.2.108
 
