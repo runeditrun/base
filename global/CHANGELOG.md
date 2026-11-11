@@ -5,6 +5,7 @@
 ### Fixes
 
 - `rer check` no longer fails a managed copy for contract evidence under `.github/workflows` or `.github/dependabot.yml` (publisher automation the platform does not install). The copy is recognised only by the platform's committed `rer-upstream.json` release record, exactly as written; each such clause passes and says it was skipped in a managed copy, every other evidence path stays a hard check, and an authoring checkout checks all paths as before.
+- A local run's sign-in page now says in plain words what it is (this app runs on your own computer; open it from the terminal where `rer dev` is running, or run `rer dev --as owner`, or `rer dev --as` an invited person's email) instead of naming `RER_OPEN`, and the local Lobby line says the same. `/auth/invite` returns `delivery: 'none'` when a development mail provider took the message and sent nothing, plus `signInUrl` for the key-gated local owner who sent it; a delivered invitation answers as before, and the default seed's access panel no longer claims an invitation was sent when none was. The local key gate, its dev-credential rule and deployed sign-in are unchanged, and a seed gets this only by adopting it. Code only: no migration.
 
 ## 0.2.108
 
