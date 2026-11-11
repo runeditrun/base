@@ -8,6 +8,7 @@
 - `rer deploy --dry-run` whose seed's own step stops (for example a seed's missing-inputs check run through `pnpm run`) printed that step's output twice, then pnpm's `ELIFECYCLE` and banner lines, a log path and an instruction to rerun without `--dry-run`. It now prints the output once, says which step stopped and that nothing was deployed, and names the same dry run to repeat. The exit code stays 1: the seed's step failed. A real deploy's output is unchanged. Code only.
 - `rer doctor` on a set-up checkout no longer says to run `rer setup` (it uses the same set-up check `rer dev` and `rer describe` use), no longer lists the deploy kit's build-workflow inputs (`RER_PREPARE_*`, `RER_DEPLOY_*`) as missing local inputs, and names the seed's other deploy inputs only as "Optional for local use; needed to deploy", so a ready checkout exits 0. Code only.
 - The dry run's "Needed for a real deploy" list named a mapped mail credential twice, as `SENDGRID_API_KEY (or SENDGRID_API_KEY)`, when a seed maps the shared `MAIL_API_KEY` binding to its provider's environment name. Each name now appears once. Code only.
+- Local one-click sign-in and its people list now refuse cross-site requests carrying only the gate cookie; same-site and key-header entry and OAuth session returns remain available. Code only, no migration; local runs only.
 
 ## 0.2.109
 
