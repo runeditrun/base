@@ -97,3 +97,21 @@ test('public deploy dry-run accepts reserved fixture senders while real deploy p
  assert.equal(corrected.code, 0, corrected.text);
  assert.equal(provider.state.writes.length, 0, 'neither refusal nor corrected dry-run writes to the provider');
 });
+
+// A seed maps the shared MAIL_API_KEY binding to its provider's own environment name.
+// The sign-in guidance names each credential once, in the words the person sets.
+test('rer deploy --dry-run names a mapped mail credential once', async t => {
+ const { root } = await deployProviderFixture(t, {
+  vars: { MAIL_PROVIDER: 'sendgrid', MAIL_FROM: 'Support <support@dry-run.example.test>' },
+  secrets: [{ binding: 'MAIL_API_KEY', environment: 'SENDGRID_API_KEY' }],
+ });
+ for (const name of Object.keys(process.env)) if (/^(CLOUDFLARE_|CF_|SENDGRID_|MAIL_)/.test(name)) delete process.env[name];
+ t.mock.method(globalThis, 'fetch', () => { throw Error('No network is available during local validation'); });
+ let text = '';
+ t.mock.method(process.stdout, 'write', chunk => { text += String(chunk); return true; });
+ t.mock.method(process.stderr, 'write', chunk => { text += String(chunk); return true; });
+ assert.equal(await main(['deploy', '--non-interactive', '--dry-run', '--cwd', root]), 0, text);
+ const line = text.split('\n').find(item => item.includes('production sign-in mail'));
+ assert.ok(line?.includes('SENDGRID_API_KEY'), text);
+ assert.doesNotMatch(line, /\b([A-Z][A-Z0-9_]+) (?:\(or|or) \1\b/, `each credential appears once: ${line}`);
+});

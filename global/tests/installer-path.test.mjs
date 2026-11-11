@@ -53,7 +53,10 @@ test('install.sh with a supplied command ends with one PATH step when ~/.local/b
  const fresh = await run('sh', ['-c', 'command -v rer'], lacking);
  assert.notEqual(fresh.code, 0, 'a fresh shell still lacks rer, so the step is what makes it work');
  assert.equal((await run('sh', ['-c', `${line}\nrer --version`], lacking)).stdout.trim(), manifest.version, 'the printed line makes bare rer work');
- assert.equal((await run('sh', ['-c', `"${launcher}/rer" cli path`], lacking)).code, 0);
+ const path = await run('sh', ['-c', `"${launcher}/rer" cli path`], lacking);
+ assert.equal(path.code, 0, path.stderr);
+ assert.ok(path.stdout.includes(line.replace('$HOME', '~')) || path.stdout.includes('.zshrc'), 'cli path shows the line to run');
+ assert.doesNotMatch(path.stdout, /Optional/, 'cli path does not call the step optional either');
 
  // PATH already has it: nothing to add.
  const present = await run('sh', [installer, '--', 'cli', 'status'], having);

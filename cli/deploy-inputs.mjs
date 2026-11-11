@@ -98,5 +98,5 @@ export async function withDeployEnvironment(project, options, out, run) {
 
 export function deployAgain(options) {
  const quote = value => /^[a-zA-Z0-9_./-]+$/.test(value) ? value : `'${String(value).replaceAll("'", "'\"'\"'")}'`;
- return `rer deploy --environment ${quote(options.environment ?? 'production')}${options.envFile ? ` --env-file ${quote(options.envFile)}` : ''}${options.cwd ? ` --cwd ${quote(relative(process.cwd(), options.cwd) || '.')}` : ''}`;
+ return `rer deploy --environment ${quote(options.environment ?? 'production')}${options.envFile ? ` --env-file ${quote(options.envFile)}` : ''}${options.cwd ? ` --cwd ${quote(relative(process.cwd(), options.cwd) || '.')}` : ''}${options.dryRun ? ' --dry-run' : ''}`;
 }

@@ -39,7 +39,7 @@ else its vendored scripts/rer.mjs.
   rer cli status       This rer: version, contents digest, install channel, launcher and other rer
                        commands on PATH. --json for data.
   rer cli install      Install this package for the current user (~/.local/bin/rer).
-  rer cli path         Optional: make rer available in future terminals; shows the shell step.
+  rer cli path         Show the shell step that makes a bare rer work in new terminals.
   rer cli uninstall    Remove the launcher and the install root; ~/.rer is untouched.
   rer update           Move to the latest published rer (--version X for an exact one), the way it
                        was installed: npx and install.sh installs switch atomically, npm installs run npm.

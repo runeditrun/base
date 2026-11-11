@@ -151,3 +151,30 @@ export const commandAdapter = {...lifecycle,deploy:ownerDeploy('deploy.json',lif
  assert.equal(unauthenticated.code, 0);
  assert.equal(provider.state.writes.length, retiredWrites);
 });
+
+test('a dry run whose seed step stops on missing inputs prints its list once, then one failure and the same dry run to repeat', async t => {
+ const { root, git } = await checkout(t, { secrets: [] });
+ await writeFile(join(root, 'adapter.mjs'), `const lifecycle = {run:async()=>{},settings:{},hooks:{}};
+const deploy = async ({root,store,signal,operationToken}) => {
+ await store.run('Validating the fixture deployment locally',process.execPath,['preflight.mjs'],{cwd:root,signal,env:{...process.env,RER_LOCAL_OPERATION:operationToken}});
+ return {dryRun:true,deployed:false};
+};
+export const commandAdapter = {...lifecycle,deploy};`);
+ // What a seed's input check under \`pnpm run\` prints: pnpm's banner, the seed's list, pnpm's failure line.
+ await writeFile(join(root, 'preflight.mjs'), `process.stderr.write(['','> @ deploy:cloudflare /fixture','> node preflight.mjs --dry-run','','Set these inputs in your private input file:','  FIXTURE_APP_HOST: the address you sign in at',' ELIFECYCLE  Command failed with exit code 1.',''].join('\\n'));process.exitCode=1;`);
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'tests/fixture', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { deploy: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs', 'deploy.json'], effects: 'Preflight the seed deployment offline.' } } }));
+ await writeFile(join(root, '.node-version'), process.versions.node + '\n');
+ await writeFile(join(root, 'package.json'), JSON.stringify({ engines: { node: process.versions.node }, packageManager: 'pnpm@10.12.4' }));
+ await writeFile(join(root, 'empty.env'), '', { mode: 0o600 });
+ git('add', '.'); git('commit', '-qm', 'deploy door');
+ const env = { ...process.env, CI: 'true', HOME: root };
+ for (const name of Object.keys(env)) if (/^(CLOUDFLARE_|CF_)/.test(name)) delete env[name];
+ const failed = await execute(process.execPath, [fileURLToPath(new URL('../bin/rer.mjs', import.meta.url)), 'deploy', '--dry-run', '--environment', 'production', '--env-file', 'empty.env', '--cwd', root], { env, cwd: root }).then(() => assert.fail('the dry run stopped, so it fails'), error => error);
+ const text = failed.stdout + failed.stderr;
+ assert.equal(failed.code, 1, text);
+ assert.equal(text.match(/FIXTURE_APP_HOST/g)?.length, 1, `the seed's list prints once:\n${text}`);
+ assert.doesNotMatch(text, /ELIFECYCLE|^> /m, 'pnpm\'s own wrapper lines are not repeated');
+ assert.doesNotMatch(text, /Last output|install\.log/, 'no second copy of the output, no log path to chase');
+ assert.match(text, /nothing was deployed\. Validating the fixture deployment locally: exit 1\./);
+ assert.match(text, /run rer deploy --environment production --env-file empty\.env --cwd \. --dry-run again/, 'the next step repeats the dry run, never a real deploy');
+});

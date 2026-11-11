@@ -25,7 +25,6 @@ import { deliveryDeclarationClauses } from './delivery-declarations.mjs';
 import { checkoutPlaceholderMarks } from './placeholder-mark.mjs';
 import { contractStatusClauses } from './contract-status.mjs';
 import { hostedExportCommand } from './hosted-export-command.mjs';
-import { cloudflareCredentials } from './deploy-needs.mjs';
 import { agentSurfaceClauses } from './agent-surface.mjs';
 
 // cliVersion: the rer version of the code answering (absent for a vendored copy
@@ -206,16 +205,12 @@ const usePnpm = directory => {
  process.env.PATH = [process.env.PATH, directory, dirname(process.execPath)].filter(value => value !== undefined).join(delimiter);
 };
 
+// The deploy kit's trusted build workflow supplies these (modules/deploy-kit/README.md); a person's computer never does.
+const buildWorkflowInput = /^RER_(?:PREPARE|DEPLOY)_[A-Z0-9_]+$/;
+
 export async function doctor(project, store, signal) {
  const { inspectOperations } = await import('../operations/operations.mjs');
  const diagnostic = await inspectOperations(project.root);
- // The operations declaration includes deployment prerequisites. Local health
- // does not require an account, and doctor never checks provider access.
- const deploymentInputs = project.profile === 'first-party' ? diagnostic.missingEnvironment.filter(name => cloudflareCredentials.includes(name)) : [];
- if (deploymentInputs.length) {
-  diagnostic.missingEnvironment = diagnostic.missingEnvironment.filter(name => !deploymentInputs.includes(name));
-  diagnostic.ok = diagnostic.commands.every(command => command.available) && !diagnostic.missingEnvironment.length && diagnostic.configuration === 'valid' && (diagnostic.loops ?? []).every(loop => ['ready', 'optional-disabled'].includes(loop.status));
- }
  const { localVariables } = await shared('local/environment.mjs');
  let values = {}, pnpm, expectedPnpm, stateIssue, stateValid = true;
  const pnpmIssues = [];
@@ -247,12 +242,24 @@ export async function doctor(project, store, signal) {
  const dependencies=project.profile==='first-party'?await dependencyDoctor(project.root):[];
  const expectedNode = await projectNodePin(project.root);
  const inputs = project.profile === 'first-party' ? requiredLocalSettings(project, values) : [];
+ // The operations declaration also lists what a deployment needs, and the inputs a hosted build
+ // workflow supplies. Local health needs neither an account nor that workflow: a first-party
+ // checkout is ready when its local setup is done (the check `rer dev` makes), and doctor never
+ // checks provider access. Deploy inputs are named as optional; workflow inputs not at all.
+ const firstParty = project.profile === 'first-party';
+ const workflowInputs = firstParty ? diagnostic.missingEnvironment.filter(name => buildWorkflowInput.test(name)) : [];
+ const deploymentInputs = firstParty ? diagnostic.missingEnvironment.filter(name => !buildWorkflowInput.test(name) && !inputs.includes(name) && !(typeof values[name] === 'string' && values[name].trim())) : [];
+ if (firstParty) {
+  diagnostic.missingEnvironment = diagnostic.missingEnvironment.filter(name => inputs.includes(name));
+  diagnostic.ok = diagnostic.commands.every(command => command.available) && !diagnostic.missingEnvironment.length && diagnostic.configuration === 'valid' && (diagnostic.loops ?? []).every(loop => ['ready', 'optional-disabled'].includes(loop.status));
+ }
+ const setupNeeded = firstParty ? !(await localState(project)).prepared : false;
  const warnings = project.profile === 'first-party' ? await cacheWarnings(project.root) : [];
  return { dependencies, warnings, browser, operations: diagnostic, ok: browser?.ok !== false && !aiIssues.length && dependencies.every(d=>d.ok) && diagnostic.ok && stateValid && !inputs.length && (project.profile !== 'first-party' || (Boolean(expectedPnpm) && process.versions.node === expectedNode && pnpm === expectedPnpm)),
   node: { actual: process.versions.node, expected: expectedNode },
   pnpm: project.profile === 'first-party' ? { actual: pnpm, expected: expectedPnpm ?? null, ...(pnpmIssues.length ? { issue: [...new Set(pnpmIssues)].join('\n') } : {}) } : undefined,
   ai: { issues: aiIssues },
-  missingInputs: [...new Set([...diagnostic.missingEnvironment, ...inputs])], deploymentInputs,
+  missingInputs: [...new Set([...diagnostic.missingEnvironment, ...inputs])], deploymentInputs, workflowInputs, setupNeeded: setupNeeded || (!firstParty && diagnostic.missingEnvironment.length > 0),
   sources: project.descriptor.environmentSources ?? {}, state: { path: project.adapter?.state, safe: stateValid, ...(stateIssue ? { issue: stateIssue } : {}) }, scope: 'local-inputs-only' };
 }
 
@@ -266,7 +273,7 @@ export function doctorSummary(result) {
  if (result.missingInputs.length) {
   lines.push('Missing local inputs:');
   for (const name of result.missingInputs) lines.push(`  ${name}${result.sources[name] ? `: ${result.sources[name]}` : ''}`);
-  lines.push('Run rer setup to configure this checkout.');
+  if (result.setupNeeded) lines.push('Run rer setup to configure this checkout.');
  }
  const unavailable = result.operations.commands.filter(command => !command.available);
  if (unavailable.length) lines.push('Unavailable command inputs:', ...unavailable.map(command => `  ${command.name}: restore its declared input files.`));

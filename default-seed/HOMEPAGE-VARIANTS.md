@@ -342,7 +342,7 @@ The primary local recipe is `startLine(run)`, derived from the repository in
 `RunData.clone`, not from setup form fields in `rer-setup.json`. Use this same
 helper for homepage and getting-started snippets when adopting the shared Run
 renderer. Node and separate-install instructions live in the collapsed “Other
-ways to run locally” disclosure; PATH setup is optional for future terminals,
+ways to run locally” disclosure; PATH setup is for later terminals' bare `rer` commands,
 not a step in the primary launch. Re-sync the shared `run-site.ts` and
 `run-chooser-style.ts` runtime copies and update any homepage/docs recipe
 template to consume `startLine(run)`. Approved homepages remain seed-owned.

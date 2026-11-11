@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.109-dev.g15c2bbca",
+  "cliVersion": "0.2.109-dev.g384fcf51",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -791,7 +791,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "d24ae9237bd9bd9ef934b237ca0f5e72257d2cccfc3f4d2d3224945853ffa63a"
+      "sha256": "094793f69ed30032dbec66505c560f890c14d7bbfa6dafeace27d0dd2326f302"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -807,7 +807,7 @@
     },
     "cli/deploy-inputs.mjs": {
       "source": "cli/deploy-inputs.mjs",
-      "sha256": "4ffb9be8b61ea5f5de2284e3e2c91c443453e0c889abf048be909d9badb0be51"
+      "sha256": "5e3de6107d2e73043db10b9c73d9e33b1e49c7c03e32d84df157cc08dd4a9d1e"
     },
     "cli/deploy-installation-key.mjs": {
       "source": "cli/deploy-installation-key.mjs",
@@ -815,7 +815,7 @@
     },
     "cli/deploy-needs.mjs": {
       "source": "cli/deploy-needs.mjs",
-      "sha256": "be09b4800b4848aaee29e3abb50df621b2e6464431653ad754c6f690b2943a45"
+      "sha256": "c0bdd4fd259362941d0288931672a6b8156525c05b5429b4d8ff2c677b15bafc"
     },
     "cli/deploy-observation.mjs": {
       "source": "cli/deploy-observation.mjs",
@@ -971,7 +971,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "abdcb91dce67d68296e9ac6f12e058879dc3f9303cb984e608dbfad2372496e7"
+      "sha256": "e9d97ee983094999867b57d3e56d9854a0364d5a065b59ae553c4de70564fea7"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -983,7 +983,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "a03aa5fed82bc5153b8b2183f6ed991d49da9492e8c6dab587c7f7f29418f611"
+      "sha256": "b629f47b78eb3b57f70600cb5fb9c2ce8ec4e34b1176eca2f81ab16d8f7074d4"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
@@ -1060,6 +1060,10 @@
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",
       "sha256": "fff0cd534ab102ed7e9ae9d8ed5b6e9005d8f5d0b37c32a15f62007d53ab2803"
+    },
+    "cli/pnpm-chatter.mjs": {
+      "source": "cli/pnpm-chatter.mjs",
+      "sha256": "58dd130350d3cf16b6a4bf679e5787b4a9542af8f98138ce5161a153d4e4065a"
     },
     "cli/pnpm-probe.mjs": {
       "source": "cli/pnpm-probe.mjs",
