@@ -177,3 +177,36 @@ integration, declare hosted-valid `verifyStandIn` values or supply its generated
 bindings through `agent-surface.json` verification hooks. Managed mail keeps its
 existing declared credential stand-ins. Verification does not read real deploy
 credentials. Native signature, replay, session and authority checks still run.
+
+## The size check in verify
+
+From the `@runeditrun/rer` release that carries it, the last step of `rer verify`
+runs the same check as `rer size`: every view and trigger statement of the
+build's D1 migrations against D1's limits, and, when the seed has a
+`size-check.json`, the declared flows at a small and a large size on local D1.
+
+- **Pin the release** that carries the step in `package.json` (an exact version)
+  and refresh the lock; a seed that stays on an older pin has no size step.
+- **Write `size-check.json`** at the checkout root: the table shape, the personas,
+  and each route or cron with a row ceiling (`cli/size/examples/happytohelp.json`
+  is a complete example, counts only, never contents). `rer check` validates it
+  offline as `SC-15.size.*`. Without the file, verify checks the schema objects
+  and prints `Size check: undeclared (no size-check.json).`
+- **Run it first from a card file.** `rer size --declaration <card file>` runs a
+  declaration kept outside the checkout, against the built checkout, without
+  committing it; commit it as `size-check.json` once the failures are understood.
+- **Expect first-run failures.** A declared flow that scans, a list that grows
+  with the data, a statement at 90 or more FROM items: each failure names the
+  flow, the rule, the numbers and its heaviest statements. Fix the statement.
+  Never raise a ceiling to make a failure go away.
+- **Use `growth.allowed` only with a `why`.** A flow that grows by design (an
+  export, a search) may declare `"growth": { "allowed": true, "why": "…" }`; the
+  reason is printed on every run.
+- **Local D1 is not real D1.** The FROM-item limit is modelled, row counts are
+  local D1's own and there is no shared 10-second window; confirm a fix on real
+  D1 with the fleet runner (`.tools/d1check.sh`).
+- **A checkout without a seedContract** (OPERATIONS version 2) runs `rer size`
+  from `size-check.json`: `build.wrangler` (default `dist/server/wrangler.json`)
+  and `build.deployDeclaration` (default `deploy.json`) say where its build is, and
+  the owner persona needs an owner claim in `rer-setup.json` or `verification.owner`
+  in `agent-surface.json`.

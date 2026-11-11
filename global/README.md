@@ -399,13 +399,20 @@ migrations; `--migrations DIR` names a migrations directory instead, and
 `--statements FILE` checks a statements file (`{"statements":[{"name","sql"}]}`)
 against that schema. It runs in any checkout, needs no account, and exits 1 on
 any failure, 0 otherwise and 3 with no build and no `--migrations`. `rer verify`
-runs the schema-object check as its last step. With a `size-check.json` (or
-`--declaration FILE`) it also builds the declared shape at a small and a large
-size on local D1, runs every declared flow on each through a rows-read meter and
-fails a flow that passes its ceiling, reads more at large than at small by over
-10 percent plus 200 rows, answers the wrong status, has a statement refused by
-local D1 or runs a statement at 90 FROM items or depth; `--write-statements DIR`
-writes the statements each size ran in the fleet runner's format.
+ends with the same check, inside its own job-queue slot, and fails exactly when
+`rer size` would. With a `size-check.json` (or `--declaration FILE`, a
+declaration kept outside the checkout) it also builds the declared shape at a
+small and a large size on local D1, runs every declared flow on each through a
+rows-read meter and fails a flow that passes its ceiling, reads more at large
+than at small by over 10 percent plus 200 rows, answers the wrong status, has a
+statement refused by local D1 or runs a statement at 90 FROM items or depth;
+`--write-statements DIR` writes the statements each size ran in the fleet
+runner's format. Without a `size-check.json`, verify's step checks the schema
+objects and prints `Size check: undeclared (no size-check.json).` A checkout
+without a seedContract runs it from the declaration's `build.wrangler` and
+`build.deployDeclaration` and never forwards to a declared argv; its owner
+persona needs an owner claim in `rer-setup.json` or `verification.owner` in
+`agent-surface.json`.
 
 Anywhere: `rer list [DIR]`, `rer cli status|install|uninstall`, `rer update`,
 `rer queue NAME -- COMMAND`, `rer --version` and `rer --help`.

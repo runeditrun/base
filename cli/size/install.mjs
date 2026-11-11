@@ -25,9 +25,9 @@ const refuseNetwork = async () => new Response('rer size installs refuse outboun
 export async function prepareRun(root, declaration, { project, now = Date.now() } = {}) {
  const verification = (await readAgentSurface(root))?.surface.verification ?? {};
  const wantsOwner = Object.values(declaration.personas ?? {}).some(persona => persona.kind === 'owner') || compiling(() => fixtureParameters(declaration)).has('owner_email');
- const run = { root, declaration, verification, now, project };
- const wrangler = await readJson(join(root, 'dist/server/wrangler.json')).catch(() => ({}));
- const bindings = (wrangler.d1_databases ?? []).map(item => item.binding);
+ const run = { root, declaration, verification, now, project, wrangler: declaration.build.wrangler };
+ const built = await readJson(join(root, declaration.build.wrangler)).catch(() => ({}));
+ const bindings = (built.d1_databases ?? []).map(item => item.binding);
  run.binding = declaration.database ?? (bindings.length === 1 ? bindings[0] : undefined);
  if (!run.binding) throw new RerError('size_database_missing', bindings.length ? `The build declares several D1 bindings (${bindings.join(', ')}); set "database" in size-check.json.` : 'This build has no D1 database to generate the shape in.', 1);
  const adapter = project?.adapter;
@@ -99,7 +99,7 @@ export async function buildInstall(run, size, clock, measure) {
  const meter = measure ? createMeter() : undefined;
  try {
   if (run.owner) keys = await ownerKeys(run.root, run.owner.native, { email: run.owner.email, sub: run.owner.sub });
-  serving = serveHosted(run.root, { declaration: run.deployDeclaration, publicHosts: run.verification.publicHosts, rpc: run.verification.rpc,
+  serving = serveHosted(run.root, { declaration: run.deployDeclaration, wrangler: run.wrangler, publicHosts: run.verification.publicHosts, rpc: run.verification.rpc,
    fixturePreparation: true, fixtureDiagnostics: true, outboundService: refuseNetwork, meter,
    bindings: keys ? ownerBindings(keys, { claim: run.owner.claim, native: run.owner.native, email: run.owner.email }) : {} });
   hosted = await timed('serve', undefined, () => serving);

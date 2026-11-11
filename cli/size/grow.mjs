@@ -17,7 +17,8 @@ const count = number => number.toLocaleString('en-US');
 /** Whether `rer size` also builds fixtures: a size-check.json at the checkout root, or --declaration FILE. */
 export const growthRequested = options => !options.statements && Boolean(options.declaration || existsSync(join(options.cwd, declarationFile)));
 
-async function declared(options) {
+/** The checkout's size declaration, read and validated: { declaration, project }. Refuses a declaration with problems. */
+export async function declared(options) {
  const file = options.declaration ? resolve(process.cwd(), options.declaration) : join(options.cwd, declarationFile);
  // Without OPERATIONS.json the checkout has no adapter: crons and deploy files come from the declaration's build paths.
  const project = await resolveProject(options.cwd).catch(() => undefined);
@@ -40,8 +41,8 @@ const phaseText = phases => Object.entries(phases).map(([phase, ms]) => `${phase
  * size's tables, phase times and then the flows; the first failing size stops the run, is printed with no "built"
  * line, and fails it. `--write-statements DIR` writes the statements each size ran.
  */
-export async function buildFixtures(options, out) {
- const { declaration, project } = await declared(options), run = await prepareRun(options.cwd, declaration, { project }), clock = runClock(declaration.budget.timeoutSeconds);
+export async function buildFixtures(options, out, loaded) {
+ const { declaration, project } = loaded ?? await declared(options), run = await prepareRun(options.cwd, declaration, { project }), clock = runClock(declaration.budget.timeoutSeconds);
  const result = { ok: true }, measured = {};
  if (!options.json) out.human('Size check: queues are held while the flows run; queue consumer work is not measured.');
  try {
@@ -67,7 +68,7 @@ export async function buildFixtures(options, out) {
   }
  } finally { clock.stop(); }
  if (!result.ok) return result;
- const verdict = judgeFlows(declaration, measured.small, measured.large, await schemasFromBuild(options.cwd));
+ const verdict = judgeFlows(declaration, measured.small, measured.large, await schemasFromBuild(options.cwd, { wrangler: declaration.build.wrangler }));
  result.ok = verdict.ok;
  result.flows = verdict.flows;
  result.queueConsumersMeasured = false;

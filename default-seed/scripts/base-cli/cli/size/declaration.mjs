@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { RerError } from '../errors.mjs';
-import { buildFacts, defaultBuild } from './build-facts.mjs';
+import { buildFacts } from './build-facts.mjs';
+import { defaultBuild } from './build-paths.mjs';
 import { duplicateKeys } from './json-duplicates.mjs';
 import { validateFlows, validatePersonas } from './validate-flows.mjs';
 import { validateShape } from './validate-shape.mjs';

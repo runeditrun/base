@@ -3,8 +3,8 @@ import { contained } from '../project.mjs';
 import { parseJsonc } from '../jsonc.mjs';
 import { deployConfigPaths } from '../deploy-config.mjs';
 import { declaredCrons } from '../scheduled.mjs';
+import { defaultBuild } from './build-paths.mjs';
 
-export const defaultBuild = { wrangler: 'dist/server/wrangler.json', deployDeclaration: 'deploy.json' };
 
 async function readOptional(root, path) {
  try { return await readFile(await contained(root, path, { optional: true }), 'utf8'); }

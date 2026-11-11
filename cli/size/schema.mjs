@@ -1,9 +1,10 @@
 import '../sqlite-notice.mjs';
 import { readFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { readMigrationRewrites, withRewrites } from '../../modules/deploy-kit/migrations.mjs';
 import { RerError, missing } from '../errors.mjs';
+import { defaultBuild } from './build-paths.mjs';
 
 // The schema a build's D1 binding gets: its migrations, in order, in a fresh
 // in-memory SQLite. Nothing here reaches a network or an account.
@@ -32,15 +33,16 @@ async function apply(directory, label, { optional = false } = {}) {
 export const schemaFromMigrations = directory => apply(resolve(directory), resolve(directory));
 
 /** The build's D1 databases, each with its migrations applied as serveHosted
- * does (dist/server/wrangler.json d1_databases[].migrations_dir, with the
+ * does (the build's wrangler file, dist/server/wrangler.json unless `wrangler`
+ * names another, d1_databases[].migrations_dir from that file's folder, with the
  * seed's reviewed migration rewrites checked against the migrations'
  * current bytes): [{ binding, db, migrations }]. An empty list is a build
  * with no D1 binding; no build is a missing input. */
-export async function schemasFromBuild(root) {
-  const build = join(root, 'dist/server');
+export async function schemasFromBuild(root, { wrangler = defaultBuild.wrangler } = {}) {
+  const file = join(root, wrangler), build = dirname(file);
   let config;
-  try { config = JSON.parse(await readFile(join(build, 'wrangler.json'), 'utf8')); }
-  catch { throw missing('No production build at dist/server/wrangler.json. Run rer build, or point --migrations at a directory of D1 migrations.'); }
+  try { config = JSON.parse(await readFile(file, 'utf8')); }
+  catch { throw missing(`No production build at ${wrangler}. Run rer build, or point --migrations at a directory of D1 migrations.`); }
   const schemas = [];
   for (const item of config.d1_databases ?? []) {
     const directory = resolve(build, item.migrations_dir ?? 'migrations');

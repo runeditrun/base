@@ -1,7 +1,7 @@
 import { readFile, readdir, realpath } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { createHash, randomBytes } from 'node:crypto';
-import { join, resolve, extname } from 'node:path';
+import { dirname, join, resolve, extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { RUN_WORKER_FIRST } from '../modules/deploy-kit/render.mjs';
 import { publicAssetPaths } from '../modules/deploy-kit/artifact.mjs';
@@ -85,12 +85,14 @@ async function hostedPublicVariables(root, config, declaration, manifest) {
 
 /** The build served as rer deploy hosts it, with declared vars, origin and
  * required public inputs and deploy/Managed mail secret stand-ins. `fetch(path, init)` uses the deployed origin. */
-export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService, rpc, workerEntrypoints = [], publicHosts, fixturePreparation = false, fixtureDiagnostics = false, meter } = {}) {
+export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', wrangler = 'dist/server/wrangler.json', bindings = {}, outboundService, rpc, workerEntrypoints = [], publicHosts, fixturePreparation = false, fixtureDiagnostics = false, meter } = {}) {
  const { loopbackFetch } = await shared('loopback-fetch.mjs');
- const build = join(root, 'dist/server'), client = join(root, 'dist/client');
+ const build = dirname(join(root, wrangler));
  let config;
- try { config = await read(join(build, 'wrangler.json')); }
- catch { throw new RerError('hosted_output_missing', 'No production build at dist/server/wrangler.json. Run rer build, then rer verify.', 1); }
+ try { config = await read(join(root, wrangler)); }
+ catch { throw new RerError('hosted_output_missing', `No production build at ${wrangler}. Run rer build, then rer verify.`, 1); }
+ // The build's own wrangler file says where its assets are: ../client from dist/server.
+ const client = resolve(build, config.assets?.directory ?? '../client');
  let declaration;
  try { declaration = await read(join(root, declarationPath)); }
  catch { throw new RerError('hosted_output_missing', `No readable deploy declaration at ${declarationPath}. A seed whose deploy reads another file names it with the commandAdapter option deployDeclaration.`, 1); }
