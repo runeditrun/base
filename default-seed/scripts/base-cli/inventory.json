@@ -731,7 +731,7 @@
     },
     "cli/contract-status.mjs": {
       "source": "cli/contract-status.mjs",
-      "sha256": "182e869f4659bd23c03d53f76477540515b2ef8991ecb1c3bb5d93cbf1019ae3"
+      "sha256": "5890200917916315d55cc2acee3e9a2fcacd22f6f603475004978aa80cf307ae"
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
