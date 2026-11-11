@@ -15,8 +15,9 @@ async function migrationFiles(directory) {
 // A build's missing migrations directory is an empty database, as serveHosted reads it.
 async function apply(directory, label, { optional = false } = {}) {
   const { DatabaseSync } = await import('node:sqlite');
-  // Foreign keys are D1's to enforce; here only the schema objects matter.
-  const db = new DatabaseSync(':memory:', { enableForeignKeyConstraints: false });
+  // Foreign keys are D1's to enforce; here only the schema objects matter. D1 (and local D1) accepts a double-quoted
+  // string literal where no such column exists, and a statement that does so must compile here too.
+  const db = new DatabaseSync(':memory:', { enableForeignKeyConstraints: false, enableDoubleQuotedStringLiterals: true });
   let files;
   try { files = await migrationFiles(directory); }
   catch (error) { if (optional && error.code === 'ENOENT') files = []; else throw missing(`Cannot read the migrations of ${label} at ${directory}: ${error.code ?? error.message}.`); }

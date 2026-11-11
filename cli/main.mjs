@@ -29,7 +29,7 @@ export async function main(argv = process.argv.slice(2)) {
    if ((await import('./size/grow.mjs')).growthRequested(options)) {
     if (options.noQueue) {const {shared}=await import('./shared.mjs');const {commandPolicy}=await shared('queue.mjs');const policy=await commandPolicy();try{if(!policy.ci)throw invalid('--no-queue requires the original caller CI=true.');}finally{await policy.close();}}
     // The queued child runs in the checkout: a relative --declaration means the caller's folder, so hand it over absolute.
-    const named = argv.indexOf('--declaration'), queuedArgv = named < 0 ? argv : argv.map((argument, index) => index === named + 1 ? resolve(process.cwd(), argument) : argument);
+    const named = ['--declaration', '--write-statements'].map(flag => argv.indexOf(flag) + 1).filter(Boolean), queuedArgv = argv.map((argument, index) => named.includes(index) ? resolve(process.cwd(), argument) : argument);
     const bounded = await (await import('./bounded.mjs')).boundedCommand({ root: options.cwd, profile: 'independent' }, options, queuedArgv, out);
     if (bounded) return bounded.exitCode;
    }

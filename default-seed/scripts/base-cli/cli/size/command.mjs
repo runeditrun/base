@@ -15,10 +15,11 @@ async function statementsSchema(options) {
 }
 
 /** rer size: statement size against D1's limits, then, with a size-check.json, the declared shape built at a small
- * and a large size on local D1. Exit 1 if any statement is at or over the margin or a size fails to build, 0 if
+ * and a large size on local D1 and every declared flow run on each through a rows-read meter. Exit 1 if any statement is at or over the margin or a size fails to build, 0 if
  * none, 3 with no build and no --migrations. */
 export async function sizeCommand(options, out) {
   let records, sqlOf, unit;
+  if (options.writeStatements && !growthRequested(options)) throw invalid('--write-statements writes what the declared flows ran: add a size-check.json at the checkout root, or --declaration FILE.');
   if (options.statements) {
     const statements = await readStatementsFile(options.statements), sql = new Map(statements.map(statement => [statement.name, statement.sql]));
     records = measureStatements(await statementsSchema(options), statements, { exact: options.json });
@@ -43,9 +44,10 @@ export async function sizeCommand(options, out) {
   const details = { statements: records.map(({ name, fromItems, depth, ok, error }) => ({ name, fromItems: fromItems ?? null, depth, ok, ...(error ? { error } : {}) })) };
   // With a size-check.json (or --declaration), the declared shape is then built at a small and a large size.
   if (!options.statements && growthRequested(options)) {
-    const { ok: built, ...sizes } = await buildFixtures(options, out);
+    const { ok: built, flows, queueConsumersMeasured, ...sizes } = await buildFixtures(options, out);
     ok = ok && built;
     details.size = sizes;
+    if (flows) Object.assign(details, { flows, queueConsumersMeasured });
   }
   out.result(ok, ok ? 0 : 1, details);
   return ok ? 0 : 1;

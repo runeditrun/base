@@ -29,6 +29,8 @@ const worker = `export default { async fetch(request, env) {
   await env.DB.prepare('INSERT INTO users(id, email) VALUES(?, ?)').bind('owner', env.OWNER_EMAIL).run();
   return new Response(null, { status: 303, headers: { location: body.returnTo ?? '/', 'set-cookie': 'session=owner; Path=/; HttpOnly' } });
  }
+ // The declared flow's route: rer size now runs it, so it must answer.
+ if (url.pathname === '/') return new Response('home');
  return new Response('not found', { status: 404 });
 } };
 `;

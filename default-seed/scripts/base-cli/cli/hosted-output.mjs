@@ -17,6 +17,7 @@ import { verificationRpc } from './agent-rpc.mjs';
 import { hostedOrigins } from './hosted-hosts.mjs';
 import { preparationProducers } from './hosted-queue-producers.mjs';
 import { FixtureDatabaseError } from '../modules/agent-door/conformance/fixtures.mjs';
+import { meterModule } from './size/meter.mjs';
 
 // Serve the production build the way rer deploy hosts it (assets behind the
 // Worker, deploy identity bound, a public https origin) on loopback, with no
@@ -84,7 +85,7 @@ async function hostedPublicVariables(root, config, declaration, manifest) {
 
 /** The build served as rer deploy hosts it, with declared vars, origin and
  * required public inputs and deploy/Managed mail secret stand-ins. `fetch(path, init)` uses the deployed origin. */
-export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService, rpc, workerEntrypoints = [], publicHosts, fixturePreparation = false, fixtureDiagnostics = false } = {}) {
+export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService, rpc, workerEntrypoints = [], publicHosts, fixturePreparation = false, fixtureDiagnostics = false, meter } = {}) {
  const { loopbackFetch } = await shared('loopback-fetch.mjs');
  const build = join(root, 'dist/server'), client = join(root, 'dist/client');
  let config;
@@ -144,6 +145,17 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   } };
   producers = preparationProducers(options, config);
  }
+ // `rer size` only: the rows-read meter wraps the app's D1 bindings, composed over the preparation wrapper when
+ // there is one. Every other caller leaves `meter` unset and serves the unwrapped build.
+ if (meter) {
+  const app = options.workers.find(worker => worker.name === 'app');
+  app.modules = [{ type: 'ESModule', path: join(build, '__rer_meter.mjs'), contents: meterModule({
+   inner: fixturePreparation ? './__rer_preparation.mjs' : './' + config.main,
+   d1: (config.d1_databases ?? []).map(item => item.binding),
+   durableObjects: (config.durable_objects?.bindings ?? []).filter(item => !item.script_name).map(item => item.class_name),
+  }) }, ...app.modules];
+  app.serviceBindings = { ...app.serviceBindings, RER_SIZE_METER: meter.service };
+ }
  const mf = new Miniflare(convertV4MiniflareOptions(options));
  let loopback;
  try {
@@ -173,13 +185,14 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    if (!fixturePreparation) throw new RerError('hosted_database_invalid', 'Native preparation requires a disposable conformance host.', 1);
    return Object.freeze({
     database: async binding => (await preparedDatabase(binding)).database,
-    scheduled: async ({ scheduledTime = Date.now() } = {}) => {
+    scheduled: async ({ scheduledTime = Date.now(), cron } = {}) => {
      if (!Number.isFinite(scheduledTime)) throw new Error('Native scheduled preparation requires a finite Unix millisecond time.');
+     if (cron !== undefined && (typeof cron !== 'string' || !cron.trim())) throw new Error('Native scheduled preparation takes a cron expression as text.');
      try {
-      const result = await (await mf.getWorker('app')).scheduled({ scheduledTime });
-      if (result.outcome !== 'ok') throw new Error();
+      const result = await (await mf.getWorker('app')).scheduled({ scheduledTime, ...(cron === undefined ? {} : { cron }) });
+      if (result.outcome !== 'ok') throw new Error(result.outcome);
      }
-     catch { throw new Error('Native scheduled preparation failed; fixture values are not logged.'); }
+     catch (error) { throw new Error(`Native scheduled preparation failed${fixtureDiagnostics && error.message ? ` (${error.message})` : ''}; fixture values are not logged.`); }
     },
     queues: Object.freeze({ hold: () => { held = true; }, release, ...producers(mf) }),
    });
@@ -206,6 +219,11 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
     await mf.setOptions(convertV4MiniflareOptions(options));
     loopback = await mf.ready;
    };
+  },
+  // A WebSocket upgrade through the ingress, which the loopback fetch cannot carry: the response holds `webSocket`.
+  upgrade: (path, { headers, origin = HOSTED_ORIGIN } = {}) => {
+   if (!origins.includes(origin)) throw new RerError('agent_door_origin', 'Agent conformance request must use a declared hosted installation origin.', 1);
+   return mf.dispatchFetch(`http://127.0.0.1/${path}`, { headers: { ...headers, upgrade: 'websocket', 'x-rer-original-url': `${origin}/${path}` } });
   },
   close: () => { release(); return mf.dispose(); },
   fetch: (path, { headers, origin = HOSTED_ORIGIN, ...init } = {}) => {

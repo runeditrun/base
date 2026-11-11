@@ -7,6 +7,7 @@ import { verificationReviewers } from '../agent-reviewers.mjs';
 import { readAgentSurface } from '../agent-surface.mjs';
 import { verificationSponsors } from '../agent-sponsors.mjs';
 import { FixtureError, compileFixture, failureColumn, fixtureParameters, sizes } from './fixture.mjs';
+import { createMeter } from './meter.mjs';
 
 // One disposable install per size: the build served as verify's hosted check serves it (a fresh local D1 with the
 // build's migrations), the owner signed in with the bootstrap agent-door conformance uses, the shape generated
@@ -80,25 +81,29 @@ const count = async (database, table) => Number(await database.prepare(`SELECT c
 
 /**
  * Builds one install at `size` and reads back what it holds. Resolves
- * `{ size, tables: [{ table, declared, before, readBack, total, ms }], totalRows, phases }` (phases in ms) and has
- * closed the install; rejects with the first failure, naming where it stopped.
+ * `{ size, tables: [{ table, declared, before, readBack, total, ms }], totalRows, phases, measured }` (phases in ms)
+ * and has closed the install; rejects with the first failure, naming where it stopped. With `measure`, the install
+ * is served with the rows-read meter and, once built, `measure({ hosted, owner, meter, timed })` runs on it before it
+ * closes; what it resolves is `measured`. `timed(phase, flow, work)` runs work under the run's clock and adds its
+ * time to that phase.
  */
-export async function buildInstall(run, size, clock) {
- const { declaration } = run, phases = { serve: 0, owner: 0, generate: 0, after: 0, readback: 0 };
+export async function buildInstall(run, size, clock, measure) {
+ const { declaration } = run, phases = { serve: 0, owner: 0, generate: 0, after: 0, readback: 0, personas: 0, flows: 0 };
  const fixture = run.fixtures[size];
- const timed = async (phase, table, work) => {
-  clock.enter(size, phase, table);
+ const timed = async (phase, table, work, flow) => {
+  clock.enter(size, phase, table, flow);
   const started = performance.now();
   try { return await clock.within(work()); } finally { phases[phase] += performance.now() - started; }
  };
- let keys, serving, hosted;
+ let keys, serving, hosted, owner, measured;
+ const meter = measure ? createMeter() : undefined;
  try {
   if (run.owner) keys = await ownerKeys(run.root, run.owner.native, { email: run.owner.email, sub: run.owner.sub });
   serving = serveHosted(run.root, { declaration: run.deployDeclaration, publicHosts: run.verification.publicHosts, rpc: run.verification.rpc,
-   fixturePreparation: true, fixtureDiagnostics: true, outboundService: refuseNetwork,
+   fixturePreparation: true, fixtureDiagnostics: true, outboundService: refuseNetwork, meter,
    bindings: keys ? ownerBindings(keys, { claim: run.owner.claim, native: run.owner.native, email: run.owner.email }) : {} });
   hosted = await timed('serve', undefined, () => serving);
-  if (keys) await timed('owner', undefined, () => signOwnerIn(run, hosted, keys));
+  if (keys) owner = await timed('owner', undefined, () => signOwnerIn(run, hosted, keys));
   const database = await (await hosted.preparation()).database(run.binding);
   const before = new Map();
   await timed('readback', undefined, async () => { for (const { table } of fixture.tables) before.set(table, await count(database, table)); });
@@ -121,7 +126,8 @@ export async function buildInstall(run, size, clock) {
    // A virtual table's shadow tables or a table SQLite cannot count are not rows the check made.
    for (const name of names) totalRows += await count(database, name).catch(() => 0);
   });
-  return { size, tables, totalRows, phases, statements: fixture.statements.length };
+  if (measure) measured = await measure({ hosted, owner, meter, timed: (phase, flow, work) => timed(phase, undefined, work, flow) });
+  return { size, tables, totalRows, phases, statements: fixture.statements.length, measured };
  } finally {
   clock.enter(size, 'closing the install');
   // A timeout can leave the install still starting: close it as soon as it exists.
