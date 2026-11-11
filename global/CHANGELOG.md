@@ -1,10 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.2.108
 
-### Fixes
+### Installer PATH step
 
-- After `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>` (or any supplied command except `business`), a later bare `rer` in a new terminal whose PATH lacks `~/.local/bin` failed with `rer: command not found`, and the installer only offered an "Optional" step inside the app. When `~/.local/bin` is not on the PATH the installer saw, its closing lines now give one required step, the `export PATH="$HOME/.local/bin:$PATH"` line to run and keep in the shell startup file, and `~/.local/bin/rer cli path` for other shells, in place of the app's optional sentence. The installer stays silent when `~/.local/bin` is already on PATH, edits no shell file and keeps the command's exit code. The seed README template (`foundation/template` README.md and OPERATIONS.md, and the default seed's README.md and RUN-LOCALLY.md) shows the same line beside its first bare `rer dev`.
+- After `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>` (or any supplied command except `business`), a later bare `rer` in a new terminal whose PATH lacks `~/.local/bin` failed with `rer: command not found`, and the installer only offered an "Optional" step inside the app. When `~/.local/bin` is not on the PATH the installer saw, its closing lines now give one required step: the `export PATH="$HOME/.local/bin:$PATH"` line to run and keep in the shell startup file, and `~/.local/bin/rer cli path` (the absolute launcher) for other shells, in place of the app's optional sentence (the installer sets `RER_INSTALLER_PATH_STEP`, which makes `rer dev` skip that sentence). The installer stays silent when `~/.local/bin` is already on PATH, edits no shell file, keeps the command's exit code, and leaves `business` commands free of shell advice.
+- The one-line installer is served from the release asset (`install.sh` in the release), so a user gets this only once this release is published; runs of the installer from an older release are unchanged.
+- The seed README template (`foundation/template` README.md and OPERATIONS.md, and the default seed's README.md and RUN-LOCALLY.md, with the exported RUN-LOCALLY.md) shows the same line beside its first bare `rer dev`. A seed gets that wording only by adopting it.
+- Code and docs only: no migration is added. Nothing here is live in any deployed seed until that seed adopts and deploys it.
 
 ## 0.2.107
 
