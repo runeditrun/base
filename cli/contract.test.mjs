@@ -98,3 +98,55 @@ test("check validates a seed's CONTRACT.md Status table and names the line of ea
  assert.deepEqual(unproven.failed.map(([id, line]) => [id, Number(line)]), [['CONTRACT.evidence.PAGE-001', row('PAGE-001')]]);
  assert.match(unproven.failed[0][2], /tests\/pages\.test\.mjs/);
 });
+
+// A managed copy is the platform's install of a published release: it carries the committed `rer-upstream.json`
+// release record and none of the publisher's repository automation except `.github/workflows/rer-managed.yml`.
+test("check does not require a managed copy to carry the publisher's .github automation cited as evidence", async t => {
+ const { root, check } = await structuralSeed(t);
+ const contract = ['# Example contract', '', '## Product target', '', '| | |', '| --- | --- |', '| Category | Team notes |', '| Incumbents a buyer switches from | Notion, Confluence |', '| First buyer | A US team of 20 |', '',
+  '## Pages', '', '- **PAGE-001 — Create a page.** A member creates a page.', '- **PAGE-002 — Share a page.** A member shares a page.', '',
+  '## Status', '', 'Judged from the code and tests at commit `0123abc` (17 October 2026).', '', '| Clause | Title | Kind | Status | Evidence | Gap |', '| --- | --- | --- | --- | --- | --- |',
+  '| `PAGE-001` | Create a page | published | done | `.github/workflows/journeys.yml` |  |', '| `PAGE-002` | Share a page | published | done | `tests/share.test.mjs` |  |', ''];
+ await mkdir(join(root, '.github/workflows'), { recursive: true }); await mkdir(join(root, 'tests'), { recursive: true });
+ await writeFile(join(root, '.github/workflows/rer-managed.yml'), 'name: Managed release\n'); await writeFile(join(root, 'tests/share.test.mjs'), '');
+ await writeFile(join(root, 'CONTRACT.md'), contract.join('\n'));
+ const evidence = result => result.report.clauses.filter(clause => clause.id.startsWith('CONTRACT.evidence.'));
+ const upstream = JSON.stringify({ schema: 1, repository: 'runeditrun/base', tag: 'v1.2.3', commit: '0123456789abcdef0123456789abcdef01234567' }) + '\n';
+
+ // An authoring checkout (no release record) keeps the hard existence check.
+ const authoring = check();
+ assert.equal(authoring.status, 1);
+ assert.deepEqual(evidence(authoring).filter(clause => !clause.ok).map(clause => clause.id), ['CONTRACT.evidence.PAGE-001']);
+ assert.match(evidence(authoring)[0].message, /\.github\/workflows\/journeys\.yml, which is not in this checkout/);
+
+ // A record that is not exactly the platform's, or not a regular file, does not mark a managed copy.
+ for (const bad of ['{}', upstream.replace('"schema":1', '"schema":2'), upstream.replace('v1.2.3', 'latest'), JSON.stringify({ ...JSON.parse(upstream), extra: 1 }), 'not json']) {
+  await writeFile(join(root, 'rer-upstream.json'), bad);
+  assert.equal(check().status, 1, `${bad.slice(0, 30)} must not mark a managed copy`);
+ }
+ await rm(join(root, 'rer-upstream.json')); await mkdir(join(root, 'rer-upstream.json'));
+ assert.equal(check().status, 1, 'a directory is not a release record');
+ await rm(join(root, 'rer-upstream.json'), { recursive: true });
+
+ // A managed copy: the .github evidence is skipped, and the skip is named.
+ await writeFile(join(root, 'rer-upstream.json'), upstream);
+ const managed = check();
+ assert.equal(managed.status, 0, managed.stdout);
+ const skipped = evidence(managed).find(clause => clause.id === 'CONTRACT.evidence.PAGE-001');
+ assert.ok(skipped.ok);
+ assert.match(skipped.message, /skipped in a managed copy/);
+ assert.match(skipped.message, /\.github\/workflows\/journeys\.yml/);
+
+ // Every other evidence path is still a hard existence check in a managed copy, and so are paths that only look like .github.
+ await rm(join(root, 'tests/share.test.mjs'));
+ const missing = check();
+ assert.equal(missing.status, 1);
+ assert.deepEqual(evidence(missing).filter(clause => !clause.ok).map(clause => clause.id), ['CONTRACT.evidence.PAGE-002']);
+ for (const sneaky of ['.github/../src/gone.mjs', 'src/.github/workflows/x.yml', '.githubx/workflows/x.yml', '.github-extra/x.yml']) {
+  await writeFile(join(root, 'tests/share.test.mjs'), ''); // restore PAGE-002 so only the sneaky path can fail
+  await writeFile(join(root, 'CONTRACT.md'), contract.join('\n').replace('`.github/workflows/journeys.yml`', `\`${sneaky}\``));
+  const result = check();
+  assert.equal(result.status, 1, `${sneaky} stays a hard check in a managed copy`);
+  assert.deepEqual(evidence(result).filter(clause => !clause.ok).map(clause => clause.id), ['CONTRACT.evidence.PAGE-001']);
+ }
+});

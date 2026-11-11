@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `rer check` no longer fails a managed copy for contract evidence under `.github/workflows` or `.github/dependabot.yml` (publisher automation the platform does not install). The copy is recognised only by the platform's committed `rer-upstream.json` release record, exactly as written; each such clause passes and says it was skipped in a managed copy, every other evidence path stays a hard check, and an authoring checkout checks all paths as before.
+
 ## 0.2.108
 
 ### Installer PATH step
