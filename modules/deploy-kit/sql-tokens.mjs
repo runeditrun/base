@@ -2,6 +2,7 @@ import { assert } from './validation.mjs';
 
 // SQLite quotes escape themselves by doubling, except brackets, which end at ].
 // Keep quoted tokens intact: their punctuation and keywords are never syntax.
+// Each token also carries its source span: sql.slice(start, end) is its text.
 export function sqlTokens(sql) {
   assert(!sql.includes('\0'), 'unsafe-migration-control');
   const tokens = [];
@@ -33,16 +34,16 @@ export function sqlTokens(sql) {
         break;
       }
       assert(closed, 'unsafe-migration-control');
-      tokens.push({ kind: char === "'" ? 'string' : 'identifier', value });
+      tokens.push({ kind: char === "'" ? 'string' : 'identifier', value, start, end: offset });
     } else if (/[0-9]/.test(char) || (char === '.' && /[0-9]/.test(sql[offset] ?? ''))) {
       const number = /^(?:0[xX][0-9a-fA-F_]+|(?:[0-9][0-9_]*(?:\.[0-9_]*)?|\.[0-9][0-9_]*)(?:[eE][+-]?[0-9][0-9_]*)?)/.exec(sql.slice(start))[0];
       offset = start + number.length;
-      tokens.push({ kind: 'number', value: number });
+      tokens.push({ kind: 'number', value: number, start, end: offset });
     } else if (/[A-Za-z_\u0080-\uFFFF]/.test(char)) {
       while (offset < sql.length && /[A-Za-z0-9_$\u0080-\uFFFF]/.test(sql[offset])) offset++;
-      tokens.push({ kind: 'word', value: sql.slice(start, offset) });
+      tokens.push({ kind: 'word', value: sql.slice(start, offset), start, end: offset });
     } else {
-      tokens.push({ kind: 'symbol', value: char });
+      tokens.push({ kind: 'symbol', value: char, start, end: offset });
     }
   }
   return tokens;

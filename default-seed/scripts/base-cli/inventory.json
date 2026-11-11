@@ -735,7 +735,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "634eb37e0e688ae10355c87863343a2af7bdd05bd450829ddb65f94545b826f2"
+      "sha256": "13453429ed00123b1cf2db005f676a7e274cd9faca40f13da6c1b0bc0e296591"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -971,7 +971,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "abdcb91dce67d68296e9ac6f12e058879dc3f9303cb984e608dbfad2372496e7"
+      "sha256": "09051aa6fad7b85af2231e7673b8fdfcd4b388136d1a50ec89bd89bd1e020baf"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -983,7 +983,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "a03aa5fed82bc5153b8b2183f6ed991d49da9492e8c6dab587c7f7f29418f611"
+      "sha256": "9289b370dd88510be3b572998f23360761ea63f05bbfac056dfcd16eee1f55e7"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
@@ -1003,7 +1003,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "69ce3d31738cea5cbd54632ed81fc27a784dee9c07c601a5d60059508544c245"
+      "sha256": "679519b010d2580aeb55d2444ece7315abc17603eac0e1af0abb8b79f3d47e27"
     },
     "cli/managed-data-schema.mjs": {
       "source": "cli/managed-data-schema.mjs",
@@ -1055,7 +1055,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "f0d411949e9746cdcf4f568dd2b8f1dc1075a5749aa07e18c0861849e99ec74a"
+      "sha256": "41f087b7c9a6ee9764cddd44a8427eba5284c8f452c091a83cba29ce297a2c95"
     },
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",
@@ -1260,6 +1260,50 @@
     "cli/site.mjs": {
       "source": "cli/site.mjs",
       "sha256": "9c4645a5f8b9f8c5777534c8b979bfeec7e74d1e99433760fae2d2a01bf1aff7"
+    },
+    "cli/size/check.mjs": {
+      "source": "cli/size/check.mjs",
+      "sha256": "8a66313f08e29faa323216192baae44d66df63f9c7290d2cc051b6a735d961e7"
+    },
+    "cli/size/command.mjs": {
+      "source": "cli/size/command.mjs",
+      "sha256": "658ef087cd108e799e850c1bd1adde456c83c422f565e0204cf5b9e351535d0a"
+    },
+    "cli/size/dml-parts.mjs": {
+      "source": "cli/size/dml-parts.mjs",
+      "sha256": "0feee1082cf4c7efbf309c9ecacd000fb5526667ab51e64a8869b809052e8dc5"
+    },
+    "cli/size/expression-depth.mjs": {
+      "source": "cli/size/expression-depth.mjs",
+      "sha256": "d0868b8d23a579cdc331158ccb6f6d6a432f1019d6fd3ec9334e0f443b54e052"
+    },
+    "cli/size/from-items.mjs": {
+      "source": "cli/size/from-items.mjs",
+      "sha256": "6d1b96cc2f3c730543edc6eb82aba8f19fcc84a182a4cbaafb7a8f4aac01116a"
+    },
+    "cli/size/limits.mjs": {
+      "source": "cli/size/limits.mjs",
+      "sha256": "aefeaa5dc1819ae8440a96352d956b6a8dea9b5382aafa97289dddaeec33000c"
+    },
+    "cli/size/report.mjs": {
+      "source": "cli/size/report.mjs",
+      "sha256": "b551cf80aee62e526938b6657f419b9827fbab9409bde03dbbf2c65049b34918"
+    },
+    "cli/size/schema-objects.mjs": {
+      "source": "cli/size/schema-objects.mjs",
+      "sha256": "c1c925d3e41f0d3d09896b3164bebfed9e7c49ac37e6c03886d9ddc98c87afb1"
+    },
+    "cli/size/schema.mjs": {
+      "source": "cli/size/schema.mjs",
+      "sha256": "d50f53aa768b9810c397ed877658b52e0ac2cbe6830066a20cd6d370588b6983"
+    },
+    "cli/size/statements.mjs": {
+      "source": "cli/size/statements.mjs",
+      "sha256": "dc8dcd16c59151e559d6604ee872b808a274c732aa15de018d536a4f725380c3"
+    },
+    "cli/size/verify-step.mjs": {
+      "source": "cli/size/verify-step.mjs",
+      "sha256": "709dbf043e88eb03c90fa10c50a27ff0400dd53c93e03a46622e6df5b36effe5"
     },
     "cli/sqlite-notice.mjs": {
       "source": "cli/sqlite-notice.mjs",
@@ -2299,7 +2343,7 @@
     },
     "modules/d1-transport/limits.mjs": {
       "source": "modules/d1-transport/limits.mjs",
-      "sha256": "81ca0076b1b46c2c35952c60a6631c6708a7248b2315785771098b4794c2ed40"
+      "sha256": "fe4d932587adcb8ce50df6d90891ba324c8df27d67ee2d1be0ba86a64aae47f2"
     },
     "modules/delivery-producer/bindings.mjs": {
       "source": "modules/delivery-producer/bindings.mjs",
@@ -2787,7 +2831,7 @@
     },
     "modules/deploy-kit/sql-tokens.mjs": {
       "source": "modules/deploy-kit/sql-tokens.mjs",
-      "sha256": "ddbcb2639e902dce995b32d75d8827f922651e080b40e01dbe76a4b682a96357"
+      "sha256": "a4d6449ac2a64252af6a94e8bbbebb2defeb584578ee2f5bcf7fc29d298ca82b"
     },
     "modules/deploy-kit/teardown.mjs": {
       "source": "modules/deploy-kit/teardown.mjs",

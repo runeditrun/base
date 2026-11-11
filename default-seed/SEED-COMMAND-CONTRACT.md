@@ -828,6 +828,30 @@ Verify fails when an element outside the edited section (or any section, for loo
 
 Pages are the page `/` answers, following same-origin redirects (at most five, so a signed-out `/` that redirects to `/sign-in` checks `/sign-in`), plus same-origin links on that page that answer 200 HTML without a session (following only a trailing-slash redirect), at most six. Name them instead with the `commandAdapter` option `publicPages` (for example `publicPages: ['/', '/docs/start']`). A check that loads no page (`/` answers an error or redirects to another origin, and no `publicPages` are declared) fails naming what it did not check, never passes. Verify prints each page with its loads or why it was skipped, each redirect followed and each link not checked; the result's `hydration` carries them as `pages`, `redirects` and `notChecked`. The check runs Chromium through the seed's own Playwright (`playwright-core`, `@playwright/test` or `playwright` resolved from its `package.json`); without one, or without its Chromium (`pnpm exec playwright install chromium`), verify fails naming what to install and never skips. In vendored mode only, `node scripts/base-cli/cli/hydration/check.mjs [ROOT] [--origin URL] [--pages /,/x] [--details]` runs the same check on the existing `dist/` build, or with `--origin` against a running `rer dev` or `rer preview`; against `rer dev` each rebuild also shows the dev hydration warning, counted in `--details`.
 
+## Statement size and growth (SC-15)
+
+Cloudflare D1 refuses a statement that nests too deeply, and local SQLite and Miniflare accept the same statement, so only real D1 shows it. Two limits, both observed rather than documented (K21, 10 Nov 2026), and D1 changed how it enforces them without notice on 10 Nov 2026:
+
+- **FROM items: 100.** Every item of every FROM clause (a table, a CTE or view reference, a FROM subquery, a table-valued function), counted with each CTE and view reference expanded in place at every reference. A recursive CTE's own reference is not expanded. A chain of 99 CTEs each reading the one before is 100 items; a CTE read twice by each of 6 CTEs above it is over 100.
+- **Expression depth: 100.** SQLite's own measure, which adds the heights of nested expressions and subqueries: 12 nested `EXISTS` is depth 91, 13 is 105.
+
+**The margin.** `rer size` and verify fail a statement at 90 or more of either measure, 10 under D1's limit, so that a change in how D1 enforces them does not turn a passing build into a refused deploy. The margin is written once, in `cli/size/limits.mjs`; D1's limits are in `modules/d1-transport/limits.mjs`.
+
+**What is measured.** FROM items come from a static model over the statement's tokens, with the schema's views expanded as CTEs are. Depth comes from SQLite itself: each statement is compiled in memory under a padded chain of additions (`SELECT (1+1+…+1) + EXISTS (SELECT 1 FROM (<statement>))`), calibrated on `SELECT 1`, so it is exact under node:sqlite's own limit. A DML statement is measured through its SELECT-shaped parts: an INSERT's SELECT or VALUES; the right-hand sides and WHERE of an upsert's DO UPDATE, with `excluded.` read as the target table; an UPDATE's SET right-hand sides, FROM, WHERE and RETURNING; a DELETE's WHERE and RETURNING. A statement that does not compile against the schema fails, naming it and SQLite's message; none is skipped. Nothing runs on a network, an account or a real D1.
+
+**The schema.** The build's D1 databases are rebuilt in memory from each `dist/server/wrangler.json` `d1_databases[].migrations_dir`, in order, with the seed's reviewed migration rewrites checked against the migrations' current bytes (the same inputs the hosted check serves). Each view is measured as its SELECT. Each trigger is measured as its WHEN clause and each body statement, with `NEW.x` and `OLD.x` read as parameters and `RAISE(...)` as NULL.
+
+**The verb.** `rer size` is rer's own verb, as `rer signin` is: no seed declares it and `rer check` does not ask for it, and it runs in first-party and independent checkouts alike.
+
+- `rer size` checks the schema objects of the build's migrations.
+- `rer size --migrations DIR` checks those of a migrations directory.
+- `rer size --statements FILE [--migrations DIR]` checks a statements file, `{"statements":[{"name","sql","params"?}]}` (the fleet runner's format; other keys are ignored), against that schema.
+- Each failure is named with its FROM items and depth and the first 160 characters of its SQL, then a summary and what to do. Exit 1 if any statement fails, 0 if none, 3 with no build and no `--migrations`. `--json` lists every statement as `{name, fromItems, depth, ok}`.
+
+**Verify.** `rer verify` ends with "Checking statement size and growth with data", after the agent-door check. It runs the schema-object check on every D1 binding of the build, returns it as `size` beside `hosted`, `hydration` and `agentDoor`, and fails naming the view or trigger that is too large. A build with no D1 binding prints one line and passes.
+
+**Coming.** The growth check, which will run a seed's declared flows against a small and a large install and fail a flow whose rows read grow with the data, is not part of this step yet; the step's label names it ahead of the check.
+
 ## Pins, aliases and responsibility
 
 Convert an unedited vendored seed with
@@ -984,6 +1008,7 @@ exact grant fields, request bodies and recovery rules.
 - SC-09: structural check rejects omissions, doctor names missing inputs, stable JSON and exits.
 - SC-10: optional independent execution uses only declared argv, preserves child outcomes and forces no stack.
 - SC-14: the seed carries its own mark; check and run site builds and deploys warn on Base's placeholder mark, and releases refuse it unless `--allow-placeholder-mark` is given, which the receipt records.
+- SC-15: statement size is checked against D1's limits with a margin of 10: `rer size`, and the last step of `rer verify`, fail a view or trigger statement at 90 FROM items or expression depth 90; the growth check is coming.
 
 ## Managed servers and bounded work
 

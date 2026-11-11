@@ -5,7 +5,7 @@ import { inventory } from './export.mjs';
 import { lstat, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { delimiter, dirname, resolve } from 'node:path';
-import { authoringVerbs, aliases, demoVerb, pins, requiredHooks, serverDefaults, signinVerb, verbs, releaseFlags } from './contract.mjs';
+import { authoringVerbs, aliases, demoVerb, pins, requiredHooks, serverDefaults, signinVerb, sizeVerb, verbs, releaseFlags } from './contract.mjs';
 import { runningVersion } from './version.mjs';
 import { contained, readPackage } from './project.mjs';
 import { shared } from './shared.mjs';
@@ -52,7 +52,9 @@ export async function describe(project) {
   }).concat(capabilities.dev?.flags?.includes('--demo') ? [['demo', { flags: demoVerb.flags.filter(flag => capabilities.dev.flags.includes(flag)), effects: demoVerb.effects }]] : [])
    // rer signin is rer's own: any seed it can deploy, it can sign the owner in to.
    .concat(Object.entries(authoringVerbs))
-   .concat(capabilities.deploy ? [['signin', { flags: signinVerb.flags, effects: signinVerb.effects }]] : [])),
+   .concat(capabilities.deploy ? [['signin', { flags: signinVerb.flags, effects: signinVerb.effects }]] : [])
+   // So is rer size: it reads migrations, whatever the seed declares.
+   .concat([['size', { flags: sizeVerb.flags, effects: sizeVerb.effects }]])),
   aliases: Object.fromEntries(Object.entries(aliases).filter(([alias, verb]) => pkg.scripts?.[alias] === commandLine(verb, declaredPackage(pkg) !== undefined))),
   local: { state: project.adapter?.state, settings: project.adapter?.settings ?? [], installerState: '.seed/installer', ...await localState(project), origin: await savedOrigin(project), ...(project.adapter?.devIdentity ? { devIdentity: true, devKey: '.rer/local/dev-key.env' } : {}) },
   // This pin serves a checkout through the machine's front door (rer door).
