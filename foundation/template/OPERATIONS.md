@@ -22,7 +22,10 @@ Start a fresh copy with one line: `npx -y @runeditrun/rer dev just-every/run-fou
 (set up only: `npx -y @runeditrun/rer setup just-every/run-foundation`; without
 Node, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-foundation`).
 It clones, installs, sets up a local owner and starts the app; to start it again
-later, run `cd run-foundation && rer dev`. Run all other first-party operations
+later, run `cd run-foundation && rer dev`; after the `curl` installer, a terminal
+without `~/.local/bin` on PATH needs `export PATH="$HOME/.local/bin:$PATH"` first
+or it says `rer: command not found` (add it to your shell startup file to keep it;
+`"$HOME/.local/bin/rer" cli path` shows the line for your shell). Run all other first-party operations
 from the composed, runnable edition checkout with `rer`. The detailed flags and
 effects are in `RUN-LOCALLY.md` and `SEED-COMMAND-CONTRACT.md`.
 

@@ -25,7 +25,11 @@ when there is none), or with `npx -y @runeditrun/rer cli install` when Node 22
 or later is on PATH.
 From this seed's root, `rer dev` alone launches it: it installs dependencies,
 sets up a local owner on a free port, starts the app and prints `RER_READY` and
-a sign-in link. To install for a real owner, run the verbs yourself:
+a sign-in link. After the installer script, a terminal without `~/.local/bin` on
+PATH needs `export PATH="$HOME/.local/bin:$PATH"` before a bare `rer dev`, or it
+says `rer: command not found` (add that line to your shell startup file to keep
+it; `"$HOME/.local/bin/rer" cli path` shows the line for your shell).
+To install for a real owner, run the verbs yourself:
 
 ```sh
 rer install

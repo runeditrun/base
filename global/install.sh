@@ -12,7 +12,8 @@
 # package's own `rer cli install`: the same layout as
 # `npx -y @runeditrun/rer cli install`. A failure leaves any previous install
 # selected and working. It never edits shell profiles: when ~/.local/bin is not
-# on PATH, the absolute launcher works now; shell setup is optional after launch.
+# on PATH, the absolute launcher works now, and a run that supplied a command ends
+# with the one PATH line to run and keep.
 #
 # Needs curl and tar. If Node 22 or later is absent, installs the pinned official
 # Node release in rer's own data directory. macOS/Linux x64/arm64; Windows: WSL2.
@@ -150,8 +151,8 @@ NODE
  export RER_TRANSFER_RER_BYTES
  mkdir "$work/stage"
  tar -xzf "$work/rer.tgz" -C "$work/stage" || fail "could not unpack rer $version; nothing was installed."
- # A supplied command replaces the app next step. Shell setup is offered only
- # after the app is ready, through the optional rer cli path command.
+ # A supplied command replaces the app next step. When ~/.local/bin is not on
+ # the caller's PATH, the closing lines below give the shell step.
  no_next=
  if [ "$#" -gt 0 ]; then no_next=1; fi
  RER_INSTALL_CHANNEL=script RER_INSTALL_NO_NEXT=$no_next "$node_binary" "$work/stage/package/global/rer.mjs" cli install </dev/null \
@@ -164,9 +165,23 @@ NODE
  # where ~/.local/bin may not be on PATH yet.
  RER_INVOKED_AS="$HOME/.local/bin/rer"
  if [ "$(command -v rer 2>/dev/null || true)" = "$RER_INVOKED_AS" ]; then RER_INVOKED_AS=rer; fi
+ # The caller's own PATH decides whether a later bare `rer` works. Read it before
+ # it is extended for the command below. Business connect stays free of shell advice.
+ path_step=
+ case ":$PATH:" in
+  *":$HOME/.local/bin:"* | *":$HOME/.local/bin/:"*) ;;
+  *) if [ "$1" != business ]; then path_step=1; fi ;;
+ esac
  PATH="$PATH:$HOME/.local/bin"
  export PATH RER_INVOKED_AS
- "$HOME/.local/bin/rer" "$@"
+ # The closing lines replace the app's own optional PATH sentence, never repeat it.
+ if [ -n "$path_step" ]; then RER_INSTALLER_PATH_STEP=1; export RER_INSTALLER_PATH_STEP; fi
+ status=0
+ "$HOME/.local/bin/rer" "$@" || status=$?
+ if [ -n "$path_step" ]; then
+  printf '\nRequired next step: %s/.local/bin is not on your PATH, so a bare `rer` in a new terminal says "rer: command not found". Run this in the terminal you will use, and add the same line to your shell startup file (~/.zshrc for zsh, ~/.bashrc for bash):\n  export PATH="$HOME/.local/bin:$PATH"\nOther shells, such as fish: run %s/.local/bin/rer cli path to see the line for yours. Until then, start rer with %s/.local/bin/rer. This installer changes no shell file.\n' "$HOME" "$HOME" "$HOME"
+ fi
+ return "$status"
 }
 
 install_node() {

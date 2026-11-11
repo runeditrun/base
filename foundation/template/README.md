@@ -30,7 +30,10 @@ prints `RER_READY` and a sign-in link. To set up without starting, run
 `npx -y @runeditrun/rer setup just-every/run-foundation`. Without Node 22 or
 later, run `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-foundation`
 instead; it brings its own Node. To start it again later, run
-`cd run-foundation && rer dev`.
+`cd run-foundation && rer dev`; after the `curl` installer, a terminal without
+`~/.local/bin` on PATH needs `export PATH="$HOME/.local/bin:$PATH"` first or it
+says `rer: command not found` (add that line to your shell startup file to keep
+it; `"$HOME/.local/bin/rer" cli path` shows the line for your shell).
 
 This edition is runnable after composition. Inside the composed edition's
 checkout, to install for a real owner, run the verbs yourself:

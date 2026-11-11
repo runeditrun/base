@@ -43,8 +43,10 @@ The installer needs no Node: without Node 22 or later on PATH it installs a
 private one for `rer` (see below). It edits no shell profile. The second step
 uses the installed launcher directly, so it works in the same shell without
 changing PATH: a child installer cannot change its parent shell’s PATH, and bare
-`rer` needs `~/.local/bin` on PATH. After the app opens, an optional
-`rer cli path` step explains how to make `rer` available in future terminals.
+`rer` needs `~/.local/bin` on PATH. When the PATH the installer saw lacks
+`~/.local/bin`, its closing lines give one required step: the
+`export PATH="$HOME/.local/bin:$PATH"` line to run now and add to your shell
+startup file, or `rer cli path` (by its absolute launcher) for other shells.
 The same start also fits on one line:
 
 ```sh
@@ -84,9 +86,10 @@ With no Node 22 or later on PATH, the script installs Node 22.20.0 from
 verifies the tarball against that release's published `SHASUMS256.txt`, and
 prints its location. The launcher uses this private runtime on later runs.
 System Node is left alone. With no arguments, the installer prints an app-start
-command using its absolute launcher. After a first launch, `rer cli path` shows
-an optional shell-specific line to make `rer` available in future terminals.
-Only running that line changes a shell startup file; `rer` never edits one.
+command using its absolute launcher. With a supplied command and no
+`~/.local/bin` on PATH, it ends with the PATH line to run and keep, and
+`rer cli path` shows the shell-specific line to make `rer` available in future
+terminals. Only running that line changes a shell startup file; `rer` never edits one.
 A re-run with the same build changes nothing; a different build keeps the
 previous version and removes older ones. It refuses to replace a launcher it
 did not write.

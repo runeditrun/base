@@ -51,6 +51,11 @@ test('public foundation CLI keeps author identity private from Run data and comp
     assert.equal(secondRun.repository, secondRepository)
     assert.equal(secondRun.clone, `npx -y @runeditrun/rer dev just-every/run-${secondEditionName}`)
     assert.equal(secondRun.name, secondEditionName)
+    // The README the generator writes shows the PATH line beside its first bare `rer dev`.
+    const secondReadme = await readFile(resolve(secondEdition, `editions/${secondEditionName}/README.md`), 'utf8')
+    const firstBare = secondReadme.indexOf(`cd run-${secondEditionName} && rer dev`)
+    assert.ok(firstBare >= 0)
+    assert.ok(secondReadme.slice(firstBare, firstBare + 400).includes('export PATH="$HOME/.local/bin:$PATH"'), 'the first bare rer dev is followed by the PATH line')
     const secondSetup = JSON.parse(await readFile(resolve(secondEdition, `editions/${secondEditionName}/rer-setup.json`)))
     assert.equal(secondSetup.title, secondEditionName)
     assert.equal(secondSetup.fields.find(field => field.name === 'APP_NAME').default, secondEditionName)

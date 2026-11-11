@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- After `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev <owner/repo>` (or any supplied command except `business`), a later bare `rer` in a new terminal whose PATH lacks `~/.local/bin` failed with `rer: command not found`, and the installer only offered an "Optional" step inside the app. When `~/.local/bin` is not on the PATH the installer saw, its closing lines now give one required step, the `export PATH="$HOME/.local/bin:$PATH"` line to run and keep in the shell startup file, and `~/.local/bin/rer cli path` for other shells, in place of the app's optional sentence. The installer stays silent when `~/.local/bin` is already on PATH, edits no shell file and keeps the command's exit code. The seed README template (`foundation/template` README.md and OPERATIONS.md, and the default seed's README.md and RUN-LOCALLY.md) shows the same line beside its first bare `rer dev`.
+
 ## 0.2.107
 
 ### Deploy mail notice and secret names
