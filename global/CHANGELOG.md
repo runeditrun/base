@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Business settings: a team adapter can now implement the optional `retiredForms(email)` so a teammate an older release of the seed erased behind an opaque placeholder (a renamed roster row) is retired when a signed roster lists them by their real address alone, with no Business member id. The module matches the placeholder row to the listing before `gone` retires it, and digests the same forms when it screens a roster; before, only the placeholder and the Business id were tombstoned and such a listing was invited as a new person. An adapter that does not implement it behaves as before. No migration; `bs_retired` holds the same value-free digests. Nothing is live in any deployed seed until that seed adopts and implements the hook.
+
 ## 0.2.109
 
 ### `rer check` in a managed copy
