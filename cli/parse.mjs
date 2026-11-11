@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { authoringVerbs, commonFlags, serverDefaults, signinVerb, verbs } from './contract.mjs';
+import { authoringVerbs, commonFlags, serverDefaults, signinVerb, sizeVerb, verbs } from './contract.mjs';
 import { invalid, refuse } from './errors.mjs';
 import { isLoopbackHost } from '../modules/operator-auth/loopback.mjs';
 import { normalizeEmail } from '../modules/operator-auth/policy.mjs';
@@ -27,7 +27,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  // Independent projects own verb names; only the common wrapper flags apply
  // to unknown names. Profile resolution rejects undeclared commands later.
  if (!/^[a-z][a-z0-9-]*$/.test(verb)) throw invalid('Unknown rer command. Run rer --help.');
- const allowed = new Set(independent ? [...commonFlags,...(['install','setup','build','verify','deploy','release','export','import','dev','preview'].includes(verb)?['--no-queue']:[])] : (verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : undefined))?.flags ?? commonFlags), options = { verb, cwd: resolve(cwd), forwarded: [], supplied: new Set() };
+ const allowed = new Set(independent ? [...commonFlags,...(['install','setup','build','verify','deploy','release','export','import','dev','preview'].includes(verb)?['--no-queue']:[])] : (verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : verb === 'size' ? sizeVerb : undefined))?.flags ?? commonFlags), options = { verb, cwd: resolve(cwd), forwarded: [], supplied: new Set() };
  let separator = false;
  for (let i = 0; i < args.length; i++) {
   const flag = args[i];
@@ -109,8 +109,8 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
 }
 
 export function help(verb) {
- if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys({...verbs, ...authoringVerbs}).join(', ')}, signin, release, listing\nRun rer VERB --help for flags.\n${appSignInHelp}\n`;
- const known = verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : undefined);
+ if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys({...verbs, ...authoringVerbs}).join(', ')}, signin, size, release, listing\nRun rer VERB --help for flags.\n${appSignInHelp}\n`;
+ const known = verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : verb === 'size' ? sizeVerb : undefined);
  const door = ['export', 'import'].includes(verb) ? 'To move records, start the app and open its signed-in owner import door:\n\n  rer dev\n\nOpen /app/import, then export or upload and review supported records there.\n\nTo back up or restore this installation:\n' : '';
  return `${door}Usage: rer ${verb}${verb === 'refresh-base' ? ' --ref FULL_COMMIT' : ''} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;
 }

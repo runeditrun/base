@@ -390,6 +390,16 @@ there lists its flags:
 `export`, `import`, `doctor`, `describe`, `check`, `release`,
 `release sign`, `release receipt` and `release keygen`.
 
+`rer size` checks statement size against D1's limits: it fails a statement at 90
+FROM items (counted with every CTE and view reference expanded) or expression
+depth 90, where D1 refuses at 100 and local SQLite and Miniflare accept both.
+With no flags it checks every view and trigger statement of the build's D1
+migrations; `--migrations DIR` names a migrations directory instead, and
+`--statements FILE` checks a statements file (`{"statements":[{"name","sql"}]}`)
+against that schema. It runs in any checkout, needs no account, and exits 1 on
+any failure, 0 otherwise and 3 with no build and no `--migrations`. `rer verify`
+runs the schema-object check as its last step.
+
 Anywhere: `rer list [DIR]`, `rer cli status|install|uninstall`, `rer update`,
 `rer queue NAME -- COMMAND`, `rer --version` and `rer --help`.
 

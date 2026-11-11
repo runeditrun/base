@@ -22,6 +22,8 @@ export async function main(argv = process.argv.slice(2)) {
   if (options.verb === 'archive') return (await import('./archive.mjs')).archiveCommand(options.archiveArgs,out);
   if (options.verb === 'listing') return (await import('./listing.mjs')).dispatchListing(options.listingArgs);
   if (options.verb === 'release') return (await import('./release.mjs')).dispatchRelease(options.releaseArgs);
+  // rer's own, like release: it reads migrations and statement files, whatever the checkout's profile.
+  if (options.verb === 'size') return await (await import('./size/command.mjs')).sizeCommand(options, out);
   const independent = await parsingProfile(options.cwd)==='independent'&&!['describe','check','doctor'].includes(options.verb);
   options=parse(argv,process.cwd(),{independent});out=output(options);
   if (options.help) return showHelp(options,out);

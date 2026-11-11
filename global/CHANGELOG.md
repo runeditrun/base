@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- New `rer size`, and a last step of `rer verify`: statement size against D1's limits. D1 refuses a statement at 100 FROM items (counted with every CTE and view reference expanded in place) or expression depth 100, and local SQLite and Miniflare accept both; rer fails a statement at 90 of either. `rer size` checks the build's view and trigger statements, `--migrations DIR` another schema, and `--statements FILE` a statements file in the fleet runner's format. Code only: no migration is added; no seed changes until it adopts a rer release that holds this.
+
 ## 0.2.110
 
 ### Business roster: a teammate erased before adoption stays erased

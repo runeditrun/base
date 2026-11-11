@@ -121,7 +121,9 @@ async function runLifecycle(project, options, out, deployRedaction) {
    await store.step('Checking that page sections hydrate as separate units');
    const hydration = await (await import('./hydration/check.mjs')).checkHydration(project.root, { pages: adapter.publicPages, declaration, report: lines => lines.forEach(line => store.report(line)) });
    const agentDoor = await (await import('./agent-door.mjs')).checkAgentDoor(project.root, { declaration, setupManifest: project.setupManifest, owner: adapter.hooks?.owner, report: line => store.report(line) });
-   return { hosted, hydration, agentDoor };
+   await store.step('Checking statement size and growth with data');
+   const size = await (await import('./size/verify-step.mjs')).checkSizeStep(project.root, { report: line => store.report(line) });
+   return { hosted, hydration, agentDoor, size };
   }
   if (['export', 'import'].includes(options.verb)) return await transfer(project, options, signal, { store, operationToken: operation.token });
   if (options.verb === 'deploy') {
