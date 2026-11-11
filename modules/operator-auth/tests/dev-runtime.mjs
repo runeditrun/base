@@ -26,14 +26,15 @@ export const sessionHash = token => createHmac('sha256', SECRET).update(`session
 export const cookieFor = token => `operator_session_local_8787=${token}`;
 export const read = path => readFile(new URL(path, import.meta.url), 'utf8');
 
-export async function runtime(schemas, extraConfig = {}, worker = 'dev-worker.mjs') {
+// `bindings` replaces or adds worker bindings: TEST_MAIL_STATUS picks the fixture mail provider's reply, a blank RER_DEV_KEY runs the worker as deployed.
+export async function runtime(schemas, extraConfig = {}, worker = 'dev-worker.mjs', bindings = {}) {
   const output = await build({ entryPoints: [fileURLToPath(new URL(`./${worker}`, import.meta.url))],
     bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022' });
   const directory = await mkdtemp(join(tmpdir(), 'operator-auth-dev-'));
   const config = { origin: ORIGIN, local: true, OWNER_EMAIL: OWNER, SESSION_SECRET: SECRET, MAIL_FROM: 'auth@example.com',
     ipLimit: 1000, emailLimit: 1000, review: { enabled: true, operatorEmail: OWNER }, ...extraConfig };
   const mf = new Miniflare({ ...convertV4MiniflareOptions({ modules: true, script: output.outputFiles[0].text, compatibilityDate: '2026-09-01',
-    d1Databases: { DB: 'auth-db' }, bindings: { TEST_CONFIG: JSON.stringify(config), RER_DEV_KEY: DEV_KEY, AUTH_ORIGIN: ORIGIN, AUTH_LOCAL: 'true' } }),
+    d1Databases: { DB: 'auth-db' }, bindings: { TEST_CONFIG: JSON.stringify(config), RER_DEV_KEY: DEV_KEY, AUTH_ORIGIN: config.origin, AUTH_LOCAL: 'true', ...bindings } }),
   resourcePersistencePath: join(directory, 'state') });
   try {
     const db = await mf.getD1Database('DB');
@@ -42,7 +43,7 @@ export async function runtime(schemas, extraConfig = {}, worker = 'dev-worker.mj
     return {
       db,
       call(path, { method = 'GET', cookie, key, input, headers: extraHeaders = {} } = {}) {
-        const url = new URL(path, ORIGIN), headers = { Host: url.host, Origin: ORIGIN, ...extraHeaders };
+        const url = new URL(path, config.origin), headers = { Host: url.host, Origin: config.origin, ...extraHeaders };
         if (cookie) headers.Cookie = cookie;
         if (key) headers['x-rer-dev-key'] = key;
         if (input !== undefined) headers['Content-Type'] = 'application/json';

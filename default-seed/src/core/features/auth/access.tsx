@@ -8,6 +8,7 @@ export function OperatorAccess({ timezone = 'UTC' }: { timezone?: string }) {
   const [operators, setOperators] = useState<OperatorRow[]>([])
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [message, setMessage] = useState('')
+  const [localInvite, setLocalInvite] = useState<{ email: string; href?: string }>()
   const [selected, setSelected] = useState<string>()
   async function request(path: string, input?: object) {
     const response = await fetch(`/auth/${path}`, input ? {
@@ -40,8 +41,15 @@ export function OperatorAccess({ timezone = 'UTC' }: { timezone?: string }) {
   }
   async function invite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const form = new FormData(event.currentTarget)
-    await mutate('invite', { email: form.get('email'), displayName: form.get('displayName'), role: form.get('role'), returnTo: '/app' })
+    const form = new FormData(event.currentTarget), email = String(form.get('email'))
+    setLocalInvite(undefined)
+    try {
+      const result = await request('invite', { email, displayName: form.get('displayName'), role: form.get('role'), returnTo: '/app' }) as { delivery?: 'none'; signInUrl?: string }
+      // A development mail provider sends nothing: say so rather than claim an invitation went out.
+      if (result.delivery === 'none') { setLocalInvite({ email, href: result.signInUrl }); setMessage('Saved. No email was sent: this app has no mail provider set up.') }
+      else setMessage('Invitation sent.')
+      await refresh(selected)
+    } catch (error) { setMessage((error as Error).message) }
   }
   // A wrong sign-in email is corrected here: after a fresh proof (rer signin, a
   // recent email-link sign-in, or the step-up link sent to the current address).
@@ -75,6 +83,7 @@ export function OperatorAccess({ timezone = 'UTC' }: { timezone?: string }) {
     </form> : null}
     <button onClick={() => { void request('signout', {}).then(() => { window.location.href = '/signin' }).catch((error: Error) => setMessage(error.message)) }}>Sign out</button>
     {message ? <p role="status">{message}</p> : null}
+    {localInvite ? <p>{localInvite.email} can sign in on this computer. {localInvite.href ? <><a href={localInvite.href}>Open their invitation</a> in a browser where you opened the app from the terminal, or </> : null}run <code>rer dev --as {localInvite.email}</code>.</p> : null}
     {session && session.operator.role !== 'member' ? <>
       {session.operator.role === 'owner' ? <p><a href="/auth/settings/identity">Business and sign-in settings</a></p> : null}
       <h3>Invite an operator</h3>

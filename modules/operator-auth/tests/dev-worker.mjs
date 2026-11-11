@@ -5,7 +5,7 @@ import { withDevIdentity } from '../dev/index.mjs';
 export const config = env => JSON.parse(env.TEST_CONFIG);
 const mailSender = env => ({ async send(message) {
   await env.DB.prepare('INSERT INTO test_mail(message) VALUES(?)').bind(JSON.stringify(message)).run();
-  return { provider: 'fixture', status: 'accepted', providerMessageId: null };
+  return { provider: 'fixture', status: env.TEST_MAIL_STATUS ?? 'accepted', providerMessageId: null };
 } });
 export const app = {
   async fetch(request, env) {

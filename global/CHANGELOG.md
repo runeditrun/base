@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Business settings: a team adapter can now implement the optional `retiredForms(email)` so a teammate an older release of the seed erased behind an opaque placeholder (a renamed roster row) is retired when a signed roster lists them by their real address alone, with no Business member id. The module matches the placeholder row to the listing before `gone` retires it, and digests the same forms when it screens a roster; before, only the placeholder and the Business id were tombstoned and such a listing was invited as a new person. An adapter that does not implement it behaves as before. No migration; `bs_retired` holds the same value-free digests. Nothing is live in any deployed seed until that seed adopts and implements the hook.
+- A local run's sign-in page now says in plain words what it is (this app runs on your own computer; open it from the terminal where `rer dev` is running, or run `rer dev --as owner`, or `rer dev --as` an invited person's email) instead of naming `RER_OPEN`, and the local Lobby line says the same. `/auth/invite` returns `delivery: 'none'` when a development mail provider took the message and sent nothing, plus `signInUrl` for the key-gated local owner who sent it; a delivered invitation answers as before, and the default seed's access panel no longer claims an invitation was sent when none was. The local key gate, its dev-credential rule and deployed sign-in are unchanged, and a seed gets this only by adopting it. Code only: no migration.
 
 ## 0.2.109
 
