@@ -971,7 +971,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "abdcb91dce67d68296e9ac6f12e058879dc3f9303cb984e608dbfad2372496e7"
+      "sha256": "bc07aa7a2d9d24b47034ccb7e249afd7c9e4b4c95cc6efbed82a54ee1a112e1c"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -1260,6 +1260,42 @@
     "cli/site.mjs": {
       "source": "cli/site.mjs",
       "sha256": "9c4645a5f8b9f8c5777534c8b979bfeec7e74d1e99433760fae2d2a01bf1aff7"
+    },
+    "cli/size/build-facts.mjs": {
+      "source": "cli/size/build-facts.mjs",
+      "sha256": "286cf3b8d032be5fa7e64ae70072a776988ea49b016a821edd58b5ad43496569"
+    },
+    "cli/size/clauses.mjs": {
+      "source": "cli/size/clauses.mjs",
+      "sha256": "3b59ecf3509247ca2d01c3c5dfcab1cd9b5d3041826b57dbdc9d449e4840f402"
+    },
+    "cli/size/declaration.mjs": {
+      "source": "cli/size/declaration.mjs",
+      "sha256": "d62ed6b0d5ca70992793748a83875d8a3586c4dc28a9603752f45f8a3f70c866"
+    },
+    "cli/size/examples/happytohelp.json": {
+      "source": "cli/size/examples/happytohelp.json",
+      "sha256": "8ff8c5c63c65eaff235f21432a4b4041c2aadbb3639f8dcb4cc1477115e13b16"
+    },
+    "cli/size/expression.mjs": {
+      "source": "cli/size/expression.mjs",
+      "sha256": "39f80631426a1f8a0feccfed96b246ee513e023c3ac2c8320296db13916ae8e3"
+    },
+    "cli/size/json-duplicates.mjs": {
+      "source": "cli/size/json-duplicates.mjs",
+      "sha256": "3088f024c4ba1d2bc97e94743f615f4a278ef1977777f4c9458e61125527ea11"
+    },
+    "cli/size/validate-flows.mjs": {
+      "source": "cli/size/validate-flows.mjs",
+      "sha256": "f84955a1746552d5bcefa4471e138613a95e482197a95f74858d8d5aef044d6c"
+    },
+    "cli/size/validate-kit.mjs": {
+      "source": "cli/size/validate-kit.mjs",
+      "sha256": "5f0bd343d421e19b92b0cb03d82747650fccbed1862eb0f172f17b26d3f80c04"
+    },
+    "cli/size/validate-shape.mjs": {
+      "source": "cli/size/validate-shape.mjs",
+      "sha256": "a980e4f5fa3b0438e4e4b06c98f606ef2ed7e396e0cf1deb52592f3caceff7fd"
     },
     "cli/sqlite-notice.mjs": {
       "source": "cli/sqlite-notice.mjs",

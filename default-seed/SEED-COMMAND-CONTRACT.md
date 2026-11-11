@@ -812,6 +812,30 @@ next numbered migration (new foundations get `0015_command_receipts.sql`), then
 route every create form through `runOnce` and 303, removing any branch that
 renders a result page from the POST itself.
 
+## Statement size and growth (SC-15)
+
+### The size-check.json format
+
+A seed can declare how its data grows in `size-check.json` at the checkout root: the shape of its tables, the routes and scheduled handlers to measure, and a ceiling of rows read for each. The declaration is data; the seed carries no test code for it. `rer check` validates the file offline (it reads the JSON and the checkout's wrangler and deploy configuration only, with no build and no network) and reports each problem as `SC-15.size.<field path>`, naming the field and the fix. With no file, `rer check` passes one `SC-15.size.undeclared` clause; with a valid file, one passing `SC-15.size.declaration`. Running the check against generated data is a later rer release; this release defines and validates the format. Base's `cli/size/examples/happytohelp.json` is a complete worked example.
+
+Keys (unknown keys are refused, naming the key):
+
+- `schema` (1) and optional `about`: where the counts came from, counts only, never contents.
+- `database`: the D1 binding to measure; required when the checkout declares more than one, and it must be one of them.
+- `build`: `wrangler` and `deployDeclaration` paths inside the checkout, for a checkout without a seedContract.
+- `budget`: `windowRows` (required) is the rows the seed allows in D1's 10-second window; `growthPercent` (default 10), `growthRows` (default 200) and `timeoutSeconds` (default 600) are optional.
+- `personas`: named `{ "kind": "owner" }`, `{ "kind": "anonymous" }` or `{ "kind": "signin", "requests": [1 to 4 requests, in order], "headers": {…} }`. A request is `method`, `path`, optional `body` and `headers`, and `capture` (variable name to a JSON pointer into the response JSON). A later request or the persona's headers use a captured value as `{{var}}`.
+- `shape.tables`: 1 to 64 tables generated in order. Each has `table`, `rows` (1 to 5,000,000, or `{ "small": N, "large": N }`), optional `chunk` (100 to 50,000, default 10,000), `values` (each column one SQLite expression, or `{ "jsonArray": { "length": expr, "item": expr } }`) and optional `parent`: `{ "table": T, "per": N }` (child n belongs to parent row (n-1)/N + 1) or `{ "table": T, "histogram": { "children": parents } }`. Expressions may use `n`, `p`, `k`, `:now`, `:owner_email` and `:size`. `shape.after` lists up to 16 single statements run after generation.
+- `flows`: 1 to 64, each with a unique `name`, a `ceiling` (rows read at the large size, per call), optional `callsInRow` (default 1), `repeat` (1 to 3), `status` and `growth` (`{ "allowed": true, "why": "…" }`), and either `persona` with a `request` (`method`, `path`, optional `body`, `headers`, `websocket`) or `scheduled` (one of the crons the checkout declares). A flow uses another persona's captured value as `{{persona.var}}`.
+
+Rules `rer check` enforces:
+
+- Names are unique; a flow's persona is declared; a scheduled flow's cron is one the checkout declares in `triggers.crons`; every `{{var}}` and `{{persona.var}}` is captured by that persona.
+- A parent table is listed earlier than its children, `per` is at least 1, and a histogram's children times parents sums to `rows`.
+- Every expression is a single expression of at most 2,000 characters: a `;` outside quotes and comments is refused.
+- `growth.allowed` needs a non-empty `why`.
+- Ceilings leave room for calls in a row: `ceiling × callsInRow ≤ budget.windowRows`. Local D1 has no shared budget, so a flow whose repeated calls each fit alone can still exceed real D1's 10-second window.
+
 ## Hydration units
 
 A mismatch between the server HTML and what React hydrates (an extension linking an address, a translator, a proxy rewrite) makes React client-render the nearest Suspense boundary; under TanStack Router that is everything under the root route, and the root route's own chrome is in no boundary at all. Seeds wrap every page section and the root chrome in `HydrationUnit`, mark one-time entrance animations with `data-intro` under the root's intro guard, hydrate through a `src/client.tsx` that passes `createRecoverableErrorHandler()`, keep addresses as lone text and send `no-transform` on documents. The convention and the adoption steps are in Base's `foundation/runtime/hydration/README.md` (in an edition, `src/base/hydration/README.md`).
@@ -984,6 +1008,7 @@ exact grant fields, request bodies and recovery rules.
 - SC-09: structural check rejects omissions, doctor names missing inputs, stable JSON and exits.
 - SC-10: optional independent execution uses only declared argv, preserves child outcomes and forces no stack.
 - SC-14: the seed carries its own mark; check and run site builds and deploys warn on Base's placeholder mark, and releases refuse it unless `--allow-placeholder-mark` is given, which the receipt records.
+- SC-15: a seed's optional `size-check.json` declares its data shape, flows and per-flow row ceilings; `rer check` validates it (`SC-15.size.*`), with ceilings that leave room for calls in a row within the seed's window budget, and passes `SC-15.size.undeclared` when there is none.
 
 ## Managed servers and bounded work
 

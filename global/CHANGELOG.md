@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `rer check` validates a seed's optional `size-check.json` (its table shape, personas, flows and per-flow row ceilings) as `SC-15.size.*` clauses, offline, with no build: unknown keys, undeclared personas and crons, histogram sums, parent order, expressions with a `;`, `growth.allowed` without a `why`, and a ceiling times calls in a row over `budget.windowRows` each fail naming the field and the fix. With no file it passes `SC-15.size.undeclared`. Code and docs only: the check does not run the declaration yet, and nothing is live in a seed until it adopts this release.
+
 ## 0.2.109
 
 ### `rer check` in a managed copy
