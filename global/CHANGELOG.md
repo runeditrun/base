@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Local one-click sign-in and its people list now refuse cross-site requests carrying only the gate cookie; same-site and key-header entry and OAuth session returns remain available. Code only, no migration; local runs only.
+
 ## 0.2.109
 
 ### `rer check` in a managed copy

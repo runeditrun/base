@@ -4191,7 +4191,7 @@
     },
     "modules/operator-auth/accounts/one-click.mjs": {
       "source": "modules/operator-auth/accounts/one-click.mjs",
-      "sha256": "54569eaa85085d6adc6877b832c9a651b003ecfa2f68949569e0e4fc21833416"
+      "sha256": "e8d7aab68407e14f94d95de428dfc680663c9e0d87e928717309fbde69b0f783"
     },
     "modules/operator-auth/accounts/owner-signin.mjs": {
       "source": "modules/operator-auth/accounts/owner-signin.mjs",
