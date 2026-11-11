@@ -40,13 +40,20 @@ export async function writeVerificationHistory(hosted, declaration, rows) {
 // Both preparation APIs use this one disposable D1 writer. The public phase
 // handle exposes individual statements; declared history retains atomic batches
 // and its stricter insert-only, trigger-free table checks above.
-export function preparationDatabase(db) {
- const refuse = () => { throw new RerError('hosted_database_invalid', new FixtureDatabaseError().message, 1); };
+// `diagnose` is for installs whose statements rer itself generates (rer size): the refusal then carries why
+// (SQLite's own message, or the door's rule) as `diagnosis`. Agent-door fixtures never set it.
+export function preparationDatabase(db, { diagnose = false } = {}) {
+ const refuse = reason => {
+  const error = new RerError('hosted_database_invalid', new FixtureDatabaseError().message, 1);
+  if (diagnose && reason !== undefined) error.diagnosis = String(reason);
+  throw error;
+ };
  const check = sql => {
-  if (typeof sql !== 'string' || sql.includes(';')) return refuse();
+  const rule = 'the disposable database takes one SELECT, INSERT INTO table, UPDATE table or DELETE FROM table statement, with no ";" anywhere in it (write char(59) for a semicolon in a string) and not on an agent_door_ or sqlite_ table';
+  if (typeof sql !== 'string' || sql.includes(';')) return refuse(rule);
   const readOnly = /^\s*SELECT\b/i.test(sql);
   const target = /^\s*(?:UPDATE\s+|INSERT\s+INTO\s+|DELETE\s+FROM\s+)([a-z_][a-z0-9_]*)\b/i.exec(sql)?.[1];
-  if (!readOnly && (!target || /^(?:agent_door_|sqlite_)/i.test(target))) return refuse();
+  if (!readOnly && (!target || /^(?:agent_door_|sqlite_)/i.test(target))) return refuse(rule);
   return { readOnly, target };
  };
  const batch = async rows => {
@@ -54,7 +61,7 @@ export function preparationDatabase(db) {
    const checked = rows.map(row => ({ ...row, ...check(row.sql) }));
    for (const { target } of checked.filter(row => !row.readOnly)) {
     const table = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=? COLLATE NOCASE").bind(target).first();
-    if (!table) return refuse();
+    if (!table) return refuse(`there is no table ${target}`);
    }
    const protectedTables = checked.some(row => !row.readOnly)
     ? (await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND lower(substr(name,1,11))='agent_door_'").all()).results : [];
@@ -67,7 +74,7 @@ export function preparationDatabase(db) {
     ...guards.map(guard => db.prepare(`DROP TRIGGER "${guard.name}"`)),
    ]);
    return results.slice(guards.length, guards.length + checked.length);
-  } catch { return refuse(); }
+  } catch (error) { return refuse(error?.diagnosis ?? error?.cause?.message ?? error?.message); }
  };
  const statement = (sql, values = []) => {
   check(sql);

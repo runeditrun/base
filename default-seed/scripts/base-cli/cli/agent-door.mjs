@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID, webcrypto } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { readFile, realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -6,7 +6,8 @@ import { runAgentDoorConformance } from '../modules/agent-door/conformance/index
 import { validateAgentSurface } from '../modules/agent-door/conformance/surface.mjs';
 import { seconds, signJws } from '../modules/agent-door/conformance/crypto.mjs';
 import { readAgentSurface } from './agent-surface.mjs';
-import { HOSTED_ORIGIN, serveHosted } from './hosted-output.mjs';
+import { serveHosted } from './hosted-output.mjs';
+import { bootstrapOwner, hostedRequest, ownerBindings, ownerClaim, ownerKeys, ownerSession, pairedBindings, reviewerDoor } from './hosted-owner.mjs';
 import { createAgentConformanceNetwork } from './agent-network.mjs';
 import { contained } from './project.mjs';
 import { RerError } from './errors.mjs';
@@ -14,14 +15,10 @@ import { verificationReviewers } from './agent-reviewers.mjs';
 import { verificationSponsors } from './agent-sponsors.mjs';
 import { verificationWebhooks } from './agent-webhooks.mjs';
 import { verificationInvoke, verificationJourney } from './agent-verifier.mjs';
-import { verificationBindings } from './agent-bindings.mjs';
 import { writeVerificationHistory } from './agent-history-database.mjs';
 import { verificationHistory } from './agent-history.mjs';
 import { journeyFixtures } from './agent-journey-fixtures.mjs';
 import { verificationAgentInitializer } from './agent-initializer.mjs';
-
-// Unpairing re-serves the installation without the Business trust it was paired with.
-const pairedBindings = ['RER_OWNER_CLAIM_ISSUER', 'RER_OWNER_CLAIM_INSTALLATION_ID', 'RER_OWNER_CLAIM_APP_ORIGIN', 'RER_OWNER_CLAIM_PUBLIC_KEYS', 'RER_BUSINESS_TRUST'];
 
 function finish(result, report) {
  if (result.capabilities) report(`Agent capabilities (${result.capabilities.mode}): declared=${result.capabilities.declared.join(',')}; refused=${result.capabilities.refused.join(',')}; unscoped=${result.capabilities.unscoped.join(',')}.`);
@@ -62,14 +59,8 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
  if (verification.reviewers !== undefined && !native.initialize) throw new RerError('agent_reviewer_invalid', 'verification.reviewers requires a native owner initializer to drive invitation and independent review.', 1);
  const reviewers = await verificationReviewers(root, verification.reviewers, email);
  if (claim?.mode && !['signed', 'setup-token'].includes(claim.mode) && !native.initialize) throw new RerError('agent_owner_invalid', `Owner claim mode ${claim.mode} requires verification.owner.initializer using the seed's production lifecycle.`, 1);
- const token = randomBytes(32).toString('hex'), kid = randomUUID(), installationId = randomUUID();
- const business = 'rer-agent-conformance';
- const issuer = `https://synthetic-base-1-${randomUUID()}.invalid`;
- const pair = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
- const { kty, crv, x, y } = await webcrypto.subtle.exportKey('jwk', pair.publicKey);
- const publicKeys = { [kid]: { kty, crv, x, y, kid, alg: 'ES256', use: 'sig' } };
- const values = { issuer, installationId, appOrigin: HOSTED_ORIGIN, publicKeys: JSON.stringify(publicKeys), email, sub, token, sessionSecret: randomBytes(32).toString('hex') };
- const nativeBindings = await verificationBindings(root, native.bindings, values);
+ const keys = await ownerKeys(root, native, { email, sub });
+ const { token, kid, installationId, business, issuer, pair } = keys;
  const network = await createAgentConformanceNetwork(root, verification.network, { email, sponsorEmails: principals.slice(1).map(person => person.email) });
  let hosted, history;
  try {
@@ -78,43 +69,19 @@ export async function checkAgentDoor(root, { declaration, setupManifest, owner, 
   if (copy) await reviewers.capture(copy, response.clone());
   return response;
  }, bindings: {
-  RER_OWNER_CLAIM_ISSUER: issuer, RER_OWNER_CLAIM_INSTALLATION_ID: installationId,
-  RER_OWNER_CLAIM_APP_ORIGIN: HOSTED_ORIGIN,
-  RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(publicKeys),
-  RER_BUSINESS_TRUST: JSON.stringify({ v: 1, issuer, audience: HOSTED_ORIGIN, subject: installationId, email, keys: publicKeys }),
-  OWNER_EMAIL: email, SETUP_TOKEN: token,
-  ...(claim?.emailField ? { [claim.emailField]: email } : {}),
-  ...(claim?.tokenField ? { [claim.tokenField]: token } : {}),
-  ...(native.emailField ? { [native.emailField]: email } : {}),
-  ...(native.tokenField ? { [native.tokenField]: token } : {}),
-  ...nativeBindings,
+  ...ownerBindings(keys, { claim, native, email }),
  } });
-  const request = (absolute, init = {}) => {
-   const url = new URL(absolute);
-   if (url.username || url.password || !hosted.origins.includes(url.origin)) throw new RerError('agent_door_origin', 'Agent conformance request must use a declared hosted installation origin.', 1);
-   const timeout = AbortSignal.timeout(30_000);
-   return hosted.fetch(url.href.slice(url.origin.length + 1), { ...init, origin: url.origin, signal: init.signal ? AbortSignal.any([init.signal, timeout]) : timeout, headers: Object.fromEntries(new Headers(init.headers)) });
-  };
-  const path = claim?.mode === 'signed' ? claim.path ?? '/auth/owner-claim' : owner?.path ?? claim?.path ?? '/auth/bootstrap';
-  const issued = seconds();
-  const claimToken = claim?.mode === 'signed' ? await signJws(pair.privateKey, kid, 'rer-owner-claim+jwt', {
-   v: 1, iss: issuer, aud: hosted.origin, installationId, email, jti: randomUUID(), iat: issued, exp: issued + 300,
-  }) : token;
+  const request = hostedRequest(hosted);
+  const { path, claimToken } = await ownerClaim({ claim, owner, hosted, keys, email });
   let bootstrap;
   try {
-   bootstrap = native.initialize ? await native.initialize({ request, origin: hosted.origin, email, sub,
-    reviewers: Object.freeze({ initialize: (label, session) => reviewers.initialize(label, session, { request, origin: hosted.origin, returnTo: owner?.returnTo ?? '/' }) }),
-    displayName: 'Synthetic Base 1', label: native.label, database: hosted.database, token, claim: { mode: claim?.mode ?? 'setup-token', path, token: claimToken }, returnTo: owner?.returnTo ?? '/', mail: network.mail, fixtures: network.fixtures,
-   }) : await request(new URL(path, hosted.origin).href, { method: 'POST', redirect: 'manual',
-    headers: { Origin: hosted.origin, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: claimToken, displayName: 'Synthetic Base 1', returnTo: owner?.returnTo ?? '/' }),
-   });
+   bootstrap = await bootstrapOwner({ hosted, request, native, claim, owner, keys, email, sub, path, claimToken,
+    extra: { reviewers: reviewerDoor(reviewers, { request, hosted, owner }), mail: network.mail, fixtures: network.fixtures } });
   } catch {
    return finish({ ok: false, points: [...validation.points, ...reviewers.points(), { id: 'BASE-AGENT-001.owner-bootstrap', ok: false, detail: 'Native owner bootstrap did not complete through the hosted installation origin.' }] }, report);
   }
-  const cookie = bootstrap.headers.getSetCookie().map(value => value.split(';', 1)[0]).join('; ');
-  await bootstrap.body?.cancel();
-  if (bootstrap.status !== 303 || bootstrap.redirected || !cookie) return finish({ ok: false, points: [...validation.points, { id: 'BASE-AGENT-001.owner-bootstrap', ok: false, detail: `Native owner bootstrap returned HTTP ${bootstrap.status}${!cookie ? ' without a session cookie' : ''}.` }] }, report);
+  const { cookie, failure } = await ownerSession(bootstrap);
+  if (failure) return finish({ ok: false, points: [...validation.points, { id: 'BASE-AGENT-001.owner-bootstrap', ok: false, detail: failure }] }, report);
   const iat = seconds();
   const settings = await signJws(pair.privateKey, kid, 'rer-business-settings+jwt', {
    v: 1, iss: issuer, aud: hosted.origin, sub: installationId, business, email, owner_id: sub,

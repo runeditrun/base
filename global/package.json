@@ -24,6 +24,7 @@
     "./jsonc": "./cli/jsonc.mjs",
     "./parse": "./cli/parse.mjs",
     "./scheduled": "./cli/scheduled.mjs",
+    "./size-fixture": "./cli/size/fixture.mjs",
     "./dev-identity": "./cli/dev-identity.mjs",
     "./local-installer": "./onboarding/adapter.mjs",
     "./state": "./onboarding/state.mjs",

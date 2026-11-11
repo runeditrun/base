@@ -319,6 +319,7 @@ line that still names it. A later refresh is a version bump:
 | `@runeditrun/rer/jsonc` | JSONC reading | `scripts/base-cli/cli/jsonc.mjs` |
 | `@runeditrun/rer/parse`, `/scheduled` | CLI argument parsing, scheduled-job helpers | `scripts/base-cli/cli/parse.mjs`, `scheduled.mjs` |
 | `@runeditrun/rer/dev-identity` | dev identity helpers | `scripts/base-cli/cli/dev-identity.mjs` |
+| `@runeditrun/rer/size-fixture` | `compileFixture(declaration, 'small' or 'large', { now, ownerEmail })`: a `size-check.json` shape as the ordered `[{name, sql, params}]` statements `rer size` runs on local D1 (the fleet runner's statements format), for seeding real D1 with the same rows | `scripts/base-cli/cli/size/fixture.mjs` |
 | `@runeditrun/rer/operator-installer` | `operatorInstaller`, `developmentTarget`, `previewTarget` | `scripts/base-onboarding/operator-installer.mjs` |
 | `@runeditrun/rer/local-installer` | `localInstaller` | `scripts/base-onboarding/adapter.mjs` |
 | `@runeditrun/rer/operator-install` | `installOperator` | `scripts/base-onboarding/operator-install.mjs` |

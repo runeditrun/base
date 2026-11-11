@@ -84,7 +84,7 @@ async function hostedPublicVariables(root, config, declaration, manifest) {
 
 /** The build served as rer deploy hosts it, with declared vars, origin and
  * required public inputs and deploy/Managed mail secret stand-ins. `fetch(path, init)` uses the deployed origin. */
-export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService, rpc, workerEntrypoints = [], publicHosts, fixturePreparation = false } = {}) {
+export async function serveHosted(root, { declaration: declarationPath = 'deploy.json', bindings = {}, outboundService, rpc, workerEntrypoints = [], publicHosts, fixturePreparation = false, fixtureDiagnostics = false } = {}) {
  const { loopbackFetch } = await shared('loopback-fetch.mjs');
  const build = join(root, 'dist/server'), client = join(root, 'dist/client');
  let config;
@@ -160,7 +160,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
  } catch (error) { await mf.dispose(); throw error; }
  const preparedDatabase = async binding => {
   if (!(config.d1_databases ?? []).some(item => item.binding === binding)) throw new RerError('hosted_database_invalid', new FixtureDatabaseError().message, 1);
-  return preparationDatabase(await mf.getD1Database(binding, 'app'));
+  return preparationDatabase(await mf.getD1Database(binding, 'app'), { diagnose: fixtureDiagnostics });
  };
  const hosted = { client, identity, origin: HOSTED_ORIGIN, origins,
   worker: async entrypoint => {

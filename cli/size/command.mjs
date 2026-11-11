@@ -3,6 +3,7 @@ import { schemasFromBuild, schemaFromMigrations } from './schema.mjs';
 import { checkSchemaObjects } from './check.mjs';
 import { measureStatements, readStatementsFile } from './statements.mjs';
 import { sizeReport } from './report.mjs';
+import { buildFixtures, growthRequested } from './grow.mjs';
 
 // The one schema a statements file runs against: --migrations DIR, else the build's only D1 database.
 async function statementsSchema(options) {
@@ -13,8 +14,9 @@ async function statementsSchema(options) {
   return schemas[0].db;
 }
 
-/** rer size: statement size against D1's limits. Exit 1 if any statement is at
- * or over the margin, 0 if none, 3 with no build and no --migrations. */
+/** rer size: statement size against D1's limits, then, with a size-check.json, the declared shape built at a small
+ * and a large size on local D1. Exit 1 if any statement is at or over the margin or a size fails to build, 0 if
+ * none, 3 with no build and no --migrations. */
 export async function sizeCommand(options, out) {
   let records, sqlOf, unit;
   if (options.statements) {
@@ -26,14 +28,25 @@ export async function sizeCommand(options, out) {
     const schemas = options.migrations ? [await schemaFromMigrations(options.migrations)] : await schemasFromBuild(options.cwd);
     if (!schemas.length) {
       out.human('Statement size: this build has no D1 database; nothing to check.');
-      out.result(true, 0, { statements: [] });
-      return 0;
+      if (!growthRequested(options)) {
+        out.result(true, 0, { statements: [] });
+        return 0;
+      }
+      records = [];
+    } else {
+      ({ records, sqlOf } = checkSchemaObjects(schemas, { exact: options.json }));
+      unit = 'view and trigger statements';
     }
-    ({ records, sqlOf } = checkSchemaObjects(schemas, { exact: options.json }));
-    unit = 'view and trigger statements';
   }
-  const ok = records.every(record => record.ok);
-  if (!options.json) for (const line of sizeReport(records, sqlOf, unit)) out.human(line);
-  out.result(ok, ok ? 0 : 1, { statements: records.map(({ name, fromItems, depth, ok, error }) => ({ name, fromItems: fromItems ?? null, depth, ok, ...(error ? { error } : {}) })) });
+  let ok = records.every(record => record.ok);
+  if (!options.json && records.length) for (const line of sizeReport(records, sqlOf, unit)) out.human(line);
+  const details = { statements: records.map(({ name, fromItems, depth, ok, error }) => ({ name, fromItems: fromItems ?? null, depth, ok, ...(error ? { error } : {}) })) };
+  // With a size-check.json (or --declaration), the declared shape is then built at a small and a large size.
+  if (!options.statements && growthRequested(options)) {
+    const { ok: built, ...sizes } = await buildFixtures(options, out);
+    ok = ok && built;
+    details.size = sizes;
+  }
+  out.result(ok, ok ? 0 : 1, details);
   return ok ? 0 : 1;
 }

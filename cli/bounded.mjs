@@ -5,13 +5,13 @@ import {fileURLToPath} from 'node:url';
 import {shared} from './shared.mjs';
 import {RerError} from './errors.mjs';
 
-// Admit the complete bounded workflow before it can acquire checkout custody.
+// Admit the complete bounded workflow before it can acquire checkout custody. rer size's installs queue as verify does.
 // The child re-enters the same dispatcher with validated live queue membership.
 // Hold the child's semantic outcome until queue and process custody are released.
 // Child diagnostics remain captured/redacted on stderr. Long-lived servers never
 // enter this boundary.
 export async function boundedCommand(project,options,argv,out){
- if(!['install','setup','build','verify','deploy','export','import'].includes(options.verb))return null;
+ if(!['install','setup','build','verify','deploy','export','import','size'].includes(options.verb))return null;
  const {commandPolicy,queuedCommand,queueLabel,maxWaitSeconds}=await shared('queue.mjs');
  const policy=await commandPolicy();
  const childArgs=[...argv];const cwdIndex=childArgs.indexOf('--cwd');if(cwdIndex>=0&&(childArgs.indexOf('--')<0||cwdIndex<childArgs.indexOf('--')))childArgs[cwdIndex+1]=project.root;
@@ -24,7 +24,7 @@ export async function boundedCommand(project,options,argv,out){
   const {createCommands}=await shared('commands.mjs');
   store=await createCommands(directory,{logs:[]},{terminal:()=>{}});
   result=await queuedCommand(process.execPath,[fileURLToPath(new URL('../bin/rer.mjs',import.meta.url)),...childArgs],{
-   cwd:project.root,verb:options.verb,signal:cancellation.signal,stdio:[!options.json&&!options.nonInteractive?'inherit':'ignore','pipe','pipe'],originalCI:policy.ci,env:{...process.env,...policy.environment,RER_BOUNDED_OUTPUT:'1'},
+   cwd:project.root,verb:options.verb==='size'?'verify':options.verb,signal:cancellation.signal,stdio:[!options.json&&!options.nonInteractive?'inherit':'ignore','pipe','pipe'],originalCI:policy.ci,env:{...process.env,...policy.environment,RER_BOUNDED_OUTPUT:'1'},
    label:await queueLabel(project.root,options.verb,'workflow'),report:text=>out.progress(store.redact(text)+'\n'),onWaiting:options.json?details=>out.event('waiting',details):undefined,
    spawn:(command,args,native)=>{
     const child=store.spawn('Running bounded workflow',command,args,native);

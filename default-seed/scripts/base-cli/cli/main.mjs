@@ -6,6 +6,7 @@ import { invalid, RerError } from './errors.mjs';
 import { resolveProject, parsingProfile } from './project.mjs';
 import { check, describe, doctorSummary } from './inspect.mjs';
 import { selectNodeRuntime } from './node-runtime.mjs';
+import { resolve } from 'node:path';
 
 export async function main(argv = process.argv.slice(2)) {
  if (argv[0] === 'door' && argv[1] === 'clauses') return (await import('./door-clauses.mjs')).doorClausesCommand(argv.slice(2));
@@ -23,7 +24,17 @@ export async function main(argv = process.argv.slice(2)) {
   if (options.verb === 'listing') return (await import('./listing.mjs')).dispatchListing(options.listingArgs);
   if (options.verb === 'release') return (await import('./release.mjs')).dispatchRelease(options.releaseArgs);
   // rer's own, like release: it reads migrations and statement files, whatever the checkout's profile.
-  if (options.verb === 'size') return await (await import('./size/command.mjs')).sizeCommand(options, out);
+  if (options.verb === 'size') {
+   // Building fixtures serves installs: that is heavy work, so it takes verify's job-queue slot.
+   if ((await import('./size/grow.mjs')).growthRequested(options)) {
+    if (options.noQueue) {const {shared}=await import('./shared.mjs');const {commandPolicy}=await shared('queue.mjs');const policy=await commandPolicy();try{if(!policy.ci)throw invalid('--no-queue requires the original caller CI=true.');}finally{await policy.close();}}
+    // The queued child runs in the checkout: a relative --declaration means the caller's folder, so hand it over absolute.
+    const named = argv.indexOf('--declaration'), queuedArgv = named < 0 ? argv : argv.map((argument, index) => index === named + 1 ? resolve(process.cwd(), argument) : argument);
+    const bounded = await (await import('./bounded.mjs')).boundedCommand({ root: options.cwd, profile: 'independent' }, options, queuedArgv, out);
+    if (bounded) return bounded.exitCode;
+   }
+   return await (await import('./size/command.mjs')).sizeCommand(options, out);
+  }
   const independent = await parsingProfile(options.cwd)==='independent'&&!['describe','check','doctor'].includes(options.verb);
   options=parse(argv,process.cwd(),{independent});out=output(options);
   if (options.help) return showHelp(options,out);
