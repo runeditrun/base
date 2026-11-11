@@ -63,6 +63,6 @@ export async function pathAdvice(paths, env = process.env, { includeShellStep = 
  const first = entries.includes(bin) && firstCommand === paths.launcher;
  if (first && await persistent(startup.files)) return lines.join('\n');
  const why = first ? 'New terminals will not find rer yet.' : firstCommand ? `Another rer (${firstCommand}) comes first on your PATH.` : 'rer is not on your PATH yet.';
- lines.push(`Optional: make rer available in future terminals. ${why} Running the following line adds ~/.local/bin to your shell's startup file and this terminal. rer changes no shell file itself:`, `  ${startup.line}`);
+ lines.push(`Next step, so a bare \`rer\` works in new terminals: ${why} Running the following line adds ~/.local/bin to your shell's startup file and this terminal. rer changes no shell file itself:`, `  ${startup.line}`);
  return lines.join('\n');
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- The PATH step that makes a bare `rer` work in new terminals is no longer called "Optional" where the docs' later commands need it: the `rer dev` ready summary (a launch through `npx` rather than the installer), `rer cli path`, `rer --help` and the run page now say what the step is for. (The installer's closing step was fixed in 0.2.108.) Code and docs only.
+- `rer deploy --dry-run` whose seed's own step stops (for example a seed's missing-inputs check run through `pnpm run`) printed that step's output twice, then pnpm's `ELIFECYCLE` and banner lines, a log path and an instruction to rerun without `--dry-run`. It now prints the output once, says which step stopped and that nothing was deployed, and names the same dry run to repeat. The exit code stays 1: the seed's step failed. A real deploy's output is unchanged. Code only.
+- `rer doctor` on a set-up checkout no longer says to run `rer setup` (it uses the same set-up check `rer dev` and `rer describe` use), no longer lists the deploy kit's build-workflow inputs (`RER_PREPARE_*`, `RER_DEPLOY_*`) as missing local inputs, and names the seed's other deploy inputs only as "Optional for local use; needed to deploy", so a ready checkout exits 0. Code only.
+- The dry run's "Needed for a real deploy" list named a mapped mail credential twice, as `SENDGRID_API_KEY (or SENDGRID_API_KEY)`, when a seed maps the shared `MAIL_API_KEY` binding to its provider's environment name. Each name now appears once. Code only.
+
 ## 0.2.109
 
 ### `rer check` in a managed copy

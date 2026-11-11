@@ -99,3 +99,38 @@ test('local doctor succeeds without deployment credentials and still refuses mis
  assert.equal(missing.code, 3, missing.stdout + missing.stderr);
  assert.deepEqual(missing.result.diagnostics.missingInputs, ['OWNER_EMAIL']);
 });
+
+test('doctor on a set-up checkout does not ask for setup or list inputs only a deployed build uses', async t => {
+ const root = await mkdtemp(join(tmpdir(), 'rer-doctor-setup-'));
+ t.after(() => rm(root, { recursive: true, force: true }));
+ await mkdir(join(root, 'home'));
+ await symlink(join(import.meta.dirname, '../default-seed/node_modules'), join(root, 'node_modules'), 'dir');
+ await writeFile(join(root, 'package.json'), JSON.stringify({ engines: { node: process.versions.node }, packageManager: 'pnpm@10.12.4' }));
+ await writeFile(join(root, '.node-version'), process.versions.node + '\n');
+ await writeFile(join(root, 'adapter.mjs'), "export const commandAdapter={version:1,state:'.wrangler/state',hooks:{secrets:{file:'.dev.vars'}}};\n");
+ // What a seed with a hosted build workflow declares: the owner's deploy inputs and the workflow's own.
+ const owner = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'MAIL_FROM'], workflow = ['RER_PREPARE_ISOLATION', 'RER_DEPLOY_ARTIFACT', 'RER_DEPLOY_RUN_ID'];
+ const environmentSources = Object.fromEntries([...owner.map(name => [name, 'Owner deployment environment. Read OPERATIONS.md']), ...workflow.map(name => [name, 'Provided by the build workflow. Read OPERATIONS.md'])]);
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'synthetic-doctor-2', runtime: { requirements: [] }, requiredEnvironment: [...owner, ...workflow], environmentSources, seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { dev: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Run this checkout locally.' } } }));
+ const invoke = async () => {
+  const child = spawn(process.execPath, [cli, 'doctor'], { cwd: root, env: { PATH: process.env.PATH, HOME: join(root, 'home'), TZ: 'UTC' }, stdio: ['ignore', 'pipe', 'pipe'], signal: t.signal });
+  let stdout = '', stderr = '';
+  child.stdout.on('data', chunk => stdout += chunk); child.stderr.on('data', chunk => stderr += chunk);
+  const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
+  return { code, text: stdout + stderr };
+ };
+ // Before setup: the person is told to set up, and only the local setting is missing.
+ const fresh = await invoke();
+ assert.equal(fresh.code, 3, fresh.text);
+ assert.match(fresh.text, /Run rer setup to configure this checkout\./);
+ assert.match(fresh.text, /Missing local inputs:\n {2}OWNER_EMAIL\n {2}AUTH_ORIGIN\n/);
+ for (const name of workflow) assert.ok(!fresh.text.includes(name), `${name} is never asked of this computer`);
+ // After setup: nothing local is missing, so doctor passes and names deploy inputs only as optional.
+ await writeFile(join(root, '.dev.vars'), 'OWNER_EMAIL=owner@example.test\nAUTH_ORIGIN=http://localhost:8787\n');
+ const ready = await invoke();
+ assert.equal(ready.code, 0, ready.text);
+ assert.doesNotMatch(ready.text, /rer setup|Missing local inputs/);
+ for (const name of workflow) assert.ok(!ready.text.includes(name), `${name} belongs to a build workflow, not to this computer`);
+ for (const name of owner) assert.ok(ready.text.includes(name), `${name} is named as needed to deploy`);
+ assert.match(ready.text, /Optional for local use; needed to deploy:/);
+});

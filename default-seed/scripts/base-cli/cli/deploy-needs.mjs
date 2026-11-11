@@ -40,12 +40,23 @@ export function missingCredentialsMessage(declaration, env, { dryRun = false, si
   ...(dryRun ? ['Needed for a real deploy (the dry run could not check the target):', ...neededForRealDeploy({declaration,env,signIn}).map(item => `  - ${item}`)] : [])].join('\n');
 }
 
+// Naming a binding by the environment name a person sets can turn "MAIL_API_KEY (or
+// SENDGRID_API_KEY)" into the same name twice: say each name once.
+function onceEach(text) {
+ return text
+  .replace(/\b([A-Z][A-Z0-9_]*) or \1\b/g, '$1')
+  .replace(/\b([A-Z][A-Z0-9_]*) \(or ([^)]*)\)/g, (all, first, rest) => {
+   const others = [...new Set(rest.split(' / ').map(name => name.trim()))].filter(name => name !== first);
+   return others.length ? `${first} (or ${others.join(' / ')})` : first;
+  });
+}
+
 // Setup guidance and failed dry-run inputs. After target resolution, held
 // secrets no longer count as missing local inputs.
 export function neededForRealDeploy({ declaration, env, signIn, secretsChecked = false }) {
  const declared = (Array.isArray(declaration.secrets) ? declaration.secrets : []).filter(item => item?.environment);
  // Sign-in names its inputs by binding; a person sets the environment name the declaration maps to it.
- const mail = signIn && declared.reduce((text, item) => item.binding === item.environment ? text : text.replace(new RegExp(`\\b${item.binding}\\b`, 'g'), item.environment), signIn);
+ const mail = signIn && onceEach(declared.reduce((text, item) => item.binding === item.environment ? text : text.replace(new RegExp(`\\b${item.binding}\\b`, 'g'), item.environment), signIn));
  const listed = name => cloudflareCredentials.includes(name) || mail && new RegExp(`\\b${name}\\b`).test(mail);
  const secrets = secretsChecked ? [] : [...new Set(declared.filter(item => !item.optional && !env[item.environment]?.trim()).map(item => item.environment))].filter(name => !listed(name));
  const credentials = secretsChecked ? [] : cloudflareCredentials.filter(name => !env[name]?.trim());

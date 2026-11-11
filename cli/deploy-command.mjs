@@ -201,6 +201,9 @@ export async function deployCommand(context) {
   const outcome = error.owner ?? claimed ?? observedClaims.at(-1)?.outcome;
   const state = deployed?.deployed || recorded ? `The application is deployed at ${deployed?.origin ?? recorded.origin}; ${outcome ? `owner ${outcome}` : 'owner claim is not confirmed'}${recorded ? '; setup token retirement is not confirmed' : ''}.` : options.dryRun ? 'The dry run did not finish; nothing was deployed.' : 'The custom deploy did not finish; inspect its deployment record before recovery.';
   const redact = value => store.redact?.(redaction.redact(value)) ?? redaction.redact(value);
+  // A dry run whose own step stopped (a build, a seed's input check) has already printed why.
+  // Say it once: which step, its exit code and the same dry run to repeat. Nothing is deployed.
+  if (options.dryRun && Number.isInteger(error.childExitCode)) throw commandFailure(redact(`The dry run did not finish; nothing was deployed. ${error.message.split('\n', 1)[0].replace(', signal none.', '.')}\nWhat it printed above names the cause. Fix it and run ${again} again.`));
   const setup = hostedSetupFailure(error, { origin: deployed?.origin ?? recorded?.origin, again });
   if (setup) throw commandFailure(redact(setup));
   const readiness = mutationReadinessFailure(error, { again, redact });

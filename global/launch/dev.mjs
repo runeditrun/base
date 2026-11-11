@@ -48,11 +48,11 @@ export async function launchDev(target) {
   catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; process.stderr.write(failure.message + '\n'); return failure.exitCode; }
  }
  showBudget(devArgs);
- // The launch never asks for shell edits. Offer the optional step only at ready,
+ // The launch never asks for shell edits. Name the PATH step only at ready,
  // and not when install.sh closes with its own required PATH step.
  delete process.env.RER_LAUNCH_PATH_STEP;
  const paths = layout();
- if (!process.env.RER_INSTALLER_PATH_STEP && await access(paths.launcher).then(() => true, () => false) && await pathAdvice(paths)) process.env.RER_LAUNCH_PATH_STEP = `Optional, after opening your app: make rer available in future terminals. Run ${shellQuote(paths.launcher)} cli path to see the shell step; it changes no shell file itself.`;
+ if (!process.env.RER_INSTALLER_PATH_STEP && await access(paths.launcher).then(() => true, () => false) && await pathAdvice(paths)) process.env.RER_LAUNCH_PATH_STEP = `Next step, after opening your app: a bare \`rer\` in a new terminal will not be found yet. Run ${shellQuote(paths.launcher)} cli path to see the one line that fixes it; it changes no shell file itself.`;
  const here = await realpath(process.cwd()).catch(() => undefined);
  const out = printer({ root: checkout, json: devArgs.includes('--json'), stopHint: `rer dev --stop${here === checkout ? '' : ` --cwd ${JSON.stringify(checkout)}`}`, keyless: doorStart });
  const detach = args.includes('--detach') || (!args.includes('--foreground') && !process.stdout.isTTY);
