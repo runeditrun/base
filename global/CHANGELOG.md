@@ -3,6 +3,7 @@
 ## Unreleased
 
 - New `rer size`, and a last step of `rer verify`: statement size against D1's limits. D1 refuses a statement at 100 FROM items (counted with every CTE and view reference expanded in place) or expression depth 100, and local SQLite and Miniflare accept both; rer fails a statement at 90 of either. `rer size` checks the build's view and trigger statements, `--migrations DIR` another schema, and `--statements FILE` a statements file in the fleet runner's format. Code only: no migration is added; no seed changes until it adopts a rer release that holds this.
+- `rer check` validates a seed's optional `size-check.json` (its table shape, personas, flows and per-flow row ceilings) as `SC-15.size.*` clauses, offline, with no build: unknown keys, undeclared personas and crons, histogram sums, parent order, expressions with a `;`, `growth.allowed` without a `why`, and a ceiling times calls in a row over `budget.windowRows` each fail naming the field and the fix. With no file it passes `SC-15.size.undeclared`. Code and docs only: the check does not run the declaration yet, and nothing is live in a seed until it adopts this release.
 
 ## 0.2.110
 

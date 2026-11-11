@@ -1,0 +1,68 @@
+{
+ "schema": 1,
+ "about": "HappyToHelp's chat workspace at ChargeDesk's measured shape, counts only, no contents. Contacts, conversations, solved share and pending events: K26/shape.json 1x (M2 instance reads, 11 Nov 2026 07:53-08:40Z). Reply blocks per conversation (histogram), sources per block and documents: K24/shape.json (instance reads, 11 Nov 2026 03:17-03:23Z). Media: 2,835 rows, K26 INSIGHTS (rows read per transcript open). Messages and outbox: 9,000 chats x 3 messages, K26 shape 1x (45 days). Small keeps every multiplicity and 1% of what grows. Window budget: M2's 3.9M-rows-in-10-s working line (not a measured limit).",
+ "database": "DB",
+ "budget": { "windowRows": 3900000, "growthPercent": 10, "growthRows": 200, "timeoutSeconds": 600 },
+ "personas": {
+  "owner": { "kind": "owner" },
+  "visitor": {
+   "kind": "signin",
+   "requests": [
+    { "method": "POST", "path": "/api/identity/widget/session", "body": { "widgetKey": "size-widget" }, "capture": { "token": "/token" } },
+    { "method": "POST", "path": "/api/conversations", "headers": { "Authorization": "Bearer {{token}}" }, "body": { "projectId": "size-p1" }, "capture": { "conversation": "/id" } }
+   ],
+   "headers": { "Authorization": "Bearer {{token}}" }
+  }
+ },
+ "shape": {
+  "tables": [
+   { "table": "projects", "rows": 1, "values": { "id": "'size-p1'", "name": "'Size check'", "widget_key": "'size-widget'", "allowed_origin": "'https://rer-hosted-check.invalid'", "created_at": ":now" } },
+   { "table": "memberships", "rows": 1, "values": { "project_id": "'size-p1'", "user_id": "(SELECT id FROM users WHERE email = :owner_email)", "role": "'owner'" } },
+   { "table": "contacts", "rows": { "small": 1620, "large": 162000 }, "chunk": 10000, "values": {
+     "id": "printf('c%06d', n)", "project_id": "'size-p1'", "name": "printf('Contact %d', n)",
+     "email": "printf('c%06d@customer.example.test', n)", "metadata_json": "'{}'", "created_at": ":now - 7776000000", "is_verified": "0" } },
+   { "table": "conversations", "rows": { "small": 1619, "large": 161893 }, "chunk": 10000, "parent": { "table": "contacts", "per": 1 }, "values": {
+     "id": "printf('v%06d', n)", "project_id": "'size-p1'", "contact_id": "printf('c%06d', p)", "requester_id": "printf('c%06d', p)",
+     "subject": "'Synthetic question'", "channel": "'widget'",
+     "status_id": "CASE WHEN n % 52 = 0 THEN 'solved' ELSE 'new' END", "status_category": "CASE WHEN n % 52 = 0 THEN 'solved' ELSE 'new' END",
+     "resolved_at": "CASE WHEN n % 52 = 0 THEN :now - 7200000 END", "created_at": ":now - 3600000 - n * 1000", "updated_at": ":now - 3600000 - n * 1000", "last_message_id": "NULL" } },
+   { "table": "knowledge_datasets", "rows": 1, "values": { "id": "'size-dataset'", "project_id": "'size-p1'", "name": "'Help center'", "status": "'published'", "created_at": ":now" } },
+   { "table": "knowledge_versions", "rows": 1, "values": { "id": "'size-version'", "dataset_id": "'size-dataset'", "fingerprint": "'size'", "created_at": ":now" } },
+   { "table": "knowledge_documents", "rows": 644, "values": { "id": "printf('size-doc-%04d', n - 1)", "version_id": "'size-version'", "url": "printf('https://help.example.test/doc-%04d', n - 1)", "title": "printf('Document %d', n)", "content": "'Synthetic document text.'" } },
+   { "table": "knowledge_reply_blocks", "rows": 373,
+     "parent": { "table": "conversations", "histogram": { "16": 1, "13": 1, "12": 1, "11": 1, "10": 3, "9": 8, "8": 7, "7": 19, "6": 1, "5": 3, "3": 3 } },
+     "values": {
+     "id": "printf('a1a1%028x', n)", "project_id": "'size-p1'", "kind": "'copy'", "payload_json": "json_object('text', printf('Synthetic copied passage %d', n))",
+     "sources_json": { "jsonArray": { "length": "CASE WHEN n <= 16 THEN 255 WHEN n <= 246 THEN 354 ELSE 53 END", "item": "printf('knowledge:size-doc-%04d', (((n % 9) * 19 + k) % 410) * 644 / 410)" } },
+     "generation_id": "'ticket:' || printf('v%06d', p)", "author_contact_id": "NULL", "created_at": ":now - 3600000", "fingerprint": "printf('size-block-%d', n)" } },
+   { "table": "messages", "rows": { "small": 270, "large": 27000 }, "chunk": 1500, "parent": { "table": "conversations", "per": 3 }, "values": {
+     "id": "printf('m%07d', n)", "project_id": "'size-p1'", "conversation_id": "printf('v%06d', p)", "local_id": "printf('size-local-%07d', n)",
+     "actor_id": "CASE (n - 1) % 3 WHEN 0 THEN printf('c%06d', p) WHEN 1 THEN 'system' ELSE (SELECT id FROM users WHERE email = :owner_email) END",
+     "actor_role": "CASE (n - 1) % 3 WHEN 0 THEN 'contact' WHEN 1 THEN 'system' ELSE 'operator' END",
+     "content": "CASE WHEN (n - 1) % 3 = 2 THEN 'See ' || coalesce((SELECT group_concat('⟦k:' || id || '⟧', ' ') FROM knowledge_reply_blocks WHERE generation_id = 'ticket:' || printf('v%06d', p)), 'our help center') ELSE 'Synthetic message' END",
+     "revision": "(n - 1) % 3 + 1", "created_at": ":now - 3600000 - p * 1000 + (n - 1) % 3" } },
+   { "table": "conversation_outbox", "rows": { "small": 270, "large": 27000 }, "chunk": 3000, "parent": { "table": "messages", "per": 1 }, "values": {
+     "project_id": "'size-p1'", "conversation_id": "printf('v%06d', (p - 1) / 3 + 1)", "message_id": "printf('m%07d', p)",
+     "created_at": ":now - 3600000 - ((p - 1) / 3 + 1) * 1000", "delivered_at": ":now - 3500000" } },
+   { "table": "media", "rows": { "small": 28, "large": 2835 }, "parent": { "table": "messages", "per": 1 }, "values": {
+     "id": "printf('media-%06d', n)", "project_id": "'size-p1'", "conversation_id": "printf('v%06d', (p - 1) / 3 + 1)", "uploaded_by": "printf('c%06d', (p - 1) / 3 + 1)",
+     "object_key": "printf('size/media-%06d', n)", "filename": "printf('file-%d.png', n)", "content_type": "'image/png'", "size": "2048",
+     "message_id": "printf('m%07d', p)", "created_at": ":now - 3600000" } },
+   { "table": "workflow_events", "rows": { "small": 30, "large": 3034 }, "parent": { "table": "conversations", "per": 1 }, "values": {
+     "event_key": "printf('size-event-%06d', n)", "project_id": "'size-p1'", "conversation_id": "printf('v%06d', p)", "kind": "'conversation.updated'",
+     "at": ":now - 3600000", "source": "'size'", "revision": "1", "ticket_version": "1", "after_json": "'{}'", "state": "'pending'", "next_attempt_at": ":now + 86400000" } }
+  ],
+  "after": [ "DELETE FROM knowledge_index_dirty" ]
+ },
+ "flows": [
+  { "name": "inbox-list", "persona": "owner", "request": { "method": "GET", "path": "/api/dashboard/projects/size-p1/conversations" }, "ceiling": 5000, "callsInRow": 3 },
+  { "name": "inbox-counts", "persona": "owner", "request": { "method": "GET", "path": "/api/dashboard/projects/size-p1/conversations/counts" }, "ceiling": 1000, "callsInRow": 3 },
+  { "name": "open-worst-conversation", "persona": "owner", "request": { "method": "GET", "path": "/api/dashboard/projects/size-p1/conversations/v000001" }, "ceiling": 25000, "callsInRow": 3 },
+  { "name": "transcript-worst", "persona": "owner", "request": { "method": "GET", "path": "/api/conversations/v000001/messages" }, "ceiling": 6000, "callsInRow": 3 },
+  { "name": "owner-reply", "persona": "owner", "request": { "method": "POST", "path": "/api/conversations/v000002/messages", "body": { "content": "Thanks for waiting.", "localId": "size-owner-reply" } }, "ceiling": 15000 },
+  { "name": "visitor-message", "persona": "visitor", "request": { "method": "POST", "path": "/api/conversations/{{visitor.conversation}}/messages", "body": { "content": "Hello", "localId": "size-visitor-1" } }, "ceiling": 12000 },
+  { "name": "visitor-socket-open", "persona": "visitor", "request": { "method": "GET", "path": "/api/conversations/{{visitor.conversation}}/socket?token={{visitor.token}}", "websocket": true }, "ceiling": 2000, "callsInRow": 2 },
+  { "name": "dashboard-socket", "persona": "owner", "request": { "method": "GET", "path": "/api/projects/size-p1/socket", "websocket": true }, "ceiling": 2000, "callsInRow": 2 },
+  { "name": "minute-tick", "scheduled": "* * * * *", "ceiling": 40000 }
+ ]
+}
