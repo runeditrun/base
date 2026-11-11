@@ -22,7 +22,7 @@ test('a visitor without the key reaches plain guidance and nothing else', async 
     assert.equal(page.status, 200);
     const text = await page.text();
     assert.match(text, /rer dev --as owner/, 'names the command');
-    assert.match(text, /rer dev --as<\/code> followed by their email/, 'names the invited person\'s command');
+    assert.doesNotMatch(text, /followed by their email/, 'an app with no invited people does not promise one');
     assert.doesNotMatch(text, /RER_OPEN|RER_DEV_KEY/, 'no internal names');
     assert.ok(!text.includes(DEV_KEY), 'no key');
     assert.ok(!text.includes(DEV_KEY.slice(0, 12)), 'no part of the key');
@@ -30,6 +30,25 @@ test('a visitor without the key reaches plain guidance and nothing else', async 
     for (const path of ['/auth/dev/enter?as=owner', '/__dev/personas', '/auth/one-click?as=' + OWNER])
       assert.equal((await r.call(path)).status, 404, `${path} without the key`);
     assert.equal((await r.call('/auth/dev/enter?as=owner', { key: DEV_KEY.replace(/.$/, 'x') })).status, 404, 'a wrong key');
+  } finally { await r.close(); }
+});
+
+test('the guidance names the invited person\'s command only once the app has an invited person, and still shows no key or address', async () => {
+  const r = await fresh({ TEST_MAIL_STATUS: 'development' });
+  try {
+    const owner = cookies(await r.call('/auth/dev/enter?as=owner', { key: DEV_KEY }));
+    const before = await (await r.call('/__dev/key')).text();
+    assert.doesNotMatch(before, /followed by their email/);
+    assert.equal((await invite(r, owner)).status, 202);
+    const page = await r.call('/__dev/key');
+    assert.equal(page.status, 200);
+    const text = await page.text();
+    assert.match(text, /rer dev --as owner/);
+    assert.match(text, /rer dev --as<\/code> followed by their email/);
+    assert.ok(!text.includes(DEV_KEY) && !text.includes(INVITEE), 'neither the key nor the invitee is on the page');
+    // Revoking the invitation takes the sentence away again.
+    await r.db.prepare("UPDATE oa_tokens SET revoked_at=1 WHERE kind='invite'").run();
+    assert.doesNotMatch(await (await r.call('/__dev/key')).text(), /followed by their email/);
   } finally { await r.close(); }
 });
 
@@ -76,6 +95,39 @@ test('the invitation link goes only to an owner holding the key; a delivered inv
     const owner = cookies(await delivered.call('/auth/dev/enter?as=owner', { key: DEV_KEY }));
     assert.deepEqual(await (await invite(delivered, owner)).json(), { status: 'accepted' }, 'a mail provider that accepted the message changes nothing');
   } finally { await delivered.close(); }
+});
+
+test('a refused cross-site one-click link tells a browser what to do, and answers everyone else exactly as before', async () => {
+  const r = await fresh({ TEST_MAIL_STATUS: 'development' });
+  try {
+    const owner = cookies(await r.call('/auth/dev/enter?as=owner', { key: DEV_KEY }));
+    const link = (await (await invite(r, owner)).json()).signInUrl;
+    const crossSite = { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate' };
+    const refused = (headers, cookie = gateOnly(owner)) => r.call(link, { cookie, headers: { ...crossSite, ...headers } });
+    const api = await refused({ accept: 'application/json' }), none = await refused({}), browser = await refused({ accept: 'text/html,application/xhtml+xml,*/*;q=0.8' });
+    // The status and the JSON for a caller that did not ask for a page are unchanged.
+    for (const response of [api, none]) {
+      assert.equal(response.status, 404);
+      assert.equal(response.headers.get('content-type'), 'application/json');
+      assert.deepEqual(await response.json(), { error: 'not_found' });
+    }
+    assert.equal(browser.status, 404, 'the same status');
+    assert.ok(!browser.headers.get('set-cookie') && !browser.headers.get('location'), 'no session and no redirect');
+    for (const name of ['cache-control', 'referrer-policy', 'x-content-type-options', 'content-security-policy'])
+      assert.equal(browser.headers.get(name), api.headers.get(name), name);
+    const text = await browser.text();
+    assert.doesNotMatch(text, /not_found|[{}]/, 'no raw JSON');
+    assert.match(text, /rer dev --as/);
+    assert.match(text, /Open the link from the app/);
+    assert.ok(!text.includes(DEV_KEY) && !text.includes(INVITEE), 'no key and no address');
+    // The refusal is still a refusal: a cookie-only cross-site request does not sign anyone in, in either form.
+    for (const response of [api, none, browser]) assert.ok(!response.headers.get('set-cookie'));
+    assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM oa_sessions WHERE operator_id<>'owner'").first()).n, 0);
+    assert.equal((await r.db.prepare("SELECT status FROM oa_operators WHERE email=?").bind(INVITEE).first()).status, 'invited');
+    // Without the key at all it is the same refusal; with it, the link still opens.
+    assert.equal((await r.call(link, { headers: { accept: 'text/html' } })).status, 404);
+    assert.equal((await r.call(link, { key: DEV_KEY, headers: { ...crossSite, accept: 'text/html' } })).status, 303);
+  } finally { await r.close(); }
 });
 
 test('a deployed runtime has neither the gate nor the local guidance', async () => {

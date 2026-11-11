@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Operator, Session } from '../../../../../modules/operator-auth/index.mjs'
+import { isLocalRun } from './local-run'
 
 type SessionRow = { id: string; kind: string; createdAt: number; expiresAt: number; active: boolean }
 type OperatorRow = Operator & { signInUrl?: string }
@@ -46,7 +47,11 @@ export function OperatorAccess({ timezone = 'UTC' }: { timezone?: string }) {
     try {
       const result = await request('invite', { email, displayName: form.get('displayName'), role: form.get('role'), returnTo: '/app' }) as { delivery?: 'none'; signInUrl?: string }
       // A development mail provider sends nothing: say so rather than claim an invitation went out.
-      if (result.delivery === 'none') { setLocalInvite({ email, href: result.signInUrl }); setMessage('Saved. No email was sent: this app has no mail provider set up.') }
+      // The way to sign in on this computer is only true of a local run; a hosted demo has its own "Sign in as" action below.
+      if (result.delivery === 'none') {
+        if (isLocalRun(window.location.hostname)) { setLocalInvite({ email, href: result.signInUrl }); setMessage('Saved. No email was sent: this app has no mail provider set up.') }
+        else setMessage('Saved. No email was sent.')
+      }
       else setMessage('Invitation sent.')
       await refresh(selected)
     } catch (error) { setMessage((error as Error).message) }

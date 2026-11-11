@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.110-dev.g701fb0b0",
+  "cliVersion": "0.2.110-dev.gd40bbe19",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -791,7 +791,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "094793f69ed30032dbec66505c560f890c14d7bbfa6dafeace27d0dd2326f302"
+      "sha256": "0f16b31bd5fb519d67832f6f8a422da8760c14b4dc2698783802efc2bad9685d"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -4315,7 +4315,7 @@
     },
     "modules/operator-auth/accounts/one-click.mjs": {
       "source": "modules/operator-auth/accounts/one-click.mjs",
-      "sha256": "e8d7aab68407e14f94d95de428dfc680663c9e0d87e928717309fbde69b0f783"
+      "sha256": "110642000c26401426790371d1a0aed4016f75c2446c1d67ab54e6753e8d38aa"
     },
     "modules/operator-auth/accounts/owner-signin.mjs": {
       "source": "modules/operator-auth/accounts/owner-signin.mjs",
@@ -4439,7 +4439,7 @@
     },
     "modules/operator-auth/dev-gate.mjs": {
       "source": "modules/operator-auth/dev-gate.mjs",
-      "sha256": "2e3d5b180dbded0042e1a39889fe683512c9c9a1d0caae4277272c2b4f468e1d"
+      "sha256": "0c15ecce5ad4ef154fc1d2c633f57d9316f2b0e95703b69bcd8b2c62b0edcb53"
     },
     "modules/operator-auth/dev/cli-session.mjs": {
       "source": "modules/operator-auth/dev/cli-session.mjs",
@@ -4451,7 +4451,11 @@
     },
     "modules/operator-auth/dev/index.mjs": {
       "source": "modules/operator-auth/dev/index.mjs",
-      "sha256": "fdf32e07f34130fd1a16ab0870bf8c73fb85c63575397e17d65a9761f9a8e2e3"
+      "sha256": "667b75dc2575742db1b7f57a613a89ff24bad2880b9d881d89cf5414a26d96fa"
+    },
+    "modules/operator-auth/dev/invited.mjs": {
+      "source": "modules/operator-auth/dev/invited.mjs",
+      "sha256": "54f5f042c592924937eb1e47ca6d751b6ddb59b76dc0b1e74962dfb2c2727d42"
     },
     "modules/operator-auth/dev/personas.mjs": {
       "source": "modules/operator-auth/dev/personas.mjs",
@@ -4643,7 +4647,7 @@
     },
     "modules/operator-auth/routes.mjs": {
       "source": "modules/operator-auth/routes.mjs",
-      "sha256": "ae375d3c64605d96a79f8e192c7f15a5dc76e17b8e16ebe9d31e3c7a83250c5d"
+      "sha256": "e6e8d6055140836085ffb272fd9cf720088d877c76d4da35fe1120a7406ec4de"
     },
     "modules/operator-auth/scheduled/definition.mjs": {
       "source": "modules/operator-auth/scheduled/definition.mjs",

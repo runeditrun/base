@@ -131,8 +131,6 @@ export async function deployCommand(context) {
  const command = async (verb, extra = [], values = env, more = {}) => owner([verb, '--declaration', path, '--environment', environment, ...(hookRecord ? ['--state', hookRecord] : []), ...(['dry-run', 'local-plan', 'deploy', 'health'].includes(verb) ? await deployProductArguments(root, productDirectory) : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
  // A hook that deployed through the kit's standard record lets rer issue and
  // retire the setup token; a hook keeping an unnamed record of its own keeps its token.
- // The hook reads that record: settle a secret change an earlier run left pending first, and stop if it cannot be.
- if (!options.dryRun && hookRecord) await command('settle');
  let recorded, hookReturned = false;
  const inspect = async (origin = deployed?.origin) => {
   try { return recorded = await command('inspect', [], env, hookReturned ? {} : {propagation:observedReadiness(origin)?.propagation}); }
@@ -142,6 +140,8 @@ export async function deployCommand(context) {
  let deployed, claimed, linked = false, linkResult, step = 'custom deploy';
  const link = async (token, origin) => { if (!linked) { const state = await inspect(origin); linkResult = await linkDependencies?.(state?.origin ?? origin, token); linked = true; } return linkResult; };
  try {
+  // The hook reads that record: settle a secret change an earlier run left pending first, and stop here, before the hook, if it cannot be.
+  if (!options.dryRun && hookRecord) { step = 'settle the recorded secret change'; await command('settle'); step = 'custom deploy'; }
   const result = await observeOwner({ paths: ['/auth/bootstrap', adapter.hooks?.owner?.path, setupManifest?.steps?.find(item => item.type === 'owner-claim')?.path].filter(Boolean), inspect, beforeClaim: link, addSecret, deployed: () => deployed, tokenKey: setupManifest?.steps?.find(item => item.type === 'owner-claim')?.tokenField }, async claims => {
    observedClaims = claims;
    const saved = { ...process.env };

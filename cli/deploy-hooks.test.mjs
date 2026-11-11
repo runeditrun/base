@@ -423,6 +423,35 @@ test('a deploy settles an interrupted secret change before its hook reads the re
  assert.deepEqual(hookSaw, { pending: undefined, current: true }, 'the hook sees the settled record');
 });
 
+test('a refused pre-hook settle names its cause and the step, and still stops before the hook', async t => {
+ const f = await fixture(t, { declared: true, returnState: true });
+ await f.run();
+ const statePath = join(f.root, '.rer/deploy/production.json');
+ // Another run holds the state lock: the settle is refused and says so.
+ await writeFile(`${statePath}.lock`, '1\n');
+ const builds = f.builds(), writes = f.provider.state.writes.length, record = await readFile(statePath, 'utf8');
+ await assert.rejects(f.run(), error => {
+  assert.equal(error.code, 'command_failed');
+  assert.equal(error.exitCode, 1);
+  assert.match(error.message, /owner-state-locked/);
+  assert.match(error.message, /Failed at settle the recorded secret change/);
+  assert.match(error.message, /run rer deploy --environment production --env-file owner.env again/);
+  assert.doesNotMatch(error.message, /pnpm|capture log/);
+  return true;
+ });
+ assert.equal(f.builds(), builds, 'the hook never ran');
+ assert.equal(f.provider.state.writes.length, writes, 'nothing was written to the provider');
+ assert.equal(await readFile(statePath, 'utf8'), record, 'the record is untouched');
+ assert.equal(await readFile(`${statePath}.lock`, 'utf8'), '1\n', 'another run\'s lock is untouched');
+ // A replaced Worker with a change pending is refused by name too.
+ await rm(`${statePath}.lock`);
+ const saved = JSON.parse(record);
+ await writeFile(statePath, JSON.stringify({ ...saved, pendingSecret: { bindings: ['MAIL_API_KEY'], present: true, versionId: saved.receipt.provider.versionId, names: [] } }));
+ f.provider.foreign.replaceWorker();
+ await assert.rejects(f.run(), error => /Failed at settle the recorded secret change/.test(error.message) && !/capture log/.test(error.message));
+ assert.equal(f.builds(), builds, 'the hook still never ran');
+});
+
 test('missing or ambiguous ownership records refuse success, and denied bootstrap is never retried', async t => {
  const f = await fixture(t);
  f.deny(); await assert.rejects(f.run(), error => {
