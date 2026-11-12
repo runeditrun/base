@@ -544,6 +544,62 @@ The owner deployment declaration may set top-level `"productDirectory": ".rer/de
 
 For an optional canonical public origin, declare `"publicOriginSetting": "PUBLIC_ORIGIN"` beside `originVar` (`AUTH_ORIGIN` or `APP_ORIGIN`) in `deploy.json`. `rer deploy` reads `PUBLIC_ORIGIN` from the adapter's saved settings; the process environment overrides saved settings and `--env-file` wins over both. The value must be `https://host[:port]`, with no credentials, path (including a trailing `/`), query, fragment, whitespace or backslashes; it is normalized to `URL.origin`. When omitted, the origin remains workers.dev. This changes only `originVar`: readiness, health checks, the deployment target, recorded resource names and IDs, and the owner claim retain the kit's workers.dev origin and identity.
 
+A seed may declare an optional `commandAdapter.deployPolicy` function:
+
+```js
+import { missing } from '@runeditrun/rer/errors';
+
+const deployPolicy = async ({ root, options, environment, env, bindings,
+ declaration, declarationPath }) => {
+ // Normalize any seed-specific choices in a local copy, then validate the
+ // applicable operation. Binding values already resolve declared env aliases.
+ if (options.setSecret && env.MAIL_MODE === 'off'
+  && options.setSecret.split(',').some(name => name === 'OUTBOUND_TOKEN' && bindings[name]?.trim())) {
+  throw missing('Credentials are not bound while email is off.');
+ }
+};
+```
+
+The public application `rer deploy` door awaits this hook once, before dispatching
+any build, custom deploy hook or owner-account provider operation, including
+account/subdomain lookup and receipt recovery. It runs for ordinary deploy,
+`--dry-run`, `--set-secret`, `--unset-secret`, `--rotate-secret`,
+`--reopen-installation-key` and `--remove`; the seed chooses which policy applies
+to each operation, allowing cleanup where appropriate. Run-site, hosted-demo and
+independent-command doors retain their own contracts. A policy must stay local:
+no provider calls, build, settings writes or secret output.
+
+`options` is a copy of the parsed CLI options: repeated/comma-separated secret
+flags have their usual deduplicated binding-name list. `environment` defaults to
+`production`. `env` is the effective deploy environment (process environment,
+then the owned `--env-file` override, then existing declared owner/generated
+input supply). `bindings` starts with declaration `vars` and overlays nonblank
+secret values under their declared Worker binding names, using each secret's
+`environment` mapping. For example, `{binding:'OUTBOUND_TOKEN',
+environment:'EMAIL_API_KEY'}` exposes `env.EMAIL_API_KEY` as
+`bindings.OUTBOUND_TOKEN`; ambient `env.OUTBOUND_TOKEN` cannot override that
+mapping. These are proposed local inputs, not a read of existing hosted secrets.
+`root`, `declaration` and checkout-relative `declarationPath` name the selected
+checkout and deploy declaration. Values are private; do not log them.
+
+This is a validation hook: treat inputs as read-only; its return value is ignored.
+Seed-specific provider enums and additional aliases remain the seed's job:
+normalize them into a local copy before checking policy. Keep any deploy hook's
+existing runtime normalization. A successful policy returns normally; throw a
+`RerError` from the same rer copy/package to refuse. `missing(message)` gives exit
+3 and JSON `error` with `code:"missing_input"`, `message`, `exitCode:3`, followed
+by `result` with `ok:false`, `exitCode:3`; `refuse(message)` retains the existing
+exit-4 `safety_refusal`. Other errors retain the existing command-failure path.
+A refusal stops before any provider contact. A declared non-function policy is
+an invalid invocation (exit 2).
+
+Seeds without this optional hook keep the existing contract: secret mutations
+use the owner-account controller's declaration, value and ownership checks,
+without invoking the application's build/deploy hook or the full-deploy
+production-auth preflight. Full deployments still run that shared preflight.
+No seed-specific mail policy is inferred. Low-level kit/controller callers remain
+responsible for their own policy; this hook belongs to the public CLI adapter.
+
 A seed's own deploy hook (the `commandAdapter` option `deploy`) returns `{deployed: true, origin}` once its upload is live (an https origin; rer refuses an http one off loopback before sending it anything), plus `setupToken`, the setup token its Worker holds, when that is not the `SETUP_TOKEN` rer passed it in the environment. `rer deploy` then waits until the origin's `/health` names the checkout's commit and claims the owner with that token, needing no deployment record from the hook. A hook that deploys with the kit under its own state file also returns that file as `state` (the kit's `deploy` result names it); rer then reads that record for every later step, so it issues, claims with and retires the setup token, and `--set-secret`, `--unset-secret` and `rer deploy --remove --yes` act on what the hook deployed.
 
 For a hosted owner claim, deploy reuses the name saved by `rer setup` in the
