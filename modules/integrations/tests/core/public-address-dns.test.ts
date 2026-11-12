@@ -35,18 +35,18 @@ test('production transport checks every DNS answer before any HTTPS connection',
   const answer = (address: string) => ({ address, family: address.includes(':') ? 6 : 4 });
   const send = () => new NodePinnedTransport().send({ url: `https://${host}/events`, headers: {}, body: '{}' });
   try {
-    for (const address of deniedAddresses) await t.test(`DNS rejects ${address} alone and in either mixed order`, async () => {
-      for (const values of [[address], ['8.8.8.8', address], [address, '2606:4700:4700::1111']]) {
+    await t.test('DNS rejects every denied address alone and in either mixed order', async () => {
+      for (const address of deniedAddresses) for (const values of [[address], ['8.8.8.8', address], [address, '2606:4700:4700::1111']]) {
         answers = values.map(answer); const before = connects;
-        await assert.rejects(send(), /Destination DNS is not public/);
-        assert.equal(connects, before);
+        await assert.rejects(send(), /Destination DNS is not public/, JSON.stringify(values));
+        assert.equal(connects, before, JSON.stringify(values));
       }
     });
     await t.test('empty and malformed answers reject', async () => {
       for (const values of [[], ['bad-address'], ['2606:::1'], ['8.8.8.256']]) {
         answers = values.map(answer); const before = connects;
-        await assert.rejects(send(), /Destination DNS is not public/);
-        assert.equal(connects, before);
+        await assert.rejects(send(), /Destination DNS is not public/, JSON.stringify(values));
+        assert.equal(connects, before, JSON.stringify(values));
       }
     });
     await t.test('public answers pin the first address with the original TLS hostname and no second resolution', async () => {

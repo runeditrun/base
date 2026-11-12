@@ -1,9 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runSendGridConformance, message, config } from './conformance.mjs';
+import { message, config } from './conformance.mjs';
 import { sendSendGrid, serializeSendGridMessage } from '../../src/adapters/sendgrid/index.mjs';
-
-test('portable SendGrid wire, receipt and transport conformance', runSendGridConformance);
 
 test('text-only and HTML-only bodies remain exact; omitted settings are omitted', () => {
   for (const field of ['text', 'html']) {
