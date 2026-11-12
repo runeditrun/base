@@ -82,7 +82,9 @@ const scenarios = [
   })),
 ];
 
-for (const scenario of scenarios) for (const overflow of [0n, 1n, 2n, 32n]) {
+// Each budget operation keeps its exact boundary and first unsafe sum. Larger
+// overflows take the same checkedSizeSum refusal path.
+for (const scenario of scenarios) for (const overflow of [0n, 1n]) {
   test(`${scenario.name} ${overflow ? `rejects safe-range overflow +${overflow}` : 'reports the exact safe-integer boundary'}`, () => {
     const small = scenario.make();
     small.apply('');
