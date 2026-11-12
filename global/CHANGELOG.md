@@ -1,19 +1,23 @@
 # Changelog
 
-## Unreleased
+## 0.2.112
 
-- Application `rer deploy` now awaits an optional seed `deployPolicy` before builds or provider contact, including secret-only updates. Policies receive effective inputs and declaration-mapped bindings so credential aliases cannot bypass a seed’s OFF choice. Seeds without the hook retain their existing deployment checks. Code only; no migration or deployed seed change.
+### Downloaded tools and export progress
 
-- `rer run --script FILE [ARGS...]` runs a downloaded JavaScript file with the runtime running rer, including the installer’s private Node, without requiring Node on PATH or a project checkout. Code and local instructions only; no migration or deployed seed change.
-- Local installation export reports allocated disk space separately from archive size and leaves the building time indeterminate until the total work is known, avoiding forecasts based on unused database pages and temporary state. CLI progress only; no archive format change or migration.
+- `rer run --script FILE [ARGS...]` runs a downloaded JavaScript file with the Node running rer, including the installer's private Node, outside a project checkout and without `node` or pnpm on PATH. It preserves the working folder, arguments and exit status; `--cwd DIR` before `--script` selects the folder. Package scripts (`rer run NAME`) continue to use the checkout's pinned runtime. The installer and local instructions show this door; it becomes available when the installed rer is upgraded.
+- Local installation export labels allocated disk space separately from archive size and leaves building time indeterminate until the total work is known. It no longer forecasts archive size or building time from unused database pages and temporary state; known-total writing and staging phases retain their progress estimates. CLI progress only; the archive format is unchanged.
 
-### `rer setup` shows migration progress, not wrangler's repeated tables
+### Setup, import and export migration output
 
-- A seed whose installer runs `wrangler d1 migrations apply` itself (a `migrate` hook returning the command) printed wrangler's whole migration table after every migration: 75 migrations meant about 1.2 MB and the first migration's name 76 times. The terminal and page now show `Applying migrations N/M` every ten migrations, any warning or error, and one `Applied N migrations.` line; a failed migration prints `Migration NAME failed.`, wrangler's error text and the log path. The setup log keeps wrangler's full output. A finished `rer setup` adds one line before `RER_SETUP_READY`: `Setup complete: N migrations applied, owner set up. Full output: <log path>`. Code only: no migration is added; a seed gets it by adopting the next release.
+- `wrangler d1 migrations apply` run through rer's command runner, including a seed's setup, import or export adapter, shows `Applying migrations N/M` every ten migrations, warnings and errors, and one `Applied N migrations. Full output: <log>` summary. Repeated tables and boilerplate stay in the full log. A failed migration names itself and keeps wrangler's error and log path; an error without a failed row is associated with the first listed migration that did not finish. Shared local import and export now show this progress instead of silencing the whole apply.
+- A finished `rer setup` adds a result line before `RER_SETUP_READY`: the number of migrations applied (or that the database is already up to date), owner setup and the full-output log path. Seeds get these command-runner and setup changes after adopting this rer through their pinned CLI.
 
-### `rer import` and `rer export` show migration progress, not wrangler's repeated tables
+### Optional seed deploy policy
 
-- Any `wrangler d1 migrations apply` run through rer's command runner, including a seed's own export and import adapter, now shows `Applying migrations N/M` every ten migrations, wrangler's warnings and errors, and one `Applied N migrations. Full output: <log>` line; wrangler's migration tables and boilerplate stay in the log. A seed adapter that ran the command without `WRANGLER_LOG=warn` printed 2.3 MB over 20,000 lines for `rer import` after `rer reset --yes` (a 197-migration reproduction printed 8.0 MB over 79,219 lines; now 1 KB over 31 lines). The shared local import and export no longer silence wrangler for the whole apply: they show that progress. A migration that fails with only an error message is named from wrangler's list (`Migration NAME failed.`). Code only: no migration is added; a seed gets it by adopting the next release.
+- Application `rer deploy` awaits optional `commandAdapter.deployPolicy({ root, options, environment, env, bindings, declaration, declarationPath })` once after basic CLI-option and declaration checks, before downstream deploy validation, builds, custom deploy hooks or owner-account provider contact, including secret-only updates and receipt recovery. `env` carries effective proposed local inputs; `bindings` overlays declaration vars with nonblank secrets mapped from their declared environment names, so an ambient binding-name value cannot override an explicit mapping. These are proposed inputs, not hosted secret readback.
+- The hook is local validation: inputs are read-only, its return value is ignored, and it must make no provider calls, builds, settings writes or secret output. A seed can reject applicable operations with `missing(message)` from the same rer copy/package (exit 3, `missing_input`); `refuse(message)` retains exit 4. Seeds without the hook keep their existing deployment checks. This releases CLI support only: each seed must adopt the CLI and implement its own policy, including normalization of its provider choices and aliases. No seed-specific mail policy is inferred, and this release establishes no installed mail-OFF or deployed behavior.
+
+Code and documentation only: the actual diff adds no migration. Nothing here establishes seed adoption or changes a deployed seed; each seed must adopt and deploy its own changes.
 
 ## 0.2.111
 
