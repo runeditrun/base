@@ -1,7 +1,11 @@
+import { runCase } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare } from '../provider.mjs';
 import { reconcileResources } from '../resources.mjs';
+
+const boundedCaseRows = [];
+const boundedCase = (name, run) => boundedCaseRows.push({name,run});
 
 const accountId = 'a'.repeat(32);
 const options = {field:'buckets', pagination:'r2-bounded'};
@@ -18,7 +22,7 @@ function fixture(pages, config = {}) {
   return {api, calls, list:() => api.list('/r2/buckets', options)};
 }
 
-test('R2 bounded mode accepts absent or null metadata only on a short requested-limit page', async () => {
+boundedCase('R2 bounded mode accepts absent or null metadata only on a short requested-limit page', async () => {
   for (const info of [undefined, null]) {
     for (const count of [0, 6, 999]) {
       const rows = buckets(count); const f = fixture([page(rows, info)]);
@@ -31,7 +35,7 @@ test('R2 bounded mode accepts absent or null metadata only on a short requested-
   }
 });
 
-test('R2 bounded mode rejects incorrect endpoints and fields before any request', async () => {
+boundedCase('R2 bounded mode rejects incorrect endpoints and fields before any request', async () => {
   const f = fixture([]);
   for (const [path, field] of [['/queues','buckets'], ['/r2/buckets/','buckets'], ['/r2/buckets?per_page=1','buckets'], ['/r2/buckets','other'], ['/r2/buckets',undefined]]) {
     await assert.rejects(f.api.list(path, {field, pagination:'r2-bounded'}), /invalid-r2-bounded-list/);
@@ -39,7 +43,7 @@ test('R2 bounded mode rejects incorrect endpoints and fields before any request'
   assert.equal(f.calls.length, 0);
 });
 
-test('R2 bounded mode follows encoded cursors through full pages and accepts a short terminal page', async () => {
+boundedCase('R2 bounded mode follows encoded cursors through full pages and accepts a short terminal page', async () => {
   for (const terminal of [undefined, null, {per_page:1000}, {per_page:1000, cursor:''}]) {
     const rows = buckets(1000);
     const f = fixture([page(rows, {per_page:1000, cursor:'YWJj+/=='}), page([{name:'last'}], terminal)]);
@@ -49,7 +53,7 @@ test('R2 bounded mode follows encoded cursors through full pages and accepts a s
   }
 });
 
-test('R2 bounded mode respects a smaller reported page bound and follows a short page with a cursor', async () => {
+boundedCase('R2 bounded mode respects a smaller reported page bound and follows a short page with a cursor', async () => {
   const f = fixture([page([{name:'first'}], {per_page:2, cursor:'next'}), page([], {per_page:2})]);
   assert.deepEqual(await f.list(), [{name:'first'}]);
   assert.equal(f.calls.length, 2);
@@ -59,7 +63,7 @@ test('R2 bounded mode respects a smaller reported page bound and follows a short
   }
 });
 
-test('R2 bounded mode rejects malformed metadata, lists and oversized pages', async () => {
+boundedCase('R2 bounded mode rejects malformed metadata, lists and oversized pages', async () => {
   for (const info of [[], false, '', {per_page:0}, {per_page:-1}, {per_page:1.5}, {per_page:'1000'}, {per_page:1001}, {per_page:null}]) {
     const f = fixture([page([], info)]);
     await assert.rejects(f.list(), /provider-incomplete-pagination/);
@@ -74,7 +78,7 @@ test('R2 bounded mode rejects malformed metadata, lists and oversized pages', as
   await assert.rejects(fixture([page(buckets(2), {per_page:1,cursor:'next'})]).list(), /provider-partial-list/);
 });
 
-test('R2 bounded mode rejects invalid cursors and repeated continuation tokens', async () => {
+boundedCase('R2 bounded mode rejects invalid cursors and repeated continuation tokens', async () => {
   for (const cursor of [0, false, {}, [], 'bad&cursor', 'white space']) {
     await assert.rejects(fixture([page([], {per_page:1000,cursor})]).list(), /provider-invalid-cursor/);
   }
@@ -83,7 +87,7 @@ test('R2 bounded mode rejects invalid cursors and repeated continuation tokens',
   assert.equal(f.calls.length, 2);
 });
 
-test('R2 bounded mode validates optional totals and count evidence without hiding contradictions', async () => {
+boundedCase('R2 bounded mode validates optional totals and count evidence without hiding contradictions', async () => {
   const first = page([{name:'first'}], {per_page:2,cursor:'next',total_count:2,count:1});
   for (const terminal of [undefined, null, {per_page:2,total_count:2,count:1}]) {
     assert.equal((await fixture([first, page([{name:'last'}], terminal)]).list()).length, 2);
@@ -100,7 +104,7 @@ test('R2 bounded mode validates optional totals and count evidence without hidin
   await assert.rejects(fixture([first, page([{name:'last'}], {per_page:2,total_count:3})]).list(), /provider-pagination-changed/);
 });
 
-test('R2 bounded mode retains row, page and request budgets', async () => {
+boundedCase('R2 bounded mode retains row, page and request budgets', async () => {
   const full = buckets(1000);
   const oversized = fixture(Array.from({length:11}, (_, i) => page(full, {per_page:1000,cursor:`next${i}`})));
   await assert.rejects(oversized.list(), /provider-list-too-large/);
@@ -126,4 +130,8 @@ test('resource reconciliation stops before a create when bounded inventory is in
   const f = fixture([page(buckets(1000))]);
   await assert.rejects(reconcileResources(f.api, {d1:[],queues:[],r2:[{binding:'FILES',name:'new-files'}]}), /provider-incomplete-pagination/);
   assert.equal(f.calls.length, 1);
+});
+
+test('bounded R2 inventory traverses complete evidence and refuses ambiguous pages', async () => {
+  for (const {name,run} of boundedCaseRows) await runCase(name,run);
 });

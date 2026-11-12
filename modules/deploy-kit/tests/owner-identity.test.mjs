@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { runCase } from './fold-case.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -27,7 +28,7 @@ function change(args) {
 }
 
 test('Worker ownership checks each receipt identity even if a replacement preserves its fingerprint', async t => {
-  for (const field of ['versionId','deploymentId','etag']) await t.test(field, async t => {
+  for (const field of ['versionId','deploymentId','etag']) await runCase(field, async t => {
     const {args,state} = await setup(t);
     await ownerDeploy(args);
     // Settings and the old fingerprint remain intact; only the provider identity changes.
@@ -119,7 +120,7 @@ test('provider input errors use neutral codes before any request', () => {
 });
 
 test('R2 legacy compatibility does not permit missing D1, KV or Queue ownership identities', async t => {
-  for (const [kind,binding] of [['d1','DB'],['kv','CACHE'],['queues','JOBS']]) await t.test(kind,async t => {
+  for (const [kind,binding] of [['d1','DB'],['kv','CACHE'],['queues','JOBS']]) await runCase(kind,async t => {
     const declared = {...declaration,[kind]:[{binding}]};
     const {args,state} = await setup(t,declared);
     await ownerDeploy(args);

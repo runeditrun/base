@@ -1,3 +1,4 @@
+import { runCase } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -11,6 +12,9 @@ import { migrationFailure } from '../diagnostics.mjs';
 import { main } from '../owner-cli.mjs';
 import { ownerProvider } from './owner-provider.mjs';
 import { providerFixture } from './provider-fixture.mjs';
+
+const completionCaseRows = [];
+const completionCase = (name, run) => completionCaseRows.push({name,run});
 
 const entry = sql => ({ name: '0001_schema.sql', sql, sha256: hash(sql) });
 const schema = "CREATE TABLE source(value TEXT); INSERT INTO source VALUES ('retained');";
@@ -38,7 +42,7 @@ const cases = [
 ];
 
 for (const [label, sql, separator] of cases) {
-  test(`completion preserves migration bytes and executes after ${label}`, async t => {
+  completionCase(`completion preserves migration bytes and executes after ${label}`, async t => {
     const { fixture, api, id, db } = await setup(t);
     const migration = entry(sql), original = structuredClone(migration);
     const result = await migrate(api, id, [migration]);
@@ -213,4 +217,8 @@ test('rer deploy retries a claim D1 rolled back on bytes a reviewed rewrite repl
   assert.deepEqual(db().prepare('SELECT id FROM custody').all().map(row => row.id), ['kept']);
   assert.ok(notices.includes('Migrations: retried 0002_custody.sql: the earlier attempt was rolled back (D1 vector-production-db).'), notices.join('\n'));
   assert.equal((await deploy()).changed, false, 'the next deploy has nothing to do');
+});
+
+test('migration completion preserves SQL bytes and records each terminator variant exactly once', async () => {
+  for (const {name,run} of completionCaseRows) await runCase(name,run);
 });
