@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.112-dev.g10a63fee",
+  "cliVersion": "0.2.112-dev.gd3add73d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4851,7 +4851,7 @@
     },
     "modules/portability/journal.mjs": {
       "source": "modules/portability/journal.mjs",
-      "sha256": "5039a16fa33f9cb2ced82341b223fe618ee66829b61f87ae77c34b0942efcc90"
+      "sha256": "cfd1ddc8547c8c7411420e410ebaac3caf55b24988892e4a473dcc1b4bfdfcc9"
     },
     "modules/portability/ledgers.mjs": {
       "source": "modules/portability/ledgers.mjs",

@@ -23,8 +23,8 @@ export async function journal(db,source) {
 }
 export async function checkEpoch(db,manifest) {
   const recorded=await statement(db,'SELECT epoch FROM rer_portability_epochs WHERE source=?',manifest.sourceIdentity).first();
-  const s=await state(db);
-  insist(manifest.epoch>=Math.max(recorded?.epoch??0,s.source_identity===manifest.sourceIdentity?s.epoch:0),'erasure_epoch');
+  const s=await statement(db,'SELECT source_identity,epoch FROM rer_portability_state WHERE id=1').first();
+  insist(manifest.epoch>=Math.max(recorded?.epoch??0,s?.source_identity===manifest.sourceIdentity?s.epoch:0),'erasure_epoch');
 }
 export async function fence(db,manifest,copies,later) {
   await checkEpoch(db,manifest);
