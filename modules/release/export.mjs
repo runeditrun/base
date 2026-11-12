@@ -3,6 +3,7 @@ import { resolve, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { git } from './source.mjs';
 import { sha256 } from './catalogue.mjs';
+import { assertArchiveTracked } from './archive-guard.mjs';
 
 // Read the checked Git blobs directly. export-ignore/export-subst attributes
 // cannot silently remove or change bytes after publication inspection.
@@ -46,6 +47,11 @@ export function cleanHistory(source, temporary, tagged = false) {
 export function publicExport(source, temporary, output) {
   const tree = sourceTree(source, resolve(temporary, 'public-source'));
   const archive = resolve(output, 'public-source.tar');
-  execFileSync('tar', ['-cf', archive, '-C', tree, '.'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  // macOS tar turns extended attributes into `._*` members and pax headers.
+  // COPYFILE_DISABLE is ignored elsewhere; the flag is added only on macOS so
+  // other hosts run the exact command they always did.
+  const flags = process.platform === 'darwin' ? ['--no-xattrs'] : [];
+  execFileSync('tar', ['-cf', archive, ...flags, '-C', tree, '.'], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, COPYFILE_DISABLE: '1' } });
+  assertArchiveTracked(archive, source.entries.keys());
   return { path: 'public-source.tar', sha256: sha256(readFileSync(archive)), format: 'tar', revision: source.commit };
 }

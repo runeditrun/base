@@ -136,6 +136,14 @@ With `--tag`, passing gates produce `public-source.tar`, containing the checked 
 exact ordinary files without Git history, and a hash-pinned site bundle:
 `site/<id>/<version>/release.json`, published documents, listing assets and
 `site/registry.json`.
+The archive is built with the host `tar` from the files written out of the checked blobs, so
+its bytes are not reproducible from the source alone (modes and times come from the producing
+host); `publicExport.sha256` in the receipt, not a rebuild, is what the signed statement
+checks the archive against. macOS `tar` would add a `._<name>` AppleDouble member for every file and
+directory carrying an extended attribute: the producer runs it with `COPYFILE_DISABLE=1` and,
+on macOS only, `--no-xattrs`, then reads the member names from the archive bytes and stops the
+release before a digest is recorded if any `._*` member is not a tracked path (a tracked file
+named `._x` is archived like any other).
 Export attributes cannot silently omit or substitute bytes. The site metadata
 comes from committed seed and contract data; no screenshots, install guarantees
 or verified maturity claims are invented. Copy the reviewed bundle into the site
