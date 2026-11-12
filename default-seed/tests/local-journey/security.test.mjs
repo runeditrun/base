@@ -1,10 +1,13 @@
+import { runRows } from '../rows.mjs'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { operatorMail } from '../../src/core/platform/auth/mail.server.mjs'
 import { localDevelopmentEnabled } from '../../src/core/platform/auth/local.server.mjs'
 
+const capabilityRows = []
+
 // These are app sends through the configured facade, including accidental live settings.
-test('local development and demo suppress application mail before provider or D1 access', async () => {
+capabilityRows.push(['local development and demo suppress application mail before provider or D1 access', {}, async () => {
   const message = { deliveryId: 'security-check', from: 'sender@example.test', to: ['reader@example.test'], subject: 'Hello', text: 'Body' }
   const originalFetch = globalThis.fetch
   globalThis.fetch = () => assert.fail('development or demo contacted a provider')
@@ -18,10 +21,14 @@ test('local development and demo suppress application mail before provider or D1
     }
     assert.equal(operatorMail({ AUTH_LOCAL: 'true', AUTH_ORIGIN: 'https://public.example.test', MAIL_PROVIDER: 'development' }), undefined)
   } finally { globalThis.fetch = originalFetch }
-})
+}])
 
-test('local capability accepts only explicit exact loopback configuration', () => {
+capabilityRows.push(['local capability accepts only explicit exact loopback configuration', {}, () => {
   for (const origin of ['http://127.0.0.1:8787', 'http://localhost:8787', 'http://[::1]:8787', 'https://localhost']) {
     assert.equal(localDevelopmentEnabled({ AUTH_LOCAL: 'true', AUTH_ORIGIN: origin }), true)
   }
+}])
+
+test("local runtime capability admits only explicit loopback and suppresses external mail effects", async t => {
+  await runRows(t, capabilityRows)
 })

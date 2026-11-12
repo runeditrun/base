@@ -1,8 +1,11 @@
+import { runRows } from '../rows.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { uncachedStartResponse } from '../../src/core/app/start-response.server.ts'
 
-test('Start response boundary preserves lazy stream identity, headers, status and cancellation', async () => {
+const responseRows = []
+
+responseRows.push(['Start response boundary preserves lazy stream identity, headers, status and cancellation', {}, async () => {
   let controller, cancelled
   const body = new ReadableStream({
     start(value) { controller = value },
@@ -28,9 +31,9 @@ test('Start response boundary preserves lazy stream identity, headers, status an
   assert.deepEqual(await next, { done: false, value: chunk })
   await reader.cancel('client disconnected')
   assert.equal(cancelled, 'client disconnected')
-})
+}])
 
-test('Start response boundary preserves native empty redirects and cookie headers', () => {
+responseRows.push(['Start response boundary preserves native empty redirects and cookie headers', {}, () => {
   const headers = new Headers({ location: '/signin?returnTo=%2Fapp' })
   headers.append('set-cookie', 'first=test; HttpOnly')
   headers.append('set-cookie', 'second=test; HttpOnly')
@@ -40,4 +43,8 @@ test('Start response boundary preserves native empty redirects and cookie header
   assert.equal(response.headers.get('location'), '/signin?returnTo=%2Fapp')
   assert.equal(response.headers.get('cache-control'), 'no-store, no-transform')
   assert.deepEqual(response.headers.getSetCookie(), ['first=test; HttpOnly', 'second=test; HttpOnly'])
+}])
+
+test("Start response boundary preserves native streams, redirects and headers while refusing caching", async t => {
+  await runRows(t, responseRows)
 })

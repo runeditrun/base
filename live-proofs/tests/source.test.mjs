@@ -1,13 +1,16 @@
+import { runRows } from '../../default-seed/tests/rows.mjs'
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateSource } from '../validate-source.mjs';
 import { fixture, git, commit, wrapper } from './helpers.mjs';
+
+const sourceRows = []
 const options = f => ({ cwd: f.controller, sha: f.sha, dispatchSha: f.sha,
   dispatchRef: 'refs/heads/main', event: 'workflow_dispatch', repo: 'runeditrun/base',
   mode: 'proof', proof: 'secrets-present', remote: f.remote });
-test('fresh main ancestry and annotated release tags accepted without executing source', t => {
+sourceRows.push(['fresh main ancestry and annotated release tags accepted without executing source', {}, t => {
   const f = fixture(t);
   writeFileSync(join(f.source, 'malicious.mjs'), 'throw new Error("must not run")');
   const main = commit(f.source, 'main-work'); git(f.source, 'push', f.remote, 'main');
@@ -17,8 +20,8 @@ test('fresh main ancestry and annotated release tags accepted without executing 
   git(f.source, 'push', f.remote, 'v1.0.0');
   assert.equal(validateSource({ ...options(f), sha: release }), release);
   assert.equal(validateSource({ ...options(f), sha: main, mode: 'stage' }), main);
-});
-test('rejects SHA expressions, names, options, injection and unknown proof before fetch', t => {
+}]);
+sourceRows.push(['rejects SHA expressions, names, options, injection and unknown proof before fetch', {}, t => {
   const f = fixture(t);
   for (const sha of ['main', f.sha.slice(0, 12), `${f.sha}^`, '--help', '$(touch injected)', `${f.sha}\n`, 'A'.repeat(40)])
     assert.throws(() => validateSource({ ...options(f), sha }), /invalid-sha/);
@@ -27,8 +30,8 @@ test('rejects SHA expressions, names, options, injection and unknown proof befor
   for (const change of [{ dispatchRef: 'refs/heads/task' }, { dispatchRef: 'refs/tags/v1' },
     { event: 'push' }, { repo: 'just-every/run-lamp' }])
     assert.throws(() => validateSource({ ...options(f), ...change }), /invalid-dispatch/);
-});
-test('rejects unrelated SHA, blob, stale tags, and workflow SHA outside main', t => {
+}]);
+sourceRows.push(['rejects unrelated SHA, blob, stale tags, and workflow SHA outside main', {}, t => {
   const f = fixture(t);
   git(f.source, 'checkout', '--orphan', 'other'); git(f.source, 'rm', '-rf', '.');
   const unrelated = commit(f.source, 'other'); git(f.source, 'push', f.remote, 'other');
@@ -41,11 +44,15 @@ test('rejects unrelated SHA, blob, stale tags, and workflow SHA outside main', t
   assert.equal(validateSource({ ...options(f), sha: unrelated }), unrelated);
   git(f.source, 'push', f.remote, ':refs/tags/v2');
   assert.throws(() => validateSource({ ...options(f), sha: unrelated }), /unreachable-sha/);
-});
-test('rejects force-push ancestry race between advertised refs and fetch', t => {
+}]);
+sourceRows.push(['rejects force-push ancestry race between advertised refs and fetch', {}, t => {
   const f = fixture(t);
   git(f.source, 'checkout', '--orphan', 'other'); git(f.source, 'rm', '-rf', '.');
   const other = commit(f.source, 'other'); git(f.source, 'push', f.remote, 'other');
   const env = wrapper(f.root, `if(args.includes('fetch')) execFileSync(real,['--git-dir',${JSON.stringify(f.remote)},'update-ref','refs/heads/main',${JSON.stringify(other)}]);`);
   assert.throws(() => validateSource({ ...options(f), env }), /source-refs-changed/);
-});
+}]);
+
+test("source validation admits only immutable reachable revisions from trusted dispatch", async t => {
+  await runRows(t, sourceRows)
+})
