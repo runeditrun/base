@@ -6,14 +6,18 @@
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { constants } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { locate } from './checkout.mjs';
 import { shared } from '../cli/shared.mjs';
 
 export const runUsage = `Usage: rer run [--cwd DIR] [SCRIPT [ARGS...]]
+       rer run [--cwd DIR] --script FILE [ARGS...]
 Runs a package.json script of this checkout as pnpm run SCRIPT ARGS would, with the
 pnpm and Node the checkout pins (rer keeps them off PATH). Without SCRIPT it lists
 the scripts. Where a project's docs say pnpm run X -- ARGS, run rer run X -- ARGS.
+With --script, runs a JavaScript file with the Node running rer, including the
+installer's private runtime. No checkout or package manager is needed. FILE is
+relative to the current folder (or --cwd DIR); remaining arguments go to the file.
 `;
 
 // The checkout's pinned Node, when it differs from this one (RER_NODE_AUTO=0 keeps this one).
@@ -37,6 +41,11 @@ export async function runScript(args) {
   cwd = args[1];
   if (!cwd?.trim() || cwd.startsWith('-')) { process.stderr.write(`A folder is required for --cwd.\n${runUsage}`); return 2; }
   args = args.slice(2);
+ }
+ if (args[0] === '--script') {
+  const file = args[1];
+  if (!file?.trim() || file.startsWith('-')) { process.stderr.write(`A file is required for --script.\n${runUsage}`); return 2; }
+  return runChild(process.execPath, [resolve(cwd ?? '.', file), ...args.slice(2)], cwd ?? process.cwd());
  }
  const target = locate(cwd ? ['run', '--cwd', cwd] : ['run']);
  if (!target.root || !['first-party', 'independent'].includes(target.profile)) {
@@ -62,7 +71,11 @@ export async function runScript(args) {
  }
  const { toolCommand } = await shared('tool-command.mjs');
  const [program, parameters] = toolCommand('pnpm', ['run', '--silent', ...args], process.env);
- const child = spawn(program, parameters, { cwd: target.root, env: process.env, stdio: 'inherit' });
+ return runChild(program, parameters, target.root);
+}
+
+async function runChild(program, parameters, cwd) {
+ const child = spawn(program, parameters, { cwd, env: process.env, stdio: 'inherit' });
  const forward = new Map(['SIGINT', 'SIGTERM', 'SIGHUP'].map(signal => [signal, () => child.kill(signal)]));
  for (const [signal, handler] of forward) process.on(signal, handler);
  try {

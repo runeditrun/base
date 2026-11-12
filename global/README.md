@@ -5,7 +5,7 @@ Allow roughly 500 MB–1 GB of downloads and 1–3 GB of disk space for a first 
 <!-- END COLD RUN BUDGET -->
 
 `rer` is the Run Edit Run command. Install it once, then run `rer <verb>` in any
-Run Edit Run checkout: every verb runs that checkout's own pinned copy, so a
+Run Edit Run checkout: project verbs run that checkout's own pinned copy, so a
 checkout always gets the behaviour it was built and tested with.
 
 For source authors, `rer adopt-edition` adds a recipe and lock to existing tracked
@@ -47,7 +47,20 @@ changing PATH: a child installer cannot change its parent shell’s PATH, and ba
 `~/.local/bin`, its closing lines give one required step: the
 `export PATH="$HOME/.local/bin:$PATH"` line to run now and add to your shell
 startup file, or `rer cli path` (by its absolute launcher) for other shells.
-The same start also fits on one line:
+To run a downloaded JavaScript tool, open its folder in the terminal and use
+`"$HOME/.local/bin/rer" run --script ./tool.mjs` followed by its arguments.
+For example, from Downloads the Oncall PagerDuty exporter runs with:
+
+```sh
+"$HOME/.local/bin/rer" run --script ./oncall-export.mjs pagerduty
+```
+
+`--script` uses the Node running `rer`, including the installer's private Node;
+it needs no checkout, pnpm or separate Node installation. The file path is
+relative to the current folder, or to `--cwd DIR` when supplied before
+`--script`. Remaining arguments go directly to the file. A package script
+(`rer run NAME`) continues to use the checkout's pinned Node and pnpm.
+The app start also fits on one line:
 
 ```sh
 curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-inkwell

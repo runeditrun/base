@@ -190,7 +190,8 @@ if (execFileSync('npm', [], { env: { ...process.env, NODE_OPTIONS: '' }, encodin
  const direct = await run(rer, [...scriptArguments.slice(startAt + 1), '--help'], installedOnly);
  assert.equal(direct.code, 0, `the installed rer runs without Node or npx on PATH: ${direct.stderr}`);
  assert.ok(direct.stdout.trim() && started.stdout.includes(direct.stdout), 'the installer runs the Run page’s requested command with its installed rer');
- assert.match(started.stdout.slice(started.stdout.indexOf(direct.stdout) + direct.stdout.length), /^\nRequired next step: /, 'its closing lines give the PATH step once the command returns');
+ const closing = started.stdout.slice(started.stdout.indexOf(direct.stdout) + direct.stdout.length);
+ assert.match(closing, /\nRequired next step: /, 'its closing lines give the PATH step after the command and runtime hint');
  await rm(runtime);
  const status = JSON.parse((await run(rer, ['cli', 'status', '--json'], env)).stdout);
  assert.equal(status.channel, 'script');

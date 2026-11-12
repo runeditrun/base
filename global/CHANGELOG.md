@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `rer run --script FILE [ARGS...]` runs a downloaded JavaScript file with the runtime running rer, including the installer’s private Node, without requiring Node on PATH or a project checkout. Code and local instructions only; no migration or deployed seed change.
+- Local installation export reports allocated disk space separately from archive size and leaves the building time indeterminate until the total work is known, avoiding forecasts based on unused database pages and temporary state. CLI progress only; no archive format change or migration.
+
 ## 0.2.111
 
 ### `rer size`: statement size and growth with data

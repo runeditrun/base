@@ -28,6 +28,9 @@ else its vendored scripts/rer.mjs.
   rer run SCRIPT [ARGS]
                        Run a package.json script with the pnpm and Node the checkout pins (rer keeps
                        them off PATH): where a project's docs say pnpm run X, run rer run X.
+  rer run --script FILE [ARGS]
+                       Run a downloaded JavaScript file with rer's Node, including its private runtime.
+                       Works outside a checkout; FILE is relative to here (or --cwd DIR).
   rer list [DIR]       The checkouts in DIR (default: here), newest first, with whether rer dev can
                        launch them, whether they are set up, and their running URL. --json for data.
   rer business ...     Set up your business once and share its name, logo and brand colour

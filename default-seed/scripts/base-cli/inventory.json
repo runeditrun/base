@@ -4887,7 +4887,7 @@
     },
     "modules/portability/progress.mjs": {
       "source": "modules/portability/progress.mjs",
-      "sha256": "b25a4ce74922dea84cd51077d0e5f00d7eda2f9f47e0014a4117466a8d658fff"
+      "sha256": "d9837921e890941e67c24c9ad939155a8e8f32785fd48441e7531e3ed4e15caa"
     },
     "modules/portability/provider-data.mjs": {
       "source": "modules/portability/provider-data.mjs",

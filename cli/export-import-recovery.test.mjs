@@ -251,7 +251,7 @@ test('export and import print progress; a crashed import is cleaned at the next 
  await seed.data("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 2500) INSERT INTO computed_entries(id,quantity,unit_price,label) SELECT 'row' || i, i, 2, NULL FROM n");
  const rows = (await seed.data(query))[0].results;
  const exported = await seed.text(['export', '--output', 'exports/large.rer']);
- assert.match(exported.stderr, /Exporting about [\d.]+ [KMG]?B of local data\./);
+ assert.match(exported.stderr, /Exporting local data \([\d.]+ [KMG]?B on disk\)\./);
  assert.match(exported.stderr, /Building the archive: (\d+) of \1 parts/);
  assert.match(exported.stderr, /Writing the archive: (\d+) of \1 parts \([\d.]+ [KMG]?B\)/);
  assert.ok(Number(/Writing the archive: \d+ of (\d+) parts/.exec(exported.stderr)[1]) >= 3, 'the archive has several parts');
