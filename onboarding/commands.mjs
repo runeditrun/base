@@ -11,6 +11,7 @@ import { waitForReadiness } from './readiness.mjs';
 import { commandCustody } from './command-custody.mjs';
 import { createProcessBaseline, createProcessScope, inheritedScopeTokens, processScopeEnvironment } from './process-scope.mjs';
 import { toolCommand } from './tool-command.mjs';
+import { isWranglerMigrationApply, wranglerMigrationView } from './migration-progress.mjs';
 
 export async function createCommands(directory,state,{terminal=text=>writeSync(1,text),spawn=spawnChild,queue:queuePolicy,custodyToken,onWaiting}={}) {
  let policy=queuePolicy?await commandPolicy():{environment:{},close:async()=>{}};
@@ -163,6 +164,9 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   spawn:spawnCommand,
   async stop(child){await stopCommand(child);await captures.get(child)?.closed;const scope=captures.get(child)?.scope;if(![...managed].some(other=>captures.get(other).scope===scope)){const actions=cleanups.get(scope)??[];cleanups.delete(scope);for(const action of actions)await action();}},
   async run(label,command,args=[],options={}) {
+   // Any caller's `wrangler d1 migrations apply` (the setup hooks, a seed's own export and import) shows
+   // a count instead of wrangler's table redrawn per migration; the log keeps every byte and is named in the summary.
+   if(!options.view&&isWranglerMigrationApply(command,args))options={...options,view:()=>wranglerMigrationView({log:redaction.redact(checkoutPath(options.cwd??process.cwd(),logPath))})};
    if(queuePolicy && options.heavy !== false) {
     let queuedChild;
     const commandSignal=signal&&options.signal?AbortSignal.any([signal,options.signal]):options.signal||signal;

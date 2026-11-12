@@ -73,11 +73,11 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
   if(unverifiedSchemaRecovery)await nativeWorker(store,'schema-recovery-preflight',input,signal);
   const {nativeApply}=await nativeWorker(store,'migration-preflight',input,signal);
   // Local migrations need no provider account: wrangler runs without credentials.
-  // Its info lines (the local location and "Use --remote if you want to access
-  // the remote instance") only confuse a local backup; warnings and errors print.
+  // The shared runner shows its progress (a count every ten migrations) and leaves out its
+  // own info lines, which only confuse a local backup; warnings and errors print.
   const { dependencyEnvironment } = await shared('dependency-environment.mjs');
   if(nativeApply)await store.run('Applying local data migrations', 'pnpm', ['exec', 'wrangler', 'd1', 'migrations', 'apply', database, '--local', '--persist-to', '.wrangler/state', '--config', 'wrangler.jsonc'], {
-   cwd: root, signal, env: { ...dependencyEnvironment(), RER_LOCAL_OPERATION: operationToken, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG: 'warn' },
+   cwd: root, signal, env: { ...dependencyEnvironment(), RER_LOCAL_OPERATION: operationToken, WRANGLER_SEND_METRICS: 'false' },
   });
   const receipt=await nativeWorker(store,direction,input,signal);
   if(legacyRecovery)receipt.output=relative(root,legacyRecovery.output);

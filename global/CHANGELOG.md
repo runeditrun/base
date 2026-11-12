@@ -9,6 +9,10 @@
 
 - A seed whose installer runs `wrangler d1 migrations apply` itself (a `migrate` hook returning the command) printed wrangler's whole migration table after every migration: 75 migrations meant about 1.2 MB and the first migration's name 76 times. The terminal and page now show `Applying migrations N/M` every ten migrations, any warning or error, and one `Applied N migrations.` line; a failed migration prints `Migration NAME failed.`, wrangler's error text and the log path. The setup log keeps wrangler's full output. A finished `rer setup` adds one line before `RER_SETUP_READY`: `Setup complete: N migrations applied, owner set up. Full output: <log path>`. Code only: no migration is added; a seed gets it by adopting the next release.
 
+### `rer import` and `rer export` show migration progress, not wrangler's repeated tables
+
+- Any `wrangler d1 migrations apply` run through rer's command runner, including a seed's own export and import adapter, now shows `Applying migrations N/M` every ten migrations, wrangler's warnings and errors, and one `Applied N migrations. Full output: <log>` line; wrangler's migration tables and boilerplate stay in the log. A seed adapter that ran the command without `WRANGLER_LOG=warn` printed 2.3 MB over 20,000 lines for `rer import` after `rer reset --yes` (a 197-migration reproduction printed 8.0 MB over 79,219 lines; now 1 KB over 31 lines). The shared local import and export no longer silence wrangler for the whole apply: they show that progress. A migration that fails with only an error message is named from wrangler's list (`Migration NAME failed.`). Code only: no migration is added; a seed gets it by adopting the next release.
+
 ## 0.2.111
 
 ### `rer size`: statement size and growth with data

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.111-dev.gd917e537",
+  "cliVersion": "0.2.111-dev.g2382b33a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "5708e0067b4432c7a19e3347e2e87ad0bc35eb8fc78d208f2aaafe6e0c933359"
+      "sha256": "4270f97812428e497e2edd14fe446e48ccec91a0e4b6bf911e8d6db85680d75d"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -65,7 +65,7 @@
     },
     "commands.mjs": {
       "source": "onboarding/commands.mjs",
-      "sha256": "3126fb665ca61262a413f7cb775a3af51d1922773ce02f26c8427f906c7cd001"
+      "sha256": "1d5022e5d79f8c9e95c997b577ec2d8f91fe22ddd90cfa864b575eff01d41290"
     },
     "dependency-approval.mjs": {
       "source": "onboarding/dependency-approval.mjs",
@@ -173,7 +173,7 @@
     },
     "migration-progress.mjs": {
       "source": "onboarding/migration-progress.mjs",
-      "sha256": "b0d09df5433cf7cc318bfa979f7133dca63832b1664e06c80664c3997c216b9b"
+      "sha256": "853426114930c3a987bd3026e00ae133cfc6b2f62e93bbe5aeabb71a9bbc5ef4"
     },
     "operator-install.mjs": {
       "source": "onboarding/operator-install.mjs",
@@ -1115,7 +1115,7 @@
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
-      "sha256": "e455058c5ead0d2668be8b4de9f01a910c5d561c6e997ab9d9e13172dd4563b5"
+      "sha256": "af3612a91129de0bc8b8c5d21e99699318158a10812ef1c5ff37ce877e9cc629"
     },
     "cli/preview-cache.mjs": {
       "source": "cli/preview-cache.mjs",

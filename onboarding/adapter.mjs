@@ -16,7 +16,6 @@ import { owner, signIn } from './adapter-auth.mjs';
 import { installerDevKey } from './dev-identity.mjs';
 import { assertArchiveFree } from './archive-output.mjs';
 import { startOriginDiagnostic } from './start-origin-diagnostic.mjs';
-import { isWranglerMigrationApply, wranglerMigrationView } from './migration-progress.mjs';
 export { ownerAccountHosting } from './adapter-hosting.mjs';
 
 // The adapter kit for an existing seed. A seed's scripts/installer/local.mjs
@@ -169,9 +168,7 @@ async function phase(context, hooks, name, hook) {
  await context.store.step(labels[name]);
  for (const [command, args = [], options = {}] of await commandsFor(context, hook)) {
   // Dependency installs run third-party build scripts without credentials.
-  // Wrangler redraws its whole migration table per migration; show a count instead (the log keeps it all).
-  const view = name === 'migrate' && isWranglerMigrationApply(command, args) ? wranglerMigrationView : undefined;
-  await context.run(labels[name], command, args, { step: steps[name], view, ...options, ...(name === 'dependencies' ? { env: dependencyEnvironment(options.env ?? process.env) } : {}) });
+  await context.run(labels[name], command, args, { step: steps[name], ...options, ...(name === 'dependencies' ? { env: dependencyEnvironment(options.env ?? process.env) } : {}) });
  }
 }
 

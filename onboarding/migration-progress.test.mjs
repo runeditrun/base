@@ -18,6 +18,8 @@ for (let i = 0; i < count; i++) {
  console.log('🌀 Executing on local database db (0000) from state:');
  const bad = failAt === i + 1;
  if (!bad) console.log('🚣 ' + (i * 7 + 3) + ' commands executed successfully.');
+ // Real wrangler prints no failed row for a SQL error: only the message.
+ if (bad && process.env.PLAIN_ERROR) { console.error('✘ [ERROR] near "oops": syntax error at offset 12'); process.exit(1); }
  console.log([rule('┌', '┬', '┐'), '│ name' + ' '.repeat(26) + '│ status │', rule('├', '┼', '┤'), ...names.slice(0, i + 1).map((n, j) => '│ ' + n.padEnd(28) + ' │ ' + (bad && j === i ? '❌' : '✅') + '     │'), rule('└', '┴', '┘')].join('\\n'));
  if (bad) { console.error('✘ [ERROR] near "oops": syntax error at offset 12'); process.exit(1); }
 }
@@ -59,4 +61,13 @@ test('a failing migration still names itself, prints the tool\'s error and the l
  }
  assert.ok(message.length < 3000, `message ${message.length} bytes`);
  assert.ok(message.includes(store.logPath) || /Log:|Full log:/.test(message));
+});
+
+test('an error wrangler does not tie to a migration is tied to the first one that never finished', async t => {
+ const { outcome, shown } = await run(t, { MIGRATIONS: '30', FAIL_AT: '17', PLAIN_ERROR: '1' });
+ assert.ok(outcome, 'the step fails');
+ for (const text of [outcome, shown]) {
+  assert.match(text, /Migration 0017_table_table_table_part\.sql failed\./);
+  assert.match(text, /syntax error at offset 12/);
+ }
 });
