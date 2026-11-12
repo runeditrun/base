@@ -3,8 +3,9 @@ import { invalid } from './errors.mjs';
 
 // Seed policy is separate from uploading: secret-only commands bypass the
 // deploy hook, but must not bypass a seed's applicable local input policy.
-export async function enforceDeployPolicy({ adapter, root, options, setupManifest, localOnlyKeys, declaration, declarationPath, settings }) {
+export async function enforceDeployPolicy({ adapter, root, options, store, setupManifest, localOnlyKeys, declaration, declarationPath, settings }) {
  if (adapter.deployPolicy === undefined) return;
+ await store.step('Checking deploy policy');
  if (typeof adapter.deployPolicy !== 'function') throw invalid('The adapter deployPolicy must be a function.');
  const { env } = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
  // Resolve declared environment aliases before policy sees Worker bindings.

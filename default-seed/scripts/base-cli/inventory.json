@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.112-dev.gf3a42c30",
+  "cliVersion": "0.2.112-dev.g10a63fee",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -835,7 +835,7 @@
     },
     "cli/deploy-policy.mjs": {
       "source": "cli/deploy-policy.mjs",
-      "sha256": "eb8c8a8fdb7356a2398e08b5fc97f7d62de8c7d0332f8211522b095331c43f09"
+      "sha256": "d3298b2dad7d97d17f58af4248fbe56252f9bb06a3f8587ed1a8ca0adc72b841"
     },
     "cli/deploy-product.mjs": {
       "source": "cli/deploy-product.mjs",
@@ -4839,7 +4839,7 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "26a83e6a01ad5e18a181d4076c808316121e81eac5b5d091d4473228eddc8b17"
+      "sha256": "7a858fa5d0dc419e9a758dd0e6cbedf3960eb7e218e60caef72e2cc005e95699"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",
@@ -4851,7 +4851,7 @@
     },
     "modules/portability/journal.mjs": {
       "source": "modules/portability/journal.mjs",
-      "sha256": "9b6d17f28ecee050e043bbae7c252872e9651bfe9a675a8cf03d535d49de9fe9"
+      "sha256": "5039a16fa33f9cb2ced82341b223fe618ee66829b61f87ae77c34b0942efcc90"
     },
     "modules/portability/ledgers.mjs": {
       "source": "modules/portability/ledgers.mjs",
