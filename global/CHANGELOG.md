@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Application `rer deploy` now awaits an optional seed `deployPolicy` before builds or provider contact, including secret-only updates. Policies receive effective inputs and declaration-mapped bindings so credential aliases cannot bypass a seed’s OFF choice. Seeds without the hook retain their existing deployment checks. Code only; no migration or deployed seed change.
+
 - `rer run --script FILE [ARGS...]` runs a downloaded JavaScript file with the runtime running rer, including the installer’s private Node, without requiring Node on PATH or a project checkout. Code and local instructions only; no migration or deployed seed change.
 - Local installation export reports allocated disk space separately from archive size and leaves the building time indeterminate until the total work is known, avoiding forecasts based on unused database pages and temporary state. CLI progress only; no archive format change or migration.
 

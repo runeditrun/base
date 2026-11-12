@@ -3,6 +3,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { deployProviderFixture } from './fixtures/deploy-provider.mjs';
 import { main } from './main.mjs';
 
@@ -114,4 +117,90 @@ test('rer deploy --dry-run names a mapped mail credential once', async t => {
  const line = text.split('\n').find(item => item.includes('production sign-in mail'));
  assert.ok(line?.includes('SENDGRID_API_KEY'), text);
  assert.doesNotMatch(line, /\b([A-Z][A-Z0-9_]+) (?:\(or|or) \1\b/, `each credential appears once: ${line}`);
+});
+
+// A synthetic seed declares its own policy; Base must call it even when the
+// ownership controller handles a secret change instead of the seed deploy hook.
+test('the public secret-only deploy enforces seed policy on mapped and direct credentials before provider access', async t => {
+ const { root, provider } = await deployProviderFixture(t, {
+  vars: { MAIL_PROVIDER: 'none' },
+  publicSettings: ['MAIL_MODE', 'MAIL_PROVIDER'],
+  secrets: ['MAIL_PROVIDER_API_KEY', 'EMAIL_API_KEY', 'OTHER_SECRET'].map(binding => ({ binding, environment: binding === 'MAIL_PROVIDER_API_KEY' ? 'EMAIL_API_KEY' : binding, optional: true })),
+ });
+ const source = await readFile(join(root, 'adapter.mjs'), 'utf8');
+ const policy = `async ({root,options,environment,env,bindings,declaration,declarationPath}) => {
+  const {appendFile} = await import('node:fs/promises');
+  const {join} = await import('node:path');
+  const {missing} = await import(${JSON.stringify(new URL('./errors.mjs', import.meta.url).href)});
+  // This seed owns OFF. Declaration-mapped bindings expose credentials even
+  // when the caller supplies their environment alias.
+  await appendFile(join(root,'policy.jsonl'), JSON.stringify({environment,declarationPath,names:Object.keys(bindings),selected:options.setSecret,mapped:bindings.MAIL_PROVIDER_API_KEY===env.EMAIL_API_KEY,declared:declaration.secrets.some(item=>item.binding==='MAIL_PROVIDER_API_KEY')})+'\\n');
+  const named = options.setSecret?.split(',') ?? Object.keys(bindings);
+  if (env.MAIL_MODE === 'off' && named.some(name => ['MAIL_PROVIDER_API_KEY','EMAIL_API_KEY'].includes(name) && bindings[name]?.trim())) throw missing('Credentials are not bound while email is off.');
+ }`;
+ await writeFile(join(root, 'adapter.mjs'), source.replace('...lifecycle,deploy:', `...lifecycle,mailOffSignIn:'rer signin',deployPolicy:${policy},deploy:`).replace("deploy:ownerDeploy('deploy.json',lifecycle)", "deploy:Object.assign(async context => ownerDeploy('deploy.json',lifecycle)(context),{managesHostedOwner:true})"));
+ execFileSync('git', ['-c','user.name=Fixture','-c','user.email=fixture@example.test','-c','commit.gpgsign=false','commit','-qam','declare seed policy'], {cwd:root,stdio:'pipe'});
+ const policyCalls = () => readFile(join(root, 'policy.jsonl'), 'utf8').then(text => text.trim().split('\n').map(JSON.parse), () => []);
+ let output = '', diagnostics = '';
+ t.mock.method(process.stdout, 'write', chunk => { output += String(chunk); return true; });
+ t.mock.method(process.stderr, 'write', chunk => { diagnostics += String(chunk); return true; });
+ const run = async (...flags) => {
+  output = ''; diagnostics = '';
+  const code = await main(['deploy', '--cwd', root, '--environment', 'secret-off', ...(flags.includes('--set-secret') ? ['--owner-name', 'Maya Chen'] : []), '--non-interactive', '--json', ...flags]);
+  return { code, text: output + diagnostics, events: output.trim().split('\n').filter(Boolean).map(JSON.parse) };
+ };
+ // Establish a receipt entirely against the provider fake, through the deploy door.
+ const initial = await run();
+ assert.equal(initial.code, 0, initial.text);
+ await writeFile(join(root, 'deploy.env'), 'MAIL_MODE=off\nMAIL_PROVIDER=none\nEMAIL_API_KEY=synthetic-base-1\nOTHER_SECRET=synthetic-base-2\n', { mode: 0o600 });
+ const receipt = await readFile(join(root, '.rer/deploy/secret-off.json'));
+ for (const binding of ['MAIL_PROVIDER_API_KEY', 'EMAIL_API_KEY']) {
+  const calls = provider.state.calls.length, before = (await policyCalls()).length;
+  const denied = await run('--env-file', 'deploy.env', '--set-secret', binding);
+  t.diagnostic(`${binding}: exit=${denied.code}; provider requests=${provider.state.calls.length - calls}`);
+  assert.equal(denied.code, 3, denied.text);
+  assert.equal(denied.events.find(event => event.event === 'error')?.code, 'missing_input');
+  assert.match(denied.text, /Credentials are not bound while email is off/);
+  const seen = await policyCalls();
+  assert.equal(seen.length, before + 1, 'policy runs once before secret dispatch');
+  assert.equal(seen.at(-1).mapped, true, 'policy gets declaration-mapped values');
+  assert.equal(seen.at(-1).declared, true);
+  assert.equal(seen.at(-1).environment, 'secret-off');
+  assert.equal(seen.at(-1).declarationPath, 'deploy.json');
+  assert.equal(provider.state.calls.length, calls, 'refusal precedes even account/subdomain lookup');
+  assert.deepEqual(await readFile(join(root, '.rer/deploy/secret-off.json')), receipt);
+  assert.ok(!denied.text.includes('synthetic-base-1'));
+ }
+ // Use the executable public door too, with a deny-all fetch edge. The
+ // synthetic receipt above is real kit state, with no provider reachable here.
+ const requests = join(root, 'requests.txt'), network = join(root, 'network.mjs');
+ await writeFile(requests, '');
+ await writeFile(network, `import {appendFileSync} from 'node:fs';globalThis.fetch=async()=>{appendFileSync(${JSON.stringify(requests)},'request\\n');throw Error('No provider access allowed')};`);
+ const child = await promisify(execFile)(process.execPath, [fileURLToPath(new URL('../bin/rer.mjs', import.meta.url)), 'deploy', '--cwd', root, '--environment', 'secret-off', '--env-file', 'deploy.env', '--set-secret', 'MAIL_PROVIDER_API_KEY', '--owner-name', 'Maya Chen', '--non-interactive', '--json'], { cwd: root, env: { ...process.env, HOME: root, NODE_OPTIONS: [process.env.NODE_OPTIONS, `--import=${pathToFileURL(network).href}`].filter(Boolean).join(' ') } }).then(() => assert.fail('OFF must refuse'), error => error);
+ assert.equal(child.code, 3, child.stdout + child.stderr);
+ assert.match(child.stdout, /"code":"missing_input"/);
+ assert.equal(await readFile(requests, 'utf8'), '', 'the executable refuses before any network contact');
+ t.diagnostic('bin/rer.mjs: exit=3; provider requests=0');
+ const allowed = await run('--env-file', 'deploy.env', '--set-secret', 'OTHER_SECRET');
+ assert.equal(allowed.code, 0, allowed.text);
+ assert.equal(provider.state.secrets.find(item => item.name === 'OTHER_SECRET')?.value, 'synthetic-base-2');
+ assert.ok(!provider.state.secrets.some(item => item.name === 'MAIL_PROVIDER_API_KEY' || item.name === 'EMAIL_API_KEY'));
+ const calls = provider.state.calls.length, before = (await policyCalls()).length;
+ const full = await run('--env-file', 'deploy.env');
+ assert.equal(full.code, 3, full.text);
+ assert.equal((await policyCalls()).length, before + 1, 'ordinary deploy also invokes seed policy');
+ assert.equal(provider.state.calls.length, calls);
+ // Allowed alias updates keep the declaration's environment mapping.
+ await writeFile(join(root, 'deploy.env'), 'MAIL_MODE=on\nEMAIL_API_KEY=synthetic-base-3\n', {mode:0o600});
+ const enabled = await run('--env-file', 'deploy.env', '--set-secret', 'MAIL_PROVIDER_API_KEY');
+ assert.equal(enabled.code, 0, enabled.text);
+ assert.equal(provider.state.secrets.find(item => item.name === 'MAIL_PROVIDER_API_KEY')?.value, 'synthetic-base-3');
+ // Opting in does not alter the existing shared production-mail preflight.
+ const afterAllowed = provider.state.calls.length;
+ const declaration = JSON.parse(await readFile(join(root, 'deploy.json'), 'utf8'));
+ await writeFile(join(root, 'deploy.json'), JSON.stringify({ ...declaration, vars: { MAIL_PROVIDER: 'resend' } }));
+ const shared = await run();
+ assert.equal(shared.code, 4, shared.text);
+ assert.match(shared.text, /Production sign-in is not configured/);
+ assert.equal(provider.state.calls.length, afterAllowed);
 });

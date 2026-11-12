@@ -1,4 +1,5 @@
 import { requireProductionAuth, mailOffNotice } from './production-auth.mjs';
+import { enforceDeployPolicy } from './deploy-policy.mjs';
 import { observedReadiness } from '../modules/deploy-kit/readiness-window.mjs';
 import { readFile, readdir } from 'node:fs/promises';
 import { contained } from './project.mjs';
@@ -80,6 +81,7 @@ export async function deployCommand(context) {
  if (local) throw refuse(`${path} names the local-only key ${local} as a deploy binding or secret. Remove it; local dev keys never reach a deployment.`);
  deployGuide(declaration);
  const settings = adapter.hooks?.secrets ?? adapter.settings;
+ await enforceDeployPolicy({ ...context, declaration, declarationPath: path, settings });
  // Required secrets have been checked; retain the production sign-in guidance.
  const dryRun = async (result, { planned = true, extraNeeded } = {}) => {
   const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
