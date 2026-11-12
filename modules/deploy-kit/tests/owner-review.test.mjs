@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile, access } from 'node:fs/promises';
@@ -8,6 +9,22 @@ import { cloudflare, withScopeHints, ownerTarget, ownerPlan, ownerDeploy, readOw
 import { main, report } from '../owner-cli.mjs';
 import { hash } from '../validation.mjs';
 import { ownerProvider } from './owner-provider.mjs';
+
+const ownedCaseRows = [];
+const ownedCase = (name, run) => ownedCaseRows.push({name,run});
+const lockCaseRows = [];
+const lockCase = (name, run) => lockCaseRows.push({name,run});
+
+
+
+
+
+
+
+
+
+
+
 
 /* Resource ownership, complete pagination and failed upgrades must preserve owner state. */
 
@@ -32,7 +49,7 @@ async function setup(t, {creationDates = false, artifact = build(source), declar
 const exists = path => access(path).then(() => true,() => false);
 const uploads = state => state.writes.filter(x => x.method === 'PUT' && x.path === '/workers/scripts/penny-production').length;
 
-test('a Worker replaced by someone else is refused before any write, never overwritten', async t => {
+ownedCase('a Worker replaced by someone else is refused before any write, never overwritten', async t => {
   const {args,state,foreign,statePath,target} = await setup(t);
   await ownerDeploy(args);
   foreign.replaceWorker();
@@ -45,7 +62,7 @@ test('a Worker replaced by someone else is refused before any write, never overw
   assert.deepEqual(await readFile(statePath),bytes);
 });
 
-test('a Worker replaced before the first receipt is refused too', async t => {
+ownedCase('a Worker replaced before the first receipt is refused too', async t => {
   const {args,state,fail,foreign} = await setup(t);
   fail('PUT',/^\/workers\/scripts\/penny-production\/schedules$/);
   await assert.rejects(ownerDeploy(args),/provider-http-500/);
@@ -55,7 +72,8 @@ test('a Worker replaced before the first receipt is refused too', async t => {
   assert.equal(state.writes.length,writes);
 });
 
-test('an interrupted upgrade of the kit\'s own Worker resumes; it is not mistaken for a replacement', async t => {
+ownedCase('an interrupted upgrade of the kit\'s own Worker resumes; it is not mistaken for a replacement', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const {args,state,fail,foreign,target,statePath} = await setup(t);
   const first = await ownerDeploy(args);
   // Cloudflare can activate an upload before its own read of that version finds it (code 100146).
@@ -85,20 +103,25 @@ test('an interrupted upgrade of the kit\'s own Worker resumes; it is not mistake
   assert.equal(interrupted.pendingUpload.fingerprint,state.settings.bindings.find(x => x.name === 'RER_DEPLOY_FINGERPRINT').text);
   // Only a live version carrying that fingerprint as binding and annotation is this deploy's own.
   const live = {settings:state.settings,version:state.version,deployments:state.deployments}, annotation = state.version.annotations['workers/message'];
+  let rowAt105 = 0;
   for (const replace of [() => { state.version.annotations['workers/message'] = 'Deploy from the dashboard'; }, () => foreign.replaceWorker()]) {
+    await caseRow(t, 'table at line 105 row ' + rowAt105++, async () => {
+
     replace();
     const writes = state.writes.length, bytes = await readFile(statePath);
     await assert.rejects(ownerDeploy(laterArgs),error => error.message === 'owned-resource-replaced' && error.resource === 'worker:penny-production');
     assert.equal(state.writes.length,writes); assert.deepEqual(await readFile(statePath),bytes);
     Object.assign(state,live); state.version.annotations['workers/message'] = annotation;
+      });
   }
   const resumed = await ownerDeploy(laterArgs);
-  assert.equal(resumed.receipt.changed,true); assert.equal(resumed.receipt.provider.versionId,state.version.id);
+  await caseRow(t, 'following assertion at line 113', async () => { assert.equal(resumed.receipt.changed,true); }); await caseRow(t, 'following assertion at line 113', async () => { assert.equal(resumed.receipt.provider.versionId,state.version.id); });
   const saved = await readOwnerState(statePath,target);
-  assert.deepEqual(saved.receipt,resumed.receipt); assert.equal(saved.pendingUpload,undefined);
+  await caseRow(t, 'following assertion at line 115', async () => { assert.deepEqual(saved.receipt,resumed.receipt); }); await caseRow(t, 'following assertion at line 115', async () => { assert.equal(saved.pendingUpload,undefined); });
+  }]]);
 });
 
-test('a bucket replaced under the same name is refused, never adopted', async t => {
+ownedCase('a bucket replaced under the same name is refused, never adopted', async t => {
   const {args,state,foreign,statePath,target} = await setup(t,{creationDates:true});
   await ownerDeploy(args);
   const saved = await readOwnerState(statePath,target);
@@ -112,7 +135,7 @@ test('a bucket replaced under the same name is refused, never adopted', async t 
   assert.equal(state.writes.length,writes);
 });
 
-test('a state file from before bucket identities were recorded does not refuse the same bucket', async t => {
+ownedCase('a state file from before bucket identities were recorded does not refuse the same bucket', async t => {
   const {args,statePath,target} = await setup(t,{creationDates:true});
   await ownerDeploy(args);
   const state = JSON.parse(await readFile(statePath,'utf8')); delete state.owned.r2['penny-production-files'].id;
@@ -132,7 +155,7 @@ test('an account with no workers.dev subdomain gets a named error before anythin
   assert.deepEqual(report(new Error('workers-subdomain-missing')),{ok:false,code:'workers-subdomain-missing'});
 });
 
-test('a lost response on the first Worker upload resumes when the live Worker carries the recorded fingerprint', async t => {
+ownedCase('a lost response on the first Worker upload resumes when the live Worker carries the recorded fingerprint', async t => {
   const {args,state,fail,statePath,target} = await setup(t);
   fail('PUT',/^\/workers\/scripts\/penny-production$/,{afterApply:true});
   await assert.rejects(ownerDeploy(args),/provider-transport-failed/);
@@ -145,7 +168,7 @@ test('a lost response on the first Worker upload resumes when the live Worker ca
   assert.equal(state.databases.length,1);
 });
 
-test('a pending Worker that does not carry a recorded build is still refused as uncertain', async t => {
+ownedCase('a pending Worker that does not carry a recorded build is still refused as uncertain', async t => {
   const {args,state,fail,foreign} = await setup(t);
   fail('PUT',/^\/workers\/scripts\/penny-production$/,{afterApply:true});
   await assert.rejects(ownerDeploy(args),/provider-transport-failed/);
@@ -156,9 +179,8 @@ test('a pending Worker that does not carry a recorded build is still refused as 
 });
 
 test('a token missing a scope names the scope, not just the status', async t => {
-  for (const [method,path,scope] of [['GET',/^\/d1\/database$/,'d1'],['GET',/^\/r2\/buckets$/,'r2'],['GET',/^\/storage\/kv\/namespaces$/,'kv'],['GET',/^\/queues$/,'queues'],
-      ['GET',/^\/workers\/scripts\/penny-production\/settings$/,'workers'],['POST',/^\/r2\/buckets$/,'r2'],['PUT',/^\/workers\/scripts\/penny-production$/,'workers']]) {
-    await t.test(`${method} ${scope}`, async t => {
+  await caseRows(t, [...([['GET',/^\/d1\/database$/,'d1'],['GET',/^\/r2\/buckets$/,'r2'],['GET',/^\/storage\/kv\/namespaces$/,'kv'],['GET',/^\/queues$/,'queues'],
+      ['GET',/^\/workers\/scripts\/penny-production\/settings$/,'workers'],['POST',/^\/r2\/buckets$/,'r2'],['PUT',/^\/workers\/scripts\/penny-production$/,'workers']]).map(([method,path,scope]) => [`${method} ${scope}`, async t => {
       const declared = declaration({kv:[{binding:'CACHE'}],queues:[{binding:'JOBS'}]});
       const {args,state,fail} = await setup(t,{declared});
       for (const status of [401,403]) {
@@ -168,12 +190,14 @@ test('a token missing a scope names the scope, not just the status', async t => 
         state.kv.splice(0); state.queues.splice(0); state.databases.splice(0); state.buckets.splice(0); state.settings = null;
         await rm(args.statePath,{force:true});
       }
-    });
-  }
+    }]),
+    ['subdomain scope refusal', async t => {
   const provider = ownerProvider(); t.after(() => provider.close());
   provider.fail('GET',/^\/workers\/subdomain$/,{status:403});
   await assert.rejects(ownerTarget(cloudflare(provider),{project:'runeditrun/penny',environment:'production'}),/token-scope-missing-workers/);
-  assert.deepEqual(report(new Error('token-scope-missing-d1')),{ok:false,code:'token-scope-missing-d1'});
+    }],
+    ['scope error report', () => { assert.deepEqual(report(new Error('token-scope-missing-d1')),{ok:false,code:'token-scope-missing-d1'}); }],
+  ]);
 });
 
 test('a path the kit does not map keeps the plain status code', async () => {
@@ -190,7 +214,7 @@ test('library errors name no throwaway variable in owner mode', () => {
   }
 });
 
-test('two deploys on one state file cannot overlap; the lock is released afterwards, even after a failure', async t => {
+lockCase('two deploys on one state file cannot overlap; the lock is released afterwards, even after a failure', async t => {
   const {args,state,statePath,fail} = await setup(t);
   const results = await Promise.allSettled([ownerDeploy(args),ownerDeploy(args)]);
   assert.equal(results.filter(x => x.status === 'fulfilled').length,1);
@@ -206,7 +230,7 @@ test('two deploys on one state file cannot overlap; the lock is released afterwa
   assert.equal(uploads(state),1);
 });
 
-test('a lock held by another run refuses before any provider request', async t => {
+lockCase('a lock held by another run refuses before any provider request', async t => {
   const {args,state,statePath} = await setup(t);
   await mkdir(join(statePath,'..'),{recursive:true});
   await writeFile(`${statePath}.lock`,'12345\n');
@@ -235,4 +259,12 @@ test('the owner CLI reports the named codes', async t => {
   provider.fail('GET',/^\/d1\/database$/,{status:403});
   await assert.rejects(main(argv,env,{fetch:provider.fetch,cwd:root}),error => report(error).code === 'token-scope-missing-d1');
   assert.equal(provider.state.writes.length,0);
+});
+
+test('owner deployment distinguishes its resumable Worker and bucket from replacements', async (t) => {
+  await caseRows(t, ownedCaseRows.map(({name,run}) => [name,run]));
+});
+
+test('owner deployment serializes state changes and releases only its own lock', async (t) => {
+  await caseRows(t, lockCaseRows.map(({name,run}) => [name,run]));
 });

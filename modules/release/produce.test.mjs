@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from '../deploy-kit/tests/fold-case.mjs';
 import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,6 +14,7 @@ const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const git = (repo, ...args) => execFileSync('git', ['-C', repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', ...args], { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
 
 test('successful producer verifies, tags the exact commit, exports bytes and pins site artifacts', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const f = fixture(t);
   // The fixture declares a public source repository for listing. Replace only
   // its GitHub visibility HTTP edge; operator login is not a test prerequisite.
@@ -43,24 +45,40 @@ test('successful producer verifies, tags the exact commit, exports bytes and pin
   assert.equal(hash(readFileSync(archive)), receipt.publicExport.sha256);
   const unpacked = resolve(f.temporary, 'unpacked'); mkdirSync(unpacked);
   execFileSync('tar', ['-xf', archive, '-C', unpacked]);
-  for (const [path, bytes] of Object.entries(f.files)) assert.deepEqual(readFileSync(resolve(unpacked, path)), Buffer.from(bytes));
-  assert.equal(existsSync(resolve(unpacked, '.git')), false);
+  let rowAt46 = 0;
+  for (const [path, bytes] of Object.entries(f.files)) {
+    await caseRow(t, 'table at line 46 row ' + rowAt46++, async () => {
+assert.deepEqual(readFileSync(resolve(unpacked, path)), Buffer.from(bytes));
+    });
+  }
+  await caseRow(t, 'following assertion at line 47', async () => { assert.equal(existsSync(resolve(unpacked, '.git')), false); });
   const manifestPath = resolve(f.options.output, receipt.siteRelease.path);
   const manifest = JSON.parse(readFileSync(manifestPath));
-  assert.equal(manifest.provenance.revision, f.sha);
+  await caseRow(t, 'following assertion at line 50', async () => { assert.equal(manifest.provenance.revision, f.sha); });
   const standalone = resolve(f.temporary, 'listing');
   const read = spawnSync(process.execPath, [resolve(root, 'bin/rer.mjs'), 'listing', '--repo', f.repo, '--ref', f.sha, '--output', standalone], { encoding: 'utf8' });
-  assert.equal(read.status, 0, read.stderr);
+  await caseRow(t, 'following assertion at line 53', async () => { assert.equal(read.status, 0, read.stderr); });
   const listing = JSON.parse(readFileSync(resolve(standalone, 'listing.json')));
-  for (const [key, value] of Object.entries(listing)) assert.deepEqual(manifest.listing[key], value);
-  assert.equal(manifest.listing.shots.length, 1);
-  assert.equal(manifest.listing.look.shotsAt, manifest.listing.look.app);
-  assert.equal(manifest.provenance.publication, 'local-release');
-  assert.deepEqual(manifest.listing.clauses, [{ id: 'TEST-001', title: 'Exact bytes', text: 'Export the verified committed bytes.' }]);
-  for (const artifact of manifest.artifacts) assert.equal(hash(readFileSync(resolve(manifestPath, '..', artifact.path))), artifact.sha256);
+  let rowAt55 = 0;
+  for (const [key, value] of Object.entries(listing)) {
+    await caseRow(t, 'table at line 55 row ' + rowAt55++, async () => {
+assert.deepEqual(manifest.listing[key], value);
+    });
+  }
+  await caseRow(t, 'following assertion at line 56', async () => { assert.equal(manifest.listing.shots.length, 1); });
+  await caseRow(t, 'following assertion at line 57', async () => { assert.equal(manifest.listing.look.shotsAt, manifest.listing.look.app); });
+  await caseRow(t, 'following assertion at line 58', async () => { assert.equal(manifest.provenance.publication, 'local-release'); });
+  await caseRow(t, 'following assertion at line 59', async () => { assert.deepEqual(manifest.listing.clauses, [{ id: 'TEST-001', title: 'Exact bytes', text: 'Export the verified committed bytes.' }]); });
+  let rowAt60 = 0;
+  for (const artifact of manifest.artifacts) {
+    await caseRow(t, 'table at line 60 row ' + rowAt60++, async () => {
+assert.equal(hash(readFileSync(resolve(manifestPath, '..', artifact.path))), artifact.sha256);
+    });
+  }
   const registry = JSON.parse(readFileSync(resolve(f.options.output, 'site/registry.json')));
-  assert.equal(registry.releases[0].sha256, hash(readFileSync(manifestPath)));
-  assert.equal(registry.releases[0].path, 'fixture/1.2.3/release.json');
+  await caseRow(t, 'following assertion at line 62', async () => { assert.equal(registry.releases[0].sha256, hash(readFileSync(manifestPath))); });
+  await caseRow(t, 'following assertion at line 63', async () => { assert.equal(registry.releases[0].path, 'fixture/1.2.3/release.json'); });
+  }]]);
 });
 
 test('clean dry run creates an export and preview, with no tag or source changes', async t => {

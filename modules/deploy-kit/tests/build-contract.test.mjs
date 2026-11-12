@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm, realpath, symlink } from 'node:fs/promises';
@@ -39,23 +40,29 @@ async function buildFixture(t) {
 }
 
 test('pinned Vite no-bundle output selects actual upload rules, excluding manifest/config/source maps', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const {root,server,files,args} = await buildFixture(t);
   const artifact = await packageBuild(args);
   const wanted = Object.keys(files).filter(path => /\.(js|mjs|wasm|txt|html|sql|bin)$/.test(path)).sort();
   assert.deepEqual(artifact.modules.map(x => x.path).sort(),wanted);
+  let rowAt46 = 0;
   for (const file of artifact.modules) {
+    await caseRow(t, 'table at line 46 row ' + rowAt46++, async () => {
+
     assert.deepEqual(Buffer.from(file.base64,'base64'),await readFile(join(server,file.path)));
     assert.equal(file.sha256,hash(await readFile(join(server,file.path))));
+      });
   }
-  assert.deepEqual(artifact.source,args.source);
-  assert.deepEqual(artifact.run,args.runIdentity);
-  assert.equal(artifact.migrations[0].sha256,hash('CREATE TABLE notes(id TEXT);'));
+  await caseRow(t, 'following assertion at line 50', async () => { assert.deepEqual(artifact.source,args.source); });
+  await caseRow(t, 'following assertion at line 51', async () => { assert.deepEqual(artifact.run,args.runIdentity); });
+  await caseRow(t, 'following assertion at line 52', async () => { assert.equal(artifact.migrations[0].sha256,hash('CREATE TABLE notes(id TEXT);')); });
   const bytes = JSON.stringify(artifact);
   const path = join(root,'artifact.json'); await writeFile(path,bytes);
   const expected = {sha256:hash(bytes),sourceSha:args.source.sha,runId:'91',runAttempt:'2'};
-  assert.deepEqual(await readArtifact(path,expected),artifact);
-  await assert.rejects(readArtifact(path,{...expected,runAttempt:'3'}),/artifact-custody-mismatch/);
-  await assert.rejects(readArtifact(path,{...expected,sha256:'0'.repeat(64)}),/artifact-digest-mismatch/);
+  await caseRow(t, 'following assertion at line 56', async () => { assert.deepEqual(await readArtifact(path,expected),artifact); });
+  await caseRow(t, 'following assertion at line 57', async () => { await assert.rejects(readArtifact(path,{...expected,runAttempt:'3'}),/artifact-custody-mismatch/); });
+  await caseRow(t, 'following assertion at line 58', async () => { await assert.rejects(readArtifact(path,{...expected,sha256:'0'.repeat(64)}),/artifact-digest-mismatch/); });
+  }]]);
 });
 
 test('every selected additional module receives its real multipart content type and bytes', async t => {

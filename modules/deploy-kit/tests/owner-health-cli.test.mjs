@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -37,6 +38,7 @@ test('owner health CLI makes one request and preserves its state on transient fa
 
 
 test('secret CLI readiness retries transient and stale versions, rejects wrong full identity, and preserves applied mutations', async t => {
+  await caseRows(t, [['independent checks', async t => {
  const { provider, root, env, options, argv, deployment } = await fixture(t);
  await rm(join(root, 'dist'), { recursive: true });
  await writeFile(join(root, '.gitignore'), 'dirty source');
@@ -59,18 +61,23 @@ test('secret CLI readiness retries transient and stale versions, rejects wrong f
  const result = await run(['--set', 'SESSION_SECRET']);
  assert.equal(calls, 4); assert.equal(result.versionId, provider.state.version.id);
  assert.notEqual(result.versionId, stale.deployment.versionId);
- for (const field of ['sourceSha', 'fingerprint']) {
+ let rowAt62 = 0;
+  for (const field of ['sourceSha', 'fingerprint']) {
+    await caseRow(t, 'table at line 62 row ' + rowAt62++, async () => {
+
   calls = 0;
   provider.state.healthOverride = async () => {
    calls++; const body = await (await healthy()).json(); body.deployment[field] = 'wrong'; return Response.json(body);
   };
   await assert.rejects(run(['--set', 'SESSION_SECRET']), /health-identity-mismatch/);
   assert.equal(calls, 1, 'wrong identity on the expected version is terminal');
- }
+     });
+  }
  provider.state.healthOverride = () => new Response('still unhealthy', { status: 503 });
- await assert.rejects(run(['--unset', 'SESSION_SECRET']), error => error.status === 503 && error.secretChange?.present === false);
+ await caseRow(t, 'following assertion at line 71', async () => { await assert.rejects(run(['--unset', 'SESSION_SECRET']), error => error.status === 503 && error.secretChange?.present === false); });
  const state = JSON.parse(await readFile(deployment.state, 'utf8'));
- assert.equal(state.receipt.provider.versionId, provider.state.version.id);
- assert.ok(state.retiredSecrets.includes('SESSION_SECRET')); assert.equal(state.pendingSecret, undefined);
- assert.ok(!provider.state.secrets.some(item => item.name === 'SESSION_SECRET'));
+ await caseRow(t, 'following assertion at line 73', async () => { assert.equal(state.receipt.provider.versionId, provider.state.version.id); });
+ await caseRow(t, 'following assertion at line 74', async () => { assert.ok(state.retiredSecrets.includes('SESSION_SECRET')); }); await caseRow(t, 'following assertion at line 74', async () => { assert.equal(state.pendingSecret, undefined); });
+ await caseRow(t, 'following assertion at line 75', async () => { assert.ok(!provider.state.secrets.some(item => item.name === 'SESSION_SECRET')); });
+  }]]);
 });

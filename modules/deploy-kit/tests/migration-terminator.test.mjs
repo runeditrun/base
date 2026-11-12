@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -11,6 +12,9 @@ import { migrationFailure } from '../diagnostics.mjs';
 import { main } from '../owner-cli.mjs';
 import { ownerProvider } from './owner-provider.mjs';
 import { providerFixture } from './provider-fixture.mjs';
+
+const completionCaseRows = [];
+const completionCase = (name, run) => completionCaseRows.push({name,run});
 
 const entry = sql => ({ name: '0001_schema.sql', sql, sha256: hash(sql) });
 const schema = "CREATE TABLE source(value TEXT); INSERT INTO source VALUES ('retained');";
@@ -38,7 +42,7 @@ const cases = [
 ];
 
 for (const [label, sql, separator] of cases) {
-  test(`completion preserves migration bytes and executes after ${label}`, async t => {
+  completionCase(`completion preserves migration bytes and executes after ${label}`, async t => {
     const { fixture, api, id, db } = await setup(t);
     const migration = entry(sql), original = structuredClone(migration);
     const result = await migrate(api, id, [migration]);
@@ -129,6 +133,7 @@ test('a claimed migration whose effects are partly present, or cannot be checked
 });
 
 test('a seed-declared reviewed rewrite lets upgrades past a released migration proceed; undeclared changes stay refused', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const { fixture, api, id, db } = await setup(t);
   const product = await mkdtemp(join(await realpath(tmpdir()), 'rewrite-proof-'));
   t.after(() => rm(product, { recursive: true, force: true }));
@@ -144,23 +149,28 @@ test('a seed-declared reviewed rewrite lets upgrades past a released migration p
   await mkdir(join(product, 'migrations'), { recursive: true });
   assert.deepEqual(await readMigrationRewrites(product), []);
   await assert.rejects(migrate(api, id, current), /changed-or-uncertain-migration-history/);
+  let rowAt151 = 0;
   for (const [rewrites, refusal] of [
     [[{ ...declared, reviewed: false }], /unreviewed-migration-rewrite/],
     [[{ ...declared, to: hash('other bytes') }], /migration-rewrite-mismatch/],
     [[{ ...declared, migration: '0009_absent.sql' }], /unknown-migration-rewrite/],
   ]) {
+    await caseRow(t, 'table at line 151 row ' + rowAt151++, async () => {
+
     await declare(rewrites);
     await assert.rejects(async () => migrate(api, id, withRewrites(current, await readMigrationRewrites(product))), refusal);
+      });
   }
   await declare([declared]);
   const upgrade = withRewrites(current, await readMigrationRewrites(product));
   const changedFirst = withRewrites([named('0001_schema.sql', `${schema}\n-- edited`), ...current.slice(1)], await readMigrationRewrites(product));
-  await assert.rejects(migrate(api, id, changedFirst), /changed-or-uncertain-migration-history/, 'an undeclared change is still refused');
-  assert.deepEqual(ledger(), before);
-  assert.equal(fixture.state.writes.length, writes, 'refusals write nothing');
-  assert.deepEqual((await migrate(api, id, upgrade)).applied, ['0003_converge.sql']);
-  assert.deepEqual(ledger(), [...before, { name: '0003_converge.sql', sha256: current[2].sha256, state: 'applied' }], 'the ledger keeps the released digest it applied');
-  assert.deepEqual((await migrate(api, id, upgrade)).applied, []);
+  await caseRow(t, 'following assertion at line 162', async () => { await assert.rejects(migrate(api, id, changedFirst), /changed-or-uncertain-migration-history/, 'an undeclared change is still refused'); });
+  await caseRow(t, 'following assertion at line 163', async () => { assert.deepEqual(ledger(), before); });
+  await caseRow(t, 'following assertion at line 164', async () => { assert.equal(fixture.state.writes.length, writes, 'refusals write nothing'); });
+  await caseRow(t, 'following assertion at line 165', async () => { assert.deepEqual((await migrate(api, id, upgrade)).applied, ['0003_converge.sql']); });
+  await caseRow(t, 'following assertion at line 166', async () => { assert.deepEqual(ledger(), [...before, { name: '0003_converge.sql', sha256: current[2].sha256, state: 'applied' }], 'the ledger keeps the released digest it applied'); });
+  await caseRow(t, 'following assertion at line 167', async () => { assert.deepEqual((await migrate(api, id, upgrade)).applied, []); });
+  }]]);
 });
 
 test('rer deploy retries a claim D1 rolled back on bytes a reviewed rewrite replaced; a claim on any other bytes is refused with the command that clears it', async t => {
@@ -213,4 +223,8 @@ test('rer deploy retries a claim D1 rolled back on bytes a reviewed rewrite repl
   assert.deepEqual(db().prepare('SELECT id FROM custody').all().map(row => row.id), ['kept']);
   assert.ok(notices.includes('Migrations: retried 0002_custody.sql: the earlier attempt was rolled back (D1 vector-production-db).'), notices.join('\n'));
   assert.equal((await deploy()).changed, false, 'the next deploy has nothing to do');
+});
+
+test('migration completion preserves SQL bytes and records each terminator variant exactly once', async (t) => {
+  await caseRows(t, completionCaseRows.map(({name,run}) => [name,run]));
 });

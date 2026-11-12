@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from '../deploy-kit/tests/fold-case.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -18,6 +19,7 @@ const absent = f => {
 const body = (repo, type, oid) => git(repo, 'cat-file', type, oid).split('\n\n').slice(1).join('\n\n');
 
 test('public child preserves exact modes/bytes, scans final tag, excludes private objects and writes a bounded handoff', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const f = publicFixture(t);
   writeFileSync(resolve(f.repo, 'removed.txt'), 'PRIVATE-only history'); const privateOld = f.commit();
   rmSync(resolve(f.repo, 'removed.txt'));
@@ -40,27 +42,32 @@ test('public child preserves exact modes/bytes, scans final tag, excludes privat
   assert.equal(body(out, 'commit', child), 'v1.2.3\n\nPublic improvements.\n\n# Details\nExact source bytes.');
   assert.equal(body(out, 'tag', 'v1.2.3'), body(out, 'commit', child));
   assert.equal(git(f.repo, 'tag', '--list'), ''); assert.equal(git(out, 'remote'), '');
+  let rowAt43 = 0;
   for (const privateCommit of [privateOld, privateTip]) {
+    await caseRow(t, 'table at line 43 row ' + rowAt43++, async () => {
+
     assert.equal(git(out, 'rev-list', '--all').includes(privateCommit), false);
     assert.notEqual(spawnSync('git', ['-C', out, 'cat-file', '-e', privateCommit]).status, 0);
+      });
   }
   const report = JSON.parse(readFileSync(resolve(f.options.output, 'publish-check.json')));
-  assert.equal(report.status, 'PASS'); assert.equal(report.complete, true); assert.equal(report.guarantees.historyScanned, true);
-  assert.equal(report.publicBase.commit, f.parent); assert.equal(report.source.commit, child);
+  await caseRow(t, 'following assertion at line 48', async () => { assert.equal(report.status, 'PASS'); }); await caseRow(t, 'following assertion at line 48', async () => { assert.equal(report.complete, true); }); await caseRow(t, 'following assertion at line 48', async () => { assert.equal(report.guarantees.historyScanned, true); });
+  await caseRow(t, 'following assertion at line 49', async () => { assert.equal(report.publicBase.commit, f.parent); }); await caseRow(t, 'following assertion at line 49', async () => { assert.equal(report.source.commit, child); });
   const site = JSON.parse(readFileSync(resolve(f.options.output, receipt.siteRelease.path)));
-  assert.equal(site.provenance.revision, child);
+  await caseRow(t, 'following assertion at line 51', async () => { assert.equal(site.provenance.revision, child); });
   const handoff = readFileSync(resolve(f.options.output, 'PUBLISH.md'), 'utf8');
-  assert.match(handoff, /set -eu/); assert.match(handoff, /ls-remote --refs/); assert.match(handoff, /push --atomic --no-follow-tags/);
-  assert.ok(handoff.includes(`${child}:refs/heads/main`)); assert.ok(handoff.includes(`${receipt.publicExport.tagObject}:refs/tags/v1.2.3`));
-  assert.doesNotMatch(handoff, /--force|--mirror|--all|--tags/);
-  assert.equal(git(f.bare, 'rev-parse', 'main'), f.parent); assert.equal(git(f.bare, 'tag', '--list'), '');
+  await caseRow(t, 'following assertion at line 53', async () => { assert.match(handoff, /set -eu/); }); await caseRow(t, 'following assertion at line 53', async () => { assert.match(handoff, /ls-remote --refs/); }); await caseRow(t, 'following assertion at line 53', async () => { assert.match(handoff, /push --atomic --no-follow-tags/); });
+  await caseRow(t, 'following assertion at line 54', async () => { assert.ok(handoff.includes(`${child}:refs/heads/main`)); }); await caseRow(t, 'following assertion at line 54', async () => { assert.ok(handoff.includes(`${receipt.publicExport.tagObject}:refs/tags/v1.2.3`)); });
+  await caseRow(t, 'following assertion at line 55', async () => { assert.doesNotMatch(handoff, /--force|--mirror|--all|--tags/); });
+  await caseRow(t, 'following assertion at line 56', async () => { assert.equal(git(f.bare, 'rev-parse', 'main'), f.parent); }); await caseRow(t, 'following assertion at line 56', async () => { assert.equal(git(f.bare, 'tag', '--list'), ''); });
   // Exercise every handoff guard from the wrong cwd, excluding its push line.
   const commands = handoff.split('```sh\n')[1].split('\n```')[0];
   const guards = commands.split('\n').filter(line => !line.startsWith('release_git push ')).join('\n');
   const checked = spawnSync('sh', ['-c', guards], { cwd: f.temporary, encoding: 'utf8' });
-  assert.equal(checked.status, 0, checked.stderr);
+  await caseRow(t, 'following assertion at line 61', async () => { assert.equal(checked.status, 0, checked.stderr); });
   writeFileSync(resolve(f.options.output, 'release-receipt.json'), '{}');
-  assert.notEqual(spawnSync('sh', ['-c', guards], { cwd: f.temporary }).status, 0);
+  await caseRow(t, 'following assertion at line 63', async () => { assert.notEqual(spawnSync('sh', ['-c', guards], { cwd: f.temporary }).status, 0); });
+  }]]);
 });
 
 test('non-dry public child retains a private source tag and public site identity', async t => {
@@ -81,19 +88,29 @@ test('dry run preserves an existing private version tag while staging the actual
 });
 
 test('public destination syntax, identity, visibility, remote tag and ambiguity fail before output', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const f = publicFixture(t);
+  let rowAt85 = 0;
   for (const onto of ['main', 'https://github.com/octocat/Hello-World', 'https://user:test-pass@github.com/octocat/Hello-World#main',
     'https://github.com/octocat/Spoon-Knife#main', 'https://github.com/octocat/Hello-World#HEAD', 'https://github.com/octocat/Hello-World#refs/heads/main',
     'https://github.com/octocat/Hello-World#bad..branch', 'https://github.com/octocat/Hello-World#main#extra', 'https://github.com/octocat/Hello-World#-branch']) {
+    await caseRow(t, 'table at line 85 row ' + rowAt85++, async () => {
+
     assert.throws(() => publicDestination(onto, f.options.repository, f.repo));
+      });
   }
-  await assert.rejects(release({ ...f.options, cleanHistory: true })); absent(f);
+  await caseRow(t, 'following assertion at line 90', async () => { await assert.rejects(release({ ...f.options, cleanHistory: true })); }); absent(f);
+  let rowAt91 = 0;
   for (const visibility of ['private', 'missing', 'unresolved']) {
+    await caseRow(t, 'table at line 91 row ' + rowAt91++, async () => {
+
     f.configure({ visibility }); await assert.rejects(release(f.options)); absent(f);
+      });
   }
-  f.configure({ visibility: 'public', ambiguous: true }); await assert.rejects(release(f.options)); absent(f);
+  f.configure({ visibility: 'public', ambiguous: true }); await caseRow(t, 'following assertion at line 94', async () => { await assert.rejects(release(f.options)); }); absent(f);
   f.configure({ ambiguous: false }); git(f.bare, 'update-ref', 'refs/tags/v1.2.3', f.parent);
-  await assert.rejects(release(f.options)); absent(f);
+  await caseRow(t, 'following assertion at line 96', async () => { await assert.rejects(release(f.options)); }); absent(f);
+  }]]);
 });
 
 for (const mode of ['moveTo', 'removeHead', 'addTag', 'unresolvedAfter', 'ambiguousAfter']) {

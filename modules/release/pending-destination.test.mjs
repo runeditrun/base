@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from '../deploy-kit/tests/fold-case.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -31,7 +32,8 @@ function api(t, f, state = 'missing') {
 
 for (const cleanHistory of [false, true]) {
   for (const dryRun of [false, true]) {
-    test(`real CLI forwards the agreed pending destination through ${cleanHistory ? 'clean export' : 'source and staged annotation'} scans, dryRun=${dryRun}`, t => {
+    test(`real CLI forwards the agreed pending destination through ${cleanHistory ? 'clean export' : 'source and staged annotation'} scans, dryRun=${dryRun}`, async t => {
+  await caseRows(t, [['independent checks', async t => {
       const f = fixture(t);
       api(t, f);
       declare(f);
@@ -61,38 +63,47 @@ os.execv(${JSON.stringify(process.execPath)}, [${JSON.stringify(process.execPath
       assert.equal(result.status, 0, result.stderr);
       const scannerCalls = readFileSync(calls, 'utf8').trim().split('\n').map(line => JSON.parse(line));
       assert.equal(scannerCalls.length, 1);
-      for (const args of scannerCalls) {
+      let rowAt64 = 0;
+  for (const args of scannerCalls) {
+    await caseRow(t, 'table at line 64 row ' + rowAt64++, async () => {
+
         const index = args.indexOf('--timeout-seconds');
         if (timeout === undefined) assert.equal(index, -1, 'omitted release timeout must leave scanner default alone');
         else { assert.ok(index >= 0); assert.equal(args[index + 1], timeout); }
-      }
+          });
+  }
       const receipt = JSON.parse(result.stdout);
-      assert.equal(receipt.status, dryRun ? 'DRY_RUN' : 'RELEASED');
-      assert.equal(receipt.source.commit, source);
-      assert.equal(git(f.repo, 'tag', '--list'), dryRun ? '' : 'v1.2.3');
+      await caseRow(t, 'following assertion at line 70', async () => { assert.equal(receipt.status, dryRun ? 'DRY_RUN' : 'RELEASED'); });
+      await caseRow(t, 'following assertion at line 71', async () => { assert.equal(receipt.source.commit, source); });
+      await caseRow(t, 'following assertion at line 72', async () => { assert.equal(git(f.repo, 'tag', '--list'), dryRun ? '' : 'v1.2.3'); });
       const report = read(resolve(f.options.output, 'publish-check.json'));
-      assert.equal(report.status, 'PASS');
-      assert.deepEqual(report.findings, []);
-      assert.ok(report.info.some(item => item.rule === 'pending-public-destination' && item.severity === 'INFO'));
+      await caseRow(t, 'following assertion at line 74', async () => { assert.equal(report.status, 'PASS'); });
+      await caseRow(t, 'following assertion at line 75', async () => { assert.deepEqual(report.findings, []); });
+      await caseRow(t, 'following assertion at line 76', async () => { assert.ok(report.info.some(item => item.rule === 'pending-public-destination' && item.severity === 'INFO')); });
       const annotation = cleanHistory ? report : report.annotationInspection;
-      assert.ok(annotation.info.some(item => item.rule === 'pending-public-destination' && item.path === '@tag-message'));
-      assert.equal(annotation.history.tagMessages, 1);
-      assert.ok(!JSON.stringify(report).includes('private-gh-diagnostic'));
+      await caseRow(t, 'following assertion at line 78', async () => { assert.ok(annotation.info.some(item => item.rule === 'pending-public-destination' && item.path === '@tag-message')); });
+      await caseRow(t, 'following assertion at line 79', async () => { assert.equal(annotation.history.tagMessages, 1); });
+      await caseRow(t, 'following assertion at line 80', async () => { assert.ok(!JSON.stringify(report).includes('private-gh-diagnostic')); });
       if (cleanHistory) {
         const exported = resolve(f.options.output, 'public-git');
         assert.equal(git(exported, 'rev-list', '--all', '--count'), '1');
         assert.equal(git(exported, 'rev-parse', 'HEAD^{tree}'), receipt.source.tree);
-        for (const object of ['HEAD', 'v1.2.3']) {
+        let rowAt85 = 0;
+  for (const object of ['HEAD', 'v1.2.3']) {
+    await caseRow(t, 'table at line 85 row ' + rowAt85++, async () => {
+
           const text = git(exported, 'cat-file', '-p', object);
           assert.ok(!text.includes(source));
           assert.ok(text.endsWith(`v1.2.3\n\n${notes}`));
-        }
-        assert.notEqual(receipt.publicExport.commit, source);
+            });
+  }
+        await caseRow(t, 'following assertion at line 90', async () => { assert.notEqual(receipt.publicExport.commit, source); });
         const manifest = read(resolve(f.options.output, receipt.siteRelease.path));
-        assert.equal(manifest.provenance.revision, receipt.publicExport.commit);
-        assert.ok(!JSON.stringify(manifest).includes(source));
+        await caseRow(t, 'following assertion at line 92', async () => { assert.equal(manifest.provenance.revision, receipt.publicExport.commit); });
+        await caseRow(t, 'following assertion at line 93', async () => { assert.ok(!JSON.stringify(manifest).includes(source)); });
       }
-    });
+      }]]);
+});
   }
 }
 

@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, realpath, rm } from 'node:fs/promises';
@@ -78,6 +79,7 @@ test('a consumer declares the service binding; deploy refuses until the service 
 
 
 test('a named service grant is tied to its deployment and rejects grant, provider and binding drift', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const identity = {versionId:'11111111-1111-4111-8111-111111111111',deploymentId:'22222222-2222-4222-8222-222222222222',etag:'service-code-etag'};
   const grant = {allowedHosts:['hooks.example.com'],sourceSha:'9'.repeat(40),fingerprint:'a'.repeat(64),provider:identity};
   const serviceWorker = {present:true,provider:{...identity},bindings:[
@@ -89,36 +91,45 @@ test('a named service grant is tied to its deployment and rejects grant, provide
   const plan = ownerPlan(target,{...consumer,services:[{binding:'PENNY_EGRESS',project:egress.project,entrypoint:'EgressRestricted',grant}]},artifact);
   await ownerDeploy({api,target,plan,artifact,statePath,fetch});
   const original = structuredClone(serviceWorker.bindings);
+  let rowAt92 = 0;
   for (const grants of [[],[{entrypoint:'EgressRestricted',allowedHosts:null}],
     [{entrypoint:'EgressRestricted',allowedHosts:grant.allowedHosts},{entrypoint:'EgressRestricted',allowedHosts:null}]]) {
+    await caseRow(t, 'table at line 92 row ' + rowAt92++, async () => {
+
     serviceWorker.bindings[0].text = JSON.stringify(grants);
     await assert.rejects(ownerHealth({api,target,plan,statePath,fetch}), /service-grant-readback-mismatch/);
+      });
   }
   serviceWorker.bindings = original;
   serviceWorker.provider.etag = 'replacement';
-  await assert.rejects(ownerHealth({api,target,plan,statePath,fetch}), /service-grant-deployment-drift/);
+  await caseRow(t, 'following assertion at line 99', async () => { await assert.rejects(ownerHealth({api,target,plan,statePath,fetch}), /service-grant-deployment-drift/); });
   serviceWorker.provider.etag = identity.etag;
   const bound = provider.state.settings.bindings.find(x => x.type === 'service');
   bound.entrypoint = 'EgressService';
-  await assert.rejects(ownerHealth({api,target,plan,statePath,fetch}), /binding-readback-mismatch/);
+  await caseRow(t, 'following assertion at line 103', async () => { await assert.rejects(ownerHealth({api,target,plan,statePath,fetch}), /binding-readback-mismatch/); });
   bound.entrypoint = 'EgressRestricted';
   bound.environment = 'other';
-  await assert.rejects(ownerHealth({api,target,plan,statePath,fetch}), /binding-readback-mismatch/);
+  await caseRow(t, 'following assertion at line 106', async () => { await assert.rejects(ownerHealth({api,target,plan,statePath,fetch}), /binding-readback-mismatch/); });
   bound.environment = 'production'; // The provider's default is legitimate.
   const bindings = provider.state.settings.bindings;
   bindings.push({type:'secret_text',name:'OPERATOR_SECRET'}, {type:'plain_text',name:'OPERATOR_VAR',text:'present'});
   await ownerHealth({api,target,plan,statePath,fetch});
+  let rowAt111 = 0;
   for (const extra of [
     {...bound,name:'UNDECLARED_BROAD',entrypoint:'EgressService'},
     {...bound}, {type:'secret_text',name:'OPERATOR_SECRET'},
     {type:'service',service:'egress-service-production',entrypoint:'EgressService'},
   ]) {
+    await caseRow(t, 'table at line 111 row ' + rowAt111++, async () => {
+
     provider.state.settings.bindings = [...bindings,extra];
     await assert.rejects(ownerHealth({api,target,plan,statePath,fetch}), /binding-readback-mismatch/);
+      });
   }
   provider.state.settings.bindings = bindings.filter(x => x !== bound);
-  await assert.rejects(ownerHealth({api,target,plan,statePath,fetch}), /binding-readback-mismatch/);
+  await caseRow(t, 'following assertion at line 120', async () => { await assert.rejects(ownerHealth({api,target,plan,statePath,fetch}), /binding-readback-mismatch/); });
   provider.state.settings.bindings = bindings;
   bound.service = 'another-service-production';
-  await assert.rejects(ownerHealth({api,target,plan,statePath,fetch}), /binding-readback-mismatch/);
+  await caseRow(t, 'following assertion at line 123', async () => { await assert.rejects(ownerHealth({api,target,plan,statePath,fetch}), /binding-readback-mismatch/); });
+  }]]);
 });

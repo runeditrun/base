@@ -1,10 +1,12 @@
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare } from '../provider.mjs';
 import { uploadAssets } from '../worker.mjs';
 import { hash } from '../validation.mjs';
 
-test('static asset multipart preserves JavaScript MIME for imported browser .mjs and .js, and binary MIME for unknown extensions', async () => {
+test('static asset multipart preserves JavaScript MIME for imported browser .mjs and .js, and binary MIME for unknown extensions', async (t) => {
+  await caseRows(t, [['independent checks', async t => {
   const cases = [
     {path:'app.js',bytes:'import { feedback } from "./assets/action-feedback.mjs"; feedback();',type:'application/javascript'},
     {path:'assets/action-feedback.mjs',bytes:'export const feedback = () => document.body.dataset.ready = "yes";',type:'application/javascript'},
@@ -30,13 +32,18 @@ test('static asset multipart preserves JavaScript MIME for imported browser .mjs
   assert.equal(session.headers.get('Authorization'),'Bearer fixture-account-token');
   const {manifest} = await session.json();
   assert.deepEqual(Object.keys(manifest),cases.map(file => `/${file.path}`));
-  for (const file of cases) assert.equal(manifest[`/${file.path}`].size,Buffer.byteLength(file.bytes));
-  assert.equal(upload.headers.get('Authorization'),'Bearer fixture-upload-token');
-  assert.match(upload.headers.get('Content-Type'),/^multipart\/form-data; boundary=/);
+  let rowAt33 = 0;
+  for (const file of cases) {
+    await caseRow(t, 'table at line 33 row ' + rowAt33++, async () => {
+assert.equal(manifest[`/${file.path}`].size,Buffer.byteLength(file.bytes));
+    });
+  }
+  await caseRow(t, 'following assertion at line 34', async () => { assert.equal(upload.headers.get('Authorization'),'Bearer fixture-upload-token'); });
+  await caseRow(t, 'following assertion at line 35', async () => { assert.match(upload.headers.get('Content-Type'),/^multipart\/form-data; boundary=/); });
   // Round-trip serialized bytes so assertions cover the actual multipart headers.
   const multipart = new Response(await upload.arrayBuffer(),{headers:upload.headers});
   const parts = await multipart.formData();
-  assert.equal([...parts.keys()].length,cases.length);
+  await caseRow(t, 'following assertion at line 39', async () => { assert.equal([...parts.keys()].length,cases.length); });
   for (const file of cases) {
     const part = parts.get(manifest[`/${file.path}`].hash);
     assert(part,`missing upload part for ${file.path}`);
@@ -44,4 +51,5 @@ test('static asset multipart preserves JavaScript MIME for imported browser .mjs
     assert.equal(part.type,file.type,`upload MIME for ${file.path}`);
     assert.equal(await part.text(),Buffer.from(file.bytes).toString('base64'));
   }
+  }]]);
 });

@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from '../deploy-kit/tests/fold-case.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync, spawnSync } from 'node:child_process';
@@ -39,7 +40,8 @@ test('smart HTTP fixture returns genuine native advertisements and an importable
   assert.deepEqual(f.state(), { heads: 0, fetches: 1 });
 });
 
-test('HTTP fixture rejects unknown destination, path, method and unsupported curl invocation before effects', t => {
+test('HTTP fixture rejects unknown destination, path, method and unsupported curl invocation before effects', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const f = publicFixture(t);
   const cases = [
     ['https://other.invalid/repo/info/refs?service=git-upload-pack'],
@@ -49,35 +51,47 @@ test('HTTP fixture rejects unknown destination, path, method and unsupported cur
     [f.options.repository + '/git-upload-pack'],
     [f.options.repository + '/git-receive-pack', 'unexpected write'],
   ];
+  let rowAt52 = 0;
   for (const [index, [url, body]] of cases.entries()) {
+    await caseRow(t, 'table at line 52 row ' + rowAt52++, async () => {
+
     const query = request(f, `rejected-${index}`, url, body), result = curl(query);
     assert.notEqual(result.status, 0);
     assert.equal(result.stdout, '');
     assert.equal(existsSync(query.output), false);
     assert.equal(existsSync(query.headers), false);
+      });
   }
-  assert.notEqual(spawnSync('curl', ['--url', f.options.repository], { encoding: 'utf8', timeout: 15000 }).status, 0);
-  assert.equal(existsSync(resolve(f.temporary, 'transport.json')), false);
+  await caseRow(t, 'following assertion at line 59', async () => { assert.notEqual(spawnSync('curl', ['--url', f.options.repository], { encoding: 'utf8', timeout: 15000 }).status, 0); });
+  await caseRow(t, 'following assertion at line 60', async () => { assert.equal(existsSync(resolve(f.temporary, 'transport.json')), false); });
+  }]]);
 });
 
-test('HTTP fixture rejects excessive config and request bytes and refuses a native unknown-object request', t => {
+test('HTTP fixture rejects excessive config and request bytes and refuses a native unknown-object request', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const f = publicFixture(t);
   const excessiveConfig = request(f, 'large-config');
   excessiveConfig.config += 'header = ' + JSON.stringify('x'.repeat(65536)) + '\n';
   const excessiveBody = request(f, 'large-body', f.options.repository + '/git-upload-pack', Buffer.alloc(1024 * 1024 + 1));
+  let rowAt68 = 0;
   for (const query of [excessiveConfig, excessiveBody]) {
+    await caseRow(t, 'table at line 68 row ' + rowAt68++, async () => {
+
     assert.notEqual(curl(query).status, 0);
     assert.equal(existsSync(query.output), false);
+      });
   }
-  assert.equal(existsSync(resolve(f.temporary, 'transport.json')), false);
+  await caseRow(t, 'following assertion at line 72', async () => { assert.equal(existsSync(resolve(f.temporary, 'transport.json')), false); });
   const unknown = request(f, 'unknown-object', f.options.repository + '/git-upload-pack',
     Buffer.concat([packet('want ' + 'f'.repeat(40) + '\n'), Buffer.from('0000'), packet('done\n')]));
-  assert.notEqual(curl(unknown).status, 0);
-  assert.equal(existsSync(unknown.output), false);
-  assert.deepEqual(readdirSync(f.temporary).filter(name => name.startsWith('transport.json.')), []);
+  await caseRow(t, 'following assertion at line 75', async () => { assert.notEqual(curl(unknown).status, 0); });
+  await caseRow(t, 'following assertion at line 76', async () => { assert.equal(existsSync(unknown.output), false); });
+  await caseRow(t, 'following assertion at line 77', async () => { assert.deepEqual(readdirSync(f.temporary).filter(name => name.startsWith('transport.json.')), []); });
+  }]]);
 });
 
 test('HTTP and Git transport requests share atomic counters and unchanged head-move hooks', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const f = publicFixture(t);
   writeFileSync(resolve(f.repo, 'README.md'), 'Changed public head.\n');
   const changed = f.commit();
@@ -92,8 +106,14 @@ test('HTTP and Git transport requests share atomic counters and unchanged head-m
     ...queries.map(query => run('curl', arguments_, query.config)),
     ...[0, 1].map(() => run('git', ['-C', f.repo, 'ls-remote', '--refs', f.options.repository, 'refs/heads/main'])),
   ]);
-  for (const result of results) assert.equal(result.status, 'fulfilled', result.reason?.message);
-  assert.deepEqual(results.slice(2).map(result => result.value).sort(), [`${f.parent}\trefs/heads/main\n`, `${changed}\trefs/heads/main\n`].sort());
-  assert.deepEqual(f.state(), { heads: 2, fetches: 2 });
-  assert.deepEqual(readdirSync(f.temporary).filter(name => name.startsWith('transport.json.')), []);
+  let rowAt95 = 0;
+  for (const result of results) {
+    await caseRow(t, 'table at line 95 row ' + rowAt95++, async () => {
+assert.equal(result.status, 'fulfilled', result.reason?.message);
+    });
+  }
+  await caseRow(t, 'following assertion at line 96', async () => { assert.deepEqual(results.slice(2).map(result => result.value).sort(), [`${f.parent}\trefs/heads/main\n`, `${changed}\trefs/heads/main\n`].sort()); });
+  await caseRow(t, 'following assertion at line 97', async () => { assert.deepEqual(f.state(), { heads: 2, fetches: 2 }); });
+  await caseRow(t, 'following assertion at line 98', async () => { assert.deepEqual(readdirSync(f.temporary).filter(name => name.startsWith('transport.json.')), []); });
+  }]]);
 });

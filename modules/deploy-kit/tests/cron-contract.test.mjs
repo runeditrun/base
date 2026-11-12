@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare } from '../provider.mjs';
@@ -7,6 +8,9 @@ import { checkCronOwnership, reconcileTriggers } from '../resources.mjs';
 import { hash } from '../validation.mjs';
 import { defaultStagePlan } from '../default-stage.mjs';
 import { documentedProvider } from './documented-provider.mjs';
+
+const cronCaseRows = [];
+const cronCase = (name, run) => cronCaseRows.push({name,run});
 
 function setup(t) {
   const fixture = documentedProvider(); t.after(() => fixture.close());
@@ -20,7 +24,8 @@ function setup(t) {
   return {...fixture,api,plan,artifact,args:{api,plan,artifact,artifactSha256:hash(artifact),fetch:fixture.fetch}};
 }
 
-test('Cron deployment reapplies changed releases, checks capability and schedule readback, and retains no-write repeats', async t => {
+cronCase('Cron deployment reapplies changed releases, checks capability and schedule readback, and retains no-write repeats', async t => {
+  await caseRows(t, [['independent checks', async t => {
   const {state,args,api,plan} = setup(t);
   plan.crons = ['* * * * *'];
   plan.r2 = [{binding:'FILES',name:'cron-proof-files'}];
@@ -56,15 +61,22 @@ test('Cron deployment reapplies changed releases, checks capability and schedule
   assert.equal(state.secrets[0].value,'test-only-retained-value');
   assert(!JSON.stringify(second).includes('test-only-retained-value'));
   const handlers = state.version.resources.script.handlers;
+  let rowAt63 = 0;
   for (const reported of [undefined,null,{},[],['fetch']]) {
+    await caseRow(t, 'table at line 63 row ' + rowAt63++, async () => {
+
     state.version.resources.script.handlers = reported;
     await assert.rejects(verifyHealth({api,plan,receipt:upgraded,fetch:args.fetch}),/missing-scheduled-handler/);
     await assert.rejects(deploy({...upgradedArgs,previousReceipt:upgraded,repeatOnly:true}),/missing-scheduled-handler/);
+      });
   }
   state.version.resources.script.handlers = handlers;
-  assert.equal(state.writes.length,writes);
+  await caseRow(t, 'following assertion at line 69', async () => { assert.equal(state.writes.length,writes); });
   const request = api.request;
+  let rowAt71 = 0;
   for (const schedules of [[],[{cron:'0 12 * * *'}]]) {
+    await caseRow(t, 'table at line 71 row ' + rowAt71++, async () => {
+
     state.schedules = plan.crons.map(cron => ({cron}));
     api.request = async (path,options) => {
       const result = await request(path,options);
@@ -74,6 +86,7 @@ test('Cron deployment reapplies changed releases, checks capability and schedule
     let receipt;
     await assert.rejects(deploy({...upgradedArgs,plan:{...plan,vars:{RELEASE:`bad-readback-${schedules.length}`}},previousReceipt:upgraded,onReceipt:value => {receipt=value;}}),/cron-drift/);
     assert.equal(receipt,undefined,'a successful write with failed readback must not produce a deployment receipt');
+      });
   }
   state.schedules = plan.crons.map(cron => ({cron}));
   api.request = async (path,options) => {
@@ -81,15 +94,16 @@ test('Cron deployment reapplies changed releases, checks capability and schedule
     if (path.endsWith('/schedules') && options?.method === 'PUT') state.deployments[0].id = crypto.randomUUID();
     return result;
   };
-  await assert.rejects(deploy({...upgradedArgs,plan:{...plan,vars:{RELEASE:'concurrent-deployment'}},previousReceipt:upgraded}),/deployment-changed-during-triggers/);
+  await caseRow(t, 'following assertion at line 88', async () => { await assert.rejects(deploy({...upgradedArgs,plan:{...plan,vars:{RELEASE:'concurrent-deployment'}},previousReceipt:upgraded}),/deployment-changed-during-triggers/); });
   api.request = request;
   state.schedules = plan.crons.map(cron => ({cron}));
   const cronWrites = state.writes.filter(x => x.path.endsWith('/schedules')).length;
   const code = 'export default {fetch() {return new Response("missing scheduled handler");}};';
   const artifact = {...upgradedArgs.artifact,modules:[{path:'index.js',base64:Buffer.from(code).toString('base64'),sha256:hash(code)}]};
   state.uploadHandlers = ['fetch'];
-  await assert.rejects(deploy({...upgradedArgs,artifact,artifactSha256:hash(artifact),previousReceipt:upgraded}),/missing-scheduled-handler/);
-  assert.equal(state.writes.filter(x => x.path.endsWith('/schedules')).length,cronWrites,'a Worker without a scheduled handler cannot publish Cron triggers');
+  await caseRow(t, 'following assertion at line 95', async () => { await assert.rejects(deploy({...upgradedArgs,artifact,artifactSha256:hash(artifact),previousReceipt:upgraded}),/missing-scheduled-handler/); });
+  await caseRow(t, 'following assertion at line 96', async () => { assert.equal(state.writes.filter(x => x.path.endsWith('/schedules')).length,cronWrites,'a Worker without a scheduled handler cannot publish Cron triggers'); });
+  }]]);
 });
 
 test('bare-array, missing, malformed, empty-string and duplicate schedule results fail closed', async () => {
@@ -108,7 +122,7 @@ test('schedule timestamps and ordering do not cause redundant PUTs', async () =>
   assert.equal(calls[0].options,undefined);
 });
 
-test('unmanaged Cron on ordinary changed-source upgrade fails before upload, migrations or any other mutation', async t => {
+cronCase('unmanaged Cron on ordinary changed-source upgrade fails before upload, migrations or any other mutation', async t => {
   const {state,args,plan,artifact} = setup(t);
   const first = await deploy(args);
   state.databases[0].db.exec("INSERT INTO notes(body) VALUES ('keep')");
@@ -126,7 +140,7 @@ test('unmanaged Cron on ordinary changed-source upgrade fails before upload, mig
   assert.equal(state.databases[0].db.prepare('PRAGMA table_info(notes)').all().length,2);
 });
 
-test('existing Worker without a prior receipt also rejects unmanaged Cron before writes', async t => {
+cronCase('existing Worker without a prior receipt also rejects unmanaged Cron before writes', async t => {
   const {state,args,artifact} = setup(t);
   await deploy(args);
   state.schedules.push({cron:'0 12 * * *'});
@@ -135,7 +149,7 @@ test('existing Worker without a prior receipt also rejects unmanaged Cron before
   assert.equal(state.writes.length,writes);
 });
 
-test('intentional Cron removal is refused instead of deleting an existing schedule', async t => {
+cronCase('intentional Cron removal is refused instead of deleting an existing schedule', async t => {
   const {state,args,plan} = setup(t);
   const first = await deploy(args);
   plan.crons = [];
@@ -145,7 +159,7 @@ test('intentional Cron removal is refused instead of deleting an existing schedu
   assert.equal(state.schedules.length,1);
 });
 
-test('ordinary upgrade may add a requested Cron while retaining old schedules and prior migrations', async t => {
+cronCase('ordinary upgrade may add a requested Cron while retaining old schedules and prior migrations', async t => {
   const {state,args,plan} = setup(t);
   const first = await deploy(args);
   plan.crons.push('0 12 * * *');
@@ -157,7 +171,7 @@ test('ordinary upgrade may add a requested Cron while retaining old schedules an
   assert.equal(state.writes.length,writes);
 });
 
-test('Cron drift introduced after upload is detected before trigger writes and retained', async t => {
+cronCase('Cron drift introduced after upload is detected before trigger writes and retained', async t => {
   const {state,args,api} = setup(t);
   const first = await deploy(args);
   args.plan.vars = {RELEASE:'changed'};
@@ -173,7 +187,7 @@ test('Cron drift introduced after upload is detected before trigger writes and r
   assert(state.schedules.some(x => x.cron === '0 12 * * *'));
 });
 
-test('same-source missing Cron, extra Cron and stale health still fail without repair', async t => {
+cronCase('same-source missing Cron, extra Cron and stale health still fail without repair', async t => {
   const {state,args,plan,api} = setup(t);
   const first = await deploy(args);
   const schedules = structuredClone(state.schedules);
@@ -212,7 +226,7 @@ test('valid upgrade extends Durable Object and D1 migration history once and ret
   assert.equal(state.writes.length,writes);
 });
 
-test('malformed schedule read on an existing Worker stops an upgrade before writes', async t => {
+cronCase('malformed schedule read on an existing Worker stops an upgrade before writes', async t => {
   const {state,args,api} = setup(t);
   const first = await deploy(args);
   args.plan.vars = {RELEASE:'next'};
@@ -223,11 +237,15 @@ test('malformed schedule read on an existing Worker stops an upgrade before writ
   assert.equal(state.writes.length,writes);
 });
 
-test('no-op still requires the recorded active version and etag with correct Cron responses', async t => {
+cronCase('no-op still requires the recorded active version and etag with correct Cron responses', async t => {
   const {state,args} = setup(t);
   const first = await deploy(args);
   const writes = state.writes.length;
   state.version.resources.script.etag = 'changed-by-another-writer';
   await assert.rejects(deploy({...args,previousReceipt:first}),/no-op-requires-authenticated-prior-receipt/);
   assert.equal(state.writes.length,writes);
+});
+
+test('deployment reconciles declared Cron schedules while refusing removal, drift and stale identities', async (t) => {
+  await caseRows(t, cronCaseRows.map(({name,run}) => [name,run]));
 });

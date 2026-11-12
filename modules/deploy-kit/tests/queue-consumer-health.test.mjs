@@ -1,3 +1,4 @@
+import { caseRow, caseRows } from './fold-case.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudflare, deploy, verifyHealth, defaultStagePlan } from '../index.mjs';
@@ -26,22 +27,29 @@ function setup(t) {
 }
 
 test('native script response supports initial health, repeated health and retained receipt with zero repair writes',async t => {
+  await caseRows(t, [['independent checks', async t => {
   const {args,state} = setup(t);
   const receipt = await deploy(args);
   const receiptBytes = JSON.stringify(receipt);
   state.databases[0].db.exec("INSERT INTO retained_notes VALUES ('owner data')");
   const writes = state.writes.length;
   const ids = state.queues.map(queue=>queue.queue_id);
-  for (let i=0;i<2;i++) assert.equal((await verifyHealth({...args,receipt})).ok,true);
+  let rowAt35 = 0;
+  for (let i=0;i<2;i++) {
+    await caseRow(t, 'table at line 35 row ' + rowAt35++, async () => {
+assert.equal((await verifyHealth({...args,receipt})).ok,true);
+    });
+  }
   const second = await deploy({...args,previousReceipt:receipt,repeatOnly:true});
-  assert.equal(second.changed,false);
-  assert.equal(state.writes.length,writes);
-  assert.equal(JSON.stringify(receipt),receiptBytes);
-  assert.deepEqual(state.queues.map(queue=>queue.queue_id),ids);
-  assert.equal(state.databases[0].db.prepare('SELECT body FROM retained_notes').get().body,'owner data');
+  await caseRow(t, 'following assertion at line 37', async () => { assert.equal(second.changed,false); });
+  await caseRow(t, 'following assertion at line 38', async () => { assert.equal(state.writes.length,writes); });
+  await caseRow(t, 'following assertion at line 39', async () => { assert.equal(JSON.stringify(receipt),receiptBytes); });
+  await caseRow(t, 'following assertion at line 40', async () => { assert.deepEqual(state.queues.map(queue=>queue.queue_id),ids); });
+  await caseRow(t, 'following assertion at line 41', async () => { assert.equal(state.databases[0].db.prepare('SELECT body FROM retained_notes').get().body,'owner data'); });
   const consumerWrite = state.writes.find(x=>x.path.endsWith('/consumers'));
-  assert.equal(consumerWrite.body.script_name,args.plan.worker);
-  assert(!Object.hasOwn(consumerWrite.body,'script'));
+  await caseRow(t, 'following assertion at line 43', async () => { assert.equal(consumerWrite.body.script_name,args.plan.worker); });
+  await caseRow(t, 'following assertion at line 44', async () => { assert(!Object.hasOwn(consumerWrite.body,'script')); });
+  }]]);
 });
 
 test('native foreign ownership blocks health and retained repeat without writes or changes',async t => {
