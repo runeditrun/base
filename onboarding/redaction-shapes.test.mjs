@@ -17,7 +17,7 @@ const jwt = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJzeW50aGV0aWMifQ.test-signature';
 const quotedCredential = 'test ' + 'opaque-synthetic-fragment '.repeat(30) + 'end';
 const longJwt = 'eyJ' + 'a'.repeat(750) + '.' + 'b'.repeat(750) + '.test-long-signature';
 
-// Each row: [shape, text, private parts that must never reach output].
+// Each row: [shape, text, private parts that must never reach output, optional exact output].
 const secretShapes = [
  ['prefixed password assignment', 'DB_PASSWORD=test-hunter2value', ['hunter2value']],
  ['prefixed token assignment', 'GITHUB_TOKEN=test-abcdef123456', ['abcdef123456']],
@@ -58,8 +58,8 @@ const secretShapes = [
  // Authorization schemes, cookies, PGP blocks and more provider prefixes.
  // JWTs need no word boundary before their header.
  ...['session-', 'session_', 'x', 'x-', '9'].flatMap(prefix => [
-  [`JWT after ${prefix}`, `${prefix}${jwt} end`, ['test-signature']],
-  [`long JWT after ${prefix}`, `${prefix}${longJwt} end`, ['test-long-signature']],
+  [`JWT after ${prefix}`, `${prefix}${jwt} end`, ['test-signature'], `${prefix}${MASK} end`],
+  [`long JWT after ${prefix}`, `${prefix}${longJwt} end`, ['test-long-signature'], `${prefix}${MASK} end`],
  ]),
  ['long quoted camelCase token', `refreshToken="${quotedCredential}"`, ['opaque-synthetic-fragment']],
  ['long quoted acronym token', `APIToken='${quotedCredential}'`, ['opaque-synthetic-fragment']],
@@ -158,13 +158,18 @@ function eachRow(rows, check) {
 
 test('table: secret-bearing shapes redact in complete text, byte-split streams and long lines', () => {
  assert.ok(secretShapes.length + registeredShapes.length + prose.length >= 110);
- eachRow(secretShapes, (shape, text, privateParts) => {
+ eachRow(secretShapes, (shape, text, privateParts, exactOutput) => {
   const redaction = createRedaction();
   const outputs = [redaction.redact(`BEFORE_MARKER ${text} AFTER_MARKER`), redaction.redact(text)];
   // Whole, byte-split, and on a line long enough to leave the line hold window.
   for (const unit of [1, 3, 4096]) outputs.push(streamed(redaction, `BEFORE_MARKER\n${text}\nAFTER_MARKER\n`, unit), streamed(redaction, text, unit));
   outputs.push(streamed(redaction, 'context '.repeat(60) + text + '\n', 1));
   for (const output of outputs) privateOutput(output, privateParts);
+  // The JWT regression matrix shares these whole-text and stream calls. Keep
+  // its stronger assertion: redact the token without changing adjacent text.
+  if (exactOutput !== undefined) {
+   for (const index of [1, 3, 5, 7]) assert.equal(outputs[index], exactOutput, `${shape}: JWT leaked or nearby diagnostics changed (${index === 1 ? 'whole text' : [1, 3, 4096][(index - 3) / 2] + '-byte stream'})`);
+  }
   for (const output of [outputs[0], outputs[2]]) { assert.match(output, /BEFORE_MARKER/); assert.match(output, /AFTER_MARKER/); }
  });
 });
