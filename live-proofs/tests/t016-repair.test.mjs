@@ -7,11 +7,10 @@ import { observation,validateFacts } from '../t016/facts.mjs';
 import { validateQualification } from '../t016/observations.mjs';
 import { publicSource } from '../t016/profile.mjs';
 import { digest } from '../../scripts/qualification/operations.mjs';
-import { selectMailbox,gmailMailbox } from '../../scripts/qualification/mailbox.mjs';
-import { sendAndReadMail } from '../../scripts/qualification/happytohelp.mjs';
+import { selectMailbox } from '../../scripts/qualification/mailbox.mjs';
 import { runtimeImages,isolationFlags,dockerEnvironment } from '../t016/isolation.mjs';
 import { runT016 } from '../t016/run.mjs';
-import { deploymentIdentity,r2DisabledReadback } from '../t016/cloudflare.mjs';
+import { deploymentIdentity } from '../t016/cloudflare.mjs';
 import { verifyAppliedBytes,recheckState,snapshotState } from '../t016/state.mjs';
 import { isolationAttestation } from '../t016/trust-boundary.mjs';
 import { browserJourney } from '../../scripts/qualification/browser.mjs';
@@ -89,32 +88,6 @@ test('missing owner mailbox choice is explicit; an available Gmail token does no
  assert.throws(()=>selectMailbox({T016_GMAIL_ACCESS_TOKEN:'test-only',T016_TEST_MAILBOX:'test@example.test'}),/choice-pending/);
  assert.throws(()=>selectMailbox({T016_MAILBOX_ADAPTER:'imap'}),/adapter-unsupported/);
 });
-test('Gmail readback returns allowlisted real identifiers and content hash',async t=>{
- const previous=globalThis.fetch;t.after(()=>globalThis.fetch=previous);let listed=false;
- globalThis.fetch=async url=>Response.json(url.endsWith('/profile')?{emailAddress:'test@example.test'}:url.includes('format=full')?{
-  internalDate:'1000',payload:{headers:[{name:'To',value:'test@example.test'},{name:'From',value:'Qualification t016-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa <sender@example.test>'},
-   {name:'Subject',value:'HappyToHelp email verification'},{name:'Message-ID',value:'<message@example.test>'}],body:{data:Buffer.from('Your configured HappyToHelp email provider delivered this verification message.').toString('base64url')}}
- }:{messages:listed?[{id:'abc123'}]:[]});
- const mailbox=gmailMailbox({token:'test-only',address:'test@example.test'}),before=await mailbox.snapshot();listed=true;
- const receipt=await mailbox.readNew(before,'sender@example.test',999,'t016-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
- validateFacts('mailbox',receipt);assert.equal(receipt.mailboxMessageId,'abc123');assert.equal(receipt.messageId,'<message@example.test>');
- assert(!JSON.stringify(receipt).includes('test-only'));
-});
-test('selected SendGrid rejection fails before durable readback and never invents mailbox delivery',async t=>{
- const previous=globalThis.fetch;t.after(()=>globalThis.fetch=previous);
- globalThis.fetch=async (url,options)=>url.includes('gmail.googleapis.com')?Response.json(url.endsWith('/profile')?{emailAddress:'test@example.test'}:{}):
-  url.endsWith('/test')?Response.json({}, {status:502}):Response.json(options.method==='PUT'?{updated:true}:{configured:true});
- await assert.rejects(sendAndReadMail({origin:'https://throwaway.example',env:{T016_MAILBOX_ADAPTER:'gmail',T016_GMAIL_ACCESS_TOKEN:'test-only',
-  T016_TEST_MAILBOX:'test@example.test',T016_SENDGRID_FROM:'sender@example.test'},state:{owner:{projectId:'project-id',token:'session-test-only'}},
-  observe(){assert.fail('No success observation should exist');},deliveryReadback(){assert.fail('No durable readback after rejection');}}),/http-status/);
-});
-test('real R2 error persists status and code; a disabled-looking error without code cannot qualify',async t=>{
- const previous=globalThis.fetch;t.after(()=>globalThis.fetch=previous);let code=10042;
- globalThis.fetch=async()=>Response.json({success:false,errors:[{code,message:'Enable R2 to continue'}]},{status:403});
- const env={CLOUDFLARE_ACCOUNT_ID:'a'.repeat(32),CLOUDFLARE_API_TOKEN:'test-only'};
- assert.deepEqual(await r2DisabledReadback(env),{status:403,code:10042});
- code=undefined;await assert.rejects(r2DisabledReadback(env),/error-code/);
-});
 test('mutable images and missing isolation attestation stop before network/provider effects',async t=>{
  const previous=globalThis.fetch;t.after(()=>globalThis.fetch=previous);globalThis.fetch=()=>assert.fail('Network must not run');
  assert.throws(()=>runtimeImages({T016_CONTROLLER_IMAGE:'ghcr.io/runeditrun/t016-controller:latest'}),/runtime-unconfigured/);
@@ -157,12 +130,6 @@ test('newer unrelated Cloudflare versions cannot satisfy a deployment receipt',a
  globalThis.fetch=async()=>Response.json({success:true,result:{deployments:[{id:'deployment-id',versions:[{version_id:'11111111-1111-1111-1111-111111111111',percentage:100}]}]}});
  await assert.rejects(deploymentIdentity({CLOUDFLARE_ACCOUNT_ID:'a'.repeat(32),CLOUDFLARE_API_TOKEN:'test-only',H2H_RESOURCE_PREFIX:'t016-1-1'},
   {output:'Current Version ID: 22222222-2222-2222-2222-222222222222',artifact:{},stage:'initial'}),/deployment-readback-failed/);
-});
-test('workflow binds existing SendGrid key and gates credentials on Linux isolation',()=>{
- const text=readFileSync('.github/workflows/live-proof.yml','utf8');
- assert(text.includes('&& secrets.SENDGRID_API_KEY'));assert(!text.includes('secrets.T016_SENDGRID_API_KEY'));
- const gate=text.split('  isolation:')[1].split('  execute:')[0];assert(!gate.includes('secrets.'));assert(!gate.includes('environment:'));
- assert(text.includes('T016_ISOLATION_ATTESTATION:'));assert(text.includes("vars.T016_MAILBOX_ADAPTER == 'gmail'"));
 });
 test('serving version is bound to exact module and static asset bytes, with race rejection',async t=>{
  const previous=globalThis.fetch;t.after(()=>globalThis.fetch=previous);

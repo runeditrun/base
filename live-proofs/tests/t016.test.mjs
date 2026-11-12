@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runT016 } from '../t016/run.mjs';
+import { validateFacts } from '../t016/facts.mjs';
 import { publicSource, secretsFor } from '../t016/profile.mjs';
 import { validateQualification } from '../t016/observations.mjs';
 import { makeReceipt, validateReceipt } from '../receipt.mjs';
@@ -57,6 +58,8 @@ test('Gmail requires mailbox identity and reads only new matching provider mail'
   assert.match(receipt.contentSha256, /^[a-f0-9]{64}$/);
   assert.equal(receipt.mailboxMessageId, 'abc123');
   assert.equal(receipt.messageId, '<fixture-message>');
+  validateFacts('mailbox', receipt);
+  assert(!JSON.stringify(receipt).includes('test-only'));
   assert.ok(calls.every(url => url.startsWith('https://gmail.googleapis.com/')));
   await assert.rejects(gmailMailbox({ token: 'test-only-token', address: 'other@example.test' }).snapshot(), /identity-mismatch/);
 });
@@ -92,7 +95,7 @@ test('SendGrid rejection fails without mailbox success; missing mail cannot pass
     if (url.endsWith('/test')) return Response.json({}, { status: 502 });
     return Response.json(options.method === 'PUT' ? { updated: true } : { configured: true });
   };
-  await assert.rejects(sendAndReadMail({ origin: 'https://fixture.example', env, state: { owner: { token: 'test-only', projectId: 'project' } }, observe() {}, deliveryReadback() { throw new Error('must not reach'); } }), /http-status/);
+  await assert.rejects(sendAndReadMail({ origin: 'https://fixture.example', env, state: { owner: { token: 'test-only', projectId: 'project' } }, observe() { assert.fail('No success observation should exist'); }, deliveryReadback() { assert.fail('No durable readback after rejection'); } }), /http-status/);
   globalThis.setTimeout = callback => { queueMicrotask(callback); return 0; };
   const mailbox = gmailMailbox({ token: 'test-only', address: env.T016_TEST_MAILBOX });
   await assert.rejects(mailbox.readNew(new Set(), env.T016_SENDGRID_FROM, Date.now(), 't016-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'), /mailbox-message-absent/);
@@ -108,6 +111,12 @@ test('workflow exposes mail secrets only to full T016 proofs, keeps writer separ
     assert.ok(!receipt.includes('secrets.' + secret));
   }
   assert.doesNotMatch(workflow, /OPENAI_API_KEY|toJSON\(secrets\)/);
+  assert(workflow.includes('&& secrets.SENDGRID_API_KEY'));
+  assert(!workflow.includes('secrets.T016_SENDGRID_API_KEY'));
+  const gate = workflow.split('  isolation:')[1].split('  execute:')[0];
+  assert(!gate.includes('secrets.')); assert(!gate.includes('environment:'));
+  assert(workflow.includes('T016_ISOLATION_ATTESTATION:'));
+  assert(workflow.includes("vars.T016_MAILBOX_ADAPTER == 'gmail'"));
 });
 test('metadata-only release migration application preserves ledger; loss or rollback rewrite fails', () => {
   const before = [{ name: '0001_initial.sql' }];
@@ -135,5 +144,9 @@ test('R2-off capture requires a real disabled-product error, not an arbitrary fa
   globalThis.fetch = async () => Response.json({ success: true, result: [] });
   await assert.rejects(r2DisabledReadback(env), /not-observed/);
   globalThis.fetch = async () => Response.json({ success: false, errors: [{ code: 10042, message: 'Please enable R2 through the dashboard' }] }, { status: 400 });
-  assert.equal((await r2DisabledReadback(env)).status, 400);
+  assert.deepEqual(await r2DisabledReadback(env), { status: 400, code: 10042 });
+  globalThis.fetch = async () => Response.json({ success: false, errors: [{ code: 10042, message: 'Enable R2 to continue' }] }, { status: 403 });
+  assert.deepEqual(await r2DisabledReadback(env), { status: 403, code: 10042 });
+  globalThis.fetch = async () => Response.json({ success: false, errors: [{ message: 'Enable R2 to continue' }] }, { status: 403 });
+  await assert.rejects(r2DisabledReadback(env), /error-code/);
 });
