@@ -118,6 +118,18 @@ sign-in link:
 rer dev --cwd default-seed
 ```
 
+Downloaded JavaScript tools can use the installed runtime too. From the folder
+containing the download, run `"$HOME/.local/bin/rer" run --script ./tool.mjs` and
+append the tool's arguments. For the Oncall PagerDuty exporter, from Downloads:
+
+```sh
+"$HOME/.local/bin/rer" run --script ./oncall-export.mjs pagerduty
+```
+
+This works outside a project and needs no `node` command on PATH. It uses the
+Node running `rer`; package scripts (`rer run NAME`) use the project's pinned
+Node and pnpm instead.
+
 To install it for a real owner, run the verbs yourself in the seed:
 
 ```sh

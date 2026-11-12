@@ -44,7 +44,7 @@ async function writeLauncher(paths) {
 const shellQuote = value => "'" + value.replaceAll("'", "'\"'\"'") + "'";
 async function closing(paths) {
  const notices = await pathAdvice(paths, process.env, { includeShellStep: false });
- return (notices ? notices + '\n' : '') + (process.env.RER_INSTALL_NO_NEXT ? '' : `Next, start an app: ${shellQuote(paths.launcher)} dev <owner>/<repo>\n`);
+ return (notices ? notices + '\n' : '') + (process.env.RER_INSTALL_NO_NEXT ? '' : `Run a downloaded JavaScript tool with the installed runtime: ${shellQuote(paths.launcher)} run --script ./tool.mjs [ARGS...]\nNext, start an app: ${shellQuote(paths.launcher)} dev <owner>/<repo>\n`);
 }
 
 export async function install({ quiet = false } = {}) {

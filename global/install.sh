@@ -178,6 +178,9 @@ NODE
  if [ -n "$path_step" ]; then RER_INSTALLER_PATH_STEP=1; export RER_INSTALLER_PATH_STEP; fi
  status=0
  "$HOME/.local/bin/rer" "$@" || status=$?
+ if [ "$1" != business ]; then
+  printf 'Run a downloaded JavaScript tool with the installed runtime: "%s/.local/bin/rer" run --script ./tool.mjs [ARGS...]\n' "$HOME"
+ fi
  if [ -n "$path_step" ]; then
   printf '\nRequired next step: %s/.local/bin is not on your PATH, so a bare `rer` in a new terminal says "rer: command not found". Run this in the terminal you will use, and add the same line to your shell startup file (~/.zshrc for zsh, ~/.bashrc for bash):\n  export PATH="$HOME/.local/bin:$PATH"\nOther shells, such as fish: run %s/.local/bin/rer cli path to see the line for yours. Until then, start rer with %s/.local/bin/rer. This installer changes no shell file.\n' "$HOME" "$HOME" "$HOME"
  fi

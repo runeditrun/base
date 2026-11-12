@@ -5,16 +5,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { buildPackage } from '../../scripts/rer-package.mjs';
 import { integrity, localRegistry } from '../../scripts/rer-package/registry.mjs';
 import { readPackage } from '../update/archive.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
-const run = (program, args, env) => new Promise((resolveRun, reject) => {
- const child = spawn(program, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
+const run = (program, args, env, cwd) => new Promise((resolveRun, reject) => {
+ const child = spawn(program, args, { env, cwd, stdio: ['ignore', 'pipe', 'pipe'] });
  let stdout = '', stderr = '';
  child.stdout.on('data', data => { stdout += data; });
  child.stderr.on('data', data => { stderr += data; });
@@ -57,6 +57,30 @@ test('install.sh with a supplied command ends with one PATH step when ~/.local/b
  assert.equal(path.code, 0, path.stderr);
  assert.ok(path.stdout.includes(line.replace('$HOME', '~')) || path.stdout.includes('.zshrc'), 'cli path shows the line to run');
  assert.doesNotMatch(path.stdout, /Optional/, 'cli path does not call the step optional either');
+
+ // A downloaded tool uses the installer's private runtime outside a checkout.
+ // The real Node stands in for the runtime download; no Node command is on PATH.
+ const downloads = join(home, 'Downloads');
+ await mkdir(downloads);
+ await symlink(dirname(dirname(process.execPath)), join(home, '.local/share/rer/node'));
+ const noNode = { HOME: home, PATH: launcher, RER_NO_UPDATE_CHECK: '1' };
+ const tool = join(downloads, 'oncall-export.mjs');
+ await writeFile(tool, `console.log(JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd(), runtime: process.execPath }));
+if (process.argv.includes('--fail')) process.exit(7);
+`);
+ for (const command of ['node --version', 'node oncall-export.mjs pagerduty']) {
+  assert.equal((await run('/bin/sh', ['-c', command], noNode, downloads)).code, 127, 'bare Node is unavailable');
+ }
+ const arguments_ = ['pagerduty', 'two words', '$HOME', '--', '--flag'];
+ const exported = await run(join(launcher, 'rer'), ['run', '--script', './oncall-export.mjs', ...arguments_], noNode, downloads);
+ assert.equal(exported.code, 0, exported.stderr);
+ assert.deepEqual(JSON.parse(exported.stdout), { args: arguments_, cwd: await realpath(downloads), runtime: await realpath(process.execPath) });
+ const fromElsewhere = await run(join(launcher, 'rer'), ['run', '--cwd', downloads, '--script', './oncall-export.mjs', '--fail'], noNode, directory);
+ assert.equal(fromElsewhere.code, 7, 'the tool keeps its own failure status');
+ assert.equal(JSON.parse(fromElsewhere.stdout).cwd, await realpath(downloads), '--cwd selects the file and working folder');
+ assert.equal((await run(join(launcher, 'rer'), ['run', '--script'], noNode, downloads)).code, 2, 'a file is required');
+ assert.equal((await run(join(launcher, 'rer'), ['run', '--script', './missing.mjs'], noNode, downloads)).code, 1, 'a missing tool fails visibly');
+ await rm(join(home, '.local/share/rer/node'));
 
  // PATH already has it: nothing to add.
  const present = await run('sh', [installer, '--', 'cli', 'status'], having);
