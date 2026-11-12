@@ -135,6 +135,7 @@ test('the public secret-only deploy enforces seed policy on mapped and direct cr
   // This seed owns OFF. Declaration-mapped bindings expose credentials even
   // when the caller supplies their environment alias.
   await appendFile(join(root,'policy.jsonl'), JSON.stringify({environment,declarationPath,names:Object.keys(bindings),selected:options.setSecret,mapped:bindings.MAIL_PROVIDER_API_KEY===env.EMAIL_API_KEY,declared:declaration.secrets.some(item=>item.binding==='MAIL_PROVIDER_API_KEY')})+'\\n');
+  if (env.MAIL_MODE === 'broken') throw Error('Seed policy could not be evaluated');
   const named = options.setSecret?.split(',') ?? Object.keys(bindings);
   if (env.MAIL_MODE === 'off' && named.some(name => ['MAIL_PROVIDER_API_KEY','EMAIL_API_KEY'].includes(name) && bindings[name]?.trim())) throw missing('Credentials are not bound while email is off.');
  }`;
@@ -203,4 +204,14 @@ test('the public secret-only deploy enforces seed policy on mapped and direct cr
  assert.equal(shared.code, 4, shared.text);
  assert.match(shared.text, /Production sign-in is not configured/);
  assert.equal(provider.state.calls.length, afterAllowed);
+ // An unclassified hook failure names its own lifecycle step, while the
+ // missing-input refusals above keep their exit-3 path and message.
+ await writeFile(join(root, 'deploy.env'), 'MAIL_MODE=broken\n', {mode:0o600});
+ const broken = await run('--env-file', 'deploy.env', '--set-secret', 'OTHER_SECRET');
+ assert.equal(broken.code, 1, broken.text);
+ const failure = broken.events.find(event => event.event === 'error');
+ assert.equal(failure.code, 'command_failed');
+ assert.match(failure.message, /Checking deploy policy failed/);
+ assert.doesNotMatch(failure.message, /Checking pinned pnpm/);
+ assert.equal(provider.state.calls.length, afterAllowed, 'an ordinary policy error also precedes provider access');
 });

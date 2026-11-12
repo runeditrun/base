@@ -15,7 +15,7 @@ const approvalId = answer => {
 }
 async function archive(service) {
   const id = await service.exports.create()
-  while ((await service.exports.advance(id)).phase !== 'complete') {}
+  while ((await service.exports.advance(id, { maxParts: 100 })).phase !== 'complete') {}
   return new Response(await service.exports.download(id)).text()
 }
 async function restore(service, text) {

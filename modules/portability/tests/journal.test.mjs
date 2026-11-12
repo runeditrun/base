@@ -27,6 +27,7 @@ test('separately supplied later journal is enforced and merged at commit',async 
 });
 test('archives older than the recorded source epoch are refused',async t=>{
   const {s,d,target}=await setup(t),a=await archive(s);await target.db.prepare('INSERT INTO rer_portability_epochs VALUES(?,?)').bind(a.manifest.sourceIdentity,1).run();await assert.rejects(restore(d,a),/erasure_epoch/);
+  assert.equal((await target.db.prepare("SELECT count(*) n FROM rer_portability_jobs WHERE kind='import'").first()).n,0, 'an already-stale archive is refused before staging');
 });
 test('erasure invalidation removes every snapshot, staging copy and stored part',async t=>{
   const {s,d,source,target}=await setup(t),a=await archive(s),id=await d.imports.create(a.manifest);await d.imports.uploadPart(id,0,a.parts[0]);

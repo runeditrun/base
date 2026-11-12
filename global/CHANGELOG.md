@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Cover setup's declaration-derived Cloudflare token permissions (including R2 and Queues) and dry-run recovery's retained `--dry-run`, while preserving real-deploy recovery. Ordinary seed deploy-policy errors now name the policy check and still stop before provider contact; missing-input refusals retain exit 3. Refuse already-stale erasure archives before expensive restore staging, retaining the final erasure fence, and advance more export parts per call in the emitted-Worker person-erasure journey without relaxing its assertions or timeout.
+
 ## 0.2.112
 
 ### Downloaded tools and export progress

@@ -20,9 +20,17 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  const history = Array.from({ length: 80 }, (_, i) => `${String(8000 + i)}_history.sql`);
  for (const [i, name] of history.entries()) await writeFile(join(f.root, 'migrations/core', name), `CREATE TABLE history_${i}(value TEXT);\n`);
  // Setup ends by naming what a hosted deploy will still need, from deploy.json.
+ const declarationPath = join(f.root, 'deploy.json');
+ const declaration = JSON.parse(await readFile(declarationPath, 'utf8'));
+ declaration.r2 = [{ binding: 'FILES' }];
+ await writeFile(declarationPath, JSON.stringify(declaration));
  const setupReady = events(await f.run(['setup', '--owner-email', 'migration-owner@example.test', '--non-interactive', '--json'])).find(event => event.event === 'setup-ready');
  assert.ok(setupReady?.neededForDeploy?.some(item => item.includes('CLOUDFLARE_API_TOKEN')), JSON.stringify(setupReady));
  assert.ok(setupReady.neededForDeploy.some(item => item.includes('MAIL_API_KEY (or RESEND_API_KEY)')), JSON.stringify(setupReady));
+ const credentials = setupReady.neededForDeploy.find(item => item.includes('CLOUDFLARE_API_TOKEN'));
+ for (const [resource, permission] of [['d1', 'D1: Edit'], ['r2', 'Workers R2 Storage: Edit'], ['kv', 'Workers KV Storage: Edit'], ['queues', 'Queues: Edit']]) {
+  assert.equal(credentials.includes(permission), Boolean(declaration[resource]?.length), `setup token permissions follow the declared ${resource} resources`);
+ }
  const setupLog = await readFile(join(f.root, '.seed/installer/install.log'), 'utf8');
  assert.ok((setupLog.match(/Migrations to be applied:/g) ?? []).length <= 1);
  assert.ok((setupLog.match(/│ name[^\n]*status/g) ?? []).length <= 1);

@@ -177,4 +177,7 @@ export const commandAdapter = {...lifecycle,deploy};`);
  assert.doesNotMatch(text, /Last output|install\.log/, 'no second copy of the output, no log path to chase');
  assert.match(text, /nothing was deployed\. Validating the fixture deployment locally: exit 1\./);
  assert.match(text, /run rer deploy --environment production --env-file empty\.env --cwd \. --dry-run again/, 'the next step repeats the dry run, never a real deploy');
+ const real = await execute(process.execPath, [fileURLToPath(new URL('../bin/rer.mjs', import.meta.url)), 'deploy', '--environment', 'production', '--env-file', 'empty.env', '--cwd', root], { env, cwd: root }).then(() => assert.fail('the same seed check stops a real deploy'), error => error);
+ assert.equal(real.code, 1, real.stdout + real.stderr);
+ assert.match(real.stdout + real.stderr, /run rer deploy --environment production --env-file empty\.env --cwd \. again using the same environment credentials/);
 });
