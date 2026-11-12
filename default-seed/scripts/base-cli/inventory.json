@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.110-dev.ge74c97ec",
+  "cliVersion": "0.2.110-dev.gd5ca346f",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4955,7 +4955,15 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "0e52ddd20da16f02342a75c69bf548496f4fc73c9bc0ad264dc9c0920793afe0"
+      "sha256": "36517882ddd32f52f9273891ea9f966a1a41b9cac96dd806b2d0751d39a41318"
+    },
+    "modules/release/archive-guard.mjs": {
+      "source": "modules/release/archive-guard.mjs",
+      "sha256": "5719078a75227df5e89f9ed5439f7017b46c70df99135871f7c7dc288a7109fb"
+    },
+    "modules/release/archive-members.mjs": {
+      "source": "modules/release/archive-members.mjs",
+      "sha256": "1cc551c89cef0a5a6c71cbbcbf6f039e8e3e0312792ecf48c4067b45736a226b"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
@@ -4967,7 +4975,7 @@
     },
     "modules/release/export.mjs": {
       "source": "modules/release/export.mjs",
-      "sha256": "e1a8bf4aa3ecf39cf014d82830e2dc378829be10e19162927cde582a469307f0"
+      "sha256": "7395466151174821b65c2e9a29a8538e0b355a216c2ab1c9282eae562dedf84c"
     },
     "modules/release/github-verify.mjs": {
       "source": "modules/release/github-verify.mjs",
