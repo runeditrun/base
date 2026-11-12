@@ -1,6 +1,7 @@
 """Fetch missing promised history in one pack before inspecting any blobs."""
 from time import monotonic
 from git_history import InspectionError
+import progress
 
 
 def missing_blob(history, oid):
@@ -22,6 +23,7 @@ def prepare(history):
                       history.run('rev-list', '--objects', '--missing=print', *history.revisions).splitlines()
                       if line.startswith(b'?'))
     before = missing()
+    progress.counts(hydration=True, missingBefore=len(before), fetches=0)
     fetches = 0
     if before:
         # A blob:none clone already owns the commits and trees. ls-tree -l and
@@ -47,7 +49,9 @@ def prepare(history):
         except InspectionError:
             raise missing_blob(history, before[0].decode()) from None
         fetches = 1
+        progress.counts(hydration=True, fetches=fetches)
     after = missing() if before else []
+    progress.counts(hydration=True, missingAfter=len(after), fetches=fetches)
     if after:
         raise missing_blob(history, after[0].decode())
     return dict(missingBefore=len(before), missingAfter=len(after), fetches=fetches,

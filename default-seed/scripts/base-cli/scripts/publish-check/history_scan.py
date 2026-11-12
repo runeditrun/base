@@ -1,6 +1,7 @@
 """Scan current files and full history using native Git and pinned Gitleaks."""
 from pathlib import Path
 from scan_timings import Timings
+import progress
 import staged_annotation
 from git_history import History, InspectionError
 from public_base import PublicBaseError
@@ -122,6 +123,8 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
         identities = {'working-tree': timings.call('identities.prepare', ContentIdentities, working_identities,
             lambda path: working_regular(Path(history.repo), path))}
         checksums = {}
+        progress.completed('history-text')
+        progress.enter('gitleaks')
         for mode in ('git', 'dir'):
             for hit in timings.call('gitleaks.' + mode, secrets, binary, mode, history.repo, history.revisions, timeout=timeout, redact=False):
                 path, commit = hit.get('File', '.'), hit.get('Commit') or history.commit
@@ -160,6 +163,8 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                         if held and checksums[identity_scope].matches(held[0], hit):
                             continue
                 add(secret_rule(hit['RuleID']), path, commit, oid, scope, scanner_rule=hit['RuleID'])
+        progress.completed('gitleaks')
+        progress.enter('history-text')
         messages, lines = [], []
         count = 1
         all_paths = dict.fromkeys(working_paths, history.commit)
@@ -188,17 +193,22 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             lines.append((count, count + length, path, commit, scope))
             count += length
         message_data = b''.join(messages)
+        progress.completed('history-text')
+        progress.enter('gitleaks')
         for hit in timings.call('gitleaks.messages', secrets, binary, 'stdin', data=message_data, timeout=timeout, redact=False):
             if not is_assignment(message_data, hit):
                 continue
             line = hit.get('StartLine', 0)
             location = next(((p, c, s) for start, end, p, c, s in lines if start <= line < end), ('@message', None, 'newly-public'))
             add(secret_rule(hit['RuleID']), location[0], location[1], scope=location[2], scanner_rule=hit['RuleID'])
+        progress.completed('gitleaks')
+        progress.enter('references')
         states = timings.call('github.references', GitHubResolver().resolve_all,
                               {repository for references, *_ in deferred for repository, _, _ in references})
         for references, path, commit, oid, scope in deferred:
             for rule in reference_rules(references, states):
                 add(rule, path, commit, oid, scope)
+        progress.completed('references')
     except PublicBaseError:
         add('scan.public-base-rejected', '.')
     except InspectionError as error:

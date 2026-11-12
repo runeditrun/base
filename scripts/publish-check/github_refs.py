@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+import progress
 from repository_intent import declarations, commands
 
 SLUG = r'[A-Za-z0-9][A-Za-z0-9_.-]{0,99}'
@@ -299,8 +300,9 @@ def gh(arguments):
     # Disable gh debug logging even if inherited from the calling shell.
     env = {k: v for k, v in os.environ.items() if k not in ('GH_DEBUG', 'DEBUG')}
     env['GH_PROMPT_DISABLED'] = '1'
-    response = subprocess.run(['gh', 'api', '--hostname', 'github.com', '--include', *arguments],
-                              env=env, capture_output=True, timeout=60)
+    with progress.operation('gh.graphql' if arguments[0] == 'graphql' else 'gh.rest'):
+        response = subprocess.run(['gh', 'api', '--hostname', 'github.com', '--include', *arguments],
+                                  env=env, capture_output=True, timeout=60)
     return response.stdout.decode('utf-8'), response.returncode
 
 

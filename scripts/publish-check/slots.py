@@ -53,7 +53,7 @@ def hold_slot(*, wait_seconds):
                 try:
                     worker = subprocess.Popen([sys.executable, '-B', str(Path(__file__).with_name('cli.py')),
                                                *sys.argv[1:]], stdin=subprocess.DEVNULL,
-                                              stderr=subprocess.DEVNULL, pass_fds=(fd,))
+                                              stderr=subprocess.DEVNULL, pass_fds=(fd, 4))
                 except OSError as error:
                     return failure('worker.launch', error)
                 # Node's pipe closes even on SIGKILL. Stop only this private

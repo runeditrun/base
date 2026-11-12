@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import progress
 from git_history import InspectionError
 
 VERSION = '8.30.1'
@@ -14,7 +15,8 @@ CONFIG = Path(__file__).with_name('gitleaks.toml')
 def executable():
     binary = shutil.which('gitleaks') or str(Path.home() / '.local/bin/gitleaks')
     try:
-        version = subprocess.run([binary, 'version'], capture_output=True, timeout=10)
+        with progress.operation('gitleaks.version'):
+            version = subprocess.run([binary, 'version'], capture_output=True, timeout=10)
         if version.returncode or version.stdout.decode().strip() != VERSION:
             raise InspectionError('scan.gitleaks-version')
     except OSError:
@@ -43,7 +45,8 @@ def inspect(binary, mode, repo=None, revisions=None, data=None, timeout=300, red
         env = {k: v for k, v in os.environ.items() if not k.startswith(('GITLEAKS_', 'GIT_'))}
         env.update(GIT_NO_REPLACE_OBJECTS='1', GIT_TERMINAL_PROMPT='0', GIT_NO_LAZY_FETCH='1')
         try:
-            result = subprocess.run(args, input=data, capture_output=True, env=env, timeout=timeout)
+            with progress.operation('gitleaks.' + mode):
+                result = subprocess.run(args, input=data, capture_output=True, env=env, timeout=timeout)
             if result.returncode not in (0, 1):
                 raise InspectionError('scan.gitleaks-failed')
             # Native reports may contain raw matches for location-bound proof.
