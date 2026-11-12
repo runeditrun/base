@@ -163,6 +163,8 @@ async function runLifecycle(project, options, out, deployRedaction) {
    const deployNeeds = await hostedNeeds(project);
    if (options.json) out.event('setup-ready', { url, setupUrl: url+'/setup', ...(deployNeeds.length ? { neededForDeploy: deployNeeds } : {}) });
    else {
+    const { checkoutPath } = await shared('step-failure.mjs');
+    out.human(`Setup complete: ${state.migrationsApplied ? `${state.migrationsApplied} migration${state.migrationsApplied === 1 ? '' : 's'} applied` : 'database already up to date'}, owner set up. Full output: ${store.redact(checkoutPath(project.root, store.logPath))}`);
     out.human(`RER_SETUP_READY ${url}`); out.human(`Next: rer dev opens ${url} signed in as the owner; first-run setup finishes at ${url}/setup. rer preview prints a one-time native owner link on loopback; rer demo also prints a separate native owner entry.`);
     if (deployNeeds.length) out.human(['To host it on your own Cloudflare account later, rer deploy needs:', ...deployNeeds.map(item => `  - ${item}`), 'Set them in your environment or a private (mode 0600) file passed with --env-file, then check with rer deploy --dry-run.'].join('\n'));
    }

@@ -38,12 +38,13 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
    else if(error.code!=='EAGAIN'&&error.code!=='EWOULDBLOCK')throw error;
   }
  };
- const emit=text=>{
+ // `logText` is what the setup log keeps when a command's view shows less than it printed.
+ const emit=(text,logText=text)=>{
+  if(logText&&!closed)log.write(logText);
   if(!text)return;
   // Store a bounded text tail as lines; fragment writes do not multiply entries.
   const textTail=((state.logs||[]).join('\n')+text).slice(-65536);
   state.logs=textTail.split('\n').slice(-400);
-  if(!closed)log.write(text);
   writeTerminal(text);
  };
  // A line that lists secret NAMES keeps each name whole: a name is not a secret, even when a value
@@ -65,14 +66,16 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   const step=stepDiagnostic({name:redaction.redact(String(label)),command:capture?.display,exitCode:detail.code,signal:detail.signal,output:lines,log:redaction.redact(checkoutPath(capture?.cwd,logPath))});
   return Object.assign(commandFailure(`${redaction.redact(String(label))}: ${status}.${detail.lastHealth?` Last health: ${redaction.redact(String(detail.lastHealth))}.`:''}\nCommand: ${capture?.display ?? '(none: the step failed inside rer)'}\nLast output (up to 40 lines):\n${lines.length?lines.slice(-40).join('\n'):'(no output)'}\nLog: ${redaction.redact(logPath)}`,{childExitCode:detail.code,signal:detail.signal,step}),{childExitCode:detail.code,signal:detail.signal});
  };
- const track=(label,child,ownershipScope)=>{
+ const track=(label,child,ownershipScope,view)=>{
   if(captures.has(child))return child;
   let resolveClose,resolveError,resolveExit;
   const capture={tail:'',scope:signal,closed:new Promise(resolve=>{resolveClose=resolve;}),failed:new Promise(resolve=>{resolveError=resolve;}),exited:new Promise(resolve=>{resolveExit=resolve;})};
   capture.custody=commandCustody(child,ownershipScope);
   // Redact in arrival order across both descriptors: their concatenation is what
   // reaches the shared page, disk and terminal sinks.
-  const filter=redaction.stream(text=>{capture.tail=(capture.tail+text).slice(-32768);emit(text);});
+  // A command's view (see migration-progress.mjs) shortens what the terminal, page and
+  // failure tail show; the log keeps every byte.
+  const filter=redaction.stream(text=>{const shown=view?view.write(text):text;capture.tail=(capture.tail+shown).slice(-32768);emit(shown,text);});
   capture.snapshot=()=> (capture.tail+filter.snapshot()).slice(-32768);
   const sources=[child.stdout,child.stderr].filter(Boolean),data=chunk=>filter.write(chunk);
   for(const source of sources)source.on('data',data);
@@ -85,7 +88,9 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
    clearTimeout(capture.stopTimer);
    child.removeListener('exit',exited);if(!capture.exitResult)exited(code,terminationSignal);
    for(const source of sources)source.removeListener('data',data);
-   filter.end();active.delete(child);if(!capture.custody)managed.delete(child);resolveClose({code,signal:terminationSignal,error,errorCode:capture.errorCode});
+   filter.end();
+   if(view){const rest=view.end();capture.tail=(capture.tail+rest).slice(-32768);emit(rest,'');Object.assign(state,view.facts?.());}
+   active.delete(child);if(!capture.custody)managed.delete(child);resolveClose({code,signal:terminationSignal,error,errorCode:capture.errorCode});
   };
   child.once('close',finish);
   captures.set(child,capture);
@@ -133,7 +138,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   state.step=announced;if(!repeated)report(label);
   // Name the executable by default; only a caller's explicit safe display may
   // include arguments. Raw argv can contain private positional values.
-  const {signal:providedSignal,afterCommand,onChild,heavy,phase,display,...native}=options;
+  const {signal:providedSignal,afterCommand,onChild,heavy,phase,display,view,...native}=options;
   const commandSignal=signal&&providedSignal?AbortSignal.any([signal,providedSignal]):providedSignal||signal;
   if(commandSignal?.aborted)throw failure(label,{reason:'cancel'});
   const ownershipScope=createProcessScope(custodyBaseline);redaction.addSecrets([ownershipScope.token,...inheritedScopeTokens(process.env),...inheritedScopeTokens(native.env)]);
@@ -141,7 +146,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   const child=spawn(program,argv,{...native,env:processScopeEnvironment(ownershipScope,{...(native.env??process.env),...policy.environment,...(custodyToken?{RER_ONBOARDING_PROCESS_OWNER:[...inheritedScopeTokens(native.env??process.env),custodyToken].join(',')}:{})}),shell:false,detached:process.platform!=='win32',stdio:[Array.isArray(native.stdio)?native.stdio[0]:'ignore','pipe','pipe',...(native.stdio?.includes('ipc')?['ipc']:[])]});
   onChild?.(child);
   ownershipRecords.set(child,{pid:child.pid,token:ownershipScope.token});
-  track(label,child,ownershipScope);
+  track(label,child,ownershipScope,view?.());
   Object.assign(captures.get(child),{cwd:native.cwd??process.cwd(),display:redaction.redact(String(display??command))});
   const cancel=()=>{void stopCommand(child);};
   commandSignal?.addEventListener('abort',cancel,{once:true});if(commandSignal?.aborted)cancel();
@@ -163,7 +168,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
     const commandSignal=signal&&options.signal?AbortSignal.any([signal,options.signal]):options.signal||signal;
     const result = await queuedCommand(command,args,{...options,verb:queuePolicy.verb,signal:commandSignal,originalCI:policy.ci,
      label:await queueLabel(options.cwd??process.cwd(),queuePolicy.verb,options.phase??'command'),report,onWaiting,maxWait:queuePolicy.maxWait,queueOptions:queuePolicy.sampler?{sampler:queuePolicy.sampler}:undefined,
-     spawn:(program,argv,native)=>(queuedChild=spawnCommand(label,program,argv,{...native,onChild:options.onChild,display:options.display})),cleanup:async(child,result)=>{await stopCommand(child);await options.afterCommand?.(result);}});
+     spawn:(program,argv,native)=>(queuedChild=spawnCommand(label,program,argv,{...native,onChild:options.onChild,display:options.display,view:options.view})),cleanup:async(child,result)=>{await stopCommand(child);await options.afterCommand?.(result);}});
     if(result?.timedOut)throw busyRefusal({...result,reason:redaction.redact(String(result.reason))},{verb:queuePolicy.verb,maxWait:queuePolicy.maxWait??maxWaitSeconds});
     if(result){if(result.code!==0)throw failure(label,result,captures.get(queuedChild));return result;}
    }
