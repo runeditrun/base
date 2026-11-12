@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### `rer setup` shows migration progress, not wrangler's repeated tables
+
+- A seed whose installer runs `wrangler d1 migrations apply` itself (a `migrate` hook returning the command) printed wrangler's whole migration table after every migration: 75 migrations meant about 1.2 MB and the first migration's name 76 times. The terminal and page now show `Applying migrations N/M` every ten migrations, any warning or error, and one `Applied N migrations.` line; a failed migration prints `Migration NAME failed.`, wrangler's error text and the log path. The setup log keeps wrangler's full output. A finished `rer setup` adds one line before `RER_SETUP_READY`: `Setup complete: N migrations applied, owner set up. Full output: <log path>`. Code only: no migration is added; a seed gets it by adopting the next release.
+
 ## 0.2.111
 
 ### `rer size`: statement size and growth with data

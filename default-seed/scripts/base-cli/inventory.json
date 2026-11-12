@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.111-dev.g9cdad528",
+  "cliVersion": "0.2.111-dev.g39b86fcc",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "4270f97812428e497e2edd14fe446e48ccec91a0e4b6bf911e8d6db85680d75d"
+      "sha256": "5708e0067b4432c7a19e3347e2e87ad0bc35eb8fc78d208f2aaafe6e0c933359"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -65,7 +65,7 @@
     },
     "commands.mjs": {
       "source": "onboarding/commands.mjs",
-      "sha256": "ea0aeae3441e1e3736fe8666faa47200472b376f7e701f894b715bcb8686bcb5"
+      "sha256": "3126fb665ca61262a413f7cb775a3af51d1922773ce02f26c8427f906c7cd001"
     },
     "dependency-approval.mjs": {
       "source": "onboarding/dependency-approval.mjs",
@@ -171,6 +171,10 @@
       "source": "onboarding/metadata.mjs",
       "sha256": "5dba3f1c9e6c72cf89e52f2c0e4cc1c7a06295e2841c7b0800d865baf24a92ce"
     },
+    "migration-progress.mjs": {
+      "source": "onboarding/migration-progress.mjs",
+      "sha256": "b0d09df5433cf7cc318bfa979f7133dca63832b1664e06c80664c3997c216b9b"
+    },
     "operator-install.mjs": {
       "source": "onboarding/operator-install.mjs",
       "sha256": "f6035967ed6755bb750c3c604b948cb946b62743847462c6da66aff3049f49a4"
@@ -181,7 +185,7 @@
     },
     "operator-migrations.mjs": {
       "source": "onboarding/operator-migrations.mjs",
-      "sha256": "c3d574a85c7164887b1fbcc861cfa6e3f4a867048347b00ee880fe7ed25ca2f0"
+      "sha256": "32820818d60e1388ee08f9ad27dd7606198f495d7dcf830f8c6fe99767e0a0a7"
     },
     "operator-prerequisites.mjs": {
       "source": "onboarding/operator-prerequisites.mjs",
@@ -987,7 +991,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "a430d291b608b02dd3aedce73f29c51e51978f0a700c1115ff4ef46780d8f49b"
+      "sha256": "55c11eb039fab28befd7383eff47133887c7d603acebcb50d25f608176db6c65"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",

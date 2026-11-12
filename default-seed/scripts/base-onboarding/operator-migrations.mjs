@@ -48,5 +48,6 @@ export async function migrateOperator(context, database) {
   const after = await appliedNames(state, table);
   const applied = names.filter(name => !before.has(name) && after.has(name));
   if (applied.length) store.report(`Applied local migrations: ${applied.join(', ')}`);
+  if (store.state) store.state.migrationsApplied = applied.length;
  } finally { await unlink(path); }
 }
