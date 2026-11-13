@@ -24,7 +24,7 @@ CREATE INDEX computed_entries_total ON computed_entries(total);`;
 
 // A runnable exported reference, using the checkout's installed dependencies.
 // Migrations and transfer use the public runner without building the application.
-export async function portabilityFixture(t,{generated=true}={}) {
+export async function portabilityFixture(t,{generated=true,receiptWorker=false}={}) {
  const directory=await mkdtemp(join(tmpdir(),'rer-data-journey-')),root=join(directory,'installation');
  const children=new Set();
  t.after(async()=>{
@@ -39,6 +39,20 @@ export async function portabilityFixture(t,{generated=true}={}) {
  const declaration = JSON.parse(await readFile(join(root, 'deploy.json'), 'utf8'));
  declaration.vars.MAIL_FROM = productionSender;
  await writeFile(join(root, 'deploy.json'), JSON.stringify(declaration));
+ if(receiptWorker) {
+  // A seed-owned worker, like Spool's adapter, reports its real export receipt
+  // on stdout while the command store captures both child streams.
+  const adapter=join(root,'scripts/installer/local.mjs');
+  await writeFile(adapter,await readFile(adapter,'utf8')+`
+const nativeExport=commandAdapter.portability.export;
+commandAdapter.portability.export=async context=>{
+ const receipt=await nativeExport(context);
+ await context.store.run('Reporting archive receipt',process.execPath,['-e',
+  "console.error('Archive integrity checked'); console.log(process.argv[1]);",JSON.stringify({ok:true,...receipt})],{cwd:context.root,signal:context.signal});
+ return receipt;
+};
+`);
+ }
  await mkdir(join(root,'exports'));
  await useWorkspaceDependencies(root);
  if(generated)await writeFile(join(root,'migrations/core/0999_computed_entries.sql'),generatedSQL);

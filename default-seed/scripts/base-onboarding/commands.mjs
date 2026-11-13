@@ -12,9 +12,9 @@ import { commandCustody } from './command-custody.mjs';
 import { createProcessBaseline, createProcessScope, inheritedScopeTokens, processScopeEnvironment } from './process-scope.mjs';
 import { toolCommand } from './tool-command.mjs';
 import { isWranglerMigrationApply, wranglerMigrationView } from './migration-progress.mjs';
-import { isWranglerQuery, wranglerQueryView, viteDiagnosticsView } from './command-diagnostics-view.mjs';
+import { isWranglerQuery, wranglerQueryView, viteDiagnosticsView, archiveReceiptView } from './command-diagnostics-view.mjs';
 
-export async function createCommands(directory,state,{terminal=text=>writeSync(1,text),spawn=spawnChild,queue:queuePolicy,custodyToken,onWaiting,filterViteWarnings=false}={}) {
+export async function createCommands(directory,state,{terminal=text=>writeSync(1,text),spawn=spawnChild,queue:queuePolicy,custodyToken,onWaiting,filterViteWarnings=false,filterArchiveReceipts=false}={}) {
  let policy=queuePolicy?await commandPolicy():{environment:{},close:async()=>{}};
  const custodyBaseline=['darwin','linux'].includes(process.platform)?await createProcessBaseline():undefined;
  const logPath=join(directory,'install.log'), log=await openPrivateLog(logPath);
@@ -74,6 +74,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
  const track=(label,child,ownershipScope,view)=>{
   if(captures.has(child))return child;
   if(filterViteWarnings)view=viteDiagnosticsView(view);
+  if(filterArchiveReceipts)view=archiveReceiptView(view);
   let resolveClose,resolveError,resolveExit;
   const capture={tail:'',scope:signal,closed:new Promise(resolve=>{resolveClose=resolve;}),failed:new Promise(resolve=>{resolveError=resolve;}),exited:new Promise(resolve=>{resolveExit=resolve;})};
   capture.custody=commandCustody(child,ownershipScope);

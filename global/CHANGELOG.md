@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Export keeps seed-owned worker success receipts in the redacted capture log and prints the log path plus the command to restore the saved file into an empty installation. Normal shared-adapter exports and deploy dry runs were already readable on current main. Spool's post-erasure restore failure belongs to its own validator ordering; Base's comparable native-erasure archive restores unchanged. No release or version change.
+
 - Setup keeps Vite source-import advisories and suppression instructions in its redacted capture log. Successful restore reports archive counts and the setup/dev next step; post-restore Wrangler SQL output stays in the log, while failed queries retain their diagnostics. Managed listener targets without an explicit timeout now use the same first-run readiness window as the shared development target and explain dependency optimization while waiting. Current-main deploy dry-run duplication and export allocation/ETA trips were already fixed; no release or version change.
 
 - Installation restore refusals explain that the destination already has people or data and give the fresh-install or backup/reset/restore path, without exposing internal table names. Deploy dry runs show a readable Worker, product resources, permissions and declared migration count; pending migrations remain unknown offline, and the full plan stays in the redacted log and `--json`. Export allocation estimates and duplicate mapped mail-key alternatives were already corrected in 0.2.112 and 0.2.110 respectively.

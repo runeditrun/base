@@ -49,3 +49,28 @@ export function viteDiagnosticsView(inner) {
   facts: () => inner?.facts?.() ?? {},
  };
 }
+
+// Seed-owned archive workers may send their success receipt on stdout. It is
+// protocol data, retained by the command store's redacted log; progress and
+// failed receipts still belong in the terminal.
+export function archiveReceiptView(inner) {
+ let pending = '';
+ const emit = text => inner ? inner.write(text) : text;
+ const line = text => {
+  let receipt;
+  try { receipt = JSON.parse(text); } catch { return emit(text); }
+  return receipt?.ok === true && typeof receipt.contentHash === 'string' && Array.isArray(receipt.tables)
+   ? '' : emit(text);
+ };
+ return {
+  write(text) {
+   const lines = (pending + text).split('\n'); pending = lines.pop();
+   return lines.map(item => line(item + '\n')).join('');
+  },
+  end(result) {
+   const rest = pending ? line(pending) : ''; pending = '';
+   return rest + (inner?.end(result) ?? '');
+  },
+  facts: () => inner?.facts?.() ?? {},
+ };
+}

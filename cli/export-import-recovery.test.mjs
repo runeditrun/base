@@ -130,7 +130,7 @@ test('import requires an explicit remote target for a non-local origin and leave
 // The documented recovery path: export, reset, import the very file that export
 // produced, and export again. The same file must always be accepted in place.
 test('a file rer just exported imports in place after reset, repeatedly; shared or group-readable input is still refused', { timeout: 15 * 60_000 }, async t => {
- const seed = await portabilityFixture(t);
+ const seed = await portabilityFixture(t,{receiptWorker:true});
  // The app's Durable Object binding, as HappyToHelp declares one: the transfer never needs it.
  const wrangler = join(seed.root, 'wrangler.jsonc');
  await writeFile(wrangler, JSON.stringify({ ...parseJsonc(await readFile(wrangler, 'utf8')), durable_objects: { bindings: [{ name: 'CONVERSATIONS', class_name: 'ConversationSocket' }] }, migrations: [{ tag: 'v1', new_sqlite_classes: ['ConversationSocket'] }] }, null, 2));
@@ -139,10 +139,16 @@ test('a file rer just exported imports in place after reset, repeatedly; shared 
  // A person's export prints no workerd warning and no receipt, and ends with one line naming the archive.
  const shown = await seed.text(['export', '--output', 'exports/shown.rer']);
  assert.doesNotMatch(shown.stdout + shown.stderr, /DurableObjectNamespace|ConversationSocket|contentHash|"tables"/);
+ assert.match(shown.stderr,/Archive integrity checked/,'worker progress remains visible');
+ const capture=await readFile(join(seed.root,'.seed/installer/install.log'),'utf8');
+ const workerReceipt=capture.split('\n').map(line=>{try{return JSON.parse(line);}catch{return null;}}).find(row=>row?.ok===true && Array.isArray(row.tables));
+ assert.ok(workerReceipt?.contentHash,'the full worker receipt stays in the capture log');
+ assert.ok(shown.stdout.includes('.seed/installer/install.log'),'the summary locates the capture');
+ assert.ok(shown.stdout.includes('rer import --input exports/shown.rer --yes'),'the summary names the same file for restore');
  const receipt = (await seed.run(['export', '--output', 'exports/shown-data.rer'])).at(-1);
  const rowCount = receipt.tables.reduce((sum, table) => sum + table.count, 0);
  assert.ok(receipt.contentHash && rowCount >= 2, 'the receipt stays --json data');
- assert.match(shown.stdout.trimEnd().split('\n').at(-1), new RegExp(`^Exported the local copy to exports/shown\\.rer \\(\\d+(\\.\\d)? (B|KB|MB)\\): ${receipt.tables.length} tables, ${rowCount.toLocaleString('en-US')} rows$`));
+ assert.match(shown.stdout.split('\n').find(line=>line.startsWith('Exported ')), new RegExp(`^Exported the local copy to exports/shown\\.rer \\(\\d+(\\.\\d)? (B|KB|MB)\\): ${receipt.tables.length} tables, ${rowCount.toLocaleString('en-US')} rows$`));
  // A hosted address is refused before any effect, naming the command that exports it, never answered with this computer's copy.
  const hosted = await seed.text(['export', '--origin', 'https://example.invalid', '--output', 'exports/hosted.rer'], 2);
  assert.match(hosted.stderr, /https:\/\/example\.invalid[^]*npx wrangler d1 export \S+ --remote --output /);
