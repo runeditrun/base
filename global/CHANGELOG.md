@@ -1,14 +1,23 @@
 # Changelog
 
-## Unreleased
+## 0.2.113
 
-- Export keeps seed-owned worker success receipts in the redacted capture log and prints the log path plus the command to restore the saved file into an empty installation. Normal shared-adapter exports and deploy dry runs were already readable on current main. Spool's post-erasure restore failure belongs to its own validator ordering; Base's comparable native-erasure archive restores unchanged. No release or version change.
+### Recovery output and archive restore
 
-- Setup keeps Vite source-import advisories and suppression instructions in its redacted capture log. Successful restore reports archive counts and the setup/dev next step; post-restore Wrangler SQL output stays in the log, while failed queries retain their diagnostics. Managed listener targets without an explicit timeout now use the same first-run readiness window as the shared development target and explain dependency optimization while waiting. Current-main deploy dry-run duplication and export allocation/ETA trips were already fixed; no release or version change.
+- Installation restore refusals explain that the destination already contains people, data or files, without exposing internal table or bucket names. Restore still requires an empty installation: use a fresh installation, or keep a backup before the explicit reset and restore commands printed in the refusal.
+- Successful local restore reports the archive, table/row counts, file counts when available, safety changes and the setup/dev next step. Wrangler SQL results stay in the redacted capture log; failed queries keep their diagnostics. Setup keeps Vite source-import advisories and suppression instructions in that log while retaining unrelated warnings and errors.
+- Local installation export keeps seed-owned worker success JSON in the redacted capture log and prints a readable archive receipt, its log path and a directly runnable `rer import --input FILE --yes` command for an empty installation. Paths needing shell quoting are quoted. The full structured receipt remains available with `--json`. Archive format is unchanged; this does not repair seed-owned restore validators.
 
-- Installation restore refusals explain that the destination already has people or data and give the fresh-install or backup/reset/restore path, without exposing internal table names. Deploy dry runs show a readable Worker, product resources, permissions and declared migration count; pending migrations remain unknown offline, and the full plan stays in the redacted log and `--json`. Export allocation estimates and duplicate mapped mail-key alternatives were already corrected in 0.2.112 and 0.2.110 respectively.
+### Deploy plans and first-run startup
 
-- Cover setup's declaration-derived Cloudflare token permissions (including R2 and Queues) and dry-run recovery's retained `--dry-run`, while preserving real-deploy recovery. Ordinary seed deploy-policy errors now name the policy check and still stop before provider contact; missing-input refusals retain exit 3. Refuse already-stale erasure archives before expensive restore staging, retaining the final erasure fence, and advance more export parts per call in the emitted-Worker person-erasure journey without relaxing its assertions or timeout.
+- `rer deploy --dry-run` prints the Worker, declared product resources, required token permissions, settings/secret counts and declared migration counts. Pending migrations remain unknown offline; the full structured plan stays in the redacted capture log and `--json`. Dry-run recovery retains `--dry-run`; real-deploy recovery retains its existing command. Ordinary seed deploy-policy failures now name `Checking deploy policy` and stop before provider contact; missing-input refusals retain exit 3. Setup token-permission coverage follows the seed's resource declaration, including R2 and Queues.
+- Managed development targets that use the listener handshake without an explicit timeout now get the shared target's first-run readiness window and explain dependency optimization while waiting. Readiness still awaits the real application listener and health check.
+
+### Erasure archive preflight
+
+- Shared portability import creation refuses an already-stale erasure archive before schema inventory and durable restore staging. The early epoch check is read-only and the final erasure fence remains in place. The reference emitted-Worker person-erasure journey advances more export parts per call without relaxing its assertions or timeout.
+
+Seeds receive these CLI and shared-module changes only after adopting this rer through their pinned package or refreshed source. No seed adoption, deployed behavior or production result is established here. The actual diff adds no migrations; previously released export allocation/ETA and duplicate mail-key wording fixes are not new in 0.2.113.
 
 ## 0.2.112
 
