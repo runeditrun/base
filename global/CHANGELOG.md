@@ -1,8 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.2.115
 
-- `rer release candidate --tag vVERSION-PRERELEASE --cwd DIR` prepares stage-only version metadata in one local commit, with repeat calls leaving the commit unchanged. Installed-copy checks now recognize pre-release upstream labels, so two-commit rehearsals keep the publisher-automation evidence exception while source checkouts still enforce it.
+### Stage candidate metadata and installed-copy recognition
+
+- New `rer release candidate --tag vVERSION-PRERELEASE --cwd DIR` prepares stage-only metadata in one local commit using the caller's Git identity. It changes only the top-level `version` in `seed.json`, `package.json` and `RELEASE.json`, preserving other metadata and formatting. A clean checkout with matching committed versions is required; the candidate must use the current version core or its next patch. Repeating the same tag is a no-op. Dirty checkouts, stable tags, malformed labels and unrelated cores are refused before writing.
+- The command runs without project bootstrap and returns the exact commit, version, tag, `stageOnly: true` and whether it changed. It creates no tag, artifact, push, signature or deployment. Candidates require rehearsal and the existing producer gates before stage use; they are not for GitHub Release, Site/registry publication or outside-user resolution. Production consumers must refuse pre-release tags. Stable producer metadata, tag matching, verification, scans and receipts remain unchanged.
+- Installed-copy checks now recognize valid SemVer pre-release upstream labels. A managed installation projection can omit publisher `.github` automation evidence during its two-commit rehearsal, as stable installed copies already can. Authoring checkouts still require publisher evidence, and other evidence paths remain required in installed copies. The global launcher and regenerated default-seed CLI expose the candidate command.
+
+0.2.114 added `rer rehearse`; it was published but did not complete release qualification. 0.2.115 adds the candidate metadata and installed-copy recognition changes above and carries that rehearsal support forward. This prepares CLI support only: seed lanes and signers must adopt the rer and rehearse their own committed sources. No seed adoption, deployed behavior or production result is established here.
+
+Code and documentation only: the actual diff since rer-v0.2.114 adds no migrations and touches neither modules/import-kit nor modules/portability. No provider calls are needed for candidate metadata preparation.
 
 ## 0.2.114
 
