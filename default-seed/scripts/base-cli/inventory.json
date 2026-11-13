@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.113-dev.gaf1443bc",
+  "cliVersion": "0.2.113-dev.g75cf341b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1023,7 +1023,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "8398f2e0334273e7ec6c204670cfd799d930091a68b636c45085986127a92443"
+      "sha256": "b194000d3cfe495781471112478f130b473d113e3130b80e5df2abe15795fcf0"
     },
     "cli/managed-data-schema.mjs": {
       "source": "cli/managed-data-schema.mjs",
@@ -1075,7 +1075,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "41f087b7c9a6ee9764cddd44a8427eba5284c8f452c091a83cba29ce297a2c95"
+      "sha256": "bc798ae090197b31757deab1d1114fddbd646d1b587f03fa63a0977be1055759"
     },
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",
@@ -1152,6 +1152,38 @@
     "cli/ready-summary.mjs": {
       "source": "cli/ready-summary.mjs",
       "sha256": "654b7c1ff472ca9cb79551cee9b07cd3cec2e6d97952019eab2dd9dccaef3056"
+    },
+    "cli/rehearse.mjs": {
+      "source": "cli/rehearse.mjs",
+      "sha256": "f0dfa671cd8131378dd1d5c500816087993c8288052d23aca5a575e59f5f1bf4"
+    },
+    "cli/rehearse/automation.mjs": {
+      "source": "cli/rehearse/automation.mjs",
+      "sha256": "ba38f3b31de09932dafb3885fcb4a5f34bbd5a0db147ff003198352489690f1b"
+    },
+    "cli/rehearse/environment.mjs": {
+      "source": "cli/rehearse/environment.mjs",
+      "sha256": "8a37a8349196c9712b7b788227fe588725d8bb5c37178e0db7c1e7a82c3beb7e"
+    },
+    "cli/rehearse/metadata.mjs": {
+      "source": "cli/rehearse/metadata.mjs",
+      "sha256": "5a230698e75e1e919c87b81e587da755274c96ea4e1a1af8c36d4b6a4979502a"
+    },
+    "cli/rehearse/options.mjs": {
+      "source": "cli/rehearse/options.mjs",
+      "sha256": "ef1b39d2096209fd875eb7e2dfd96d3dc40ea73d1d05c776ff10be539c95c0ef"
+    },
+    "cli/rehearse/run.mjs": {
+      "source": "cli/rehearse/run.mjs",
+      "sha256": "ef06601dd651757f97cd0068ecaf83619d85cc0a71f1bfd40940cd6a86452a82"
+    },
+    "cli/rehearse/snapshot.mjs": {
+      "source": "cli/rehearse/snapshot.mjs",
+      "sha256": "e5ee7b3cdcf47a0ce0de5d499a2c330de05edc659b7634c971b2a8463a130e9e"
+    },
+    "cli/rehearse/workflow.mjs": {
+      "source": "cli/rehearse/workflow.mjs",
+      "sha256": "7a5e27bd09cb74507b3bbcbccdeb90bd381bad68aaf2d3fa3b5a689e187e8903"
     },
     "cli/release.mjs": {
       "source": "cli/release.mjs",
@@ -1487,7 +1519,7 @@
     },
     "edition-authoring/lock.mjs": {
       "source": "edition-authoring/lock.mjs",
-      "sha256": "c95f09ff1e0d7f457cc15a333d96d0c12c81337e2b37f7f10ddf2d10b60e72f2"
+      "sha256": "1eaece15094a293fef349382150b11aae68c8272edc682660b1d48879ecceb77"
     },
     "edition-authoring/manifest.mjs": {
       "source": "edition-authoring/manifest.mjs",

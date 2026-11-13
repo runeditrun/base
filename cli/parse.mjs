@@ -109,7 +109,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
 }
 
 export function help(verb) {
- if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys({...verbs, ...authoringVerbs}).join(', ')}, signin, size, release, listing\nRun rer VERB --help for flags.\n${appSignInHelp}\n`;
+ if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys({...verbs, ...authoringVerbs}).join(', ')}, signin, size, release, listing, rehearse\nRun rer VERB --help for flags.\n${appSignInHelp}\n`;
  const known = verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : verb === 'size' ? sizeVerb : undefined);
  const door = ['export', 'import'].includes(verb) ? 'To move records, start the app and open its signed-in owner import door:\n\n  rer dev\n\nOpen /app/import, then export or upload and review supported records there.\n\nTo back up or restore this installation:\n' : '';
  return `${door}Usage: rer ${verb}${verb === 'refresh-base' ? ' --ref FULL_COMMIT' : ''} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;

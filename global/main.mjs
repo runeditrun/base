@@ -25,6 +25,8 @@ else its vendored scripts/rer.mjs.
                        RER_READY and a sign-in link. Without a terminal it returns once the app is
                        ready and leaves it running (--detach and --foreground override); allow up
                        to 10 minutes on a first launch, or rerun it to reattach. rer dev --stop stops it.
+  rer rehearse [--cwd DIR] [--ref REF]
+                       Rehearse every managed build operation in a two-commit scratch copy.
   rer run SCRIPT [ARGS]
                        Run a package.json script with the pnpm and Node the checkout pins (rer keeps
                        them off PATH): where a project's docs say pnpm run X, run rer run X.
@@ -59,6 +61,7 @@ export async function main(argv) {
  handleBrokenPipes();
  const [verb] = argv;
  const installsFirst = checkoutBootstrap(argv) === 'before';
+ if (verb === 'rehearse') return (await import('../cli/rehearse.mjs')).rehearseCommand(argv.slice(1));
  if (verb === '--version' || verb === '-v') return (await import('./version.mjs')).versionCommand(argv);
  if (verb === 'queue' && argv.length === 2 && argv[1] === '--help') {
   process.stdout.write('Usage: rer queue NAME -- COMMAND [ARGS]\nRun COMMAND once this computer\'s job queue admits it.\n');

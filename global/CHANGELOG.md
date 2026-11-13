@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add `rer rehearse` to run every declared first managed-build operation in an offline-created, projected two-commit scratch copy, continue after failures, and report every outcome with redacted captures and bounded execution.
+
 ## 0.2.113
 
 ### Recovery output and archive restore

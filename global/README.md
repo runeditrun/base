@@ -727,3 +727,54 @@ runtime and type dependencies. The existing
 `@runeditrun/rer/modules/import-kit/d1` entry remains available. See the
 [adoption guide](https://github.com/runeditrun/base/blob/main/modules/import-kit/src/door/ADOPTING.md)
 for native adapters, consent, declared intake projection and reviewed apply/Undo.
+
+## Rehearse before signing a seed release
+
+Run `rer rehearse --cwd /path/to/seed --ref HEAD` before announcing a release.
+It exports the selected commit into a fresh repository outside the checkout,
+with an empty `Initial commit` and one installation commit. The installation
+projection removes publisher automation, preserves a dispatch-only managed
+workflow, updates its recipe/copy metadata, adds schema-1 `rer-upstream.json`
+(repository, tag/ref, exact source SHA), and regenerates changed lock identities
+through Base's source-lock generator while retaining the publisher's source pins.
+Uncommitted files and publisher history are absent. The source checkout is unchanged.
+
+This installs dependencies and builds. Signers and seed lanes must use the heavy slot:
+
+```sh
+python3 -I /path/to/.tools/heavy-slot.py --remote auto -- rer rehearse --cwd /path/to/seed --ref HEAD
+```
+
+Use a committed clean worktree for remote routing and make the source available
+on that runner. The command itself uses local Git objects and creates no remote;
+only the declared operations may acquire dependencies over the network. Supply the
+same Node and package-manager tools as the seed's trusted build. A fresh private
+HOME/config/cache and a restricted environment keep caller provider credentials out.
+The operations are trusted source code, not a sandbox for an untrusted seed.
+
+Every declared `setup`, `build`, `verify`, `artifact` command runs in that order
+from the scratch root, in its own `bash -e -o pipefail` process. Rehearsal continues
+after failures, so one run reports every failing operation. A later command that
+cannot start because a prior operation left a required input unavailable is
+reported `NOT REACHED` with the missing-input diagnostic. Recovery prose is not
+an executable operation. Shell variables and working-directory changes do not
+carry between operations; filesystem changes do.
+
+The summary prints PASS/FAIL/NOT REACHED, the first cause line and the full redacted
+capture-log path. Logs survive scratch cleanup; `--keep` retains the repository and
+its private HOME for diagnosis. `--operation-timeout-seconds N` defaults to 900;
+`--timeout-seconds N` bounds preparation and all operations together (default 3600).
+Both accept integer seconds from 1 to 86400. If no dispatch-only managed workflow
+exists, provide the platform's immutable `--workflow-ref OWNER/REPO/.github/workflows/FILE.yml@SHA`.
+`--repository OWNER/REPO` overrides the descriptor's source repository identity.
+A branch/ref in the rehearsal upstream record identifies unreleased source; it is
+not a signed stable-release record.
+
+Exit codes: 0 all pass; 1 an operation failed or was not reached; 2 invalid flags;
+3 preparation/source/declaration failure; 124 overall timeout; 130/143 interruption.
+A per-operation timeout is FAIL and exit 1. With `--json`, stdout contains one
+version-1 `result` event with `ok`, `exitCode`, source/install identities, elapsed
+`seconds`, `captureLog` and every operation's command, status, cause and child
+exit/signal. `rer rehearse --help` lists the flags. This proves local declared
+build operations under the recorded host conditions; GitHub attestation, artifact
+upload and provider deployment remain separate.
