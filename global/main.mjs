@@ -61,6 +61,7 @@ export async function main(argv) {
  handleBrokenPipes();
  const [verb] = argv;
  const installsFirst = checkoutBootstrap(argv) === 'before';
+ if (verb === 'release' && argv[1] === 'candidate') return (await import('../cli/release-candidate.mjs')).candidateCommand(argv.slice(2));
  if (verb === 'rehearse') return (await import('../cli/rehearse.mjs')).rehearseCommand(argv.slice(1));
  if (verb === '--version' || verb === '-v') return (await import('./version.mjs')).versionCommand(argv);
  if (verb === 'queue' && argv.length === 2 && argv[1] === '--help') {

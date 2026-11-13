@@ -139,7 +139,7 @@ test("check does not require a managed copy to carry the publisher's .github aut
  await rm(join(root, '.github/workflows/journeys.yml'));
 
  // A record that is not exactly the platform's, or not a regular file, does not mark a managed copy.
- for (const bad of ['{}', upstream.replace('"schema":1', '"schema":2'), upstream.replace('v1.2.3', 'latest'), JSON.stringify({ ...JSON.parse(upstream), extra: 1 }), 'not json']) {
+ for (const bad of ['{}', upstream.replace('"schema":1', '"schema":2'), upstream.replace('v1.2.3', 'latest'), upstream.replace('v1.2.3', 'v1.2.3-01'), upstream.replace('v1.2.3', 'v1.2.3-rc..1'), JSON.stringify({ ...JSON.parse(upstream), extra: 1 }), 'not json']) {
   await writeFile(join(root, 'rer-upstream.json'), bad);
   assert.equal(check().status, 1, `${bad.slice(0, 30)} must not mark a managed copy`);
  }
@@ -155,6 +155,13 @@ test("check does not require a managed copy to carry the publisher's .github aut
  assert.ok(skipped.ok);
  assert.match(skipped.message, /skipped in a managed copy/);
  assert.match(skipped.message, /\.github\/workflows\/journeys\.yml/);
+
+ // Candidate and build labels use the same narrow automation exception.
+ for (const tag of ['v1.2.3-rc1', '1.2.3-rc.1+stage.2', 'v1.2.3+build.2']) {
+  await writeFile(join(root, 'rer-upstream.json'), JSON.stringify({...JSON.parse(upstream), tag}));
+  const candidate = check(); assert.equal(candidate.status, 0, candidate.stdout);
+  assert.ok(evidence(candidate).every(clause => clause.ok));
+ }
 
  // Every other evidence path is still a hard existence check in a managed copy, and so are paths that only look like .github.
  await rm(join(root, 'tests/share.test.mjs'));

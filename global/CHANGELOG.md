@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `rer release candidate --tag vVERSION-PRERELEASE --cwd DIR` prepares stage-only version metadata in one local commit, with repeat calls leaving the commit unchanged. Installed-copy checks now recognize pre-release upstream labels, so two-commit rehearsals keep the publisher-automation evidence exception while source checkouts still enforce it.
+
 ## 0.2.114
 
 ### Pre-install rehearsal

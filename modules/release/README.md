@@ -1,5 +1,34 @@
 # `rer release`
 
+For a stage-only candidate from a landed seed commit, use a clean checkout on
+its candidate branch:
+
+```sh
+rer release candidate --cwd /path/to/seed --tag v0.4.25-rc1
+```
+
+This writes only the top-level `version` fields in committed `seed.json`,
+`package.json` and `RELEASE.json`, preserving other metadata and formatting,
+and commits them together using the caller's Git identity. It requires their
+existing versions to agree and accepts a SemVer pre-release of the current core
+or its immediately following patch (for example, `0.4.24` to `0.4.25-rc1`).
+Minor and major versions use the normal explicit metadata preparation. Repeating
+the same tag succeeds without another commit. Dirty checkouts, stable tags,
+malformed labels and unrelated version cores are refused before any write.
+`--json` returns `stageOnly: true`, the version, tag, exact commit and whether
+it changed. No project code, install, producer, tag or remote action runs.
+
+The committed version always contains the SemVer pre-release suffix; production
+consumers must refuse pre-release tags. These candidates are stage only: no
+GitHub Release, Site/registry publication or outside-user release resolution.
+Run `rer rehearse --cwd /path/to/seed --ref <candidate-commit>` and the existing
+producer gates on the returned commit before stage use. To rehearse the exact
+candidate label, use that label as `--ref` once it resolves locally. Installed
+copies with a valid pre-release `rer-upstream.json` get the same narrowly scoped
+publisher-automation evidence exception as stable installed copies. Authoring
+checkouts still enforce every evidence file. The ordinary stable producer's
+metadata, tag matching, verification, scans and receipts are unchanged.
+
 Before a Base release, run `pnpm verify:scale` for the full import-kit datasets. It
 is not part of `pnpm verify`: run it on a machine with at least 16 GB of memory and
 nothing else heavy running, because its D1 datasets are large.
