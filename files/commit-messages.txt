@@ -1,0 +1,3 @@
+11685c867f22ad545583e0d70a0923e7f109264b
+test: retain redacted Auth setup refusal diagnostics
+

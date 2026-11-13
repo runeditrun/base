@@ -1,0 +1,45 @@
+{
+  "repository": "runeditrun/base",
+  "branch": "cloud/gr-base-auth-diagnostics-1",
+  "head": "11685c867f22ad545583e0d70a0923e7f109264b",
+  "main": "d2a239a0b0d7b054b4f58b64f498f1c7aed8d22f",
+  "changed_files": [
+    "cli/fixtures/dependency-link.mjs"
+  ],
+  "candidate_commits": 1,
+  "identity_and_all_messages_checked": true,
+  "full_history": true,
+  "push": "success on first guarded attempt",
+  "pull_request": {
+    "base": "main",
+    "head_sha": "11685c867f22ad545583e0d70a0923e7f109264b",
+    "html_url": "https://github.com/runeditrun/base/pull/853",
+    "number": 853
+  },
+  "verify_discovery": [
+    {
+      "conclusion": null,
+      "event": "pull_request",
+      "head_sha": "11685c867f22ad545583e0d70a0923e7f109264b",
+      "html_url": "https://github.com/runeditrun/base/actions/runs/43481900337",
+      "id": 43481900337,
+      "name": "Verify",
+      "status": "in_progress"
+    }
+  ],
+  "verify": {
+    "conclusion": "success",
+    "head_sha": "11685c867f22ad545583e0d70a0923e7f109264b",
+    "html_url": "https://github.com/runeditrun/base/actions/runs/43481900337",
+    "status": "completed",
+    "id": 43481900337,
+    "poll": 6,
+    "observed_utc": "2026-11-13T18:51:55.663827+00:00"
+  },
+  "terminal_status": "READY",
+  "remote_head_verified": true,
+  "unpublished_product_commits": false,
+  "github_calls": 8,
+  "scope_blockers": [],
+  "publication_gate": "Mac fleet must perform its full-history publication scan and normal landing gates"
+}

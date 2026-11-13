@@ -1,0 +1,148 @@
+{
+  "files": [
+    {
+      "blob": "e84a6b6b37021d35a76f9351dfe5f0eb0a7d3d49",
+      "bytes": 2955,
+      "path": "PLAN.md",
+      "sha256": "c940ff2343f6076d190b6bb441b61834e7de54f5f51a35b1428c8e79e8b9d015"
+    },
+    {
+      "blob": "bb81696b4a3f14173cb30f4b9fce6da594174ce3",
+      "bytes": 7951,
+      "path": "REPORT.md",
+      "sha256": "d6ed155ba5b098c77544f9013981581f8db9c5e9c458fa5f34ede6fa5ad4b047"
+    },
+    {
+      "blob": "34fde415dd33d60219a54233113e3e49bb87179f",
+      "bytes": 363,
+      "path": "browser-launch-adapter.mjs",
+      "sha256": "3ec96d71a56dbc83a55d8f9437502865961885719496a4d6a07a3f723efa1709"
+    },
+    {
+      "blob": "c166d17c74a5759ef724447d71f83344ea91609b",
+      "bytes": 2468,
+      "path": "browser-proof-receipt.json",
+      "sha256": "79ad5880f0a7aec02f3529ba2e7d45d98299db691ff0b3415e4d2dc0ac96b569"
+    },
+    {
+      "blob": "abca1b82884ec758faf737436849c37de5d685ff",
+      "bytes": 1300,
+      "path": "check-runner.py",
+      "sha256": "3c56bc41ebaea23e3714e5b10c4b95a63813882babf868d05c75bd6dd6d0768b"
+    },
+    {
+      "blob": "613f7a4a690c65faf59871b364aa58360e115373",
+      "bytes": 228,
+      "path": "ci-discovery.json",
+      "sha256": "c70889b2215ca427fc1ec79c109a1e911ca8a78ef8033fbfc1fc228d3c7ae215"
+    },
+    {
+      "blob": "ba19c2eae9a2bb9cb6af3bbe29b524ed8b4242a0",
+      "bytes": 278,
+      "path": "ci-latest.json",
+      "sha256": "be0bd656e69cbefbcf180c30cba540a0c1ef0b4fa384071efed14ed105fb6f3a"
+    },
+    {
+      "blob": "c3f8006260e7ef8e9a57167466a85fb9c9b9ab91",
+      "bytes": 1557,
+      "path": "ci-observations.jsonl",
+      "sha256": "9ba5396d8c725cc04caa49b69007ad5391344d61528d557b62b7db9e2d0063b0"
+    },
+    {
+      "blob": "be9d9bc2a64c40556b4b491bdc6433fd03f16589",
+      "bytes": 712,
+      "path": "ci-shard-plan.json",
+      "sha256": "324fef1cb8558654fe5b9c0032bad92fbd7c240db9b280657d1e669ff8523484"
+    },
+    {
+      "blob": "55bfeff023c4ae17dc59e12f86f446b1960e6b53",
+      "bytes": 85,
+      "path": "commit-identities.txt",
+      "sha256": "148bad84b5b174568017df50d58e073566703d43c6c9fe7fa6f1af04420adf55"
+    },
+    {
+      "blob": "286f4d4ff859090377b94bd5ea9095faa2d3654d",
+      "bytes": 95,
+      "path": "commit-messages.txt",
+      "sha256": "8839a2d55b57dcc9b2a071b56c131c7d0400a0d36234905d53ab2789541c1668"
+    },
+    {
+      "blob": "a77c253f2076e34143efbce287a9eace249536c8",
+      "bytes": 2339,
+      "path": "dependency-install.log",
+      "sha256": "621d2a802320ba9614394481f15e5181cb5830b7d521972e9be0c28bd0ace4e1"
+    },
+    {
+      "blob": "97c39957a84913ef6ee6875fdf735e5dd06a7839",
+      "bytes": 4153,
+      "path": "dependency-setup.log",
+      "sha256": "96cd1cead760cb642738547f01c9e4fa8ae275900a7f162560e1a3d4a77f7299"
+    },
+    {
+      "blob": "fcbfbe914f8d72811bfe59f6b7813d32f560345d",
+      "bytes": 4004,
+      "path": "diagnostic.patch",
+      "sha256": "13a4e60b50b1009658c3c3f23c38d7d169cd8539a78cc3d04446393b1fb13092"
+    },
+    {
+      "blob": "3034ce5e03ea71fab52e61484df2786953bc946c",
+      "bytes": 1566,
+      "path": "github-calls.jsonl",
+      "sha256": "1613f366d687047ffcff33b7ad7b67a89a9005678d35142f973e600577f198e4"
+    },
+    {
+      "blob": "2efbbd8129c7fabc885d51f868e2d93a9f7b7e29",
+      "bytes": 741,
+      "path": "local-checks.json",
+      "sha256": "3fdd75c0ec09a1e5bb9b5313e1fa0503ddb29f28223e5d2029597eb13349dfdb"
+    },
+    {
+      "blob": "f39d319562553eb529e2db20796460d154be31ed",
+      "bytes": 860,
+      "path": "packet-review.json",
+      "sha256": "3de795376676bd6df0eafd3acb6ab14cb39a4ac1700b8d93564294e216da702b"
+    },
+    {
+      "blob": "276f373b6d5b94feb3cb8fec7d3ab569d3990514",
+      "bytes": 140,
+      "path": "pr-receipt.json",
+      "sha256": "02b6d770835f74bc8d6d8bc25519b49b3665d6c21039dbb3ed53eda536efc87f"
+    },
+    {
+      "blob": "22cce7512709c939b1fbe87e26795eae2cff4abd",
+      "bytes": 708,
+      "path": "product-push.log",
+      "sha256": "03fa2657375c6586fe775ee4b8d479bce5cd43590e7e54255e00c9fc63345af1"
+    },
+    {
+      "blob": "93c0bc60fb492264caafc2653dca79ea3bf429d4",
+      "bytes": 1467,
+      "path": "product-receipt.json",
+      "sha256": "1ad13c1e8ac62de922522c1973a64c138d09c7a1118d9c589ac28688e244719a"
+    },
+    {
+      "blob": "b2c86b581977ca3f2de80c3c746b7590e590f5c9",
+      "bytes": 736,
+      "path": "source-receipt.json",
+      "sha256": "fafe3b4148829013be0fef08bc47c6782141ccd7dde83a8b26d858c190aa58df"
+    },
+    {
+      "blob": "83861be5d2d223dfcfea2a89926116aa29cb8eb7",
+      "bytes": 3105,
+      "path": "source-review.md",
+      "sha256": "9045d6de8d8c4969acec6195cea9e4b6dfcf96d2c291fa369370e0f684d3b525"
+    },
+    {
+      "blob": "7368991c8d35521e29260c537189f0fe6a7564ab",
+      "bytes": 981,
+      "path": "typecheck.log",
+      "sha256": "d54dba5afe8d364276006a01e26489582817922c09a04b77557affe322ad410c"
+    }
+  ],
+  "product_branch": "cloud/gr-base-auth-diagnostics-1",
+  "product_head": "11685c867f22ad545583e0d70a0923e7f109264b",
+  "ref": "refs/heads/evidence/gr-base-auth-diagnostics-1",
+  "repository": "runeditrun/base",
+  "schema": 1,
+  "tag": "gr-base-auth-diagnostics-1"
+}

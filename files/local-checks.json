@@ -1,0 +1,32 @@
+{
+  "node": "v22.20.0",
+  "pnpm": "10.12.4",
+  "platform": "Linux cloud VM; system Chromium /usr/bin/chromium --no-sandbox",
+  "results": [
+    {
+      "check": "dependency-setup",
+      "command": [
+        "node",
+        "--import",
+        "/tmp/gr-system-chromium.mjs",
+        "--test",
+        "cli/dependency-setup.test.mjs"
+      ],
+      "exit_code": 0,
+      "seconds": 602.449,
+      "started_utc": "2026-11-13T18:10:41.360287+00:00",
+      "log": "dependency-setup.log"
+    },
+    {
+      "check": "typecheck",
+      "command": [
+        "pnpm",
+        "typecheck:modules"
+      ],
+      "exit_code": 0,
+      "seconds": 18.998,
+      "started_utc": "2026-11-13T18:20:44.074699+00:00",
+      "log": "typecheck.log"
+    }
+  ]
+}

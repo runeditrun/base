@@ -1,0 +1,75 @@
+{
+  "existing_assertions": true,
+  "viewports": [
+    1440,
+    390
+  ],
+  "journeys": [
+    "default-seed",
+    "foundation"
+  ],
+  "screenshots_generated": [
+    {
+      "file": "default-seed-editor-refused-1440.png",
+      "bytes": 9419,
+      "sha256": "68c93299543a1e53917acf436c5b84d2383b3cca074120fd4634b70b2c2adfd0"
+    },
+    {
+      "file": "default-seed-editor-refused-390.png",
+      "bytes": 6203,
+      "sha256": "aeab2748a726d8641091c8e8a426ea5b654eb27b922ab047334b5514512ff8bd"
+    },
+    {
+      "file": "default-seed-identity-1440.png",
+      "bytes": 62228,
+      "sha256": "ef1c64781c1f6c0cf7a8fd4eef461847d0a12d014e5429834a311a2a7e0dd348"
+    },
+    {
+      "file": "default-seed-identity-390.png",
+      "bytes": 52581,
+      "sha256": "c6e19b66271fa642a172e866be0ac97a101c21ea5bc5d89b0cbf99f5eb328e87"
+    },
+    {
+      "file": "default-seed-provider-unavailable-1440.png",
+      "bytes": 31793,
+      "sha256": "cf5a3620b60836d6c251baad63fcee919259a0c081653884a6903d855c12c3f0"
+    },
+    {
+      "file": "default-seed-provider-unavailable-390.png",
+      "bytes": 28482,
+      "sha256": "10d5770c7efbde0f4bb1f65dd78924e216e2185a57ed0bec6b8854dbb91dc9e2"
+    },
+    {
+      "file": "foundation-editor-refused-1440.png",
+      "bytes": 9419,
+      "sha256": "68c93299543a1e53917acf436c5b84d2383b3cca074120fd4634b70b2c2adfd0"
+    },
+    {
+      "file": "foundation-editor-refused-390.png",
+      "bytes": 6203,
+      "sha256": "aeab2748a726d8641091c8e8a426ea5b654eb27b922ab047334b5514512ff8bd"
+    },
+    {
+      "file": "foundation-identity-1440.png",
+      "bytes": 38779,
+      "sha256": "0f6c36229aebd962f11e9b349b587004a3c2aaea6cb98a40cea537eb6c8fdb61"
+    },
+    {
+      "file": "foundation-identity-390.png",
+      "bytes": 32424,
+      "sha256": "daec4590e0f63f5b35ee31c848f307f6860822977561e038ce29fd16421d7368"
+    },
+    {
+      "file": "foundation-provider-unavailable-1440.png",
+      "bytes": 26605,
+      "sha256": "e74f2bd755cb3164f24cc1cffba7f337efe0f65b2dcae356ac8d18a6fe48550f"
+    },
+    {
+      "file": "foundation-provider-unavailable-390.png",
+      "bytes": 23570,
+      "sha256": "dc9ac29aef60f1a60d09efb55f662e6085f90d2b9f0d1eddcdfccbe28f260c1a"
+    }
+  ],
+  "public_packet_images": false,
+  "reason": "No UI source changes; command transcript retains existing browser assertions. Screenshots retained separately as local browser-evidence/auth-6 outside the product clone, not selected for public evidence transfer."
+}

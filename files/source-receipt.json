@@ -1,0 +1,16 @@
+{
+  "base": "d2a239a0b0d7b054b4f58b64f498f1c7aed8d22f",
+  "changed_file": "cli/fixtures/dependency-link.mjs",
+  "changed_file_sha256": "836b8c28a23e3fb67da89469a6bb310fb6cd943a07fdd75d74a557bf859f9483",
+  "patch_sha256": "13a4e60b50b1009658c3c3f23c38d7d169cd8539a78cc3d04446393b1fb13092",
+  "public_test_file_unchanged": true,
+  "public_test_file_sha256": "57be287cfa31989a0a6ea05688060ad46e77b5cca0e930d270d780c4d885a38b",
+  "permanent_test_count_before": 5,
+  "permanent_test_count_after": 5,
+  "permanent_tests_added": 0,
+  "permanent_tests_removed": 0,
+  "clauses_changed": 0,
+  "runtime_files_changed": 0,
+  "generated_files_changed": 0,
+  "publication_scan": "Reserved to Mac fleet by cloud adaptation; no cloud COMPLETE claim"
+}

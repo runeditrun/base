@@ -1,0 +1,40 @@
+default-seed                             |  WARN  The field "pnpm.overrides" was found in [CHECKOUT]/default-seed/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+default-seed                             |  WARN  The field "pnpm.onlyBuiltDependencies" was found in [CHECKOUT]/default-seed/package.json. This will not take effect. You should configure "pnpm.onlyBuiltDependencies" at the root of the workspace instead.
+Scope: all 3 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +172
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   ╭──────────────────────────────────────────╮
+   │                                          │
+   │   Update available! 10.12.4 → 12.18.0.   │
+   │   Changelog: https://pnpm.io/v/12.18.0   │
+   │     To update, run: pnpm add -g pnpm     │
+   │                                          │
+   ╰──────────────────────────────────────────╯
+
+Progress: resolved 172, reused 0, downloaded 14, added 14
+Progress: resolved 172, reused 0, downloaded 32, added 32
+Progress: resolved 172, reused 0, downloaded 44, added 44
+Progress: resolved 172, reused 0, downloaded 62, added 62
+Progress: resolved 172, reused 0, downloaded 80, added 80
+Progress: resolved 172, reused 0, downloaded 103, added 100
+Progress: resolved 172, reused 0, downloaded 128, added 128
+Progress: resolved 172, reused 0, downloaded 153, added 153
+Progress: resolved 172, reused 0, downloaded 169, added 169
+Progress: resolved 172, reused 0, downloaded 172, added 172, done
+.../node_modules/workerd postinstall$ node install.js
+.../esbuild@0.28.1/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.28.1/node_modules/esbuild postinstall: Done
+.../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+.../node_modules/workerd postinstall: Done
+
+devDependencies:
++ ajv 8.20.0
++ ajv-formats 3.0.1
++ miniflare 5.20260907.0-alpha
++ ws 8.22.0
+
+Done in 12.7s using pnpm v10.12.4

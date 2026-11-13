@@ -1,0 +1,31 @@
+{
+  "selected_files": [
+    "REPORT.md",
+    "PLAN.md",
+    "source-review.md",
+    "source-receipt.json",
+    "diagnostic.patch",
+    "local-checks.json",
+    "dependency-setup.log",
+    "typecheck.log",
+    "dependency-install.log",
+    "browser-launch-adapter.mjs",
+    "check-runner.py",
+    "browser-proof-receipt.json",
+    "ci-shard-plan.json",
+    "commit-identities.txt",
+    "commit-messages.txt",
+    "product-receipt.json",
+    "product-push.log",
+    "pr-receipt.json",
+    "ci-discovery.json",
+    "github-calls.jsonl",
+    "ci-observations.jsonl",
+    "ci-latest.json"
+  ],
+  "regular_files_only": true,
+  "symlinks_selected": false,
+  "credential_value_matches": 0,
+  "absolute_home_paths": 0,
+  "review": "Explicit actual report/receipt/log/source selections; no credential file, environment dump, held-out material or screenshot selected."
+}

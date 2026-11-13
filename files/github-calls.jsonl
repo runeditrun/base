@@ -1,0 +1,8 @@
+{"call": 1, "utc": "2026-11-13T18:21:43.635651+00:00", "command": ["gh", "api", "repos/runeditrun/base/pulls", "--input", "/tmp/gr-auth-diagnostics-pr.json", "--jq", "{number,html_url,head_sha:.head.sha,base:.base.ref}"]}
+{"call": 2, "utc": "2026-11-13T18:21:51.886443+00:00", "command": ["gh", "api", "repos/runeditrun/base/actions/runs?head_sha=11685c867f22ad545583e0d70a0923e7f109264b&per_page=100", "--jq", "[.workflow_runs[]|{id,name,status,conclusion,head_sha,event,html_url}]"]}
+{"call": 3, "utc": "2026-11-13T18:26:51.924006+00:00", "command": ["gh", "api", "repos/runeditrun/base/actions/runs/43481900337", "--jq", "{status,conclusion,head_sha,html_url}"]}
+{"call": 4, "utc": "2026-11-13T18:31:52.614280+00:00", "command": ["gh", "api", "repos/runeditrun/base/actions/runs/43481900337", "--jq", "{status,conclusion,head_sha,html_url}"]}
+{"call": 5, "utc": "2026-11-13T18:36:53.199107+00:00", "command": ["gh", "api", "repos/runeditrun/base/actions/runs/43481900337", "--jq", "{status,conclusion,head_sha,html_url}"]}
+{"call": 6, "utc": "2026-11-13T18:41:53.856624+00:00", "command": ["gh", "api", "repos/runeditrun/base/actions/runs/43481900337", "--jq", "{status,conclusion,head_sha,html_url}"]}
+{"call": 7, "utc": "2026-11-13T18:46:54.481373+00:00", "command": ["gh", "api", "repos/runeditrun/base/actions/runs/43481900337", "--jq", "{status,conclusion,head_sha,html_url}"]}
+{"call": 8, "utc": "2026-11-13T18:51:55.071723+00:00", "command": ["gh", "api", "repos/runeditrun/base/actions/runs/43481900337", "--jq", "{status,conclusion,head_sha,html_url}"]}

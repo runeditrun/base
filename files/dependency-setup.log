@@ -1,0 +1,53 @@
+TAP version 13
+# (node:1005) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# {"journey":"default-seed","width":1440,"noJavaScriptConfirmation":true,"providerUnavailable":"native owner admitted","unlink":"key absent; provider 401; native 200","relink":"sector and bindings retained; setting on; new provider session 200","optionalEditor":"native owner 200; matching subject 200; member 403; changed subject 403; revoked 403"}
+# {"journey":"default-seed","width":390,"noJavaScriptConfirmation":true,"providerUnavailable":"native owner admitted","unlink":"key absent; provider 401; native 200","relink":"sector and bindings retained; setting on; new provider session 200","optionalEditor":"native owner 200; matching subject 200; member 403; changed subject 403; revoked 403"}
+# Subtest: default-seed: public noninteractive setup links Auth after native owner, repeats without a token and keeps private approval out of saved answers
+ok 1 - default-seed: public noninteractive setup links Auth after native owner, repeats without a token and keeps private approval out of saved answers
+  ---
+  duration_ms: 163829.908098
+  type: 'test'
+  ...
+# default-seed 124s after fixture; rer setup x4 119s [38 27 27 28]; rer dev x1 33s [33]; rer deploy x1 8s [8]; rer doctor x1 2s [2]
+# {"journey":"foundation","width":1440,"noJavaScriptConfirmation":true,"providerUnavailable":"native owner admitted","unlink":"key absent; provider 401; native 200","relink":"sector and bindings retained; setting on; new provider session 200","optionalEditor":"native owner 200; matching subject 200; member 403; changed subject 403; revoked 403"}
+# {"journey":"foundation","width":390,"noJavaScriptConfirmation":true,"providerUnavailable":"native owner admitted","unlink":"key absent; provider 401; native 200","relink":"sector and bindings retained; setting on; new provider session 200","optionalEditor":"native owner 200; matching subject 200; member 403; changed subject 403; revoked 403"}
+# Subtest: foundation: public noninteractive setup links Auth after native owner, repeats without a token and keeps private approval out of saved answers
+ok 2 - foundation: public noninteractive setup links Auth after native owner, repeats without a token and keeps private approval out of saved answers
+  ---
+  duration_ms: 138228.09985
+  type: 'test'
+  ...
+# foundation 72s after fixture; rer setup x4 93s [23 24 23 22]; rer dev x1 21s [21]; rer deploy x1 5s [5]; rer doctor x1 1s [1]
+# Subtest: default-seed: a linked seed exports, resets and imports to a relink prompt and relinks to the same sector
+ok 3 - default-seed: a linked seed exports, resets and imports to a relink prompt and relinks to the same sector
+  ---
+  duration_ms: 113231.595923
+  type: 'test'
+  ...
+# default-seed 75s after fixture; rer setup x2 67s [37 30]; rer export x1 11s [11]; rer reset x1 0s [0]; rer import x1 32s [32]
+# Subtest: foundation: a linked seed exports, resets and imports to a relink prompt and relinks to the same sector
+ok 4 - foundation: a linked seed exports, resets and imports to a relink prompt and relinks to the same sector
+  ---
+  duration_ms: 107256.596142
+  type: 'test'
+  ...
+# foundation 45s after fixture; rer setup x3 66s [22 22 22]; rer export x1 8s [8]; rer reset x1 0s [0]; rer import x1 14s [14]
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Subtest: default-seed: a linked seed deploys to a controlled account and links Auth there
+ok 5 - default-seed: a linked seed deploys to a controlled account and links Auth there
+  ---
+  duration_ms: 79268.05617
+  type: 'test'
+  ...
+# Controlled deploy: wrong-origin approval exit 3 with no initiation; ready returned origin accepts both exact-scope approvals, consumes both private files, completes owner claim and authenticated settings.
+# default-seed 37s after fixture; rer setup x1 40s [40]; rer deploy x2 36s [29 7]
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 602344.091854
