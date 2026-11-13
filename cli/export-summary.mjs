@@ -11,7 +11,7 @@ export function exportSummary({ target = 'local', origin, output, bytes, tables,
  return [
   `Exported ${copy} to ${output} (${size(bytes)}): ${counted(tables.length, 'table')}, ${counted(rows, 'row')}`,
   captureLog && `Full output: ${captureLog}`,
-  `To restore into an empty installation: rer import --input ${file} --yes.`,
+  `To restore into an empty installation: rer import --input ${file} --yes`,
  ].filter(Boolean).join('\n');
 }
 
