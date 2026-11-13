@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, cp, readFile, writeFile, rm, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, execFileSync } from 'node:child_process';
 import { exportCLI } from './export.mjs';
 import { verbs, aliases, pins } from './contract.mjs';
 const base = resolve(import.meta.dirname, '..');
@@ -108,7 +108,7 @@ test("check does not require a managed copy to carry the publisher's .github aut
   '## Status', '', 'Judged from the code and tests at commit `0123abc` (17 October 2026).', '', '| Clause | Title | Kind | Status | Evidence | Gap |', '| --- | --- | --- | --- | --- | --- |',
   '| `PAGE-001` | Create a page | published | done | `.github/workflows/journeys.yml` |  |', '| `PAGE-002` | Share a page | published | done | `tests/share.test.mjs` |  |', ''];
  await mkdir(join(root, '.github/workflows'), { recursive: true }); await mkdir(join(root, 'tests'), { recursive: true });
- await writeFile(join(root, '.github/workflows/rer-managed.yml'), 'name: Managed release\n'); await writeFile(join(root, 'tests/share.test.mjs'), '');
+ await writeFile(join(root, '.github/workflows/rer-managed.yml'), 'name: Managed release\non: workflow_dispatch\njobs: {}\n'); await writeFile(join(root, 'tests/share.test.mjs'), '');
  await writeFile(join(root, 'CONTRACT.md'), contract.join('\n'));
  const evidence = result => result.report.clauses.filter(clause => clause.id.startsWith('CONTRACT.evidence.'));
  const upstream = JSON.stringify({ schema: 1, repository: 'runeditrun/base', tag: 'v1.2.3', commit: '0123456789abcdef0123456789abcdef01234567' }) + '\n';
@@ -118,6 +118,25 @@ test("check does not require a managed copy to carry the publisher's .github aut
  assert.equal(authoring.status, 1);
  assert.deepEqual(evidence(authoring).filter(clause => !clause.ok).map(clause => clause.id), ['CONTRACT.evidence.PAGE-001']);
  assert.match(evidence(authoring)[0].message, /\.github\/workflows\/journeys\.yml, which is not in this checkout/);
+
+ // Rehearse a candidate source through the same first-party check after the
+ // projection removes publisher evidence. The branch is a fixture label, not a release tag.
+ const git = (...args) => execFileSync('git', ['-C', root, ...args], {encoding:'utf8', stdio:'pipe'}).trim();
+ await writeFile(join(root, '.github/workflows/journeys.yml'), 'name: Publisher\non: push\n');
+ await writeFile(join(root, 'rer-project.json'), JSON.stringify({schema:1, projectId:'example/seed', sourceRepository:'runeditrun/base', deployment:{target:'cloudflare-workers'}, operations:{
+  build: `node -e "const {execFileSync:g}=require('node:child_process');if(g('git',['rev-list','--count','HEAD']).toString().trim()!=='2'||g('git',['remote']).toString().trim())process.exit(1)"`,
+  verify: 'node scripts/rer.mjs check --profile first-party',
+ }}));
+ git('init','-q'); git('config','user.name','Fixture'); git('config','user.email','fixture@example.invalid');
+ git('add','.'); git('commit','-qm','Synthetic candidate source');
+ const label = 'v1.2.3-rc1'; git('branch', label);
+ const rehearsal = spawnSync(process.execPath, [join(root, 'scripts/rer.mjs'), 'rehearse', '--cwd', root, '--ref', label, '--json', '--keep'], {encoding:'utf8', timeout:45000});
+ const rehearsed = JSON.parse(rehearsal.stdout.trim().split('\n').at(-1));
+ if (rehearsed.captureLog) t.after(() => rm(dirname(rehearsed.captureLog), {recursive:true, force:true}));
+ if (rehearsed.scratch) t.after(() => rm(dirname(rehearsed.scratch), {recursive:true, force:true}));
+ assert.equal(rehearsal.status, 0, rehearsal.stdout + rehearsal.stderr + (rehearsed.captureLog ? await readFile(rehearsed.captureLog,'utf8') : ''));
+ assert.ok(rehearsed.operations.every(operation => operation.status === 'PASS'));
+ await rm(join(root, '.github/workflows/journeys.yml'));
 
  // A record that is not exactly the platform's, or not a regular file, does not mark a managed copy.
  for (const bad of ['{}', upstream.replace('"schema":1', '"schema":2'), upstream.replace('v1.2.3', 'latest'), JSON.stringify({ ...JSON.parse(upstream), extra: 1 }), 'not json']) {
