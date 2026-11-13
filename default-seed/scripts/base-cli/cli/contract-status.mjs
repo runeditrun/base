@@ -26,7 +26,7 @@ async function isManagedCopy(root) {
   const value = JSON.parse(await readFile(path, 'utf8'));
   return !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).sort().join(',') === 'commit,repository,schema,tag'
    && value.schema === 1 && /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100}$/.test(value.repository)
-   && /^v?(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(value.tag) && /^[a-f0-9]{40}$/i.test(value.commit);
+   && /^v?(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(value.tag) && /^[a-f0-9]{40}$/i.test(value.commit);
  } catch { return false; }
 }
 

@@ -38,6 +38,9 @@ Without --tag, write a preview. This command never pushes, uploads or deploys.
   --no-queue             Bypass the job queue only in the original CI environment.
   --help                 Print this help without performing release work.
 
+Stage-only metadata preparation:
+  rer release candidate --tag vVERSION-PRERELEASE [--cwd DIR] [--json]
+
 Signing and receipt commands:
   rer release sign --artifact DIR (--key-file FILE | --key-stdin) [--scope test|rer] [--publisher NAMESPACE]
   rer release receipt --artifact DIR --anchors FILE [--environment test] [--after VERSION:SHA256]
@@ -52,6 +55,7 @@ Key generation requires non-terminal stdout; --key-stdin requires non-terminal s
 
 export async function dispatchRelease(args) {
  if (args.length === 1 && args[0] === '--help') { console.log(releaseHelp); return 0; }
+ if (args[0] === 'candidate') return (await import('./release-candidate.mjs')).candidateCommand(args.slice(1));
  if (Object.hasOwn(releaseVerb.subcommands, args[0])) return (await import('../modules/release/signing-cli.mjs')).dispatchSigning(args[0], args.slice(1));
  try {
   const options = {};

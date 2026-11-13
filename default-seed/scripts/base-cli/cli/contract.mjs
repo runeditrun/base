@@ -40,7 +40,7 @@ export const releaseFlags = ['--repo', '--project', '--repository', '--output', 
 export const releaseVerb = Object.freeze({
  bootstrap: 'before', flags: [...commonFlags, ...releaseFlags],
  // These operate on supplied files and keys, without running project code.
- subcommands: Object.freeze({ sign: { bootstrap: 'never' }, receipt: { bootstrap: 'never' }, keygen: { bootstrap: 'never' } }),
+ subcommands: Object.freeze({ candidate: { bootstrap: 'never' }, sign: { bootstrap: 'never' }, receipt: { bootstrap: 'never' }, keygen: { bootstrap: 'never' } }),
 });
 // All checkout commands, including those supplied by rer rather than declared
 // as seed operations. Bootstrap belongs to the selected command: before

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.114-dev.gfe5b424f",
+  "cliVersion": "0.2.114-dev.g1c717ddf",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -739,11 +739,11 @@
     },
     "cli/contract-status.mjs": {
       "source": "cli/contract-status.mjs",
-      "sha256": "5890200917916315d55cc2acee3e9a2fcacd22f6f603475004978aa80cf307ae"
+      "sha256": "7cf7b73d25f0d202d461d5331834c0d0adb88da2c964f8e4af19db2f782c5843"
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "e73f6b91bb631dc3e422467e642735b3673f047ba7e2557e9bf829f452a4aefb"
+      "sha256": "402623ce46b9a5223dd18312e0460c8ea3539e775f87744276e5e0b22d29e2b5"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -1185,9 +1185,13 @@
       "source": "cli/rehearse/workflow.mjs",
       "sha256": "7a5e27bd09cb74507b3bbcbccdeb90bd381bad68aaf2d3fa3b5a689e187e8903"
     },
+    "cli/release-candidate.mjs": {
+      "source": "cli/release-candidate.mjs",
+      "sha256": "bc18d35af097df29bf98d238271370d0ca182b73681ad4240caf5985032da9dc"
+    },
     "cli/release.mjs": {
       "source": "cli/release.mjs",
-      "sha256": "a6a76c05fe5d0bb3e1c203aa293e514d9bc47e19bfea4a1c5819dec8a6e3ad3f"
+      "sha256": "4f12d233748a51001806ef9688604bee1c96eace867926b8229a3ca1929d351d"
     },
     "cli/run-transfers.mjs": {
       "source": "cli/run-transfers.mjs",
@@ -5003,7 +5007,7 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "36517882ddd32f52f9273891ea9f966a1a41b9cac96dd806b2d0751d39a41318"
+      "sha256": "c3e5add95c3dbd936912424b7cfd55db619ee0197c3e9ca3c6ef74ebb09fae60"
     },
     "modules/release/archive-guard.mjs": {
       "source": "modules/release/archive-guard.mjs",
@@ -5012,6 +5016,10 @@
     "modules/release/archive-members.mjs": {
       "source": "modules/release/archive-members.mjs",
       "sha256": "1cc551c89cef0a5a6c71cbbcbf6f039e8e3e0312792ecf48c4067b45736a226b"
+    },
+    "modules/release/candidate.mjs": {
+      "source": "modules/release/candidate.mjs",
+      "sha256": "898ce7225718d0fe040953e3f57167351e0d9054675543469467c9c1df353021"
     },
     "modules/release/catalogue.mjs": {
       "source": "modules/release/catalogue.mjs",
