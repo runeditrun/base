@@ -58,7 +58,10 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   for(const match of text.matchAll(pattern)){result+=redaction.redact(text.slice(from,match.index))+match[0];from=match.index+match[0].length;}
   return result+redaction.redact(text.slice(from));
  };
- const report=(text,{names}={})=>emit(redactBesideNames(String(text),names)+'\n');
+ const report=(text,{names,logOnly=false}={})=>{
+  const line=redactBesideNames(String(text),names)+'\n';
+  emit(logOnly?'':line,line);
+ };
  const failure=(label,detail={},capture)=>{
   const outcome=`exit ${detail.code??'none'}, signal ${detail.signal??'none'}`;
   const status=detail.reason==='cancel'?`cancelled (${outcome})`:detail.reason==='deadline'?`readiness deadline exceeded (${outcome})`:detail.error?`could not start${detail.errorCode?` (${detail.errorCode})`:''} (${outcome})`:outcome;
