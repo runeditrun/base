@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.112-dev.gb519f12b",
+  "cliVersion": "0.2.112-dev.g8a3d0a37",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "4270f97812428e497e2edd14fe446e48ccec91a0e4b6bf911e8d6db85680d75d"
+      "sha256": "cad51ec620b621ae8c80686a9f4c1c6cee010cdedc344503cb6f0c4245340b1c"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -59,13 +59,17 @@
       "source": "onboarding/command-custody.mjs",
       "sha256": "60c2be80991054feb4c9d56205e65ed0c8d01cfbe10dec698eb312bf90faecf6"
     },
+    "command-diagnostics-view.mjs": {
+      "source": "onboarding/command-diagnostics-view.mjs",
+      "sha256": "817808bfcffa9de6ea5ba2c847b7cd5bf6be84c778ea0763a22d2094e49b0e20"
+    },
     "command-recovery.mjs": {
       "source": "onboarding/command-recovery.mjs",
       "sha256": "4b6e383f56206a4b3b9f2394b79f1921cc8e20384f5be9e9694c1bb0dde968b6"
     },
     "commands.mjs": {
       "source": "onboarding/commands.mjs",
-      "sha256": "a4f4866adc5becfff81fbbd2a79033d5377b61472527d2a16c925c6e4f837557"
+      "sha256": "e962f67a9258cf0b54f4168bed5e38e2868529bf41147d82c3fb79b24a17f59d"
     },
     "dependency-approval.mjs": {
       "source": "onboarding/dependency-approval.mjs",
@@ -979,7 +983,7 @@
     },
     "cli/import-summary.mjs": {
       "source": "cli/import-summary.mjs",
-      "sha256": "5c65d2f045a678eb12e549b38f8dd122571aff4b07f93fc4142a959c37e9defa"
+      "sha256": "5a32b7b0e61c5f8455e4e860b4373b424583e5407bddef69f63e9b4aca22913a"
     },
     "cli/independent.mjs": {
       "source": "cli/independent.mjs",
@@ -999,7 +1003,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "55c11eb039fab28befd7383eff47133887c7d603acebcb50d25f608176db6c65"
+      "sha256": "8d0c1d268ad28022c512b7edc0c38be3787eade3ea507c9b1bfde3cabf5f74ca"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
@@ -1059,7 +1063,7 @@
     },
     "cli/output.mjs": {
       "source": "cli/output.mjs",
-      "sha256": "55f0be3a231f56638d4475260ff04ad73270a4ccc12b4d409de7bfc6f890f310"
+      "sha256": "648b8afd2fa7bb5793e168d47bf7095dae2e67a81ddba8189e4cd31cab391b27"
     },
     "cli/package-calls.mjs": {
       "source": "cli/package-calls.mjs",
@@ -1411,7 +1415,7 @@
     },
     "cli/transfers.mjs": {
       "source": "cli/transfers.mjs",
-      "sha256": "f03ff8550fe98a879e417ac8b4fae222103d43c772c71118f8abeec55a8eda47"
+      "sha256": "dcba7d7c40c97ba8fec96f69e879eebdc699c692617d5af43c5f490d0bc4032e"
     },
     "cli/upstream-agent.mjs": {
       "source": "cli/upstream-agent.mjs",

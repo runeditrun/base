@@ -50,5 +50,5 @@ export async function transfer(project, options, signal, custody) {
   custody.store.report('Imported provider links need fresh approval. Run rer setup with RER_LINK_TOKEN_FILE to re-link this installation.');
   return {...result,needsRelink:true,nextCommand:'rer setup'};
  }
- return result;
+ return direction === 'import' ? { ...result, captureLog: relative(project.root, custody.store.logPath), nextCommand: 'rer setup' } : result;
 }

@@ -1,7 +1,7 @@
 import { humanError } from './human-error.mjs';
 import { handleBrokenPipes } from './stdio.mjs';
 import { exportSummary } from './export-summary.mjs';
-import { importSafetySummary } from './import-summary.mjs';
+import { importSummary, importSafetySummary } from './import-summary.mjs';
 export function output(options) {
  handleBrokenPipes();
  let finished = false;
@@ -21,7 +21,7 @@ export function output(options) {
    if (structuredResult) this.event('result', { ok, exitCode, ...details });
    // A finished export ends with one line naming its archive; the receipt is --json data.
    else if (options.verb === 'export' && (ok || details.hostedExport) && exportSummary({ ...details, exitCode })) this.human(exportSummary({ ...details, exitCode }));
-   else if (ok && options.verb === 'import' && importSafetySummary(details)) this.human('import: complete (exit 0)\n' + importSafetySummary(details));
+   else if (ok && options.verb === 'import' && (importSummary(details) || importSafetySummary(details))) this.human(importSummary(details) || ('import: complete (exit 0)\n' + importSafetySummary(details)));
    else if (!['describe', 'check', 'dev', 'preview', 'setup'].includes(options.verb) || !ok) this.human(`${options.verb}: ${ok ? 'complete' : 'failed'} (exit ${exitCode})`);
   },
   error(error) {

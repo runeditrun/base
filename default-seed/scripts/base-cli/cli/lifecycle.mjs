@@ -82,7 +82,7 @@ async function runLifecycle(project, options, out, deployRedaction) {
   const directory = project.profile === 'first-party' && options.verb !== 'doctor' ? await privateDirectory(project.root, capture) : (temporary = await mkdtemp(join(tmpdir(), 'rer-command-')));
   const state = { logs: [] };
   const progress = text => { if (!installingFrozen || options.json) out.progress(text); };
-  store = await createCommands(directory, state, { terminal: options.verb === 'deploy' && options.dryRun ? withoutPnpmChatter(progress) : progress, onWaiting: options.json ? details => out.event('waiting', details) : undefined, queue: ['install','setup','build','verify','deploy','export','import'].includes(options.verb)?{verb:options.verb,originalCI:process.env.CI==='true'}:undefined });
+  store = await createCommands(directory, state, { filterViteWarnings: options.verb === 'setup', terminal: options.verb === 'deploy' && options.dryRun ? withoutPnpmChatter(progress) : progress, onWaiting: options.json ? details => out.event('waiting', details) : undefined, queue: ['install','setup','build','verify','deploy','export','import'].includes(options.verb)?{verb:options.verb,originalCI:process.env.CI==='true'}:undefined });
   store.state = state;
   if (deployRedaction) store.addSecrets?.(Object.values(process.env).filter(value => value && deployRedaction.redact(value) !== value));
   store.setupManifest = project.setupManifest;
