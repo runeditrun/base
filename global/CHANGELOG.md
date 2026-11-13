@@ -1,8 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.2.114
 
-- Add `rer rehearse` to run every declared first managed-build operation in an offline-created, projected two-commit scratch copy, continue after failures, and report every outcome with redacted captures and bounded execution.
+### Pre-install rehearsal
+
+- New `rer rehearse --cwd DIR --ref REF` runs the selected committed seed's declared setup, build, verify and artifact operations, in order, in a fresh two-commit installation copy outside the source checkout. It removes publisher automation, retains or generates a dispatch-only managed workflow, updates installation metadata and source-lock identities while preserving publisher source pins, and leaves the source checkout unchanged.
+- Rehearsal continues after operation failures and reports PASS, FAIL or NOT REACHED with the first cause, elapsed time and a redacted capture-log path. Per-operation and overall deadlines bound execution; `--json` provides the structured result and `--keep` retains the scratch copy for diagnosis. A fresh private HOME/config/cache and restricted environment keep caller provider credentials out. Declared operations are trusted seed code and may acquire dependencies over the network; signers and seed lanes must run this heavy work through their supported heavy slot.
+- The global launcher and refreshed default-seed CLI expose the command and its help. This releases CLI support: each signer or seed lane must adopt this rer and run rehearsal against its own committed seed. A local rehearsal does not establish GitHub attestation, artifact upload, provider deployment, seed adoption or production behavior.
+
+Code and documentation only: the actual diff adds no migrations and touches neither modules/import-kit nor modules/portability. No deployed seed behavior is changed by preparing this release.
 
 ## 0.2.113
 
