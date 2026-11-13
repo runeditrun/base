@@ -113,7 +113,13 @@ test('public import restores into absent or engine-only D1 files and preserves o
 
  const occupied=await f.run(input,4);
  assert.equal(occupied.find(event=>event.event==='error').code,'restore_refused');
- assert.match(occupied.find(event=>event.event==='error').message,/table computed_entries .*already holds rows/);
+ const refusal=occupied.find(event=>event.event==='error').message;
+ assert.match(refusal,/empty installation/);
+ assert.match(refusal,/rer reset --yes and rer import --input exports\/saved\.rer --yes/);
+ assert.doesNotMatch(refusal,/computed_entries/);
+ const human=await f.text(input,4);
+ assert.doesNotMatch(human.stdout+human.stderr,/computed_entries/);
+ assert.match(human.stderr,/fresh installation/);
  assert.deepEqual((await f.data(query))[0].results,before,'occupied refusal leaves the data untouched');
  console.log('(c) occupied: exit=4; restore_refused; existing rows unchanged');
  await f.run(['reset','--yes']);

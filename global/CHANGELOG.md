@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Installation restore refusals explain that the destination already has people or data and give the fresh-install or backup/reset/restore path, without exposing internal table names. Deploy dry runs show a readable Worker, product resources, permissions and declared migration count; pending migrations remain unknown offline, and the full plan stays in the redacted log and `--json`. Export allocation estimates and duplicate mapped mail-key alternatives were already corrected in 0.2.112 and 0.2.110 respectively.
+
 - Cover setup's declaration-derived Cloudflare token permissions (including R2 and Queues) and dry-run recovery's retained `--dry-run`, while preserving real-deploy recovery. Ordinary seed deploy-policy errors now name the policy check and still stop before provider contact; missing-input refusals retain exit 3. Refuse already-stale erasure archives before expensive restore staging, retaining the final erasure fence, and advance more export parts per call in the emitted-Worker person-erasure journey without relaxing its assertions or timeout.
 
 ## 0.2.112

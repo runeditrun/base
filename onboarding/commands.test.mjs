@@ -21,12 +21,15 @@ test('command capture strips ANSI and all split credentials and preserves final 
  let child;const f=await fixture(t,()=>child=fakeChild());
  const secrets=['VAULT_SECRET_123','INVALIDATED_SECRET_456','DIRECT_NESTED_KEY_789','SESSION_TOKEN_ABC'];
  f.store.addSecrets(secrets);
+ f.store.report(`Captured detail: ${secrets[0]}`,{logOnly:true});
  const result=f.store.run('Build application','unused',['argv-never-printed'],{env:{MY_TOKEN:'TEST_ENV_SECRET_ABC'}});
  child.stdout.write('\x1b[');child.stdout.write('31mFirst line\x1b[0m\n');
  for(const secret of [...secrets,'TEST_ENV_SECRET_ABC','ghp_FOO123456','sk-proj-XYZ987654']){for(const character of secret)child.stderr.write(character);child.stderr.write('\n');}
  child.exitCode=40;child.emit('exit',40,null);child.stderr.write('real final output after exit\n');child.emit('close',40,null);
  let error;await assert.rejects(result,value=>{error=value;return true;});
  const message=installationFailureMessage(error),disk=await readFile(f.store.logPath,'utf8');
+ assert.match(disk,/Captured detail: \[REDACTED\]/);
+ assert.ok(!f.terminal().includes('Captured detail:') && !JSON.stringify(f.state).includes('Captured detail:'),'log-only detail stays out of terminal and its visible tail');
  for(const text of [JSON.stringify(f.state),disk,f.terminal(),message]){for(const secret of [...secrets,'TEST_ENV_SECRET_ABC','ghp_FOO123456','sk-proj-XYZ987654','argv-never-printed'])assert.ok(!text.includes(secret));assert.ok(!text.includes('\x1b'));}
  assert.match(message,/Build application: exit 40, signal none/);assert.match(message,/real final output after exit/);assert.match(message,/Log:/);assert.match(disk,/First line/);
  error.message='UNTRUSTED';assert.equal(installationFailureMessage(error),message);

@@ -22,6 +22,8 @@ import { keptSecrets, keepSecrets, forgetSecrets } from './deploy-secrets.mjs';
 import { withoutLocalSettings, refuseLocalEnvOutput } from './local-env.mjs';
 import { deployProductDirectory, deployProductArguments } from './deploy-product.mjs';
 import { rotateInstallationKey, reopenInstallationKey, keepInstallationKey } from './deploy-installation-key.mjs';
+import { deployPlanLines } from './deploy-plan.mjs';
+import { relative } from 'node:path';
 
 export function ownerDeploy(declarationPath, lifecycle) {
  // rer verify serves the build with this declaration's vars and secrets.
@@ -69,7 +71,9 @@ export function ownerDeploy(declarationPath, lifecycle) {
   try {
    if (options.dryRun) {
     const {plan} = await owner('local-plan');
-    store.report(`Would deploy: ${JSON.stringify(plan)}`);
+    store.report(`Deploy plan: ${JSON.stringify(plan)}`, { logOnly: true });
+    for (const line of deployPlanLines(plan, declaration)) store.report(line);
+    store.report(`Full plan: repeat this command with --json.${store.logPath ? ` Redacted capture log: ${relative(root, store.logPath)}` : ''}`);
     return { dryRun: true, deployed: false, providerChecked: false, plan };
    }
    // A custom hook's own state file, when its deploy named one.

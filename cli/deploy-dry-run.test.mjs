@@ -12,7 +12,8 @@ const execute = promisify(execFile);
 
 test('the public deploy dry run reaches offline seed hooks and reports unchecked providers with or without a hook', async t => {
  for (const hook of ['managed', 'legacy', 'none', 'kit', 'missing-owner']) {
-  const { root } = await checkout(t, { secrets: [{ binding: 'EMAIL_API_KEY', environment: 'EMAIL_API_KEY' }] });
+  const { root } = await checkout(t, { secrets: [{ binding: 'EMAIL_API_KEY', environment: 'EMAIL_API_KEY' }],
+   d1:[{binding:'DB'},{binding:'REPORTS'}],r2:[{binding:'FILES'}],kv:[{binding:'CACHE'}],queues:[{binding:'JOBS'}] });
   await writeFile(join(root, 'adapter.mjs'), `import {ownerDeploy} from ${JSON.stringify(new URL('./deploy.mjs', import.meta.url).href)};
 import {writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -47,6 +48,16 @@ export const commandAdapter = {...lifecycle,deploy:${hook === 'none' ? "ownerDep
   if (hook === 'missing-owner') assert.match(receipt.neededForRealDeploy.join('\n'), /real OWNER_EMAIL/);
   assert.match(receipt.neededForRealDeploy.join('\n'), /\bEMAIL_API_KEY\b/);
   assert.equal(await readFile(requests, 'utf8'), '', `${hook} preflight makes no provider request`);
+  if(hook === 'none') {
+   const human=await execute(process.execPath,[fileURLToPath(new URL('../bin/rer.mjs',import.meta.url)),'deploy','--dry-run','--cwd',root],{env});
+   const text=human.stdout+human.stderr;
+   for(const database of receipt.plan.d1)assert.ok(text.includes(`D1 database: ${database.name}`));
+   for(const [kind,label] of [['r2','R2 storage'],['kv','KV storage'],['queues','Queue']])assert.ok(text.includes(`${label}: ${receipt.plan[kind][0].name}`));
+   assert.match(text,/Workers R2 Storage: Edit/);
+   assert.match(text,/Workers KV Storage: Edit/);
+   assert.match(text,/Queues: Edit/);
+   assert.equal(await readFile(requests,'utf8'),'','the readable resource plan also stays offline');
+  }
   await assert.rejects(access(join(root, '.rer/deploy/production.json')), { code: 'ENOENT' });
  }
 });
@@ -99,6 +110,17 @@ export const commandAdapter = {...lifecycle,deploy:ownerDeploy('deploy.json',lif
  const human = await invoke(false, '--dry-run');
  assert.equal(human.code, 0, human.text);
  assert.match(human.text, /Would deploy:/);
+ assert.ok(human.text.includes(`Worker: ${plan.worker}`));
+ assert.ok(human.text.includes(`D1 database: ${plan.d1[0].name}`));
+ assert.ok(human.text.includes(`${plan.d1[0].migrations.length} declared migration`));
+ assert.match(human.text,/Pending migrations: unknown/);
+ assert.match(human.text,/Workers Scripts: Edit, D1: Edit/);
+ assert.doesNotMatch(human.text,/"worker"|0001_owner\.sql|GOOGLE_MAIL_CLIENT_SECRET/);
+ const logPath=/Redacted capture log: (.+)/.exec(human.text)?.[1];
+ assert.ok(logPath,'the readable plan links to its complete capture');
+ const log=await readFile(join(root,logPath),'utf8');
+ const capturedPlan=JSON.parse(log.split('\n').find(line=>line.startsWith('Deploy plan: ')).slice('Deploy plan: '.length));
+ assert.deepEqual(capturedPlan,plan,'the full structured plan survives in the log and --json');
  t.diagnostic(`Dry run: exit ${human.code}; ${human.text}`);
  await assert.rejects(access(join(root, '.rer/deploy/production.json')), { code: 'ENOENT' });
  const real = await rer();

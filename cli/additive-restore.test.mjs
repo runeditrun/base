@@ -89,11 +89,14 @@ test('an archive made before later additive migrations restores into the upgrade
  assert.equal((await seed.run(['import', '--input', 'exports/settings.rer', '--yes'])).at(-1).contentHash, edited.contentHash);
  assert.deepEqual((await seed.data(settings))[0].results, [{ key: 'currency', value: 'EUR' }, defaults[1]]);
  assert.deepEqual((await seed.data(original))[0].results, rows);
- // A row the migrations did not insert still refuses, naming its table and the next step.
+ // A row the migrations did not insert still refuses, explaining the next step without internal table names.
  // The refused newer archive leaves a reset, migrated installation.
  await refused('exports/newer.rer', /migration_ledger:unknown:1001_index\.sql/);
  await seed.data("INSERT INTO app_settings VALUES('locale','en-AU')");
  const occupied = await seed.run(['import', '--input', 'exports/settings.rer', '--yes'], 4);
- assert.match(occupied.find(event => event.event === 'error').message, /^Restore refused \(target_not_empty\): table app_settings in this installation already holds rows its migrations did not insert, .*rer reset --yes and rer import --input exports\/settings\.rer --yes again\.$/);
+ const refusal=occupied.find(event => event.event === 'error').message;
+ assert.match(refusal,/empty installation/);
+ assert.match(refusal,/rer reset --yes and rer import --input exports\/settings\.rer --yes/);
+ assert.doesNotMatch(refusal,/app_settings/);
  assert.deepEqual((await seed.data(settings))[0].results, [{ key: 'currency', value: 'USD' }, { key: 'locale', value: 'en-AU' }, defaults[1]]);
 });
