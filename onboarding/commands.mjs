@@ -12,8 +12,9 @@ import { commandCustody } from './command-custody.mjs';
 import { createProcessBaseline, createProcessScope, inheritedScopeTokens, processScopeEnvironment } from './process-scope.mjs';
 import { toolCommand } from './tool-command.mjs';
 import { isWranglerMigrationApply, wranglerMigrationView } from './migration-progress.mjs';
+import { isWranglerQuery, wranglerQueryView, viteDiagnosticsView } from './command-diagnostics-view.mjs';
 
-export async function createCommands(directory,state,{terminal=text=>writeSync(1,text),spawn=spawnChild,queue:queuePolicy,custodyToken,onWaiting}={}) {
+export async function createCommands(directory,state,{terminal=text=>writeSync(1,text),spawn=spawnChild,queue:queuePolicy,custodyToken,onWaiting,filterViteWarnings=false}={}) {
  let policy=queuePolicy?await commandPolicy():{environment:{},close:async()=>{}};
  const custodyBaseline=['darwin','linux'].includes(process.platform)?await createProcessBaseline():undefined;
  const logPath=join(directory,'install.log'), log=await openPrivateLog(logPath);
@@ -72,6 +73,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
  };
  const track=(label,child,ownershipScope,view)=>{
   if(captures.has(child))return child;
+  if(filterViteWarnings)view=viteDiagnosticsView(view);
   let resolveClose,resolveError,resolveExit;
   const capture={tail:'',scope:signal,closed:new Promise(resolve=>{resolveClose=resolve;}),failed:new Promise(resolve=>{resolveError=resolve;}),exited:new Promise(resolve=>{resolveExit=resolve;})};
   capture.custody=commandCustody(child,ownershipScope);
@@ -93,7 +95,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
    child.removeListener('exit',exited);if(!capture.exitResult)exited(code,terminationSignal);
    for(const source of sources)source.removeListener('data',data);
    filter.end();
-   if(view){const rest=view.end();capture.tail=(capture.tail+rest).slice(-32768);emit(rest,'');Object.assign(state,view.facts?.());}
+   if(view){const rest=view.end({code,signal:terminationSignal,error});capture.tail=(capture.tail+rest).slice(-32768);emit(rest,'');Object.assign(state,view.facts?.());}
    active.delete(child);if(!capture.custody)managed.delete(child);resolveClose({code,signal:terminationSignal,error,errorCode:capture.errorCode});
   };
   child.once('close',finish);
@@ -170,6 +172,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
    // Any caller's `wrangler d1 migrations apply` (the setup hooks, a seed's own export and import) shows
    // a count instead of wrangler's table redrawn per migration; the log keeps every byte and is named in the summary.
    if(!options.view&&isWranglerMigrationApply(command,args))options={...options,view:()=>wranglerMigrationView({log:redaction.redact(checkoutPath(options.cwd??process.cwd(),logPath))})};
+   if(!options.view&&isWranglerQuery(command,args))options={...options,view:()=>wranglerQueryView({log:redaction.redact(checkoutPath(options.cwd??process.cwd(),logPath))})};
    if(queuePolicy && options.heavy !== false) {
     let queuedChild;
     const commandSignal=signal&&options.signal?AbortSignal.any([signal,options.signal]):options.signal||signal;

@@ -21,7 +21,20 @@ async function history(t, { seedOwned = false } = {}) {
   await writeFile(adapter, source.replace(", WRANGLER_LOG: 'warn'", ''));
  }
  for (let n = 1; n <= extra; n++) await writeFile(join(seed.root, `migrations/core/05${String(n).padStart(3, '0')}_history.sql`), `-- history ${n}\nSELECT ${n};\n`);
+ await seed.run(['export', '--output', 'exports/empty.rer']);
+ await seed.data("INSERT INTO people(id,name,email,created_at) VALUES('clinic','Maya Chen','maya@cedargrove.example','2026-11-13'),('studio','Leo Martinez','leo@northstar.example','2026-11-13')");
  await seed.run(['export', '--output', 'exports/history.rer']);
+ if(seedOwned){
+  // Orbit rebuilds its search index through a real post-restore Wrangler SQL
+  // command. Exercise that same adapter boundary, without replacing the app.
+  const adapter=join(seed.root,'scripts/installer/local.mjs');
+  await writeFile(adapter,await readFile(adapter,'utf8')+`\nconst native=commandAdapter.portability;
+commandAdapter.portability={...native,async import(context){
+ const receipt=await native.import(context);
+ await context.store.run('Optimizing restored search','pnpm',['exec','wrangler','d1','execute','default-seed-reference','--local','--persist-to','.wrangler/state','--config','wrangler.jsonc','--command','PRAGMA optimize'],{cwd:context.root,signal:context.signal,env:{...process.env,WRANGLER_SEND_METRICS:'false'}});
+ return receipt;
+}};\n`);
+ }
  await seed.run(['reset', '--yes']);
  return seed;
 }
@@ -35,6 +48,13 @@ async function boundedImport(t, seed) {
  assert.match(shown, /Applying migrations 10\/\d+/);
  assert.match(shown, /Applied \d+ migrations\. Full output: \S*install\.log/);
  assert.ok(!shown.includes('Migrations to be applied'));
+ assert.doesNotMatch(shown,/Executing on local database|"results"\s*:|"meta"\s*:|commands? executed successfully/);
+ const manifest=JSON.parse((await readFile(join(seed.root,'exports/history.rer'),'utf8')).split('\n')[0]);
+ const rows=manifest.tables.reduce((sum,table)=>sum+table.count,0);
+ assert.match(shown,new RegExp(`${manifest.tables.length} tables, ${rows} rows`),'completion counts describe the actual archive');
+ assert.match(shown,/Next:.*rer setup.*rer dev/);
+ assert.deepEqual((await seed.data('SELECT name FROM people ORDER BY id'))[0].results,[{name:'Maya Chen'},{name:'Leo Martinez'}]);
+ return shown;
 }
 
 test('rer import shows migration progress, and a failing migration names itself, its error and the log', { timeout: 15 * 60_000 }, async t => {
@@ -51,5 +71,16 @@ test('rer import shows migration progress, and a failing migration names itself,
 });
 
 test('rer import is just as short when the seed\'s own adapter lets wrangler print its tables', { timeout: 15 * 60_000 }, async t => {
- await boundedImport(t, await history(t, { seedOwned: true }));
+ const seed=await history(t,{seedOwned:true});
+ const shown=await boundedImport(t,seed),log=await readFile(join(seed.root,'.seed/installer/install.log'),'utf8');
+ assert.match(log,/Executing on local database/);
+ assert.match(log,/"results"\s*:/);
+ assert.match(shown,/Full output: \S*install\.log/);
+ // A failed post-restore database operation still names its real SQL error.
+ await seed.run(['reset','--yes']);
+ const adapter=join(seed.root,'scripts/installer/local.mjs');
+ await writeFile(adapter,(await readFile(adapter,'utf8')).replace('PRAGMA optimize','SELECT * FROM missing_search_index'));
+ const failed=await seed.text(['import','--input','exports/history.rer','--yes'],1);
+ assert.match(failed.stdout+failed.stderr,/missing_search_index/);
+ assert.match(failed.stdout+failed.stderr,/Log: \S*install\.log/);
 });

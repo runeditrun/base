@@ -6,6 +6,13 @@ import { fixture } from './fixtures/reference.mjs';
 import { devEntryBrowser } from './fixtures/dev-entry-browser.mjs';
 
 const events = child => child.stdoutText.trim().split('\n').filter(Boolean).map(JSON.parse);
+async function awaitReady(child) {
+ const deadline=performance.now()+180000;
+ while(!child.stdoutText.includes('"event":"ready"')&&child.exitCode===null&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,100));
+ const ready=events(child).find(event=>event.event==='ready');
+ assert.ok(ready,'the real Vite listener reaches managed readiness');
+ return ready;
+}
 
 test('install fetches no browser, setup lists what hosting needs, and dev applies newly pulled canonical migrations before serving and stops on a migration error', { timeout: 20 * 60_000 }, async t => {
  const f = await fixture('default-seed', t);
@@ -37,19 +44,47 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  const applied = setupLog.split('\n').find(line => line.startsWith('Applied local migrations:'));
  for (const name of history) assert.ok(applied?.includes(name), `setup names ${name}`);
  t.diagnostic(`setup history: ${history.length} synthetic migrations; 0 repeated tables; all applied names present`);
+ const setupStarted=performance.now();
+ const setup=await f.run(['setup','--owner-email','migration-owner@example.test','--non-interactive']);
+ const setupText=setup.stdoutText+setup.stderrText;
+ assert.doesNotMatch(setupText,/dynamic import cannot be analyzed|VITE_CONFIG_NATIVE_IGNORE_WARNING|vite:import-analysis/);
+ const setupCapture=await readFile(join(f.root,'.seed/installer/install.log'),'utf8');
+ assert.match(setupCapture,/vite:import-analysis/,'source-import diagnostics remain in the redacted capture');
+ assert.match(setupText,/Full output: \S*install\.log/);
+ t.diagnostic(`human rer setup: ${((performance.now()-setupStarted)/1000).toFixed(2)} s; source warnings only in capture`);
  await f.sql("CREATE TABLE saved_before_upgrade(value TEXT); INSERT INTO saved_before_upgrade VALUES('owner content')");
  const path = join(f.root, 'migrations/core/9998_local_upgrade.sql');
  // Simulate git pull after setup: the old build cannot know this migration.
  await writeFile(path, "CREATE TABLE local_upgrade(value TEXT); INSERT INTO local_upgrade VALUES('applied');\n");
  const settings = await readFile(join(f.root, '.dev.vars'));
- const ready = events(await f.run(['dev', '--detach', '--json'])).find(event => event.event === 'ready');
+ // Uptime supplies its own managed runtime target without an explicit timeout.
+ // Delay real Vite configuration beyond the old handshake window, then require
+ // actual app health. No fake server or readiness event can make this pass.
+ const adapter=join(f.root,'scripts/installer/local.mjs'),adapterBytes=await readFile(adapter,'utf8');
+ const config=join(f.root,'vite.config.ts'),configBytes=await readFile(config,'utf8');
+ await writeFile(adapter,adapterBytes+`\ncommandAdapter.dev=async context=>{const [program,args,{timeoutMs,...options}]=await developmentTarget(context);return [program,args,options];};\n`);
+ await writeFile(config,configBytes+'\nawait new Promise(resolve=>setTimeout(resolve,70000));\n');
+ let ready,upgradeCapture;
+ const startupStarted=performance.now();
+ const startup=f.start(['dev','--foreground','--json']);
+ try{
+  ready=await awaitReady(startup);
+  assert.equal((await fetch(ready.url+'/health')).status,200);
+  assert.match(startup.stderrText,/Still starting/,'startup reports progress before it becomes ready');
+  t.diagnostic(`no-timeout managed rer dev: ${((performance.now()-startupStarted)/1000).toFixed(2)} s to real readiness`);
+  upgradeCapture=await readFile(join(f.root,'.seed/installer/install.log'),'utf8');
+ }finally{
+  await f.stop(startup);
+  await writeFile(adapter,adapterBytes);await writeFile(config,configBytes);
+ }
+ const serving=f.start(['dev','--foreground','--json']);
+ ready = await awaitReady(serving);
  assert.ok(ready);
  assert.equal((await fetch(ready.url + '/health')).status, 200);
  assert.deepEqual((await f.sql('SELECT value FROM local_upgrade'))[0].results, [{ value: 'applied' }]);
  assert.deepEqual((await f.sql('SELECT value FROM saved_before_upgrade'))[0].results, [{ value: 'owner content' }]);
  assert.deepEqual((await f.sql("SELECT name FROM d1_migrations WHERE name='9998_local_upgrade.sql'"))[0].results, [{ name: '9998_local_upgrade.sql' }]);
- const capture = await readFile(join(f.root, '.seed/installer/install.log'), 'utf8');
- assert.ok(capture.split('\n').some(line => line.includes('Applied local migrations:') && line.includes('9998_local_upgrade.sql')), 'startup names the applied migration');
+ assert.ok(upgradeCapture.split('\n').some(line => line.includes('Applied local migrations:') && line.includes('9998_local_upgrade.sql')), 'startup names the applied migration');
  await devEntryBrowser(ready);
  // rer dev --as takes anyone in the local database by email; an unknown email names the people it takes.
  await f.sql("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('local-member','jordan@example.test','Jordan','member','active',1)");
@@ -59,10 +94,11 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  assert.equal(events(await f.run(['dev', '--as', 'admin@dev.localhost', '--json'])).find(event => event.event === 'ready')?.signedInAs, 'admin@dev.localhost');
  const unknown = events(await f.run(['dev', '--as', 'nobody@example.test', '--json'], 2)).find(event => event.event === 'error')?.message;
  assert.match(unknown, /nobody@example\.test[^]*owner \(migration-owner@example\.test\)[^]*jordan@example\.test/);
- await f.run(['dev', '--stop', '--json']);
- const repeated = events(await f.run(['dev', '--detach', '--json'])).find(event => event.event === 'ready');
+ await f.stop(serving);
+ const restarted=f.start(['dev','--foreground','--json']);
+ const repeated = await awaitReady(restarted);
  assert.equal((await fetch(repeated.url + '/health')).status, 200, 'an up-to-date database starts without reapplying SQL');
- await f.run(['dev', '--stop', '--json']);
+ await f.stop(restarted);
  assert.deepEqual(await readFile(join(f.root, '.dev.vars')), settings);
 
  await writeFile(join(f.root, 'migrations/core/9999_broken_upgrade.sql'), 'INSERT INTO missing_upgrade_table VALUES (1);\n');

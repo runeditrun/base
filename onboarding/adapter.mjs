@@ -233,7 +233,11 @@ async function start(context, hooks) {
   try{return await listenerPorts(child.pid);}
   catch(error){throw installationFailure('command_failed',{step:'start',diagnostic:error});}
  };
- const readinessTimeoutMs=timeoutMs??60000,readinessStarted=performance.now();
+ // A seed can use the managed IPC handshake without developmentTarget's
+ // options (Uptime does). Give that real listener/health journey the same
+ // first-run budget, including Vite dependency optimization.
+ const readinessTimeoutMs=timeoutMs??(runtimePortHandshake?900000:60000),readinessStarted=performance.now();
+ if(runtimePortHandshake)store.report('Waiting for the application server to finish starting; first launch may optimize dependencies.');
  try {
   await store.waitForReady(readinessLabel, child, async probeSignal => {
    if(runtimePortHandshake){

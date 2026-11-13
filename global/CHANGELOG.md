@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Setup keeps Vite source-import advisories and suppression instructions in its redacted capture log. Successful restore reports archive counts and the setup/dev next step; post-restore Wrangler SQL output stays in the log, while failed queries retain their diagnostics. Managed listener targets without an explicit timeout now use the same first-run readiness window as the shared development target and explain dependency optimization while waiting. Current-main deploy dry-run duplication and export allocation/ETA trips were already fixed; no release or version change.
+
 - Installation restore refusals explain that the destination already has people or data and give the fresh-install or backup/reset/restore path, without exposing internal table names. Deploy dry runs show a readable Worker, product resources, permissions and declared migration count; pending migrations remain unknown offline, and the full plan stays in the redacted log and `--json`. Export allocation estimates and duplicate mapped mail-key alternatives were already corrected in 0.2.112 and 0.2.110 respectively.
 
 - Cover setup's declaration-derived Cloudflare token permissions (including R2 and Queues) and dry-run recovery's retained `--dry-run`, while preserving real-deploy recovery. Ordinary seed deploy-policy errors now name the policy check and still stop before provider contact; missing-input refusals retain exit 3. Refuse already-stale erasure archives before expensive restore staging, retaining the final erasure fence, and advance more export parts per call in the emitted-Worker person-erasure journey without relaxing its assertions or timeout.
