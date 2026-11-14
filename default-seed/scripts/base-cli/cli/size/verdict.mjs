@@ -121,12 +121,12 @@ export function verdictLines(verdict, declaration) {
 
 /** One size's statements in the fleet runner's format: { statements: [{ name: "<flow> #<i>", sql, params }] }, every
  * statement each flow's last run executed, in order, with its parameters as bound. */
-export function statementsFile(size, results, { complete = true, error } = {}) {
+export function statementsFile(size, results, { complete = true, error, queueConsumersMeasured = null, unmeasuredFlows = [] } = {}) {
  const statements = [];
  for (const result of results) {
   let index = 0;
   for (const { sql, params, exec } of result.executions) if (!exec) statements.push({ name: `${result.name} #${++index}`, sql, params });
  }
- return { about: `rer size: statements observed at the ${size} size, in order, with their parameters as bound.`, statements, complete,
-  ...(!complete ? { error, flows: results.map(run => ({ name: run.name, runs: run.runs, incomplete: run.incomplete, ...flowSummary(run) })) } : {}) };
+ return { about: `rer size: statements observed at the ${size} size, in order, with their parameters as bound.`, statements, complete, queueConsumersMeasured,
+  ...(!complete ? { error, unmeasuredFlows, flows: results.map(run => ({ name: run.name, runs: run.runs, incomplete: run.incomplete, ...flowSummary(run) })) } : {}) };
 }

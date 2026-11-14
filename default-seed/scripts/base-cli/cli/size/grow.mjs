@@ -72,6 +72,12 @@ export async function buildFixtures(options, out, loaded) {
    }
   }
  } finally { clock.stop(); }
+ if (!result.ok) for (const size of sizes) {
+  const attempted = measured[size] ?? [];
+  result[size] ??= { code: 'size_not_measured', error: 'This size was not measured because the session stopped.' };
+  result[size].measurements = attempted.map(run => ({ name: run.name, runs: run.runs, incomplete: run.incomplete, ...flowSummary(run) }));
+  result[size].unmeasuredFlows = declaration.flows.filter(flow => !attempted.some(run => run.name === flow.name)).map(flow => flow.name);
+ }
  if (result.ok) {
   const verdict = judgeFlows(declaration, measured.small, measured.large, await schemasFromBuild(options.cwd, { wrangler: declaration.build.wrangler }));
   result.ok = verdict.ok;
@@ -84,6 +90,7 @@ export async function buildFixtures(options, out, loaded) {
   await mkdir(directory, { recursive: true });
   for (const size of sizes) {
    const evidence = statementsFile(size, measured[size] ?? [], { complete: completed[size] === true,
+    queueConsumersMeasured: result.queueConsumersMeasured, unmeasuredFlows: result[size]?.unmeasuredFlows,
     error: result[size]?.error ?? (completed[size] ? undefined : 'This size was not measured because the session stopped.') });
    await writeFile(join(directory, `${size}.json`), JSON.stringify(evidence, null, 1) + '\n');
   }
