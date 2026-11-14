@@ -137,7 +137,12 @@ test('rer size uses a verification-only owner and public host without changing s
  await writeFile(join(root, 'agent-surface.json'), JSON.stringify(surface));
  const refused = await exec(['size', '--cwd', root, '--json'], env);
  assert.equal(refused.code, 1, refused.stdout + refused.stderr);
- assert.equal(flow(result(refused), 'public').ok, false, 'deployment vars alone must not admit the host');
+ const denied = result(refused);
+ assert.equal(denied.size.small.code, 'size_flow_incomplete', 'an unadmitted origin stops the measurement');
+ const publicRun = denied.size.small.measurements.find(item => item.name === 'public');
+ assert.equal(publicRun.incomplete, true);
+ assert.match(publicRun.error, /origin/i, 'deployment vars alone must not admit the host');
+ assert.equal(denied.flows, undefined, 'a failed request cannot produce complete verdicts');
 });
 
 
@@ -160,8 +165,10 @@ test('size holds owner and scheduled queues while measuring the scheduled handle
  }
 });
 
-test('a timed-out request stops before a later flow and exports partial work without a passing verdict', { timeout: 300_000 }, async t => {
+test('a request timeout or run deadline stops before a later flow and exports partial work without a passing verdict', { timeout: 300_000 }, async t => {
+ for (const timeoutSeconds of [180, 15]) {
  const shape = structuredClone(declaration);
+ shape.budget.timeoutSeconds = timeoutSeconds;
  shape.flows = [
   shape.flows.find(item => item.name === 'keyed'),
   { name: 'slow', persona: 'anonymous', request: { method: 'GET', path: '/slow' }, repeat: 2, ceiling: 100000 },
@@ -171,7 +178,7 @@ test('a timed-out request stops before a later flow and exports partial work wit
  assert.equal(outcome.code, 1, outcome.stdout + outcome.stderr);
  assert.equal(size.ok, false);
  t.diagnostic(JSON.stringify({ result: size, small: JSON.parse(await readFile(join(directory, 'statements', 'small.json'), 'utf8')) }));
- assert.equal(size.size.small.code, 'size_flow_incomplete');
+ assert.equal(size.size.small.code, timeoutSeconds === 15 ? 'size_timeout' : 'size_flow_incomplete');
  assert.equal(size.queueConsumersMeasured, false);
  assert.equal(size.flows, undefined, 'incomplete evidence cannot produce growth verdicts');
  const exported = JSON.parse(await readFile(join(directory, 'statements', 'small.json'), 'utf8'));
@@ -186,4 +193,5 @@ test('a timed-out request stops before a later flow and exports partial work wit
  const large = JSON.parse(await readFile(join(directory, 'statements', 'large.json'), 'utf8'));
  assert.equal(large.complete, false);
  assert.deepEqual(large.statements, [], 'an unattempted size has no invented measurements');
+ }
 });

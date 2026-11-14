@@ -43,6 +43,7 @@ export default {
   }
   switch (url.pathname) {
    case '/queue-state': return new Response(null, { status: (await db.prepare('SELECT count(*) AS c FROM queue_effects').first('c')) === 0 ? 200 : 409 });
+   // Cross the real HTTP deadline without burning CPU; real D1 statements bracket the pending request.
    case '/slow':
     await db.prepare('SELECT id FROM filler WHERE id = ?').bind(1).all();
     await new Promise(resolve => setTimeout(resolve, 31000));
