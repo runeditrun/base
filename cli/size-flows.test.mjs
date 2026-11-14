@@ -176,6 +176,8 @@ test('a timed-out request stops before a later flow and exports partial work wit
  assert.equal(size.flows, undefined, 'incomplete evidence cannot produce growth verdicts');
  const exported = JSON.parse(await readFile(join(directory, 'statements', 'small.json'), 'utf8'));
  assert.equal(exported.complete, false);
+ assert.equal(exported.queueConsumersMeasured, false);
+ assert.ok(exported.unmeasuredFlows.includes('after-slow'));
  assert.equal(exported.flows.find(item => item.name === 'slow').runs, 1, 'a failed warmup must not be retried');
  assert.ok(exported.flows.find(item => item.name === 'slow').incomplete);
  assert.ok(exported.statements.some(item => item.name.startsWith('keyed #')));
