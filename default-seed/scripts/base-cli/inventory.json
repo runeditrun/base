@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.116-dev.g499f2e37",
+  "cliVersion": "0.2.116-dev.g4a4d4aec",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,7 +391,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "d5f1a753e754d9360374749eb9521c3283027e493384bbaec5a8a686a7eb084e"
+      "sha256": "4fbe88cb76a718a1a2414331395b3c2e2d8cc6064f02e32ff813b7988a199fec"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -1379,7 +1379,7 @@
     },
     "cli/size/grow.mjs": {
       "source": "cli/size/grow.mjs",
-      "sha256": "b5cfa6793b53ecbfc6811b223b4e0a1dbd3facaaff4f46c3f1193f6bb966fc59"
+      "sha256": "3d4600360cfa2c27302b3e7908b2cd9ecc4c8147f8a96e4a9de06548c0dbe05f"
     },
     "cli/size/install.mjs": {
       "source": "cli/size/install.mjs",
