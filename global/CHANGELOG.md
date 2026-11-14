@@ -1,8 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.2.116
 
-- Let seeds declare only a `verification` object in `agent-surface.json` for disposable size-check owners and public hosts without declaring an agent door. Any additional top-level key retains full agent-door conformance.
+### Verification-only agent surfaces
+
+- `rer verify` treats an `agent-surface.json` whose only top-level key is an object-valued `verification` as an undeclared agent door and returns `agentDoor: {declared:false}`. Any other top-level key, including schema or version metadata, keeps full agent declaration validation and conformance. Offline `rer check` still validates a present file as a full agent declaration.
+- `rer size` still reads `verification.owner` for its disposable native owner and `verification.publicHosts` for admitted deployment hostname variables. A seed without agent tools can use those size-check settings without declaring an agent door; the actual setup flow is unchanged.
+
+### Auth setup fixture diagnostics
+
+- The Auth setup test fixture reports redacted refusal classifications for port availability/listening, private input custody and malformed local dev keys, plus whether a port was announced and whether the app port equals the controlled provider edge. These are fixture-only diagnostics; they do not change runtime setup behavior or contact a real provider.
+
+Seeds receive the verification-only CLI support after adopting this rer through their pinned package or refreshed source. Preparing this release establishes no seed adoption, deployed behavior or production result. The actual diff adds no migrations and touches neither modules/import-kit nor modules/portability.
 
 ## 0.2.115
 
