@@ -102,3 +102,18 @@ test('narrowing declarations reject widening fields, open objects and hidden sch
  assert.equal(validateAgentSurface(incomplete).ok, false);
  t.diagnostic(`Gap N negative declarations: ${mutations.length + 1}/${mutations.length + 1} refused.`);
 });
+
+
+test('rer verify treats a verification-only surface like an absent agent declaration', { timeout: 120000 }, async t => {
+ const root = await fixtureSeed(t, 'setup-token');
+ const env = await isolatedQueue(t, { ...process.env, CI: 'true', WRANGLER_SEND_METRICS: 'false' });
+ await writeFile(join(root, 'agent-surface.json'), JSON.stringify({ verification: { owner: { email: 'synthetic-base-1@example.test' } } }));
+ const outcome = await run(process.execPath, [join(base, 'bin/rer.mjs'), 'verify', '--cwd', root, '--json'], { env, timeout: 75000, maxBuffer: 4 * 1024 * 1024 })
+  .then(value => ({ code: 0, ...value }), error => ({ code: error.code, stdout: error.stdout, stderr: error.stderr }));
+ t.diagnostic(outcome.stdout + outcome.stderr);
+ assert.equal(outcome.code, 0, outcome.stdout + outcome.stderr);
+ const result = JSON.parse(outcome.stdout.trim().split('\n').at(-1));
+ assert.equal(result.ok, true);
+ assert.deepEqual(result.agentDoor, { declared: false });
+ assert.match(outcome.stdout, /Agent door conformance: undeclared \(verification-only agent-surface\.json\)/);
+});
