@@ -57,25 +57,36 @@ async function once(flow, { hosted, personas, now }) {
  * unsettled, executions }. `executions` lists each statement the last run executed, in order.
  */
 export async function runFlow(flow, install) {
- let last;
+ const result = { name: flow.name, kind: kindOf(flow), persona: flow.persona ?? null, label: flowLabel(flow), runs: 0,
+  status: null, ms: 0, executions: [], rowsRead: 0, rowsWritten: 0, statements: 0, incomplete: true };
+ install.results?.push(result);
  for (let run = 0; run < flow.repeat; run++) {
   const window = install.meter.open();
+  Object.assign(result, { runs: run + 1, startedAt: performance.now(), executions: window.statements, incomplete: true });
   let outcome;
   try { outcome = await once(flow, install); }
-  catch (error) { await window.close({ quietMs: 0, maxMs: 0 }); throw error; }
-  const { statements, unsettled } = await window.close();
-  last = { ...outcome, unsettled, executions: statements, rowsRead: sum(statements, 'rows_read'), rowsWritten: sum(statements, 'rows_written'), statements: statements.length };
+  catch (error) {
+   Object.assign(result, { error: String(error?.message ?? error), ms: performance.now() - result.startedAt });
+   await window.close({ quietMs: 0, maxMs: 0 });
+   throw error;
+  }
+  // An aborted request can leave unannounced D1 work running. No quiet interval proves cancellation.
+  const { statements, unsettled } = await window.close(outcome.error ? { quietMs: 0, maxMs: 0 } : undefined);
+  Object.assign(result, outcome, { unsettled, executions: statements, rowsRead: sum(statements, 'rows_read'),
+   rowsWritten: sum(statements, 'rows_written'), statements: statements.length, incomplete: Boolean(outcome.error || unsettled) });
+  if (result.incomplete) {
+   install.meter.stop();
+   throw new RerError('size_flow_incomplete', `Flow ${flow.name} did not finish safely (${outcome.error ?? 'work remained unsettled'}). This measurement session stopped; later flows and sizes were not measured because outstanding work could contaminate them.`, 1);
+  }
  }
- return { name: flow.name, kind: kindOf(flow), persona: flow.persona ?? null, label: flowLabel(flow), runs: flow.repeat, ...last };
+ return result;
 }
 
-/** Every declared flow, in order, on one install: resolves the list of runFlow results. `each(flow, work)` runs one
- * flow's work (the run's clock names the flow it stopped in). */
+/** Every declared flow, in order, on one install. A transport failure or unsettled window stops the session,
+ * including repeats; only a complete response with settled work permits another measurement window. */
 export async function runFlows(flows, install, each = (flow, work) => work()) {
- const results = [];
- for (const flow of flows) {
-  const result = await each(flow, () => runFlow(flow, install));
-  results.push(result);
- }
+ const results = install.results ?? [];
+ install = { ...install, results };
+ for (const flow of flows) await each(flow, () => runFlow(flow, install));
  return results;
 }

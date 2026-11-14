@@ -8,7 +8,7 @@ import { sizes } from './fixture.mjs';
 import { prepareRun, buildInstall } from './install.mjs';
 import { runClock } from './clock.mjs';
 import { measureInstall } from './measure.mjs';
-import { judgeFlows, statementsFile, verdictLines } from './verdict.mjs';
+import { flowSummary, judgeFlows, statementsFile, verdictLines } from './verdict.mjs';
 import { schemasFromBuild } from './schema.mjs';
 
 const seconds = ms => `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)} s`;
@@ -43,7 +43,7 @@ const phaseText = phases => Object.entries(phases).map(([phase, ms]) => `${phase
  */
 export async function buildFixtures(options, out, loaded) {
  const { declaration, project } = loaded ?? await declared(options), run = await prepareRun(options.cwd, declaration, { project }), clock = runClock(declaration.budget.timeoutSeconds);
- const result = { ok: true }, measured = {};
+ const result = { ok: true, queueConsumersMeasured: null }, measured = {}, completed = {};
  if (!options.json) out.human('Size check: queues are held while the flows run; queue consumer work is not measured.');
  try {
   for (const size of sizes) {
@@ -51,6 +51,8 @@ export async function buildFixtures(options, out, loaded) {
    try {
     const built = await buildInstall(run, size, clock, measureInstall(run));
     measured[size] = built.measured;
+    completed[size] = true;
+    result.queueConsumersMeasured = false;
     const phasesMs = Object.fromEntries(Object.entries(built.phases).map(([phase, ms]) => [phase, Math.round(ms)]));
     result[size] = { tables: built.tables.map(table => ({ ...table, ms: Math.round(table.ms) })), totalRows: built.totalRows, phasesMs, statements: built.statements };
     if (options.json) continue;
@@ -61,22 +63,30 @@ export async function buildFixtures(options, out, loaded) {
    } catch (error) {
     if (!(error instanceof RerError)) throw error;
     result.ok = false;
-    result[size] = { error: error.message, code: error.code };
+    measured[size] = error.measurement?.flows ?? [];
+    if (error.measurement?.queuesHeld) result.queueConsumersMeasured = false;
+    result[size] = { ...(error.installation ? { tables: error.installation.tables, totalRows: error.installation.totalRows } : {}),
+     error: error.message, code: error.code, measurements: measured[size].map(run => ({ name: run.name, runs: run.runs, incomplete: run.incomplete, ...flowSummary(run) })) };
     if (!options.json) out.human(`  FAIL ${error.message}`);
     break;
    }
   }
  } finally { clock.stop(); }
- if (!result.ok) return result;
- const verdict = judgeFlows(declaration, measured.small, measured.large, await schemasFromBuild(options.cwd, { wrangler: declaration.build.wrangler }));
- result.ok = verdict.ok;
- result.flows = verdict.flows;
- result.queueConsumersMeasured = false;
- if (!options.json) verdictLines(verdict, declaration).forEach(line => out.human(line));
+ if (result.ok) {
+  const verdict = judgeFlows(declaration, measured.small, measured.large, await schemasFromBuild(options.cwd, { wrangler: declaration.build.wrangler }));
+  result.ok = verdict.ok;
+  result.flows = verdict.flows;
+  result.queueConsumersMeasured = false;
+  if (!options.json) verdictLines(verdict, declaration).forEach(line => out.human(line));
+ }
  if (options.writeStatements) {
   const directory = resolve(process.cwd(), options.writeStatements);
   await mkdir(directory, { recursive: true });
-  for (const size of sizes) await writeFile(join(directory, `${size}.json`), JSON.stringify(statementsFile(size, measured[size]), null, 1) + '\n');
+  for (const size of sizes) {
+   const evidence = statementsFile(size, measured[size] ?? [], { complete: completed[size] === true,
+    error: result[size]?.error ?? (completed[size] ? undefined : 'This size was not measured because the session stopped.') });
+   await writeFile(join(directory, `${size}.json`), JSON.stringify(evidence, null, 1) + '\n');
+  }
   if (!options.json) out.human(`  Wrote the statements each size ran to ${join(directory, 'small.json')} and ${join(directory, 'large.json')}.`);
  }
  return result;

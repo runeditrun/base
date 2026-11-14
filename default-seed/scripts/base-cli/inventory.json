@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.116-dev.ge3c88132",
+  "cliVersion": "0.2.116-dev.gc8ad5f4c",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,7 +391,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "9168c734d647691c111f5ae7033d3de77c6b03088808dbba876a77fa728404c0"
+      "sha256": "d5f1a753e754d9360374749eb9521c3283027e493384bbaec5a8a686a7eb084e"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -939,7 +939,7 @@
     },
     "cli/hosted-output.mjs": {
       "source": "cli/hosted-output.mjs",
-      "sha256": "0744c9e579e2fd9cdbb707cfc3d978de258355ee248395ce765bc8795dd4de98"
+      "sha256": "20f5f3bc940a992d7513c03b7fdc71fe22e2fb1c45e181afa31ea275e3961d52"
     },
     "cli/hosted-owner.mjs": {
       "source": "cli/hosted-owner.mjs",
@@ -1339,11 +1339,11 @@
     },
     "cli/size/clock.mjs": {
       "source": "cli/size/clock.mjs",
-      "sha256": "b0d9c97f0bb8d21a5bc6da95b2f4e190a3697442690854e4dcf4bd83eef1f023"
+      "sha256": "ad7a8248807fd2d05f37bc9cd71390d2be0f52ee199b39543d2e0eb66b503d1d"
     },
     "cli/size/command.mjs": {
       "source": "cli/size/command.mjs",
-      "sha256": "0d56cecb21b1f6060094e8dbd8c511752fc3643b1766187164338179de2b151d"
+      "sha256": "88462de3fa47c7f2cc6f75aced10ece74800406051ab86c6aea6e57d7d1d6890"
     },
     "cli/size/declaration.mjs": {
       "source": "cli/size/declaration.mjs",
@@ -1371,7 +1371,7 @@
     },
     "cli/size/flows.mjs": {
       "source": "cli/size/flows.mjs",
-      "sha256": "e003adc2c8033e6dc832cdbd059cf5b0bc43650c881c7b871d4b4d367c28d326"
+      "sha256": "1e119fbd5c55a52132d91454881a27700cefbdd6bb613d2ebbf560cfdf6ab7bf"
     },
     "cli/size/from-items.mjs": {
       "source": "cli/size/from-items.mjs",
@@ -1379,11 +1379,11 @@
     },
     "cli/size/grow.mjs": {
       "source": "cli/size/grow.mjs",
-      "sha256": "bfe3f427a1abebc88b027e5c233a28cb0626a8d062307c1777f5615c766d0b0e"
+      "sha256": "02560daff80d389e88f830ce12cdf35452f865194bfe4d496a1cb1082ac59ea1"
     },
     "cli/size/install.mjs": {
       "source": "cli/size/install.mjs",
-      "sha256": "2b54a62e120487be1cc34711fa57821b037e04790da9c34213801838bad383dd"
+      "sha256": "96c8bcce7864ac92d0418a96d74f142e7f4fb47efde7d0fa6366ca3796583412"
     },
     "cli/size/json-duplicates.mjs": {
       "source": "cli/size/json-duplicates.mjs",
@@ -1395,11 +1395,11 @@
     },
     "cli/size/measure.mjs": {
       "source": "cli/size/measure.mjs",
-      "sha256": "b947efd82ef00a9d4c79905e2855d9b4fb7d258e935c68d9cb0e93782faaecf8"
+      "sha256": "f01b59793ce7f417cf9724ad3d68d949257ef8939c4a45dd75ae1cbc6dc4ef4e"
     },
     "cli/size/meter.mjs": {
       "source": "cli/size/meter.mjs",
-      "sha256": "2130676ffa66e1fc26bb471075ce1d6711f3439942584678c54c4b6a62a24fbf"
+      "sha256": "788d8f435b2335e28d6a1cd97f7aea8b37839043fbe100626f68db9c24c9ae76"
     },
     "cli/size/personas.mjs": {
       "source": "cli/size/personas.mjs",
@@ -1435,7 +1435,7 @@
     },
     "cli/size/verdict.mjs": {
       "source": "cli/size/verdict.mjs",
-      "sha256": "62d37eaabb5c67926ee9743e56499a5b09799c61480ca9a4f3957b2155ce1969"
+      "sha256": "4ef84e9c4a29a760b932ac2883981fcba6562f00f35121d1482fa9844444c02f"
     },
     "cli/size/verify-step.mjs": {
       "source": "cli/size/verify-step.mjs",

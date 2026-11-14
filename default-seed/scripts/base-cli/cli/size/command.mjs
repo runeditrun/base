@@ -50,7 +50,8 @@ export async function measureSize(options, out) {
     const { ok: built, flows, queueConsumersMeasured, ...sizes } = await buildFixtures(options, out, loaded);
     ok = ok && built;
     details.size = sizes;
-    if (flows) Object.assign(details, { flows, queueConsumersMeasured });
+    details.queueConsumersMeasured = queueConsumersMeasured;
+    if (flows) details.flows = flows;
   } else if (!options.statements && !options.migrations) out.human(undeclaredLine);
   return { ok, details };
 }
