@@ -139,3 +139,47 @@ test('rer size uses a verification-only owner and public host without changing s
  assert.equal(refused.code, 1, refused.stdout + refused.stderr);
  assert.equal(flow(result(refused), 'public').ok, false, 'deployment vars alone must not admit the host');
 });
+
+
+test('size holds owner and scheduled queues while measuring the scheduled handler at independent sizes', { timeout: 300_000 }, async t => {
+ const shape = structuredClone(declaration);
+ shape.flows = [
+  { name: 'tick', scheduled: '* * * * *', ceiling: 100000, growth: { allowed: true, why: 'The scheduled handler scans the declared cohort.' } },
+  { name: 'queue-state', persona: 'owner', request: { method: 'GET', path: '/queue-state' }, ceiling: 100 },
+ ];
+ const { outcome, size, directory } = await sizeRun(t, shape, ['--write-statements', '{dir}/statements']);
+ assert.equal(outcome.code, 0, outcome.stdout + outcome.stderr);
+ assert.equal(size.queueConsumersMeasured, false);
+ assert.ok(flow(size, 'tick').large.rowsRead > flow(size, 'tick').small.rowsRead);
+ for (const name of ['small', 'large']) {
+  assert.equal(flow(size, 'queue-state')[name].status, 200, 'no consumer ran during owner setup or scheduled work');
+  const exported = JSON.parse(await readFile(join(directory, 'statements', name + '.json'), 'utf8'));
+  assert.ok(exported.statements.some(item => item.name.startsWith('tick #') && item.params.includes('s')));
+  assert.ok(!exported.statements.some(item => item.sql.includes('INSERT INTO queue_effects') || item.sql.includes('FROM filler WHERE id >')));
+ }
+});
+
+test('a timed-out request stops before a later flow and exports partial work without a passing verdict', { timeout: 300_000 }, async t => {
+ const shape = structuredClone(declaration);
+ shape.flows = [
+  shape.flows.find(item => item.name === 'keyed'),
+  { name: 'slow', persona: 'anonymous', request: { method: 'GET', path: '/slow' }, repeat: 2, ceiling: 100000 },
+  { name: 'after-slow', persona: 'anonymous', request: { method: 'GET', path: '/after-slow' }, ceiling: 100 },
+ ];
+ const { outcome, size, directory } = await sizeRun(t, shape, ['--write-statements', '{dir}/statements']);
+ assert.equal(outcome.code, 1, outcome.stdout + outcome.stderr);
+ assert.equal(size.ok, false);
+ assert.equal(size.size.small.code, 'size_flow_incomplete');
+ assert.equal(size.queueConsumersMeasured, false);
+ assert.equal(size.flows, undefined, 'incomplete evidence cannot produce growth verdicts');
+ const exported = JSON.parse(await readFile(join(directory, 'statements', 'small.json'), 'utf8'));
+ assert.equal(exported.complete, false);
+ assert.equal(exported.flows.find(item => item.name === 'slow').runs, 1, 'a failed warmup must not be retried');
+ assert.ok(exported.flows.find(item => item.name === 'slow').incomplete);
+ assert.ok(exported.statements.some(item => item.name.startsWith('keyed #')));
+ assert.ok(exported.statements.some(item => item.name.startsWith('slow #')));
+ assert.ok(!exported.statements.some(item => item.name.startsWith('after-slow #')));
+ const large = JSON.parse(await readFile(join(directory, 'statements', 'large.json'), 'utf8'));
+ assert.equal(large.complete, false);
+ assert.deepEqual(large.statements, [], 'an unattempted size has no invented measurements');
+});

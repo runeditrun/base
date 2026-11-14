@@ -14,6 +14,7 @@ import { join, resolve } from 'node:path';
 const migration = `CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE);
 CREATE TABLE items (id TEXT PRIMARY KEY, note TEXT NOT NULL);
 CREATE TABLE filler (id INTEGER PRIMARY KEY);
+CREATE TABLE queue_effects (id INTEGER PRIMARY KEY);
 `;
 const scan = 'SELECT count(*) AS c FROM items WHERE note = ?';
 const worker = `
@@ -37,9 +38,18 @@ export default {
    const body = await request.json().catch(() => ({}));
    if (!env.SETUP_TOKEN || body.token !== env.SETUP_TOKEN) return new Response('forbidden', { status: 403 });
    await db.prepare('INSERT INTO users(id, email) VALUES(?, ?)').bind('owner', env.OWNER_EMAIL).run();
+   await env.JOBS.send({ source: 'owner' });
    return new Response(null, { status: 303, headers: { location: body.returnTo ?? '/', 'set-cookie': 'session=owner; Path=/; HttpOnly' } });
   }
   switch (url.pathname) {
+   case '/queue-state': return new Response(null, { status: (await db.prepare('SELECT count(*) AS c FROM queue_effects').first('c')) === 0 ? 200 : 409 });
+   case '/slow':
+    await db.prepare('SELECT id FROM filler WHERE id = ?').bind(1).all();
+    await new Promise(resolve => setTimeout(resolve, 31000));
+    return Response.json(await db.prepare('SELECT id FROM filler WHERE id > ?').bind(0).all());
+   case '/after-slow':
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    return Response.json(await db.prepare('SELECT id FROM items WHERE id = ?').bind('i0001').first());
    case '/scan': return Response.json(await db.prepare(scan).bind('x').first());
    case '/raw': return Response.json(await db.prepare(scan).bind('x').raw());
    case '/batch': return Response.json((await db.batch([db.prepare(scan).bind('x'), db.prepare('SELECT 1 AS one')])).map(result => result.results));
@@ -54,7 +64,8 @@ export default {
    default: return new Response('not found', { status: 404 });
   }
  },
- async scheduled(controller, env) { await env.DB.prepare(scan).bind('s').all(); },
+ async scheduled(controller, env) { await env.JOBS.send({ source: 'scheduled' }); await env.DB.prepare(scan).bind('s').all(); },
+ async queue(batch, env) { await env.DB.prepare('SELECT id FROM filler WHERE id > ?').bind(0).all(); await env.DB.prepare('INSERT INTO queue_effects DEFAULT VALUES').run(); },
 };
 `;
 
@@ -92,6 +103,7 @@ export async function writeSizeSeed(root, shape = declaration, { base = resolve(
   'wrangler.jsonc': JSON.stringify({ triggers: { crons: ['* * * * *'] } }),
   'rer-setup.json': JSON.stringify({ fields: [], steps: [{ type: 'owner-claim', mode: 'setup-token', emailField: 'OWNER_EMAIL', tokenField: 'SETUP_TOKEN' }] }),
   'dist/server/wrangler.json': JSON.stringify({ main: 'index.js', compatibility_date: '2026-09-08', triggers: { crons: ['* * * * *'] },
+   queues: { producers: [{ binding: 'JOBS', queue: 'size-jobs' }], consumers: [{ queue: 'size-jobs', max_batch_size: 1, max_batch_timeout: 0 }] },
    d1_databases: [{ binding: 'DB', database_name: 'app', database_id: 'app', migrations_dir: 'migrations' }],
    durable_objects: { bindings: [{ name: 'COUNTER', class_name: 'Counter' }] } }),
   'dist/server/index.js': worker, 'dist/server/migrations/0001.sql': migration, 'size-check.json': JSON.stringify(shape),
