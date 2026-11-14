@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFile, writeFile, symlink } from 'node:fs/promises';
+import { readFile, writeFile, symlink, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomBytes, randomUUID, webcrypto } from 'node:crypto';
 import { fixtureSeed, buildFixture } from './tests/fixtures/agent-door/seed.mjs';
@@ -110,10 +110,37 @@ test('rer verify treats a verification-only surface like an absent agent declara
  await writeFile(join(root, 'agent-surface.json'), JSON.stringify({ verification: { owner: { email: 'synthetic-base-1@example.test' } } }));
  const outcome = await run(process.execPath, [join(base, 'bin/rer.mjs'), 'verify', '--cwd', root, '--json'], { env, timeout: 75000, maxBuffer: 4 * 1024 * 1024 })
   .then(value => ({ code: 0, ...value }), error => ({ code: error.code, stdout: error.stdout, stderr: error.stderr }));
- t.diagnostic(outcome.stdout + outcome.stderr);
+ if (outcome.code !== 0) t.diagnostic(outcome.stdout + outcome.stderr);
  assert.equal(outcome.code, 0, outcome.stdout + outcome.stderr);
  const result = JSON.parse(outcome.stdout.trim().split('\n').at(-1));
  assert.equal(result.ok, true);
  assert.deepEqual(result.agentDoor, { declared: false });
- assert.match(outcome.stdout, /Agent door conformance: undeclared \(verification-only agent-surface\.json\)/);
+ await rm(join(root, 'agent-surface.json'));
+ const absent = await run(process.execPath, [join(base, 'bin/rer.mjs'), 'verify', '--cwd', root, '--json'], { env, timeout: 75000, maxBuffer: 4 * 1024 * 1024 });
+ const absentResult = JSON.parse(absent.stdout.trim().split('\n').at(-1));
+ assert.equal(absentResult.ok, result.ok);
+ assert.deepEqual(absentResult.agentDoor, result.agentDoor);
+ assert.match(outcome.stdout + outcome.stderr, /Agent door conformance: undeclared \(verification-only agent-surface\.json\)/);
+});
+
+
+test('verification alongside any other surface key retains full agent conformance', { timeout: 120000 }, async t => {
+ const root = await fixtureSeed(t, 'setup-token'), file = join(root, 'agent-surface.json');
+ for (const key of ['tools', 'resources', 'seed', 'capabilities', 'schema', '$schema', 'version', 'unknown']) {
+  await writeFile(file, JSON.stringify({ verification: {}, [key]: [] }));
+  await assert.rejects(checkAgentDoor(root, { report() {} }), error => error.code === 'agent_door_failed'
+   && error.agentDoor.points.some(point => !point.ok), `${key} must not opt out of conformance`);
+ }
+ for (const surface of [{}, { verification: null }, { verification: [] }]) {
+  await writeFile(file, JSON.stringify(surface));
+  await assert.rejects(checkAgentDoor(root, { report() {} }), { code: 'agent_door_failed' });
+ }
+ await writeFile(file, JSON.stringify({ verification: {}, tools: [] }));
+ const env = await isolatedQueue(t, { ...process.env, CI: 'true', WRANGLER_SEND_METRICS: 'false' });
+ const failure = await run(process.execPath, [join(base, 'bin/rer.mjs'), 'verify', '--cwd', root, '--json'], { env, timeout: 75000, maxBuffer: 4 * 1024 * 1024 }).then(() => null, error => error);
+ assert.ok(failure, 'incomplete tool declarations must fail rer verify');
+ assert.equal(failure.code, 1);
+ const events = failure.stdout.trim().split('\n').map(JSON.parse);
+ assert.ok(events.some(event => event.code === 'agent_door_failed'), failure.stdout + failure.stderr);
+ assert.match(failure.stdout + failure.stderr, /Agent door conformance: 1\/10 points passed/);
 });

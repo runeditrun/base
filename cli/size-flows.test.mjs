@@ -1,6 +1,6 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -92,4 +92,50 @@ test('flows that read the same at both sizes under their ceilings pass, and rer 
  assert.equal(outcome.code, 0, outcome.stdout + outcome.stderr);
  assert.equal(size.ok, true);
  assert.deepEqual(size.flows.map(item => item.ok), [true, true]);
+});
+
+
+test('rer size uses a verification-only owner and public host without changing setup', { timeout: 300_000 }, async t => {
+ const shape = structuredClone(declaration);
+ shape.personas = { owner: { kind: 'owner' }, anonymous: { kind: 'anonymous' } };
+ shape.flows = [
+  { name: 'owner', persona: 'owner', request: { method: 'GET', path: '/owner' }, ceiling: 100 },
+  { name: 'public', persona: 'anonymous', request: { method: 'GET', path: 'https://status.rer-hosted-check.invalid/public' }, ceiling: 100 },
+ ];
+ const { root } = await seeded(shape), env = await isolatedQueue(t, process.env);
+ const setup = JSON.stringify({ fields: [], steps: [] });
+ await writeFile(join(root, 'rer-setup.json'), setup);
+ await writeFile(join(root, 'agent-surface.json'), JSON.stringify({ verification: {
+  owner: { email: 'synthetic-base-1@example.test', emailField: 'OWNER_EMAIL', tokenField: 'SETUP_TOKEN' }, publicHosts: ['STATUS_HOST'],
+ } }));
+ await writeFile(join(root, 'deploy.json'), JSON.stringify({ version: 1, vars: { STATUS_HOST: 'status.rer-hosted-check.invalid' } }));
+ // Keep the fixture's real bootstrap; these routes require its native owner row/session and the admitted host.
+ await writeFile(join(root, 'dist/server/host-entry.mjs'), `import worker, { Counter } from './index.js';
+ export { Counter };
+ export default {...worker, async fetch(request, env, ctx) {
+  const url = new URL(request.url);
+  if (url.pathname === '/owner') {
+   const row = await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind('owner').first();
+   return new Response(null, {status: request.headers.get('cookie') === 'session=owner' && row?.email === 'synthetic-base-1@example.test' ? 200 : 401});
+  }
+  if (url.pathname === '/public') return new Response(null, {status: url.hostname === env.STATUS_HOST && request.headers.get('host') === env.STATUS_HOST ? 200 : 421});
+  return worker.fetch(request, env, ctx);
+ }};`);
+ const file = join(root, 'dist/server/wrangler.json'), config = JSON.parse(await readFile(file, 'utf8'));
+ config.main = 'host-entry.mjs';
+ await writeFile(file, JSON.stringify(config));
+ const outcome = await exec(['size', '--cwd', root, '--json'], env), size = result(outcome);
+ assert.equal(outcome.code, 0, outcome.stdout + outcome.stderr);
+ assert.equal(size.ok, true);
+ for (const item of size.flows) {
+  assert.equal(item.small.status, 200);
+  assert.equal(item.large.status, 200);
+ }
+ assert.equal(await readFile(join(root, 'rer-setup.json'), 'utf8'), setup, 'size must leave the actual setup flow unchanged');
+ const surface = JSON.parse(await readFile(join(root, 'agent-surface.json'), 'utf8'));
+ delete surface.verification.publicHosts;
+ await writeFile(join(root, 'agent-surface.json'), JSON.stringify(surface));
+ const refused = await exec(['size', '--cwd', root, '--json'], env);
+ assert.equal(refused.code, 1, refused.stdout + refused.stderr);
+ assert.equal(flow(result(refused), 'public').ok, false, 'deployment vars alone must not admit the host');
 });

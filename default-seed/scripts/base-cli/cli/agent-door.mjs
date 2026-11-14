@@ -33,7 +33,13 @@ function finish(result, report) {
 export async function checkAgentDoor(root, { declaration, setupManifest, owner, report = console.log } = {}) {
  const declared = await readAgentSurface(root);
  if (!declared) { report('Agent door conformance: undeclared (no agent-surface.json).'); return { declared: false }; }
- const validation = validateAgentSurface(declared.surface, { contract: declared.contract });
+ const surface = declared.surface;
+ if (surface && typeof surface === 'object' && !Array.isArray(surface) && Object.keys(surface).length === 1
+  && surface.verification && typeof surface.verification === 'object' && !Array.isArray(surface.verification)) {
+  report('Agent door conformance: undeclared (verification-only agent-surface.json)');
+  return { declared: false };
+ }
+ const validation = validateAgentSurface(surface, { contract: declared.contract });
  if (!validation.ok) return finish(validation, report);
  const manifest = setupManifest ?? JSON.parse(await readFile(join(root, 'rer-setup.json'), 'utf8'));
  const claim = manifest.steps?.find(step => step.type === 'owner-claim');

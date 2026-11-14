@@ -403,7 +403,7 @@
     },
     "cli/agent-door.mjs": {
       "source": "cli/agent-door.mjs",
-      "sha256": "0ce012a4b82cd5246863e9925c3f25633e3bc54d211b4fa4afb59e0b44dd37dd"
+      "sha256": "d099f33e41858338e78fd80cf2d5193cc065260f97af242d0ebaa01f7909d934"
     },
     "cli/agent-fixtures.mjs": {
       "source": "cli/agent-fixtures.mjs",

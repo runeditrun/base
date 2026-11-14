@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Let seeds declare only a `verification` object in `agent-surface.json` for disposable size-check owners and public hosts without declaring an agent door. Any additional top-level key retains full agent-door conformance.
+
 ## 0.2.115
 
 ### Stage candidate metadata and installed-copy recognition
