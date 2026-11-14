@@ -133,9 +133,10 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
  * Work outside a window (the owner's sign-in, other personas) is not recorded.
  */
 export function createMeter() {
- let current = null, pending = 0, lastEvent = 0;
+ let current = null, pending = 0, lastEvent = 0, stopped = false;
  const service = async request => {
   const event = await request.json();
+  if (stopped) return new Response(null, { status: 204 });
   lastEvent = performance.now();
   if (event.kind === 'wait') pending = Math.max(0, pending + event.delta);
   else if (current) current.statements.push({ binding: event.binding, sql: event.sql, params: event.params ?? [], rows_read: event.rows_read ?? 0, rows_written: event.rows_written ?? 0, ...(event.error ? { error: event.error } : {}), ...(event.exec ? { exec: true } : {}), ...(event.batch ? { batch: true } : {}) });
@@ -143,16 +144,20 @@ export function createMeter() {
  };
  return {
   service,
+  stop() { stopped = true; current = null; },
   /** Starts a window. The returned `close` ends it once the caller has read the response, its waitUntil work has
    * settled and no statement has been recorded for `quietMs`; after `maxMs` it ends regardless and says so. */
   open() {
+   if (stopped) throw new Error('This measurement session has stopped.');
    if (current) throw new Error('A meter window is already open.');
    const window = current = { statements: [] };
    return {
+    statements: window.statements,
     close: async ({ quietMs = 250, maxMs = 30_000 } = {}) => {
      const readAt = performance.now();
      let unsettled = false;
      while (true) {
+      if (stopped) { unsettled = true; break; }
       const now = performance.now(), quiet = now - Math.max(lastEvent, readAt) >= quietMs;
       if (pending === 0 && quiet) break;
       if (now - readAt >= maxMs) { unsettled = true; break; }

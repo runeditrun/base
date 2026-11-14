@@ -41,7 +41,7 @@ function measureDistinct(schemas, flowResults) {
  return measured;
 }
 
-const summary = run => ({ rowsRead: run.rowsRead, rowsWritten: run.rowsWritten, statements: run.statements, status: run.status, ms: Math.round(run.ms), ...(run.error ? { error: run.error } : {}), ...(run.detail ? { detail: run.detail } : {}), ...(run.unsettled ? { unsettled: true } : {}), top: topStatements(run.executions) });
+export const flowSummary = run => ({ rowsRead: run.executions.reduce((total, item) => total + item.rows_read, 0), rowsWritten: run.executions.reduce((total, item) => total + item.rows_written, 0), statements: run.executions.length, status: run.status, ms: Math.round(run.ms), ...(run.error ? { error: run.error } : {}), ...(run.detail ? { detail: run.detail } : {}), ...(run.unsettled ? { unsettled: true } : {}), top: topStatements(run.executions) });
 
 // Only the measures at the failing line: a statement at depth 105 says so and not "0 FROM items".
 function sizeText({ fromItems, depth }) {
@@ -91,7 +91,7 @@ export function judgeFlows(declaration, small, large, schemas) {
    if (!record || record.ok) continue;
    failures.push({ rule: 'statement-size', message: `statement size: ${record.error ?? sizeText(record)}`, sql, ...(record.error ? {} : { fromItems: record.fromItems, depth: record.depth }) });
   }
-  return { name: flow.name, persona: flow.persona ?? null, kind: at.small.kind, label: at.small.label, callsInRow: flow.callsInRow, ceiling: flow.ceiling, ok: failures.length === 0, failures, growthAllowed: flow.growth?.why ?? null, small: summary(at.small), large: summary(at.large) };
+  return { name: flow.name, persona: flow.persona ?? null, kind: at.small.kind, label: at.small.label, callsInRow: flow.callsInRow, ceiling: flow.ceiling, ok: failures.length === 0, failures, growthAllowed: flow.growth?.why ?? null, small: flowSummary(at.small), large: flowSummary(at.large) };
  });
  const checked = [...measured.values()].reduce((all, records) => all + records.size, 0);
  return { ok: verdicts.every(verdict => verdict.ok), flows: verdicts, checked };
@@ -121,11 +121,12 @@ export function verdictLines(verdict, declaration) {
 
 /** One size's statements in the fleet runner's format: { statements: [{ name: "<flow> #<i>", sql, params }] }, every
  * statement each flow's last run executed, in order, with its parameters as bound. */
-export function statementsFile(size, results) {
+export function statementsFile(size, results, { complete = true, error } = {}) {
  const statements = [];
  for (const result of results) {
   let index = 0;
   for (const { sql, params, exec } of result.executions) if (!exec) statements.push({ name: `${result.name} #${++index}`, sql, params });
  }
- return { about: `rer size: every statement each flow ran at the ${size} size, in order, with its parameters as bound.`, statements };
+ return { about: `rer size: statements observed at the ${size} size, in order, with their parameters as bound.`, statements, complete,
+  ...(!complete ? { error, flows: results.map(run => ({ name: run.name, runs: run.runs, incomplete: run.incomplete, ...flowSummary(run) })) } : {}) };
 }

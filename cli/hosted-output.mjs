@@ -130,7 +130,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   durableObjects: Object.fromEntries((config.durable_objects?.bindings ?? []).filter(item => !item.script_name).map(item => [item.name, { className: item.class_name, useSQLite: true }])),
   ...(config.assets ? { assets: { directory: client, binding: config.assets.binding ?? 'ASSETS', routerConfig: { has_user_worker: true, invoke_user_worker_ahead_of_assets: RUN_WORKER_FIRST } } } : {}),
  }] };
- let preparation, producers, held = false;
+ let preparation, producers, held = false, closing = false;
  const waiting = new Set();
  const release = () => { held = false; for (const resume of waiting) resume(); waiting.clear(); };
  // Install the gate before owner hooks retain any D1 handles; replacing
@@ -140,10 +140,10 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
   const wrapper = join(build, '__rer_preparation.mjs');
   const native = './' + config.main;
   app.modules = [{ type: 'ESModule', path: wrapper, contents:
-   `import app from ${JSON.stringify(native)};export * from ${JSON.stringify(native)};export default {...app,async queue(batch,env,ctx){await env.RER_PREPARATION_QUEUE_GATE.fetch('https://queue.invalid');return app.queue(batch,env,ctx)}}` }, ...modules];
+   `import app from ${JSON.stringify(native)};export * from ${JSON.stringify(native)};export default {...app,async queue(batch,env,ctx){const gate=await env.RER_PREPARATION_QUEUE_GATE.fetch('https://queue.invalid');if(!gate.ok)throw new Error('Preparation host closed');return app.queue(batch,env,ctx)}}` }, ...modules];
   app.serviceBindings = { ...app.serviceBindings, RER_PREPARATION_QUEUE_GATE: async () => {
    if (held) await new Promise(resume => waiting.add(resume));
-   return new Response(null, { status: 204 });
+   return new Response(null, { status: closing ? 410 : 204 });
   } };
   producers = preparationProducers(options, config);
  }
@@ -227,7 +227,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
    if (!origins.includes(origin)) throw new RerError('agent_door_origin', 'Agent conformance request must use a declared hosted installation origin.', 1);
    return mf.dispatchFetch(`http://127.0.0.1/${path}`, { headers: { ...headers, upgrade: 'websocket', 'x-rer-original-url': `${origin}/${path}` } });
   },
-  close: () => { release(); return mf.dispose(); },
+  close: () => { closing = true; release(); return mf.dispose(); },
   fetch: (path, { headers, origin = HOSTED_ORIGIN, ...init } = {}) => {
    if (!origins.includes(origin)) throw new RerError('agent_door_origin', 'Agent conformance request must use a declared hosted installation origin.', 1);
    return loopbackFetch(loopback, { ...init, redirect: 'manual', headers: { ...headers, 'x-rer-original-url': `${origin}/${path}` } });

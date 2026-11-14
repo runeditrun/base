@@ -93,9 +93,10 @@ export async function buildInstall(run, size, clock, measure) {
  const timed = async (phase, table, work, flow) => {
   clock.enter(size, phase, table, flow);
   const started = performance.now();
-  try { return await clock.within(work()); } finally { phases[phase] += performance.now() - started; }
+  try { return await clock.within(work); } finally { phases[phase] += performance.now() - started; }
  };
- let keys, serving, hosted, owner, measured;
+ let keys, serving, hosted, owner, measured, built;
+ const measurement = { flows: [], queuesHeld: false };
  const meter = measure ? createMeter() : undefined;
  try {
   if (run.owner) keys = await ownerKeys(run.root, run.owner.native, { email: run.owner.email, sub: run.owner.sub });
@@ -103,8 +104,11 @@ export async function buildInstall(run, size, clock, measure) {
    fixturePreparation: true, fixtureDiagnostics: true, outboundService: refuseNetwork, meter,
    bindings: keys ? ownerBindings(keys, { claim: run.owner.claim, native: run.owner.native, email: run.owner.email }) : {} });
   hosted = await timed('serve', undefined, () => serving);
+  const preparation = await timed('serve', undefined, () => hosted.preparation());
+  preparation.queues.hold();
+  measurement.queuesHeld = true;
   if (keys) owner = await timed('owner', undefined, () => signOwnerIn(run, hosted, keys));
-  const database = await (await hosted.preparation()).database(run.binding);
+  const database = await preparation.database(run.binding);
   const before = new Map();
   await timed('readback', undefined, async () => { for (const { table } of fixture.tables) before.set(table, await count(database, table)); });
   const ms = new Map(fixture.tables.map(({ table }) => [table, 0]));
@@ -126,8 +130,15 @@ export async function buildInstall(run, size, clock, measure) {
    // A virtual table's shadow tables or a table SQLite cannot count are not rows the check made.
    for (const name of names) totalRows += await count(database, name).catch(() => 0);
   });
-  if (measure) measured = await measure({ hosted, owner, meter, timed: (phase, flow, work) => timed(phase, undefined, work, flow) });
-  return { size, tables, totalRows, phases, statements: fixture.statements.length, measured };
+  built = { size, tables, totalRows, phases, statements: fixture.statements.length };
+  if (measure) measured = await measure({ hosted, owner, meter, results: measurement.flows, timed: (phase, flow, work) => timed(phase, undefined, work, flow) });
+  return { ...built, measured };
+ } catch (error) {
+  // Freeze the partial evidence before disposal. Neither an aborted client nor the run deadline cancels D1.
+  meter?.stop();
+  for (const flow of measurement.flows) if (flow.incomplete) flow.ms = performance.now() - flow.startedAt;
+  Object.assign(error, { measurement: { ...measurement, flows: structuredClone(measurement.flows) }, installation: built });
+  throw error;
  } finally {
   clock.enter(size, 'closing the install');
   // A timeout can leave the install still starting: close it as soon as it exists.

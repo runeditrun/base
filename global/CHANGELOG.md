@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `rer size` holds disposable queue consumers before owner setup and fixture activity while still measuring declared scheduled handlers. A request failure or unsettled window now stops the measurement session before further repeats, flows or sizes; failed runs retain partial statements and explicit completeness diagnostics instead of attributing outstanding work to a later flow.
+
 ## 0.2.116
 
 ### Verification-only agent surfaces

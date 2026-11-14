@@ -672,3 +672,17 @@ new clauses start missing, and seed-owned AGENT and SURFACE clauses stay intact.
 Run the edition's source-lock command last. See
 [Contract clauses](../modules/agent-door/ADOPTING.md#contract-clauses) for source
 delivery and generation details.
+
+
+## Size measurement isolation
+
+`rer size` uses the disposable host's preparation API to hold queue consumers
+before owner setup or fixtures can enqueue work. Producers and declared scheduled
+handlers still run. Setup `waitUntil` work settles before the first flow.
+A request failure, timeout or unsettled measurement stops that session before
+another repeat, flow or size: aborting the client does not prove D1 cancellation.
+`--write-statements DIR` retains both size files on failure, marking partial and
+unattempted sizes `complete:false`; these files keep the existing statement names,
+SQL and bound parameters and carry diagnostic flow summaries. Missing work never
+produces a passing growth verdict. See the size section of
+[the command contract](../export/SEED-COMMAND-CONTRACT.md#statement-size-and-growth).
