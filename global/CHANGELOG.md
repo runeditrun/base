@@ -1,8 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.2.117
 
-- `rer size` holds disposable queue consumers before owner setup and fixture activity while still measuring declared scheduled handlers. A request failure or unsettled window now stops the measurement session before further repeats, flows or sizes; failed runs retain partial statements and explicit completeness diagnostics instead of attributing outstanding work to a later flow.
+### Size queue isolation and timeout attribution
+
+- `rer size` holds disposable queue consumers through the hosted preparation API before owner setup, fixture generation and persona sign-in. Producers can enqueue and declared scheduled handlers still run and are measured; queue consumer work is excluded, and closing the install discards held deliveries.
+- Owner and persona work must settle before the first flow. A request failure, timeout or unsettled measurement stops the session before another repeat, flow or size, so outstanding work is not attributed to following routes. Client abort does not prove D1 cancellation; incomplete evidence produces no growth verdict.
+- Failed measurements retain partial flow summaries and both `--write-statements` exports with completeness, queue-isolation and unmeasured-flow diagnostics. An unattempted size has no observed statements; that empty export is not evidence of zero cost.
+
+This releases CLI support only. HH and Lamp own their query fixes and adoption; no seed query fix, adoption, deployed behavior or production result is established here. The actual diff adds no migrations and touches neither modules/import-kit nor modules/portability.
 
 ## 0.2.116
 
