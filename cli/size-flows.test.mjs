@@ -100,7 +100,7 @@ test('rer size uses a verification-only owner and public host without changing s
  shape.personas = { owner: { kind: 'owner' }, anonymous: { kind: 'anonymous' } };
  shape.flows = [
   { name: 'owner', persona: 'owner', request: { method: 'GET', path: '/owner' }, ceiling: 100 },
-  { name: 'public', persona: 'anonymous', request: { method: 'GET', path: 'https://status.rer-hosted-check.invalid/public' }, ceiling: 100 },
+  { name: 'public', persona: 'anonymous', request: { method: 'GET', path: '//status.rer-hosted-check.invalid/public' }, ceiling: 100 },
  ];
  const { root } = await seeded(shape), env = await isolatedQueue(t, process.env);
  const setup = JSON.stringify({ fields: [], steps: [] });
