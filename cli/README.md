@@ -685,4 +685,4 @@ another repeat, flow or size: aborting the client does not prove D1 cancellation
 unattempted sizes `complete:false`; these files keep the existing statement names,
 SQL and bound parameters and carry diagnostic flow summaries. Missing work never
 produces a passing growth verdict. See the size section of
-[the command contract](../export/SEED-COMMAND-CONTRACT.md#statement-size-and-growth).
+[the command contract](../export/SEED-COMMAND-CONTRACT.md#statement-size-and-growth-sc-15).

@@ -66,7 +66,7 @@ export async function buildFixtures(options, out, loaded) {
     measured[size] = error.measurement?.flows ?? [];
     if (error.measurement?.queuesHeld) result.queueConsumersMeasured = false;
     result[size] = { ...(error.installation ? { tables: error.installation.tables, totalRows: error.installation.totalRows } : {}),
-     error: error.message, code: error.code, measurements: measured[size].map(run => ({ name: run.name, runs: run.runs, incomplete: run.incomplete, ...flowSummary(run) })) };
+     error: error.message, code: error.code };
     if (!options.json) out.human(`  FAIL ${error.message}`);
     break;
    }
@@ -74,7 +74,7 @@ export async function buildFixtures(options, out, loaded) {
  } finally { clock.stop(); }
  if (!result.ok) for (const size of sizes) {
   const attempted = measured[size] ?? [];
-  result[size] ??= { code: 'size_not_measured', error: 'This size was not measured because the session stopped.' };
+  if (!result[size]) continue;
   result[size].measurements = attempted.map(run => ({ name: run.name, runs: run.runs, incomplete: run.incomplete, ...flowSummary(run) }));
   result[size].unmeasuredFlows = declaration.flows.filter(flow => !attempted.some(run => run.name === flow.name)).map(flow => flow.name);
  }
@@ -90,7 +90,7 @@ export async function buildFixtures(options, out, loaded) {
   await mkdir(directory, { recursive: true });
   for (const size of sizes) {
    const evidence = statementsFile(size, measured[size] ?? [], { complete: completed[size] === true,
-    queueConsumersMeasured: result.queueConsumersMeasured, unmeasuredFlows: result[size]?.unmeasuredFlows,
+    queueConsumersMeasured: result.queueConsumersMeasured, unmeasuredFlows: result[size]?.unmeasuredFlows ?? declaration.flows.map(flow => flow.name),
     error: result[size]?.error ?? (completed[size] ? undefined : 'This size was not measured because the session stopped.') });
    await writeFile(join(directory, `${size}.json`), JSON.stringify(evidence, null, 1) + '\n');
   }

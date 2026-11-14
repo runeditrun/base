@@ -167,31 +167,31 @@ test('size holds owner and scheduled queues while measuring the scheduled handle
 
 test('a request timeout or run deadline stops before a later flow and exports partial work without a passing verdict', { timeout: 300_000 }, async t => {
  for (const timeoutSeconds of [180, 15]) {
- const shape = structuredClone(declaration);
- shape.budget.timeoutSeconds = timeoutSeconds;
- shape.flows = [
-  shape.flows.find(item => item.name === 'keyed'),
-  { name: 'slow', persona: 'anonymous', request: { method: 'GET', path: '/slow' }, repeat: 2, ceiling: 100000 },
-  { name: 'after-slow', persona: 'anonymous', request: { method: 'GET', path: '/after-slow' }, ceiling: 100 },
- ];
- const { outcome, size, directory } = await sizeRun(t, shape, ['--write-statements', '{dir}/statements']);
- assert.equal(outcome.code, 1, outcome.stdout + outcome.stderr);
- assert.equal(size.ok, false);
- t.diagnostic(JSON.stringify({ result: size, small: JSON.parse(await readFile(join(directory, 'statements', 'small.json'), 'utf8')) }));
- assert.equal(size.size.small.code, timeoutSeconds === 15 ? 'size_timeout' : 'size_flow_incomplete');
- assert.equal(size.queueConsumersMeasured, false);
- assert.equal(size.flows, undefined, 'incomplete evidence cannot produce growth verdicts');
- const exported = JSON.parse(await readFile(join(directory, 'statements', 'small.json'), 'utf8'));
- assert.equal(exported.complete, false);
- assert.equal(exported.queueConsumersMeasured, false);
- assert.ok(exported.unmeasuredFlows.includes('after-slow'));
- assert.equal(exported.flows.find(item => item.name === 'slow').runs, 1, 'a failed warmup must not be retried');
- assert.ok(exported.flows.find(item => item.name === 'slow').incomplete);
- assert.ok(exported.statements.some(item => item.name.startsWith('keyed #')));
- assert.ok(exported.statements.some(item => item.name.startsWith('slow #')));
- assert.ok(!exported.statements.some(item => item.name.startsWith('after-slow #')));
- const large = JSON.parse(await readFile(join(directory, 'statements', 'large.json'), 'utf8'));
- assert.equal(large.complete, false);
- assert.deepEqual(large.statements, [], 'an unattempted size has no invented measurements');
+  const shape = structuredClone(declaration);
+  shape.budget.timeoutSeconds = timeoutSeconds;
+  shape.flows = [
+   shape.flows.find(item => item.name === 'keyed'),
+   { name: 'slow', persona: 'anonymous', request: { method: 'GET', path: '/slow' }, repeat: 2, ceiling: 100000 },
+   { name: 'after-slow', persona: 'anonymous', request: { method: 'GET', path: '/after-slow' }, ceiling: 100 },
+  ];
+  const { outcome, size, directory } = await sizeRun(t, shape, ['--write-statements', '{dir}/statements']);
+  assert.equal(outcome.code, 1, outcome.stdout + outcome.stderr);
+  assert.equal(size.ok, false);
+  t.diagnostic(JSON.stringify({ result: size, small: JSON.parse(await readFile(join(directory, 'statements', 'small.json'), 'utf8')) }));
+  assert.equal(size.size.small.code, timeoutSeconds === 15 ? 'size_timeout' : 'size_flow_incomplete');
+  assert.equal(size.queueConsumersMeasured, false);
+  assert.equal(size.flows, undefined, 'incomplete evidence cannot produce growth verdicts');
+  const exported = JSON.parse(await readFile(join(directory, 'statements', 'small.json'), 'utf8'));
+  assert.equal(exported.complete, false);
+  assert.equal(exported.queueConsumersMeasured, false);
+  assert.ok(exported.unmeasuredFlows.includes('after-slow'));
+  assert.equal(exported.flows.find(item => item.name === 'slow').runs, 1, 'a failed warmup must not be retried');
+  assert.ok(exported.flows.find(item => item.name === 'slow').incomplete);
+  assert.ok(exported.statements.some(item => item.name.startsWith('keyed #')));
+  assert.ok(exported.statements.some(item => item.name.startsWith('slow #')));
+  assert.ok(!exported.statements.some(item => item.name.startsWith('after-slow #')));
+  const large = JSON.parse(await readFile(join(directory, 'statements', 'large.json'), 'utf8'));
+  assert.equal(large.complete, false);
+  assert.deepEqual(large.statements, [], 'an unattempted size has no invented measurements');
  }
 });
