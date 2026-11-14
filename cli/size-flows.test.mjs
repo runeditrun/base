@@ -148,6 +148,7 @@ test('size holds owner and scheduled queues while measuring the scheduled handle
   { name: 'queue-state', persona: 'owner', request: { method: 'GET', path: '/queue-state' }, ceiling: 100 },
  ];
  const { outcome, size, directory } = await sizeRun(t, shape, ['--write-statements', '{dir}/statements']);
+ t.diagnostic(JSON.stringify({ code: outcome.code, result: size }));
  assert.equal(outcome.code, 0, outcome.stdout + outcome.stderr);
  assert.equal(size.queueConsumersMeasured, false);
  assert.ok(flow(size, 'tick').large.rowsRead > flow(size, 'tick').small.rowsRead);
@@ -169,6 +170,7 @@ test('a timed-out request stops before a later flow and exports partial work wit
  const { outcome, size, directory } = await sizeRun(t, shape, ['--write-statements', '{dir}/statements']);
  assert.equal(outcome.code, 1, outcome.stdout + outcome.stderr);
  assert.equal(size.ok, false);
+ t.diagnostic(JSON.stringify({ result: size, small: JSON.parse(await readFile(join(directory, 'statements', 'small.json'), 'utf8')) }));
  assert.equal(size.size.small.code, 'size_flow_incomplete');
  assert.equal(size.queueConsumersMeasured, false);
  assert.equal(size.flows, undefined, 'incomplete evidence cannot produce growth verdicts');
