@@ -9,6 +9,47 @@ from test_source_metadata import public_scan
 
 
 class CopyDigestTests(RepositoryFixture, unittest.TestCase):
+    def test_fragment_relative_columns_require_a_proved_copy_digest(self):
+        name = 'vendor/base/synthetic-base-1/api-key.mjs'
+        data = b'export const name = "synthetic-base-1";\n'
+        digest = hashlib.sha256(data).hexdigest()
+        self.write(name, data)
+        revision = hashlib.sha1(b'synthetic-base-1').hexdigest()
+        copy = dict(path='vendor/base', originPath='runtime', revision=revision,
+                    files={name: digest}, modes={name: '100644'}, adapted={name: revision},
+                    acknowledged={name: dict(sha256=digest, mode='100644')})
+        record = dict(schemaVersion=1, padding='', copies=[copy])
+        path = 'base-copies.json'
+
+        def serialized():
+            return json.dumps(record, indent=2)
+
+        # Native directory fragments consume 100 KB plus at most 25 KB toward
+        # a safe boundary. Start fragment two inside the key's physical line.
+        record['padding'] = 'x' * (125_000 - serialized().encode().index(b'api-key.mjs'))
+        self.write(path, serialized())
+        self.commit()
+        hits = inspect(executable(), 'dir', repo=str(self.repo), redact=False)
+        hit, = (h for h in hits if h['RuleID'] == 'hex-api-key' and h['Secret'] == digest)
+        line = serialized().splitlines()[hit['StartLine'] - 1].encode()
+        self.assertGreater(line.index(hit['Match'].encode()), 0)
+        self.assertEqual(hit['StartColumn'], 1)
+        self.assertEqual(public_scan(self)['status'], 'PASS')
+
+        # A credential-shaped hex value on the very same copy-pointer line
+        # has no matching preimage and must still fail, in history and today.
+        credential = hashlib.sha256(b'synthetic-base-2-credential').hexdigest()
+        copy['files'][name] = credential
+        self.write(path, serialized())
+        self.commit()
+        report = public_scan(self)
+        self.assertEqual(report['status'], 'FAIL')
+        self.assertTrue(any(f['path'] == path and f['rule'] == 'secret.assignment'
+                            and f.get('scannerRule') == 'hex-api-key'
+                            and {'working-tree', 'release-tree'} <= set(f['scopes'])
+                            for f in report['findings']))
+        self.assertNotIn(credential, json.dumps(report))
+
     def test_mixed_directory_copy_proves_each_file_through_public_cli(self):
         files = {'vendor/base/runtime.mjs': b'export const enabled = true;\n',
                  'vendor/base/api-key.mjs': b'export const first = true;\n',
