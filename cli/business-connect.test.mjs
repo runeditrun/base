@@ -250,11 +250,12 @@ test('two Businesses on one origin revoke independently in either order and lega
  await new Promise(resolve => proxy.listen(0, '127.0.0.1', resolve));
  t.after(() => new Promise(resolve => { proxy.close(resolve); proxy.closeAllConnections(); }));
  const origin = `http://127.0.0.1:${proxy.address().port}`;
+ for (const remote of remotes) remote.state.startPatch = { verification_uri: `${origin}/business/${remote.state.business.id}/pair` };
  for (const order of [[0, 1], [1, 0]]) {
   const home = join(directory, `two-business-${order.join('')}`), envs = remotes.map((_, i) => ({ RER_BUSINESS_STATE_DIR: join(home, `business-${i}`) }));
   for (const [i, remote] of remotes.entries()) {
    selected = remote;
-   const paired = await connectWhile(home, ['--code', 'ABCD-1234', '--origin', origin], () => approve(remote), { env: envs[i] });
+   const paired = await connectWhile(home, ['--business', remote.state.business.id, '--origin', origin], () => approve(remote), { env: envs[i] });
    assert.equal(paired.code, 0, paired.stderr);
   }
   assert.equal(Object.keys(JSON.parse(await readFile(join(home, 'fake-keychain.json'), 'utf8'))).length, 2);
@@ -267,7 +268,7 @@ test('two Businesses on one origin revoke independently in either order and lega
   t.diagnostic(`two Businesses on one origin: disconnect order ${order.join(',')}: Device revoked twice`);
  }
  const home = join(directory, 'legacy-key-home'); selected = remotes[0];
- const paired = await connectWhile(home, ['--code', 'ABCD-1234', '--origin', origin], () => approve(selected));
+ const paired = await connectWhile(home, ['--business', selected.state.business.id, '--origin', origin], () => approve(selected));
  assert.equal(paired.code, 0, paired.stderr);
  const { credentialHandle } = await import('./business/state.mjs');
  const path = join(home, '.rer/business/state.json'), state = JSON.parse(await readFile(path, 'utf8'));
@@ -287,8 +288,8 @@ async function fixtureServer(t) {
  return remote;
 }
 const deviceOwner = (remote, action) => fetch(`${remote.origin}/api/business/${remote.state.business.id}/device-pairings/${remote.state.devicePairing.id}/${action}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ user_code: remote.state.devicePairing.user_code }) });
-const approve = remote => remote.state.devicePairing ? deviceOwner(remote, 'approve') : fetch(remote.origin + '/api/business/biz/pairings/pair1/approve', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmed: true, confirmation_number: '246810' }) });
-const starts = remote => remote.state.requests.filter(entry => entry.route === '/api/business/executors/device-pairings' || entry.route === '/api/business/executors/pair' && entry.body.code).length;
+const approve = remote => deviceOwner(remote, 'approve');
+const starts = remote => remote.state.requests.filter(entry => entry.route === '/api/business/executors/device-pairings').length;
 const waiting = 'Keep this command running.';
 // Runs connect in the foreground and, once it prints the number and waits,
 // calls act(child) (approve, interrupt or nothing). Resolves with the finished run.
@@ -464,113 +465,7 @@ test('a killed packed supervisor resumes a lapsed lease from its acknowledged sc
  assert.equal((await cli(home, ['business','disconnect'])).code, 0);
 });
 
-test('connect waits for approval, resumes after an interruption, names real causes, and never redeems a code it cannot keep', async t => {
- const legacy = join(directory, 'legacy-code'); await mkdir(legacy);
- const remote = await fixtureServer(t);
- const redemptions = () => remote.state.requests.filter(entry => entry.body.code).length;
- const pendingHome = join(legacy, 'pending-home');
- const pendingArgs = ['--code','ABCD-1234','--origin',remote.origin];
-
- // Ctrl-C while waiting keeps the redeemed pairing; the next run resumes it and waits for approval.
- const interrupted = await connectWhile(pendingHome, pendingArgs, child => child.kill('SIGINT'));
- assert.equal(interrupted.code, 130, interrupted.stderr);
- assert.match(interrupted.stderr, /Stopped waiting for approval\. The pairing is saved: run .* business connect --origin http:\/\/127\.0\.0\.1:\d+ to resume it/);
- const savedPending = JSON.parse(await readFile(join(pendingHome, '.rer/business/pairing.json'), 'utf8'));
- const resumed = await connectWhile(pendingHome, [], () => approve(remote));
- assert.equal(resumed.code, 0, resumed.stderr);
- assert.ok(resumed.stdout.includes(savedPending.confirmation_number), 'the resumed run shows the same number');
- assert.equal(redemptions(), 1, 'resuming never redeems the code again');
- assert.equal(remote.state.active, true);
- assert.equal((await cli(pendingHome, ['business','disconnect'])).code, 0);
-
- // A refused or expired pairing ends the wait with the server's reason and drops the saved pairing.
- remote.state.pairingRefused = true;
- const refused = await cli(pendingHome, ['business','connect',...pendingArgs]);
- assert.equal(refused.code, 1);
- assert.ok(refused.stderr.includes('the server said: Pairing expired or used') && !refused.stderr.includes('Business command failed'), refused.stderr);
- assert.ok(!(await readdir(join(pendingHome, '.rer/business'))).includes('pairing.json'));
- remote.state.pairingRefused = false;
- remote.state.pairingSeconds = 2;
- const unapproved = await cli(pendingHome, ['business','connect',...pendingArgs]);
- delete remote.state.pairingSeconds;
- assert.equal(unapproved.code, 1, 'nobody approved before the code expired');
- assert.ok(unapproved.stdout.includes(waiting) && unapproved.stderr.includes('Pairing expired or used'), unapproved.stderr);
- const wrongCode = await cli(pendingHome, ['business','connect','--code','WXYZ-9999','--origin',remote.origin]);
- assert.equal(wrongCode.code, 1);
- assert.ok(wrongCode.stderr.includes('did not accept code WXYZ-9999') && wrongCode.stderr.includes('Pairing expired or used'), wrongCode.stderr);
- const unreachable = await cli(pendingHome, ['business','connect','--code','ABCD-1234','--origin','http://127.0.0.1:9']);
- assert.equal(unreachable.code, 1);
- assert.match(unreachable.stderr, /^Could not reach the Business server at http:\/\/127\.0\.0\.1:9: /, unreachable.stderr);
- const expired = JSON.parse(JSON.stringify(savedPending));
- expired.expires_at = new Date(Date.now() - 1000).toISOString();
- await mkdir(join(pendingHome, '.rer/business'), { recursive: true });
- await writeFile(join(pendingHome, '.rer/business/pairing.json'), JSON.stringify(expired));
- const beforeExpiry = remote.state.requests.length;
- assert.equal((await cli(pendingHome, ['business','connect'])).code, 1);
- assert.equal(remote.state.requests.length, beforeExpiry, 'expired pairing is never polled or silently replaced');
- assert.equal((await cli(pendingHome, ['business','disconnect'])).code, 0);
-
- // The waiting line names the command that works from the agent's own shell.
- const onPath = join(legacy, 'rer-on-path');
- await mkdir(onPath, { recursive: true }); await writeFile(join(onPath, 'rer'), '#!/bin/sh\n', { mode: 0o755 });
- const withoutRer = await connectWhile(pendingHome, pendingArgs, child => child.kill('SIGTERM'), { path: '/usr/bin:/bin' });
- assert.equal(withoutRer.code, 143);
- assert.ok(withoutRer.stdout.includes(`run npx -y @runeditrun/rer business connect --origin ${remote.origin} to resume this pairing`), withoutRer.stdout);
- const withRer = await connectWhile(pendingHome, [], child => child.kill('SIGINT'), { path: `${onPath}:/usr/bin:/bin` });
- assert.ok(withRer.stdout.includes(`run rer business connect --origin ${remote.origin} to resume this pairing`), withRer.stdout);
- assert.equal((await cli(pendingHome, ['business','disconnect'])).code, 0);
-
- // Without an OS credential store, or with one that reads but refuses writes
- // (as an agent sandbox does), the one-use code is never redeemed.
- for (const marker of ['no-credential-store', 'fail-credential-store', 'sandboxed-credential-store']) {
-  const lockedHome = join(legacy, `${marker}-home`);
-  await mkdir(lockedHome); await writeFile(join(lockedHome, marker), '');
-  const beforeLocked = redemptions();
-  const locked = await cli(lockedHome, ['business','connect',...pendingArgs]);
-  assert.equal(locked.code, 1); assert.match(locked.stderr, /^OS credential storage could not (?:read|save) a credential: .*Nothing was sent, so the pairing code still works\./);
-  assert.equal(redemptions(), beforeLocked, 'the code is not redeemed when its credential could not be stored');
-  if (marker === 'sandboxed-credential-store') {
-   // A Codex user is told to approve running this one connect command outside the sandbox.
-   assert.ok(locked.stderr.includes('Operation not permitted') && locked.stderr.includes('approve running it outside the sandbox'), locked.stderr);
-   assert.match(locked.stderr, new RegExp(`Approve this command outside the sandbox: (?:rer|npx -y @runeditrun/rer) business connect --code ABCD-1234 --origin ${remote.origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\. Every other business command runs inside the sandbox\\.`));
-  }
-  assert.deepEqual(await readdir(lockedHome), [marker]);
-  await rm(join(lockedHome, marker));
-  const unlocked = await connectWhile(lockedHome, pendingArgs, () => approve(remote));
-  assert.ok(unlocked.stdout.includes('246810'), 'the same code still pairs once the store is available');
-  assert.equal((await cli(lockedHome, ['business','disconnect'])).code, 0);
- }
-
- // An approval near the code's end extends the server's expiry; a later run still collects it.
- const lateHome = join(legacy, 'late-approval-home');
- remote.state.pairingSeconds = 3;
- const stopped = await connectWhile(lateHome, pendingArgs, child => child.kill('SIGINT'));
- assert.equal(stopped.code, 130);
- const redeemed = Date.now();
- assert.equal((await approve(remote)).status, 200);
- delete remote.state.pairingSeconds;
- await delay(Math.max(0, redeemed + 3500 - Date.now()));
- const collected = await cli(lateHome, ['business','connect']);
- assert.equal(collected.code, 0, collected.stderr); assert.ok(collected.stdout.includes('This computer is connected to Business'));
- assert.equal((await cli(lateHome, ['business','disconnect'])).code, 0);
-
- // A store that fails after approval never activates the computer.
- const failedHome = join(legacy, 'storage-failed-home');
- const authenticated = () => remote.state.requests.filter(entry => entry.authorization === `Bearer ${remote.device}`).length;
- const beforeFailure = authenticated();
- const failed = await connectWhile(failedHome, pendingArgs, async () => {
-  await writeFile(join(failedHome, 'fail-credential-store'), '');
-  await approve(remote);
- });
- assert.equal(failed.code, 1); assert.match(failed.stderr, /OS credential storage could not save/);
- assert.equal(authenticated(), beforeFailure, 'failed credential storage sends no activation or other device-authenticated request');
- assert.equal(remote.state.active, false);
- const unrevoked = await cli(failedHome, ['business','disconnect']);
- assert.equal(unrevoked.code, 0);
- assert.ok(!unrevoked.stdout.includes('Device revoked') && unrevoked.stdout.includes(`${remote.origin}/business`), 'without a stored credential nothing is revoked, and the browser is named for it');
-});
-
-test('connect starts and resumes device approval, respects poll intervals and preserves credentials and legacy compatibility', async t => {
+test('connect starts and resumes device approval, respects poll intervals and preserves credentials', async t => {
  const remote = await fixtureServer(t), home = join(directory, 'pending-home');
  const args = ['--business', 'biz', '--origin', remote.origin];
  const pendingPath = join(home, '.rer/business/pairing.json');
@@ -590,7 +485,9 @@ test('connect starts and resumes device approval, respects poll intervals and pr
   assert.deepEqual(await readdir(lockedHome), [marker]);
   await rm(join(lockedHome, marker));
   await connect(lockedHome, remote, { env: { WSL_DISTRO_NAME: 'synthetic-test' } });
-  assert.equal(remote.state.requests.findLast(item => item.route === '/api/business/executors/device-pairings').body.os, 'wsl');
+  const reportedOs = remote.state.requests.findLast(item => item.route === '/api/business/executors/device-pairings').body.os;
+  if (process.platform === 'linux') assert.equal(reportedOs, 'wsl');
+  else assert.equal(reportedOs, { darwin: 'macos', win32: 'windows' }[process.platform] ?? 'other');
   assert.equal((await cli(lockedHome, ['business', 'disconnect'])).code, 0);
  }
  const blockedHome = join(directory, 'blocked-state-home'); await mkdir(blockedHome);
@@ -722,9 +619,9 @@ test('connect starts and resumes device approval, respects poll intervals and pr
  delete remote.state.pairingSeconds;
  await delay(1100);
  const collecting = await readPending(), collectionStarts = starts(remote);
- const legacyWhileCollecting = await cli(home, ['business', 'connect', '--code', 'ABCD-1234', '--origin', remote.origin]);
- assert.equal(legacyWhileCollecting.code, 1);
- assert.equal((await readPending()).device_code, collecting.device_code, 'another flow cannot discard a live collection window');
+ const retiredWhileCollecting = await cli(home, ['business', 'connect', '--code', 'ABCD-1234', '--origin', remote.origin]);
+ assert.equal(retiredWhileCollecting.code, 2);
+ assert.equal((await readPending()).device_code, collecting.device_code, 'an unknown option cannot discard a live collection window');
  assert.equal(starts(remote), collectionStarts);
  assert.equal((await cli(home, ['business', 'connect', ...args])).code, 0);
  assert.equal((await cli(home, ['business', 'disconnect'])).code, 0);
@@ -768,26 +665,28 @@ test('connect starts and resumes device approval, respects poll intervals and pr
  assert.equal(failed.code, 1); assert.match(failed.stderr, /OS credential storage could not save/);
  assert.equal(authenticated(), beforeFailure, 'failed credential storage sends no activation or other device-authenticated request'); await absent();
  await rm(join(home, 'fail-credential-store'));
- for (const options of [['--business', 'biz', '--code', 'ABCD-1234'], ['--business', '../bad'], ['--business', 'biz', '--timeout', '-1'], ['--business', 'biz', '--timeout', '901'], ['--business', 'biz', '--timeout', '1.5'], ['--business', 'biz', '--origin', 'http://example.test']]) {
+ const beforeInvalid = remote.state.requests.length;
+ for (const options of [['--code', 'ABCD-1234'], ['--business', 'biz', '--code', 'ABCD-1234'], ['--business', '../bad'], ['--business', 'biz', '--timeout', '-1'], ['--business', 'biz', '--timeout', '901'], ['--business', 'biz', '--timeout', '1.5'], ['--business', 'biz', '--origin', 'http://example.test']]) {
   const invalid = await cli(home, ['business', 'connect', ...options]); assert.equal(invalid.code, 2);
  }
+ assert.equal(remote.state.requests.length, beforeInvalid, 'unknown options and invalid flags send no requests');
  const badUsage = await cli(home, ['business', 'connect', '--business']);
  assert.equal(badUsage.code, 2); t.diagnostic('PROBE gr-base-pairing-device-1 A: missing/invalid flags -> exit=2; requests=0');
  const help = await cli(home, ['business', 'connect', '--help']);
- assert.equal(help.code, 0); assert.match(help.stdout, /--business/); assert.match(help.stdout, /--code/); assert.match(help.stdout, /--timeout/);
+ assert.equal(help.code, 0); assert.match(help.stdout, /--business/); assert.doesNotMatch(help.stdout, /--code/); assert.match(help.stdout, /--timeout/);
 });
 
-test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it before redeeming, and asks for choices in plain words', async t => {
+test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it before pairing, and asks for choices in plain words', async t => {
  const remote = await fixtureServer(t);
  const redemptions = () => starts(remote);
  const home = join(directory, 'state-dir-home'), work = join(home, 'work');
  await mkdir(work, { recursive: true }); await writeFile(join(work, 'not-a-folder'), '');
  const blocked = join(work, 'not-a-folder', 'state');
  const before = redemptions();
- const refused = await cli(home, ['business','connect','--code','ABCD-1234','--origin',remote.origin], { env: { RER_BUSINESS_STATE_DIR: blocked } });
+ const refused = await cli(home, ['business','connect','--business','biz','--origin',remote.origin], { env: { RER_BUSINESS_STATE_DIR: blocked } });
  assert.equal(refused.code, 1);
- assert.ok(refused.stderr.startsWith(`Business cannot save its state in ${blocked}: `) && refused.stderr.includes('Nothing was sent, so the pairing code still works.') && refused.stderr.includes('RER_BUSINESS_STATE_DIR') && !refused.stderr.includes('RER_STATE_DIR'), refused.stderr);
- assert.equal(redemptions(), before, 'an unwritable state folder stops connect before the code is redeemed');
+ assert.ok(refused.stderr.startsWith(`Business cannot save its state in ${blocked}: `) && refused.stderr.includes('Nothing was sent.') && refused.stderr.includes('RER_BUSINESS_STATE_DIR') && !refused.stderr.includes('RER_STATE_DIR'), refused.stderr);
+ assert.equal(redemptions(), before, 'an unwritable state folder stops connect before a pairing starts');
 
  const stateDir = join(work, '.rer-business');
  await mkdir(stateDir); await writeFile(join(stateDir, 'keep.txt'), 'not rer');

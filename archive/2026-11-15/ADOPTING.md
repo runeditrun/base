@@ -20,7 +20,7 @@ names in the seed's built Wrangler configuration are accepted; undeclared
 names are refused. Phase fixture preparation clears previous faults, and each
 conformance installation is disposable. These controls are absent from
 production, dev and demo. Refresh the CLI copies, including
-`hosted-queue-producers.mjs`; see the [preparation guide](modules/agent-door/ADOPTING.md#disposable-native-preparation).
+`hosted-queue-producers.mjs`; see the [preparation guide](../../modules/agent-door/ADOPTING.md#disposable-native-preparation).
 
 Refresh `modules/agent-door/pipeline.ts` and `conformance/journey.mjs` together
 for completed mutation replay:
@@ -45,14 +45,14 @@ This covers aggregate visibility enforced inside a tool's `run`, as well as
 resource reads. Revoked clients receive the native empty result or refusal;
 unchanged visibility retains the result and approval receipt. Mutation replay
 keeps its recorded outcome and once-only effect. See
-[`modules/agent-door/ADOPTING.md`](modules/agent-door/ADOPTING.md#current-admission-on-replay).
+[`modules/agent-door/ADOPTING.md`](../../modules/agent-door/ADOPTING.md#current-admission-on-replay).
 
 Node seeds using `createPortability({db,policy})` can restore a legacy v2 backup
 that carries its own hashed migration ledger: the library reads checkout files
 and collects the ledger from authenticated parts before durable staging. Keep
 one service instance through upload/finalize. Worker adoption still needs the
 refresh/lock evidence artifact described in the
-[portability guide](modules/portability/README.md#archives-across-later-additive-migrations);
+[portability guide](../../modules/portability/README.md#archives-across-later-additive-migrations);
 checkout-free Workers continue to refuse this automatic path.
 
 Legacy v2 installation backups can restore across later additive migrations
@@ -66,7 +66,7 @@ refuse before staging.
 V2 backups whose object inventory omitted objects on excluded tables use the
 same replay proof of that historical inventory. The full destination replay
 must account for those objects; an unexplained excluded-table index or trigger
-still refuses. See [older v2 backups](modules/portability/README.md#older-version-2-backups-and-acknowledged-recovery).
+still refuses. See [older v2 backups](../../modules/portability/README.md#older-version-2-backups-and-acknowledged-recovery).
 
 Use an installed current RER package to refresh a seed whose copied authoring
 CLI is still from 0.2.82. Pin the package in the seed first, then invoke its

@@ -1,17 +1,8 @@
 # Agent instructions
 
-To bring existing data into a seed, sign in as the owner and use its import
-screen. First step: open this path on the destination app:
-
-```text
-/app/import
-```
-
-Upload a supported source export, review the plan and its differences, then
-approve that exact plan to apply it. Reconcile the result against native data;
-use Undo from the same history when needed. Base's reference accepts people JSON
-here, not installation `.rer` archives. Editions adopt this same door
-with their own supported readers and native adapters.
+This repository is a complete product you can run as it is or change to fit. Start with
+"Launch for review" below to see it running; `CONTRACT.md` says what the product does and `HANDOVER.md` where its
+work stands. Any part of it (UI, logic, schema, infrastructure) may be changed for the company that runs it.
 
 ## Launch for review
 
@@ -104,6 +95,21 @@ Reset is destructive local cleanup. Archive restore needs an empty destination a
 explicit confirmation. See `RUN-LOCALLY.md` for flags, state and deployment
 requirements.
 
+## Bring existing data in
+
+One way in is the app's import screen: sign in as the owner and open this path on the destination app:
+
+```text
+/app/import
+```
+
+Upload a supported source export, review the plan and its differences, then
+approve that exact plan to apply it. Reconcile the result against native data;
+use Undo from the same history when needed. Base's reference accepts people JSON
+here, not installation `.rer` archives. Editions adopt this same door
+with their own supported readers and native adapters. An agent may also bring data in another way the product
+supports, keeping its migrations and data rules.
+
 ## Two homepages
 
 An installed instance serves the Lobby at `/` (Sign in, or Finish setup before
@@ -117,8 +123,7 @@ changes; never redraw an owner-approved homepage for it.
 
 Base and its maintained seed stack are optional ways to create and operate a
 product. Independently authored projects keep their own source, runtime, tools,
-installer and provider choices. RER can manage them through their declared
-operations; these instructions do not imply universal hosted compatibility.
+installer and provider choices.
 
 Base provides reusable source, a runnable reference and an edition-authoring
 path. A family holds source that its editions select. An edition owns the full

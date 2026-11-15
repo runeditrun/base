@@ -1,5 +1,7 @@
 # BOOTSTRAP.md — define an edition before building it
 
+Dated record (strategy, 15 Nov 2026): kept in place only because `plant.sh` plants it into new seed repositories; the seed playbook now owns how an edition is defined and built. Not current guidance where the two differ.
+
 Read `AGENTS.md`, `BASELINE.md`, the relevant product research and `HANDOVER.md`.
 This stage turns an intended edition and its UI into a clear build brief; it does
 not claim that the backend or release tooling already exists.

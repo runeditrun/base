@@ -13,11 +13,11 @@ const later = seconds => new Date(Date.now() + seconds * 1000).toISOString();
 
 /** Network edge from platform b64ab7f5: executors/{pairing,tokens,tasks,mcp}.ts. */
 export async function server(t, { businessId = 'biz' } = {}) {
- const state = { approved: false, requests: [], tasks: [], released: null, checkpoint: {}, uploads: [], phase: 'ready', fence: 0, grants: new Map(), claims: new Map() };
+ const state = { requests: [], tasks: [], released: null, checkpoint: {}, uploads: [], phase: 'ready', fence: 0, grants: new Map(), claims: new Map() };
  state.business = { id: businessId, name: 'synthetic-base-1', legal_name: null, brand_color: '#264F45', logo_url: null };
  const device = `bz_device_fixture-credential-${businessId}`;
  const tokens = new Map(), tasks = taskStore(state);
- let redeemed = false, issued = false, tokenSequence = 0, origin, pairingExpires = 0;
+ let issued = false, tokenSequence = 0, origin;
  const pairings = new Map();
  const deviceRefusal = (status, code) => [{ error: state.refusalText ?? 'Fixture device pairing refused', code }, status];
  function startDevice(body, request) {
@@ -81,29 +81,6 @@ export async function server(t, { businessId = 'biz' } = {}) {
   tokens.set(`Bearer ${access}`, { audience: body.audience, taskId: body.task_id ?? null, until: Date.now() + seconds * 1000 });
   return { access_token: access, token_type: 'Bearer', expires_in: seconds, expires_at: later(seconds),
    audience: `${origin}/api/business/${body.audience === 'mcp' ? 'mcp' : 'tasks'}`, task_id: body.task_id ?? null };
- }
- function pair(body) {
-  if (body.pairing_token !== undefined) {
-   closed(body, ['pairing_token']);
-   requireValue(typeof body.pairing_token === 'string' && body.pairing_token.length <= 200);
-   requireValue(redeemed && !issued && body.pairing_token === 'fixture-pairing-poll' && Date.now() < pairingExpires, 401, 'Pairing expired or used');
-   if (!state.approved) return [{ status: 'authorization_pending', interval: state.pollSeconds ?? 5 }, 202];
-   issued = true;
-   return [{ status: 'paired', device_credential: device, executor_id: 'executor1', business_id: businessId, idle_expires_at: later(30 * 24 * 3600) }, 200];
-  }
-  closed(body, ['code', 'device_name', 'working_folder', 'os', 'agent_kind', 'capabilities']);
-  requireValue(typeof body.code === 'string' && body.code.length <= 100);
-  // The platform's own limits: a short single-line name, and an absolute folder.
-  requireValue(body.device_name === undefined || typeof body.device_name === 'string' && body.device_name.trim() && body.device_name.length <= 200 && !/[\r\n\x00-\x1f]/.test(body.device_name));
-  requireValue(body.working_folder === undefined || typeof body.working_folder === 'string' && body.working_folder.length <= 1000 && !/[\x00-\x1f\x7f]/.test(body.working_folder) && (body.working_folder.startsWith('/') || body.working_folder.startsWith('~/')));
-  requireValue(body.code === 'ABCD-1234', 401, 'Pairing expired or used');
-  requireValue(['macos', 'linux', 'wsl', 'windows', 'other'].includes(body.os) && ['codex', 'claude', 'other'].includes(body.agent_kind));
-  requireValue(Array.isArray(body.capabilities) && body.capabilities.length <= 100 && body.capabilities.every(value => typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,100}$/.test(value)));
-  // Each explicit pairing starts a fresh browser-created fixture pairing.
-  // Like the platform, the code's own expiry applies until approval.
-  redeemed = true; issued = false; state.approved = false; state.revoked = false; state.active = false; state.agentKind = body.agent_kind;
-  const seconds = state.pairingSeconds ?? 600; pairingExpires = Date.now() + seconds * 1000;
-  return [{ status: 'pending_approval', pairing_token: 'fixture-pairing-poll', confirmation_number: '246810', expires_at: later(seconds), interval: state.pollSeconds ?? 5 }, 202];
  }
  function tool(token, name, args) {
   object(args);
@@ -206,16 +183,6 @@ export async function server(t, { businessId = 'biz' } = {}) {
      return send({ pairing_id: pairing.id, status: 'approved', collect_by: new Date(pairing.expires).toISOString() });
     }
     pairing.denied = true; return send({ pairing_id: pairing.id, status: 'denied' });
-   }
-   if (route === '/api/business/biz/pairings/pair1/approve') {
-    closed(body, ['confirmation_number', 'confirmed']);
-    requireValue(redeemed && !issued && Date.now() < pairingExpires && body.confirmation_number === '246810' && body.confirmed === true, 403);
-    // Approval gives the computer ten more minutes to collect its credential.
-    state.approved = true; pairingExpires = Date.now() + 600_000; return send({ approved: true });
-   }
-   if (route === '/api/business/executors/pair') {
-    if (body.pairing_token && state.pairingRefused) return send({ error: 'Pairing expired or used', requestId: 'fixture-request' }, 401);
-    return send(...pair(body));
    }
    if (route === '/api/business/executors/token') return send(mint(request, body));
    if (route === '/api/business/mcp') return mcp(request, body, send);
