@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.118-dev.ge32d762c",
+  "cliVersion": "0.2.118-dev.gef7ce0e4",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -5207,7 +5207,7 @@
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "5a6e369a211306f67961c7889f5350b8f90d590f6f1787711a3861172ee308d0"
+      "sha256": "ec23d1e619234f570facf69304ca40b6c6578a6de10ae8c56b2b27dfe1ef1165"
     },
     "scripts/publish-check/assignment.py": {
       "source": "scripts/publish-check/assignment.py",
@@ -5219,7 +5219,7 @@
     },
     "scripts/publish-check/checksum_maps.py": {
       "source": "scripts/publish-check/checksum_maps.py",
-      "sha256": "7e844ce56f885bd1ff2e1f8cea821c73ee3775013580ea63c585948c14bdd77f"
+      "sha256": "1175f4d1ba3093ad79c3f0996e1d2213ebfb3506cbcaf4d8ea4afdfd3e26f2b9"
     },
     "scripts/publish-check/cli.py": {
       "source": "scripts/publish-check/cli.py",
@@ -5311,7 +5311,7 @@
     },
     "scripts/publish-check/hit_location.py": {
       "source": "scripts/publish-check/hit_location.py",
-      "sha256": "752e4ab06878a9111000cc0aba74eebd5baa63a92a5c79f3ff7696be7dd8e4e0"
+      "sha256": "3f0c170dc13d8e33abb3886ae830e31177681299cdbb1098cd8a96b4be26ccfb"
     },
     "scripts/publish-check/hygiene_config.py": {
       "source": "scripts/publish-check/hygiene_config.py",
@@ -5327,7 +5327,7 @@
     },
     "scripts/publish-check/json_identity.py": {
       "source": "scripts/publish-check/json_identity.py",
-      "sha256": "1e0be539690d64022e6731802f79c40b88d78df49e1ab08f3c6cfaa19037fb0e"
+      "sha256": "37fbf0ecfe567001c02d4fac02001968ac50a039bfeb52d22e57bdd64b9c3534"
     },
     "scripts/publish-check/license-exceptions.json": {
       "source": "scripts/publish-check/license-exceptions.json",
