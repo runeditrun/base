@@ -1,0 +1,310 @@
+TAP version 13
+# (node:1071) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"deployed":true,"origin":"https://fixture-production.fixture-account.workers.dev","dependenciesLinked":true}
+# Subtest: rer deploy accepts terminal Cloudflare list shapes and follows advertised pages
+    # Subtest: absent
+    ok 1 - absent
+      ---
+      duration_ms: 706.976362
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"deployed":true,"origin":"https://fixture-production.fixture-account.workers.dev","dependenciesLinked":true}
+    # Subtest: null
+    ok 2 - null
+      ---
+      duration_ms: 354.67401
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"deployed":true,"origin":"https://fixture-production.fixture-account.workers.dev","dependenciesLinked":true}
+    # Subtest: empty-cursor
+    ok 3 - empty-cursor
+      ---
+      duration_ms: 387.39005
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"deployed":true,"origin":"https://fixture-production.fixture-account.workers.dev","dependenciesLinked":true}
+    # Subtest: absent-cursor
+    ok 4 - absent-cursor
+      ---
+      duration_ms: 501.481692
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"deployed":true,"origin":"https://fixture-production.fixture-account.workers.dev","dependenciesLinked":true}
+    # Subtest: total-pages
+    ok 5 - total-pages
+      ---
+      duration_ms: 492.040184
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"deployed":true,"origin":"https://fixture-production.fixture-account.workers.dev","dependenciesLinked":true}
+    # Subtest: next-page
+    ok 6 - next-page
+      ---
+      duration_ms: 569.895994
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"deployed":true,"origin":"https://fixture-production.fixture-account.workers.dev","dependenciesLinked":true}
+    # Subtest: next-cursor
+    ok 7 - next-cursor
+      ---
+      duration_ms: 470.42678
+      type: 'test'
+      ...
+    1..7
+ok 1 - rer deploy accepts terminal Cloudflare list shapes and follows advertised pages
+  ---
+  duration_ms: 3485.193129
+  type: 'test'
+  ...
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# {"version":1,"verb":"deploy","event":"error","code":"command_failed","message":"Deploy failed at check R2: provider-incomplete-pagination.\\nCloudflare call GET /r2/buckets: provider-incomplete-pagination (no Cloudflare error code or message supplied).\\nResources created this attempt: none.\\nCloudflare did not supply a complete list. Inspect the named GET call in Cloudflare, resolve its missing continuation, then run rer deploy --environment production --cwd ../../../../../../tmp/rer-remove-xHiXPF again with the same account and environment. Keep the deployment record so rer can reuse its resources.","exitCode":1}
+# {"version":1,"verb":"deploy","event":"result","ok":false,"exitCode":1}
+# Subtest: rer deploy refuses an explicitly truncated provider list without a usable continuation
+ok 2 - rer deploy refuses an explicitly truncated provider list without a usable continuation
+  ---
+  duration_ms: 405.123014
+  type: 'test'
+  ...
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"deployed":true,"origin":"https://fixture-production.fixture-account.workers.dev","dependenciesLinked":true}
+# Checking pinned pnpm
+# 10.12.4
+# Removed worker:fixture-production, queues:fixture-production-jobs; read back: none of them remains.
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"removed":["worker:fixture-production","queues:fixture-production-jobs"],"deployed":false}
+# Subtest: rer deploy --remove --yes detaches every owned queue consumer, deletes once and reads back absence
+ok 3 - rer deploy --remove --yes detaches every owned queue consumer, deletes once and reads back absence
+  ---
+  duration_ms: 1338.110655
+  type: 'test'
+  ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# (node:1071) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"dryRun":false,"deployed":true,"origin":"https://run-fixture.example.test","site":{"worker":"fixture-production--site","appWorker":"fixture-production","module":"site-worker.mjs","bindings":["ASSETS"],"assets":"dist/site","files":2,"references":{"unresolved":[]},"domain":"run-fixture.example.test","hostnames":["run-fixture.example.test","www.run-fixture.example.test"],"workersDev":false,"runWorkerFirst":true,"assetsConfig":{"html_handling":"auto-trailing-slash","not_found_handling":"404-page"},"redirects":[{"from":"https://www.run-fixture.example.test/*","to":"https://run-fixture.example.test/","status":301}]}}
+# Subtest: rer deploy --site restarts inconsistent lists and never replays writes
+    # Subtest: /zones partial
+    ok 1 - /zones partial
+      ---
+      duration_ms: 921.97115
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"dryRun":false,"deployed":true,"origin":"https://run-fixture.example.test","site":{"worker":"fixture-production--site","appWorker":"fixture-production","module":"site-worker.mjs","bindings":["ASSETS"],"assets":"dist/site","files":2,"references":{"unresolved":[]},"domain":"run-fixture.example.test","hostnames":["run-fixture.example.test","www.run-fixture.example.test"],"workersDev":false,"runWorkerFirst":true,"assetsConfig":{"html_handling":"auto-trailing-slash","not_found_handling":"404-page"},"redirects":[{"from":"https://www.run-fixture.example.test/*","to":"https://run-fixture.example.test/","status":301}]}}
+    # Subtest: /workers/domains partial
+    ok 2 - /workers/domains partial
+      ---
+      duration_ms: 719.494137
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"dryRun":false,"deployed":true,"origin":"https://run-fixture.example.test","site":{"worker":"fixture-production--site","appWorker":"fixture-production","module":"site-worker.mjs","bindings":["ASSETS"],"assets":"dist/site","files":2,"references":{"unresolved":[]},"domain":"run-fixture.example.test","hostnames":["run-fixture.example.test","www.run-fixture.example.test"],"workersDev":false,"runWorkerFirst":true,"assetsConfig":{"html_handling":"auto-trailing-slash","not_found_handling":"404-page"},"redirects":[{"from":"https://www.run-fixture.example.test/*","to":"https://run-fixture.example.test/","status":301}]}}
+    # Subtest: /workers/domains changed
+    ok 3 - /workers/domains changed
+      ---
+      duration_ms: 637.585372
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"dryRun":false,"deployed":true,"origin":"https://run-fixture.example.test","site":{"worker":"fixture-production--site","appWorker":"fixture-production","module":"site-worker.mjs","bindings":["ASSETS"],"assets":"dist/site","files":2,"references":{"unresolved":[]},"domain":"run-fixture.example.test","hostnames":["run-fixture.example.test","www.run-fixture.example.test"],"workersDev":false,"runWorkerFirst":true,"assetsConfig":{"html_handling":"auto-trailing-slash","not_found_handling":"404-page"},"redirects":[{"from":"https://www.run-fixture.example.test/*","to":"https://run-fixture.example.test/","status":301}]}}
+    # Subtest: /workers/scripts/fixture-production--site/versions partial
+    ok 4 - /workers/scripts/fixture-production--site/versions partial
+      ---
+      duration_ms: 669.976795
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"dryRun":false,"deployed":true,"origin":"https://run-fixture.example.test","site":{"worker":"fixture-production--site","appWorker":"fixture-production","module":"site-worker.mjs","bindings":["ASSETS"],"assets":"dist/site","files":2,"references":{"unresolved":[]},"domain":"run-fixture.example.test","hostnames":["run-fixture.example.test","www.run-fixture.example.test"],"workersDev":false,"runWorkerFirst":true,"assetsConfig":{"html_handling":"auto-trailing-slash","not_found_handling":"404-page"},"redirects":[{"from":"https://www.run-fixture.example.test/*","to":"https://run-fixture.example.test/","status":301}]}}
+    # Subtest: /workers/scripts/fixture-production--site/deployments partial
+    ok 5 - /workers/scripts/fixture-production--site/deployments partial
+      ---
+      duration_ms: 485.97717
+      type: 'test'
+      ...
+    1..5
+ok 4 - rer deploy --site restarts inconsistent lists and never replays writes
+  ---
+  duration_ms: 3435.985611
+  type: 'test'
+  ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"error","code":"deploy_refused","message":"Run site deploy stopped: provider-partial-list. Cloudflare call GET /zones: provider-partial-list (no Cloudflare error code or message supplied).","exitCode":1}
+# {"version":1,"verb":"deploy","event":"result","ok":false,"exitCode":1}
+# Subtest: rer deploy --site exhausts three inconsistent preflight reads without deploying
+    # Subtest: /zones partial
+    ok 1 - /zones partial
+      ---
+      duration_ms: 559.071526
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"error","code":"deploy_refused","message":"Run site deploy stopped: provider-pagination-changed. Cloudflare call GET /workers/domains: provider-pagination-changed (no Cloudflare error code or message supplied).","exitCode":1}
+# {"version":1,"verb":"deploy","event":"result","ok":false,"exitCode":1}
+    # Subtest: /workers/domains changed
+    ok 2 - /workers/domains changed
+      ---
+      duration_ms: 621.847277
+      type: 'test'
+      ...
+    1..2
+ok 5 - rer deploy --site exhausts three inconsistent preflight reads without deploying
+  ---
+  duration_ms: 1181.35784
+  type: 'test'
+  ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"error","code":"deploy_refused","message":"Run site deploy stopped: provider-http-403. GET /zones: GET /client/v4/zones; elapsed 0 ms; HTTP 403; Cloudflare refused GET /zones: 10000 Synthetic provider refusal; {\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}.","exitCode":1,"siteDeploy":{"code":"provider-http-403","step":"GET /zones","created":[],"providerRequest":{"method":"GET","endpoint":"/client/v4/zones","status":403,"elapsedMs":0,"timeoutMs":30000,"cause":"HTTP refusal","step":"GET /zones","body":"{\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}"},"providerCodes":[10000],"provider":"GET /zones: GET /client/v4/zones; elapsed 0 ms; HTTP 403; Cloudflare refused GET /zones: 10000 Synthetic provider refusal; {\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}","output":"{\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}"},"step":"GET /zones"}
+# {"version":1,"verb":"deploy","event":"result","ok":false,"exitCode":1,"siteDeploy":{"code":"provider-http-403","step":"GET /zones","created":[],"providerRequest":{"method":"GET","endpoint":"/client/v4/zones","status":403,"elapsedMs":0,"timeoutMs":30000,"cause":"HTTP refusal","step":"GET /zones","body":"{\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}"},"providerCodes":[10000],"provider":"GET /zones: GET /client/v4/zones; elapsed 0 ms; HTTP 403; Cloudflare refused GET /zones: 10000 Synthetic provider refusal; {\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}","output":"{\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}"}}
+# Subtest: rer deploy --site refuses ordinary provider errors immediately and cancels a settling wait
+    # Subtest: 403
+    ok 1 - 403
+      ---
+      duration_ms: 589.271257
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"error","code":"deploy_refused","message":"Run site deploy stopped: provider-http-503. GET /zones: GET /client/v4/zones; elapsed 1 ms; HTTP 503; Cloudflare refused GET /zones: 10000 Synthetic provider refusal; {\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}.","exitCode":1,"siteDeploy":{"code":"provider-http-503","step":"GET /zones","created":[],"providerRequest":{"method":"GET","endpoint":"/client/v4/zones","status":503,"elapsedMs":1,"timeoutMs":30000,"cause":"HTTP refusal","step":"GET /zones","body":"{\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}"},"providerCodes":[10000],"provider":"GET /zones: GET /client/v4/zones; elapsed 1 ms; HTTP 503; Cloudflare refused GET /zones: 10000 Synthetic provider refusal; {\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}","output":"{\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}"},"step":"GET /zones"}
+# {"version":1,"verb":"deploy","event":"result","ok":false,"exitCode":1,"siteDeploy":{"code":"provider-http-503","step":"GET /zones","created":[],"providerRequest":{"method":"GET","endpoint":"/client/v4/zones","status":503,"elapsedMs":1,"timeoutMs":30000,"cause":"HTTP refusal","step":"GET /zones","body":"{\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}"},"providerCodes":[10000],"provider":"GET /zones: GET /client/v4/zones; elapsed 1 ms; HTTP 503; Cloudflare refused GET /zones: 10000 Synthetic provider refusal; {\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}","output":"{\\"success\\":false,\\"errors\\":[{\\"code\\":10000,\\"message\\":\\"Synthetic provider refusal\\"}]}"}}
+    # Subtest: 503
+    ok 2 - 503
+      ---
+      duration_ms: 557.216017
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"error","code":"deploy_refused","message":"Run site deploy stopped: provider-invalid-list. Cloudflare call GET /zones: provider-invalid-list (no Cloudflare error code or message supplied).","exitCode":1}
+# {"version":1,"verb":"deploy","event":"result","ok":false,"exitCode":1}
+    # Subtest: malformed
+    ok 3 - malformed
+      ---
+      duration_ms: 542.156138
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"error","code":"deploy_refused","message":"Run site deploy stopped: provider-incomplete-pagination. Cloudflare call GET /zones: provider-incomplete-pagination (no Cloudflare error code or message supplied).","exitCode":1}
+# {"version":1,"verb":"deploy","event":"result","ok":false,"exitCode":1}
+    # Subtest: truncated
+    ok 4 - truncated
+      ---
+      duration_ms: 604.785553
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"error","code":"cancelled","message":"Stopped by SIGINT after owned children were stopped.","exitCode":130}
+# {"version":1,"verb":"deploy","event":"result","ok":false,"exitCode":130}
+    # Subtest: cancel
+    ok 5 - cancel
+      ---
+      duration_ms: 551.84921
+      type: 'test'
+      ...
+    1..5
+ok 6 - rer deploy --site refuses ordinary provider errors immediately and cancels a settling wait
+  ---
+  duration_ms: 2846.508707
+  type: 'test'
+  ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"dryRun":false,"deployed":true,"origin":"https://run-fixture.example.test","site":{"worker":"fixture-production--site","appWorker":"fixture-production","module":"site-worker.mjs","bindings":["ASSETS"],"assets":"dist/site","files":2,"references":{"unresolved":[]},"domain":"run-fixture.example.test","hostnames":["run-fixture.example.test","www.run-fixture.example.test"],"workersDev":false,"runWorkerFirst":true,"assetsConfig":{"html_handling":"auto-trailing-slash","not_found_handling":"404-page"},"redirects":[{"from":"https://www.run-fixture.example.test/*","to":"https://run-fixture.example.test/","status":301}]}}
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"dryRun":false,"deployed":true,"origin":"https://run-fixture.example.test","site":{"worker":"fixture-production--site","appWorker":"fixture-production","module":"site-worker.mjs","bindings":["ASSETS"],"assets":"dist/site","files":2,"references":{"unresolved":[]},"domain":"run-fixture.example.test","hostnames":["run-fixture.example.test","www.run-fixture.example.test"],"workersDev":false,"runWorkerFirst":true,"assetsConfig":{"html_handling":"auto-trailing-slash","not_found_handling":"404-page"},"redirects":[{"from":"https://www.run-fixture.example.test/*","to":"https://run-fixture.example.test/","status":301}]}}
+# Subtest: rer deploy --site preserves stable deployment and repeat behaviour
+ok 7 - rer deploy --site preserves stable deployment and repeat behaviour
+  ---
+  duration_ms: 1119.623234
+  type: 'test'
+  ...
+# Checking pinned pnpm
+# 10.12.4
+# Building the run site
+# {"pages":2,"assets":0,"styles":0}
+# {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"dryRun":false,"deployed":true,"origin":"https://run-fixture.example.test","site":{"worker":"fixture-production--site","appWorker":"fixture-production","module":"site-worker.mjs","bindings":["ASSETS"],"assets":"dist/site","files":2,"references":{"unresolved":[]},"domain":"run-fixture.example.test","hostnames":["run-fixture.example.test","www.run-fixture.example.test"],"workersDev":false,"runWorkerFirst":true,"assetsConfig":{"html_handling":"auto-trailing-slash","not_found_handling":"404-page"},"redirects":[{"from":"https://www.run-fixture.example.test/*","to":"https://run-fixture.example.test/","status":301}]}}
+# Subtest: rer deploy --site waits a real 20 seconds before restarting a partial zone read
+ok 8 - rer deploy --site waits a real 20 seconds before restarting a partial zone read
+  ---
+  duration_ms: 20570.22903
+  type: 'test'
+  ...
+1..8
+# tests 27
+# suites 0
+# pass 27
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 34497.057134

@@ -1,0 +1,15 @@
+{
+  "signed": "Run Edit Run fleet, 2026-11-15",
+  "command": "git log origin/main..HEAD --format=\"%an <%ae>%n%cn <%ce>%n%(trailers:only,unfold)\"",
+  "all_parents_included": true,
+  "candidate_commits": [
+    {
+      "head": "a7ccc0cd247ce1fb2fa3ce84e22c117c29a5673b",
+      "author": "Run Edit Run fleet <fleet@runeditrun.com>",
+      "committer": "Run Edit Run fleet <fleet@runeditrun.com>",
+      "trailers": [],
+      "complete_message_inspected": true
+    }
+  ],
+  "status": "PASS"
+}

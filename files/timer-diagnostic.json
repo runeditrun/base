@@ -1,0 +1,67 @@
+{
+  "node": "v24.19.0",
+  "iterations": 2000,
+  "delayMs": 5,
+  "wall": {
+    "early": 11,
+    "minMs": 4,
+    "maxMs": 13
+  },
+  "monotonic": {
+    "early": 12,
+    "minMs": 4.093968000000132,
+    "maxMs": 12.658244999999624
+  },
+  "examples": [
+    {
+      "iteration": 0,
+      "wallMs": 4,
+      "monotonicMs": 4.2767279999999985
+    },
+    {
+      "iteration": 214,
+      "wallMs": 4,
+      "monotonicMs": 4.115489999999909
+    },
+    {
+      "iteration": 262,
+      "wallMs": 4,
+      "monotonicMs": 4.108439999999973
+    },
+    {
+      "iteration": 277,
+      "wallMs": 4,
+      "monotonicMs": 4.110513000000083
+    },
+    {
+      "iteration": 570,
+      "wallMs": 4,
+      "monotonicMs": 4.134193999999752
+    },
+    {
+      "iteration": 975,
+      "wallMs": 4,
+      "monotonicMs": 4.097009000000071
+    },
+    {
+      "iteration": 1066,
+      "wallMs": 4,
+      "monotonicMs": 4.10734500000035
+    },
+    {
+      "iteration": 1138,
+      "wallMs": 4,
+      "monotonicMs": 4.54457100000036
+    },
+    {
+      "iteration": 1149,
+      "wallMs": 4,
+      "monotonicMs": 4.482668999999987
+    },
+    {
+      "iteration": 1173,
+      "wallMs": 4,
+      "monotonicMs": 4.098951999999372
+    }
+  ]
+}

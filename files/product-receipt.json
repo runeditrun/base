@@ -1,0 +1,35 @@
+{
+  "signed": "Run Edit Run fleet, 2026-11-15",
+  "repository": "runeditrun/base",
+  "branch": "cloud/gr-base-flake-backoff-1",
+  "head": "a7ccc0cd247ce1fb2fa3ce84e22c117c29a5673b",
+  "base": "bd23185acf2d54b57edee962cd9267e2b83c252b",
+  "product_custody": "READY",
+  "product_push_attempts": 1,
+  "remote_head_verified": true,
+  "working_tree_clean": true,
+  "draft_pr": "https://github.com/runeditrun/base/pull/870",
+  "verify": {
+    "run_id": 43768480456,
+    "status": "completed",
+    "conclusion": "success",
+    "head_sha": "a7ccc0cd247ce1fb2fa3ce84e22c117c29a5673b",
+    "html_url": "https://github.com/runeditrun/base/actions/runs/43768480456"
+  },
+  "explicit_pr_ci_github_calls": 7,
+  "product_commits": 1,
+  "test_counts": {
+    "before": 27,
+    "after": 27,
+    "new": 0,
+    "local_pass": 27,
+    "local_fail": 0
+  },
+  "clause_changes": [],
+  "clause_status_counts": "unchanged",
+  "claims": [],
+  "blockers": [],
+  "proof_files": "kept only in separate evidence packet",
+  "retained_product": "published named branch and draft PR",
+  "clone_cleanup": "remove after evidence publication and exact-ref verification"
+}

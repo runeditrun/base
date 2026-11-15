@@ -1,0 +1,30 @@
+{
+  "signed": "Run Edit Run fleet, 2026-11-15",
+  "base": "bd23185acf2d54b57edee962cd9267e2b83c252b",
+  "candidate": "a7ccc0cd247ce1fb2fa3ce84e22c117c29a5673b",
+  "source_observations": [
+    {
+      "file": "cli/deploy-pagination.test.mjs",
+      "base_blob": "dead37e7427a19d99e68aedfaec2c40336b0fcda",
+      "base_matches": [
+        {
+          "line": 112,
+          "source": "if (page === 1) {attempts++;started.push(performance.now());}"
+        }
+      ]
+    },
+    {
+      "file": "modules/deploy-kit/provider.mjs",
+      "base_blob": "9ec02f7816414ce949edd4be308328627a7588e0",
+      "base_matches": [
+        {
+          "line": 161,
+          "source": "await timers.setTimeout(20000, undefined, {signal});"
+        }
+      ]
+    }
+  ],
+  "exported_backoff_constant": false,
+  "production_timer": "node:timers/promises.setTimeout",
+  "test_clock": "performance.now()"
+}

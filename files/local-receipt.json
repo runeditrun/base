@@ -1,0 +1,61 @@
+{
+  "signed": "Run Edit Run fleet, 2026-11-15",
+  "commands": [
+    {
+      "command": "node --test --test-concurrency=1 cli/deploy-pagination.test.mjs",
+      "node": "22.20.0",
+      "exit": 0,
+      "counts": {
+        "tests": 27,
+        "pass": 27,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "real_wait_test_duration_ms": 20570.22903,
+      "run_count": 1
+    },
+    {
+      "command": "pnpm --dir default-seed typecheck",
+      "node": "22.20.0",
+      "pnpm": "10.12.4",
+      "exit": 0
+    },
+    {
+      "command": "node packet/timer-diagnostic.mjs",
+      "node": "22.20.0",
+      "exit": 0,
+      "iterations": 2000,
+      "delay_ms": 5,
+      "wall_early": 8,
+      "monotonic_early": 8
+    },
+    {
+      "command": "node packet/timer-diagnostic.mjs",
+      "node": "24.19.0",
+      "exit": 0,
+      "iterations": 2000,
+      "delay_ms": 5,
+      "wall_early": 11,
+      "monotonic_early": 12
+    },
+    {
+      "command": "pnpm typecheck:modules",
+      "node": "22.20.0",
+      "pnpm": "10.12.4",
+      "exit": 0,
+      "module_js_files_checked": 506
+    }
+  ],
+  "test_counts": {
+    "before": 27,
+    "after": 27,
+    "top_level_before": 8,
+    "top_level_after": 8,
+    "new_permanent_tests": 0
+  },
+  "production_changed": false,
+  "contracts_changed": false,
+  "maintained_cli_regenerated": false
+}

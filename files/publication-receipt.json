@@ -1,0 +1,28 @@
+{
+  "status": "PASS",
+  "complete": true,
+  "source": {
+    "commit": "a7ccc0cd247ce1fb2fa3ce84e22c117c29a5673b",
+    "tree": "466e521ec4df9ca719cc7177f9e4dbc792d6947c"
+  },
+  "scanner": {
+    "name": "gitleaks",
+    "version": "8.30.1"
+  },
+  "blocking_findings": 0,
+  "history": {
+    "scope": "selected-and-public-base",
+    "commits": 1647,
+    "trees": 1626,
+    "blobs": 10849,
+    "commitMessages": 1647,
+    "tagMessages": 115,
+    "hydration": {
+      "missingBefore": 7519,
+      "missingAfter": 0,
+      "fetches": 1,
+      "seconds": 2.736256
+    }
+  },
+  "public_base": "https://github.com/runeditrun/base.git#main"
+}
