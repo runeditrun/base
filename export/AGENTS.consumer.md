@@ -1,17 +1,8 @@
 # Agent instructions
 
-To bring existing data into a seed, sign in as the owner and use its import
-screen. First step: open this path on the destination app:
-
-```text
-/app/import
-```
-
-Upload a supported source export, review the plan and its differences, then
-approve that exact plan to apply it. Reconcile the result against native data;
-use Undo from the same history when needed. Base's reference accepts people JSON
-here, not installation `.rer` archives. Editions adopt this same door
-with their own supported readers and native adapters.
+This repository is a complete product you can run as it is or change to fit. Start with
+"Launch for review" below to see it running; `CONTRACT.md` says what the product does and `HANDOVER.md` where its
+work stands. Any part of it (UI, logic, schema, infrastructure) may be changed for the company that runs it.
 
 ## Launch for review
 
@@ -124,6 +115,21 @@ the signed-in import door when bringing records in.
 
 Run `rer describe` to inspect the supported flags and effects before using
 other options.
+
+## Bring existing data in
+
+One way in is the app's import screen: sign in as the owner and open this path on the destination app:
+
+```text
+/app/import
+```
+
+Upload a supported source export, review the plan and its differences, then
+approve that exact plan to apply it. Reconcile the result against native data;
+use Undo from the same history when needed. Base's reference accepts people JSON
+here, not installation `.rer` archives. Editions adopt this same door
+with their own supported readers and native adapters. An agent may also bring data in another way the product
+supports, keeping its migrations and data rules.
 
 ## Working on this edition
 

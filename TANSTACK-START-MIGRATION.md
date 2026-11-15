@@ -1,5 +1,7 @@
 # TanStack Start migration recipe for Cloudflare seeds
 
+Dated record (strategy, 15 Nov 2026): kept at this path because seeds' vendored `AGENTS.md` and `foundation/initialize.mjs` link it by URL; its acceptance matrix records the rendering swap and is not current guidance.
+
 This recipe preserves existing applications while changing their rendering stack.
 Author common runtime changes in the base repository, shared domain and modules
 in the family repository, and finished screens in edition sources. Assemble and
