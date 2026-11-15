@@ -5,6 +5,7 @@ import { excludedTable } from '../modules/portability/catalogue.mjs';
 import { schemaSQL } from '../modules/portability/schema-identity.mjs';
 import { ensurePortabilitySchema, portabilityPlan } from '../modules/container/portability-schema.mjs';
 import { ensureImportLeases } from '../modules/portability/import-lease.mjs';
+import { ensureObjectInventory } from '../modules/portability/object-inventory.mjs';
 import { splitStatements } from '../modules/portability/sql-text.mjs';
 import { createPortability } from '../modules/portability/index.mjs';
 import { migrationReplay } from '../modules/portability/migration-history.mjs';
@@ -55,6 +56,7 @@ export async function managedSchema(db, plan, policy, ledger) {
   const native = nativeDatabase(scratch);
   await ensurePortabilitySchema(native, await portabilityPlan(splitStatements));
   await ensureImportLeases(native);
+  await ensureObjectInventory(native);
   previous = new Map((await all(native, query)).map(object => [key(object), object]));
   const inventory = [], groups = new Map();
   const account = (object, disposition, migration) => {
