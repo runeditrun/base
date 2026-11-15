@@ -111,7 +111,10 @@ test('doctor on a set-up checkout does not ask for setup or list inputs only a d
  // What a seed with a hosted build workflow declares: the owner's deploy inputs and the workflow's own.
  const owner = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'MAIL_FROM'], workflow = ['RER_PREPARE_ISOLATION', 'RER_DEPLOY_ARTIFACT', 'RER_DEPLOY_RUN_ID'];
  const environmentSources = Object.fromEntries([...owner.map(name => [name, 'Owner deployment environment. Read OPERATIONS.md']), ...workflow.map(name => [name, 'Provided by the build workflow. Read OPERATIONS.md'])]);
- await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'synthetic-doctor-2', runtime: { requirements: [] }, requiredEnvironment: [...owner, ...workflow], environmentSources, seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { dev: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Run this checkout locally.' } } }));
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'synthetic-doctor-2', runtime: { requirements: [] }, requiredEnvironment: [...owner, ...workflow], environmentSources: { ...environmentSources, SENDGRID_API_KEY: 'Owner deployment environment. Read OPERATIONS.md' }, seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' },
+  // A required sign-in mail loop on a hosted provider: the local app suppresses mail, so its key is a deploy input.
+  loops: [{ id: 'sign-in-mail', type: 'mail', required: true, enabled: true, provider: 'sendgrid' }],
+  commands: { dev: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Run this checkout locally.' } } }));
  const invoke = async () => {
   const child = spawn(process.execPath, [cli, 'doctor'], { cwd: root, env: { PATH: process.env.PATH, HOME: join(root, 'home'), TZ: 'UTC' }, stdio: ['ignore', 'pipe', 'pipe'], signal: t.signal });
   let stdout = '', stderr = '';
@@ -131,6 +134,7 @@ test('doctor on a set-up checkout does not ask for setup or list inputs only a d
  assert.equal(ready.code, 0, ready.text);
  assert.doesNotMatch(ready.text, /rer setup|Missing local inputs/);
  for (const name of workflow) assert.ok(!ready.text.includes(name), `${name} belongs to a build workflow, not to this computer`);
- for (const name of owner) assert.ok(ready.text.includes(name), `${name} is named as needed to deploy`);
+ for (const name of [...owner, 'SENDGRID_API_KEY']) assert.ok(ready.text.includes(name), `${name} is named as needed to deploy`);
+ assert.doesNotMatch(ready.text, /Loop sign-in-mail/, 'a mail loop waiting only on its deploy key is not a local failure');
  assert.match(ready.text, /Optional for local use; needed to deploy:/);
 });
