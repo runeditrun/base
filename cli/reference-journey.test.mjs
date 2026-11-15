@@ -190,8 +190,12 @@ assert.equal((await stat(join(f.root,'.dev.vars'))).mode&0o777,0o600);
  const deployPath=join(f.root,'deploy.json'),deployment=await readFile(deployPath),declaration=JSON.parse(deployment);
  const deploySettings=join(f.root,'.seed/installer/dry-run.env');
  try {
-  declaration.vars.MAIL_FROM=productionSender;await writeFile(deployPath,JSON.stringify(declaration));
-  await writeFile(deploySettings,'MAIL_API_KEY=test-only-outbound-key\n',{mode:0o600});
+  const sender=declaration.secrets?.find(secret=>secret.binding==='MAIL_FROM');
+  // Foundations accept the sender through a declared environment mapping;
+  // declaring that same binding as a public var would be an invalid plan.
+  if(!sender)declaration.vars.MAIL_FROM=productionSender;
+  await writeFile(deployPath,JSON.stringify(declaration));
+  await writeFile(deploySettings,`MAIL_API_KEY=test-only-outbound-key\n${sender?`${sender.environment}=${productionSender}\n`:''}`,{mode:0o600});
   const dry=await f.run(['deploy','--dry-run','--env-file','.seed/installer/dry-run.env','--json']);assert.equal(events(dry).at(-1).ok,true);assert.equal(events(dry).at(-1).plan.d1[0].binding,'DB');assert.match(dry.stdoutText+dry.stderrText,/no credentials were needed/);
  } finally {await writeFile(deployPath,deployment);await rm(deploySettings,{force:true});}
  // The run site builds from edition identity alone, even in a set-up checkout.

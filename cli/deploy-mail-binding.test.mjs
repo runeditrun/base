@@ -98,6 +98,15 @@ test('public deploy dry-run accepts reserved fixture senders while real deploy p
  await writeFile(join(root, 'rer-packaging.json'), JSON.stringify({ artifact: { specInputs: { publicVariables: { MAIL_FROM } } } }));
  const corrected = await run(true, true, '--env-file', 'sender.env');
  assert.equal(corrected.code, 0, corrected.text);
+ const plan = JSON.parse(corrected.text.trim().split('\n').findLast(line => line.includes('"event":"result"'))).plan;
+ assert.ok(plan.secrets.some(item => item.binding === 'MAIL_FROM'), 'the mapped sender remains a secret binding');
+ assert.ok(!plan.vars.includes('MAIL_FROM'), 'the mapped sender is not also a public variable');
+ // The same sender in both places is still a binding collision, even when
+ // preflight accepts its identity. Fix callers rather than relaxing this check.
+ await writeFile(join(root, 'deploy.json'), JSON.stringify({ ...declaration, vars: { ...vars, MAIL_FROM }, secrets: [{ binding: 'MAIL_FROM', environment: 'OUTBOUND_SENDER' }] }));
+ const duplicate = await run(true, true, '--env-file', 'sender.env');
+ assert.equal(duplicate.code, 1, duplicate.text);
+ assert.match(duplicate.text, /invalid-public-variable/);
  assert.equal(provider.state.writes.length, 0, 'neither refusal nor corrected dry-run writes to the provider');
 });
 
