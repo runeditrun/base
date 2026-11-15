@@ -1,3 +1,4 @@
+import { failureStep } from '../modules/portability/archive-step.mjs';
 import { installD1Preflight } from '../modules/container/adapters/d1-workerd-setup.mjs';
 import { portabilityPlan, ensurePortabilitySchema } from '../modules/container/portability-schema.mjs';
 import { exportArchive, importArchive, fileRecords } from '../modules/portability/files.mjs';
@@ -94,7 +95,8 @@ catch (error) {
  const identityTable = error instanceof PortabilityError && error.code.startsWith('identity_table_undeclared:') ? error.code.slice('identity_table_undeclared:'.length) : undefined;
  const safety = error instanceof PortabilityError && error.code.startsWith('import_row_') ? error.code.slice(error.code.indexOf(':')+1) : undefined;
  // Anything that is not a portability refusal names its class and code, never its message: that can hold row data.
+ const step=failureStep(error) ?? (process.argv[2] === 'import' ? undefined : process.argv[2]);
  const native = error instanceof PortabilityError || error.message === 'archive_json' ? undefined : nativeFailure(error);
  process.exitCode = exitCode;
- await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, ...(reExport ? { reExport: true } : {}), ...(migration ? { migration } : {}), ...(unapplied ? { unapplied } : {}), ...(occupied ? { occupied } : {}), ...(identityTable ? { identityTable } : {}), ...(safety ? { safety } : {}), ...(native ? { native } : {}), exitCode });
+ await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, step, ...(reExport ? { reExport: true } : {}), ...(migration ? { migration } : {}), ...(unapplied ? { unapplied } : {}), ...(occupied ? { occupied } : {}), ...(identityTable ? { identityTable } : {}), ...(safety ? { safety } : {}), ...(native ? { native } : {}), exitCode });
 }
