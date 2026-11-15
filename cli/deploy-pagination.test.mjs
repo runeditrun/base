@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHook } from 'node:async_hooks';
 import { readFile, writeFile, symlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setImmediate as turn } from 'node:timers/promises';
@@ -100,7 +101,14 @@ async function drain() { for (let i=0;i<10;i++) await turn(); }
 // build. Stepping just short of each delay proves reads cannot resume early.
 function listingEdge(t, f, {path='/zones',failure='partial',failures=1,later=false,realTime=false} = {}) {
  let attempts = 0, failuresLeft = failures, clockStarted = false, observed = false;
- const pages = [], started = [], query = [];
+ const pages = [], started = [], query = [], delays = [];
+ if (realTime) {
+  // Observe native timer creation without replacing or advancing the real timer.
+  const hook = createHook({init(_id,type,_trigger,timer) {
+   if (type === 'Timeout') delays.push(timer._idleTimeout);
+  }}).enable();
+  t.after(() => hook.disable());
+ }
  t.mock.method(globalThis,'fetch',async (input,init = {}) => {
   const url = new URL(input), method = init.method ?? 'GET';
   const response = await f.provider.fetch(input,init);
@@ -126,7 +134,7 @@ function listingEdge(t, f, {path='/zones',failure='partial',failures=1,later=fal
   }
   return Response.json(body);
  });
- return {pages,query,started,get attempts(){return attempts;},get observed(){return observed;},
+ return {pages,query,started,delays,get attempts(){return attempts;},get observed(){return observed;},
   async waitForFailure() {
    // Real I/O (the CLI build) finishes before timers become controlled.
    const until = performance.now()+30000;
@@ -222,6 +230,10 @@ test('rer deploy --site waits a real 20 seconds before restarting a partial zone
  assert.equal(f.provider.state.writes.length,0);
  assert.equal(await pending,0,f.output.join('')+f.errors.join(''));
  assert.equal(edge.attempts,2);
- assert.ok(edge.started[1]-edge.started[0] >= 20000,'the real backoff is at least 20 seconds');
+ assert.ok(edge.delays.includes(20000),'the real backoff timer is configured for 20 seconds');
+ // Node schedules timers on a millisecond clock; even performance.now() can
+ // measure a wake just under the requested delay. Compare at that precision.
+ const elapsedMs = edge.started[1]-edge.started[0];
+ assert.ok(Math.ceil(elapsedMs) >= 20000,`the real backoff is 20 seconds at timer precision (${elapsedMs} ms)`);
  assert.equal(uploads(f).length,1);
 });
