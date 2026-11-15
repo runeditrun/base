@@ -1,10 +1,26 @@
 # Changelog
 
-## Unreleased
+## 0.2.118
+
+### Local diagnostics and Move in guidance
+
+- After a clean `rer dev`, `rer doctor` treats required loops waiting only on deployment inputs as ready for local use and lists those inputs as optional locally and needed for deployment. It still checks local configuration, commands and required local inputs.
+- Import and export help directs owners to the app's signed-in Move in page; `/app/import` is the Base reference path, and each project's own documentation names its path.
 
 ### Business device pairing only
 
-- Removed `rer business connect --code` because Business retired browser-created pairing codes. Pair with `rer business connect --business ID`; the Business Connect page names the ID.
+- Removed `rer business connect --code` and its browser-created pairing flow, help and recovery guidance. Pair with `rer business connect --business ID`; the Business Connect page names the ID. Saved device pairings can still resume.
+
+### Explicit outbound mail off
+
+- Foundations accept an explicit `MAIL_PROVIDER=none` through declared environment-to-Worker bindings. Provider and sender bindings, and the mail key at the binding layer, are optional; mail off needs no sender or key and binds neither `MAIL_FROM` nor `MAIL_API_KEY`. An absent provider does not select off, and enabled providers still require their real sender and credentials. Conflicting mail-off credentials are refused.
+- `rer deploy --dry-run` validates this choice, says outbound email is off and names `rer signin` for owner entry. Email sign-in links and invitations remain unavailable. A declared optional operations mail loop reports `optional-disabled`; a required delivery loop still fails when mail is off.
+
+### Recorded app target for owner sign-in
+
+- `rer signin` selects the app Worker from the held ownership record, preserving its recorded account, project, environment and origin instead of recomputing the default Worker name. The selected identity must match the caller and live deployment. Wrong account, project or environment, missing or replaced Worker or receipt, and substitution of a public-page Worker refuse without issuing an owner grant.
+
+These changes become available to seeds after adopting the released package or refreshed source. This preparation establishes no seed adoption, provider delivery, deployment or production result. The actual diff adds no migrations and changes neither modules/import-kit nor modules/portability.
 
 ## 0.2.117
 
