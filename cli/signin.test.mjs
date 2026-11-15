@@ -210,8 +210,9 @@ test('rer signin selects only the held app identity and refuses mismatched or re
  await succeeds(saved.receipt.origin);
  assert.ok(h.requests.some(({ path }) => path.includes(`/workers/scripts/${saved.worker}/`)));
  assert.ok(h.requests.every(({ path }) => !path.includes(page.worker)), 'the page record never supplies the signin target');
+ assert.ok(h.requests.every(({ path }) => !path.endsWith('/workers/subdomain')), 'a recorded app origin does not require workers.dev');
  assert.ok(h.calls.some(sql => /^INSERT INTO oa_owner_signins/.test(sql)));
- const grants = (await h.db.prepare('SELECT count(*) AS n FROM oa_owner_signins').first()).n;
+ let grants = (await h.db.prepare('SELECT count(*) AS n FROM oa_owner_signins').first()).n;
  const refuses = async (args, credentials, pattern) => {
   h.calls.length = 0;
   const result = await run(args, credentials);
@@ -241,16 +242,11 @@ test('rer signin selects only the held app identity and refuses mismatched or re
  await writeFile(hookPath, JSON.stringify({ state: '.rer/deploy/production.json' }));
  h.setLiveWorker(saved.worker);
  await succeeds(saved.receipt.origin);
+ grants = (await h.db.prepare('SELECT count(*) AS n FROM oa_owner_signins').first()).n;
  const settings = h.provider.state.settings;
  h.provider.state.settings = null;
- // Account for the successful hook-selected grant when checking subsequent refusals.
- h.calls.length = 0;
- const missing = await run();
- assert.equal(missing.exit, 4); assert.match(missing.error.message, /no longer the one this checkout deployed/);
- assert.equal(h.calls.length, 0);
+ await refuses([], undefined, /no longer the one this checkout deployed/);
  h.provider.state.settings = settings;
  h.provider.foreign.replaceWorker();
- const replaced = await run();
- assert.equal(replaced.exit, 4); assert.match(replaced.error.message, /no longer the one this checkout deployed/);
- assert.equal(h.calls.length, 0);
+ await refuses([], undefined, /no longer the one this checkout deployed/);
 });
