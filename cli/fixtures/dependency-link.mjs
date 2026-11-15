@@ -43,6 +43,8 @@ export async function linkedSetup(kind,t) {
  const f=await fixture(kind,t),origin='http://127.0.0.1:'+await freePort(),provider=await testProvider(origin,'cli-owner@example.test');
  const deployPath=join(f.root,'deploy.json'),declaration=JSON.parse(await readFile(deployPath,'utf8'));
  declaration.vars={...declaration.vars,MAIL_FROM:productionSender};
+ // This journey fixes its sender in vars, replacing any optional input mapping.
+ declaration.secrets=declaration.secrets.filter(item=>item.binding!=='MAIL_FROM');
  await writeFile(deployPath,JSON.stringify(declaration));
  await adoptEditor(f.root,kind);
  if(kind==='foundation') {const path=join(f.root,'rer-setup.json'),manifest=JSON.parse(await readFile(path,'utf8'));manifest.steps=manifest.steps.map(step=>step.type==='owner-claim'?{type:'owner-claim',mode:'idp',emailField:'OWNER_EMAIL',dependency:'oidc-provider@1',path:'/auth/owner-claim'}:step);await writeFile(path,JSON.stringify(manifest));}
