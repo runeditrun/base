@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.118-dev.gdd2539f8",
+  "cliVersion": "0.2.118-dev.g6c4a6bc8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -799,7 +799,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "317770e7356f4732eeaac5b498631f0ad8a75a6c33bba0d07e370b0be8f04812"
+      "sha256": "6189d17b38fdb2b434cff8908854a4a25d9645d185210f82011ab9b66aea2e1c"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -815,7 +815,7 @@
     },
     "cli/deploy-inputs.mjs": {
       "source": "cli/deploy-inputs.mjs",
-      "sha256": "5e3de6107d2e73043db10b9c73d9e33b1e49c7c03e32d84df157cc08dd4a9d1e"
+      "sha256": "b2657c6d13665e15f97eb7da3611ec1cba4a4f3f989a7913e45ab1bf89a07a92"
     },
     "cli/deploy-installation-key.mjs": {
       "source": "cli/deploy-installation-key.mjs",
@@ -863,7 +863,7 @@
     },
     "cli/deploy-settings.mjs": {
       "source": "cli/deploy-settings.mjs",
-      "sha256": "b26ed7b70db7985f5f80dbbb588f6a3e2eb79e30516294dd8fb332ead29fb842"
+      "sha256": "8e5f904b1ebc0cacfa9ee060a21e4be279468d88feb983d0f85c354fe6c84e76"
     },
     "cli/deploy-setup.mjs": {
       "source": "cli/deploy-setup.mjs",
@@ -879,7 +879,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "b6399d7f76d0717713e71b719c3624df9209eedd5dc8a68981e493a127b7fe30"
+      "sha256": "4fff2fafbabc62d76cad5770fd3462033bb962182d1ebe9d42bbb78090ea05cd"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",

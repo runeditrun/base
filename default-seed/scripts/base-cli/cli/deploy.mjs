@@ -61,7 +61,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
   const { main } = await import('../modules/deploy-kit/owner-cli.mjs');
   const { createRedaction } = await shared('redaction.mjs');
   const redaction = createRedaction();
-  redaction.addSecrets([...(await settingKinds({ declaration, setupManifest })).privateValues(env), env.CLOUDFLARE_ACCOUNT_ID, ...(declaration.secrets ?? []).map(item => env[item.environment]).filter(Boolean)]);
+  redaction.addSecrets((await settingKinds({ declaration, setupManifest })).privateValues(env));
   const claim = setupManifest?.steps?.find(item => item.type === 'owner-claim');
   const declared = binding => (Array.isArray(declaration.secrets) ? declaration.secrets : []).find(item => item?.binding === binding);
   const owner = async (command, extra = [], values = env, more = {}) => main([command, '--declaration', declarationPath, '--environment', environment, ...(['dry-run', 'local-plan', 'deploy', 'health'].includes(command) ? await deployProductArguments(root, productDirectory) : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
