@@ -8,7 +8,8 @@ import { describe } from './errors.mjs';
 import { identifier, originUrl } from './api.mjs';
 import { appAddress, appSignInHelp } from '../app-address.mjs';
 
-const usage = `Set up your business: rer business connect
+const usage = `Set up your business: rer business connect --business ID
+The Business Connect page names the ID.
 Business keeps your business name, logo and brand colour together for the apps
 that support shared Business settings. Choose what to share in your browser.
 
@@ -19,7 +20,6 @@ Advanced commands (Usage: rer business VERB)
   scan [DIR...] [--json]          Names-only local discovery
   connect --business ID [--origin URL] [--timeout SECONDS]
                                  Print a code and link for the owner to approve in a signed-in browser
-                                 Older Business pages: connect --code CODE [--origin URL]
                                  Connect carries the Business name into local apps
   run [--once]                   Work this computer's tasks: the folder scan the owner allows. Says what
                                  it is doing and what it waits for; applies the owner's choices at each
@@ -72,13 +72,12 @@ the code's 10 minutes), then keeps the credential in OS credential storage.
   --origin URL       Business platform address (default: ${appAddress}).
   --timeout SECONDS  Wait at most this long, then exit 75 with the pairing kept;
                      run the same command again to keep waiting (same code).
-  --code CODE        Older Business pages: redeem a code made in the browser.
 Exits 0 connected, 1 ended (refused, expired or failed), 2 usage, 75 still waiting.
 `,
  token: `Usage: rer business token
 Print an MCP Authorization header object for this computer's paired Business.
 Send this headersHelper output directly to the MCP client; it contains a credential.
-Requires an existing pairing: rer business connect.
+Requires an existing pairing: rer business connect --business ID (the Connect page names the ID).
 `,
 };
 
@@ -93,11 +92,9 @@ export async function businessCommand(argv) {
    const options = {};
    for (let index = 0; index < args.length; index += 2) {
     const name = args[index];
-    if (!['--code', '--origin', '--business', '--timeout'].includes(name) || !args[index + 1] || args[index + 1].startsWith('--') || Object.hasOwn(options, name.slice(2))) return invalid();
+    if (!['--origin', '--business', '--timeout'].includes(name) || !args[index + 1] || args[index + 1].startsWith('--') || Object.hasOwn(options, name.slice(2))) return invalid();
     options[name.slice(2)] = args[index + 1];
    }
-   if (options.code !== undefined && !/^[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/.test(options.code)) return invalid();
-   if (options.code !== undefined && (options.business !== undefined || options.timeout !== undefined)) return invalid();
    if (options.timeout !== undefined) {
     if (!/^\d{1,3}$/.test(options.timeout) || Number(options.timeout) > 900) return invalid();
     options.timeout = Number(options.timeout);
@@ -106,7 +103,7 @@ export async function businessCommand(argv) {
     if (options.business !== undefined) identifier(options.business);
     if (options.origin !== undefined && options.business !== undefined) originUrl(options.origin);
    } catch { return invalid(); }
-   if (options.origin !== undefined && options.code === undefined && options.business === undefined) originUrl(options.origin);
+   if (options.origin !== undefined && options.business === undefined) originUrl(options.origin);
    await connect(options);
   } else if (verb === 'done' && args.length === 3) await done(...args);
   else if (verb === 'answer' && [3, 4].includes(args.length)) await answer(...args);

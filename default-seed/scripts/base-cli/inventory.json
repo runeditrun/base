@@ -519,7 +519,7 @@
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "fc31c3bf1544ad393df8061240a0c066b97023b0b98cbc5b0e16ac80f4c86c3e"
+      "sha256": "751e0267c8dc7c6ad08c578cf695008b2fc80b6847e93c63f708956aac03053c"
     },
     "cli/business/config-policy.mjs": {
       "source": "cli/business/config-policy.mjs",
@@ -527,7 +527,7 @@
     },
     "cli/business/connect.mjs": {
       "source": "cli/business/connect.mjs",
-      "sha256": "4aca402f09e52a4f9d5f5959dd5c23c10f26e6e87f978230c364362a43d2f68d"
+      "sha256": "782479191ba64ada6b3f92a4d8da54723f13ea872fe1a2eb7c36e80910641362"
     },
     "cli/business/detector.mjs": {
       "source": "cli/business/detector.mjs",
@@ -563,7 +563,7 @@
     },
     "cli/business/local-commands.mjs": {
       "source": "cli/business/local-commands.mjs",
-      "sha256": "08a9969c9513e93e3016d4f7c3a8f1ecb54033cd7419badc7dcd62b6470e8533"
+      "sha256": "ab6531d7980f56bc73ce38bd49214f35eb04c68198f2b5f8ba692e2e693b8fb7"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
@@ -639,7 +639,7 @@
     },
     "cli/business/state.mjs": {
       "source": "cli/business/state.mjs",
-      "sha256": "f0c3742c69c0d43671b2b49ffb15eb33c60bd28fa3161181826ebf8fcff7773a"
+      "sha256": "35505273243d42923ba3ee03d032b43a2a9f8d751d34535f017bd274ef6b5cb2"
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",

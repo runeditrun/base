@@ -13,10 +13,10 @@ import { supportsTaskKind } from './supervisor.mjs';
 
 export async function paired() {
  const state = await loadState();
- if (!state?.origin || !state.businessId || !state.executorId) throw Error(`This computer is not paired. Run ${rerCommand()} business connect --code CODE.`);
+ if (!state?.origin || !state.businessId || !state.executorId) throw Error(`This computer is not paired. Run ${rerCommand()} business connect --business ID; the Business Connect page names the ID.`);
  if (state.revoked) throw Error(`This computer was ${revokedText(state)}`);
  const credential = await createCredentialStore().get(deviceCredentialHandle(state));
- if (!credential) throw Error(`This computer's Business credential is missing from OS credential storage. Run ${rerCommand()} business disconnect, then connect again with a new code from ${state.origin}/business.`);
+ if (!credential) throw Error(`This computer's Business credential is missing from OS credential storage. Run ${rerCommand()} business disconnect, then run ${rerCommand()} business connect --business ID; the Connect page at ${state.origin}/business names the ID.`);
  return { state, credential };
 }
 
