@@ -194,7 +194,7 @@ exclusive. For example:
 ```
 
 Every environment name must match `[A-Z][A-Z0-9_]*`. A nonempty `providers` map
-supports `sendgrid`, `resend`, `cloudflare` and `development` only. Every provider
+supports `sendgrid`, `resend`, `cloudflare`, `development` and explicit `none`. Every provider
 entry declares `requiredEnvironment` (an empty array is allowed). Hosted entries
 also require `apiKeyEnvironment`; Cloudflare additionally requires
 `accountIdEnvironment`, checked as 32 hex characters. Those account declarations
@@ -203,6 +203,19 @@ readiness check. The inspector checks presence and the declared guard; a project
 configuration module remains responsible for its native sender and credential
 validation. A required mail loop still fails when foundation-only configuration
 is valid but mail has not been configured.
+
+An optional mail loop may declare `"none": { "requiredEnvironment": [] }` in
+its `binding.providers`. Only an explicit selector value of `none` turns that
+loop off; its report says `optional-disabled` with `mailOff: true`, and the CLI
+explains that no delivery is available and a declared provider must be configured
+to enable it. A required loop selected to `none` still fails (`disabled-required`).
+The off entry cannot declare credentials, sender requirements or development
+settings, and cannot be a `whenUnset` default. The application's configuration
+validator must honor the same deliberate off state. This inspection does not
+send mail or verify a deployment; rer's deploy preflight independently checks
+the mail-free sign-in declaration and rejects conflicting sending credentials.
+
+— Codex, 2026-11-15T03:31:15Z
 
 Optional `whenUnset` declares a hosted provider and its inputs with the same
 shape. It applies only if the selector is absent (`undefined`), never for blank,

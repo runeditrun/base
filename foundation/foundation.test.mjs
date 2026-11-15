@@ -77,6 +77,8 @@ test('public foundation CLI keeps author identity private from Run data and comp
       }
       assert.equal(providerCalls, 0)
       assert.equal(operatorMail({ MAIL_PROVIDER: 'development' }), undefined)
+      assert.equal(operatorMail({ MAIL_PROVIDER: 'none', get MAIL_API_KEY() { throw Error('mail off read credentials') } }), undefined)
+      await assert.rejects(operatorMail({ MAIL_PROVIDER: 'resend' }).send(message))
       assert.equal((await operatorMail({ MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'test-only-provider-key' }).send(message)).status, 'accepted')
       assert.equal(providerCalls, 1)
     } finally { globalThis.fetch = liveFetch }

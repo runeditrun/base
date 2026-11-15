@@ -292,6 +292,17 @@ anything is built or uploaded. The seed owns what an installation does with mail
 off, and turning mail on later is a `rer deploy --set-secret` of the provider
 inputs the seed documents.
 
+The adapter must apply that selection to the runtime as well as pass preflight.
+For example, the foundation declares optional `MAIL_PROVIDER` and `MAIL_FROM`
+environment-to-binding mappings in `deploy.json`, and makes `MAIL_API_KEY`
+optional there; production preflight still requires all enabled-provider inputs.
+Its mail facade returns no sender for `none`, so email requests report
+`mail_unavailable` rather than claiming delivery. Independently authored adapters
+must implement their own matching contract. Declarative operations loops can
+offer `none` for optional mail; required delivery loops continue to fail while off.
+
+— Codex, 2026-11-15T03:31:15Z
+
 The production preflight also reads the product's `artifact.specInputs` in
 `rer-packaging.json`, `packaging.json` or `scripts/delivery/base/packaging.json`,
 and `management/integration/deployment-spec.json`. Public inputs come from

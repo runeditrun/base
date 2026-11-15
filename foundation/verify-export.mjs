@@ -13,6 +13,7 @@ import { sourceRoots } from '../cli/export.mjs'
 const root = resolve(import.meta.dirname, '..')
 const { initialize } = await import('./initialize.mjs')
 const { verifyInstaller } = await import('./installer-verification.mjs')
+const { verifyMailOff } = await import('./mail-off-verification.mjs')
 const tmp = await mkdtemp(resolve(tmpdir(), 'rer-foundation-runtime-'))
 const previousServers = process.env.RER_SERVERS_DIR
 process.env.RER_SERVERS_DIR = resolve(tmp, 'servers')
@@ -176,6 +177,11 @@ const { inspectOperations } = await import(pathToFileURL(resolve(output, 'script
 assert.deepEqual((await inspectOperations(output, { ...process.env, CLOUDFLARE_ACCOUNT_ID: '', CLOUDFLARE_API_TOKEN: '' })).missingEnvironment, ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'])
 assert.equal((await inspectOperations(output, { ...process.env, CLOUDFLARE_ACCOUNT_ID: '0'.repeat(32), CLOUDFLARE_API_TOKEN: 'test-only-inspection-input' })).ok, true)
 const originalStatePath = process.env.RER_LOCAL_STATE_PATH
+if (process.argv.includes('--mail-off-only')) {
+ execFileSync('pnpm', ['install', '--frozen-lockfile'], { cwd: output, stdio: 'inherit' })
+ await verifyMailOff(output)
+ execFileSync('pnpm', ['run', 'typecheck'], { cwd: output, stdio: 'inherit' })
+} else {
 try {
  process.env.RER_LOCAL_STATE_PATH = resolve(output, '.wrangler/state')
  await verifyStateSafety(output)
@@ -184,6 +190,7 @@ if (!process.argv.includes('--state-safety-only')) {
 const installerOutput=resolve(tmp,'installer-edition')
 execFileSync(process.execPath,[root+'/composition/cli.mjs','first','--family-repo',family,'--base-repo',base,'--output',installerOutput],{stdio:'inherit'})
 await verifyInstaller(installerOutput)
+await verifyMailOff(installerOutput)
 // Onboarding just built this personalized export. Check that same artifact
 // without repeating the build in the standalone verify/setup commands.
 for (const command of ['typecheck', 'test:typecheck', 'test:runtime']) {
@@ -191,6 +198,7 @@ for (const command of ['typecheck', 'test:typecheck', 'test:runtime']) {
 }
 execFileSync('pnpm', ['exec', 'wrangler', 'deploy', '--dry-run'], { cwd: installerOutput, stdio: 'inherit' })
 console.log('Fresh committed foundation export, frozen install, build, runtime and deployment dry run passed')
+}
 }
 
 } finally {

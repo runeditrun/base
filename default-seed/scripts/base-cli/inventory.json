@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.117-dev.g0ed0bcb4",
+  "cliVersion": "0.2.117-dev.g84ed30de",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,7 +391,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "4fbe88cb76a718a1a2414331395b3c2e2d8cc6064f02e32ff813b7988a199fec"
+      "sha256": "28b44850278a9c1450abab380194fe2736baadf6cf070b2877a8fca6634e5ed7"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -5183,15 +5183,15 @@
     },
     "operations/README.md": {
       "source": "operations/README.md",
-      "sha256": "ed5974e8e52e5adfea0a8a696ffc8dbc01d556ccca82b6a3f5feb40d89ec92bd"
+      "sha256": "9d4c3a8dea86c644fcd772d35c334fb8d8af5e998fbe3939124707f2c1a2fe79"
     },
     "operations/operations.mjs": {
       "source": "operations/operations.mjs",
-      "sha256": "c0af9edbc9ded47063b31f352fb76c83b0d236d00caa63b5f6b8a44cce59da88"
+      "sha256": "2d43f5d5dc63c7d302bc6b2fd94e961abdf7ab88e33b20eccbdc97d070065776"
     },
     "operations/project-operations.mjs": {
       "source": "operations/project-operations.mjs",
-      "sha256": "583a32cabf96c13a53b3cd493d8dd798c8a3e1ad4ff460b33512c4a37ef43385"
+      "sha256": "f008f34a25f65bf6263b022ee4110792cd3d58fd203a6856104ef286590607ea"
     },
     "scripts/publish-check.mjs": {
       "source": "scripts/publish-check.mjs",

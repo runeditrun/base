@@ -199,9 +199,17 @@ Local durable state lives under `.wrangler/state`; generated settings and
 installer bookkeeping remain private and outside source control. Local export
 and restore use the shared portability module and explicitly exclude owner/auth,
 outbox, private settings and transient state. Remote transfers require full
-resource coverage. Owner-account deployment requires private credentials and a
-real verified mail provider configuration; no local check proves provider
-delivery.
+resource coverage. Owner-account deployment requires private account credentials.
+Mail can be deliberately off with `MAIL_PROVIDER=none` in an owned mode-0600
+`--env-file`; no sender or mail key is then needed. The foundation declares the
+existing `rer signin` owner entry, which still verifies the account and owned
+deployment record. Email sign-in and invitations report unavailable. An enabled
+provider still requires its real sender and credentials; an absent provider
+does not select off. The deploy declaration maps the provider and sender inputs
+to actual Worker bindings, with optional mail credentials validated by rer's
+production preflight. No local check proves provider delivery.
+
+— Codex, 2026-11-15T03:31:15Z
 
 Read [the exported local operations guide](../export/RUN-LOCALLY.md),
 [the command contract](../export/SEED-COMMAND-CONTRACT.md),

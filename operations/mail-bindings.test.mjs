@@ -79,6 +79,27 @@ test('mail binding checks the selected runtime inputs, preserves foundation vali
   assert.equal(JSON.parse(invalid.stdout).configuration, 'invalid');
   assert.equal(`${invalid.stdout}${invalid.stderr}`.includes('synthetic-validator-private-value'), false);
   for (const name of ['MAIL_API_KEY', 'MAIL_FROM', 'RESEND_FROM_EMAIL', 'APP_URL']) assert.ok(invalid.stderr.includes(name));
+  // Off is a declared optional capability, never an inferred ready mail loop.
+  assert.equal(run({ MAIL_PROVIDER: 'none' }).status, 1);
+  descriptor.loops[0].binding.providers.none = { requiredEnvironment: [] };
+  await save();
+  const requiredOff = run({ MAIL_PROVIDER: 'none' });
+  assert.equal(requiredOff.status, 1);
+  assert.equal(JSON.parse(requiredOff.stdout).loops[0].status, 'disabled-required');
+  descriptor.loops[0].required = false;
+  await save();
+  const off = run({ MAIL_PROVIDER: 'none' });
+  assert.equal(off.status, 0);
+  assert.equal(JSON.parse(off.stdout).loops[0].mailOff, true);
+  assert.match(off.stderr, /mail is off.*sign-in/);
+  assert.equal(run({ MAIL_PROVIDER: 'sendgrid' }).status, 1);
+  assert.equal(run({ MAIL_PROVIDER: 'sendgrid', MAIL_API_KEY: 'synthetic-active', MAIL_FROM: 'noreply@example.test' }).status, 0);
+  assert.equal(run({}).status, 1);
+  for (const inputs of [{ requiredEnvironment: ['MAIL_FROM'] }, { requiredEnvironment: [], apiKeyEnvironment: 'MAIL_API_KEY' }]) {
+    descriptor.loops[0].binding.providers.none = inputs;
+    await save();
+    assert.equal(run({ MAIL_PROVIDER: 'none' }).status, 1);
+  }
 });
 
 test('development mail is explicit and confined to canonical loopback origins in development mode', async t => {

@@ -13,9 +13,7 @@
   "originVar": "AUTH_ORIGIN",
   "publicOriginSetting": "PUBLIC_ORIGIN",
   "vars": {
-    "AUTH_LOCAL": "false",
-    "MAIL_PROVIDER": "resend",
-    "MAIL_FROM": "auth@example.invalid"
+    "AUTH_LOCAL": "false"
   },
   "secrets": [
     {
@@ -40,8 +38,22 @@
       "environment": "SETUP_TOKEN"
     },
     {
+      "binding": "MAIL_PROVIDER",
+      "environment": "MAIL_PROVIDER",
+      "optional": true,
+      "verifyStandIn": "resend"
+    },
+    {
+      "binding": "MAIL_FROM",
+      "environment": "MAIL_FROM",
+      "optional": true,
+      "verifyStandIn": "auth@example.invalid"
+    },
+    {
       "binding": "MAIL_API_KEY",
-      "environment": "MAIL_API_KEY"
+      "environment": "MAIL_API_KEY",
+      "optional": true,
+      "verifyStandIn": "verification-only-mail-key"
     }
   ]
 }
