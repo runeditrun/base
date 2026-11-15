@@ -9,24 +9,47 @@ const protocolVersion = '2025-11-25';
 const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': protocolVersion };
 export const classifications = ['uses', 'sells', 'both', 'product-dependency'];
 
+/** One MCP session on the Business server. The returned function calls a tool and returns its structuredContent (it throws when
+ * the tool refuses); `.call` returns the raw tool result, `.exchange` the raw JSON-RPC response for any method, `.initialized` the
+ * server's initialize result. The short-lived bearer is minted again within 30 seconds of expiry, and once on a 401. */
 export async function mcpClient(api, { taskId, signal } = {}) {
- const minted = await api.mintToken('mcp', { taskId, signal });
- const options = { token: minted.access_token, signal, headers };
+ let minted = await api.mintToken('mcp', { taskId, signal });
+ const remint = async () => { minted = await api.mintToken('mcp', { taskId, signal }); };
  let sequence = 0;
+ async function post(body) {
+  if (Date.parse(minted.expires_at) - Date.now() < 30_000) await remint();
+  const send = () => api.post('/api/business/mcp', body, { token: minted.access_token, signal, headers });
+  try { return await send(); } catch (error) {
+   if (error.status !== 401) throw error;
+   await remint();
+   return send();
+  }
+ }
+ async function exchange(method, params, notification = false) {
+  const id = ++sequence;
+  const result = await post({ jsonrpc: '2.0', ...(!notification ? { id } : {}), method, params });
+  if (notification) return null;
+  if (!result || result.id !== id || !result.error === !result.result) throw Error('Business MCP operation was refused.');
+  return result;
+ }
  async function rpc(method, params, notification = false) {
-  const result = await api.post('/api/business/mcp', { jsonrpc: '2.0', ...(!notification ? { id: ++sequence } : {}), method, params }, options);
-  if (notification) return;
-  if (!result || result.error || result.id !== sequence) throw Error('Business MCP operation was refused.');
-  return result.result;
+  const result = await exchange(method, params, notification);
+  if (result?.error) throw Error('Business MCP operation was refused.');
+  return result?.result;
  }
  const initialized = await rpc('initialize', { protocolVersion, capabilities: {}, clientInfo: { name: 'rer-business', version: '1.0.0' } });
  if (initialized.protocolVersion !== protocolVersion) throw Error('Business MCP protocol revision is unsupported.');
  await rpc('notifications/initialized', {}, true);
- return async (name, args = {}) => {
-  const result = await rpc('tools/call', { name, arguments: args });
+ const call = async (name, args = {}) => {
+  const response = await exchange('tools/call', { name, arguments: args });
+  if (response.error) throw Error(`Business MCP refused ${name}${typeof response.error.message === 'string' ? `: ${response.error.message.slice(0, 300)}` : ''}.`);
+  return response.result;
+ };
+ return Object.assign(async (name, args = {}) => {
+  const result = await call(name, args);
   if (result?.isError || !result?.structuredContent) throw Error('Business task action is unavailable. Use the browser to check its requirements.');
   return result.structuredContent;
- };
+ }, { call, exchange, initialized });
 }
 
 export async function nextQuestions(api, signal) {
