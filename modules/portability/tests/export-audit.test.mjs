@@ -26,7 +26,11 @@ test('direct file export records seed audit atomically and refuses callback or a
     },
   });
   for (failure of ['callback', 'sql']) {
-    await assert.rejects(exportArchive(service, path), failure === 'callback' ? /audit callback refused/ : /UNIQUE constraint failed/);
+    await assert.rejects(exportArchive(service, path), error=>{
+      assert.match(error.message,failure === 'callback' ? /audit callback refused/ : /UNIQUE constraint failed/);
+      if(failure==='sql')assert.equal(error.portabilityStep,'export_snapshot');
+      return true;
+    });
     assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM operation_audit').first()).n, 0);
     assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM rer_portability_jobs').first()).n, 0);
     assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name GLOB 'rer_portability_snap_*'").first()).n, 0);

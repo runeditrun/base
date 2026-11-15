@@ -1,4 +1,6 @@
-import { statement, state, guard, job, save, partStatements, parts, readPart, cleanCopies, quote, stream, insist, run } from './storage.mjs';
+import { prepareInventory, metadataJson, inventoryStatements } from './object-inventory.mjs';
+import { archiveStep } from './archive-step.mjs';
+import { statement, state, guard, job, save, partStatements, parts, readPart, cleanCopies, quote, stream, insist } from './storage.mjs';
 import { catalogue, encodedRow } from './catalogue.mjs';
 import { checkReferences } from './references.mjs';
 import { createCopy,readCopy,normalizeCopy } from './copies.mjs';
@@ -16,7 +18,7 @@ export async function createExport(context,actor='direct') {
   for(const [binding,spec] of Object.entries(config.buckets).sort()) {
     let cursor;
     do {
-      const page=await buckets[binding].list({prefix:spec.prefix??'',cursor,include:['httpMetadata','customMetadata']});
+      const page=await archiveStep('export_object_inventory',()=>buckets[binding].list({prefix:spec.prefix??'',cursor,include:['httpMetadata','customMetadata']}));
       for(const object of page.objects) objects.push({bucket:binding,key:object.key,size:object.size,etag:object.etag,httpMetadata:object.httpMetadata??{},customMetadata:object.customMetadata??{}});
       cursor=page.truncated?page.cursor:undefined;
     }while(cursor);
@@ -27,9 +29,10 @@ export async function createExport(context,actor='direct') {
   const manifest={kind:'manifest',format:FORMAT,version:2,product:config.product,exportedAt:new Date().toISOString(),sourceIdentity:s.source_identity,schema:cat.identity,tables:cat.tables,schemaObjects:cat.schemaObjects,objects,payloads:[],excludedTables:cat.excludedTables,excludedColumns:config.secretColumns,requiredConfiguration:config.requiredConfiguration,partCount:0,epoch:s.epoch,journal:await journal(db,s.source_identity),...(migrations?{migrations}:{}),...(origin?{migrationLedger:origin}:{})};
   const row={id,kind:'export',actor,phase:'building',completed:0,metadata:{manifest,copies,cursor:{table:0,row:0,binary:0,offset:0},partBytes:config.partBytes}};
   const audit=context.onExport?context.onExport({id,actor:actor==='direct'?null:actor,scope:'installation'}):[];
-  await db.batch([guard(db,'EXISTS(SELECT 1 FROM rer_portability_state WHERE id=1 AND applying=0 AND source_identity=? AND epoch=?)',s.source_identity,s.epoch),
-    ...cat.tables.flatMap(t=>createCopy(db,t,copies[t.name],true)),statement(db,'INSERT INTO rer_portability_jobs(id,kind,actor,phase,metadata) VALUES(?,?,?,?,?)',id,'export',actor,row.phase,canonicalJson(row.metadata)),db.prepare('DELETE FROM rer_portability_guard'),
-    ...audit.map(([sql,args])=>statement(db,sql,...args))]);
+  prepareInventory(row);
+  await archiveStep('export_snapshot',()=>db.batch([guard(db,'EXISTS(SELECT 1 FROM rer_portability_state WHERE id=1 AND applying=0 AND source_identity=? AND epoch=?)',s.source_identity,s.epoch),
+    ...cat.tables.flatMap(t=>createCopy(db,t,copies[t.name],true)),statement(db,'INSERT INTO rer_portability_jobs(id,kind,actor,phase,metadata) VALUES(?,?,?,?,?)',id,'export',actor,row.phase,metadataJson(row.metadata)),...inventoryStatements(db,row),db.prepare('DELETE FROM rer_portability_guard'),
+    ...audit.map(([sql,args])=>statement(db,sql,...args))]));
   try {
     await dropDevData(db,cat.tables,copies);
     await dropProviderData(db,cat.tables,copies);
@@ -38,7 +41,7 @@ export async function createExport(context,actor='direct') {
     for(const [name,producer] of Object.entries(config.extraPayloads).sort()) {
       const descriptor=await capturePayload(db,id,manifest.payloads.length,await producer.produce());manifest.payloads.push({name,...descriptor});
     }
-    await run(db,'UPDATE rer_portability_jobs SET metadata=? WHERE id=?',canonicalJson(row.metadata),id);
+    await save(db,row).run();
     await checkReferences(context,copies,objects);
     return id;
   }catch(e){await abortExport(context,id);throw e;}
@@ -68,24 +71,30 @@ async function nextItems(context,row) {
   }
   const entries=[...manifest.objects,...manifest.payloads];
   if(cursor.binary===entries.length)return null;
-  const entry=entries[cursor.binary],length=Math.min(entry.size-cursor.offset,Math.max(1,Math.floor((partBytes-200-utf8(canonicalJson({bucket:entry.bucket??null,key:entry.key??null,name:entry.name??null})).length)*3/4)));
-  let bytes,item;
-  if(cursor.binary<manifest.objects.length) {
-    const object=await buckets[entry.bucket].get(entry.key,length?{range:{offset:cursor.offset,length}}:undefined);
-    insist(object && object.etag===entry.etag,'object_changed:'+entry.bucket+':'+entry.key);
-    bytes=new Uint8Array(await object.arrayBuffer());insist(bytes.length===length,'object_changed:'+entry.key);
-    item={kind:'object',bucket:entry.bucket,key:entry.key,offset:cursor.offset,data:base64(bytes)};
-  }else{
-    bytes=await payloadRange(db,row.id,cursor.binary-manifest.objects.length,cursor.offset,length);
-    item={kind:'payload',name:entry.name,offset:cursor.offset,data:base64(bytes)};
+  const items=[];let used=200;
+  while(cursor.binary<entries.length && items.length<1000 && partBytes-used>512) {
+    const entry=entries[cursor.binary],header=utf8(canonicalJson({bucket:entry.bucket??null,key:entry.key??null,name:entry.name??null})).length;
+    if(used+200+header>=partBytes){insist(items.length,'binary_part_too_large');break;}
+    const length=Math.min(entry.size-cursor.offset,Math.max(1,Math.floor((partBytes-used-200-header)*3/4)));
+    let bytes,item;
+    if(cursor.binary<manifest.objects.length) {
+      const object=await buckets[entry.bucket].get(entry.key,length?{range:{offset:cursor.offset,length}}:undefined);
+      insist(object && object.etag===entry.etag,'object_changed:'+entry.bucket+':'+entry.key);
+      bytes=new Uint8Array(await object.arrayBuffer());insist(bytes.length===length,'object_changed:'+entry.key);
+      item={kind:'object',bucket:entry.bucket,key:entry.key,offset:cursor.offset,data:base64(bytes)};
+    }else{
+      bytes=await payloadRange(db,row.id,cursor.binary-manifest.objects.length,cursor.offset,length);
+      item={kind:'payload',name:entry.name,offset:cursor.offset,data:base64(bytes)};
+    }
+    const hash=new StreamHash();if(cursor.hash){hash.h=Uint32Array.from(cursor.hash.h);hash.block=Uint8Array.from(cursor.hash.block);hash.size=cursor.hash.size;hash.used=cursor.hash.used;}
+    hash.update(bytes);cursor.offset+=length;
+    if(cursor.offset===entry.size) {
+      const digest=hash.digest();if(entry.sha256)insist(entry.sha256===digest,'payload_changed');entry.sha256=digest;delete entry.etag;
+      cursor.binary++;cursor.offset=0;delete cursor.hash;
+    }else cursor.hash={h:[...hash.h],block:[...hash.block],size:hash.size,used:hash.used};
+    items.push(item);used+=utf8(canonicalJson(item)).length+1;
   }
-  const hash=new StreamHash();if(cursor.hash){hash.h=Uint32Array.from(cursor.hash.h);hash.block=Uint8Array.from(cursor.hash.block);hash.size=cursor.hash.size;hash.used=cursor.hash.used;}
-  hash.update(bytes);cursor.offset+=length;
-  if(cursor.offset===entry.size) {
-    const digest=hash.digest();if(entry.sha256)insist(entry.sha256===digest,'payload_changed');entry.sha256=digest;delete entry.etag;
-    cursor.binary++;cursor.offset=0;delete cursor.hash;
-  }else cursor.hash={h:[...hash.h],block:[...hash.block],size:hash.size,used:hash.used};
-  return [item];
+  return items;
 }
 export async function advanceExport(context,id,{expectedPart,maxParts=1}={}) {
   insist(Number.isSafeInteger(maxParts) && maxParts>0 && maxParts<=100,'advance_limit');
@@ -94,10 +103,10 @@ export async function advanceExport(context,id,{expectedPart,maxParts=1}={}) {
     if(row.phase==='complete')return exportStatus(context,id);
     insist(row.phase==='building','export_phase',409);
     if(expectedPart!==undefined && row.completed!==expectedPart)return exportStatus(context,id);
-    const before=row.completed,items=await nextItems(context,row);
+    const before=row.completed,binary=row.metadata.cursor.binary,items=await archiveStep('export_part',()=>nextItems(context,row));
     if(items) {
       const part=await makePart(before,items),size=await checkPart(part,before,row.metadata.partBytes);row.completed++;row.metadata.bytes=(row.metadata.bytes??0)+size+1;
-      try{await context.db.batch([guard(context.db,'(SELECT completed FROM rer_portability_jobs WHERE id=?)=?',id,before),...partStatements(context.db,id,part),save(context.db,row),context.db.prepare('DELETE FROM rer_portability_guard')]);}
+      try{await context.db.batch([guard(context.db,'(SELECT completed FROM rer_portability_jobs WHERE id=?)=?',id,before),...partStatements(context.db,id,part),...inventoryStatements(context.db,row,binary,row.metadata.cursor.binary),save(context.db,row),context.db.prepare('DELETE FROM rer_portability_guard')]);}
       catch(e){if((await job(context.db,id)).completed===before)throw e;}
       if(expectedPart!==undefined)expectedPart++;
     }else{
