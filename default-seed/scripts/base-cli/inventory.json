@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.118-dev.g560b7ad8",
+  "cliVersion": "0.2.118-dev.gcbce460b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1027,7 +1027,7 @@
     },
     "cli/managed-data-schema.mjs": {
       "source": "cli/managed-data-schema.mjs",
-      "sha256": "4f434d41a37e4351a2e1e177389c1c6367445f82a5167f86114376aba329ee7a"
+      "sha256": "a4dd481986c3ac9628b8b1f079c04e766535e6b057f40fee496a23e91d3456d3"
     },
     "cli/managed-data-zip.mjs": {
       "source": "cli/managed-data-zip.mjs",
