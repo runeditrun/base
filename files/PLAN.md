@@ -1,0 +1,11 @@
+# PLAN — bz-connect-agent-run-1
+
+Signed /root builder, 2026-11-15 UTC. Scope: generic authenticated Business agent pairing/grants, scoped Cloudflare child issuance and rer business run; no deployment or provider mutation.
+
+1. Resolve authoritative source lineage: platform front cloud/bz-front-handover-1 at 2ade5642b2dd292d8957d36f5029fc60d922ed2e, parked cloud/owner-agent-door-1 at f912d556bb31a7044b5123b9ccbcd697a16b3090; Base cloud/owner-agent-door-rer-1 at 42bc289fcce17a1ccdb2d7e390615533f09b200d. Inspect main and ancestors before selective replay; preserve current contracts, controller and SEC-1. Never modify frozen sources.
+2. Start platform candidate at frozen front and ordinarily merge fresh main. Start Base candidate at main. Reuse landed doors and grants; omit unrelated parked capabilities. Add new migration 152 only if fresh main has no collision; preserve applied migration bytes.
+3. Couple deploy authorization to paired agent, exact Business/account, explicit active grant/actions and provider permission/resource/expiry ceilings. Return child only via authenticated rer exchange; preserve parent custody and fail closed. Track safe cleanup status without credential output.
+4. Implement arbitrary command subprocess boundary with real deploy variable names, output masking across writes, preserved argv/exit/signal semantics and honest revocation outcomes; no ambient/provider escalation.
+5. Run only touched public-door route/CLI tests and typecheck under heavy-slot admission, one heavy job at once. Personally exercise changed screens at 1440/390 with realistic test data through maintained product path. No real provider mutation, browser session transfer or deploy.
+6. Integrate fresh main before publication; source lock last; private added-line credential review; full-history COMPLETE Base publication scan via supported tool with run-base#main and edition identity. One normal candidate push per repo, allowed identity, git log -1, natural exact-SHA CI using one ci-wait observer.
+7. Publish actual PLAN/REPORT/check files with supported cloud_evidence transport. Report READY only for qualified frozen heads; otherwise exact BLOCKED/default. Independent gate/landing/stage/release belong to bz/pr/gr/fv, not this builder.

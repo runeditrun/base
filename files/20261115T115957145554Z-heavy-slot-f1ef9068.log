@@ -1,0 +1,132 @@
+QUEUED ticket=34517 job=20261115T115957145554Z-heavy-slot-f1ef9068
+ADMITTED slot=3 cap=3 load=9.74
+RESOLVED_SHA d491b89294f2810a8d32c63a5f3084695802b8d9
+NODE v22.20.0; source=scripts/agent-bootstrap.sh:NODE_VERSION; TZ=UTC; provider credentials absent
+PACKAGE_MANAGER pnpm@10.12.4
+default-seed                             |  WARN  The field "pnpm.overrides" was found in /Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/default-seed/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+default-seed                             |  WARN  The field "pnpm.onlyBuiltDependencies" was found in /Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/default-seed/package.json. This will not take effect. You should configure "pnpm.onlyBuiltDependencies" at the root of the workspace instead.
+Scope: all 3 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +173
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 173, reused 172, downloaded 0, added 108
+Progress: resolved 173, reused 173, downloaded 0, added 172
+Progress: resolved 173, reused 173, downloaded 0, added 173, done
+
+devDependencies:
++ ajv 8.20.0
++ ajv-formats 3.0.1
++ miniflare 5.20260907.0-alpha
++ ws 8.22.0
+
+Done in 9s using pnpm v10.12.4
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +26
+++++++++++++++++++++++++++
+Progress: resolved 26, reused 26, downloaded 0, added 26, done
+
+devDependencies:
++ miniflare 5.20260907.0-alpha
+
+Done in 478ms using pnpm v10.12.4
+PLAYWRIGHT Version 1.63.0; shared cache /Users/m1-runner/rer-remote/playwright
+PLAYWRIGHT_WARM 1.63.0; no install or download
+COMMAND_START nice=10
+TAP version 13
+# Subtest: an outside agent acts on installed apps through the agent verbs and the stdio bridge
+ok 1 - an outside agent acts on installed apps through the agent verbs and the stdio bridge
+  ---
+  duration_ms: 2345.66725
+  type: 'test'
+  ...
+# Subtest: business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors
+not ok 2 - business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors
+  ---
+  duration_ms: 158.253875
+  type: 'test'
+  location: '/Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business-run.test.mjs:48:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business/keychain.mjs:24
+     const error = new Error(`OS credential storage could not ${operation} a credential: ${cause(binary, result)}. No credential was written to a file.`);
+                   ^
+    
+    Error: OS credential storage could not read a credential: security exited with status 1. Unlock macOS Keychain, or install and unlock Linux Secret Service (secret-tool), then try again. No credential was written to a file.
+        at unavailable (file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business/keychain.mjs:24:16)
+        at Object.get (file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business/keychain.mjs:80:32)
+        at async paired (file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business/local-commands.mjs:18:21)
+        at async Module.grantCommand (file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business/run-grant.mjs:38:30)
+        at async file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/bin/rer.mjs:3:20 {
+      sandboxRefused: false,
+      osStatus: 1
+    }
+    
+    Node.js v22.20.0
+    
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    unavailable (file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business/keychain.mjs:24:16)
+    Object.get (file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business/keychain.mjs:80:32)
+    async paired (file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business/local-commands.mjs:18:21)
+    async Module.grantCommand (file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business/run-grant.mjs:38:30)
+    async file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/bin/rer.mjs:3:20 {
+    TestContext.<anonymous> (file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business-run.test.mjs:53:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: business run refuses unavailable authority without spawning or retrying and reports unconfirmed cleanup separately from the child exit
+not ok 3 - business run refuses unavailable authority without spawning or retrying and reports unconfirmed cleanup separately from the child exit
+  ---
+  duration_ms: 162.898375
+  type: 'test'
+  location: '/Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business-run.test.mjs:62:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business-run.test.mjs:65:133)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: business run forwards signals and enforces credential expiry, then revokes before exiting with the child signal
+not ok 4 - business run forwards signals and enforces credential expiry, then revokes before exiting with the child signal
+  ---
+  duration_ms: 15015.902334
+  type: 'test'
+  location: '/Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business-run.test.mjs:73:1'
+  failureType: 'testCodeFailure'
+  error: 'child did not start'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Timeout._onTimeout (file:///Users/m1-runner/rer-remote/jobs/20261115T115957Z-heavy-slot-f1ef9068/repo/cli/business-run.test.mjs:77:76)
+    listOnTimeout (node:internal/timers:588:17)
+    process.processTimers (node:internal/timers:523:7)
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 1
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 15431.391583
+RESULT exit=1 wall_seconds=31.38 command_seconds=15.579 retained=True

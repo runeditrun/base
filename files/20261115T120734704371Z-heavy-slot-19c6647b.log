@@ -1,0 +1,40 @@
+QUEUED ticket=34523 job=20261115T120734704371Z-heavy-slot-19c6647b
+ADMITTED slot=2 cap=3 load=5.64
+RESOLVED_SHA 1d23121833d9c5d5aa3a880dc55878d8660ecbc5
+NODE v22.20.0; source=scripts/agent-bootstrap.sh:NODE_VERSION; TZ=UTC; provider credentials absent
+PACKAGE_MANAGER pnpm@10.12.4
+default-seed                             |  WARN  The field "pnpm.overrides" was found in /Users/m1-runner/rer-remote/jobs/20261115T120734Z-heavy-slot-19c6647b/repo/default-seed/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+default-seed                             |  WARN  The field "pnpm.onlyBuiltDependencies" was found in /Users/m1-runner/rer-remote/jobs/20261115T120734Z-heavy-slot-19c6647b/repo/default-seed/package.json. This will not take effect. You should configure "pnpm.onlyBuiltDependencies" at the root of the workspace instead.
+Scope: all 3 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +173
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 173, reused 173, downloaded 0, added 172
+Progress: resolved 173, reused 173, downloaded 0, added 173, done
+
+devDependencies:
++ ajv 8.20.0
++ ajv-formats 3.0.1
++ miniflare 5.20260907.0-alpha
++ ws 8.22.0
+
+Done in 5.6s using pnpm v10.12.4
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +26
+++++++++++++++++++++++++++
+Progress: resolved 26, reused 26, downloaded 0, added 26, done
+
+devDependencies:
++ miniflare 5.20260907.0-alpha
+
+Done in 352ms using pnpm v10.12.4
+PLAYWRIGHT Version 1.63.0; shared cache /Users/m1-runner/rer-remote/playwright
+PLAYWRIGHT_WARM 1.63.0; no install or download
+COMMAND_START nice=10
+
+> @run-edit-run/default-seed-reference@0.1.0 typecheck /Users/m1-runner/rer-remote/jobs/20261115T120734Z-heavy-slot-19c6647b/repo/default-seed
+> tsc --build --incremental
+
+RESULT exit=0 wall_seconds=28.015 command_seconds=4.732 retained=False

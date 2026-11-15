@@ -1,0 +1,22 @@
+{
+  "id": "20261115T120501580401Z-heavy-slot-485ad865",
+  "ref": "a5f2df7fa30a41978c56caa2d6764a63cf76b9c1",
+  "source": "bundle",
+  "started_at": 1794744303.1160161,
+  "exit_code": 0,
+  "command_seconds": 10.085,
+  "queue_seconds": 0.053,
+  "sha": "a5f2df7fa30a41978c56caa2d6764a63cf76b9c1",
+  "isolated_home": true,
+  "node_requested": "22.20.0",
+  "node_source": "scripts/agent-bootstrap.sh:NODE_VERSION",
+  "node": "v22.20.0",
+  "node_path": "/Users/m1-runner/rer-remote/.tools/node-v22.20.0-darwin-arm64/bin/node",
+  "package_manager": "pnpm@10.12.4",
+  "setup_seconds": 10.173,
+  "wall_seconds": 21.604,
+  "finished_at": 1794744324.719798,
+  "job_retained": false,
+  "job_path": "/Users/m1-runner/rer-remote/jobs/20261115T120501Z-heavy-slot-485ad865",
+  "log_path": "/Users/m1-runner/rer-remote/logs/20261115T120501580401Z-heavy-slot-485ad865.log"
+}

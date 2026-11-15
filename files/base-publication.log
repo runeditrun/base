@@ -1,0 +1,4 @@
+heavy-slot: publish-check.sh/node publish-check.mjs local-only workload; --remote never; routing to local FIFO
+heavy-slot: slot 0 of 10; running after 0.16s; 10 slots; free+inactive 29.2%; load5 8.83; publication max-hold=60min
+publish-check: Base main c3a3875
+{"schema":"rer.publish-check/v3","status":"INCOMPLETE","complete":false,"source":null,"findings":[{"rule":"scan.deadline-exceeded","path":".","commit":null,"scope":"newly-public"}],"preExisting":[],"warnings":[],"fixtures":[],"reviewed":[],"info":[],"thirdPartyNotices":[],"history":{"commits":0,"trees":0,"blobs":0},"guarantees":{"historyScanned":false,"visualRecognition":false,"environmentChecked":false},"diagnostics":[{"stage":"slot","code":"process.signal","signal":"SIGKILL"},{"stage":"report","code":"report.empty"}],"implementation":{"version":"0.2.118"}}

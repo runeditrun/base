@@ -1,0 +1,65 @@
+QUEUED ticket=34519 job=20261115T120216884512Z-heavy-slot-b2b72f73
+ADMITTED slot=3 cap=3 load=6.92
+RESOLVED_SHA 44f48bf65dfd9e82c5eb760cc1e4321f453f20ab
+NODE v22.20.0; source=scripts/agent-bootstrap.sh:NODE_VERSION; TZ=UTC; provider credentials absent
+PACKAGE_MANAGER pnpm@10.12.4
+default-seed                             |  WARN  The field "pnpm.overrides" was found in /Users/m1-runner/rer-remote/jobs/20261115T120216Z-heavy-slot-b2b72f73/repo/default-seed/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+default-seed                             |  WARN  The field "pnpm.onlyBuiltDependencies" was found in /Users/m1-runner/rer-remote/jobs/20261115T120216Z-heavy-slot-b2b72f73/repo/default-seed/package.json. This will not take effect. You should configure "pnpm.onlyBuiltDependencies" at the root of the workspace instead.
+Scope: all 3 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +173
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 173, reused 173, downloaded 0, added 172
+Progress: resolved 173, reused 173, downloaded 0, added 173, done
+
+devDependencies:
++ ajv 8.20.0
++ ajv-formats 3.0.1
++ miniflare 5.20260907.0-alpha
++ ws 8.22.0
+
+Done in 5.9s using pnpm v10.12.4
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +26
+++++++++++++++++++++++++++
+Progress: resolved 26, reused 26, downloaded 0, added 26, done
+
+devDependencies:
++ miniflare 5.20260907.0-alpha
+
+Done in 366ms using pnpm v10.12.4
+PLAYWRIGHT Version 1.63.0; shared cache /Users/m1-runner/rer-remote/playwright
+COMMAND_EXIT command=/Users/m1-runner/rer-remote/jobs/20261115T120216Z-heavy-slot-b2b72f73/repo/default-seed/node_modules/.bin/playwright exit=0 output=descendant-pipe-open; drain bound reached; preserving command status
+PLAYWRIGHT_WARM 1.63.0; no install or download
+COMMAND_START nice=10
+TAP version 13
+# Subtest: business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors
+ok 1 - business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors
+  ---
+  duration_ms: 544.242417
+  type: 'test'
+  ...
+# Subtest: business run refuses unavailable authority without spawning or retrying and reports unconfirmed cleanup separately from the child exit
+ok 2 - business run refuses unavailable authority without spawning or retrying and reports unconfirmed cleanup separately from the child exit
+  ---
+  duration_ms: 461.320542
+  type: 'test'
+  ...
+# Subtest: business run forwards signals and enforces credential expiry, then revokes before exiting with the child signal
+ok 3 - business run forwards signals and enforces credential expiry, then revokes before exiting with the child signal
+  ---
+  duration_ms: 1515.866042
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2584.661125
+RESULT exit=0 wall_seconds=15.9 command_seconds=2.713 retained=False
