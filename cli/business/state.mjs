@@ -57,12 +57,12 @@ async function saveJson(name, value) {
  } finally { await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
 }
 
-/** Before a one-use code is spent or an approval collected, prove the state
+/** Before a pairing starts or an approval is collected, prove the state
  * folder takes the same private create, write and replace the pairing needs.
  * Folders made only for the check are removed again, so a refused connect
  * leaves nothing behind.
  */
-export async function checkStateWritable({ codeExists = true } = {}) {
+export async function checkStateWritable() {
  const directory = stateDirectory(), probe = join(directory, `${randomUUID()}.tmp`), created = [];
  for (let path = directory; path !== dirname(path); path = dirname(path)) {
   try { await lstat(path); break; } catch (error) { if (error.code !== 'ENOENT') break; created.push(path); }
@@ -78,7 +78,7 @@ export async function checkStateWritable({ codeExists = true } = {}) {
   const fix = chosenStateDirectory()
    ? 'Allow writes to that folder in this session, or set RER_BUSINESS_STATE_DIR to a folder this session can write'
    : 'Allow writes to that folder, or set RER_BUSINESS_STATE_DIR to a folder this session can write (in Codex, one inside the working folder, such as RER_BUSINESS_STATE_DIR="$PWD/.rer-business")';
-  throw Error(`Business cannot save its state in ${directory}: ${localCause(error) ?? error.message}. ${codeExists ? 'Nothing was sent, so the pairing code still works.' : 'Nothing was sent.'} ${fix}, then run connect again.`);
+  throw Error(`Business cannot save its state in ${directory}: ${localCause(error) ?? error.message}. Nothing was sent. ${fix}, then run connect again.`);
  } finally {
   for (const path of created) await rmdir(path).catch(() => {});
  }

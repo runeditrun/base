@@ -531,12 +531,6 @@ different origin or Business: disconnect first or use a separate
 `RER_BUSINESS_STATE_DIR`. It reports this computer's plain name, working folder,
 agent and OS (including WSL) for the owner to recognise.
 
-For older Business pages, `rer business connect --code ABCD-1234 --origin URL`
-keeps the browser-created code and six-digit confirmation-number flow unchanged
-in 0.2.98. It cannot be combined with `--business` or `--timeout`. Removal is
-planned for a later release after the production rollback target uses device pairing.
-The install.sh form still passes either connect command through unchanged.
-
 The owner chooses three things on the computer's row in the browser: "Add rules
 so Claude Code never reads your secret files" (Claude Code user Read deny
 rules), "Keep this computer awake while it works" (recorded; nothing keeps the computer awake now that rer runs no exports) and "Install the background service" (a launchd or systemd user

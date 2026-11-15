@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Business device pairing only
+
+- Removed `rer business connect --code` because Business retired browser-created pairing codes. Pair with `rer business connect --business ID`; the Business Connect page names the ID.
+
 ## 0.2.117
 
 ### Size queue isolation and timeout attribution
