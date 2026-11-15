@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.118-dev.g417fe676",
+  "cliVersion": "0.2.118-dev.g560b7ad8",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4887,7 +4887,7 @@
     },
     "modules/portability/import.mjs": {
       "source": "modules/portability/import.mjs",
-      "sha256": "827da16dbd508b7d2dff275ad114b853ff6457ce867ceba32c2b98611126b73c"
+      "sha256": "2ede4561feecf4a90f4216779e1c6a63ba72dce6c58d28570533ddf02a6d3a44"
     },
     "modules/portability/index.d.mts": {
       "source": "modules/portability/index.d.mts",

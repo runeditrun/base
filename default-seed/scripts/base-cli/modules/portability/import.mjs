@@ -138,10 +138,10 @@ async function uploadLeasedPart(context,id,index,part) {
   return importStatus(context,id,{includeLease:false});
 }
 const binaryKey=entry=>canonicalJson(entry.bucket===undefined?['payload',entry.name]:['object',entry.bucket,entry.key]);
-function binaryStream(context,id,entry,indexes) {
+function binaryStream(entry,indexes,read) {
   const selected=indexes.get(binaryKey(entry));insist(selected,'binary_inventory');
   return stream((async function*(){
-    for(const index of selected)for(const item of (await readPart(context.db,id,index)).items) {
+    for(const index of selected)for(const item of (await read(index)).items) {
       if(entry.bucket===undefined?item.kind==='payload' && item.name===entry.name:item.kind==='object' && item.bucket===entry.bucket && item.key===entry.key)yield unbase64(item.data);
     }
   })());
@@ -220,17 +220,24 @@ async function finalizeLeasedImport(context,id,{contentHash,archiveHash,laterJou
   }
   row.phase='applying';
   await db.batch([guard(db,'(SELECT import_job FROM rer_portability_state WHERE id=1)=?',id),db.prepare('UPDATE rer_portability_state SET applying=1 WHERE id=1'),save(db,row),db.prepare('DELETE FROM rer_portability_guard')]);
+  // Grouped objects often share a part. Keep one immutable part during this
+  // leased finalize, rather than rereading its bytes for every small object.
+  let cached;
+  const readBinaryPart=async index=>{
+    if(cached?.index!==index)cached=await readPart(db,id,index);
+    return cached;
+  };
   try {
     for(const object of manifest.objects) {
       await run(db,'INSERT OR IGNORE INTO rer_portability_owned VALUES(?,?,?)',id,object.bucket,object.key);
-      await writeObject(context.buckets[object.bucket],object,binaryStream(context,id,object,binaryIndexes));
+      await writeObject(context.buckets[object.bucket],object,binaryStream(object,binaryIndexes,readBinaryPart));
       const stored=await context.buckets[object.bucket].get(object.key);insist(stored,'object_write_failed');
       // Read back independently, including multipart results, before the commit.
       const hash=new (await import('./hash.mjs')).StreamHash();const reader=stored.body.getReader();
       for(;;){const {value,done}=await reader.read();if(done)break;hash.update(value);}reader.releaseLock();
       insist(hash.digest()===object.sha256,'object_write_checksum');
     }
-    for(const payload of manifest.payloads)await config.extraPayloads[payload.name].consume(binaryStream(context,id,payload,binaryIndexes),payload);
+    for(const payload of manifest.payloads)await config.extraPayloads[payload.name].consume(binaryStream(payload,binaryIndexes,readBinaryPart),payload);
     const derived=await rebuildDerivedStatements(db,config);
     row.phase='complete';row.metadata.contentHash=digest;
     if(row.metadata.schemaUnverified)row.metadata.schemaUnverified.archiveHash=archiveHash;
