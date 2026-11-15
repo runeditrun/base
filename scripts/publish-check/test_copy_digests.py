@@ -14,10 +14,14 @@ class CopyDigestTests(RepositoryFixture, unittest.TestCase):
         data = b'export const name = "synthetic-base-1";\n'
         digest = hashlib.sha256(data).hexdigest()
         self.write(name, data)
+        adapted = 'vendor/base/synthetic-base-1/runtime.mjs'
+        local = b'export const name = "synthetic-base-2";\n'
+        self.write(adapted, local)
         revision = hashlib.sha1(b'synthetic-base-1').hexdigest()
         copy = dict(path='vendor/base', originPath='runtime', revision=revision,
-                    files={name: digest}, modes={name: '100644'}, adapted={name: revision},
-                    acknowledged={name: dict(sha256=digest, mode='100644')})
+                    files={name: digest, adapted: digest},
+                    modes={name: '100644', adapted: '100644'}, adapted={adapted: revision},
+                    acknowledged={adapted: dict(sha256=hashlib.sha256(local).hexdigest(), mode='100644')})
         record = dict(schemaVersion=1, padding='', copies=[copy])
         path = 'base-copies.json'
 
@@ -34,7 +38,8 @@ class CopyDigestTests(RepositoryFixture, unittest.TestCase):
         line = serialized().splitlines()[hit['StartLine'] - 1].encode()
         self.assertGreater(line.index(hit['Match'].encode()), 0)
         self.assertEqual(hit['StartColumn'], 1)
-        self.assertEqual(public_scan(self)['status'], 'PASS')
+        report = public_scan(self)
+        self.assertEqual(report['status'], 'PASS', report['findings'])
 
         # A credential-shaped hex value on the very same copy-pointer line
         # has no matching preimage and must still fail, in history and today.
