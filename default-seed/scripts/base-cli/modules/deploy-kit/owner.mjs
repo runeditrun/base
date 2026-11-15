@@ -100,15 +100,33 @@ async function listedAfterCreate(api, kind, item, {windowMs = LIST_WINDOW_MS, cl
   }
 }
 /** Reads the account's workers.dev subdomain; no other provider request. */
-export async function ownerTarget(provider, {project, environment}) {
+async function workerOrigin(provider, worker) {
   const api = withScopeHints(provider);
-  const worker = ownerWorkerName(project, environment);
   let result;
   try { result = await api.request('/workers/subdomain'); }
   catch (error) { if (error.status === 404) throw new Error('workers-subdomain-missing'); throw error; }
   assert(typeof result?.subdomain === 'string' && result.subdomain, 'workers-subdomain-missing');
   assert(/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(result.subdomain),'invalid-account-subdomain');
-  return {accountId:api.accountId,project,environment,worker,origin:`https://${worker}.${result.subdomain}.workers.dev`};
+  return `https://${worker}.${result.subdomain}.workers.dev`;
+}
+export async function ownerTarget(api, {project, environment}) {
+  const worker = ownerWorkerName(project, environment);
+  return {accountId:api.accountId,project,environment,worker,origin:await workerOrigin(api,worker)};
+}
+
+/** Signin follows the selected app record, including native uploaders' custom names.
+ * The caller still supplies the account, project and environment to validate it.
+ * Later state reads and the live provider check must corroborate this identity. */
+export async function recordedOwnerTarget(api, {project, environment, statePath}) {
+  ownerWorkerName(project, environment); // Validate the caller's project and environment as usual.
+  let recorded;
+  try { recorded = JSON.parse(await regularBytes(statePath, 4 * 1024 * 1024)); }
+  catch (error) { throw new Error(error.code === 'ENOENT' ? 'missing-owner-receipt' : 'invalid-owner-state'); }
+  assert(resourceName(recorded?.worker), 'invalid-owner-state');
+  const target = {accountId:api.accountId,project,environment,worker:recorded.worker};
+  const state = await readOwnerState(statePath,target);
+  assert(state.receipt, 'missing-owner-receipt');
+  return {...target,origin:state.receipt.origin ?? await workerOrigin(api,target.worker)};
 }
 
 function entries(declaration, key) {

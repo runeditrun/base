@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.117-dev.g0ed0bcb4",
+  "cliVersion": "0.2.117-dev.ge3185891",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2867,7 +2867,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "d866bf2dcf97eac3172010920f018c932df921b335cddfee1cf81c6c9fc970fe"
+      "sha256": "37899b927514086fa138a53ddd121a6ffdc5f0dce9b79acd5bf26adecd20a500"
     },
     "modules/deploy-kit/owner-rekey.mjs": {
       "source": "modules/deploy-kit/owner-rekey.mjs",
@@ -2895,7 +2895,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "8a29bb76f1f2036db2ead34ac8cc366a552d4d436e8ada47eac489c785cb0a1e"
+      "sha256": "2be0d9a3ef0eb114a2e59214495208d9e9e061a0aeafb06cd51c402b4bed1dda"
     },
     "modules/deploy-kit/pagination.mjs": {
       "source": "modules/deploy-kit/pagination.mjs",
