@@ -41,6 +41,18 @@ class CopyDigestTests(RepositoryFixture, unittest.TestCase):
         report = public_scan(self)
         self.assertEqual(report['status'], 'PASS', report['findings'])
 
+        # Identical full matches on a minified line must not let a proved
+        # pointer hide an unproved credential field beside it.
+        record['padding'] = ''
+        record['credentials'] = {name: digest}
+        self.write(path, json.dumps(record, separators=(',', ':')))
+        report = public_scan(self)
+        self.assertEqual(report['status'], 'FAIL')
+        self.assertTrue(any(f['path'] == path and f['rule'] == 'secret.assignment'
+                            and f.get('scannerRule') == 'hex-api-key'
+                            and 'working-tree' in f['scopes'] for f in report['findings']))
+        del record['credentials']
+
         # A credential-shaped hex value on the very same copy-pointer line
         # has no matching preimage and must still fail, in history and today.
         credential = hashlib.sha256(b'synthetic-base-2-credential').hexdigest()

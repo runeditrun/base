@@ -1,4 +1,4 @@
-"""Resolve a native Gitleaks hit to one unambiguous full-match byte span."""
+"""Resolve a native Gitleaks hit to its possible full-match byte spans."""
 
 
 def match_spans(data, hit):
@@ -18,9 +18,12 @@ def match_spans(data, hit):
         # Later fragment lines also count the preceding LF in their columns.
         # Bind the full match within the reported lines instead. Even an
         # apparently exact column cannot disambiguate repeated occurrences.
+        # Callers must prove every candidate, never just the first one.
+        spans = []
         start = data.find(match, left, right)
-        if start < 0 or data.find(match, start + 1, right) >= 0:
-            return []
-        return [(start, start + len(match))]
+        while start >= 0:
+            spans.append((start, start + len(match)))
+            start = data.find(match, start + 1, right)
+        return spans
     except (KeyError, TypeError, IndexError, UnicodeError):
         return []

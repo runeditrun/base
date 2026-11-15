@@ -81,20 +81,19 @@ class Document:
         if not secret:
             return False
         spans = match_spans(self.data, hit)
-        if len(spans) != 1:
+        if not spans:
             return False
-        left, right = spans[0]
-        start = self.data.find(secret, left, right)
-        if start < 0 or self.data.find(secret, start + 1, right) >= 0:
-            return False
-        for pointer in pointers:
-            span = self.spans.get(pointer)
-            if span:
-                a, b, value = span
-                # A uniquely located native match is not itself a proof.
-                # Bind the captured bytes, including a truncated capture, to
-                # the exact unescaped JSON value at a proved pointer.
-                if (a + 1 <= start and start + len(secret) <= b - 1
-                        and self.data[a + 1:b - 1] == value.encode('ascii')):
-                    return True
-        return False
+        allowed = [self.spans[pointer] for pointer in pointers if pointer in self.spans]
+        for left, right in spans:
+            start = self.data.find(secret, left, right)
+            if start < 0 or self.data.find(secret, start + 1, right) >= 0:
+                return False
+            # Location alone is not proof. Every possible native occurrence
+            # must bind its captured bytes (even a truncated capture) to an
+            # exact unescaped JSON value at a proved pointer. An identical
+            # credential elsewhere on the line therefore retains the finding.
+            if not any(a + 1 <= start and start + len(secret) <= b - 1
+                       and self.data[a + 1:b - 1] == value.encode('ascii')
+                       for a, b, value in allowed):
+                return False
+        return True

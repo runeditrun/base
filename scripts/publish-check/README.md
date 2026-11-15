@@ -150,9 +150,9 @@ that commit's blobs and working-tree preimages reject linked paths. There is no
 path, filename, hash-value or repository exemption. `hit_location.py` resolves
 the native match's exact bytes for both proofs. Gitleaks directory fragments can
 start mid-line without reporting their starting column. The resolver therefore
-requires a unique full match within the reported LF-delimited lines; unresolved
-or repeated matches retain their findings even if a reported column appears to
-fit. Classification still requires the structural and digest proofs above.
+locates full matches within the reported LF-delimited lines. An unresolved match
+retains its finding; repeated matches must all satisfy the structural and digest
+proofs above, even if a reported column appears to identify just one of them.
 
 `trust_bundle.py` classifies an email match as public CA certificate metadata
 only when all of these hold: the file's path is an artifact listed by a committed
