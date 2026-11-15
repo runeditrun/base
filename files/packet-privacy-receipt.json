@@ -98,6 +98,16 @@
       "path": "product-receipt.json",
       "bytes": 1134,
       "sha256": "8f58731571862164b84d72b27574d11b0920649093715559ca220a48cb393dcd"
+    },
+    {
+      "path": "initial-remote-custody-receipt.json",
+      "bytes": 298,
+      "sha256": "feed6e87ffdb30e21926c64ab10334d009aba6431b538b223c25063efe98624f"
+    },
+    {
+      "path": "evidence-initial-transfer.log",
+      "bytes": 3814,
+      "sha256": "36682570df28e9e2730ac753e64eade31ebce28c8adb553da2da573b5950cce6"
     }
   ]
 }

@@ -1,0 +1,8 @@
+{
+  "repository": "runeditrun/base",
+  "product_head": "a7ccc0cd247ce1fb2fa3ce84e22c117c29a5673b",
+  "evidence_head": "172d884823b72a705c93d0642bda3e7c5fb154af",
+  "evidence_ref": "refs/heads/evidence/gr-base-flake-backoff-1",
+  "remote_refs_verified": true,
+  "product_working_tree_clean": true
+}

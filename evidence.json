@@ -25,10 +25,22 @@
       "sha256": "2f5b63e50250339cfc7125956176049f33f56c7850ce493571ce00a6d8137da6"
     },
     {
+      "blob": "99a2de451fbe2019ab6a71cc6d29b15d6c476f6b",
+      "bytes": 3814,
+      "path": "evidence-initial-transfer.log",
+      "sha256": "36682570df28e9e2730ac753e64eade31ebce28c8adb553da2da573b5950cce6"
+    },
+    {
       "blob": "60a26643c932e338c2000c3f329e6a5e0e6acbf9",
       "bytes": 490,
       "path": "identity-receipt.json",
       "sha256": "6934f08a873ce292f01442d92d666c837459d3f288e6def41dff0741d86c3ea8"
+    },
+    {
+      "blob": "443bb0150ba1ed61d50f2bfb263258976f2e8544",
+      "bytes": 298,
+      "path": "initial-remote-custody-receipt.json",
+      "sha256": "feed6e87ffdb30e21926c64ab10334d009aba6431b538b223c25063efe98624f"
     },
     {
       "blob": "6a828c950b8b4be13c4183f4f08829980b873206",
@@ -43,10 +55,10 @@
       "sha256": "67a0ac8490b2694e3b17c88ace926c6813c96e12cf44559a182ff973e3491e60"
     },
     {
-      "blob": "e75c559a6ea13be00268ea2fb1f6dfc16fa13beb",
-      "bytes": 3137,
+      "blob": "b7219c0ff54b75b0b8cca35ef76be5a939d2c0c5",
+      "bytes": 3470,
       "path": "packet-privacy-receipt.json",
-      "sha256": "e8c86bef8418141c6a500e9f50d43805260f0899a101960d3e1ccc6880ca43d5"
+      "sha256": "1c200ec8dc36f0dcd3604540afd099704fcf0ce96240400ea542c821506a4961"
     },
     {
       "blob": "e04d5eb4af1e83e24bbf81b7e582ecb31c9e3f4a",
