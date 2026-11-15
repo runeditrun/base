@@ -1,3 +1,4 @@
+import { prepareInventory, metadataJson, inventoryStatements } from './object-inventory.mjs';
 import { libraryMigrations } from './library-history.mjs';
 import { all, statement, state, guard, job, save, partQueries, parts, readPart, dropCopyStatements, cleanCopyStatements, quote, stream, insist, run } from './storage.mjs';
 import { stagePart } from './import-staging.mjs';
@@ -78,11 +79,12 @@ export async function createImport(context,manifest,actor='direct',legacyRecover
   }
   const copies=Object.fromEntries(targets.map((t,i)=>[t.name,'rer_portability_stage_'+id.replaceAll('-','')+'_'+i]));
   const row={id,kind:'import',actor,phase:'staging',completed:0,metadata:{manifest:original,...(unverified?{schemaUnverified:{reason:'acknowledged recovery of a version 2 archive without schemaObjects',sourceIdentity:original.sourceIdentity,exportedAt:original.exportedAt,acknowledgedAt:new Date().toISOString()}}:{}),...(skippedTables.length?{restoreManifest:manifest,skippedTables}:{}),copies,targets,triggers:cat.triggers,...(bridge.fromSchema?{bridge}:{}),...(replays?{replays}:{}),...(legacyRecovery?{legacyRecovery}: {}),...(ledgers?{ledgers}:{})}};
+  prepareInventory(row);
   try {
     await db.batch([guard(db,'(SELECT import_job FROM rer_portability_state WHERE id=1) IS NULL'),
       statement(db,'UPDATE rer_portability_state SET import_job=?,applying=? WHERE id=1',id,unverified?1:0),
       ...targets.flatMap(t=>createCopy(db,t,copies[t.name])),
-      statement(db,'INSERT INTO rer_portability_jobs(id,kind,actor,phase,metadata) VALUES(?,?,?,?,?)',id,'import',actor,row.phase,canonicalJson(row.metadata)),createImportLease(db,id),db.prepare('DELETE FROM rer_portability_guard')]);
+      statement(db,'INSERT INTO rer_portability_jobs(id,kind,actor,phase,metadata) VALUES(?,?,?,?,?)',id,'import',actor,row.phase,metadataJson(row.metadata)),...inventoryStatements(db,row),createImportLease(db,id),db.prepare('DELETE FROM rer_portability_guard')]);
   }catch(e){const running=(await state(db)).import_job;if(running)throw await importRunning(db,running);throw e;}
   return id;
 }

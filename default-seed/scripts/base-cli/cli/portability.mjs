@@ -110,7 +110,7 @@ async function nativeWorker(store,direction,input,signal) {
    : receipt.reason?.startsWith('migration_ledger:') ? ledgerRefusal(receipt)
    : receipt.migration ? `Restore refused (schema_mismatch:migration_data): migration ${receipt.migration} changed data after this archive was made, so its rows would skip that change. Restore an archive made after it.`
    : receipt.occupied ? occupiedRefusal(input,receipt.reason)
-   : `The portability module refused or failed the archive operation (${receipt.reason ?? 'incomplete'}${receipt.native ? `: ${receipt.native.class}${receipt.native.code && receipt.native.code !== receipt.reason ? `, code ${receipt.native.code}` : ''}` : ''}).${receipt.native && receipt.exitCode === 1 ? ' Run the same command again; it starts over.' : ''}`, receipt.exitCode ?? 1);
+   : `The portability module refused or failed the archive operation (${receipt.reason ?? 'incomplete'}${receipt.native ? `: ${receipt.native.class}${receipt.native.code && receipt.native.code !== receipt.reason ? `, code ${receipt.native.code}` : ''}` : ''})${receipt.step ? ` during ${receipt.step}` : ''}.${receipt.native && receipt.exitCode === 1 ? ' Run the same command again; it starts over.' : ''}`, receipt.exitCode ?? 1);
   delete receipt.ok;
   return receipt;
 }

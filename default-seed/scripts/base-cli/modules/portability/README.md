@@ -1133,6 +1133,8 @@ modules/portability/sqlite-tokens.mjs
 modules/portability/bookkeeping.mjs
 modules/portability/snapshot-objects.mjs
 modules/portability/storage.mjs
+modules/portability/object-inventory.mjs
+modules/portability/archive-step.mjs
 modules/portability/copies.mjs
 modules/portability/derived.mjs
 modules/portability/dev-data.mjs
@@ -1268,3 +1270,9 @@ parameters of at most 2 MiB each. It refuses compressed or encrypted entries,
 unsafe paths, duplicate or unexpected members, missing ledgers, other versions,
 container transport, later-journal and legacy-recovery options. Refusals use
 constant `managed_data_*` reasons and do not print source values.
+
+Large object inventories are stored in bounded internal rows so D1 cell and row
+limits do not prevent backups. Native CLI failures name the transfer stage (for
+example `export_snapshot`) without printing SQL, values or absolute paths. Keep
+the stopped source and retry after resolving the named stage; changing source
+objects or deleting data is not a remedy for an inventory storage failure.
