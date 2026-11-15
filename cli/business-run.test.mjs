@@ -82,3 +82,13 @@ test('business run forwards signals and enforces credential expiry, then revokes
  const expired=await f.run([process.execPath,'-e','setInterval(()=>{},1000)']);assert.equal(expired.signal,'SIGTERM');assert.match(expired.stderr,/cleanup: revoked/);
  assert.equal(f.state.revocations,3);
 });
+
+test('business run reaches the ordinary rer deploy dry-run child without live provider mutation',{timeout:300000},async t=>{
+ const f=await fixture(t);
+ const result=await f.run([process.execPath,entry,'deploy','--dry-run','--cwd',join(base,'default-seed'),'--json']);
+ assert.equal(result.code,0,result.stderr+'\n'+result.stdout);
+ const receipt=result.stdout.trim().split('\n').filter(Boolean).map(line=>{try{return JSON.parse(line);}catch{return null;}}).filter(Boolean).at(-1);
+ assert.equal(receipt.ok,true);assert.equal(receipt.dryRun,true);assert.equal(receipt.deployed,false);assert.equal(receipt.providerChecked,false);
+ assert.equal(f.state.issued,1);assert.equal(f.state.revocations,1);
+ assert.ok(!(result.stdout+result.stderr).includes(secret));assert.match(result.stderr,/cleanup: revoked/);
+});
