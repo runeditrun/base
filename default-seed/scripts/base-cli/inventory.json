@@ -743,7 +743,7 @@
     },
     "cli/contract.mjs": {
       "source": "cli/contract.mjs",
-      "sha256": "402623ce46b9a5223dd18312e0460c8ea3539e775f87744276e5e0b22d29e2b5"
+      "sha256": "20a03a2e0a7af6719a5b5423836932ff376c6dbf7ea05d5b75aa7e7e305569bc"
     },
     "cli/delivery-declarations.mjs": {
       "source": "cli/delivery-declarations.mjs",
@@ -991,7 +991,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "79a1e34194efb75ef288b14c8a6cee0987e4c1268f58ef960278ef16155b8d43"
+      "sha256": "40e747be30d9d6ef12a610e25a5067634370cc6527635e4bd8721319a102c1e9"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -1075,7 +1075,7 @@
     },
     "cli/parse.mjs": {
       "source": "cli/parse.mjs",
-      "sha256": "bc798ae090197b31757deab1d1114fddbd646d1b587f03fa63a0977be1055759"
+      "sha256": "9ca9083df89e0ad9f485c3cb1415a7b194e51cd3518cc8d1ac727af1f21a12cf"
     },
     "cli/placeholder-mark.mjs": {
       "source": "cli/placeholder-mark.mjs",

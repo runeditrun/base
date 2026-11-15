@@ -253,9 +253,14 @@ export async function doctor(project, store, signal) {
  const firstParty = project.profile === 'first-party';
  const workflowInputs = firstParty ? diagnostic.missingEnvironment.filter(name => buildWorkflowInput.test(name)) : [];
  const deploymentInputs = firstParty ? diagnostic.missingEnvironment.filter(name => !buildWorkflowInput.test(name) && !inputs.includes(name) && !(typeof values[name] === 'string' && values[name].trim())) : [];
+ // A required loop that waits only on inputs a deployment supplies (a hosted mail provider's key, say) is ready for
+ // local use: the local app suppresses that delivery. Its inputs are named with the other deploy inputs.
+ const deployOnlyLoop = loop => firstParty && loop.status === 'missing-inputs' && (loop.missingEnvironment ?? []).every(name => !inputs.includes(name));
+ const loopDeploymentInputs = (diagnostic.loops ?? []).filter(deployOnlyLoop).flatMap(loop => loop.missingEnvironment ?? []);
  if (firstParty) {
   diagnostic.missingEnvironment = diagnostic.missingEnvironment.filter(name => inputs.includes(name));
-  diagnostic.ok = diagnostic.commands.every(command => command.available) && !diagnostic.missingEnvironment.length && diagnostic.configuration === 'valid' && (diagnostic.loops ?? []).every(loop => ['ready', 'optional-disabled'].includes(loop.status));
+  diagnostic.ok = diagnostic.commands.every(command => command.available) && !diagnostic.missingEnvironment.length && diagnostic.configuration === 'valid' && (diagnostic.loops ?? []).every(loop => ['ready', 'optional-disabled'].includes(loop.status) || deployOnlyLoop(loop));
+  diagnostic.loops = (diagnostic.loops ?? []).map(loop => deployOnlyLoop(loop) ? { ...loop, deploymentOnly: true } : loop);
  }
  const setupNeeded = firstParty ? !(await localState(project)).prepared : false;
  const warnings = project.profile === 'first-party' ? await cacheWarnings(project.root) : [];
@@ -263,7 +268,7 @@ export async function doctor(project, store, signal) {
   node: { actual: process.versions.node, expected: expectedNode },
   pnpm: project.profile === 'first-party' ? { actual: pnpm, expected: expectedPnpm ?? null, ...(pnpmIssues.length ? { issue: [...new Set(pnpmIssues)].join('\n') } : {}) } : undefined,
   ai: { issues: aiIssues },
-  missingInputs: [...new Set([...diagnostic.missingEnvironment, ...inputs])], deploymentInputs, workflowInputs, setupNeeded: setupNeeded || (!firstParty && diagnostic.missingEnvironment.length > 0),
+  missingInputs: [...new Set([...diagnostic.missingEnvironment, ...inputs])], deploymentInputs: [...new Set([...deploymentInputs, ...loopDeploymentInputs])], workflowInputs, setupNeeded: setupNeeded || (!firstParty && diagnostic.missingEnvironment.length > 0),
   sources: project.descriptor.environmentSources ?? {}, state: { path: project.adapter?.state, safe: stateValid, ...(stateIssue ? { issue: stateIssue } : {}) }, scope: 'local-inputs-only' };
 }
 
@@ -282,7 +287,7 @@ export function doctorSummary(result) {
  const unavailable = result.operations.commands.filter(command => !command.available);
  if (unavailable.length) lines.push('Unavailable command inputs:', ...unavailable.map(command => `  ${command.name}: restore its declared input files.`));
  if (result.operations.configuration === 'invalid') lines.push('Local configuration is invalid. Check the declared configuration module; private validator details are suppressed.');
- for (const loop of result.operations.loops ?? []) if (!['ready', 'optional-disabled'].includes(loop.status)) lines.push(`Loop ${loop.id}: ${loop.status}${loop.missingEnvironment?.length ? `; missing ${loop.missingEnvironment.join(', ')}` : ''}.`);
+ for (const loop of result.operations.loops ?? []) if (!['ready', 'optional-disabled'].includes(loop.status) && !loop.deploymentOnly) lines.push(`Loop ${loop.id}: ${loop.status}${loop.missingEnvironment?.length ? `; missing ${loop.missingEnvironment.join(', ')}` : ''}.`);
  if (!result.state.safe) lines.push(`Local state: ${result.state.issue}`);
  if (result.browser?.issue) lines.push(`Browser dependencies: ${result.browser.issue}`);
  else if (result.browser?.note) lines.push(result.browser.note);
