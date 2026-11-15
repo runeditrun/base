@@ -26,6 +26,10 @@ import { keepHookSecrets } from './deploy-secrets.mjs';
 import { withoutLocalSettings, refuseLocalEnvOutput } from './local-env.mjs';
 import { deployProductDirectory, deployProductArguments, DeployProductError } from './deploy-product.mjs';
 
+// A hook may wrap this controller. Its needs return to the caller, which renders
+// the combined dry-run summary once after every local plan step has succeeded.
+const deferDryRunSummary = Symbol('defer dry-run summary');
+
 export function validateDeployOptions(options) {
  const changes = [options.remove && '--remove', options.setSecret && '--set-secret', options.unsetSecret && '--unset-secret', options.rotateSecret && '--rotate-secret', options.reopenInstallationKey && '--reopen-installation-key'].filter(Boolean);
  if (changes.length > 1 || changes.length && options.dryRun) throw invalid(`Use ${changes.join(', ')}${options.dryRun ? ' and --dry-run' : ''} on separate runs.`);
@@ -88,16 +92,18 @@ export async function deployCommand(context) {
   const plan = result?.plan ?? (!planned ? undefined : (await owner(['local-plan', '--declaration', path, '--environment', options.environment ?? 'production', ...await deployProductArguments(root, deployProductDirectory(declaration))], production.env, { cwd: root, localOnlyKeys })).plan);
   result = { ...result, dryRun: true, deployed: false, providerChecked: false, plan };
   const { signIn, mailOff } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
-  if (mailOff) store.report(mailOffNotice(mailOff, options.environment ?? 'production'), { names: mailOff.credentialNames });
-  // The one completion line: rer's own plan step (or its deliberate skip) succeeded. A hook's own line says only that the hook finished.
-  store.report('deploy: local dry run complete; no credentials were needed, no Cloudflare requests were made and nothing was changed remotely. Target secrets and remote readiness were not checked.');
   const needed = [...new Set([...neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false }), ...(result.neededForRealDeploy ?? []), ...(extraNeeded ?? [])])];
-  reportNeeded(store, needed);
-  if (declaration.secrets?.some(item => item.binding === 'INSTALLATION_KEY')) store.report('deploy: INSTALLATION_KEY is a private generated binding; INSTALLATION_KEY_PREVIOUS is optional and managed only during rotation or an explicit retired-key reopen. Values are withheld.');
+  if (!context[deferDryRunSummary]) {
+   if (mailOff) store.report(mailOffNotice(mailOff, options.environment ?? 'production'), { names: mailOff.credentialNames });
+   // The one completion line: rer's own plan step (or its deliberate skip) succeeded. A hook's own line says only that the hook finished.
+   store.report('deploy: local dry run complete; no credentials were needed, no Cloudflare requests were made and nothing was changed remotely. Target secrets and remote readiness were not checked.');
+   reportNeeded(store, needed);
+   if (declaration.secrets?.some(item => item.binding === 'INSTALLATION_KEY')) store.report('deploy: INSTALLATION_KEY is a private generated binding; INSTALLATION_KEY_PREVIOUS is optional and managed only during rotation or an explicit retired-key reopen. Values are withheld.');
+  }
   return needed.length && result && typeof result === 'object' ? { ...result, neededForRealDeploy: needed } : result;
  };
  const runHook = hookContext => options.dryRun ? withLocalDeployPlan(async () => {
-  try { return await adapter.deploy(hookContext); }
+  try { return await adapter.deploy({ ...hookContext, [deferDryRunSummary]: true }); }
   catch (error) {
    // Production-only owner/input preflights may refuse before the hook builds.
    // An offline plan defers those inputs, retaining the refusal as guidance.

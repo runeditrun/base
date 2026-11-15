@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.118-dev.g0ef27d31",
+  "cliVersion": "0.2.118",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -799,7 +799,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "793eb5906fe3041e2fa97377e77e14e90f952711feff60419da6b1252baad168"
+      "sha256": "317770e7356f4732eeaac5b498631f0ad8a75a6c33bba0d07e370b0be8f04812"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
