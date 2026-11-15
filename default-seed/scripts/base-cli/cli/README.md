@@ -697,3 +697,43 @@ unattempted sizes `complete:false`; these files keep the existing statement name
 SQL and bound parameters and carry diagnostic flow summaries. Missing work never
 produces a passing growth verdict. See the size section of
 [the command contract](../export/SEED-COMMAND-CONTRACT.md#statement-size-and-growth-sc-15).
+
+## Run a command with a Business grant
+
+Pair with the Business using `rer business connect --business ID`. The owner
+approves this agent, ticks **Run software commands with an approved cloud grant**,
+Connects Cloudflare, selects the exact Business account and approves a per-agent
+grant with explicit resource permissions and expiry. These choices install nothing.
+
+```sh
+rer business run --grant GRANT_ID -- rer deploy
+rer business run --grant GRANT_ID -- any-command 'argument with spaces'
+```
+
+`cloudflare.token` in the Business MCP describes the exchange without returning a
+credential. Only the paired rer exchange receives a child token; the parent OAuth
+credential stays on the trusted server. The command gets `CLOUDFLARE_API_TOKEN`
+and `CLOUDFLARE_ACCOUNT_ID` in its environment. Cloudflare credential aliases from
+the caller environment are removed. No shell is inserted and arguments after
+`--`, including help flags, are passed unchanged. Existing `run [--once]` continues
+its computer check-in behavior.
+
+This is an environment boundary, not a sandbox. The selected process and its
+descendants can read and use the credential, and a malicious process can disclose
+it or read other files or OS credentials available to the same user. Use software
+you trust. Output masks the credential and common encoded forms across chunk
+boundaries; it cannot hide every transformation a malicious process invents.
+Commands may load their own files and credentials. The wrapper supplies only the
+approved credential, never retries with broader or ambient access, and does not
+protect a process from its own deliberate credential loading.
+
+The child expires after at most 15 minutes, bounded also by the grant and the
+provider authorization. The wrapper interrupts a command at that expiry. It
+requests revocation after success, failure, signals or spawn failure; SIGKILL,
+crashes, network loss and lost acknowledgements may leave a token until server
+expiry. Child exit codes and Unix terminating signals are preserved. Cleanup has
+its own stderr status, including **unconfirmed**, which is never called revoked.
+The safe lease ID in that status supports `rer business cleanup LEASE` to retry
+revocation and `rer business cleanup LEASE --status` to read its status. Cleanup
+needs the original pairing, but does not require the removed deploy action or an
+active grant. No child token is saved in state, OS storage, logs or MCP output.

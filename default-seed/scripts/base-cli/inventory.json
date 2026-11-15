@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.118",
+  "cliVersion": "0.2.118-dev.g44f48bf6",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,7 +391,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "28b44850278a9c1450abab380194fe2736baadf6cf070b2877a8fca6634e5ed7"
+      "sha256": "f961e34f43b8e94b2b7ea186361d37503769c025d836d1fea23b7f6eceeead6c"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -501,6 +501,30 @@
       "source": "cli/browser-runtime.mjs",
       "sha256": "993ac97de526d169d36b0f71b4b25b703d6023c63bd259403cc86e85c1f36ed5"
     },
+    "cli/business/agent-args.mjs": {
+      "source": "cli/business/agent-args.mjs",
+      "sha256": "9383fb3df30b55ec8848a464012a64c43a9d25fabe95b879b8e0e5deeabd7cf7"
+    },
+    "cli/business/agent-help.mjs": {
+      "source": "cli/business/agent-help.mjs",
+      "sha256": "f70274f2f6c73bf706c35129013641e49145922a35289bede38eba3b31bd6f62"
+    },
+    "cli/business/agent-output.mjs": {
+      "source": "cli/business/agent-output.mjs",
+      "sha256": "f590b3ca9d2b7bd9e6f612b3d2a9286206ea52a5de905826557c4a5a97cd2f55"
+    },
+    "cli/business/agent-table.mjs": {
+      "source": "cli/business/agent-table.mjs",
+      "sha256": "22aaea90d99698d3f02dc83bc78a1c3bc25eda68cd509cbb80aa7c8d98e480f5"
+    },
+    "cli/business/agent-verbs.mjs": {
+      "source": "cli/business/agent-verbs.mjs",
+      "sha256": "3ebdaa98899d49a193f7bfb2735e9082a0d1c71b1bedabd523b28c9a19acb2d3"
+    },
+    "cli/business/agent-wait.mjs": {
+      "source": "cli/business/agent-wait.mjs",
+      "sha256": "d1a04f26b24bcac7bac6841e03551aa707f221215eb20f3f1597937842c7f42c"
+    },
     "cli/business/api.mjs": {
       "source": "cli/business/api.mjs",
       "sha256": "324194a500b396f8e22f1da172f8113b44d271b023198f4546142a9588e5884b"
@@ -519,7 +543,7 @@
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "751e0267c8dc7c6ad08c578cf695008b2fc80b6847e93c63f708956aac03053c"
+      "sha256": "666fa54e2d0d8ec6d1d4ac1ab05107cddeb1f48ad5fd3047384f85a6c96cc9bb"
     },
     "cli/business/config-policy.mjs": {
       "source": "cli/business/config-policy.mjs",
@@ -564,6 +588,10 @@
     "cli/business/local-commands.mjs": {
       "source": "cli/business/local-commands.mjs",
       "sha256": "ab6531d7980f56bc73ce38bd49214f35eb04c68198f2b5f8ba692e2e693b8fb7"
+    },
+    "cli/business/mcp-bridge.mjs": {
+      "source": "cli/business/mcp-bridge.mjs",
+      "sha256": "1663d30442f00ae52d51019d73b71cc8c44596955bedc9dd98fe5c5cff3a0f3f"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
@@ -611,11 +639,23 @@
     },
     "cli/business/questions.mjs": {
       "source": "cli/business/questions.mjs",
-      "sha256": "02deec922cd9c4a05dabf3625831cf7e068ef93a528901ac6e62cdb88de32200"
+      "sha256": "e26b3096bcdc54995b3fdcd79102ab305ae42df93c230caab21f1af9a86b71f6"
     },
     "cli/business/repository.mjs": {
       "source": "cli/business/repository.mjs",
       "sha256": "10ba93237061130c17222ddeba43645802e2c97b7a0d935d01958516d753b325"
+    },
+    "cli/business/run-child.mjs": {
+      "source": "cli/business/run-child.mjs",
+      "sha256": "def12553d35f730f3e4aeca049e6fdaf22c7e03dab97a8bd71ecf66ae7e1c8c6"
+    },
+    "cli/business/run-grant.mjs": {
+      "source": "cli/business/run-grant.mjs",
+      "sha256": "5ba90a04325616c9e9eee95088efba67ba5a88db5eb836acc0ea7881d45c66d0"
+    },
+    "cli/business/run-mask.mjs": {
+      "source": "cli/business/run-mask.mjs",
+      "sha256": "fe54361345018d4178642d8296472293bc14b42cb66577675e4bf1105999b2ab"
     },
     "cli/business/scan-command.mjs": {
       "source": "cli/business/scan-command.mjs",
