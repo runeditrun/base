@@ -1,10 +1,28 @@
 # Changelog
 
-## Unreleased
+## 0.2.118
+
+### Local diagnostics and Move in guidance
+
+- `rer doctor` treats a required operations loop waiting only on deployment inputs as ready for local use, listing those inputs under “Optional for local use; needed to deploy”. A clean `rer dev` no longer fails doctor solely because hosted mail credentials are absent.
+- `rer import` and `rer export` help direct owners to the app's signed-in Move in page; `/app/import` is the Base reference path, and the project's own docs name its path.
 
 ### Business device pairing only
 
-- Removed `rer business connect --code` because Business retired browser-created pairing codes. Pair with `rer business connect --business ID`; the Business Connect page names the ID.
+- Removed the retired `rer business connect --code` path and its help and recovery guidance. Pair with `rer business connect --business ID`; the Business Connect page names the ID.
+
+### Explicit outbound mail off
+
+- Foundations accept an explicit `MAIL_PROVIDER=none` choice. Provider and sender use optional environment-to-Worker bindings, and the mail key is optional at the binding layer. With `none`, no `MAIL_FROM` or `MAIL_API_KEY` binding is supplied; `rer deploy --dry-run` reports outbound email off and names `rer signin` for the owner.
+- Optional declarative mail loops can report `optional-disabled` for an explicitly declared `none`; required delivery loops still fail while mail is off. Missing provider selection never means off, conflicting sending credentials refuse, and enabled providers still require their real sender and key. Email links and invitations remain unavailable when mail is off.
+
+### Owner sign-in follows the recorded app
+
+- `rer signin` selects the app Worker from the held ownership record, including a recorded custom Worker name, and validates the selected account, project and environment. It no longer recomputes the default Worker name. Wrong scope, a missing or replaced Worker or receipt, and substitution of a public-page Worker refuse without issuing owner grants.
+
+The source also archives the old root adoption recipe, marks the bootstrap and TanStack migration recipes as dated records, and opens exported agent guidance on the product and launch path. This release establishes no HH, Lamp or Spool production guarantee and performs no seed adoption or pin move. No executable migration, modules/portability or modules/import-kit change is included; the migration-guide edit only adds its dated-record banner.
+
+— Codex, 2026-11-15T06:29:08Z
 
 ## 0.2.117
 
