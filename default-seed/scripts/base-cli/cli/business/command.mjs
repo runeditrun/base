@@ -7,6 +7,8 @@ import { run } from './supervisor.mjs';
 import { describe } from './errors.mjs';
 import { identifier, originUrl } from './api.mjs';
 import { appAddress, appSignInHelp } from '../app-address.mjs';
+import { agentUsage, agentHelp } from './agent-help.mjs';
+import { agentFamilies } from './agent-table.mjs';
 
 const usage = `Set up your business: rer business connect --business ID
 The Business Connect page names the ID.
@@ -21,6 +23,9 @@ Advanced commands (Usage: rer business VERB)
   connect --business ID [--origin URL] [--timeout SECONDS]
                                  Print a code and link for the owner to approve in a signed-in browser
                                  Connect carries the Business name into local apps
+  run --grant G -- <command> [args...]
+                                 Run a command with an approved scoped cloud credential; revoked after
+  cleanup LEASE [--status]        Retry cleanup or read its safe status
   run [--once]                   Work this computer's tasks: the folder scan the owner allows. Says what
                                  it is doing and what it waits for; applies the owner's choices at each
                                  check-in
@@ -37,10 +42,11 @@ Advanced commands (Usage: rer business VERB)
                                  inside an agent sandbox it names the one command that finishes
 State lives in $RER_BUSINESS_STATE_DIR when set, otherwise in ~/.rer/business.
 In an agent sandbox that writes only inside its working folder, use RER_BUSINESS_STATE_DIR="$PWD/.rer-business".
-${appSignInHelp}
+${agentUsage}${appSignInHelp}
 `;
 
 const verbHelp = {
+ ...agentHelp,
  setup: `Usage: rer business setup --origin URL --session-file FILE --confirm-demo [--hosting managed|assisted|self_host] [--json]
 Create the Business for the synthetic demo company in setup-company.json and save
 its profile, through the platform's owner routes. A repeat reuses that Business and
@@ -58,7 +64,12 @@ changes nothing when its profile already matches. It provisions no seeds.
 Exits 0 when the Business exists with that profile; 1 with a named {code} on stderr.
 ${appSignInHelp}
 `,
- run: `Usage: rer business run [--once]
+ run: `Usage: rer business run --grant G -- <command> [args...]
+Run any software command under this paired agent’s explicit deploy action and grant.
+The scoped Cloudflare token and account reach only the child environment. Output
+is masked and cleanup is reported separately; the child’s exit status is kept.
+
+Usage: rer business run [--once]
 Work this computer's tasks (the folder scan the owner allows) and check in every
 25 seconds until stopped. Steps for this computer's agent, such as a seed's Move in,
 are shown by rer business next. --once returns after one check-in.
@@ -82,8 +93,13 @@ Requires an existing pairing: rer business connect --business ID (the Connect pa
 };
 
 export async function businessCommand(argv) {
+ if (argv[0] === 'run' && argv[1] === '--grant' || argv[0] === 'cleanup') {
+  try { const commands = await import('./run-grant.mjs'); return await (argv[0] === 'cleanup' ? commands.cleanupCommand(argv.slice(1)) : commands.grantCommand(argv.slice(1))); }
+  catch (error) { process.stderr.write(describe(error) + '\n'); return 1; }
+ }
  if (Object.hasOwn(verbHelp, argv[0]) && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(verbHelp[argv[0]]); return 0; }
  if (argv[0] === 'setup') return setupCommand(argv.slice(1));
+ if (agentFamilies.has(argv[0])) return (await import('./agent-verbs.mjs')).agentCommand(argv);
  if (!argv.length || argv[0] !== 'scan' && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(usage); return 0; }
  if (argv[0] === 'scan') return scanCommand(argv);
  try {
