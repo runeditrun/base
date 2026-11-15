@@ -93,8 +93,10 @@ Requires an existing pairing: rer business connect --business ID (the Connect pa
 };
 
 export async function businessCommand(argv) {
- if (argv[0] === 'run' && argv[1] === '--grant') return (await import('./run-grant.mjs')).grantCommand(argv.slice(1));
- if (argv[0] === 'cleanup') return (await import('./run-grant.mjs')).cleanupCommand(argv.slice(1));
+ if (argv[0] === 'run' && argv[1] === '--grant' || argv[0] === 'cleanup') {
+  try { const commands = await import('./run-grant.mjs'); return await (argv[0] === 'cleanup' ? commands.cleanupCommand(argv.slice(1)) : commands.grantCommand(argv.slice(1))); }
+  catch (error) { process.stderr.write(describe(error) + '\n'); return 1; }
+ }
  if (Object.hasOwn(verbHelp, argv[0]) && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(verbHelp[argv[0]]); return 0; }
  if (argv[0] === 'setup') return setupCommand(argv.slice(1));
  if (agentFamilies.has(argv[0])) return (await import('./agent-verbs.mjs')).agentCommand(argv);

@@ -10,7 +10,7 @@ import {credentialHandle} from './business/state.mjs';
 const base=resolve(import.meta.dirname,'..'),entry=join(base,'bin/rer.mjs');
 const device='bz_device_synthetic-command-computer',secret='synthetic-scoped-command-secret',account='a'.repeat(32);
 async function fixture(t) {
- const home=await mkdtemp(join(base,'.business-command-'));t.after(()=>rm(home,{recursive:true,force:true}));
+ const home=await mkdtemp(join(base,'.business-connect-command-'));t.after(()=>rm(home,{recursive:true,force:true}));
  const state={issued:0,revocations:0,refuse:false,cleanupFails:false,expiryMs:900000,leases:new Map()};
  const server=createServer(async(req,res)=>{
   let text='';for await(const data of req)text+=data;
