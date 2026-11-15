@@ -36,10 +36,14 @@ async function hosted(t) {
  await db.prepare(await readFile(new URL('../modules/operator-auth/accounts/schema/owner-signin.sql', import.meta.url), 'utf8')).run();
  const ownerCookie = await app.bootstrap();
  await db.prepare("INSERT INTO oa_operators(id,email,display_name,role,status,created_at) VALUES('member-1','member@example.com','Member','member','active',1)").run();
- const uuid = provider.state.databases[0].uuid, calls = [];
+ const uuid = provider.state.databases[0].uuid, calls = [], requests = [];
+ let liveWorker = 'fixture-production';
  // D1 query API calls for the deployment's database run on the Worker's D1.
  const fetch = async (input, init = {}) => {
   const path = new URL(input).pathname;
+  requests.push({ path, method: init.method ?? 'GET' });
+  const worker = /\/workers\/scripts\/([^/]+)/.exec(path)?.[1];
+  if (worker && worker !== liveWorker) return Response.json({ success: false, errors: [] }, { status: 404 });
   if (path.endsWith(`/d1/database/${uuid}/query`)) {
    calls.push(JSON.parse(init.body).sql);
    const result = await db.prepare(JSON.parse(init.body).sql).all();
@@ -58,7 +62,7 @@ async function hosted(t) {
  };
  const token = lines => new URL(lines.join('\n').match(/https:\/\/\S+/)[0]).searchParams.get('token');
  const use = value => app.call('/auth/owner-signin', { method: 'POST', input: { token: value } });
- return { root, app, db, calls, signin, token, use, ownerCookie, fetch, credentials };
+ return { root, app, db, calls, requests, provider, signin, token, use, ownerCookie, fetch, credentials, setLiveWorker: worker => { liveWorker = worker; } };
 }
 
 async function files(directory) {
@@ -161,12 +165,92 @@ test('rer signin directs native-auth owners to their declared page or setup reco
  }
 });
 
-test('rer signin prints the link at the recorded custom-domain origin, not workers.dev', async t => {
+test('rer signin selects only the held app identity and refuses mismatched or replaced targets through the public CLI', async t => {
  const h = await hosted(t);
- const statePath = join(h.root, '.rer/deploy/production.json'), saved = JSON.parse(await readFile(statePath, 'utf8'));
+ await writeFile(join(h.root, '.node-version'), process.versions.node);
+ await writeFile(join(h.root, 'adapter.mjs'), "export const commandAdapter = {deploy: Object.assign(async()=>{}, {declaration:'deploy.json'})};");
+ await writeFile(join(h.root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'tests/fixture', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { deploy: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs', 'deploy.json'], effects: 'Manage the test deployment.' } } }));
+ const run = async (args = [], credentials = h.credentials) => {
+  const saved = { ...process.env }, lines = [];
+  delete process.env.CLOUDFLARE_ACCOUNT_ID; delete process.env.CLOUDFLARE_API_TOKEN;
+  Object.assign(process.env, credentials);
+  const network = t.mock.method(globalThis, 'fetch', h.fetch);
+  const stdout = t.mock.method(process.stdout, 'write', text => { lines.push(String(text)); return true; });
+  let exit;
+  try { exit = await main(['signin', '--cwd', h.root, '--json', ...args]); }
+  finally {
+   stdout.mock.restore(); network.mock.restore();
+   for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key];
+   Object.assign(process.env, saved);
+  }
+  const events = lines.join('').trim().split('\n').map(line => JSON.parse(line));
+  return { exit, result: events.at(-1), error: events.find(event => event.event === 'error') };
+ };
+ const succeeds = async origin => {
+  const { exit, result, error } = await run();
+  assert.equal(exit, 0, error?.message);
+  assert.equal(new URL(result.link).origin, origin);
+  assert.equal((await h.use(new URL(result.link).searchParams.get('token'))).status, 303);
+ };
+ await succeeds('https://fixture-production.fixture-account.workers.dev');
+ const statePath = join(h.root, '.rer/deploy/production.json');
+ const saved = JSON.parse(await readFile(statePath, 'utf8'));
+ saved.worker = 'synthetic-customer-app';
  saved.receipt.origin = 'https://app.customer.example';
- await writeFile(statePath, JSON.stringify(saved));
- const lines = (await h.signin()).lines.join('\n');
- assert.match(lines, /https:\/\/app\.customer\.example\/auth\/owner-signin\?token=/);
- assert.doesNotMatch(lines, /workers\.dev/);
+ const [oldName, database] = Object.entries(saved.owned.d1)[0];
+ saved.owned.d1 = { 'synthetic-customer-app-db': database };
+ h.provider.state.databases.find(row => row.name === oldName).name = 'synthetic-customer-app-db';
+ h.setLiveWorker(saved.worker);
+ const save = record => writeFile(statePath, JSON.stringify(record));
+ await save(saved);
+ // Native apps keep a separate, valid public-page Worker record with the same project/environment.
+ const page = { ...saved, worker: 'synthetic-customer-app-page', owned: { ...saved.owned, d1: {} }, receipt: { ...saved.receipt, origin: 'https://page.customer.example' } };
+ await writeFile(join(h.root, '.rer/deploy/production.page.json'), JSON.stringify(page));
+ h.requests.length = 0;
+ await succeeds(saved.receipt.origin);
+ assert.ok(h.requests.some(({ path }) => path.includes(`/workers/scripts/${saved.worker}/`)));
+ assert.ok(h.requests.every(({ path }) => !path.includes(page.worker)), 'the page record never supplies the signin target');
+ assert.ok(h.calls.some(sql => /^INSERT INTO oa_owner_signins/.test(sql)));
+ const grants = (await h.db.prepare('SELECT count(*) AS n FROM oa_owner_signins').first()).n;
+ const refuses = async (args, credentials, pattern) => {
+  h.calls.length = 0;
+  const result = await run(args, credentials);
+  assert.notEqual(result.exit, 0);
+  assert.equal(result.result.link, undefined);
+  assert.match(result.error.message, pattern);
+  assert.ok(h.calls.every(sql => /^SELECT\b/.test(sql)), 'refusal cannot write an owner grant');
+  assert.equal((await h.db.prepare('SELECT count(*) AS n FROM oa_owner_signins').first()).n, grants);
+ };
+ await refuses([], { ...h.credentials, CLOUDFLARE_ACCOUNT_ID: 'b'.repeat(32) }, /owner-state-target-mismatch/);
+ const declarationPath = join(h.root, 'deploy.json'), declaration = await readFile(declarationPath, 'utf8');
+ await writeFile(declarationPath, JSON.stringify({ ...JSON.parse(declaration), project: 'tests/another-app' }));
+ await refuses([], undefined, /owner-state-target-mismatch/);
+ await writeFile(declarationPath, declaration);
+ await writeFile(join(h.root, '.rer/deploy/staging.json'), JSON.stringify(saved));
+ await refuses(['--environment', 'staging'], undefined, /owner-state-target-mismatch/);
+ await rm(statePath);
+ await refuses([], undefined, /No deployment of the production environment/);
+ await save({ ...saved, receipt: null });
+ await refuses([], undefined, /no completed rer deployment/);
+ await save(saved);
+ // A hook may select the native app record as well; it still cannot turn a page into an auth app.
+ const hookPath = join(h.root, '.rer/deploy/production.hook.json');
+ await writeFile(hookPath, JSON.stringify({ state: '.rer/deploy/production.page.json' }));
+ h.setLiveWorker(page.worker);
+ await refuses([], undefined, /seed's own sign-in flow/);
+ await writeFile(hookPath, JSON.stringify({ state: '.rer/deploy/production.json' }));
+ h.setLiveWorker(saved.worker);
+ await succeeds(saved.receipt.origin);
+ const settings = h.provider.state.settings;
+ h.provider.state.settings = null;
+ // Account for the successful hook-selected grant when checking subsequent refusals.
+ h.calls.length = 0;
+ const missing = await run();
+ assert.equal(missing.exit, 4); assert.match(missing.error.message, /no longer the one this checkout deployed/);
+ assert.equal(h.calls.length, 0);
+ h.provider.state.settings = settings;
+ h.provider.foreign.replaceWorker();
+ const replaced = await run();
+ assert.equal(replaced.exit, 4); assert.match(replaced.error.message, /no longer the one this checkout deployed/);
+ assert.equal(h.calls.length, 0);
 });
