@@ -1,0 +1,96 @@
+QUEUED ticket=34545 job=20261115T125954018855Z-heavy-slot-c7a545e1
+ADMITTED slot=1 cap=3 load=5.35
+RESOLVED_SHA 3de4500376e9a7183e4c5443cd11805536edb202
+NODE v22.20.0; source=scripts/agent-bootstrap.sh:NODE_VERSION; TZ=UTC; provider credentials absent
+PACKAGE_MANAGER pnpm@10.12.4
+default-seed                             |  WARN  The field "pnpm.overrides" was found in /Users/m1-runner/rer-remote/jobs/20261115T125954Z-heavy-slot-c7a545e1/repo/default-seed/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+default-seed                             |  WARN  The field "pnpm.onlyBuiltDependencies" was found in /Users/m1-runner/rer-remote/jobs/20261115T125954Z-heavy-slot-c7a545e1/repo/default-seed/package.json. This will not take effect. You should configure "pnpm.onlyBuiltDependencies" at the root of the workspace instead.
+Scope: all 3 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +173
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 173, reused 173, downloaded 0, added 172
+Progress: resolved 173, reused 173, downloaded 0, added 173, done
+
+devDependencies:
++ ajv 8.20.0
++ ajv-formats 3.0.1
++ miniflare 5.20260907.0-alpha
++ ws 8.22.0
+
+Done in 5.6s using pnpm v10.12.4
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +26
+++++++++++++++++++++++++++
+Progress: resolved 26, reused 26, downloaded 0, added 26, done
+
+devDependencies:
++ miniflare 5.20260907.0-alpha
+
+Done in 362ms using pnpm v10.12.4
+PLAYWRIGHT Version 1.63.0; shared cache /Users/m1-runner/rer-remote/playwright
+PLAYWRIGHT_WARM 1.63.0; no install or download
+COMMAND_START nice=10
+TAP version 13
+# Subtest: business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors
+ok 1 - business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors
+  ---
+  duration_ms: 552.156834
+  type: 'test'
+  ...
+# Subtest: business run refuses unavailable authority without spawning or retrying and reports unconfirmed cleanup separately from the child exit
+ok 2 - business run refuses unavailable authority without spawning or retrying and reports unconfirmed cleanup separately from the child exit
+  ---
+  duration_ms: 461.77525
+  type: 'test'
+  ...
+# Subtest: business run forwards signals and enforces credential expiry, then revokes before exiting with the child signal
+ok 3 - business run forwards signals and enforces credential expiry, then revokes before exiting with the child signal
+  ---
+  duration_ms: 1500.921
+  type: 'test'
+  ...
+# Subtest: business run reaches the ordinary rer deploy dry-run child without live provider mutation
+ok 4 - business run reaches the ordinary rer deploy dry-run child without live provider mutation
+  ---
+  duration_ms: 7401.870042
+  type: 'test'
+  ...
+# (node:67228) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the public deploy dry run reaches offline seed hooks and reports unchecked providers with or without a hook
+ok 5 - the public deploy dry run reaches offline seed hooks and reports unchecked providers with or without a hook
+  ---
+  duration_ms: 3433.16975
+  type: 'test'
+  ...
+# Subtest: deploy dry run prints a local plan without credentials or provider access while deploy keeps its refusals
+ok 6 - deploy dry run prints a local plan without credentials or provider access while deploy keeps its refusals
+  ---
+  duration_ms: 5842.398167
+  type: 'test'
+  ...
+# Dry run: exit 0; deploy: complete (exit 0)\\nChecking pinned pnpm\\n10.12.4\\nWould deploy:\\n  Worker: synthetic-base-1-production\\n  D1 database: synthetic-base-1-production-db (1 declared migration)\\n  Secret inputs: 2 required, 1 optional\\n  Public settings: 3; scheduled triggers: 0\\n  Cloudflare token permissions: Workers Scripts: Edit, D1: Edit\\n  Pending migrations: unknown until the hosted databases are checked.\\nFull plan: repeat this command with --json. Redacted capture log: .seed/installer/install.log\\ndeploy: local dry run complete; no credentials were needed, no Cloudflare requests were made and nothing was changed remotely. Target secrets and remote readiness were not checked.\\nNeeded for a real deploy (this dry run went ahead without them):\\n  - CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN (Create an account API token at https://dash.cloudflare.com/profile/api-tokens with these account permissions: Workers Scripts: Edit, D1: Edit. Copy your account ID from the Cloudflare dashboard.)\\n  - FIXTURE_GOOGLE_ID\\n  - FIXTURE_GOOGLE_SECRET\\n
+# Real deploy: exit 3; CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required to deploy to your Cloudflare account. Nothing was deployed.\\nCreate an account API token at https://dash.cloudflare.com/profile/api-tokens with these account permissions: Workers Scripts: Edit, D1: Edit. Copy your account ID from the Cloudflare dashboard.\\nSet them in your environment or an owned 0600 --env-file, then run the same deploy command again.
+# Subtest: a dry run whose seed step stops on missing inputs prints its list once, then one failure and the same dry run to repeat
+ok 7 - a dry run whose seed step stops on missing inputs prints its list once, then one failure and the same dry run to repeat
+  ---
+  duration_ms: 1280.965292
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 10642.11875
+
+> @run-edit-run/default-seed-reference@0.1.0 typecheck /Users/m1-runner/rer-remote/jobs/20261115T125954Z-heavy-slot-c7a545e1/repo/default-seed
+> tsc --build --incremental
+
+RESULT exit=0 wall_seconds=38.421 command_seconds=15.31 retained=False

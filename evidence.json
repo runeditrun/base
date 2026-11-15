@@ -49,22 +49,64 @@
       "sha256": "2d1ab14a73a96d47748fb313640d30566b085da1dae34ce1d0ff88be1faa4782"
     },
     {
-      "blob": "1fa6915b9db9e7fd95338b05433295e2a0c53370",
-      "bytes": 2260,
-      "path": "PLAN.md",
-      "sha256": "1749fc05bb5c1d04c018e4314f97493c0682f5bc309cbf7707c7d7d7d6824589"
+      "blob": "ad2056c339b5157eda9d2d2b10f17e01bfdfe678",
+      "bytes": 855,
+      "path": "20261115T125954018855Z-heavy-slot-c7a545e1.json",
+      "sha256": "b250132ff47e2adb43fe3e54c90f45308c9e422c81d5747b927dd74c30f428d4"
     },
     {
-      "blob": "a40ce8cf299ad406482cebe9e14fcf311ed4a383",
-      "bytes": 13334,
+      "blob": "c99ab1ad41290908450d17560471b055260acddc",
+      "bytes": 6031,
+      "path": "20261115T125954018855Z-heavy-slot-c7a545e1.log",
+      "sha256": "e4640fd2931bc8ae5544f847b708aef89ce96e85faf56db579969ea5c3dc4639"
+    },
+    {
+      "blob": "5ef5651feb18b99d055b0176ea48bea6aa973be8",
+      "bytes": 2948,
+      "path": "PLAN.md",
+      "sha256": "bd1e9995e34b76cc9c05977c189e36d7ad7d68c80f0eeddf94b6a9d0f86918ce"
+    },
+    {
+      "blob": "dc4850f226edb1b6fa9869d914909e7ab4807b0e",
+      "bytes": 15699,
       "path": "REPORT.md",
-      "sha256": "5aa75f2d727281a5ec4d2a14bb8201186013a554dba1d0c34e81f8b790d10ac6"
+      "sha256": "fd452670f72768f8f0276b04a5fd27b22da96c3987700df1ba9a30c184978561"
     },
     {
       "blob": "c694d39441bc8d8a72e3efeba8fdd9c5c66e971b",
       "bytes": 245,
       "path": "base-ci-wait.log",
       "sha256": "d1b13ec62455289eb13e4cb43733a24baba3692ef4084d40577bc6e48f472158"
+    },
+    {
+      "blob": "79ad4127c6bde986760f269e7ac3684480dd6752",
+      "bytes": 327,
+      "path": "base-final-ci-wait.log",
+      "sha256": "236e9424906f486fd7c17209be9b5a16f43fe4ba26ecda61fc2ae84253a52d66"
+    },
+    {
+      "blob": "a81f30e6e7fb5f5db0cbaf4521d0594b06d86774",
+      "bytes": 1280,
+      "path": "base-final-paths.txt",
+      "sha256": "4896dc485872b589f8108e0454aa05b3358d0f5f12fd02525007f5d2b3275a38"
+    },
+    {
+      "blob": "879d3e0d4ac21a9e1a15c11b816370829b9f1904",
+      "bytes": 1108882,
+      "path": "base-final-publication-scan.log",
+      "sha256": "5bfe0fe9a2c273a301b11148b504e1758514cef97238c0e573dfa94a8a3f13fa"
+    },
+    {
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "path": "base-integration-export.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "blob": "83bbc31987f4229c483e91eba548447aa86734f4",
+      "bytes": 6515,
+      "path": "base-integration-tests.log",
+      "sha256": "4c9c6319f2232b393e1c08093e56752536f5e931bce98b656afcde7697dd7d29"
     },
     {
       "blob": "6264181c4db567ea8b869972c17f5aff838610f0",
@@ -86,7 +128,7 @@
     }
   ],
   "product_branch": "cloud/bz-connect-agent-run-1",
-  "product_head": "1d23121833d9c5d5aa3a880dc55878d8660ecbc5",
+  "product_head": "3de4500376e9a7183e4c5443cd11805536edb202",
   "ref": "refs/heads/evidence/bz-connect-agent-run-1",
   "repository": "runeditrun/base",
   "schema": 1,
