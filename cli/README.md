@@ -658,6 +658,51 @@ other hosting is refused (`existing_demo_hosting_differs`). Errors print a named
 `{code}` to stderr and exit 1. This command does not pair the computer or use
 its stored device credential.
 
+## Agent verbs
+
+An outside agent acts on a company's installed apps through the Business MCP
+without a browser. The computer must be paired first (`rer business connect`).
+`rer business FAMILY VERB [--flags] [--json]` calls the tool `FAMILY.VERB`:
+
+```sh
+rer business installations list
+rer business change request --app INSTALLATION_ID "Make the header blue" --wait --publish
+rer business update follow INSTALLATION_ID --wait
+rer business domain attach --app INSTALLATION_ID --surface app --hostname help.example.com
+rer business tools                  # every tool the server offers
+rer business call installation.status --installation-id INSTALLATION_ID
+```
+
+Families: `installations`, `installation`, `change`, `update`, `domain`, `import`,
+`plan`, `profile` (`business.profile.set`) and `app`; `rer business --help` lists
+each verb. They share one table in `cli/business/agent-table.mjs`, one row per
+tool: a new tool needs one row, or no row at all with `rer business call TOOL`.
+
+- Flags become the tool's arguments (kebab-case to snake_case); `--app` is
+  `--installation-id`. Free words fill the verb's main argument (`change request`
+  takes them as `intent`; the others take one identifier). A value starting with
+  `{` or `[` is sent as JSON, `@FILE` reads a file and `--args JSON` gives the whole
+  arguments object. Arguments are closed objects: the server refuses an unknown one.
+- Output is a few plain lines. `--json` prints the tool's `structuredContent`
+  alone on stdout; progress goes to stderr.
+- `--wait` follows `change request`, `change follow` and `update follow` to their
+  end, polling every 15 seconds (`--interval SECONDS`) for at most `--timeout
+  SECONDS` (default 1800), and prints each state change. It stops when the server's
+  `next` is `publish`, `done` or `ask_owner`, or the state is `failed` or `refused`.
+  `--publish` (on `change request` and `change follow`) then calls `change.publish`
+  and waits for `live`.
+- Exit codes: 0 done; 1 refused or failed, with the server's message on stderr (an
+  action the owner has not granted this computer names where the owner grants it:
+  Business, under Computers); 2 usage; 3 `not_built` ("not built yet"); 75 still
+  working when `--timeout` ran out.
+
+`rer business mcp` runs a local stdio MCP server (newline-delimited JSON-RPC,
+revision 2025-11-25) that forwards `initialize`, `tools/*` and `resources/*` to the
+Business MCP. It mints the short-lived bearer from the paired device credential,
+mints it again within 30 seconds of expiry and once on a 401, and writes only
+protocol messages to stdout. An MCP-native agent adds it as a stdio server and
+never handles a token: `claude mcp add business -- rer business mcp`.
+
 ## Sync agent contract clauses
 
 `rer door clauses --write` synchronizes Base's thirteen shared agent duties
