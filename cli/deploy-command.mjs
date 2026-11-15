@@ -129,7 +129,7 @@ export async function deployCommand(context) {
  const redaction = createRedaction();
  const kinds = await settingKinds({ declaration, setupManifest });
  const addSecret = value => { redaction.addSecrets([value]); store.addSecrets?.([value]); };
- for (const value of [...kinds.privateValues(env), env.CLOUDFLARE_ACCOUNT_ID, ...(declaration.secrets ?? []).map(item => env[item.environment])].filter(Boolean)) addSecret(value);
+ for (const value of kinds.privateValues(env)) addSecret(value);
  const environment = options.environment ?? 'production';
  // The hook uploads every value it is given: a generated secret it gets is the one the Worker keeps.
  if (!options.dryRun) await keepHookSecrets({ root, environment, declaration, setupManifest, env, generated, reused, rotated, again: deployAgain(options), report: (line, more) => store.report(line, more) });

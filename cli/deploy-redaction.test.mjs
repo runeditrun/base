@@ -13,7 +13,7 @@ import { main as ownerKit } from '../modules/deploy-kit/owner-cli.mjs';
 // The deploy door with the real owner kit; only Cloudflare and the app's claim
 // endpoint are fake. The hook says what it was given in its own output, as a
 // seed's build and deploy hooks do. Values are random so a leak cannot match by chance.
-async function checkout(t, { publicSettings = ['APP_HOST'] } = {}) {
+async function checkout(t, { publicSettings = ['APP_HOST'], setupFields = [] } = {}) {
  const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-deploy-redaction-')));
  const saved = { ...process.env };
  t.after(async () => { for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key]; Object.assign(process.env, saved); await rm(root, { recursive: true, force: true }); });
@@ -53,10 +53,12 @@ async function checkout(t, { publicSettings = ['APP_HOST'] } = {}) {
  t.mock.method(process.stderr, 'write', chunk => { output.push(String(chunk)); return true; });
  const adapter = { settings: [], run: async () => {}, deployDeclaration: 'deploy.json', hooks: { owner: {} } };
  adapter.deploy = async ({ options, store }) => {
+  store.report(`MAIL_PROVIDER=${process.env.MAIL_PROVIDER}; REGION=${process.env.REGION_INPUT}; PRIVATE_INPUT=${process.env.PRIVATE_INPUT}; API_CREDENTIAL=${process.env.API_CREDENTIAL}`);
   store.report(`hook sees mail key ${process.env.MAIL_API_KEY}, sender ${process.env.MAIL_FROM}, host ${process.env.APP_HOST}, region ${process.env.TEAM_REGION}`);
+  if (options.dryRun) return ownerKit(['local-plan', '--declaration', 'deploy.json', '--environment', options.environment ?? 'production'], process.env, { cwd: root });
   return { deployed: true, ...(await ownerKit(['deploy', '--declaration', 'deploy.json', '--environment', options.environment ?? 'production'], process.env, { cwd: root })) };
  };
- const manifest = { steps: [{ type: 'owner-claim', mode: 'signed', path: '/auth/owner-claim', emailField: 'OWNER_EMAIL', tokenField: 'SETUP_TOKEN' }], fields: ['SESSION_SECRET', 'SETUP_TOKEN'].map(name => ({ name, kind: 'secret', generate: 'hex' })) };
+ const manifest = { steps: [{ type: 'owner-claim', mode: 'signed', path: '/auth/owner-claim', emailField: 'OWNER_EMAIL', tokenField: 'SETUP_TOKEN' }], fields: [...['SESSION_SECRET', 'SETUP_TOKEN'].map(name => ({ name, kind: 'secret', generate: 'hex' })), ...setupFields] };
  const run = async (options = {}) => {
   output.length = 0;
   const out = { progress: line => output.push(line), event: (event, details) => output.push(JSON.stringify({ event, ...details })), human: line => output.push(line) };
@@ -110,4 +112,34 @@ test('declaring an --env-file setting as non-secret prints it; a declared secret
  await f.writeDeclaration({ publicSettings: ['lowercase'] });
  f.git('commit', '-qam', 'invalid public setting');
  await assert.rejects(f.run({}), /invalid-public-settings/);
+});
+
+test('deploy dry-run output shows public selections across plain vars and secret transport while masking private and credential-shaped values', async t => {
+ const f = await checkout(t, { publicSettings: ['APP_HOST', 'REGION'], setupFields: [{ name: 'MAIL_PROVIDER', kind: 'select' }] });
+ const key = ['sk', 'test', 'synthetic', 'base', 'credential'].join('_');
+ const privateValue = 'synthetic-base-private-input';
+ const apiCredential = ['sk', 'test', 'synthetic', 'base', 'separate'].join('_');
+ const mapped = [
+  { binding: 'MAIL_PROVIDER', environment: 'MAIL_PROVIDER', optional: true },
+  { binding: 'REGION', environment: 'REGION_INPUT', optional: true },
+  { binding: 'PRIVATE_INPUT', environment: 'PRIVATE_INPUT', optional: true },
+  { binding: 'API_CREDENTIAL', environment: 'API_CREDENTIAL', optional: true },
+ ];
+ for (const transport of ['vars', 'secrets']) {
+  await f.writeDeclaration({ vars: transport === 'vars' ? { MAIL_PROVIDER: 'none', REGION: 'eu' } : {}, secrets: mapped.filter(item => transport === 'secrets' || !['MAIL_PROVIDER', 'REGION'].includes(item.binding)) });
+  for (const provider of ['none', 'mailgun', key]) {
+   await f.writeEnv({ MAIL_PROVIDER: provider, REGION_INPUT: 'eu', PRIVATE_INPUT: privateValue, MAIL_API_KEY: '', API_CREDENTIAL: apiCredential });
+   const before = f.provider.state.calls.length;
+   await f.run({ dryRun: true });
+   const text = f.output.join('');
+   const expected = provider === key ? '[REDACTED]' : provider;
+   assert.ok(text.includes(`MAIL_PROVIDER=${expected};`), `${transport}: ${provider === key ? 'credential' : provider}: ${text}`);
+   if (transport === 'secrets') assert.ok(text.includes('REGION=eu;'), 'public classification follows environment aliases');
+   assert.ok(text.includes('PRIVATE_INPUT=[REDACTED]'), 'an unshaped declared secret stays private');
+   assert.ok(!text.includes(key) && !text.includes(apiCredential) && !text.includes(privateValue), 'private bytes stay out of output');
+   assert.equal(f.provider.state.calls.length, before, 'dry run makes no provider call');
+   const files = await f.files();
+   assert.ok(!files.includes(key) && !files.includes(apiCredential) && !files.includes(privateValue), 'capture logs contain no private bytes');
+  }
+ }
 });

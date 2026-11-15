@@ -3,24 +3,30 @@ import { shared } from './shared.mjs';
 // What a deployment's declaration says each value is. A value prints in full only
 // when the declaration names it a non-secret setting: a declared var, the origin
 // variable and its setting, a setup field that is not a secret, or a name in
-// "publicSettings". Anything the declaration calls a secret, any credential-named
-// key and any other --env-file value stays redacted.
+// "publicSettings". Secret transport alone does not make an explicitly public
+// setting private. Credential bindings, private setup fields and undeclared
+// --env-file values stay redacted.
 const PRIVATE_KEYS = ['CLOUDFLARE_ACCOUNT_ID'];
 
 export async function settingKinds({ declaration = {}, setupManifest } = {}) {
- const { credentialName, credentialUrl, credentialValues } = await shared('redaction.mjs');
+ const { credentialName, credentialValue, credentialValues } = await shared('redaction.mjs');
  const secrets = Array.isArray(declaration.secrets) ? declaration.secrets : [];
  const names = list => (Array.isArray(list) ? list : []).filter(name => typeof name === 'string');
  const fields = Array.isArray(setupManifest?.fields) ? setupManifest.fields : [];
- const secret = new Set([...PRIVATE_KEYS, ...secrets.flatMap(item => [item?.binding, item?.environment]), ...fields.filter(field => field?.kind === 'secret').map(field => field.name)].filter(Boolean));
- const open = new Set([...Object.keys(declaration.vars ?? {}), declaration.originVar, declaration.publicOriginSetting, ...names(declaration.publicSettings), ...fields.filter(field => field?.kind !== 'secret').map(field => field?.name)].filter(name => name && !secret.has(name)));
- // A declared setting is exempt from the key-name heuristic (AUTH_ORIGIN is a
- // name, not a credential), never when its value carries credentials itself.
- const shown = (key, value) => open.has(key) && typeof value === 'string' && !credentialUrl(value);
+ const privateFields = new Set([...PRIVATE_KEYS, ...fields.filter(field => field?.kind === 'secret').map(field => field.name)]);
+ // Select fields describe public choices. Other transported inputs need an
+ // explicit publicSettings declaration; an owner email is still private.
+ const publicTransport = new Set([...names(declaration.publicSettings), ...fields.filter(field => field?.kind === 'select').map(field => field.name)]);
+ const publicBindings = secrets.filter(item => publicTransport.has(item?.binding) &&
+  [item.binding, item.environment].every(name => name && !privateFields.has(name) && !credentialName(name)));
+ const secret = new Set([...privateFields, ...secrets.filter(item => !publicBindings.includes(item)).flatMap(item => [item?.binding, item?.environment])].filter(Boolean));
+ const open = new Set([...Object.keys(declaration.vars ?? {}), declaration.originVar, declaration.publicOriginSetting, ...names(declaration.publicSettings), ...fields.filter(field => field?.kind !== 'secret').map(field => field?.name), ...publicBindings.flatMap(item => [item.binding, item.environment])].filter(name => name && !secret.has(name)));
+ // Public names never exempt a credential-shaped value from masking.
+ const shown = (key, value) => open.has(key) && typeof value === 'string' && !credentialValue(value);
  return {
   shown,
   // The values to keep out of output, from every key that is not shown.
-  privateValues: env => Object.entries(env).flatMap(([key, value]) => typeof value !== 'string' || shown(key, value) ? [] : secret.has(key) ? (value ? [value] : []) : credentialValues({ [key]: value })),
+  privateValues: env => Object.entries(env).flatMap(([key, value]) => typeof value !== 'string' || shown(key, value) ? [] : (secret.has(key) || credentialValue(value)) ? (value ? [value] : []) : credentialValues({ [key]: value })),
   // Keys the deploy hides by default and the person may declare.
   undeclared: keys => keys.filter(key => !open.has(key) && !secret.has(key) && !credentialName(key)),
  };
