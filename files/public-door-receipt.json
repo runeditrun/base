@@ -1,0 +1,269 @@
+{
+  "source": "eb290f0dfb493d5c696533393ef1cf047cf41d2e",
+  "stamp": "2026-11-15T07:52:02.394Z",
+  "rows": [
+    {
+      "label": "before-unchanged-journey",
+      "command": "node scripts/rer.mjs deploy --dry-run --env-file .rer/public-door/inputs.env --owner-name Morgan Ellis --non-interactive --json",
+      "exit": 1,
+      "errors": [
+        {
+          "code": "command_failed",
+          "message": "Deploy failed at prepare deploy: invalid-public-variable.\nResources created this attempt: none.\nFix the cause, then run rer deploy --environment production --env-file .rer/public-door/inputs.env --cwd . --dry-run again: it continues with what was created. To delete what this environment created instead: rer deploy --environment production --env-file .rer/public-door/inputs.env --cwd . --dry-run --remove --yes."
+        }
+      ],
+      "result": {
+        "version": 1,
+        "verb": "deploy",
+        "event": "result",
+        "ok": false,
+        "exitCode": 1
+      },
+      "providerCredentialsSupplied": false
+    },
+    {
+      "label": "after-declared-sender-input",
+      "command": "node scripts/rer.mjs deploy --dry-run --env-file .rer/public-door/inputs.env --owner-name Morgan Ellis --non-interactive --json",
+      "exit": 0,
+      "errors": [],
+      "result": {
+        "version": 1,
+        "verb": "deploy",
+        "event": "result",
+        "ok": true,
+        "exitCode": 0,
+        "dryRun": true,
+        "deployed": false,
+        "providerChecked": false,
+        "plan": {
+          "worker": "foundation-production",
+          "d1": [
+            {
+              "binding": "DB",
+              "name": "foundation-production-db",
+              "migrations": [
+                "0001_owner.sql",
+                "0002_outbox.sql",
+                "0003_portability.sql",
+                "0004_first_run.sql",
+                "0005_identity_providers.sql",
+                "0005_notes.sql",
+                "0006_provider_control.sql",
+                "0007_dependencies.sql",
+                "0008_owner_claim.sql",
+                "0009_idp_owner.sql",
+                "0010_provider_pins.sql",
+                "0011_dependency_setup.sql",
+                "0012_dependency_approval.sql",
+                "0013_erasure.sql",
+                "0014_owner_signin.sql",
+                "0015_command_receipts.sql",
+                "0016_sealing.sql"
+              ]
+            }
+          ],
+          "r2": [],
+          "kv": [],
+          "queues": [],
+          "durableObjects": [],
+          "services": [],
+          "secrets": [
+            {
+              "binding": "OWNER_EMAIL",
+              "optional": false
+            },
+            {
+              "binding": "SESSION_SECRET",
+              "optional": false
+            },
+            {
+              "binding": "INSTALLATION_KEY",
+              "optional": false
+            },
+            {
+              "binding": "INSTALLATION_KEY_PREVIOUS",
+              "optional": true
+            },
+            {
+              "binding": "SETUP_TOKEN",
+              "optional": false
+            },
+            {
+              "binding": "MAIL_PROVIDER",
+              "optional": true
+            },
+            {
+              "binding": "MAIL_FROM",
+              "optional": true
+            },
+            {
+              "binding": "MAIL_API_KEY",
+              "optional": true
+            }
+          ],
+          "vars": [
+            "AUTH_LOCAL",
+            "AUTH_ORIGIN"
+          ],
+          "crons": []
+        },
+        "neededForRealDeploy": [
+          "CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN (Create an account API token at https://dash.cloudflare.com/profile/api-tokens with these account permissions: Workers Scripts: Edit, D1: Edit. Copy your account ID from the Cloudflare dashboard.)",
+          "OWNER_EMAIL",
+          "production sign-in mail: MAIL_PROVIDER (resend, sendgrid, cloudflare or rer), MAIL_API_KEY, or an approved Auth SSO install"
+        ]
+      },
+      "providerCredentialsSupplied": false
+    },
+    {
+      "label": "explicit-mail-off",
+      "command": "node scripts/rer.mjs deploy --dry-run --env-file .rer/public-door/inputs.env --owner-name Morgan Ellis --non-interactive --json",
+      "exit": 0,
+      "errors": [],
+      "result": {
+        "version": 1,
+        "verb": "deploy",
+        "event": "result",
+        "ok": true,
+        "exitCode": 0,
+        "dryRun": true,
+        "deployed": false,
+        "providerChecked": false,
+        "plan": {
+          "worker": "foundation-production",
+          "d1": [
+            {
+              "binding": "DB",
+              "name": "foundation-production-db",
+              "migrations": [
+                "0001_owner.sql",
+                "0002_outbox.sql",
+                "0003_portability.sql",
+                "0004_first_run.sql",
+                "0005_identity_providers.sql",
+                "0005_notes.sql",
+                "0006_provider_control.sql",
+                "0007_dependencies.sql",
+                "0008_owner_claim.sql",
+                "0009_idp_owner.sql",
+                "0010_provider_pins.sql",
+                "0011_dependency_setup.sql",
+                "0012_dependency_approval.sql",
+                "0013_erasure.sql",
+                "0014_owner_signin.sql",
+                "0015_command_receipts.sql",
+                "0016_sealing.sql"
+              ]
+            }
+          ],
+          "r2": [],
+          "kv": [],
+          "queues": [],
+          "durableObjects": [],
+          "services": [],
+          "secrets": [
+            {
+              "binding": "OWNER_EMAIL",
+              "optional": false
+            },
+            {
+              "binding": "SESSION_SECRET",
+              "optional": false
+            },
+            {
+              "binding": "INSTALLATION_KEY",
+              "optional": false
+            },
+            {
+              "binding": "INSTALLATION_KEY_PREVIOUS",
+              "optional": true
+            },
+            {
+              "binding": "SETUP_TOKEN",
+              "optional": false
+            },
+            {
+              "binding": "MAIL_PROVIDER",
+              "optional": true
+            },
+            {
+              "binding": "MAIL_FROM",
+              "optional": true
+            },
+            {
+              "binding": "MAIL_API_KEY",
+              "optional": true
+            }
+          ],
+          "vars": [
+            "AUTH_LOCAL",
+            "AUTH_ORIGIN"
+          ],
+          "crons": []
+        },
+        "neededForRealDeploy": [
+          "CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN (Create an account API token at https://dash.cloudflare.com/profile/api-tokens with these account permissions: Workers Scripts: Edit, D1: Edit. Copy your account ID from the Cloudflare dashboard.)",
+          "OWNER_EMAIL"
+        ]
+      },
+      "providerCredentialsSupplied": false
+    },
+    {
+      "label": "enabled-provider-missing-credential",
+      "command": "node scripts/rer.mjs deploy --env-file .rer/public-door/inputs.env --owner-name Morgan Ellis --non-interactive --json",
+      "exit": 4,
+      "errors": [
+        {
+          "code": "safety_refusal",
+          "message": "Production sign-in is not configured. Configure outbound email; missing or invalid: MAIL_API_KEY (or [REDACTED]_API_KEY). Or select and approve an Auth SSO install through the declared oidc-provider@1 setup dependency. Local dev and demo use automatic RER_OPEN sign-in. Nothing was built or uploaded."
+        }
+      ],
+      "result": {
+        "version": 1,
+        "verb": "deploy",
+        "event": "result",
+        "ok": false,
+        "exitCode": 4
+      },
+      "providerCredentialsSupplied": false
+    },
+    {
+      "label": "mail-off-with-credential",
+      "command": "node scripts/rer.mjs deploy --env-file .rer/public-door/inputs.env --owner-name Morgan Ellis --non-interactive --json",
+      "exit": 4,
+      "errors": [
+        {
+          "code": "safety_refusal",
+          "message": "MAIL_PROVIDER=[REDACTED] turns outbound email off, and MAIL_API_KEY would bind a way to send. Remove it or choose a mail provider. Nothing was built or uploaded."
+        }
+      ],
+      "result": {
+        "version": 1,
+        "verb": "deploy",
+        "event": "result",
+        "ok": false,
+        "exitCode": 4
+      },
+      "providerCredentialsSupplied": false
+    },
+    {
+      "label": "invalid-public-variable-still-refused",
+      "command": "node scripts/rer.mjs deploy --dry-run --env-file .rer/public-door/inputs.env --owner-name Morgan Ellis --non-interactive --json",
+      "exit": 1,
+      "errors": [
+        {
+          "code": "command_failed",
+          "message": "Deploy failed at prepare deploy: invalid-public-variable.\nResources created this attempt: [REDACTED].\nFix the cause, then run rer deploy --environment production --env-file .rer/public-door/inputs.env --cwd . --dry-run again: it continues with what was created. To delete what this environment created instead: rer deploy --environment production --env-file .rer/public-door/inputs.env --cwd . --dry-run --remove --yes."
+        }
+      ],
+      "result": {
+        "version": 1,
+        "verb": "deploy",
+        "event": "result",
+        "ok": false,
+        "exitCode": 1
+      },
+      "providerCredentialsSupplied": false
+    }
+  ]
+}

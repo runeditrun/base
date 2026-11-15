@@ -1,0 +1,17 @@
+{
+  "repository": "runeditrun/base",
+  "branch": "cloud/gr-base-public-variable-fix-1",
+  "head": "ab89bea760f0be8a708a056a5c6ae611b5e09abd",
+  "tree": "8fb6f5531826668b13140691e6ebd6dd12185391",
+  "base": "eb290f0dfb493d5c696533393ef1cf047cf41d2e",
+  "shallow": "false",
+  "status": "",
+  "stamp": "2026-11-15T07:55:27Z",
+  "author": "Run Edit Run fleet <fleet@runeditrun.com>",
+  "committer": "Run Edit Run fleet <fleet@runeditrun.com>",
+  "trailers": "",
+  "changed_paths": [
+    "cli/deploy-mail-binding.test.mjs",
+    "cli/reference-journey.test.mjs"
+  ]
+}

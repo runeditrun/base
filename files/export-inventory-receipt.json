@@ -1,0 +1,9 @@
+{
+  "head": "ab89bea760f0be8a708a056a5c6ae611b5e09abd",
+  "changedFiles": [
+    "cli/deploy-mail-binding.test.mjs",
+    "cli/reference-journey.test.mjs"
+  ],
+  "changedExportSources": [],
+  "regenerationNeeded": false
+}

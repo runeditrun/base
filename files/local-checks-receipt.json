@@ -1,0 +1,13 @@
+{
+  "head": "ab89bea760f0be8a708a056a5c6ae611b5e09abd",
+  "checks": [
+    {"command": "node --test --test-concurrency=1 cli/deploy-mail-binding.test.mjs cli/production-auth.test.mjs", "exit": 0, "tests": 10, "pass": 10, "fail": 0, "skipped": 0, "log": "targeted-tests.log"},
+    {"command": "pnpm --dir default-seed run typecheck", "exit": 0, "log": "typecheck.log"},
+    {"command": "git diff --check", "exit": 0},
+    {"command": "node packet/public-door-probe.mjs BASE PACKET", "exit": 0, "source": "eb290f0dfb493d5c696533393ef1cf047cf41d2e", "cases": 6, "receipt": "public-door-receipt.json"}
+  ],
+  "affected_test_registrations_before": 14,
+  "affected_test_registrations_after": 14,
+  "clauses_changed": 0,
+  "runtime_files_changed": 0
+}

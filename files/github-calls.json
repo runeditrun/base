@@ -1,0 +1,160 @@
+[
+  {
+    "number": 1,
+    "purpose": "create-pr",
+    "destination": "pr-receipt.json",
+    "time": 1794729602.3479803,
+    "stamp": "2026-11-15T08:00:02.347985+00:00",
+    "command": [
+      "gh",
+      "api",
+      "--method",
+      "POST",
+      "repos/runeditrun/base/pulls",
+      "--input",
+      "../packet/pr-request.json",
+      "--jq",
+      "{number,html_url,head:{sha:.head.sha,ref:.head.ref},base:{sha:.base.sha,ref:.base.ref}}"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 2,
+    "purpose": "discover",
+    "destination": "ci-discovery-initial.json",
+    "time": 1794729605.8289475,
+    "stamp": "2026-11-15T08:00:05.828952+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs?head_sha=ab89bea760f0be8a708a056a5c6ae611b5e09abd&per_page=100",
+      "--jq",
+      "{total_count,workflow_runs:[.workflow_runs[]|{id,name,event,status,conclusion,head_sha,html_url,created_at}]}"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 3,
+    "purpose": "dispatch-journeys",
+    "destination": "journeys-dispatch.json",
+    "time": 1794729606.3404534,
+    "stamp": "2026-11-15T08:00:06.340486+00:00",
+    "command": [
+      "gh",
+      "api",
+      "--method",
+      "POST",
+      "repos/runeditrun/base/actions/workflows/verify.yml/dispatches",
+      "-f",
+      "ref=cloud/gr-base-public-variable-fix-1",
+      "-F",
+      "inputs[journeys]=true"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 4,
+    "purpose": "discover",
+    "destination": "ci-discovery.json",
+    "time": 1794729906.8556907,
+    "stamp": "2026-11-15T08:05:06.855695+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs?head_sha=ab89bea760f0be8a708a056a5c6ae611b5e09abd&per_page=100",
+      "--jq",
+      "{total_count,workflow_runs:[.workflow_runs[]|{id,name,event,status,conclusion,head_sha,html_url,created_at}]}"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 5,
+    "purpose": "observe",
+    "destination": "ci-ordinary.json",
+    "time": 1794730207.8865814,
+    "stamp": "2026-11-15T08:10:07.886586+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/43692435308",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 6,
+    "purpose": "observe",
+    "destination": "ci-journeys.json",
+    "time": 1794730208.5571744,
+    "stamp": "2026-11-15T08:10:08.557178+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/43692435119",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 7,
+    "purpose": "observe",
+    "destination": "ci-ordinary.json",
+    "time": 1794730809.5911145,
+    "stamp": "2026-11-15T08:20:09.591118+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/43692435308",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 8,
+    "purpose": "observe",
+    "destination": "ci-journeys.json",
+    "time": 1794730810.2188134,
+    "stamp": "2026-11-15T08:20:10.218817+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/43692435119",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 9,
+    "purpose": "observe",
+    "destination": "ci-ordinary.json",
+    "time": 1794731111.2594507,
+    "stamp": "2026-11-15T08:25:11.259455+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/43692435308",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  },
+  {
+    "number": 10,
+    "purpose": "observe",
+    "destination": "ci-journeys.json",
+    "time": 1794731111.854872,
+    "stamp": "2026-11-15T08:25:11.854878+00:00",
+    "command": [
+      "gh",
+      "api",
+      "repos/runeditrun/base/actions/runs/43692435119",
+      "--jq",
+      "{status,conclusion,head_sha,html_url}"
+    ],
+    "exit": 0
+  }
+]

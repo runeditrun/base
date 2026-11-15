@@ -1,0 +1,14 @@
+{
+  "scan_status": "FAIL",
+  "complete": true,
+  "head": "ab89bea760f0be8a708a056a5c6ae611b5e09abd",
+  "tree": "8fb6f5531826668b13140691e6ebd6dd12185391",
+  "history_commits": 1632,
+  "findings": 166,
+  "rule_counts": {
+    "SEC-3": 166
+  },
+  "all_finding_blobs_reachable_from_origin_main": true,
+  "finding_blobs_absent_from_origin_main": [],
+  "working_tree_findings": 0
+}

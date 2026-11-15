@@ -1,0 +1,123 @@
+TAP version 13
+# (node:9134) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Checking pinned pnpm
+# 10.12.4
+# Checking pinned pnpm
+# 10.12.4
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+# Subtest: rer deploy accepts the declared adapter mail credential and preserves its environment mapping
+    # Subtest: sendgrid
+    ok 1 - sendgrid
+      ---
+      duration_ms: 1580.60344
+      type: 'test'
+      ...
+# Checking pinned pnpm
+# 10.12.4
+# Checking pinned pnpm
+# 10.12.4
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+    # Subtest: resend
+    ok 2 - resend
+      ---
+      duration_ms: 1185.846044
+      type: 'test'
+      ...
+    1..2
+ok 1 - rer deploy accepts the declared adapter mail credential and preserves its environment mapping
+  ---
+  duration_ms: 2767.401366
+  type: 'test'
+  ...
+# Subtest: public deploy dry-run accepts reserved fixture senders while real deploy preserves sender refusals
+ok 2 - public deploy dry-run accepts reserved fixture senders while real deploy preserves sender refusals
+  ---
+  duration_ms: 15416.569661
+  type: 'test'
+  ...
+# Human fixture dry run: exit 0; deploy: complete (exit 0)\\nChecking pinned pnpm\\n10.12.4\\nWould deploy:\\n  Worker: fixture-production\\n  D1 databases: none\\n  R2 storage: fixture-production-files\\n  Secret inputs: 0 required, 0 optional\\n  Public settings: 3; scheduled triggers: 0\\n  Cloudflare token permissions: Workers Scripts: Edit, Workers R2 Storage: Edit\\n  Pending migrations: unknown until the hosted databases are checked.\\nFull plan: repeat this command with --json. Redacted capture log: .seed/installer/install.log\\ndeploy: local dry run complete; no credentials were needed, no Cloudflare requests were made and nothing was changed remotely. Target secrets and remote readiness were not checked.\\nNeeded for a real deploy (this dry run went ahead without them):\\n  - CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN (Create an account API token at https://dash.cloudflare.com/profile/api-tokens with these account permissions: Workers Scripts: Edit, Workers R2 Storage: Edit. Copy your account ID from the Cloudflare dashboard.)\\n  - production sign-in mail: MAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>). Edit vars.MAIL_FROM in deploy.json, then run rer deploy --dry-run again.\\nReal deploy: exit 4; deploy: failed (exit 4)\\nChecking pinned pnpm\\n10.12.4\\nMAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>). Edit vars.MAIL_FROM in deploy.json, then run rer deploy --dry-run again. Nothing was built or uploaded.\\n
+# JSON fixture dry run: exit 0; {"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"dryRun":true,"deployed":false,"providerChecked":false,"plan":{"worker":"fixture-production","d1":[],"r2":[{"binding":"FILES","name":"fixture-production-files"}],"kv":[],"queues":[],"durableObjects":[],"services":[],"secrets":[],"vars":["MAIL_PROVIDER","MAIL_FROM","MAIL_API_KEY"],"crons":[]},"neededForRealDeploy":["CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN (Create an account API token at https://dash.cloudflare.com/profile/api-tokens with these account permissions: Workers Scripts: Edit, Workers R2 Storage: Edit. Copy your account ID from the Cloudflare dashboard.)","production sign-in mail: MAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>). Edit vars.MAIL_FROM in deploy.json, then run rer deploy --dry-run again."]}\\nChecking pinned pnpm\\n10.12.4\\nWould deploy:\\n  Worker: fixture-production\\n  D1 databases: none\\n  R2 storage: fixture-production-files\\n  Secret inputs: 0 required, 0 optional\\n  Public settings: 3; scheduled triggers: 0\\n  Cloudflare token permissions: Workers Scripts: Edit, Workers R2 Storage: Edit\\n  Pending migrations: unknown until the hosted databases are checked.\\nFull plan: repeat this command with --json. Redacted capture log: .seed/installer/install.log\\ndeploy: local dry run complete; no credentials were needed, no Cloudflare requests were made and nothing was changed remotely. Target secrets and remote readiness were not checked.\\nNeeded for a real deploy (this dry run went ahead without them):\\n  - CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN (Create an account API token at https://dash.cloudflare.com/profile/api-tokens with these account permissions: Workers Scripts: Edit, Workers R2 Storage: Edit. Copy your account ID from the Cloudflare dashboard.)\\n  - production sign-in mail: MAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>). Edit vars.MAIL_FROM in deploy.json, then run rer deploy --dry-run again.\\nReal deploy: exit 4; {"version":1,"verb":"deploy","event":"error","code":"safety_refusal","message":"MAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>). Edit vars.MAIL_FROM in deploy.json, then run rer deploy --dry-run again. Nothing was built or uploaded.","exitCode":4}\\n{"version":1,"verb":"deploy","event":"result","ok":false,"exitCode":4}\\nChecking pinned pnpm\\n10.12.4\\n
+# Subtest: rer deploy --dry-run names a mapped mail credential once
+ok 3 - rer deploy --dry-run names a mapped mail credential once
+  ---
+  duration_ms: 300.910295
+  type: 'test'
+  ...
+# Subtest: the public secret-only deploy enforces seed policy on mapped and direct credentials before provider access
+ok 4 - the public secret-only deploy enforces seed policy on mapped and direct credentials before provider access
+  ---
+  duration_ms: 2581.574082
+  type: 'test'
+  ...
+# MAIL_PROVIDER_API_KEY: exit=3; provider requests=0
+# EMAIL_API_KEY: exit=3; provider requests=0
+# bin/rer.mjs: exit=3; provider requests=0
+# (node:10071) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Checking pinned pnpm
+# 10.12.4
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+# Checking pinned pnpm
+# 10.12.4
+# Checking pinned pnpm
+# 10.12.4
+# Checking pinned pnpm
+# 10.12.4
+# Deploying the production environment to your Cloudflare account.
+# Your application is live on your Cloudflare account at https://fixture-production.fixture-account.workers.dev.
+# credentials-only update: {"code":0,"events":[{"version":1,"verb":"deploy","event":"result","ok":true,"exitCode":0,"deployed":true,"origin":"https://fixture-production.fixture-account.workers.dev","dependenciesLinked":true}]}
+# Checking pinned pnpm
+# 10.12.4
+# Checking pinned pnpm
+# 10.12.4
+# Subtest: credentials-only deploy update uses declared live mail secrets with a valid declared sender
+ok 5 - credentials-only deploy update uses declared live mail secrets with a valid declared sender
+  ---
+  duration_ms: 2087.393504
+  type: 'test'
+  ...
+# Subtest: rer deploy refuses missing production sign-in before building and accepts declared outbound settings
+ok 6 - rer deploy refuses missing production sign-in before building and accepts declared outbound settings
+  ---
+  duration_ms: 58975.293521
+  type: 'test'
+  ...
+# Subtest: rer deploy resolves deferred mail from the product packaging contract before its custom deploy hook
+ok 7 - rer deploy resolves deferred mail from the product packaging contract before its custom deploy hook
+  ---
+  duration_ms: 11950.242032
+  type: 'test'
+  ...
+# Subtest: rer deploy accepts an explicit MAIL_PROVIDER=none only for a seed that declares a sign-in without mail
+ok 8 - rer deploy accepts an explicit MAIL_PROVIDER=none only for a seed that declares a sign-in without mail
+  ---
+  duration_ms: 12996.215502
+  type: 'test'
+  ...
+1..8
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 107247.826573

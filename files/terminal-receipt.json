@@ -1,0 +1,45 @@
+{
+  "author": "Run Edit Run fleet",
+  "stamp": "2026-11-15T08:25:26Z",
+  "repository": "runeditrun/base",
+  "branch": "cloud/gr-base-public-variable-fix-1",
+  "head": "ab89bea760f0be8a708a056a5c6ae611b5e09abd",
+  "tree": "8fb6f5531826668b13140691e6ebd6dd12185391",
+  "pr": "https://github.com/runeditrun/base/pull/860",
+  "ordinary": {
+    "id": 43692435308,
+    "conclusion": null,
+    "head_sha": "ab89bea760f0be8a708a056a5c6ae611b5e09abd",
+    "html_url": "https://github.com/runeditrun/base/actions/runs/43692435308",
+    "status": "in_progress"
+  },
+  "journeys": {
+    "id": 43692435119,
+    "dispatched_journeys": true,
+    "conclusion": "success",
+    "head_sha": "ab89bea760f0be8a708a056a5c6ae611b5e09abd",
+    "html_url": "https://github.com/runeditrun/base/actions/runs/43692435119",
+    "status": "completed"
+  },
+  "terminal_state": "PUSHED",
+  "qualification": "NOT QUALIFIED; exact-head required CI has not both completed successfully",
+  "github_task_calls": 10,
+  "targeted_tests": {
+    "pass": 10,
+    "fail": 0,
+    "skip": 0
+  },
+  "typecheck": "PASS",
+  "publication": {
+    "status": "PASS",
+    "complete": true,
+    "new_findings": 0,
+    "inherited_findings": 166
+  },
+  "registrations_before": 14,
+  "registrations_after": 14,
+  "public_door_failures_before": 1,
+  "public_door_failures_after": 0,
+  "clause_status_changes": [],
+  "landing": "NOT PERFORMED; fleet owns landing and publication gates"
+}

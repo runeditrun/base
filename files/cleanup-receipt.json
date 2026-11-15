@@ -1,0 +1,10 @@
+{
+  "stamp": "2026-11-15T08:11:37Z",
+  "head": "ab89bea760f0be8a708a056a5c6ae611b5e09abd",
+  "product_worktree_clean": true,
+  "root_node_modules_removed": true,
+  "reference_node_modules_removed": true,
+  "real_probe_fixture_cleanup": "completed by fixture after-hooks; probe subprocess/subreaper exited 0",
+  "owned_server_or_browser_cleanup": "no live descendants left by completed probe/check/scan subreapers",
+  "product_clone_cleanup": "retained only for final evidence publication; delete after successful transfer"
+}
