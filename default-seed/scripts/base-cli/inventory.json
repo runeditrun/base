@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.118-dev.gdd2539f8",
+  "cliVersion": "0.2.118-dev.ge32d762c",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -5207,7 +5207,7 @@
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "c2d8fe8392fd2163cdd4e97c03b07ab683e067d8e1e1581e32c3c5ebfada0861"
+      "sha256": "5a6e369a211306f67961c7889f5350b8f90d590f6f1787711a3861172ee308d0"
     },
     "scripts/publish-check/assignment.py": {
       "source": "scripts/publish-check/assignment.py",
@@ -5311,7 +5311,7 @@
     },
     "scripts/publish-check/hit_location.py": {
       "source": "scripts/publish-check/hit_location.py",
-      "sha256": "adcd3403de1f3a3abaf57518acb14273ae06ace5a17d5136192fadfc2d5f194d"
+      "sha256": "752e4ab06878a9111000cc0aba74eebd5baa63a92a5c79f3ff7696be7dd8e4e0"
     },
     "scripts/publish-check/hygiene_config.py": {
       "source": "scripts/publish-check/hygiene_config.py",
@@ -5327,7 +5327,7 @@
     },
     "scripts/publish-check/json_identity.py": {
       "source": "scripts/publish-check/json_identity.py",
-      "sha256": "462f1eaf74d3a1b380af8b85e3529da4f9af24218a16fe73c9ec4e3aa0105b07"
+      "sha256": "1e0be539690d64022e6731802f79c40b88d78df49e1ab08f3c6cfaa19037fb0e"
     },
     "scripts/publish-check/license-exceptions.json": {
       "source": "scripts/publish-check/license-exceptions.json",

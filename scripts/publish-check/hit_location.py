@@ -1,18 +1,26 @@
-"""Resolve a native Gitleaks hit to the exact byte spans of its match."""
+"""Resolve a native Gitleaks hit to one unambiguous full-match byte span."""
 
 
 def match_spans(data, hit):
-    lines = data.splitlines(keepends=True)
     try:
+        # Gitleaks counts LF bytes, not Python's broader set of line breaks.
+        lines = data.split(b'\n')
         first, last = hit['StartLine'] - 1, hit['EndLine'] - 1
         if not (0 <= first <= last < len(lines)):
             return []
-        start = sum(map(len, lines[:first])) + hit['StartColumn'] - 1
-        end = sum(map(len, lines[:last])) + hit['EndColumn']
-        # Gitleaks 8.30.1 includes the preceding newline in columns
-        # after fragment line one; Git fragments may begin mid-file.
-        # Resolve that one-byte difference only against the exact match.
-        return [(start - shift, end - shift) for shift in (0, 1)
-                if data[start - shift:end - shift] == hit['Match'].encode('utf-8')]
+        match = hit['Match'].encode('utf-8')
+        if not match:
+            return []
+        left = sum(len(line) + 1 for line in lines[:first])
+        right = left + sum(len(line) + 1 for line in lines[first:last + 1])
+        # Directory fragments can start mid-line. Their columns are relative
+        # to that fragment, whose starting column is absent from the report.
+        # Later fragment lines also count the preceding LF in their columns.
+        # Bind the full match within the reported lines instead. Even an
+        # apparently exact column cannot disambiguate repeated occurrences.
+        start = data.find(match, left, right)
+        if start < 0 or data.find(match, start + 1, right) >= 0:
+            return []
+        return [(start, start + len(match))]
     except (KeyError, TypeError, IndexError, UnicodeError):
         return []

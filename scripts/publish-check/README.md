@@ -148,7 +148,11 @@ entry that does not prove, a 40-hex value, a key that names no tree file, or a h
 value with no file-name key keeps the native finding. Historical matches use only
 that commit's blobs and working-tree preimages reject linked paths. There is no
 path, filename, hash-value or repository exemption. `hit_location.py` resolves
-the native match's exact bytes for both proofs.
+the native match's exact bytes for both proofs. Gitleaks directory fragments can
+start mid-line without reporting their starting column. The resolver therefore
+requires a unique full match within the reported LF-delimited lines; unresolved
+or repeated matches retain their findings even if a reported column appears to
+fit. Classification still requires the structural and digest proofs above.
 
 `trust_bundle.py` classifies an email match as public CA certificate metadata
 only when all of these hold: the file's path is an artifact listed by a committed
