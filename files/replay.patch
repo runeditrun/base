@@ -1,0 +1,1773 @@
+diff --git a/cli/README.md b/cli/README.md
+index 3c68cc6a..abe0d9d1 100644
+--- a/cli/README.md
++++ b/cli/README.md
+@@ -697,3 +697,43 @@ unattempted sizes `complete:false`; these files keep the existing statement name
+ SQL and bound parameters and carry diagnostic flow summaries. Missing work never
+ produces a passing growth verdict. See the size section of
+ [the command contract](../export/SEED-COMMAND-CONTRACT.md#statement-size-and-growth-sc-15).
++
++## Run a command with a Business grant
++
++Pair with the Business using `rer business connect --business ID`. The owner
++approves this agent, ticks **Run software commands with an approved cloud grant**,
++Connects Cloudflare, selects the exact Business account and approves a per-agent
++grant with explicit resource permissions and expiry. These choices install nothing.
++
++```sh
++rer business run --grant GRANT_ID -- rer deploy
++rer business run --grant GRANT_ID -- any-command 'argument with spaces'
++```
++
++`cloudflare.token` in the Business MCP describes the exchange without returning a
++credential. Only the paired rer exchange receives a child token; the parent OAuth
++credential stays on the trusted server. The command gets `CLOUDFLARE_API_TOKEN`
++and `CLOUDFLARE_ACCOUNT_ID` in its environment. Cloudflare credential aliases from
++the caller environment are removed. No shell is inserted and arguments after
++`--`, including help flags, are passed unchanged. Existing `run [--once]` continues
++its computer check-in behavior.
++
++This is an environment boundary, not a sandbox. The selected process and its
++descendants can read and use the credential, and a malicious process can disclose
++it or read other files or OS credentials available to the same user. Use software
++you trust. Output masks the credential and common encoded forms across chunk
++boundaries; it cannot hide every transformation a malicious process invents.
++Commands may load their own files and credentials. The wrapper supplies only the
++approved credential, never retries with broader or ambient access, and does not
++protect a process from its own deliberate credential loading.
++
++The child expires after at most 15 minutes, bounded also by the grant and the
++provider authorization. The wrapper interrupts a command at that expiry. It
++requests revocation after success, failure, signals or spawn failure; SIGKILL,
++crashes, network loss and lost acknowledgements may leave a token until server
++expiry. Child exit codes and Unix terminating signals are preserved. Cleanup has
++its own stderr status, including **unconfirmed**, which is never called revoked.
++The safe lease ID in that status supports `rer business cleanup LEASE` to retry
++revocation and `rer business cleanup LEASE --status` to read its status. Cleanup
++needs the original pairing, but does not require the removed deploy action or an
++active grant. No child token is saved in state, OS storage, logs or MCP output.
+diff --git a/cli/business-agent.test.mjs b/cli/business-agent.test.mjs
+new file mode 100644
+index 00000000..c57d1909
+--- /dev/null
++++ b/cli/business-agent.test.mjs
+@@ -0,0 +1,87 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { spawn } from 'node:child_process';
++import { createInterface } from 'node:readline';
++import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
++import { join, resolve } from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { agentServer } from './fixtures/business/agent-server.mjs';
++import { credentialHandle } from './business/state.mjs';
++
++const base = resolve(import.meta.dirname, '..');
++const device = 'bz_device_fixture-agent';
++
++// A computer already paired with a Business, and the fake Business MCP it talks to.
++async function paired(t) {
++ const root = await mkdtemp(join(base, '.business-connect-agent-'));
++ t.after(() => rm(root, { recursive: true, force: true }));
++ const remote = await agentServer(t, device);
++ const home = join(root, 'home');
++ await mkdir(join(home, '.rer/business'), { recursive: true });
++ await writeFile(join(home, '.rer/business/state.json'), JSON.stringify({ origin: remote.origin, businessId: 'biz', executorId: 'executor1', credentialVersion: 2 }));
++ await writeFile(join(home, 'fake-keychain.json'), JSON.stringify({ [credentialHandle(remote.origin, 'biz')]: device }));
++ const env = { PATH: process.env.PATH, HOME: home, RER_NO_UPDATE_CHECK: '1', NODE_OPTIONS: `--import=${fileURLToPath(new URL('./fixtures/business/register.mjs', import.meta.url))}` };
++ const start = args => spawn(process.execPath, [join(base, 'bin/rer.mjs'), 'business', ...args], { cwd: home, env, stdio: ['pipe', 'pipe', 'pipe'] });
++ const rer = args => new Promise(done => {
++  const child = start(args); let stdout = '', stderr = '';
++  child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; });
++  child.on('close', code => done({ code, stdout, stderr })); child.stdin.end();
++ });
++ return { remote, rer, start };
++}
++
++test('an outside agent acts on installed apps through the agent verbs and the stdio bridge', async t => {
++ const { remote, rer, start } = await paired(t);
++
++ const listed = await rer(['installations', 'list', '--json']);
++ assert.equal(listed.code, 0, listed.stderr);
++ assert.equal(JSON.parse(listed.stdout).installations[0].installation_id, 'inst_1');
++ assert.match((await rer(['installations', 'list'])).stdout, /inst_1\s+happytohelp\s+Support\s+running/);
++
++ // Request a change, wait for its preview, publish it and wait for live.
++ const changed = await rer(['change', 'request', '--app', 'inst_1', 'Make the header blue', '--wait', '--publish', '--interval', '0.05']);
++ assert.equal(changed.code, 0, changed.stderr);
++ assert.deepEqual(remote.followed, ['working', 'working', 'preview_ready', 'publishing', 'live']);
++ assert.deepEqual(remote.calls.find(([name]) => name === 'change.request')[1], { installation_id: 'inst_1', intent: 'Make the header blue' });
++ for (const phase of ['working', 'preview_ready', 'publishing', 'live']) assert.match(changed.stdout, new RegExp(`Change chg_1: ${phase}`));
++ assert.equal(remote.published, 1);
++
++ // A tool that is not built yet has its own exit code; a refusal names where the owner grants the action.
++ const unbuilt = await rer(['domain', 'records', 'inst_1']);
++ assert.equal(unbuilt.code, 3);
++ assert.match(unbuilt.stderr, /Not built yet: not built yet/);
++ const ungranted = await rer(['app', 'send-sign-in-link', '--app', 'inst_1']);
++ assert.equal(ungranted.code, 1);
++ assert.match(ungranted.stderr, /app\.send_sign_in_link[^\n]*Business, under Computers/);
++ assert.equal((await rer(['change', 'request', 'No app named'])).code, 2, 'a missing --app is a usage error, not a server call');
++
++ // A change that is still working when --timeout runs out exits 75 and says how to keep waiting.
++ remote.stall = true;
++ const slow = await rer(['change', 'follow', 'chg_1', '--wait', '--timeout', '0.15', '--interval', '0.1']);
++ assert.equal(slow.code, 75);
++ assert.match(slow.stderr, /Keep waiting with: .*change follow chg_1 --wait/);
++
++ const tools = await rer(['tools']);
++ assert.match(tools.stdout, /^installations\.list {2}List the installed apps$/m);
++
++ // The stdio bridge: an MCP client sends protocol messages; the bearer is minted and re-minted behind it.
++ const child = start(['mcp']);
++ const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]();
++ const ask = async message => { child.stdin.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n'); return JSON.parse((await lines.next()).value); };
++ t.after(() => child.kill());
++ const initialized = await ask({ id: 1, method: 'initialize', params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'agent', version: '1' } } });
++ assert.equal(initialized.result.protocolVersion, '2025-11-25');
++ child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
++ const listing = await ask({ id: 2, method: 'tools/list' });
++ assert.ok(listing.result.tools.some(tool => tool.name === 'installations.list'));
++ const mints = remote.mints;
++ for (const bearer of remote.bearers) remote.stale.add(bearer); // The server has dropped every bearer the bridge holds.
++ const called = await ask({ id: 3, method: 'tools/call', params: { name: 'installations.list', arguments: {} } });
++ assert.equal(called.id, 3);
++ assert.equal(called.result.structuredContent.installations[0].installation_id, 'inst_1');
++ assert.equal(remote.mints, mints + 1, 'the 401 minted one new bearer and retried once');
++ child.stdin.end();
++ const stderr = []; child.stderr.on('data', chunk => stderr.push(chunk));
++ await new Promise(done => child.on('close', done));
++ assert.equal(Buffer.concat(stderr).toString(), '');
++});
+diff --git a/cli/business-run.test.mjs b/cli/business-run.test.mjs
+new file mode 100644
+index 00000000..08cb2a96
+--- /dev/null
++++ b/cli/business-run.test.mjs
+@@ -0,0 +1,94 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import {createServer} from 'node:http';
++import {spawn} from 'node:child_process';
++import {once} from 'node:events';
++import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
++import {join,resolve} from 'node:path';
++import {credentialHandle} from './business/state.mjs';
++
++const base=resolve(import.meta.dirname,'..'),entry=join(base,'bin/rer.mjs');
++const device='bz_device_synthetic-command-computer',secret='synthetic-scoped-command-secret',account='a'.repeat(32);
++async function fixture(t) {
++ const home=await mkdtemp(join(base,'.business-connect-command-'));t.after(()=>rm(home,{recursive:true,force:true}));
++ const state={issued:0,revocations:0,refuse:false,cleanupFails:false,expiryMs:900000,leases:new Map()};
++ const server=createServer(async(req,res)=>{
++  let text='';for await(const data of req)text+=data;
++  const body=text?JSON.parse(text):{},root='/api/business/executors/cloudflare-token';
++  const json=(status,value)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(value));};
++  if(req.headers.authorization!=='Bearer '+device)return json(401,{error:'pairing refused'});
++  if(req.url===root&&req.method==='POST'){
++   state.issued++;if(state.refuse)return json(403,{error:secret});
++   const lease={lease_id:body.lease_id,grant_id:body.grant_id,business_id:'business',executor_id:'computer',account_id:account,credential_expires_at:new Date(Date.now()+state.expiryMs).toISOString(),cleanup_status:'active',provider_credential_revoked:false};
++   state.leases.set(lease.lease_id,lease);return json(200,{...lease,credential:secret});
++  }
++  const id=req.url.slice(root.length+1).split('/')[0],lease=state.leases.get(id);
++  if(!lease)return json(404,{error:'no such command'});
++  if(req.url.endsWith('/revoke')){state.revocations++;return json(200,{...lease,cleanup_status:state.cleanupFails?'unconfirmed':'revoked',provider_credential_revoked:!state.cleanupFails});}
++  return json(200,lease);
++ });
++ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
++ t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
++ const origin=`http://127.0.0.1:${server.address().port}`;
++ await mkdir(join(home,'.rer/business'),{recursive:true});
++ await writeFile(join(home,'.rer/business/state.json'),JSON.stringify({origin,businessId:'business',executorId:'computer',credentialVersion:2}));
++ await writeFile(join(home,'fake-keychain.json'),JSON.stringify({[credentialHandle(origin,'business')]:device}));
++ const env={PATH:process.env.PATH,HOME:home,RER_NO_UPDATE_CHECK:'1',CI:'true',NODE_OPTIONS:`--import=${new URL('./fixtures/business/register.mjs',import.meta.url).pathname}`,
++  CLOUDFLARE_API_TOKEN:'ambient-broad-token',CLOUDFLARE_ACCOUNT_ID:'f'.repeat(32),CF_API_TOKEN:'ambient-alias-token'};
++ const start=args=>{
++  const child=spawn(process.execPath,[entry,'business',...args],{cwd:home,env,stdio:['pipe','pipe','pipe']});let stdout='',stderr='';
++  child.stdout.on('data',data=>stdout+=data);child.stderr.on('data',data=>stderr+=data);child.stdin.end();
++  const result=once(child,'close').then(([code,signal])=>({code,signal,stdout,stderr}));
++  return {child,result,output:()=>stdout+stderr};
++ };
++ const run=async command=>(await start(['run','--grant','grant-1','--',...command]).result);
++ return {home,state,start,run};
++}
++
++test('business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors',async t=>{
++ const f=await fixture(t);
++ const script=`const token=process.env.CLOUDFLARE_API_TOKEN; if(token!==${JSON.stringify(secret)}||process.env.CLOUDFLARE_ACCOUNT_ID!==${JSON.stringify(account)}||process.env.CF_API_TOKEN)process.exit(92); console.log(JSON.stringify(process.argv.slice(1))); process.stdout.write(token.slice(0,8)); setTimeout(()=>{process.stdout.write(token.slice(8));process.stderr.write(token.slice(0,11));setTimeout(()=>{process.stderr.write(token.slice(11));console.log(' finished');process.exit(Number(process.argv[1]));},10)},10);`;
++ for(const code of [0,17]){
++  const result=await f.run([process.execPath,'-e',script,String(code),'argument with spaces','--help','$(literal)','']);
++  assert.equal(result.code,code,result.stderr);assert.equal(result.signal,null);
++  assert.ok(result.stdout.includes(JSON.stringify([String(code),'argument with spaces','--help','$(literal)',''])));
++  assert.match(result.stdout,/\[credential\]/);assert.match(result.stderr,/cleanup: revoked/);
++  for(const value of [secret,account,device,'ambient-broad-token','ambient-alias-token'])assert.ok(!(result.stdout+result.stderr).includes(value));
++ }
++ const missing=await f.run(['/missing-command-for-business-run']);assert.equal(missing.code,127);assert.match(missing.stderr,/cleanup: revoked/);
++ assert.equal(f.state.issued,3);assert.equal(f.state.revocations,3);
++});
++
++test('business run refuses unavailable authority without spawning or retrying and reports unconfirmed cleanup separately from the child exit',async t=>{
++ const f=await fixture(t);f.state.refuse=true;
++ let result=await f.run([process.execPath,'-e','console.log("SHOULD-NOT-RUN")']);
++ assert.equal(result.code,1);assert.ok(!result.stdout.includes('SHOULD-NOT-RUN'));assert.ok(!result.stderr.includes(secret));assert.equal(f.state.issued,1);
++ f.state.refuse=false;f.state.cleanupFails=true;
++ result=await f.run([process.execPath,'-e','process.exit(23)']);assert.equal(result.code,23);assert.match(result.stderr,/cleanup: unconfirmed/);assert.match(result.stderr,/rer business cleanup [a-f0-9-]+/);
++ const lease=[...f.state.leases.keys()][0];f.state.cleanupFails=false;
++ const cleaned=await f.start(['cleanup',lease]).result;assert.equal(cleaned.code,0);assert.match(cleaned.stderr,/cleanup: revoked/);
++ assert.equal(f.state.issued,2,'cleanup never reissues a credential');
++});
++
++test('business run forwards signals and enforces credential expiry, then revokes before exiting with the child signal',async t=>{
++ const f=await fixture(t);
++ for(const signal of ['SIGINT','SIGTERM']){
++  const running=f.start(['run','--grant','grant-1','--',process.execPath,'-e','console.log("COMMAND_READY");setInterval(()=>{},1000)']);
++  await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('child did not start')),15000);const see=()=>{if(running.output().includes('COMMAND_READY')){clearTimeout(timeout);running.child.stdout.off('data',see);resolve();}};running.child.stdout.on('data',see);see();});
++  running.child.kill(signal);const result=await running.result;
++  assert.equal(result.signal,signal);assert.match(result.stderr,/cleanup: revoked/);
++ }
++ f.state.expiryMs=1000;
++ const expired=await f.run([process.execPath,'-e','setInterval(()=>{},1000)']);assert.equal(expired.signal,'SIGTERM');assert.match(expired.stderr,/cleanup: revoked/);
++ assert.equal(f.state.revocations,3);
++});
++
++test('business run reaches the ordinary rer deploy dry-run child without live provider mutation',{timeout:300000},async t=>{
++ const f=await fixture(t);
++ const result=await f.run([process.execPath,entry,'deploy','--dry-run','--cwd',join(base,'default-seed'),'--json']);
++ assert.equal(result.code,0,result.stderr+'\n'+result.stdout);
++ const receipt=result.stdout.trim().split('\n').filter(Boolean).map(line=>{try{return JSON.parse(line);}catch{return null;}}).filter(Boolean).at(-1);
++ assert.equal(receipt.ok,true);assert.equal(receipt.dryRun,true);assert.equal(receipt.deployed,false);assert.equal(receipt.providerChecked,false);
++ assert.equal(f.state.issued,1);assert.equal(f.state.revocations,1);
++ assert.ok(!(result.stdout+result.stderr).includes(secret));assert.match(result.stderr,/cleanup: revoked/);
++});
+diff --git a/cli/business/agent-args.mjs b/cli/business/agent-args.mjs
+new file mode 100644
+index 00000000..39a2db48
+--- /dev/null
++++ b/cli/business/agent-args.mjs
+@@ -0,0 +1,60 @@
++import { readFile } from 'node:fs/promises';
++import { aliases } from './agent-table.mjs';
++
++const booleans = new Set(['json', 'wait', 'publish', 'help']);
++const numbers = new Set(['timeout', 'interval']);
++export class Usage extends Error {}
++
++const snake = flag => (aliases[flag] ?? flag).replaceAll('-', '_');
++// A value that starts like JSON is sent as JSON; @FILE reads a JSON (or text) file. Anything else is text.
++async function value(flag, text) {
++ let source = text;
++ if (text.startsWith('@')) {
++  try { source = (await readFile(text.slice(1), 'utf8')).trim(); } catch { throw new Usage(`Could not read ${text.slice(1)} for --${flag}.`); }
++  if (!/^[[{]/.test(source)) return source;
++ }
++ if (!/^[[{]/.test(source)) return source;
++ try { return JSON.parse(source); } catch { throw new Usage(`--${flag} is not valid JSON.`); }
++}
++
++/** Flags and bare words to { arguments, control, positional }. Flags become arguments (kebab-case to snake_case); --json,
++ * --wait, --publish, --timeout SECONDS and --interval SECONDS steer rer itself; --args JSON adds a whole arguments object. */
++export async function parseArguments(args) {
++ const control = {}, named = {}, words = [];
++ for (let index = 0; index < args.length; index++) {
++  const token = args[index];
++  if (token === '-h') { control.help = true; continue; }
++  if (!token.startsWith('--') || token === '--') { words.push(token); continue; }
++  const [flag, inline] = token.slice(2).split(/=(.*)/s, 2);
++  if (!/^[a-z][a-z0-9-]{0,40}$/.test(flag)) throw new Usage(`Unknown flag ${token.slice(0, 40)}.`);
++  if (booleans.has(flag)) { control[flag] = true; continue; }
++  const text = inline ?? args[++index];
++  if (text === undefined || inline === undefined && text.startsWith('--')) throw new Usage(`A value is required for --${flag}.`);
++  const target = numbers.has(flag) ? control : named;
++  const key = numbers.has(flag) ? flag : snake(flag);
++  if (Object.hasOwn(target, key)) throw new Usage(`Repeated flag --${flag}.`);
++  if (numbers.has(flag)) {
++   const number = Number(text);
++   if (!Number.isFinite(number) || number <= 0 || number > 86400) throw new Usage(`--${flag} takes a number of seconds.`);
++   control[flag] = number;
++  } else named[key] = await value(flag, text);
++ }
++ const { args: whole, ...rest } = named;
++ if (whole !== undefined && (whole === null || typeof whole !== 'object' || Array.isArray(whole))) throw new Usage('--args takes a JSON object.');
++ for (const key of Object.keys(whole ?? {})) if (Object.hasOwn(rest, key)) throw new Usage(`${key} is given both as a flag and in --args.`);
++ return { arguments: { ...whole, ...rest }, control, words };
++}
++
++/** Put the bare words into the row's positional argument: free text for a sentence, exactly one word for an identifier. */
++export function place(row, parsed) {
++ const { words } = parsed, into = row.positional;
++ if (!words.length) return parsed.arguments;
++ if (!into) throw new Usage(`Unexpected word "${words[0].slice(0, 40)}". Pass values as --flag VALUE.`);
++ if (Object.hasOwn(parsed.arguments, into)) throw new Usage(`${into} is given both as a flag and as words.`);
++ if (into !== 'intent' && words.length > 1) throw new Usage(`Expected one ${into.replaceAll('_', '-')}, got ${words.length} words.`);
++ return { ...parsed.arguments, [into]: words.join(' ') };
++}
++
++export function missing(row, argumentsObject) {
++ return (row.required ?? []).filter(name => argumentsObject[name] === undefined);
++}
+diff --git a/cli/business/agent-help.mjs b/cli/business/agent-help.mjs
+new file mode 100644
+index 00000000..7afd9647
+--- /dev/null
++++ b/cli/business/agent-help.mjs
+@@ -0,0 +1,53 @@
++import { rows, families } from './agent-table.mjs';
++
++const verb = name => name.split(' ')[1];
++const exits = `Exits 0 done, 1 refused or failed (the server's message is printed), 2 usage, 3 not built yet, 75 still working when\n--timeout ran out. A verb the owner has not granted this computer names where the owner grants it: Business, under Computers.`;
++const flags = `
++  --app ID, --installation-id ID   The installed app (from rer business installations list)
++  --FLAG VALUE                     Any other flag is an argument of the tool: --change-id, --preparation-id,
++                                   --domain-id, --request-key, --method, --surface, --hostname, --public-path
++                                   (kebab-case becomes snake_case). A value that starts with { or [ is JSON;
++                                   @FILE reads a file. --args JSON gives the whole arguments object
++  --json                           Print the tool's structuredContent as JSON (progress goes to stderr)
++  --wait, --timeout SECONDS, --interval SECONDS
++                                   Follow to the end where the verb supports it (default 1800 s, polling every 15 s)
++${exits}`;
++
++/** The lines the advanced-commands help adds for the agent verbs. */
++export const agentUsage = `
++Agent verbs (Usage: rer business FAMILY VERB [--flags] [--json])
++Act on the company's installed apps from this computer, with no browser. Needs rer business connect first.
++${Object.entries(rows).map(([name, row]) => `  ${name.padEnd(24)} ${row.about}`).join('\n')}
++  tools                    List the tools the Business server offers
++  call TOOL [--flags]      Call a tool that has no verb of its own yet
++  mcp                      A local stdio MCP server for Claude Code or Codex: add \`rer business mcp\` as a server
++                           and the agent never handles a token
++  change request --app ID "WHAT TO CHANGE" [--wait] [--publish]
++                           --wait follows the change to its preview; --publish also publishes it and waits for live
++${exits}
++`;
++
++const family = name => Object.entries(rows).filter(([key]) => key.split(' ')[0] === name)
++ .map(([key, row]) => `  ${verb(key).padEnd(22)} ${row.about}`).join('\n');
++const help = name => `Usage: rer business ${name} VERB [--flags] [--json]
++${family(name)}
++${flags}
++`;
++
++export const agentHelp = {
++ ...Object.fromEntries(families.map(name => [name, help(name)])),
++ tools: `Usage: rer business tools [--json]
++List the tools the Business server offers: name and a one-line description. Use rer business call TOOL to call one that has no verb.
++`,
++ call: `Usage: rer business call TOOL [--flag VALUE ...] [--args JSON] [--json]
++Call any Business tool by name, such as installation.status. Flags become the tool's arguments (kebab-case to snake_case).
++Exits 0 done, 1 refused or failed, 3 not built yet.
++`,
++ mcp: `Usage: rer business mcp
++Run a local MCP server on stdin and stdout (newline-delimited JSON-RPC, revision 2025-11-25) that forwards to the Business
++MCP. It keeps the short-lived bearer fresh from this computer's pairing, so the agent that starts it never handles a token.
++Claude Code: claude mcp add business -- rer business mcp
++Codex: add [mcp_servers.business] with command = "rer" and args = ["business", "mcp"]
++Needs rer business connect first. Only protocol messages go to stdout; diagnostics go to stderr.
++`,
++};
+diff --git a/cli/business/agent-output.mjs b/cli/business/agent-output.mjs
+new file mode 100644
+index 00000000..a4a68414
+--- /dev/null
++++ b/cli/business/agent-output.mjs
+@@ -0,0 +1,38 @@
++import { redact } from './errors.mjs';
++
++const scalar = value => value === null || ['string', 'number', 'boolean'].includes(typeof value);
++export const clean = (value, limit = 300) => redact(typeof value === 'string' ? value : JSON.stringify(value)).replace(/\s+/g, ' ').trim().slice(0, limit);
++
++// One plain line for an object: its scalar fields as key=value, nested values as compact JSON.
++function item(object) {
++ if (scalar(object)) return clean(object);
++ return Object.entries(object).filter(([, value]) => value !== null && value !== undefined).map(([key, value]) => `${key}=${clean(value, 120)}`).join('  ');
++}
++
++/** A tool result as a few plain lines. */
++export function plain(tool, data) {
++ if (tool === 'installations.list' && Array.isArray(data.installations)) {
++  if (!data.installations.length) return ['No apps are installed for this company yet.'];
++  return data.installations.map(app => [app.installation_id, app.app, app.name, app.state, app.version, app.app_url].filter(part => part !== undefined && part !== null).map(part => clean(part, 120)).join('  '));
++ }
++ const lines = [];
++ for (const [key, value] of Object.entries(data)) {
++  if (value === null || value === undefined) continue;
++  if (Array.isArray(value)) { lines.push(`${key}: ${value.length ? '' : 'none'}`.trimEnd(), ...value.map(entry => `  - ${item(entry)}`)); }
++  else if (scalar(value)) lines.push(`${key}: ${clean(value)}`);
++  else lines.push(`${key}: ${item(value)}`);
++ }
++ return lines.length ? lines : ['Done.'];
++}
++
++/** Why a tool refused, in words the person reading an agent's transcript can act on. */
++export function refusalText(data, ownerPage) {
++ const message = typeof data?.message === 'string' && data.message ? clean(data.message, 500) : null;
++ if (data?.status === 'not_built') return `Not built yet: ${message ?? 'Business has not built this yet.'}`;
++ if (data?.status === 'action_not_granted') {
++  const action = typeof data.action === 'string' ? clean(data.action, 80) : 'this action';
++  return `The owner has not let this computer do "${action}". The owner grants it in Business, under Computers: ${ownerPage}`;
++ }
++ const code = typeof data?.code === 'string' ? ` (${clean(data.code, 80)})` : '';
++ return `Business refused: ${message ?? data?.status ?? 'no reason given'}${code}`;
++}
+diff --git a/cli/business/agent-table.mjs b/cli/business/agent-table.mjs
+new file mode 100644
+index 00000000..06fbfadc
+--- /dev/null
++++ b/cli/business/agent-table.mjs
+@@ -0,0 +1,32 @@
++// The agent verbs: `rer business FAMILY VERB` is one row here. A row names the Business MCP tool it calls, the argument a bare
++// word fills (positional), the arguments the call needs (required) and whether --wait follows it to its end (wait). A new
++// tool needs one row; `rer business call TOOL --flag value` reaches a tool that has none yet.
++export const rows = {
++ 'installations list': { tool: 'installations.list', about: 'The apps installed for this company, with their state and address' },
++ 'installation status': { tool: 'installation.status', positional: 'installation_id', required: ['installation_id'], about: 'One installed app: state, version, hosting, progress' },
++ 'change request': { tool: 'change.request', positional: 'intent', required: ['installation_id', 'intent'], wait: 'change', about: 'Ask for a change to an app, in plain words' },
++ 'change follow': { tool: 'change.follow', positional: 'change_id', required: ['change_id'], wait: 'change', about: 'Where a requested change is, and what happens next' },
++ 'change publish': { tool: 'change.publish', positional: 'change_id', required: ['change_id'], about: 'Publish a change whose preview is ready' },
++ 'update list': { tool: 'update.list', positional: 'installation_id', required: ['installation_id'], about: 'Updates available for an app' },
++ 'update prepare': { tool: 'update.prepare', positional: 'installation_id', required: ['installation_id'], about: 'Prepare the app for its next update' },
++ 'update build': { tool: 'update.build', positional: 'installation_id', required: ['installation_id', 'preparation_id'], about: 'Build a prepared update' },
++ 'update follow': { tool: 'update.follow', positional: 'installation_id', required: ['installation_id'], wait: 'update', about: 'Where an update is' },
++ 'domain set': { tool: 'domain.set', positional: 'domain', required: ['domain'], about: "Set the company's domain" },
++ 'domain prove': { tool: 'domain.prove', required: ['method'], about: 'Prove the domain: --method txt|cloudflare' },
++ 'domain attach': { tool: 'domain.attach', positional: 'hostname', required: ['installation_id', 'surface', 'hostname'], about: 'Give an app surface a hostname (--public-path optional)' },
++ 'domain records': { tool: 'domain.records', positional: 'installation_id', required: ['installation_id'], about: 'The DNS records an app needs' },
++ 'domain check': { tool: 'domain.check', required: ['installation_id', 'domain_id'], about: 'Check that a domain is attached and answering' },
++ 'domain remove': { tool: 'domain.remove', required: ['installation_id', 'domain_id'], about: 'Detach a domain from an app' },
++ 'import start': { tool: 'import.start', positional: 'installation_id', required: ['installation_id'], about: "Start moving an old tool's data into an app" },
++ 'import follow': { tool: 'import.follow', positional: 'installation_id', required: ['installation_id'], about: 'Where an import is' },
++ 'profile set': { tool: 'business.profile.set', required: ['profile'], about: 'Save the business profile: --profile JSON or --profile @FILE' },
++ 'plan draft': { tool: 'plan.draft', about: 'Draft the plan: --FIELD VALUE, or --args JSON' },
++ 'plan read': { tool: 'plan.read', about: 'Read the plan' },
++ 'plan request-approval': { tool: 'plan.request_approval', about: 'Ask the owner to approve the plan' },
++ 'app owner-signed-in': { tool: 'app.owner_signed_in', positional: 'installation_id', required: ['installation_id'], about: 'Has the owner signed in to the app yet' },
++ 'app send-sign-in-link': { tool: 'app.send_sign_in_link', positional: 'installation_id', required: ['installation_id'], about: 'Email the owner a sign-in link to the app' },
++};
++// Short flag names for argument names, so `--app ID` is `--installation-id ID`.
++export const aliases = { app: 'installation_id' };
++export const families = [...new Set(Object.keys(rows).map(name => name.split(' ')[0]))];
++export const agentFamilies = new Set([...families, 'tools', 'mcp', 'call']);
+diff --git a/cli/business/agent-verbs.mjs b/cli/business/agent-verbs.mjs
+new file mode 100644
+index 00000000..4d1cd2f0
+--- /dev/null
++++ b/cli/business/agent-verbs.mjs
+@@ -0,0 +1,132 @@
++import { Api } from './api.mjs';
++import { mcpClient, ownerLink } from './questions.mjs';
++import { paired } from './local-commands.mjs';
++import { describe } from './errors.mjs';
++import { businessCommand } from './invocation.mjs';
++import { rows } from './agent-table.mjs';
++import { parseArguments, place, missing, Usage } from './agent-args.mjs';
++import { plain, refusalText, clean } from './agent-output.mjs';
++import { waitFor, failedState, stateName, exitStillWaiting } from './agent-wait.mjs';
++import { agentUsage } from './agent-help.mjs';
++
++export const exitNotBuilt = 3;
++
++class Refused extends Error {
++ constructor(data) { super(data?.message ?? 'Business refused the action.'); this.data = data; }
++}
++
++// A tool's structuredContent, or the refusal it came back with.
++async function invoke(session, tool, args) {
++ const result = await session.call(tool, args);
++ if (result?.isError) throw new Refused(result.structuredContent ?? { status: 'refused', message: result.content?.find?.(part => part?.type === 'text')?.text });
++ if (!result?.structuredContent || typeof result.structuredContent !== 'object') throw Error(`Business returned no result for ${tool}.`);
++ return result.structuredContent;
++}
++
++const idOf = (data, key) => data[key]?.id ?? data[`${key}_id`];
++
++async function change(row, args, control, session, say) {
++ let data = await invoke(session, row.tool, args);
++ const id = idOf(data, 'change') ?? args.change_id;
++ if (typeof id === 'string') say(`Change ${clean(id, 80)}: ${clean(stateName(data) ?? 'requested', 60)}`);
++ if (!control.wait && !control.publish) {
++  if (row.tool === 'change.request' && typeof id === 'string') say(`Follow it with: ${businessCommand(`change follow ${id} --wait`)}`);
++  return data;
++ }
++ if (typeof id !== 'string') throw Error('Business did not name the change, so there is nothing to follow.');
++ const options = { say: state => say(`Change ${id}: ${state}`), timeout: control.timeout, interval: control.interval, from: stateName(data) };
++ const follow = () => invoke(session, 'change.follow', { change_id: id });
++ let waited = await waitFor(follow, options);
++ if (waited.ended && control.publish && !failedState(waited.data) && waited.data.next === 'publish') {
++  const published = await invoke(session, 'change.publish', { change_id: id });
++  say(`Change ${id}: ${stateName(published) ?? 'publishing'}`);
++  waited = await waitFor(follow, { ...options, publishing: true, from: stateName(published) ?? 'publishing' });
++ }
++ data = waited.data;
++ if (!waited.ended) throw Object.assign(Error(`Still working after ${control.timeout ?? 1800} seconds. Keep waiting with: ${businessCommand(`change follow ${id} --wait`)}`), { exitCode: exitStillWaiting, data });
++ if (failedState(data)) throw Object.assign(Error(`The change ${stateName(data)}: ${clean(data.change?.message ?? data.message ?? 'no reason given', 300)}`), { exitCode: 1, data });
++ if (data.next === 'ask_owner') say('The owner needs to answer something in Business before this can go on.');
++ else if (data.next === 'publish') say(`Its preview is ready. Publish it with: ${businessCommand(`change publish ${id}`)}`);
++ return data;
++}
++
++async function update(row, args, control, session, say) {
++ const data = await invoke(session, row.tool, args);
++ if (!control.wait) return data;
++ const waited = await waitFor(() => invoke(session, 'update.follow', args), { say: state => say(`Update ${args.installation_id}: ${state}`), timeout: control.timeout, interval: control.interval });
++ if (!waited.ended) throw Object.assign(Error(`Still working after ${control.timeout ?? 1800} seconds. Keep waiting with: ${businessCommand(`update follow ${args.installation_id} --wait`)}`), { exitCode: exitStillWaiting, data: waited.data });
++ if (failedState(waited.data)) throw Object.assign(Error(`The update ${stateName(waited.data)}.`), { exitCode: 1, data: waited.data });
++ return waited.data;
++}
++const waiters = { change, update };
++
++async function work(row, parsed, session, out) {
++ const args = place(row, parsed), absent = missing(row, args), { control } = parsed;
++ if (absent.length) throw new Usage(`${row.tool} needs ${absent.map(name => `--${name.replaceAll('_', '-')}`).join(', ')}. Run rer business ${row.name.split(' ')[0]} --help.`);
++ for (const flag of ['wait', 'publish']) {
++  if (control[flag] && !(row.wait && (flag === 'wait' || row.tool.startsWith('change.')))) throw new Usage(`${row.name} does not take --${flag}.`);
++ }
++ const say = line => out.line(line);
++ out.result(row.tool, row.wait ? await waiters[row.wait](row, args, control, session, say) : await invoke(session, row.tool, args));
++}
++
++// Lines for a person go to stdout; with --json only the final structuredContent does, and progress goes to stderr.
++function output(json) {
++ return {
++  line: text => (json ? process.stderr : process.stdout).write(text + '\n'),
++  result: (tool, data) => { if (json) process.stdout.write(JSON.stringify(data) + '\n'); else for (const line of plain(tool, data)) process.stdout.write(line + '\n'); },
++ };
++}
++
++async function listTools(session, json) {
++ const tools = [];
++ let cursor;
++ for (let page = 0; page < 20; page++) {
++  const response = await session.exchange('tools/list', cursor ? { cursor } : {});
++  if (response.error) throw Error('Business MCP refused tools/list.');
++  tools.push(...(Array.isArray(response.result?.tools) ? response.result.tools : []));
++  cursor = response.result?.nextCursor;
++  if (!cursor) break;
++ }
++ if (json) process.stdout.write(JSON.stringify({ tools }) + '\n');
++ else for (const tool of tools) process.stdout.write(`${clean(tool.name, 80)}  ${clean(String(tool.description ?? '').split('\n')[0], 160)}`.trimEnd() + '\n');
++}
++
++function usage(text) { process.stderr.write(`${text}\n${agentUsage}`); return 2; }
++
++export async function agentCommand(argv) {
++ const [first, second, ...rest] = argv;
++ if (first === 'mcp') return (await import('./mcp-bridge.mjs')).bridge();
++ let row, tail = rest;
++ if (first === 'tools') { row = { name: 'tools' }; tail = [second, ...rest].filter(item => item !== undefined); }
++ else if (first === 'call') {
++  if (!/^[a-z][a-z0-9_.]{0,80}$/.test(second ?? '')) return usage('Name the tool: rer business call TOOL [--flag VALUE].');
++  row = { name: `call ${second}`, tool: second };
++ } else {
++  row = rows[`${first} ${second}`] && { name: `${first} ${second}`, ...rows[`${first} ${second}`] };
++  if (!row) return usage(`Unknown command: rer business ${first}${second ? ` ${clean(second, 40)}` : ''}.`);
++ }
++ let parsed;
++ try { parsed = await parseArguments(tail); } catch (error) { if (error instanceof Usage) return usage(error.message); throw error; }
++ const out = output(parsed.control.json);
++ let state;
++ try {
++  const connection = await paired();
++  state = connection.state;
++  const session = await mcpClient(new Api(state.origin, connection.credential));
++  if (row.name === 'tools') await listTools(session, parsed.control.json);
++  else await work(row, parsed, session, out);
++  return 0;
++ } catch (error) {
++  if (error instanceof Usage) return usage(error.message);
++  if (error instanceof Refused) {
++   const text = refusalText(error.data, ownerLink(state));
++   if (parsed.control.json) process.stdout.write(JSON.stringify(error.data ?? {}) + '\n');
++   process.stderr.write(text + '\n');
++   return error.data?.status === 'not_built' ? exitNotBuilt : 1;
++  }
++  if (error.data && parsed.control.json) process.stdout.write(JSON.stringify(error.data) + '\n');
++  process.stderr.write(describe(error) + '\n');
++  return error.exitCode ?? 1;
++ }
++}
+diff --git a/cli/business/agent-wait.mjs b/cli/business/agent-wait.mjs
+new file mode 100644
+index 00000000..5af1ef10
+--- /dev/null
++++ b/cli/business/agent-wait.mjs
+@@ -0,0 +1,28 @@
++import { pause } from './api.mjs';
++import { clean } from './agent-output.mjs';
++
++export const exitStillWaiting = 75;
++// What a follow result says. A change or an update is `{change|update: {state, ...}, next}`; next tells the agent what to do.
++const stateOf = data => data.change?.state ?? data.update?.state ?? data.import?.state ?? data.state;
++const finished = new Set(['live', 'failed', 'refused', 'done']);
++const stops = new Set(['publish', 'done', 'ask_owner']);
++
++/** Poll `follow()` every interval until the work ends or the timeout passes, saying each state change through `say`.
++ * `publishing` waits through next=publish (a publish just made is not done yet): only live, done, ask_owner, failed or
++ * refused end it. Returns { data, ended }; ended is false when the timeout ran out first. */
++export async function waitFor(follow, { say, timeout = 1800, interval = 15, publishing = false, from }) {
++ const deadline = Date.now() + timeout * 1000;
++ let last = from, data;
++ for (;;) {
++  data = await follow();
++  const state = stateOf(data), next = data.next;
++  if (state !== last) say(`${clean(state ?? 'unknown', 60)}${typeof data.change?.title === 'string' ? ` (${clean(data.change.title, 100)})` : ''}`);
++  last = state;
++  const over = finished.has(state) || next === 'ask_owner' || next === 'done' || !publishing && stops.has(next) || state === undefined && next === undefined;
++  if (over) return { data, ended: true };
++  if (Date.now() + interval * 1000 > deadline) return { data, ended: false };
++  await pause(interval * 1000);
++ }
++}
++export const failedState = data => ['failed', 'refused'].includes(stateOf(data));
++export const stateName = stateOf;
+diff --git a/cli/business/command.mjs b/cli/business/command.mjs
+index 2e7be6c7..be1c9cdf 100644
+--- a/cli/business/command.mjs
++++ b/cli/business/command.mjs
+@@ -7,6 +7,8 @@ import { run } from './supervisor.mjs';
+ import { describe } from './errors.mjs';
+ import { identifier, originUrl } from './api.mjs';
+ import { appAddress, appSignInHelp } from '../app-address.mjs';
++import { agentUsage, agentHelp } from './agent-help.mjs';
++import { agentFamilies } from './agent-table.mjs';
+ 
+ const usage = `Set up your business: rer business connect --business ID
+ The Business Connect page names the ID.
+@@ -21,6 +23,9 @@ Advanced commands (Usage: rer business VERB)
+   connect --business ID [--origin URL] [--timeout SECONDS]
+                                  Print a code and link for the owner to approve in a signed-in browser
+                                  Connect carries the Business name into local apps
++  run --grant G -- <command> [args...]
++                                 Run a command with an approved scoped cloud credential; revoked after
++  cleanup LEASE [--status]        Retry cleanup or read its safe status
+   run [--once]                   Work this computer's tasks: the folder scan the owner allows. Says what
+                                  it is doing and what it waits for; applies the owner's choices at each
+                                  check-in
+@@ -37,10 +42,11 @@ Advanced commands (Usage: rer business VERB)
+                                  inside an agent sandbox it names the one command that finishes
+ State lives in $RER_BUSINESS_STATE_DIR when set, otherwise in ~/.rer/business.
+ In an agent sandbox that writes only inside its working folder, use RER_BUSINESS_STATE_DIR="$PWD/.rer-business".
+-${appSignInHelp}
++${agentUsage}${appSignInHelp}
+ `;
+ 
+ const verbHelp = {
++ ...agentHelp,
+  setup: `Usage: rer business setup --origin URL --session-file FILE --confirm-demo [--hosting managed|assisted|self_host] [--json]
+ Create the Business for the synthetic demo company in setup-company.json and save
+ its profile, through the platform's owner routes. A repeat reuses that Business and
+@@ -58,7 +64,12 @@ changes nothing when its profile already matches. It provisions no seeds.
+ Exits 0 when the Business exists with that profile; 1 with a named {code} on stderr.
+ ${appSignInHelp}
+ `,
+- run: `Usage: rer business run [--once]
++ run: `Usage: rer business run --grant G -- <command> [args...]
++Run any software command under this paired agent’s explicit deploy action and grant.
++The scoped Cloudflare token and account reach only the child environment. Output
++is masked and cleanup is reported separately; the child’s exit status is kept.
++
++Usage: rer business run [--once]
+ Work this computer's tasks (the folder scan the owner allows) and check in every
+ 25 seconds until stopped. Steps for this computer's agent, such as a seed's Move in,
+ are shown by rer business next. --once returns after one check-in.
+@@ -82,8 +93,13 @@ Requires an existing pairing: rer business connect --business ID (the Connect pa
+ };
+ 
+ export async function businessCommand(argv) {
++ if (argv[0] === 'run' && argv[1] === '--grant' || argv[0] === 'cleanup') {
++  try { const commands = await import('./run-grant.mjs'); return await (argv[0] === 'cleanup' ? commands.cleanupCommand(argv.slice(1)) : commands.grantCommand(argv.slice(1))); }
++  catch (error) { process.stderr.write(describe(error) + '\n'); return 1; }
++ }
+  if (Object.hasOwn(verbHelp, argv[0]) && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(verbHelp[argv[0]]); return 0; }
+  if (argv[0] === 'setup') return setupCommand(argv.slice(1));
++ if (agentFamilies.has(argv[0])) return (await import('./agent-verbs.mjs')).agentCommand(argv);
+  if (!argv.length || argv[0] !== 'scan' && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(usage); return 0; }
+  if (argv[0] === 'scan') return scanCommand(argv);
+  try {
+diff --git a/cli/business/mcp-bridge.mjs b/cli/business/mcp-bridge.mjs
+new file mode 100644
+index 00000000..7030d23d
+--- /dev/null
++++ b/cli/business/mcp-bridge.mjs
+@@ -0,0 +1,58 @@
++import { createInterface } from 'node:readline';
++import { Api } from './api.mjs';
++import { mcpClient } from './questions.mjs';
++import { paired } from './local-commands.mjs';
++import { describe } from './errors.mjs';
++
++const protocolVersion = '2025-11-25';
++const forwarded = /^(tools|resources|prompts|completion|logging)\//;
++
++/** A local stdio MCP server for an agent (Claude Code, Codex): newline-delimited JSON-RPC in, the same out. Calls go to the
++ * Business MCP with a bearer minted from this computer's pairing and minted again when it nears expiry or is refused, so the
++ * agent never holds a token. Only protocol messages are written to stdout; everything else goes to stderr. */
++export async function bridge({ input = process.stdin, output = process.stdout, errors = process.stderr } = {}) {
++ let session;
++ const connection = () => session ??= (async () => {
++  const { state, credential } = await paired();
++  return mcpClient(new Api(state.origin, credential));
++ })().catch(error => { session = undefined; throw error; });
++ const send = message => output.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n');
++ const fail = (id, code, text) => send({ id, error: { code, message: text } });
++
++ async function handle(message) {
++  const { id, method, params } = message;
++  if (typeof method !== 'string') return;
++  if (id === undefined || id === null) return; // A notification needs no answer.
++  try {
++   if (method === 'ping') return send({ id, result: {} });
++   const upstream = await connection();
++   if (method === 'initialize') {
++    const { capabilities, instructions } = upstream.initialized;
++    return send({ id, result: { protocolVersion, capabilities: capabilities ?? {}, serverInfo: { name: 'rer-business', version: '1.0.0' }, ...(typeof instructions === 'string' ? { instructions } : {}) } });
++   }
++   if (!forwarded.test(method)) return fail(id, -32601, `Method not found: ${method.slice(0, 80)}`);
++   const response = await upstream.exchange(method, params ?? {});
++   if (response.error) {
++    const { code, message: text, data } = response.error;
++    return send({ id, error: { code: Number.isInteger(code) ? code : -32000, message: describe(Error(String(text ?? 'Business refused the request.'))), ...(data !== undefined ? { data } : {}) } });
++   }
++   send({ id, result: response.result });
++  } catch (error) {
++   errors.write(describe(error) + '\n');
++   fail(id, -32000, describe(error));
++  }
++ }
++
++ const pending = new Set();
++ const lines = createInterface({ input, crlfDelay: Infinity });
++ for await (const line of lines) {
++  if (!line.trim()) continue;
++  let message;
++  try { message = JSON.parse(line); } catch { fail(null, -32700, 'Parse error'); continue; }
++  if (message === null || typeof message !== 'object' || Array.isArray(message)) { fail(null, -32600, 'Invalid request'); continue; }
++  const work = handle(message).finally(() => pending.delete(work));
++  pending.add(work);
++ }
++ await Promise.all(pending);
++ return 0;
++}
+diff --git a/cli/business/questions.mjs b/cli/business/questions.mjs
+index d4ae56a6..2539e97e 100644
+--- a/cli/business/questions.mjs
++++ b/cli/business/questions.mjs
+@@ -9,24 +9,47 @@ const protocolVersion = '2025-11-25';
+ const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': protocolVersion };
+ export const classifications = ['uses', 'sells', 'both', 'product-dependency'];
+ 
++/** One MCP session on the Business server. The returned function calls a tool and returns its structuredContent (it throws when
++ * the tool refuses); `.call` returns the raw tool result, `.exchange` the raw JSON-RPC response for any method, `.initialized` the
++ * server's initialize result. The short-lived bearer is minted again within 30 seconds of expiry, and once on a 401. */
+ export async function mcpClient(api, { taskId, signal } = {}) {
+- const minted = await api.mintToken('mcp', { taskId, signal });
+- const options = { token: minted.access_token, signal, headers };
++ let minted = await api.mintToken('mcp', { taskId, signal });
++ const remint = async () => { minted = await api.mintToken('mcp', { taskId, signal }); };
+  let sequence = 0;
++ async function post(body) {
++  if (Date.parse(minted.expires_at) - Date.now() < 30_000) await remint();
++  const send = () => api.post('/api/business/mcp', body, { token: minted.access_token, signal, headers });
++  try { return await send(); } catch (error) {
++   if (error.status !== 401) throw error;
++   await remint();
++   return send();
++  }
++ }
++ async function exchange(method, params, notification = false) {
++  const id = ++sequence;
++  const result = await post({ jsonrpc: '2.0', ...(!notification ? { id } : {}), method, params });
++  if (notification) return null;
++  if (!result || result.id !== id || !result.error === !result.result) throw Error('Business MCP operation was refused.');
++  return result;
++ }
+  async function rpc(method, params, notification = false) {
+-  const result = await api.post('/api/business/mcp', { jsonrpc: '2.0', ...(!notification ? { id: ++sequence } : {}), method, params }, options);
+-  if (notification) return;
+-  if (!result || result.error || result.id !== sequence) throw Error('Business MCP operation was refused.');
+-  return result.result;
++  const result = await exchange(method, params, notification);
++  if (result?.error) throw Error('Business MCP operation was refused.');
++  return result?.result;
+  }
+  const initialized = await rpc('initialize', { protocolVersion, capabilities: {}, clientInfo: { name: 'rer-business', version: '1.0.0' } });
+  if (initialized.protocolVersion !== protocolVersion) throw Error('Business MCP protocol revision is unsupported.');
+  await rpc('notifications/initialized', {}, true);
+- return async (name, args = {}) => {
+-  const result = await rpc('tools/call', { name, arguments: args });
++ const call = async (name, args = {}) => {
++  const response = await exchange('tools/call', { name, arguments: args });
++  if (response.error) throw Error(`Business MCP refused ${name}${typeof response.error.message === 'string' ? `: ${response.error.message.slice(0, 300)}` : ''}.`);
++  return response.result;
++ };
++ return Object.assign(async (name, args = {}) => {
++  const result = await call(name, args);
+   if (result?.isError || !result?.structuredContent) throw Error('Business task action is unavailable. Use the browser to check its requirements.');
+   return result.structuredContent;
+- };
++ }, { call, exchange, initialized });
+ }
+ 
+ export async function nextQuestions(api, signal) {
+diff --git a/cli/business/run-child.mjs b/cli/business/run-child.mjs
+new file mode 100644
+index 00000000..71e4b4d3
+--- /dev/null
++++ b/cli/business/run-child.mjs
+@@ -0,0 +1,42 @@
++import { spawn } from 'node:child_process';
++import { constants } from 'node:os';
++import { commandMask } from './run-mask.mjs';
++
++export const signalCode = signal => 128 + (constants.signals[signal] ?? 1);
++export function childEnvironment(source, credential, account) {
++ const env = Object.fromEntries(Object.entries(source).filter(([key]) => !/^(?:CLOUDFLARE_|CF_|MANAGED_CLOUDFLARE_)/i.test(key)));
++ return { ...env, CLOUDFLARE_API_TOKEN: credential, CLOUDFLARE_ACCOUNT_ID: account };
++}
++/** Own one process group, forward interruption, and bound its lifetime to the credential's server expiry. */
++export async function runChild(command, lease, { signal, source = process.env, output = process.stdout, errors = process.stderr } = {}) {
++ const values = [lease.credential, lease.account_id], stdout = commandMask(values, output), stderr = commandMask(values, errors);
++ let child, escalation, expiry, stopped;
++ const stop = reason => {
++  stopped ??= reason;
++  if (!child?.pid) return;
++  const send = sig => { try { if (process.platform === 'win32') child.kill(sig); else process.kill(-child.pid, sig); } catch (error) { if (error.code !== 'ESRCH') throw error; } };
++  send(reason);
++  escalation ??= setTimeout(() => send('SIGKILL'), 3000);
++ };
++ const interrupt = () => stop(signal.reason?.signal ?? 'SIGTERM');
++ try {
++  if (signal?.aborted) return { code: signalCode(signal.reason?.signal ?? 'SIGTERM'), signal: signal.reason?.signal };
++  child = spawn(command[0], command.slice(1), { env: childEnvironment(source, lease.credential, lease.account_id),
++   stdio: ['inherit', 'pipe', 'pipe'], shell: false, detached: process.platform !== 'win32' });
++  child.stdout.on('data', stdout.write); child.stderr.on('data', stderr.write);
++  signal?.addEventListener('abort', interrupt, { once: true });
++  if (signal?.aborted) interrupt();
++  expiry = setTimeout(() => stop('SIGTERM'), Math.max(1, Date.parse(lease.credential_expires_at) - Date.now()));
++  const result = await new Promise(resolve => {
++   let spawnError;
++   child.on('error', error => { spawnError = error; });
++   child.on('close', (code, exitSignal) => resolve(spawnError ? { code: spawnError.code === 'ENOENT' ? 127 : 126, spawnError: spawnError.code }
++    : { code: code ?? signalCode(exitSignal ?? stopped ?? 'SIGTERM'), signal: exitSignal }));
++  });
++  if (result.spawnError) errors.write(`Command could not start (${String(result.spawnError).replace(/[^A-Z0-9_]/g, '')}).\n`);
++  return result;
++ } finally {
++  clearTimeout(expiry); clearTimeout(escalation); signal?.removeEventListener('abort', interrupt);
++  stdout.end(); stderr.end();
++ }
++}
+diff --git a/cli/business/run-grant.mjs b/cli/business/run-grant.mjs
+new file mode 100644
+index 00000000..9dad88e9
+--- /dev/null
++++ b/cli/business/run-grant.mjs
+@@ -0,0 +1,65 @@
++import { randomUUID } from 'node:crypto';
++import { Api, identifier } from './api.mjs';
++import { paired } from './local-commands.mjs';
++import { runChild, signalCode } from './run-child.mjs';
++
++const route = '/api/business/executors/cloudflare-token';
++const usage = 'Usage: rer business run --grant G -- <command> [args...]\n';
++function validLease(value, state, grant, id) {
++ return value?.lease_id === id && value.grant_id === grant && value.business_id === state.businessId && value.executor_id === state.executorId
++  && /^[a-f0-9]{32}$/.test(value.account_id) && typeof value.credential === 'string' && value.credential.length >= 16 && value.credential.length <= 4096
++  && !/[\s\x00-\x1f\x7f]/.test(value.credential) && value.cleanup_status === 'active' && value.provider_credential_revoked === false
++  && Number.isFinite(Date.parse(value.credential_expires_at)) && Date.parse(value.credential_expires_at) > Date.now()
++  && Date.parse(value.credential_expires_at) <= Date.now() + 900_000;
++}
++async function cleanup(api, id) {
++ try {
++  const value = await api.post(`${route}/${id}/revoke`, {}, { quiet: true, timeout: 15000 });
++  if (value?.lease_id === id && ['revoked', 'expired'].includes(value.cleanup_status)
++   && (value.cleanup_status !== 'revoked' || value.provider_credential_revoked === true)) return value.cleanup_status;
++ } catch { /* A lost acknowledgement is unconfirmed, never success. */ }
++ return 'unconfirmed';
++}
++export async function cleanupCommand(args) {
++ if (args.length < 1 || args.length > 2 || args[1] !== undefined && args[1] !== '--status' || !/^[a-f0-9-]{36}$/.test(args[0])) {
++  process.stderr.write('Usage: rer business cleanup LEASE [--status]\n'); return 2;
++ }
++ const {state, credential} = await paired(), api = new Api(state.origin, credential), id = args[0];
++ try {
++  const value = args[1] ? await api.request('GET', `${route}/${id}`, undefined, { quiet: true }) : null;
++  const status = args[1] ? value?.lease_id === id && ['issuing','active','revoked','unconfirmed','expired'].includes(value.cleanup_status) ? value.cleanup_status : 'unconfirmed' : await cleanup(api, id);
++  process.stderr.write(`Cloud credential cleanup: ${status}. Lease ${id}.\n`);
++  return ['revoked','expired'].includes(status) ? 0 : 1;
++ } catch { process.stderr.write(`Cloud credential cleanup: unconfirmed. Lease ${id}.\n`); return 1; }
++}
++export async function grantCommand(args) {
++ if (args[0] !== '--grant' || !args[1] || args[2] !== '--' || !args[3]) { process.stderr.write(usage); return 2; }
++ try { identifier(args[1]); } catch { process.stderr.write(usage); return 2; }
++ const {state, credential} = await paired(), api = new Api(state.origin, credential), id = randomUUID();
++ const stop = new AbortController(), handlers = new Map();
++ for (const signal of ['SIGINT','SIGTERM','SIGHUP']) {
++  const handler = () => { if (!stop.signal.aborted) stop.abort({signal}); };
++  handlers.set(signal, handler); process.on(signal, handler);
++ }
++ let lease, code = 1, exitSignal;
++ try {
++  // No automatic retry: a lost response may already have minted a child. Cleanup uses the preselected lease id.
++  lease = await api.post(route, {grant_id: args[1], lease_id: id}, {quiet: true, signal: stop.signal});
++  if (!validLease(lease, state, args[1], id) || lease.credential === credential) throw Error('invalid credential exchange');
++  const result = await runChild(args.slice(3), lease, {signal: stop.signal});
++  code = result.code; exitSignal = result.signal;
++ } catch {
++  code = stop.signal.aborted ? signalCode(stop.signal.reason.signal) : 1;
++  process.stderr.write('Business command refused or its credential exchange failed. Check pairing, selected account, deploy action, grant and Cloudflare consent in Business.\n');
++ } finally {
++  const status = await cleanup(api, id);
++  const expiry = lease && Number.isFinite(Date.parse(lease.credential_expires_at)) ? new Date(lease.credential_expires_at).toISOString() : 'the server-enforced expiry (at most 15 minutes)';
++  process.stderr.write(`Cloud credential cleanup: ${status}. Lease ${id}.${status === 'unconfirmed' ? ` Credential expiry: ${expiry}. Retry: rer business cleanup ${id}.` : ''}\n`);
++  lease = undefined;
++  for (const [signal, handler] of handlers) process.removeListener(signal, handler);
++ }
++ // Keep the child's exit status even if cleanup is unconfirmed; cleanup has its own explicit status above.
++ exitSignal ??= stop.signal.reason?.signal;
++ if (exitSignal && process.platform !== 'win32') { process.kill(process.pid, exitSignal); await new Promise(resolve => setImmediate(resolve)); }
++ return code;
++}
+diff --git a/cli/business/run-mask.mjs b/cli/business/run-mask.mjs
+new file mode 100644
+index 00000000..cbc3cc90
+--- /dev/null
++++ b/cli/business/run-mask.mjs
+@@ -0,0 +1,21 @@
++import { StringDecoder } from 'node:string_decoder';
++
++/** Keep a possible credential prefix across writes; neither chunk boundaries nor EOF release it. */
++export function commandMask(values, output) {
++ const secrets = [...new Set(values.filter(value => typeof value === 'string' && value).flatMap(value =>
++  [value, encodeURIComponent(value), Buffer.from(value).toString('base64'), Buffer.from(value).toString('base64url')]))].sort((a, b) => b.length - a.length);
++ const decoder = new StringDecoder('utf8');
++ let pending = '';
++ function replace(text) { for (const secret of secrets) text = text.split(secret).join('[credential]'); return text; }
++ function write(chunk) {
++  pending = replace(pending + decoder.write(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
++  let held = 0;
++  for (const secret of secrets) for (let count = Math.min(secret.length - 1, pending.length); count > held; count--)
++   if (pending.endsWith(secret.slice(0, count))) { held = count; break; }
++  const ready = pending.slice(0, pending.length - held);
++  pending = pending.slice(pending.length - held);
++  if (ready) output.write(ready);
++ }
++ return { write, end() { pending = replace(pending + decoder.end()); if (pending) output.write('[credential]'); pending = ''; },
++  text: replace };
++}
+diff --git a/cli/fixtures/business/agent-server.mjs b/cli/fixtures/business/agent-server.mjs
+new file mode 100644
+index 00000000..3921cde4
+--- /dev/null
++++ b/cli/fixtures/business/agent-server.mjs
+@@ -0,0 +1,50 @@
++import { createServer } from 'node:http';
++
++// A fake Business MCP at the network edge: the executors token route and /api/business/mcp (Streamable HTTP JSON-RPC 2025-11-25),
++// with the agent tools' result shapes. `state` is the test's handle on what it saw and how it answers next.
++export async function agentServer(t, device) {
++ const state = { mints: 0, bearers: new Set(), stale: new Set(), calls: [], followed: [], published: 0, stall: false };
++ // The phases the next change.follow calls return, the last one repeating; what each phase says to do next.
++ let script = [];
++ const next = { working: 'wait', preview_ready: 'publish', publishing: 'wait', live: 'done' };
++ const tools = [['installations.list', 'List the installed apps'], ['change.request', 'Ask for a change'], ['domain.records', 'DNS records'], ['app.send_sign_in_link', 'Sign-in link']];
++ const refusal = structuredContent => ({ isError: true, content: [{ type: 'text', text: structuredContent.message }], structuredContent });
++ const answer = (structuredContent) => ({ content: [{ type: 'text', text: 'ok' }], structuredContent });
++ function call(name, args) {
++  state.calls.push([name, args]);
++  if (name === 'installations.list') return answer({ installations: [{ installation_id: 'inst_1', app: 'happytohelp', name: 'Support', state: 'running', version: '0.4.1', app_url: 'https://help.example.test' }] });
++  if (name === 'change.request') { script = ['working', 'working', 'preview_ready']; return answer({ change: { id: 'chg_1', state: 'working' }, next: 'wait' }); }
++  if (name === 'change.follow') {
++   const phase = state.stall ? 'working' : script.length > 1 ? script.shift() : script[0];
++   state.followed.push(phase);
++   return answer({ change: { id: args.change_id, state: phase }, next: next[phase] });
++  }
++  if (name === 'change.publish') { script = ['publishing', 'live']; state.published++; return answer({ change: { id: args.change_id, state: 'publishing' }, next: 'wait' }); }
++  if (name === 'domain.records') return refusal({ status: 'not_built', code: 'not_built', message: 'not built yet' });
++  if (name === 'app.send_sign_in_link') return refusal({ status: 'action_not_granted', code: 'action_not_granted', action: 'app.send_sign_in_link', message: 'The owner has not granted this action.' });
++  return refusal({ status: 'refused', code: 'unknown_tool', message: `No tool ${name}` });
++ }
++ const server = createServer(async (request, response) => {
++  let text = ''; for await (const chunk of request) text += chunk;
++  const body = text ? JSON.parse(text) : {};
++  const json = (status, value) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(value)); };
++  const token = (request.headers.authorization ?? '').replace(/^Bearer /, '');
++  if (request.url === '/api/business/executors/token') {
++   if (token !== device) return json(401, { error: 'unknown device' });
++   const bearer = `bz_task_fixture-${++state.mints}`; state.bearers.add(bearer);
++   return json(200, { access_token: bearer, token_type: 'Bearer', expires_in: 300, expires_at: new Date(Date.now() + 300_000).toISOString(), audience: `${state.origin}/api/business/mcp`, task_id: null });
++  }
++  if (request.url !== '/api/business/mcp') return json(404, { error: 'no route' });
++  if (!state.bearers.has(token) || state.stale.has(token)) return json(401, { error: 'bearer expired' });
++  const reply = result => json(200, { jsonrpc: '2.0', id: body.id, result });
++  if (body.method === 'initialize') return reply({ protocolVersion: '2025-11-25', capabilities: { tools: {} }, serverInfo: { name: 'business', version: '1' } });
++  if (body.method === 'notifications/initialized') { response.writeHead(202, { 'content-length': 0 }); return response.end(); }
++  if (body.method === 'tools/list') return reply({ tools: tools.map(([name, description]) => ({ name, description, inputSchema: { type: 'object' } })) });
++  if (body.method === 'tools/call') return reply(call(body.params.name, body.params.arguments));
++  return json(200, { jsonrpc: '2.0', id: body.id, error: { code: -32601, message: 'Method not found' } });
++ });
++ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
++ t.after(() => server.close());
++ state.origin = `http://127.0.0.1:${server.address().port}`;
++ return state;
++}
+diff --git a/default-seed/scripts/base-cli/cli/README.md b/default-seed/scripts/base-cli/cli/README.md
+index 3c68cc6a..abe0d9d1 100644
+--- a/default-seed/scripts/base-cli/cli/README.md
++++ b/default-seed/scripts/base-cli/cli/README.md
+@@ -697,3 +697,43 @@ unattempted sizes `complete:false`; these files keep the existing statement name
+ SQL and bound parameters and carry diagnostic flow summaries. Missing work never
+ produces a passing growth verdict. See the size section of
+ [the command contract](../export/SEED-COMMAND-CONTRACT.md#statement-size-and-growth-sc-15).
++
++## Run a command with a Business grant
++
++Pair with the Business using `rer business connect --business ID`. The owner
++approves this agent, ticks **Run software commands with an approved cloud grant**,
++Connects Cloudflare, selects the exact Business account and approves a per-agent
++grant with explicit resource permissions and expiry. These choices install nothing.
++
++```sh
++rer business run --grant GRANT_ID -- rer deploy
++rer business run --grant GRANT_ID -- any-command 'argument with spaces'
++```
++
++`cloudflare.token` in the Business MCP describes the exchange without returning a
++credential. Only the paired rer exchange receives a child token; the parent OAuth
++credential stays on the trusted server. The command gets `CLOUDFLARE_API_TOKEN`
++and `CLOUDFLARE_ACCOUNT_ID` in its environment. Cloudflare credential aliases from
++the caller environment are removed. No shell is inserted and arguments after
++`--`, including help flags, are passed unchanged. Existing `run [--once]` continues
++its computer check-in behavior.
++
++This is an environment boundary, not a sandbox. The selected process and its
++descendants can read and use the credential, and a malicious process can disclose
++it or read other files or OS credentials available to the same user. Use software
++you trust. Output masks the credential and common encoded forms across chunk
++boundaries; it cannot hide every transformation a malicious process invents.
++Commands may load their own files and credentials. The wrapper supplies only the
++approved credential, never retries with broader or ambient access, and does not
++protect a process from its own deliberate credential loading.
++
++The child expires after at most 15 minutes, bounded also by the grant and the
++provider authorization. The wrapper interrupts a command at that expiry. It
++requests revocation after success, failure, signals or spawn failure; SIGKILL,
++crashes, network loss and lost acknowledgements may leave a token until server
++expiry. Child exit codes and Unix terminating signals are preserved. Cleanup has
++its own stderr status, including **unconfirmed**, which is never called revoked.
++The safe lease ID in that status supports `rer business cleanup LEASE` to retry
++revocation and `rer business cleanup LEASE --status` to read its status. Cleanup
++needs the original pairing, but does not require the removed deploy action or an
++active grant. No child token is saved in state, OS storage, logs or MCP output.
+diff --git a/default-seed/scripts/base-cli/cli/business/agent-args.mjs b/default-seed/scripts/base-cli/cli/business/agent-args.mjs
+new file mode 100644
+index 00000000..39a2db48
+--- /dev/null
++++ b/default-seed/scripts/base-cli/cli/business/agent-args.mjs
+@@ -0,0 +1,60 @@
++import { readFile } from 'node:fs/promises';
++import { aliases } from './agent-table.mjs';
++
++const booleans = new Set(['json', 'wait', 'publish', 'help']);
++const numbers = new Set(['timeout', 'interval']);
++export class Usage extends Error {}
++
++const snake = flag => (aliases[flag] ?? flag).replaceAll('-', '_');
++// A value that starts like JSON is sent as JSON; @FILE reads a JSON (or text) file. Anything else is text.
++async function value(flag, text) {
++ let source = text;
++ if (text.startsWith('@')) {
++  try { source = (await readFile(text.slice(1), 'utf8')).trim(); } catch { throw new Usage(`Could not read ${text.slice(1)} for --${flag}.`); }
++  if (!/^[[{]/.test(source)) return source;
++ }
++ if (!/^[[{]/.test(source)) return source;
++ try { return JSON.parse(source); } catch { throw new Usage(`--${flag} is not valid JSON.`); }
++}
++
++/** Flags and bare words to { arguments, control, positional }. Flags become arguments (kebab-case to snake_case); --json,
++ * --wait, --publish, --timeout SECONDS and --interval SECONDS steer rer itself; --args JSON adds a whole arguments object. */
++export async function parseArguments(args) {
++ const control = {}, named = {}, words = [];
++ for (let index = 0; index < args.length; index++) {
++  const token = args[index];
++  if (token === '-h') { control.help = true; continue; }
++  if (!token.startsWith('--') || token === '--') { words.push(token); continue; }
++  const [flag, inline] = token.slice(2).split(/=(.*)/s, 2);
++  if (!/^[a-z][a-z0-9-]{0,40}$/.test(flag)) throw new Usage(`Unknown flag ${token.slice(0, 40)}.`);
++  if (booleans.has(flag)) { control[flag] = true; continue; }
++  const text = inline ?? args[++index];
++  if (text === undefined || inline === undefined && text.startsWith('--')) throw new Usage(`A value is required for --${flag}.`);
++  const target = numbers.has(flag) ? control : named;
++  const key = numbers.has(flag) ? flag : snake(flag);
++  if (Object.hasOwn(target, key)) throw new Usage(`Repeated flag --${flag}.`);
++  if (numbers.has(flag)) {
++   const number = Number(text);
++   if (!Number.isFinite(number) || number <= 0 || number > 86400) throw new Usage(`--${flag} takes a number of seconds.`);
++   control[flag] = number;
++  } else named[key] = await value(flag, text);
++ }
++ const { args: whole, ...rest } = named;
++ if (whole !== undefined && (whole === null || typeof whole !== 'object' || Array.isArray(whole))) throw new Usage('--args takes a JSON object.');
++ for (const key of Object.keys(whole ?? {})) if (Object.hasOwn(rest, key)) throw new Usage(`${key} is given both as a flag and in --args.`);
++ return { arguments: { ...whole, ...rest }, control, words };
++}
++
++/** Put the bare words into the row's positional argument: free text for a sentence, exactly one word for an identifier. */
++export function place(row, parsed) {
++ const { words } = parsed, into = row.positional;
++ if (!words.length) return parsed.arguments;
++ if (!into) throw new Usage(`Unexpected word "${words[0].slice(0, 40)}". Pass values as --flag VALUE.`);
++ if (Object.hasOwn(parsed.arguments, into)) throw new Usage(`${into} is given both as a flag and as words.`);
++ if (into !== 'intent' && words.length > 1) throw new Usage(`Expected one ${into.replaceAll('_', '-')}, got ${words.length} words.`);
++ return { ...parsed.arguments, [into]: words.join(' ') };
++}
++
++export function missing(row, argumentsObject) {
++ return (row.required ?? []).filter(name => argumentsObject[name] === undefined);
++}
+diff --git a/default-seed/scripts/base-cli/cli/business/agent-help.mjs b/default-seed/scripts/base-cli/cli/business/agent-help.mjs
+new file mode 100644
+index 00000000..7afd9647
+--- /dev/null
++++ b/default-seed/scripts/base-cli/cli/business/agent-help.mjs
+@@ -0,0 +1,53 @@
++import { rows, families } from './agent-table.mjs';
++
++const verb = name => name.split(' ')[1];
++const exits = `Exits 0 done, 1 refused or failed (the server's message is printed), 2 usage, 3 not built yet, 75 still working when\n--timeout ran out. A verb the owner has not granted this computer names where the owner grants it: Business, under Computers.`;
++const flags = `
++  --app ID, --installation-id ID   The installed app (from rer business installations list)
++  --FLAG VALUE                     Any other flag is an argument of the tool: --change-id, --preparation-id,
++                                   --domain-id, --request-key, --method, --surface, --hostname, --public-path
++                                   (kebab-case becomes snake_case). A value that starts with { or [ is JSON;
++                                   @FILE reads a file. --args JSON gives the whole arguments object
++  --json                           Print the tool's structuredContent as JSON (progress goes to stderr)
++  --wait, --timeout SECONDS, --interval SECONDS
++                                   Follow to the end where the verb supports it (default 1800 s, polling every 15 s)
++${exits}`;
++
++/** The lines the advanced-commands help adds for the agent verbs. */
++export const agentUsage = `
++Agent verbs (Usage: rer business FAMILY VERB [--flags] [--json])
++Act on the company's installed apps from this computer, with no browser. Needs rer business connect first.
++${Object.entries(rows).map(([name, row]) => `  ${name.padEnd(24)} ${row.about}`).join('\n')}
++  tools                    List the tools the Business server offers
++  call TOOL [--flags]      Call a tool that has no verb of its own yet
++  mcp                      A local stdio MCP server for Claude Code or Codex: add \`rer business mcp\` as a server
++                           and the agent never handles a token
++  change request --app ID "WHAT TO CHANGE" [--wait] [--publish]
++                           --wait follows the change to its preview; --publish also publishes it and waits for live
++${exits}
++`;
++
++const family = name => Object.entries(rows).filter(([key]) => key.split(' ')[0] === name)
++ .map(([key, row]) => `  ${verb(key).padEnd(22)} ${row.about}`).join('\n');
++const help = name => `Usage: rer business ${name} VERB [--flags] [--json]
++${family(name)}
++${flags}
++`;
++
++export const agentHelp = {
++ ...Object.fromEntries(families.map(name => [name, help(name)])),
++ tools: `Usage: rer business tools [--json]
++List the tools the Business server offers: name and a one-line description. Use rer business call TOOL to call one that has no verb.
++`,
++ call: `Usage: rer business call TOOL [--flag VALUE ...] [--args JSON] [--json]
++Call any Business tool by name, such as installation.status. Flags become the tool's arguments (kebab-case to snake_case).
++Exits 0 done, 1 refused or failed, 3 not built yet.
++`,
++ mcp: `Usage: rer business mcp
++Run a local MCP server on stdin and stdout (newline-delimited JSON-RPC, revision 2025-11-25) that forwards to the Business
++MCP. It keeps the short-lived bearer fresh from this computer's pairing, so the agent that starts it never handles a token.
++Claude Code: claude mcp add business -- rer business mcp
++Codex: add [mcp_servers.business] with command = "rer" and args = ["business", "mcp"]
++Needs rer business connect first. Only protocol messages go to stdout; diagnostics go to stderr.
++`,
++};
+diff --git a/default-seed/scripts/base-cli/cli/business/agent-output.mjs b/default-seed/scripts/base-cli/cli/business/agent-output.mjs
+new file mode 100644
+index 00000000..a4a68414
+--- /dev/null
++++ b/default-seed/scripts/base-cli/cli/business/agent-output.mjs
+@@ -0,0 +1,38 @@
++import { redact } from './errors.mjs';
++
++const scalar = value => value === null || ['string', 'number', 'boolean'].includes(typeof value);
++export const clean = (value, limit = 300) => redact(typeof value === 'string' ? value : JSON.stringify(value)).replace(/\s+/g, ' ').trim().slice(0, limit);
++
++// One plain line for an object: its scalar fields as key=value, nested values as compact JSON.
++function item(object) {
++ if (scalar(object)) return clean(object);
++ return Object.entries(object).filter(([, value]) => value !== null && value !== undefined).map(([key, value]) => `${key}=${clean(value, 120)}`).join('  ');
++}
++
++/** A tool result as a few plain lines. */
++export function plain(tool, data) {
++ if (tool === 'installations.list' && Array.isArray(data.installations)) {
++  if (!data.installations.length) return ['No apps are installed for this company yet.'];
++  return data.installations.map(app => [app.installation_id, app.app, app.name, app.state, app.version, app.app_url].filter(part => part !== undefined && part !== null).map(part => clean(part, 120)).join('  '));
++ }
++ const lines = [];
++ for (const [key, value] of Object.entries(data)) {
++  if (value === null || value === undefined) continue;
++  if (Array.isArray(value)) { lines.push(`${key}: ${value.length ? '' : 'none'}`.trimEnd(), ...value.map(entry => `  - ${item(entry)}`)); }
++  else if (scalar(value)) lines.push(`${key}: ${clean(value)}`);
++  else lines.push(`${key}: ${item(value)}`);
++ }
++ return lines.length ? lines : ['Done.'];
++}
++
++/** Why a tool refused, in words the person reading an agent's transcript can act on. */
++export function refusalText(data, ownerPage) {
++ const message = typeof data?.message === 'string' && data.message ? clean(data.message, 500) : null;
++ if (data?.status === 'not_built') return `Not built yet: ${message ?? 'Business has not built this yet.'}`;
++ if (data?.status === 'action_not_granted') {
++  const action = typeof data.action === 'string' ? clean(data.action, 80) : 'this action';
++  return `The owner has not let this computer do "${action}". The owner grants it in Business, under Computers: ${ownerPage}`;
++ }
++ const code = typeof data?.code === 'string' ? ` (${clean(data.code, 80)})` : '';
++ return `Business refused: ${message ?? data?.status ?? 'no reason given'}${code}`;
++}
+diff --git a/default-seed/scripts/base-cli/cli/business/agent-table.mjs b/default-seed/scripts/base-cli/cli/business/agent-table.mjs
+new file mode 100644
+index 00000000..06fbfadc
+--- /dev/null
++++ b/default-seed/scripts/base-cli/cli/business/agent-table.mjs
+@@ -0,0 +1,32 @@
++// The agent verbs: `rer business FAMILY VERB` is one row here. A row names the Business MCP tool it calls, the argument a bare
++// word fills (positional), the arguments the call needs (required) and whether --wait follows it to its end (wait). A new
++// tool needs one row; `rer business call TOOL --flag value` reaches a tool that has none yet.
++export const rows = {
++ 'installations list': { tool: 'installations.list', about: 'The apps installed for this company, with their state and address' },
++ 'installation status': { tool: 'installation.status', positional: 'installation_id', required: ['installation_id'], about: 'One installed app: state, version, hosting, progress' },
++ 'change request': { tool: 'change.request', positional: 'intent', required: ['installation_id', 'intent'], wait: 'change', about: 'Ask for a change to an app, in plain words' },
++ 'change follow': { tool: 'change.follow', positional: 'change_id', required: ['change_id'], wait: 'change', about: 'Where a requested change is, and what happens next' },
++ 'change publish': { tool: 'change.publish', positional: 'change_id', required: ['change_id'], about: 'Publish a change whose preview is ready' },
++ 'update list': { tool: 'update.list', positional: 'installation_id', required: ['installation_id'], about: 'Updates available for an app' },
++ 'update prepare': { tool: 'update.prepare', positional: 'installation_id', required: ['installation_id'], about: 'Prepare the app for its next update' },
++ 'update build': { tool: 'update.build', positional: 'installation_id', required: ['installation_id', 'preparation_id'], about: 'Build a prepared update' },
++ 'update follow': { tool: 'update.follow', positional: 'installation_id', required: ['installation_id'], wait: 'update', about: 'Where an update is' },
++ 'domain set': { tool: 'domain.set', positional: 'domain', required: ['domain'], about: "Set the company's domain" },
++ 'domain prove': { tool: 'domain.prove', required: ['method'], about: 'Prove the domain: --method txt|cloudflare' },
++ 'domain attach': { tool: 'domain.attach', positional: 'hostname', required: ['installation_id', 'surface', 'hostname'], about: 'Give an app surface a hostname (--public-path optional)' },
++ 'domain records': { tool: 'domain.records', positional: 'installation_id', required: ['installation_id'], about: 'The DNS records an app needs' },
++ 'domain check': { tool: 'domain.check', required: ['installation_id', 'domain_id'], about: 'Check that a domain is attached and answering' },
++ 'domain remove': { tool: 'domain.remove', required: ['installation_id', 'domain_id'], about: 'Detach a domain from an app' },
++ 'import start': { tool: 'import.start', positional: 'installation_id', required: ['installation_id'], about: "Start moving an old tool's data into an app" },
++ 'import follow': { tool: 'import.follow', positional: 'installation_id', required: ['installation_id'], about: 'Where an import is' },
++ 'profile set': { tool: 'business.profile.set', required: ['profile'], about: 'Save the business profile: --profile JSON or --profile @FILE' },
++ 'plan draft': { tool: 'plan.draft', about: 'Draft the plan: --FIELD VALUE, or --args JSON' },
++ 'plan read': { tool: 'plan.read', about: 'Read the plan' },
++ 'plan request-approval': { tool: 'plan.request_approval', about: 'Ask the owner to approve the plan' },
++ 'app owner-signed-in': { tool: 'app.owner_signed_in', positional: 'installation_id', required: ['installation_id'], about: 'Has the owner signed in to the app yet' },
++ 'app send-sign-in-link': { tool: 'app.send_sign_in_link', positional: 'installation_id', required: ['installation_id'], about: 'Email the owner a sign-in link to the app' },
++};
++// Short flag names for argument names, so `--app ID` is `--installation-id ID`.
++export const aliases = { app: 'installation_id' };
++export const families = [...new Set(Object.keys(rows).map(name => name.split(' ')[0]))];
++export const agentFamilies = new Set([...families, 'tools', 'mcp', 'call']);
+diff --git a/default-seed/scripts/base-cli/cli/business/agent-verbs.mjs b/default-seed/scripts/base-cli/cli/business/agent-verbs.mjs
+new file mode 100644
+index 00000000..4d1cd2f0
+--- /dev/null
++++ b/default-seed/scripts/base-cli/cli/business/agent-verbs.mjs
+@@ -0,0 +1,132 @@
++import { Api } from './api.mjs';
++import { mcpClient, ownerLink } from './questions.mjs';
++import { paired } from './local-commands.mjs';
++import { describe } from './errors.mjs';
++import { businessCommand } from './invocation.mjs';
++import { rows } from './agent-table.mjs';
++import { parseArguments, place, missing, Usage } from './agent-args.mjs';
++import { plain, refusalText, clean } from './agent-output.mjs';
++import { waitFor, failedState, stateName, exitStillWaiting } from './agent-wait.mjs';
++import { agentUsage } from './agent-help.mjs';
++
++export const exitNotBuilt = 3;
++
++class Refused extends Error {
++ constructor(data) { super(data?.message ?? 'Business refused the action.'); this.data = data; }
++}
++
++// A tool's structuredContent, or the refusal it came back with.
++async function invoke(session, tool, args) {
++ const result = await session.call(tool, args);
++ if (result?.isError) throw new Refused(result.structuredContent ?? { status: 'refused', message: result.content?.find?.(part => part?.type === 'text')?.text });
++ if (!result?.structuredContent || typeof result.structuredContent !== 'object') throw Error(`Business returned no result for ${tool}.`);
++ return result.structuredContent;
++}
++
++const idOf = (data, key) => data[key]?.id ?? data[`${key}_id`];
++
++async function change(row, args, control, session, say) {
++ let data = await invoke(session, row.tool, args);
++ const id = idOf(data, 'change') ?? args.change_id;
++ if (typeof id === 'string') say(`Change ${clean(id, 80)}: ${clean(stateName(data) ?? 'requested', 60)}`);
++ if (!control.wait && !control.publish) {
++  if (row.tool === 'change.request' && typeof id === 'string') say(`Follow it with: ${businessCommand(`change follow ${id} --wait`)}`);
++  return data;
++ }
++ if (typeof id !== 'string') throw Error('Business did not name the change, so there is nothing to follow.');
++ const options = { say: state => say(`Change ${id}: ${state}`), timeout: control.timeout, interval: control.interval, from: stateName(data) };
++ const follow = () => invoke(session, 'change.follow', { change_id: id });
++ let waited = await waitFor(follow, options);
++ if (waited.ended && control.publish && !failedState(waited.data) && waited.data.next === 'publish') {
++  const published = await invoke(session, 'change.publish', { change_id: id });
++  say(`Change ${id}: ${stateName(published) ?? 'publishing'}`);
++  waited = await waitFor(follow, { ...options, publishing: true, from: stateName(published) ?? 'publishing' });
++ }
++ data = waited.data;
++ if (!waited.ended) throw Object.assign(Error(`Still working after ${control.timeout ?? 1800} seconds. Keep waiting with: ${businessCommand(`change follow ${id} --wait`)}`), { exitCode: exitStillWaiting, data });
++ if (failedState(data)) throw Object.assign(Error(`The change ${stateName(data)}: ${clean(data.change?.message ?? data.message ?? 'no reason given', 300)}`), { exitCode: 1, data });
++ if (data.next === 'ask_owner') say('The owner needs to answer something in Business before this can go on.');
++ else if (data.next === 'publish') say(`Its preview is ready. Publish it with: ${businessCommand(`change publish ${id}`)}`);
++ return data;
++}
++
++async function update(row, args, control, session, say) {
++ const data = await invoke(session, row.tool, args);
++ if (!control.wait) return data;
++ const waited = await waitFor(() => invoke(session, 'update.follow', args), { say: state => say(`Update ${args.installation_id}: ${state}`), timeout: control.timeout, interval: control.interval });
++ if (!waited.ended) throw Object.assign(Error(`Still working after ${control.timeout ?? 1800} seconds. Keep waiting with: ${businessCommand(`update follow ${args.installation_id} --wait`)}`), { exitCode: exitStillWaiting, data: waited.data });
++ if (failedState(waited.data)) throw Object.assign(Error(`The update ${stateName(waited.data)}.`), { exitCode: 1, data: waited.data });
++ return waited.data;
++}
++const waiters = { change, update };
++
++async function work(row, parsed, session, out) {
++ const args = place(row, parsed), absent = missing(row, args), { control } = parsed;
++ if (absent.length) throw new Usage(`${row.tool} needs ${absent.map(name => `--${name.replaceAll('_', '-')}`).join(', ')}. Run rer business ${row.name.split(' ')[0]} --help.`);
++ for (const flag of ['wait', 'publish']) {
++  if (control[flag] && !(row.wait && (flag === 'wait' || row.tool.startsWith('change.')))) throw new Usage(`${row.name} does not take --${flag}.`);
++ }
++ const say = line => out.line(line);
++ out.result(row.tool, row.wait ? await waiters[row.wait](row, args, control, session, say) : await invoke(session, row.tool, args));
++}
++
++// Lines for a person go to stdout; with --json only the final structuredContent does, and progress goes to stderr.
++function output(json) {
++ return {
++  line: text => (json ? process.stderr : process.stdout).write(text + '\n'),
++  result: (tool, data) => { if (json) process.stdout.write(JSON.stringify(data) + '\n'); else for (const line of plain(tool, data)) process.stdout.write(line + '\n'); },
++ };
++}
++
++async function listTools(session, json) {
++ const tools = [];
++ let cursor;
++ for (let page = 0; page < 20; page++) {
++  const response = await session.exchange('tools/list', cursor ? { cursor } : {});
++  if (response.error) throw Error('Business MCP refused tools/list.');
++  tools.push(...(Array.isArray(response.result?.tools) ? response.result.tools : []));
++  cursor = response.result?.nextCursor;
++  if (!cursor) break;
++ }
++ if (json) process.stdout.write(JSON.stringify({ tools }) + '\n');
++ else for (const tool of tools) process.stdout.write(`${clean(tool.name, 80)}  ${clean(String(tool.description ?? '').split('\n')[0], 160)}`.trimEnd() + '\n');
++}
++
++function usage(text) { process.stderr.write(`${text}\n${agentUsage}`); return 2; }
++
++export async function agentCommand(argv) {
++ const [first, second, ...rest] = argv;
++ if (first === 'mcp') return (await import('./mcp-bridge.mjs')).bridge();
++ let row, tail = rest;
++ if (first === 'tools') { row = { name: 'tools' }; tail = [second, ...rest].filter(item => item !== undefined); }
++ else if (first === 'call') {
++  if (!/^[a-z][a-z0-9_.]{0,80}$/.test(second ?? '')) return usage('Name the tool: rer business call TOOL [--flag VALUE].');
++  row = { name: `call ${second}`, tool: second };
++ } else {
++  row = rows[`${first} ${second}`] && { name: `${first} ${second}`, ...rows[`${first} ${second}`] };
++  if (!row) return usage(`Unknown command: rer business ${first}${second ? ` ${clean(second, 40)}` : ''}.`);
++ }
++ let parsed;
++ try { parsed = await parseArguments(tail); } catch (error) { if (error instanceof Usage) return usage(error.message); throw error; }
++ const out = output(parsed.control.json);
++ let state;
++ try {
++  const connection = await paired();
++  state = connection.state;
++  const session = await mcpClient(new Api(state.origin, connection.credential));
++  if (row.name === 'tools') await listTools(session, parsed.control.json);
++  else await work(row, parsed, session, out);
++  return 0;
++ } catch (error) {
++  if (error instanceof Usage) return usage(error.message);
++  if (error instanceof Refused) {
++   const text = refusalText(error.data, ownerLink(state));
++   if (parsed.control.json) process.stdout.write(JSON.stringify(error.data ?? {}) + '\n');
++   process.stderr.write(text + '\n');
++   return error.data?.status === 'not_built' ? exitNotBuilt : 1;
++  }
++  if (error.data && parsed.control.json) process.stdout.write(JSON.stringify(error.data) + '\n');
++  process.stderr.write(describe(error) + '\n');
++  return error.exitCode ?? 1;
++ }
++}
+diff --git a/default-seed/scripts/base-cli/cli/business/agent-wait.mjs b/default-seed/scripts/base-cli/cli/business/agent-wait.mjs
+new file mode 100644
+index 00000000..5af1ef10
+--- /dev/null
++++ b/default-seed/scripts/base-cli/cli/business/agent-wait.mjs
+@@ -0,0 +1,28 @@
++import { pause } from './api.mjs';
++import { clean } from './agent-output.mjs';
++
++export const exitStillWaiting = 75;
++// What a follow result says. A change or an update is `{change|update: {state, ...}, next}`; next tells the agent what to do.
++const stateOf = data => data.change?.state ?? data.update?.state ?? data.import?.state ?? data.state;
++const finished = new Set(['live', 'failed', 'refused', 'done']);
++const stops = new Set(['publish', 'done', 'ask_owner']);
++
++/** Poll `follow()` every interval until the work ends or the timeout passes, saying each state change through `say`.
++ * `publishing` waits through next=publish (a publish just made is not done yet): only live, done, ask_owner, failed or
++ * refused end it. Returns { data, ended }; ended is false when the timeout ran out first. */
++export async function waitFor(follow, { say, timeout = 1800, interval = 15, publishing = false, from }) {
++ const deadline = Date.now() + timeout * 1000;
++ let last = from, data;
++ for (;;) {
++  data = await follow();
++  const state = stateOf(data), next = data.next;
++  if (state !== last) say(`${clean(state ?? 'unknown', 60)}${typeof data.change?.title === 'string' ? ` (${clean(data.change.title, 100)})` : ''}`);
++  last = state;
++  const over = finished.has(state) || next === 'ask_owner' || next === 'done' || !publishing && stops.has(next) || state === undefined && next === undefined;
++  if (over) return { data, ended: true };
++  if (Date.now() + interval * 1000 > deadline) return { data, ended: false };
++  await pause(interval * 1000);
++ }
++}
++export const failedState = data => ['failed', 'refused'].includes(stateOf(data));
++export const stateName = stateOf;
+diff --git a/default-seed/scripts/base-cli/cli/business/command.mjs b/default-seed/scripts/base-cli/cli/business/command.mjs
+index 2e7be6c7..be1c9cdf 100644
+--- a/default-seed/scripts/base-cli/cli/business/command.mjs
++++ b/default-seed/scripts/base-cli/cli/business/command.mjs
+@@ -7,6 +7,8 @@ import { run } from './supervisor.mjs';
+ import { describe } from './errors.mjs';
+ import { identifier, originUrl } from './api.mjs';
+ import { appAddress, appSignInHelp } from '../app-address.mjs';
++import { agentUsage, agentHelp } from './agent-help.mjs';
++import { agentFamilies } from './agent-table.mjs';
+ 
+ const usage = `Set up your business: rer business connect --business ID
+ The Business Connect page names the ID.
+@@ -21,6 +23,9 @@ Advanced commands (Usage: rer business VERB)
+   connect --business ID [--origin URL] [--timeout SECONDS]
+                                  Print a code and link for the owner to approve in a signed-in browser
+                                  Connect carries the Business name into local apps
++  run --grant G -- <command> [args...]
++                                 Run a command with an approved scoped cloud credential; revoked after
++  cleanup LEASE [--status]        Retry cleanup or read its safe status
+   run [--once]                   Work this computer's tasks: the folder scan the owner allows. Says what
+                                  it is doing and what it waits for; applies the owner's choices at each
+                                  check-in
+@@ -37,10 +42,11 @@ Advanced commands (Usage: rer business VERB)
+                                  inside an agent sandbox it names the one command that finishes
+ State lives in $RER_BUSINESS_STATE_DIR when set, otherwise in ~/.rer/business.
+ In an agent sandbox that writes only inside its working folder, use RER_BUSINESS_STATE_DIR="$PWD/.rer-business".
+-${appSignInHelp}
++${agentUsage}${appSignInHelp}
+ `;
+ 
+ const verbHelp = {
++ ...agentHelp,
+  setup: `Usage: rer business setup --origin URL --session-file FILE --confirm-demo [--hosting managed|assisted|self_host] [--json]
+ Create the Business for the synthetic demo company in setup-company.json and save
+ its profile, through the platform's owner routes. A repeat reuses that Business and
+@@ -58,7 +64,12 @@ changes nothing when its profile already matches. It provisions no seeds.
+ Exits 0 when the Business exists with that profile; 1 with a named {code} on stderr.
+ ${appSignInHelp}
+ `,
+- run: `Usage: rer business run [--once]
++ run: `Usage: rer business run --grant G -- <command> [args...]
++Run any software command under this paired agent’s explicit deploy action and grant.
++The scoped Cloudflare token and account reach only the child environment. Output
++is masked and cleanup is reported separately; the child’s exit status is kept.
++
++Usage: rer business run [--once]
+ Work this computer's tasks (the folder scan the owner allows) and check in every
+ 25 seconds until stopped. Steps for this computer's agent, such as a seed's Move in,
+ are shown by rer business next. --once returns after one check-in.
+@@ -82,8 +93,13 @@ Requires an existing pairing: rer business connect --business ID (the Connect pa
+ };
+ 
+ export async function businessCommand(argv) {
++ if (argv[0] === 'run' && argv[1] === '--grant' || argv[0] === 'cleanup') {
++  try { const commands = await import('./run-grant.mjs'); return await (argv[0] === 'cleanup' ? commands.cleanupCommand(argv.slice(1)) : commands.grantCommand(argv.slice(1))); }
++  catch (error) { process.stderr.write(describe(error) + '\n'); return 1; }
++ }
+  if (Object.hasOwn(verbHelp, argv[0]) && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(verbHelp[argv[0]]); return 0; }
+  if (argv[0] === 'setup') return setupCommand(argv.slice(1));
++ if (agentFamilies.has(argv[0])) return (await import('./agent-verbs.mjs')).agentCommand(argv);
+  if (!argv.length || argv[0] !== 'scan' && argv.some(arg => ['--help', '-h'].includes(arg))) { process.stdout.write(usage); return 0; }
+  if (argv[0] === 'scan') return scanCommand(argv);
+  try {
+diff --git a/default-seed/scripts/base-cli/cli/business/mcp-bridge.mjs b/default-seed/scripts/base-cli/cli/business/mcp-bridge.mjs
+new file mode 100644
+index 00000000..7030d23d
+--- /dev/null
++++ b/default-seed/scripts/base-cli/cli/business/mcp-bridge.mjs
+@@ -0,0 +1,58 @@
++import { createInterface } from 'node:readline';
++import { Api } from './api.mjs';
++import { mcpClient } from './questions.mjs';
++import { paired } from './local-commands.mjs';
++import { describe } from './errors.mjs';
++
++const protocolVersion = '2025-11-25';
++const forwarded = /^(tools|resources|prompts|completion|logging)\//;
++
++/** A local stdio MCP server for an agent (Claude Code, Codex): newline-delimited JSON-RPC in, the same out. Calls go to the
++ * Business MCP with a bearer minted from this computer's pairing and minted again when it nears expiry or is refused, so the
++ * agent never holds a token. Only protocol messages are written to stdout; everything else goes to stderr. */
++export async function bridge({ input = process.stdin, output = process.stdout, errors = process.stderr } = {}) {
++ let session;
++ const connection = () => session ??= (async () => {
++  const { state, credential } = await paired();
++  return mcpClient(new Api(state.origin, credential));
++ })().catch(error => { session = undefined; throw error; });
++ const send = message => output.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n');
++ const fail = (id, code, text) => send({ id, error: { code, message: text } });
++
++ async function handle(message) {
++  const { id, method, params } = message;
++  if (typeof method !== 'string') return;
++  if (id === undefined || id === null) return; // A notification needs no answer.
++  try {
++   if (method === 'ping') return send({ id, result: {} });
++   const upstream = await connection();
++   if (method === 'initialize') {
++    const { capabilities, instructions } = upstream.initialized;
++    return send({ id, result: { protocolVersion, capabilities: capabilities ?? {}, serverInfo: { name: 'rer-business', version: '1.0.0' }, ...(typeof instructions === 'string' ? { instructions } : {}) } });
++   }
++   if (!forwarded.test(method)) return fail(id, -32601, `Method not found: ${method.slice(0, 80)}`);
++   const response = await upstream.exchange(method, params ?? {});
++   if (response.error) {
++    const { code, message: text, data } = response.error;
++    return send({ id, error: { code: Number.isInteger(code) ? code : -32000, message: describe(Error(String(text ?? 'Business refused the request.'))), ...(data !== undefined ? { data } : {}) } });
++   }
++   send({ id, result: response.result });
++  } catch (error) {
++   errors.write(describe(error) + '\n');
++   fail(id, -32000, describe(error));
++  }
++ }
++
++ const pending = new Set();
++ const lines = createInterface({ input, crlfDelay: Infinity });
++ for await (const line of lines) {
++  if (!line.trim()) continue;
++  let message;
++  try { message = JSON.parse(line); } catch { fail(null, -32700, 'Parse error'); continue; }
++  if (message === null || typeof message !== 'object' || Array.isArray(message)) { fail(null, -32600, 'Invalid request'); continue; }
++  const work = handle(message).finally(() => pending.delete(work));
++  pending.add(work);
++ }
++ await Promise.all(pending);
++ return 0;
++}
+diff --git a/default-seed/scripts/base-cli/cli/business/questions.mjs b/default-seed/scripts/base-cli/cli/business/questions.mjs
+index d4ae56a6..2539e97e 100644
+--- a/default-seed/scripts/base-cli/cli/business/questions.mjs
++++ b/default-seed/scripts/base-cli/cli/business/questions.mjs
+@@ -9,24 +9,47 @@ const protocolVersion = '2025-11-25';
+ const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': protocolVersion };
+ export const classifications = ['uses', 'sells', 'both', 'product-dependency'];
+ 
++/** One MCP session on the Business server. The returned function calls a tool and returns its structuredContent (it throws when
++ * the tool refuses); `.call` returns the raw tool result, `.exchange` the raw JSON-RPC response for any method, `.initialized` the
++ * server's initialize result. The short-lived bearer is minted again within 30 seconds of expiry, and once on a 401. */
+ export async function mcpClient(api, { taskId, signal } = {}) {
+- const minted = await api.mintToken('mcp', { taskId, signal });
+- const options = { token: minted.access_token, signal, headers };
++ let minted = await api.mintToken('mcp', { taskId, signal });
++ const remint = async () => { minted = await api.mintToken('mcp', { taskId, signal }); };
+  let sequence = 0;
++ async function post(body) {
++  if (Date.parse(minted.expires_at) - Date.now() < 30_000) await remint();
++  const send = () => api.post('/api/business/mcp', body, { token: minted.access_token, signal, headers });
++  try { return await send(); } catch (error) {
++   if (error.status !== 401) throw error;
++   await remint();
++   return send();
++  }
++ }
++ async function exchange(method, params, notification = false) {
++  const id = ++sequence;
++  const result = await post({ jsonrpc: '2.0', ...(!notification ? { id } : {}), method, params });
++  if (notification) return null;
++  if (!result || result.id !== id || !result.error === !result.result) throw Error('Business MCP operation was refused.');
++  return result;
++ }
+  async function rpc(method, params, notification = false) {
+-  const result = await api.post('/api/business/mcp', { jsonrpc: '2.0', ...(!notification ? { id: ++sequence } : {}), method, params }, options);
+-  if (notification) return;
+-  if (!result || result.error || result.id !== sequence) throw Error('Business MCP operation was refused.');
+-  return result.result;
++  const result = await exchange(method, params, notification);
++  if (result?.error) throw Error('Business MCP operation was refused.');
++  return result?.result;
+  }
+  const initialized = await rpc('initialize', { protocolVersion, capabilities: {}, clientInfo: { name: 'rer-business', version: '1.0.0' } });
+  if (initialized.protocolVersion !== protocolVersion) throw Error('Business MCP protocol revision is unsupported.');
+  await rpc('notifications/initialized', {}, true);
+- return async (name, args = {}) => {
+-  const result = await rpc('tools/call', { name, arguments: args });
++ const call = async (name, args = {}) => {
++  const response = await exchange('tools/call', { name, arguments: args });
++  if (response.error) throw Error(`Business MCP refused ${name}${typeof response.error.message === 'string' ? `: ${response.error.message.slice(0, 300)}` : ''}.`);
++  return response.result;
++ };
++ return Object.assign(async (name, args = {}) => {
++  const result = await call(name, args);
+   if (result?.isError || !result?.structuredContent) throw Error('Business task action is unavailable. Use the browser to check its requirements.');
+   return result.structuredContent;
+- };
++ }, { call, exchange, initialized });
+ }
+ 
+ export async function nextQuestions(api, signal) {
+diff --git a/default-seed/scripts/base-cli/cli/business/run-child.mjs b/default-seed/scripts/base-cli/cli/business/run-child.mjs
+new file mode 100644
+index 00000000..71e4b4d3
+--- /dev/null
++++ b/default-seed/scripts/base-cli/cli/business/run-child.mjs
+@@ -0,0 +1,42 @@
++import { spawn } from 'node:child_process';
++import { constants } from 'node:os';
++import { commandMask } from './run-mask.mjs';
++
++export const signalCode = signal => 128 + (constants.signals[signal] ?? 1);
++export function childEnvironment(source, credential, account) {
++ const env = Object.fromEntries(Object.entries(source).filter(([key]) => !/^(?:CLOUDFLARE_|CF_|MANAGED_CLOUDFLARE_)/i.test(key)));
++ return { ...env, CLOUDFLARE_API_TOKEN: credential, CLOUDFLARE_ACCOUNT_ID: account };
++}
++/** Own one process group, forward interruption, and bound its lifetime to the credential's server expiry. */
++export async function runChild(command, lease, { signal, source = process.env, output = process.stdout, errors = process.stderr } = {}) {
++ const values = [lease.credential, lease.account_id], stdout = commandMask(values, output), stderr = commandMask(values, errors);
++ let child, escalation, expiry, stopped;
++ const stop = reason => {
++  stopped ??= reason;
++  if (!child?.pid) return;
++  const send = sig => { try { if (process.platform === 'win32') child.kill(sig); else process.kill(-child.pid, sig); } catch (error) { if (error.code !== 'ESRCH') throw error; } };
++  send(reason);
++  escalation ??= setTimeout(() => send('SIGKILL'), 3000);
++ };
++ const interrupt = () => stop(signal.reason?.signal ?? 'SIGTERM');
++ try {
++  if (signal?.aborted) return { code: signalCode(signal.reason?.signal ?? 'SIGTERM'), signal: signal.reason?.signal };
++  child = spawn(command[0], command.slice(1), { env: childEnvironment(source, lease.credential, lease.account_id),
++   stdio: ['inherit', 'pipe', 'pipe'], shell: false, detached: process.platform !== 'win32' });
++  child.stdout.on('data', stdout.write); child.stderr.on('data', stderr.write);
++  signal?.addEventListener('abort', interrupt, { once: true });
++  if (signal?.aborted) interrupt();
++  expiry = setTimeout(() => stop('SIGTERM'), Math.max(1, Date.parse(lease.credential_expires_at) - Date.now()));
++  const result = await new Promise(resolve => {
++   let spawnError;
++   child.on('error', error => { spawnError = error; });
++   child.on('close', (code, exitSignal) => resolve(spawnError ? { code: spawnError.code === 'ENOENT' ? 127 : 126, spawnError: spawnError.code }
++    : { code: code ?? signalCode(exitSignal ?? stopped ?? 'SIGTERM'), signal: exitSignal }));
++  });
++  if (result.spawnError) errors.write(`Command could not start (${String(result.spawnError).replace(/[^A-Z0-9_]/g, '')}).\n`);
++  return result;
++ } finally {
++  clearTimeout(expiry); clearTimeout(escalation); signal?.removeEventListener('abort', interrupt);
++  stdout.end(); stderr.end();
++ }
++}
+diff --git a/default-seed/scripts/base-cli/cli/business/run-grant.mjs b/default-seed/scripts/base-cli/cli/business/run-grant.mjs
+new file mode 100644
+index 00000000..9dad88e9
+--- /dev/null
++++ b/default-seed/scripts/base-cli/cli/business/run-grant.mjs
+@@ -0,0 +1,65 @@
++import { randomUUID } from 'node:crypto';
++import { Api, identifier } from './api.mjs';
++import { paired } from './local-commands.mjs';
++import { runChild, signalCode } from './run-child.mjs';
++
++const route = '/api/business/executors/cloudflare-token';
++const usage = 'Usage: rer business run --grant G -- <command> [args...]\n';
++function validLease(value, state, grant, id) {
++ return value?.lease_id === id && value.grant_id === grant && value.business_id === state.businessId && value.executor_id === state.executorId
++  && /^[a-f0-9]{32}$/.test(value.account_id) && typeof value.credential === 'string' && value.credential.length >= 16 && value.credential.length <= 4096
++  && !/[\s\x00-\x1f\x7f]/.test(value.credential) && value.cleanup_status === 'active' && value.provider_credential_revoked === false
++  && Number.isFinite(Date.parse(value.credential_expires_at)) && Date.parse(value.credential_expires_at) > Date.now()
++  && Date.parse(value.credential_expires_at) <= Date.now() + 900_000;
++}
++async function cleanup(api, id) {
++ try {
++  const value = await api.post(`${route}/${id}/revoke`, {}, { quiet: true, timeout: 15000 });
++  if (value?.lease_id === id && ['revoked', 'expired'].includes(value.cleanup_status)
++   && (value.cleanup_status !== 'revoked' || value.provider_credential_revoked === true)) return value.cleanup_status;
++ } catch { /* A lost acknowledgement is unconfirmed, never success. */ }
++ return 'unconfirmed';
++}
++export async function cleanupCommand(args) {
++ if (args.length < 1 || args.length > 2 || args[1] !== undefined && args[1] !== '--status' || !/^[a-f0-9-]{36}$/.test(args[0])) {
++  process.stderr.write('Usage: rer business cleanup LEASE [--status]\n'); return 2;
++ }
++ const {state, credential} = await paired(), api = new Api(state.origin, credential), id = args[0];
++ try {
++  const value = args[1] ? await api.request('GET', `${route}/${id}`, undefined, { quiet: true }) : null;
++  const status = args[1] ? value?.lease_id === id && ['issuing','active','revoked','unconfirmed','expired'].includes(value.cleanup_status) ? value.cleanup_status : 'unconfirmed' : await cleanup(api, id);
++  process.stderr.write(`Cloud credential cleanup: ${status}. Lease ${id}.\n`);
++  return ['revoked','expired'].includes(status) ? 0 : 1;
++ } catch { process.stderr.write(`Cloud credential cleanup: unconfirmed. Lease ${id}.\n`); return 1; }
++}
++export async function grantCommand(args) {
++ if (args[0] !== '--grant' || !args[1] || args[2] !== '--' || !args[3]) { process.stderr.write(usage); return 2; }
++ try { identifier(args[1]); } catch { process.stderr.write(usage); return 2; }
++ const {state, credential} = await paired(), api = new Api(state.origin, credential), id = randomUUID();
++ const stop = new AbortController(), handlers = new Map();
++ for (const signal of ['SIGINT','SIGTERM','SIGHUP']) {
++  const handler = () => { if (!stop.signal.aborted) stop.abort({signal}); };
++  handlers.set(signal, handler); process.on(signal, handler);
++ }
++ let lease, code = 1, exitSignal;
++ try {
++  // No automatic retry: a lost response may already have minted a child. Cleanup uses the preselected lease id.
++  lease = await api.post(route, {grant_id: args[1], lease_id: id}, {quiet: true, signal: stop.signal});
++  if (!validLease(lease, state, args[1], id) || lease.credential === credential) throw Error('invalid credential exchange');
++  const result = await runChild(args.slice(3), lease, {signal: stop.signal});
++  code = result.code; exitSignal = result.signal;
++ } catch {
++  code = stop.signal.aborted ? signalCode(stop.signal.reason.signal) : 1;
++  process.stderr.write('Business command refused or its credential exchange failed. Check pairing, selected account, deploy action, grant and Cloudflare consent in Business.\n');
++ } finally {
++  const status = await cleanup(api, id);
++  const expiry = lease && Number.isFinite(Date.parse(lease.credential_expires_at)) ? new Date(lease.credential_expires_at).toISOString() : 'the server-enforced expiry (at most 15 minutes)';
++  process.stderr.write(`Cloud credential cleanup: ${status}. Lease ${id}.${status === 'unconfirmed' ? ` Credential expiry: ${expiry}. Retry: rer business cleanup ${id}.` : ''}\n`);
++  lease = undefined;
++  for (const [signal, handler] of handlers) process.removeListener(signal, handler);
++ }
++ // Keep the child's exit status even if cleanup is unconfirmed; cleanup has its own explicit status above.
++ exitSignal ??= stop.signal.reason?.signal;
++ if (exitSignal && process.platform !== 'win32') { process.kill(process.pid, exitSignal); await new Promise(resolve => setImmediate(resolve)); }
++ return code;
++}
+diff --git a/default-seed/scripts/base-cli/cli/business/run-mask.mjs b/default-seed/scripts/base-cli/cli/business/run-mask.mjs
+new file mode 100644
+index 00000000..cbc3cc90
+--- /dev/null
++++ b/default-seed/scripts/base-cli/cli/business/run-mask.mjs
+@@ -0,0 +1,21 @@
++import { StringDecoder } from 'node:string_decoder';
++
++/** Keep a possible credential prefix across writes; neither chunk boundaries nor EOF release it. */
++export function commandMask(values, output) {
++ const secrets = [...new Set(values.filter(value => typeof value === 'string' && value).flatMap(value =>
++  [value, encodeURIComponent(value), Buffer.from(value).toString('base64'), Buffer.from(value).toString('base64url')]))].sort((a, b) => b.length - a.length);
++ const decoder = new StringDecoder('utf8');
++ let pending = '';
++ function replace(text) { for (const secret of secrets) text = text.split(secret).join('[credential]'); return text; }
++ function write(chunk) {
++  pending = replace(pending + decoder.write(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
++  let held = 0;
++  for (const secret of secrets) for (let count = Math.min(secret.length - 1, pending.length); count > held; count--)
++   if (pending.endsWith(secret.slice(0, count))) { held = count; break; }
++  const ready = pending.slice(0, pending.length - held);
++  pending = pending.slice(pending.length - held);
++  if (ready) output.write(ready);
++ }
++ return { write, end() { pending = replace(pending + decoder.end()); if (pending) output.write('[credential]'); pending = ''; },
++  text: replace };
++}

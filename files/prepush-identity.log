@@ -1,0 +1,6 @@
+Exact scan qualifies head; full history; zero new findings; main and source refs unchanged; new branch absent
+refs {"refs/heads/cloud/bz-connect-agent-run-1": "3de4500376e9a7183e4c5443cd11805536edb202", "refs/heads/main": "34847bae3f640486f16d42affb2274f32075248a"}
+ccad9ab155047ccb2e6e2fccee099bf3c39174b8
+James Peter <github@zemaj.com>
+James Peter <github@zemaj.com>
+Replay gated business run CLI content linearly with main inventory stamp

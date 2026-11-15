@@ -1,0 +1,10 @@
+Installed .tools/cloud_landing_linearize.py check: PASS on exact linear candidate
+gated source 3de4500376e9a7183e4c5443cd11805536edb202 tree e1b707e2994d6b38425315f0c4468060aebb9d50
+linear candidate ccad9ab155047ccb2e6e2fccee099bf3c39174b8 tree 1af01ea30cef6c96888764162976a8cb7d0d3805
+sole parent/current main 34847bae3f640486f16d42affb2274f32075248a
+FULL DIFF LIST ["default-seed/scripts/base-cli/inventory.json"]
+only changed JSON field cliVersion: 0.2.118-dev.g44f48bf6 -> 0.2.118 (main advisory stamp)
+All product behavior, tests, CLI and exported files except advisory inventory stamp: byte/mode-identical
+candidate-only ordinary commits1; merge commits0; no newer-main differences at creation
+public-base source identity: canonical repository is runeditrun/base (Repo header, actual origin), main 34847bae3f640486f16d42affb2274f32075248a
+runeditrun/run-base remote query returned Repository not found; use existing explicitly authorized canonical runeditrun/base#main, no project/repository/annotation overrides

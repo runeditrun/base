@@ -1,0 +1,101 @@
+QUEUED ticket=34659 job=20261115T184427810055Z-heavy-slot-639e51fc
+ADMITTED slot=1 cap=3 load=9.04
+RESOLVED_SHA ccad9ab155047ccb2e6e2fccee099bf3c39174b8
+NODE v22.20.0; source=scripts/agent-bootstrap.sh:NODE_VERSION; TZ=UTC; provider credentials absent
+PACKAGE_MANAGER pnpm@10.12.4
+default-seed                             |  WARN  The field "pnpm.overrides" was found in /Users/m1-runner/rer-remote/jobs/20261115T184427Z-heavy-slot-639e51fc/repo/default-seed/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+default-seed                             |  WARN  The field "pnpm.onlyBuiltDependencies" was found in /Users/m1-runner/rer-remote/jobs/20261115T184427Z-heavy-slot-639e51fc/repo/default-seed/package.json. This will not take effect. You should configure "pnpm.onlyBuiltDependencies" at the root of the workspace instead.
+Scope: all 3 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +173
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 173, reused 173, downloaded 0, added 147
+Progress: resolved 173, reused 173, downloaded 0, added 173, done
+
+devDependencies:
++ ajv 8.20.0
++ ajv-formats 3.0.1
++ miniflare 5.20260907.0-alpha
++ ws 8.22.0
+
+Done in 7.7s using pnpm v10.12.4
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +26
+++++++++++++++++++++++++++
+Progress: resolved 26, reused 26, downloaded 0, added 26, done
+
+devDependencies:
++ miniflare 5.20260907.0-alpha
+
+Done in 504ms using pnpm v10.12.4
+PLAYWRIGHT Version 1.63.0; shared cache /Users/m1-runner/rer-remote/playwright
+PLAYWRIGHT_WARM 1.63.0; no install or download
+COMMAND_START nice=10
+ WARN  The field "pnpm.overrides" was found in /Users/m1-runner/rer-remote/jobs/20261115T184427Z-heavy-slot-639e51fc/repo/default-seed/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+ WARN  The field "pnpm.onlyBuiltDependencies" was found in /Users/m1-runner/rer-remote/jobs/20261115T184427Z-heavy-slot-639e51fc/repo/default-seed/package.json. This will not take effect. You should configure "pnpm.onlyBuiltDependencies" at the root of the workspace instead.
+Scope: all 3 workspace projects
+
+Done in 3.3s using pnpm v10.12.4
+TAP version 13
+# Subtest: an outside agent acts on installed apps through the agent verbs and the stdio bridge
+ok 1 - an outside agent acts on installed apps through the agent verbs and the stdio bridge
+  ---
+  duration_ms: 2472.78875
+  type: 'test'
+  ...
+# Subtest: business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors
+ok 2 - business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors
+  ---
+  duration_ms: 730.892958
+  type: 'test'
+  ...
+# Subtest: business run refuses unavailable authority without spawning or retrying and reports unconfirmed cleanup separately from the child exit
+ok 3 - business run refuses unavailable authority without spawning or retrying and reports unconfirmed cleanup separately from the child exit
+  ---
+  duration_ms: 628.176
+  type: 'test'
+  ...
+# Subtest: business run forwards signals and enforces credential expiry, then revokes before exiting with the child signal
+ok 4 - business run forwards signals and enforces credential expiry, then revokes before exiting with the child signal
+  ---
+  duration_ms: 1707.110375
+  type: 'test'
+  ...
+# Subtest: business run reaches the ordinary rer deploy dry-run child without live provider mutation
+ok 5 - business run reaches the ordinary rer deploy dry-run child without live provider mutation
+  ---
+  duration_ms: 9671.1765
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 12818.915459
+TAP version 13
+# Subtest: portable CLI source inventory is deterministic and independent execution works outside Base
+ok 1 - portable CLI source inventory is deterministic and independent execution works outside Base
+  ---
+  duration_ms: 3692.655167
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3773.248875
+
+> @run-edit-run/default-seed-reference@0.1.0 typecheck /Users/m1-runner/rer-remote/jobs/20261115T184427Z-heavy-slot-639e51fc/repo/default-seed
+> tsc --build --incremental
+
+RESULT exit=0 wall_seconds=42.23 command_seconds=27.229 retained=False

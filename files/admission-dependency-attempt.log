@@ -1,0 +1,45 @@
+heavy-slot: m1-runner refused: busy running=3/3 waiting=0 load=8.95; trying next host
+heavy-slot: slot 0 of 10; running after 0.47s; 10 slots; free+inactive 31.5%; load5 4.45
+✔ an outside agent acts on installed apps through the agent verbs and the stdio bridge (2708.852792ms)
+✔ business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors (1031.635667ms)
+✔ business run refuses unavailable authority without spawning or retrying and reports unconfirmed cleanup separately from the child exit (865.685292ms)
+✔ business run forwards signals and enforces credential expiry, then revokes before exiting with the child signal (1912.403292ms)
+✖ business run reaches the ordinary rer deploy dry-run child without live provider mutation (1727.246333ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5661.330042
+
+✖ failing tests:
+
+test at cli/business-run.test.mjs:86:1
+✖ business run reaches the ordinary rer deploy dry-run child without live provider mutation (1727.246333ms)
+  AssertionError [ERR_ASSERTION]: Checking pinned pnpm
+  10.12.4
+  Building your application
+  build:app
+  sh: vite: command not found
+  Cloud credential cleanup: revoked. Lease f8ef400b-3807-4535-9a00-1ad73089e85b.
+  
+  {"version":1,"verb":"deploy","event":"node-selection","versionSelected":"22.20.0","previousVersion":"26.0.0","message":"Using project Node 22.20.0 (current Node 26.0.0)."}
+  {"version":1,"verb":"deploy","event":"error","code":"command_failed","message":"Building your application failed. Inspect the private redacted capture log.","exitCode":1}
+  {"version":1,"verb":"deploy","event":"result","ok":false,"exitCode":1}
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///Users/zemaj/www/rer-consolidation/work/bz-connect-agent-run-base-linear-1/base/cli/business-run.test.mjs:89:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

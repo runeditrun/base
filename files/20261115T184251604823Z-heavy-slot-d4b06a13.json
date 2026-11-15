@@ -1,0 +1,13 @@
+{
+  "id": "20261115T184251604823Z-heavy-slot-d4b06a13",
+  "ref": "ccad9ab155047ccb2e6e2fccee099bf3c39174b8",
+  "source": "bundle",
+  "started_at": 1794768173.856889,
+  "exit_code": 75,
+  "command_seconds": null,
+  "wall_seconds": 0.094,
+  "finished_at": 1794768173.9510322,
+  "job_retained": false,
+  "job_path": "/Users/m1-runner/rer-remote/jobs/20261115T184251Z-heavy-slot-d4b06a13",
+  "log_path": "/Users/m1-runner/rer-remote/logs/20261115T184251604823Z-heavy-slot-d4b06a13.log"
+}

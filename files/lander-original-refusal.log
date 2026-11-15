@@ -1,0 +1,8 @@
+Installed original check REFUSED: linearize candidate: merge commit 3de4500376e9a7183e4c5443cd11805536edb202 carries content not reproducible by an automatic merge (1 files); push a linear candidate (rebase onto main, no merge commits)
+parents 1d23121833d9c5d5aa3a880dc55878d8660ecbc5 34847bae3f640486f16d42affb2274f32075248a
+automatic return 1 tree 0f126ba312a896a609fb6e1ca74f8f6d91332911
+source tree e1b707e2994d6b38425315f0c4468060aebb9d50
+conflicts ["default-seed/scripts/base-cli/inventory.json"]
+full differing files ["default-seed/scripts/base-cli/inventory.json"]
+parent cliVersion 1d23121833d9c5d5aa3a880dc55878d8660ecbc5 0.2.118-dev.g44f48bf6
+parent cliVersion 34847bae3f640486f16d42affb2274f32075248a 0.2.118
