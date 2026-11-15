@@ -189,8 +189,10 @@ test('rer signin selects only the held app identity and refuses mismatched or re
  const succeeds = async origin => {
   const { exit, result, error } = await run();
   assert.equal(exit, 0, error?.message);
-  assert.equal(new URL(result.link).origin, origin);
-  assert.equal((await h.use(new URL(result.link).searchParams.get('token'))).status, 303);
+  const link = new URL(result.link);
+  assert.equal(link.origin, origin);
+  assert.equal(link.pathname, '/auth/owner-signin');
+  assert.equal((await h.use(link.searchParams.get('token'))).status, 303);
  };
  await succeeds('https://fixture-production.fixture-account.workers.dev');
  const statePath = join(h.root, '.rer/deploy/production.json');
