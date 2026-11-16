@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { createServer } from 'node:net';
 import { isolatedQueue } from './fixtures/queue.mjs';
 
 const base = join(import.meta.dirname, '..');
@@ -21,10 +20,6 @@ test('setup on an earlier install adds missing managed secrets and keeps every s
  const pins = JSON.parse(await readFile(join(base, 'default-seed/package.json'), 'utf8'));
  await writeFile(join(root, '.node-version'), pins.engines.node + '\n');
  await writeFile(join(root, 'package.json'), JSON.stringify({ engines: pins.engines, packageManager: pins.packageManager }));
- const socket = createServer();
- await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(0, '127.0.0.1', resolve); });
- const port = socket.address().port;
- await new Promise(resolve => socket.close(resolve));
  const managed = name => ({ name, label: name, kind: 'secret', input: 'managed', required: true, ownerVisible: false, generate: 'hex' });
  await writeFile(join(root, 'rer-setup.json'), JSON.stringify({ schema: 1, title: 'Upgraded install', groups: [], fields: [
   { name: 'ADMIN_EMAIL', label: 'Owner email', kind: 'email', required: true },
@@ -51,7 +46,9 @@ export const commandAdapter = declare(lifecycle, { setup: { manifestFile: 'rer-s
  const path = join(root, '.dev.vars');
  await writeFile(path, earlier, { mode: 0o600 });
  const setup = () => {
-  const result = spawnSync(process.execPath, [join(base, 'bin/rer.mjs'), 'setup', '--port', String(port), '--json', '--non-interactive'], { cwd: root, env, encoding: 'utf8', timeout: 30000 });
+  // Let setup search for a free port when it runs. Releasing an ephemeral
+  // listen(0) reservation here lets a concurrent journey take it before setup.
+  const result = spawnSync(process.execPath, [join(base, 'bin/rer.mjs'), 'setup', '--json', '--non-interactive'], { cwd: root, env, encoding: 'utf8', timeout: 30000 });
   assert.ifError(result.error);
   assert.equal(result.status, 1, 'only the seed start hook stops setup: ' + result.stdout);
   return result;

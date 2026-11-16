@@ -8,6 +8,8 @@ import { spawn } from 'node:child_process';
 import { exportReference } from '../../scripts/export-reference.mjs';
 import { isolatedQueue } from './queue.mjs';
 import { useWorkspaceDependencies } from './workspace-dependencies.mjs';
+import { commandCustody } from '../../onboarding/command-custody.mjs';
+import { createProcessBaseline, createProcessScope, processScopeEnvironment } from '../../onboarding/process-scope.mjs';
 
 const base=resolve(import.meta.dirname,'../..');
 export const generatedSQL=`CREATE TABLE computed_entries (
@@ -27,13 +29,20 @@ CREATE INDEX computed_entries_total ON computed_entries(total);`;
 export async function portabilityFixture(t,{generated=true,receiptWorker=false}={}) {
  const directory=await mkdtemp(join(tmpdir(),'rer-data-journey-')),root=join(directory,'installation');
  const children=new Set();
+ let closing;
+ const stop=()=>closing??=Promise.allSettled([...children].map(child=>child.custody?.stop())).then(results=>{
+  const errors=results.filter(result=>result.status==='rejected').map(result=>result.reason);
+  if(errors.length)throw new AggregateError(errors,'Fixture process cleanup failed');
+ });
+ const cancelled=()=>{void stop().catch(()=>{});};
+ t.signal.addEventListener('abort',cancelled,{once:true});
  t.after(async()=>{
   try {
-   for(const child of children)if(child.exitCode===null&&child.signalCode===null){child.kill('SIGTERM');await child.done;}
-   // Setup can leave a managed dev server after its command has returned.
-   // Stop it while its checkout and server identity still exist.
-   await command(['scripts/rer.mjs','dev','--stop','--json']);
-  } finally { await rm(directory,{recursive:true,force:true,maxRetries:3,retryDelay:100}); }
+   await stop();
+  } finally {
+   t.signal.removeEventListener('abort',cancelled);
+   await rm(directory,{recursive:true,force:true,maxRetries:3,retryDelay:100});
+  }
  });
  await exportReference(base,root);
  const declaration = JSON.parse(await readFile(join(root, 'deploy.json'), 'utf8'));
@@ -57,11 +66,23 @@ commandAdapter.portability.export=async context=>{
  await useWorkspaceDependencies(root);
  if(generated)await writeFile(join(root,'migrations/core/0999_computed_entries.sql'),generatedSQL);
  const env=await isolatedQueue(t,{PATH:process.env.PATH,HOME:process.env.HOME,CI:'true',WRANGLER_SEND_METRICS:'false',RER_NODE_AUTO:'0'});
+ const baseline=await createProcessBaseline();
  async function command(args,expected=0,extraEnv={}) {
-  const child=spawn(process.execPath,args,{cwd:root,env:{...env,...extraEnv},stdio:['ignore','pipe','pipe']});children.add(child);
+  t.signal.throwIfAborted();
+  assert.ok(!closing,'Fixture is shutting down');
+  const scope=createProcessScope(baseline);
+  const child=spawn(process.execPath,args,{cwd:root,env:processScopeEnvironment(scope,{...env,...extraEnv}),stdio:['ignore','pipe','pipe']});children.add(child);
+  child.custody=commandCustody(child,scope);
   let stdout='',stderr='';child.stdout.on('data',data=>stdout+=data);child.stderr.on('data',data=>stderr+=data);
-  child.done=new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',resolve);});
+  child.done=new Promise(resolve=>child.once('close',resolve));
+  // Exit can precede close indefinitely when a descendant inherited a pipe.
+  // Retain custody after parent exit and stop only this launch's recorded
+  // process identities, including detached helpers, before awaiting its pipes.
+  const exited=new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',resolve);});
+  try { await exited; }
+  finally { await child.custody?.stop(); }
   const code=await child.done;
+  t.signal.throwIfAborted();
   if(code!==expected)await retainStartupFailure(root,{stdoutText:stdout,exitCode:child.exitCode,signalCode:child.signalCode});
   assert.equal(code,expected,`Fixture command ${args[0]} exited ${code}: ${stdout}\n${stderr}`);
   return {stdout,stderr};
