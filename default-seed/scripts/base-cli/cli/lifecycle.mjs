@@ -113,7 +113,7 @@ async function runLifecycle(project, options, out, deployRedaction) {
   if (options.verb === 'verify') {
    const target = adapter.verify;
    if (!Array.isArray(target)) throw refuse('A complete internal verification target is missing.');
-   await ensureChromium(project.root, store, signal);
+   await ensureChromium(project.root, store, signal, project.adapter?.browser);
    await store.run('Verifying application', target[0], target[1], { cwd: project.root, signal, env: { ...process.env, RER_LOCAL_OPERATION: operation.token } });
    await store.step('Serving the production build as rer deploy hosts it');
    const declaration = adapter.deployDeclaration ?? adapter.deploy?.declaration;

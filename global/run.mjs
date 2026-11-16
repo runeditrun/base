@@ -66,7 +66,7 @@ export async function runScript(args) {
   await projectNode(target.root, process.env);
  } catch (error) { if (!(error instanceof RerError)) throw error; process.stderr.write(error.message + '\n'); return error.exitCode; }
  if (args[0] && /\bplaywright\b/.test(scripts[args[0]] ?? '')) {
-  const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, ['run']);
+  const code = await (await import('./browser-runtime.mjs')).browserPreflight(target.root, ['run', ...(scripts[args[0]].match(/--(?:headed|debug)\b/g) ?? []), ...args.slice(1)]);
   if (code !== undefined) return code;
  }
  const { toolCommand } = await shared('tool-command.mjs');

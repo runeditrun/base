@@ -59,6 +59,7 @@ export async function describe(project) {
   local: { state: project.adapter?.state, settings: project.adapter?.settings ?? [], installerState: '.seed/installer', ...await localState(project), origin: await savedOrigin(project), ...(project.adapter?.devIdentity ? { devIdentity: true, devKey: '.rer/local/dev-key.env' } : {}) },
   // This pin serves a checkout through the machine's front door (rer door).
   door: { protocol: doorProtocol },
+  browser: await browserDoctor(project.root, project.adapter?.browser),
  };
 }
 
@@ -241,7 +242,7 @@ export async function doctor(project, store, signal) {
    if (directory) { usePnpm(directory); try { pnpm = await probePnpm(project.root, store, signal); pnpmIssues.length = 0; } catch (error) { if (signal?.aborted) throw error; pnpmIssues.push(store.redact(error.message)); } }
   }
  }
- const browser = project.profile === 'first-party' ? await browserDoctor(project.root) : undefined;
+ const browser = project.profile === 'first-party' ? await browserDoctor(project.root, project.adapter?.browser) : undefined;
  const aiIssues = await localAiDiagnostics(project,process.env);
  const dependencies=project.profile==='first-party'?await dependencyDoctor(project.root):[];
  const expectedNode = await projectNodePin(project.root);
