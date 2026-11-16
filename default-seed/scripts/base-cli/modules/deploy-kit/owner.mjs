@@ -1,7 +1,9 @@
+import { pause } from './cancellation.mjs';
+import { shared } from '../../cli/shared.mjs';
 import { readinessWindow } from './readiness-window.mjs';
 import { uploadedWorker } from './uploaded-worker.mjs';
 import { ingressBindings } from './container-config.mjs';
-import { mkdir, open, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { assert, hash, identifier, resourceName, uuid, validatePlan } from './validation.mjs';
 import { definiteProviderRefusal } from './provider.mjs';
@@ -71,15 +73,16 @@ export const LIST_WINDOW_MS = 120000;
 const settleable = error => ['provider-partial-list','provider-pagination-changed'].includes(error.message);
 /** Owner mode replays a list read, and a GET of a path the provider reads as a list (a Worker's
  * deployments or versions), until a complete snapshot arrives or the window closes. */
-export function withSettledLists(api, {windowMs = LIST_WINDOW_MS, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))} = {}) {
+export function withSettledLists(api, {windowMs = LIST_WINDOW_MS, clock = () => performance.now(), sleep, signal} = {}) {
   if (api.settledLists) return api;
   const settled = read => async (...args) => {
     const start = clock();
     for (let delay = 500; ; delay = Math.min(delay * 2, 4000)) {
+      signal?.throwIfAborted();
       try { return await read(...args); }
       catch (error) {
         if (!settleable(error) || clock() - start + delay > windowMs) throw error;
-        await sleep(delay);
+        await pause(delay,signal,sleep);
       }
     }
   };
@@ -90,13 +93,14 @@ export function withSettledLists(api, {windowMs = LIST_WINDOW_MS, clock = () => 
 }
 /** Waits until the account's listing shows a resource this run just created, so no later
  * read mistakes it for a missing or replaced one. One that never appears is named. */
-async function listedAfterCreate(api, kind, item, {windowMs = LIST_WINDOW_MS, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))} = {}) {
+async function listedAfterCreate(api, kind, item, {windowMs = LIST_WINDOW_MS, clock = () => performance.now(), sleep, signal} = {}) {
   const start = clock();
   for (let delay = 500; ; delay = Math.min(delay * 2, 4000)) {
+    signal?.throwIfAborted();
     try { if (findResource(await resourceKinds[kind].list(api.unsettled ?? api),kind,item.name)) return; }
     catch (error) { if (!settleable(error)) throw error; }
     if (clock() - start + delay > windowMs) throw refuse('resource-not-listed',kind,item.name);
-    await sleep(delay);
+    await pause(delay,signal,sleep);
   }
 }
 /** Reads the account's workers.dev subdomain; no other provider request. */
@@ -373,18 +377,13 @@ async function checkOwnedWorker(api, plan, state, save) {
   return checkWorkerIdentity(api, plan, state, save);
 }
 
-/** One deploy at a time per state file: an exclusive lock file for the whole run. */
+/** One deploy per state file. A killed writer's lock is reclaimed only after
+ * its PID/start identity is dead, using the local operation's exclusive takeover. */
 export async function withStateLock(path, run) {
   await mkdir(dirname(path),{recursive:true,mode:0o700});
-  const lock = `${path}.lock`;
-  let handle;
-  try { handle = await open(lock,'wx',0o600); }
-  catch (error) { throw error.code === 'EEXIST' ? new Error('owner-state-locked') : error; }
-  try {
-    await handle.writeFile(`${process.pid}\n`);
-    await handle.close();
-    return await run();
-  } finally { try { await handle.close(); } finally { await rm(lock,{force:true}); } }
+  const { fileOperation } = await shared('local/operation.mjs');
+  const lock = await fileOperation(`${path}.lock`, undefined, () => new Error('owner-state-locked'));
+  try { return await run(); } finally { await lock.release(); }
 }
 
 /** Find or create every declared resource under the owner's account, migrate, upload and check health.
@@ -446,7 +445,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
     }
     return result;
   }};
-  const receipt = await deploy({api:observed, plan, artifact, artifactSha256:hash(artifact), previousReceipt:state.receipt ?? undefined,
+  const receipt = await deploy({api:observed, plan, artifact, artifactSha256:hash(artifact), previousReceipt:state.receipt ?? undefined, pendingUpload:state.pendingUpload,
     // Migrations run inside this run's state lock: no other deploy of this install is running.
     createResources:false, uploadWithoutReceipt:true, locked:true, env, fetch, healthOptions, readiness, declaredSecrets,
     onReceipt: async candidate => { if (candidate.changed || !state.receipt) { state.receipt = candidate; delete state.pendingUpload; delete state.pendingSecret; await save(); } },
@@ -457,7 +456,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
 
 /** Independent read-only health of the last owner deployment recorded in the state file. */
 export async function ownerHealth({api: provider, target, plan, statePath, fetch = globalThis.fetch, healthOptions = {}}) {
-  const api = withSettledLists(withScopeHints(provider));
+  const api = withSettledLists(withScopeHints(provider),{signal:healthOptions.signal});
   validatePlan(plan); assertOwnerNames(target, plan);
   const state = await readOwnerState(statePath, target);
   assert(state.receipt, 'missing-owner-receipt');

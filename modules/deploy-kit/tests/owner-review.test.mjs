@@ -139,7 +139,7 @@ test('a lost response on the first Worker upload resumes when the live Worker ca
   assert.deepEqual((await readOwnerState(statePath,target)).owned.worker,{status:'pending'});
   assert(state.settings);
   const {receipt} = await ownerDeploy(args);
-  assert.equal(receipt.changed,true); assert.equal(uploads(state),2);
+  assert.equal(receipt.changed,true); assert.equal(uploads(state),1);
   const saved = await readOwnerState(statePath,target);
   assert.deepEqual(saved.owned.worker,{status:'created'}); assert.deepEqual(saved.receipt,receipt);
   assert.equal(state.databases.length,1);
@@ -209,11 +209,11 @@ test('two deploys on one state file cannot overlap; the lock is released afterwa
 test('a lock held by another run refuses before any provider request', async t => {
   const {args,state,statePath} = await setup(t);
   await mkdir(join(statePath,'..'),{recursive:true});
-  await writeFile(`${statePath}.lock`,'12345\n');
+  await writeFile(`${statePath}.lock`,`${process.pid}\n`);
   const calls = state.calls.length;
   await assert.rejects(ownerDeploy(args),error => error.message === 'owner-state-locked');
   assert.equal(state.calls.length,calls); assert.equal(await exists(statePath),false);
-  assert.equal(await readFile(`${statePath}.lock`,'utf8'),'12345\n');
+  assert.equal(await readFile(`${statePath}.lock`,'utf8'),`${process.pid}\n`);
 });
 
 test('the owner CLI reports the named codes', async t => {

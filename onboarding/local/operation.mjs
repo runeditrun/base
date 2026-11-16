@@ -22,7 +22,12 @@ const graceMs = 10000
 export async function localOperation(root, inheritedToken) {
   const directory = join(root, '.wrangler/local-operation')
   await privateDirectory(root, directory)
-  const path = join(directory, 'active.json')
+  return fileOperation(join(directory, 'active.json'), inheritedToken)
+}
+
+// Shared with hosted deploy state: the same dead-process takeover and exclusive
+// guard protect both operations without deleting a live writer's lock.
+export async function fileOperation(path, inheritedToken, onBusy = busy) {
   if (inheritedToken) {
     let owner
     try { owner = JSON.parse(await readFile(path, 'utf8')) } catch { /* Fixed diagnostic below. */ }
@@ -40,7 +45,7 @@ export async function localOperation(root, inheritedToken) {
       // A killed process cannot release its lock. Take over only when the
       // recorded process is gone; a half-written file gets a short grace.
       if (attempt === 0 && await takeOver(path)) continue
-      throw await busy(path)
+      throw await onBusy(path)
     }
   }
   const token = randomUUID()
@@ -121,7 +126,10 @@ async function staleIdentity(path) {
     const status = await handle.stat({ bigint: true })
     const id = key(status)
     try {
-      const owner = JSON.parse(await handle.readFile('utf8'))
+      const recorded = JSON.parse(await handle.readFile('utf8'))
+      // Older deploy locks contain only a PID. Keep a live legacy holder; a
+      // dead one is safe to recover just like a structured operation record.
+      const owner = Number.isSafeInteger(recorded) ? { pid: recorded } : recorded
       if (Number.isSafeInteger(owner.pid) && owner.pid > 0) {
         if (await ownerAlive(owner)) return undefined
         retained = true

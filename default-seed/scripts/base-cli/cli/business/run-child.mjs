@@ -10,7 +10,7 @@ export function childEnvironment(source, credential, account) {
 /** Own one process group, forward interruption, and bound its lifetime to the credential's server expiry. */
 export async function runChild(command, lease, { signal, source = process.env, output = process.stdout, errors = process.stderr } = {}) {
  const values = [lease.credential, lease.account_id], stdout = commandMask(values, output), stderr = commandMask(values, errors);
- let child, escalation, expiry, stopped;
+ let child, escalation, expiry, stopped, credentialExpired = false;
  const stop = reason => {
   stopped ??= reason;
   if (!child?.pid) return;
@@ -26,7 +26,7 @@ export async function runChild(command, lease, { signal, source = process.env, o
   child.stdout.on('data', stdout.write); child.stderr.on('data', stderr.write);
   signal?.addEventListener('abort', interrupt, { once: true });
   if (signal?.aborted) interrupt();
-  expiry = setTimeout(() => stop('SIGTERM'), Math.max(1, Date.parse(lease.credential_expires_at) - Date.now()));
+  expiry = setTimeout(() => { if (!stopped) credentialExpired = true; stop('SIGTERM'); }, Math.max(1, Date.parse(lease.credential_expires_at) - Date.now()));
   const result = await new Promise(resolve => {
    let spawnError;
    child.on('error', error => { spawnError = error; });
@@ -34,7 +34,7 @@ export async function runChild(command, lease, { signal, source = process.env, o
     : { code: code ?? signalCode(exitSignal ?? stopped ?? 'SIGTERM'), signal: exitSignal }));
   });
   if (result.spawnError) errors.write(`Command could not start (${String(result.spawnError).replace(/[^A-Z0-9_]/g, '')}).\n`);
-  return result;
+  return { ...result, credentialExpired };
  } finally {
   clearTimeout(expiry); clearTimeout(escalation); signal?.removeEventListener('abort', interrupt);
   stdout.end(); stderr.end();
