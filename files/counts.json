@@ -1,0 +1,24 @@
+{
+  "focused_test": {
+    "before_registrations": 1,
+    "after_registrations": 1
+  },
+  "touched_group": {
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0
+  },
+  "copy_check": {
+    "passed": 1,
+    "failed": 0
+  },
+  "default_browser_prerequisites": {
+    "before": 2,
+    "after": 1
+  },
+  "shell_only_missing_browser_notices": {
+    "before": 1,
+    "after": 0
+  },
+  "clause_status_changes": []
+}

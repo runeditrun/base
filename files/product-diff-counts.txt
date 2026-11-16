@@ -1,0 +1,14 @@
+19	0	cli/README.md
+32	17	cli/browser-runtime.mjs
+105	42	cli/browser-runtime.test.mjs
+2	1	cli/inspect.mjs
+1	1	cli/lifecycle.mjs
+10	1	default-seed/SEED-COMMAND-CONTRACT.md
+19	0	default-seed/scripts/base-cli/cli/README.md
+32	17	default-seed/scripts/base-cli/cli/browser-runtime.mjs
+2	1	default-seed/scripts/base-cli/cli/inspect.mjs
+1	1	default-seed/scripts/base-cli/cli/lifecycle.mjs
+4	4	default-seed/scripts/base-cli/inventory.json
+10	1	export/SEED-COMMAND-CONTRACT.md
+9	5	global/browser-runtime.mjs
+1	1	global/run.mjs

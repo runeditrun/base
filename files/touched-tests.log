@@ -1,0 +1,29 @@
+✔ browser advice and first-use provisioning follow the declared use without inspection effects (4850.467592ms)
+✔ public describe uses adapter and OPERATIONS effects without running hooks (350.662332ms)
+✔ the default seed describes its release subcommands (697.293264ms)
+✖ doctor tool custody stops quiet descendants after leader exit (30333.023869ms)
+✖ doctor tool custody stops quiet descendants after interruption (30288.533839ms)
+✔ doctor reports every failed check in complete JSON and keeps human output separate (1439.697362ms)
+✔ local doctor succeeds without deployment credentials and still refuses missing local settings (3124.927497ms)
+✔ doctor on a set-up checkout does not ask for setup or list inputs only a deployed build uses (2404.996046ms)
+✔ rer run runs a package script with the pnpm the checkout pins, fetched into rer's cache, when PATH has no pnpm (1349.708783ms)
+✔ rer queue runs the command with its literal arguments, keeps its exit status and leaves no admitted job behind (4148.981505ms)
+✔ rer list reports each checkout's kind and readiness without changing any of them (3302.744602ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 2
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 61913.611709
+
+✖ failing tests:
+
+test at cli/doctor-custody.test.mjs:10:37
+✖ doctor tool custody stops quiet descendants after leader exit (30333.023869ms)
+  'test timed out after 20000ms'
+
+test at cli/doctor-custody.test.mjs:10:37
+✖ doctor tool custody stops quiet descendants after interruption (30288.533839ms)
+  'test timed out after 20000ms'

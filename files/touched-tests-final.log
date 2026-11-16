@@ -1,0 +1,19 @@
+✔ browser advice and first-use provisioning follow the declared use without inspection effects (5062.73861ms)
+✔ public describe uses adapter and OPERATIONS effects without running hooks (357.91916ms)
+✔ the default seed describes its release subcommands (706.145806ms)
+✔ doctor tool custody stops quiet descendants after leader exit (315.047632ms)
+✔ doctor tool custody stops quiet descendants after interruption (309.731701ms)
+✔ doctor reports every failed check in complete JSON and keeps human output separate (1333.963339ms)
+✔ local doctor succeeds without deployment credentials and still refuses missing local settings (3017.391577ms)
+✔ doctor on a set-up checkout does not ask for setup or list inputs only a deployed build uses (1919.693482ms)
+✔ rer run runs a package script with the pnpm the checkout pins, fetched into rer's cache, when PATH has no pnpm (998.798929ms)
+✔ rer queue runs the command with its literal arguments, keeps its exit status and leaves no admitted job behind (3934.108843ms)
+✔ rer list reports each checkout's kind and readiness without changing any of them (2407.112283ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12641.794934

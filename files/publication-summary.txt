@@ -1,0 +1,8 @@
+Publication: PASS / complete=true / new findings=0
+Candidate: 3f30348f6ffbcfe4906048550ea28b6e79f82725
+Tree: 215b42f09bbbf3524cdaaf29aa18d93e9fb48784
+Selected/public-base history scanned: 1652 commits, 1631 trees, 10869 blobs, 1652 commit messages, 116 tag messages.
+Full clone (not shallow); public base https://github.com/runeditrun/base#main.
+All candidate author/committer identities and messages checked; fleet identity, no coauthor trailers.
+Product push succeeded on first attempt using cloud-push.py.
+Draft PR: https://github.com/runeditrun/base/pull/874

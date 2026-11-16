@@ -1,0 +1,28 @@
+TAP version 13
+# Subtest: browser advice and first-use provisioning follow the declared use without inspection effects
+ok 1 - browser advice and first-use provisioning follow the declared use without inspection effects
+  ---
+  duration_ms: 3938.586039
+  type: 'test'
+  ...
+# Subtest: public describe uses adapter and OPERATIONS effects without running hooks
+ok 2 - public describe uses adapter and OPERATIONS effects without running hooks
+  ---
+  duration_ms: 323.579706
+  type: 'test'
+  ...
+# Subtest: the default seed describes its release subcommands
+ok 3 - the default seed describes its release subcommands
+  ---
+  duration_ms: 795.123881
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4039.738637

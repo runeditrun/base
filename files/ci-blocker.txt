@@ -1,0 +1,10 @@
+BLOCKED product branch=cloud/gr-base-browser-advice-1 head=3f30348f6ffbcfe4906048550ea28b6e79f82725
+Draft PR: https://github.com/runeditrun/base/pull/874
+Verify 43840095497 completed/failure; sole failed job 133206425787 (cli 2/5), failed step 13.
+Required once-only log archive command: gh run view 43840095497 --repo runeditrun/base --job 133206425787 --log-failed
+Observed: exit=0 stdout_bytes=0 stderr_bytes=0 HTTP=unknown (not supplied by gh).
+Check-run title/summary/text=null; annotations_count=2, annotations not read within exhausted ten-call budget.
+No assertion or root cause available; no fabricated diagnosis, no rerun or dispatch.
+Touched browser/describe tests under CI Node 22.20.0: 3/3 pass.
+Release rer 43840087819: dry-run build success; publish skipped.
+Product push successful; no push rejection or unpushed product work.
