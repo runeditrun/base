@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.120
+
+### Commands under an approved Business grant
+
+- `rer business run --grant G -- <command> [args...]` exchanges this computer's pairing and explicit grant for a short-lived scoped Cloudflare child credential. It removes inherited Cloudflare credential aliases, passes arguments without a shell and preserves the child's exit code or Unix terminating signal. Existing `run [--once]` check-ins remain available.
+- The wrapper masks the credential and common encoded forms in output, interrupts the command at credential expiry and requests cleanup after completion or interruption. Cleanup reports revoked, expired or unconfirmed separately from the child result; `rer business cleanup LEASE [--status]` retries revocation or reads its status. This environment boundary is not a sandbox: run trusted software, and an unconfirmed cleanup can leave the credential usable until server expiry.
+
+### Agent commands and stdio MCP
+
+- Paired agents can call Business tools for installed apps, changes, updates, domains, imports, profiles, plans and owner sign-in actions, subject to the server's available tools and the owner's grants. `rer business tools` discovers tools and `rer business call TOOL` reaches tools without a dedicated verb. Flags accept structured JSON or file input; `--json` returns structured results.
+- Change and update following supports bounded waits. A change request can wait for its preview and, with explicit `--publish`, request publication and wait for live. Refusals, unavailable tools and unfinished waits retain distinct outcomes and actionable guidance.
+- `rer business mcp` forwards newline-delimited JSON-RPC over stdio to the Business MCP. The paired client refreshes its short-lived bearer near expiry and once after a 401; protocol output stays on stdout and diagnostics on stderr.
+
+These CLI changes require the matching Business server, pairing, owner approvals and grants. This preparation establishes no live-provider, Managed deployment, seed adoption or production result. The actual source diff changes no portability, import-kit, product migrations or archive format identity; the browser advice change is not included.
+
 ## 0.2.119
 
 ### Large installation archive inventories
