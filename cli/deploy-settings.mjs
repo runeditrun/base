@@ -49,3 +49,17 @@ export async function declaredSettings(project) {
 export function undeclaredNotice(names, path) {
  return `Undeclared --env-file settings stay out of rer's output: ${names.join(', ')}. To print one, declare it as a non-secret setting: add its name to "publicSettings" in ${path}.`;
 }
+
+// Opt-in transport for a public choice with an explicit reset value. Keep this
+// distinct from setup select fields: old declarations keep their exact plans.
+export async function switchableDefaults(declaration, setupManifest) {
+ const kinds = await settingKinds({ declaration, setupManifest });
+ return Object.fromEntries((Array.isArray(declaration.secrets) ? declaration.secrets : []).filter(item =>
+  item?.optional === true && Array.isArray(declaration.publicSettings) && declaration.publicSettings.includes(item.binding) &&
+  kinds.shown(item.binding, declaration.vars?.[item.binding]) && kinds.shown(item.environment, declaration.vars?.[item.binding])
+ ).map(item => [item.binding, declaration.vars[item.binding]]));
+}
+
+export function switchableDeclarationHelp(path = 'deploy.json') {
+ return `For a switchable public setting such as MAIL_PROVIDER, declare its name in publicSettings, its default in vars, and a secrets entry with binding, environment and optional: true in ${path}; keep the same public default in Wrangler vars. Credentials remain secrets.`;
+}

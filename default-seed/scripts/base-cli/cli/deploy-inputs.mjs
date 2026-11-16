@@ -4,6 +4,7 @@ import { shared } from './shared.mjs';
 import { invalid, refuse } from './errors.mjs';
 import { readDeployEnvFile } from '../modules/deploy-kit/env-file.mjs';
 import { publicOrigin } from '../modules/deploy-kit/public-origin.mjs';
+import { switchableDefaults, switchableDeclarationHelp } from './deploy-settings.mjs';
 import { keptSecrets, rotations, savedSecrets } from './deploy-secrets.mjs';
 
 // The values a Workers deploy reads for its declared secrets: this process's
@@ -20,6 +21,7 @@ export async function deployEnvironment({ root, options, declaration, setupManif
   catch (error) { throw invalid(`The --env-file ${options.envFile} could not be used: ${error.code === 'ENOENT' ? 'no such file' : error.message}.`); }
   Object.assign(env, values);
  }
+ await applyPublicAssignments(env, options, declaration, setupManifest);
  const originSetting = declaration.publicOriginSetting;
  if (originSetting !== undefined && env[originSetting] === undefined && settings) {
   const { readSettings } = await shared('adapter-settings.mjs');
@@ -76,6 +78,7 @@ export async function withDeployEnvironment(project, options, out, run) {
  const { createRedaction } = await shared('redaction.mjs');
  const { declaredSettings, settingKinds, undeclaredNotice } = await import('./deploy-settings.mjs');
  const declared = await declaredSettings(project), kinds = await settingKinds(declared);
+ await applyPublicAssignments(env, options, declared.declaration ?? {}, declared.setupManifest);
  const redaction = createRedaction();
  const supplied = Object.entries(env).filter(([key, value]) => saved[key] !== value);
  redaction.addSecrets([...kinds.privateValues(env), ...supplied.filter(([key, value]) => !kinds.shown(key, value)).map(([, value]) => value)]);
@@ -96,4 +99,14 @@ export async function withDeployEnvironment(project, options, out, run) {
 export function deployAgain(options) {
  const quote = value => /^[a-zA-Z0-9_./-]+$/.test(value) ? value : `'${String(value).replaceAll("'", "'\"'\"'")}'`;
  return `rer deploy --environment ${quote(options.environment ?? 'production')}${options.envFile ? ` --env-file ${quote(options.envFile)}` : ''}${options.cwd ? ` --cwd ${quote(relative(process.cwd(), options.cwd) || '.')}` : ''}${options.dryRun ? ' --dry-run' : ''}`;
+}
+
+async function applyPublicAssignments(env, options, declaration, setupManifest) {
+ if (options.setSecretValues && declaration.project) {
+  const defaults = await switchableDefaults(declaration, setupManifest);
+  for (const [binding, value] of Object.entries(options.setSecretValues)) {
+   if (!Object.hasOwn(defaults, binding)) throw invalid(`--set-secret NAME=VALUE accepts only declared switchable public settings. ${switchableDeclarationHelp()} Supply credentials through the environment or an owned 0600 --env-file.`);
+   env[declaration.secrets.find(item => item.binding === binding).environment] = value;
+  }
+ }
 }

@@ -144,7 +144,7 @@ export function localOnlyBinding(declaration, localOnlyKeys = []) {
   return names.find(name => refused.has(name)) ?? null;
 }
 /** A seed declares bindings, never names. Migrations come from the packaged artifact. */
-export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], env = {} } = {}) {
+export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], env = {}, publicDefaults = {} } = {}) {
   assert(declaration?.version === 1 && typeof declaration === 'object' && Object.keys(declaration).every(key => DECLARATION_KEYS.includes(key)), 'invalid-owner-declaration');
   assert(declaration.publicSettings === undefined || Array.isArray(declaration.publicSettings) && new Set(declaration.publicSettings).size === declaration.publicSettings.length && declaration.publicSettings.every(name => typeof name === 'string' && /^[A-Z][A-Z0-9_]*$/.test(name)), 'invalid-public-settings');
   ownerPlatforms(declaration);
@@ -165,6 +165,7 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
   const queues = entries(declaration,'queues');
   for (const item of queues) assert(item.deadLetterQueue === undefined || queues.some(other => other.binding === item.deadLetterQueue), 'invalid-dead-letter-queue');
   const vars = {...(declaration.vars ?? {})};
+  for (const name of Object.keys(publicDefaults)) if (declaration.secrets?.some(item => item.binding === name)) delete vars[name];
   const origin = publicOrigin(declaration, env);
   if (declaration.originVar !== undefined) {
     assert(identifier(declaration.originVar) && !Object.hasOwn(vars,declaration.originVar), 'invalid-owner-origin-variable');
@@ -183,7 +184,7 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
     durableObjects:entries(declaration,'durableObjects').map(item => ({...item})),
     // verifyStandIn is only `rer verify`'s hosted-check value: never planned, sent or stored.
     // An optional secret (`"optional": true`, an integration's credential) may stay unset: it is bound only once supplied.
-    secrets:entries(declaration,'secrets').map(({verifyStandIn,...item}) => { assert(verifyStandIn === undefined || typeof verifyStandIn === 'string' && verifyStandIn.length > 0 && verifyStandIn.length <= 1024, 'invalid-verify-stand-in'); return item; }),
+    secrets:entries(declaration,'secrets').map(({verifyStandIn,...item}) => { assert(verifyStandIn === undefined || typeof verifyStandIn === 'string' && verifyStandIn.length > 0 && verifyStandIn.length <= 1024, 'invalid-verify-stand-in'); return Object.hasOwn(publicDefaults,item.binding) ? {...item,publicDefault:publicDefaults[item.binding]} : item; }),
     crons:[...(declaration.crons ?? [])],vars,
     // Only declarations using these add the keys, so earlier plans and fingerprints are unchanged.
     ...(services.length ? {services} : {}),...(declaration.workersDev === false ? {workersDev:false} : {})});
