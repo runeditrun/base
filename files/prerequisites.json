@@ -1,0 +1,8 @@
+{
+  "expected_source": "48acb56eb706b94538efdeea4ea55884d32441ba",
+  "fresh_remote_main": "48acb56eb706b94538efdeea4ea55884d32441ba",
+  "target_tag": "rer-v0.2.121",
+  "target_tag_present": false,
+  "previous_report_exists": false,
+  "previous_bundle_exists": false
+}

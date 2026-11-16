@@ -1,0 +1,5 @@
+{
+  "command": "git fetch --no-tags origin f2737d02a5f77be042cfdfd237a7dce4689cbe2f",
+  "exit_code": 128,
+  "diagnostic": "fatal: remote error: upload-pack: not our ref f2737d02a5f77be042cfdfd237a7dce4689cbe2f\n"
+}
