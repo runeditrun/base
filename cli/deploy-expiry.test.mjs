@@ -8,7 +8,7 @@ test('rer deploy resumes expired grant runs to the uninterrupted resource, owner
  const uninterrupted=await expiryDeploy(t), first=await uninterrupted.run();
  assert.equal(first.code,0,first.stdout+first.stderr);
  const expected=deploymentSummary(uninterrupted.provider);
- for (const point of ['before-upload','after-d1','mid-upload','accepted-upload']) {
+ for (const point of ['before-upload','after-d1','mid-upload','accepted-upload','unconfirmed-create']) {
   const f=await expiryDeploy(t), stopped=await f.run(point);
   assert.equal(stopped.reached,true,`${point}: ${stopped.stdout}\n${stopped.stderr}`);
   assert.equal(stopped.signal,'SIGKILL',stopped.stdout+stopped.stderr);
@@ -16,6 +16,21 @@ test('rer deploy resumes expired grant runs to the uninterrupted resource, owner
   assert.match(stopped.stderr,/exit status: 137/i);
   assert.match(stopped.stderr,/cleanup: revoked/);
   const partial=JSON.parse(await readFile(f.statePath,'utf8'));
+  if(point==='unconfirmed-create') {
+   assert.equal(partial.owned.d1['fixture-production-db'].status,'pending');
+   const writes=f.provider.state.writes.length, database=f.provider.state.databases[0].uuid;
+   const resumed=await f.run();
+   assert.equal(resumed.code,1,resumed.stdout+resumed.stderr);
+   assert.match(resumed.stdout,/Found d1:fixture-production-db at a pending create name/);
+   assert.match(resumed.stdout,/preserved the resource and deployment record/);
+   assert.equal(f.provider.state.writes.length,writes,'an unconfirmed create never duplicates or deletes a resource');
+   assert.equal(f.provider.state.databases[0].uuid,database);
+   assert.deepEqual(JSON.parse(await readFile(f.statePath,'utf8')),partial);
+   await assert.rejects(access(`${f.statePath}.lock`),{code:'ENOENT'});
+   assert.equal(f.business.state.revocations,2);
+   assert.equal(new Set(f.authorities).size,2);
+   continue;
+  }
   assert.equal(partial.owned.d1['fixture-production-db'].status,'created');
   if(point==='accepted-upload') assert.ok(partial.pendingUpload && !partial.pendingUpload.provider);
   const ids={d1:f.provider.state.databases[0].uuid,r2:f.provider.state.buckets[0]?.creation_date,kv:f.provider.state.kv[0]?.id,queue:f.provider.state.queues[0]?.queue_id};

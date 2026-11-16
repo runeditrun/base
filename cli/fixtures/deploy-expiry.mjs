@@ -43,7 +43,8 @@ export async function expiryDeploy(t) {
    // Withhold an acknowledged read or response while the credential expires.
    // The CLI catches TERM, so its wrapper must eventually KILL this blocked run.
    const saved = await readFile(statePath,'utf8').then(JSON.parse,()=>null);
-   const stop = barrier === 'after-d1' && path === '/d1/database' && method === 'GET' && saved?.owned.d1['fixture-production-db']?.status === 'created'
+   const stop = barrier === 'unconfirmed-create' && path === '/d1/database' && method === 'POST'
+    || barrier === 'after-d1' && path === '/d1/database' && method === 'GET' && saved?.owned.d1['fixture-production-db']?.status === 'created'
     || barrier === 'before-upload' && path.endsWith('/assets-upload-session')
     || barrier === 'mid-upload' && path === '/workers/assets/upload'
     || barrier === 'accepted-upload' && path === '/workers/scripts/fixture-production' && method === 'PUT';
