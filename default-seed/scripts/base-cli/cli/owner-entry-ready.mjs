@@ -55,7 +55,7 @@ export async function ownerEntryReady(root, link, signal, store) {
    // time to finish on its own rather than being restarted on every poll.
    if (status && (status >= 400 || state?.retry || state?.refresh) && performance.now() - lastReload > 1000) {
     lastReload = performance.now();
-    try { await page.reload({ waitUntil: 'domcontentloaded', timeout: Math.min(5000, remaining()) }); } catch { last = 'destination document did not finish loading'; }
+    try { await page.reload({ waitUntil: 'domcontentloaded', timeout: Math.min(5000, remaining()) }); } catch { last += '; the next destination document did not finish loading'; }
    }
    await pause(Math.min(100, remaining()), undefined, { signal: bounded }).catch(() => {});
   }
