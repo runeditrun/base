@@ -292,6 +292,36 @@ anything is built or uploaded. The seed owns what an installation does with mail
 off, and turning mail on later is a `rer deploy --set-secret` of the provider
 inputs the seed documents.
 
+A seed can opt into a switchable public selector with one `deploy.json` edit:
+
+```json
+{
+  "publicSettings": ["MAIL_PROVIDER"],
+  "vars": { "MAIL_PROVIDER": "none" },
+  "secrets": [
+    { "binding": "MAIL_PROVIDER", "environment": "MAIL_PROVIDER", "optional": true }
+  ]
+}
+```
+
+Merge these entries into the existing declaration, keeping its other settings
+and credentials. Retain the same `MAIL_PROVIDER=none` default in Wrangler vars
+and the managed spec's `publicVariableNames`; the selector stays public in the
+managed artifact, outside its secret names. `rer check` accepts this explicit
+public default plus optional transport and reports conflicting source defaults.
+`rer doctor` names the supported declaration when a source overlap is refused.
+Declarations without this combination keep their previous behavior.
+
+Use `rer deploy --set-secret MAIL_PROVIDER=sendgrid --set-secret MAIL_API_KEY
+--env-file deploy.env` with the seed's declared sender and credential inputs.
+The existing name-only form still reads the declared environment mapping.
+`NAME=VALUE` is accepted only for opted-in public settings; credentials still
+come from the environment or an owned 0600 `--env-file` and remain masked.
+`rer deploy --unset-secret MAIL_PROVIDER,MAIL_API_KEY` removes those overrides
+and restores the declared public default in the same Worker version. A plain
+deploy preserves a held override. These changes use the existing ownership,
+grouped-version and recovery machinery and preserve the admitted owner.
+
 The adapter must apply that selection to the runtime as well as pass preflight.
 For example, the foundation declares optional `MAIL_PROVIDER` and `MAIL_FROM`
 environment-to-binding mappings in `deploy.json`, and makes `MAIL_API_KEY`
