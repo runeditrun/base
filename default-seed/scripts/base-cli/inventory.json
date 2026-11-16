@@ -391,7 +391,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "f961e34f43b8e94b2b7ea186361d37503769c025d836d1fea23b7f6eceeead6c"
+      "sha256": "2fa836407cf9d4e42b9fddf35b4929ddf5455e505a113cc7b273bc59288f6e12"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -499,7 +499,7 @@
     },
     "cli/browser-runtime.mjs": {
       "source": "cli/browser-runtime.mjs",
-      "sha256": "993ac97de526d169d36b0f71b4b25b703d6023c63bd259403cc86e85c1f36ed5"
+      "sha256": "55d1c542ca30579aec6863d9df710ae61ea3874e58228ee2f8a5c97776119421"
     },
     "cli/business/agent-args.mjs": {
       "source": "cli/business/agent-args.mjs",
@@ -1031,7 +1031,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "40e747be30d9d6ef12a610e25a5067634370cc6527635e4bd8721319a102c1e9"
+      "sha256": "f5a19932dfcb19e6cf4fb7288948d29d6824ec019918467b12532285d4d88492"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -1043,7 +1043,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "78ab5f3cbe7ef1927c979a86f24d7d8d86adfa769abf7d24080d75b779908b8a"
+      "sha256": "a12cff34fd9bed93394995d81e07ebaf9d6c59e0942202835d4827d86b2dc599"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
