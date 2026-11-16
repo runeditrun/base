@@ -106,7 +106,8 @@ commandAdapter.prepareData=async(root,store)=>{
  // agent explicitly invokes an updated CLI on a checkout with an older pin.
  // Use a real packed copy: its refusal must retain the selected CLI's status.
  const packed=await buildPackage(base,join(root,'packed'));
- await writePackage(readPackage(await readFile(packed)),join(root,'node_modules/@runeditrun/rer'));
+ const packageBytes=await readFile(packed);
+ await writePackage(readPackage(packageBytes,{integrity:'sha512-'+createHash('sha512').update(packageBytes).digest('base64')}),join(root,'node_modules/@runeditrun/rer'));
  await writeFile(join(root,'adapter.mjs'),`
 import {localInstaller} from ${JSON.stringify(source('onboarding/adapter.mjs'))};
 import {commandAdapter as declare} from ${JSON.stringify(source('cli/adapter.mjs'))};
