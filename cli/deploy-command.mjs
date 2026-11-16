@@ -18,7 +18,7 @@ import { rememberHookState, hookState } from './deploy-hook-record.mjs';
 import { main as owner, withLocalDeployPlan } from '../modules/deploy-kit/owner-cli.mjs';
 import { localOnlyBinding, ownerWorkerName } from '../modules/deploy-kit/owner.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
-import { deployDiagnostic, migrationFailure, providerFailure, assetFailure } from '../modules/deploy-kit/diagnostics.mjs';
+import { deployDiagnostic, migrationFailure, providerFailure, assetFailure, ownerTargetFailure } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
 import { settingKinds } from './deploy-settings.mjs';
 import { deployGuide, neededForRealDeploy, reportNeeded } from './deploy-needs.mjs';
@@ -201,6 +201,7 @@ export async function deployCommand(context) {
   if (error instanceof DeployProductError) throw error;
   const again = deployAgain(options);
   const { commandFailure } = await shared('failures.mjs');
+  if (ownerTargetFailure(error)) throw commandFailure(redaction.redact(ownerTargetFailure(error)));
   const secrets = secretFailureMessage(error);
   if (secrets) throw commandFailure(secrets);
   if (options.dryRun && error.message === 'missing-input') throw new RerError('missing_input', `Dry run cannot read the target secret bindings without ${error.inputs.join(' and ')}. Set the Cloudflare credentials in the environment or an owned 0600 --env-file, then run the same command again.`, 3);

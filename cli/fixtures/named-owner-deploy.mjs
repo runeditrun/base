@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { checkout, manifest } from './owner-deploy.mjs';
+import { checkout } from './owner-deploy.mjs';
 import { ownerProvider } from '../../modules/deploy-kit/tests/owner-provider.mjs';
 import { createOperatorAuth, createAuthHandler } from '../../modules/operator-auth/index.mjs';
 import { database } from '../../modules/operator-auth/identity/oidc/tests/runtime.mjs';
@@ -18,7 +18,7 @@ export async function namedOwnerDeploy(t, prefix) {
   Object.assign(process.env,saved); provider.close();
  });
  for (const name of Object.keys(process.env)) if (/^(CLOUDFLARE_|CF_)/.test(name) || secrets.some(item => item.environment === name)) delete process.env[name];
- Object.assign(process.env, {CI:'true',HOME:root,CLOUDFLARE_ACCOUNT_ID:provider.accountId,CLOUDFLARE_API_TOKEN:provider.token});
+ Object.assign(process.env, {CI:'true',HOME:root,CLOUDFLARE_ACCOUNT_ID:provider.accountId,CLOUDFLARE_API_TOKEN:provider.token,OWNER_EMAIL:'owner@example.test',SETUP_TOKEN:'synthetic-bootstrap-token-for-fixture',SESSION_SECRET:'synthetic-session-secret-for-fixture'});
  if (prefix) process.env.LAMP_RESOURCE_PREFIX = prefix; else delete process.env.LAMP_RESOURCE_PREFIX;
  await writeFile(join(root,'migrations/core/0001_owner.sql'), await readFile(new URL('../../modules/operator-auth/accounts/schema/operator-auth.sql',import.meta.url)));
  await writeFile(join(root,'migrations/core/0002_signin.sql'), await readFile(new URL('../../modules/operator-auth/accounts/schema/owner-signin.sql',import.meta.url)));
@@ -44,11 +44,10 @@ export const commandAdapter={settings:[],run:async()=>{},hooks:{owner:{}},deploy
   const {receipt}=await ownerDeploy({api,target,plan:ownerPlan(target,declaration,artifact),artifact,statePath:state,env:process.env});
   return {deployed:true,origin:receipt.origin,state};
  }};`);
- await writeFile(join(root,'setup.json'),JSON.stringify(manifest));
  await writeFile(join(root,'.node-version'),process.versions.node);
  await writeFile(join(root,'package.json'),JSON.stringify({engines:{node:process.versions.node},packageManager:'pnpm@10.12.4'}));
  await writeFile(join(root,'OPERATIONS.json'),JSON.stringify({version:2,project:'tests/fixture',runtime:{requirements:[]},requiredEnvironment:[],
-  seedContract:{version:1,profile:'first-party',adapter:'adapter.mjs',setup:'setup.json'},
+  seedContract:{version:1,profile:'first-party',adapter:'adapter.mjs'},
   commands:{deploy:{argv:['node','adapter.mjs'],inputs:['adapter.mjs','deploy.json'],effects:'Deploy to the fixture account.'}}}));
  git('add','.'); git('commit','-qm','native deploy fixture');
  const worker = `${prefix ?? 'fixture'}-production`;
@@ -59,7 +58,7 @@ export const commandAdapter={settings:[],run:async()=>{},hooks:{owner:{}},deploy
   // for the derived sibling cannot accidentally pass against the same state.
   if (named && named !== worker) return Response.json({success:false,errors:[]},{status:404});
   if (url.hostname.endsWith('.workers.dev') && url.pathname.startsWith('/auth/')) {
-   if (url.hostname !== `${worker}.owner-account.workers.dev`) throw Error('wrong app Worker');
+   if (url.hostname !== `${worker}.fixture-account.workers.dev`) throw Error('wrong app Worker');
    const vars=Object.fromEntries(provider.state.settings.bindings.filter(item=>item.type==='plain_text').map(item=>[item.name,item.text]));
    const values=Object.fromEntries(provider.state.secrets.map(item=>[item.name,item.value]));
    const db=provider.state.databases[0].db;

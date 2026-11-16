@@ -18,8 +18,8 @@ test('public deploy claims, signs in, redeploys and removes the native uploader 
   const signin=await f.run('signin');
   assert.equal(signin.code,0,signin.text);
   assert.equal(signin.result.owner,'owner@example.test');
-  assert.equal(new URL(signin.result.link).hostname,`${f.worker}.owner-account.workers.dev`);
-  const used=await fetch(signin.result.link,{method:'POST',headers:{Origin:new URL(signin.result.link).origin,'Content-Type':'application/json'},body:JSON.stringify({token:new URL(signin.result.link).searchParams.get('token')})});
+  assert.equal(new URL(signin.result.link).hostname,`${f.worker}.fixture-account.workers.dev`);
+  const used=await fetch(new URL('/auth/owner-signin',signin.result.link),{method:'POST',headers:{Origin:new URL(signin.result.link).origin,'Content-Type':'application/json'},body:JSON.stringify({token:new URL(signin.result.link).searchParams.get('token')})});
   assert.equal(used.status,303,await used.text());
   const repeated=await f.run();
   assert.equal(repeated.code,0,repeated.text);
@@ -52,6 +52,13 @@ test('public deploy and remove retain foreign ownership refusals and name record
   assert.equal(f.provider.state.writes.length,writes);
  }
  await writeFile(f.statePath,record);
+ process.env.LAMP_RESOURCE_PREFIX='synthetic-lamp-moved';
+ const moved=await f.run();
+ assert.notEqual(moved.code,0);
+ assert.match(moved.text,/owner-state-target-mismatch/);
+ for (const worker of [f.worker,'synthetic-lamp-moved-production']) assert.ok(moved.text.includes(worker),moved.text);
+ assert.equal(f.provider.state.writes.length,writes);
+ process.env.LAMP_RESOURCE_PREFIX='synthetic-lamp-copy';
  f.provider.foreign.replaceWorker();
  for (const flags of [[],['--remove','--yes']]) {
   const result=await f.run('deploy',...flags);
