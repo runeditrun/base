@@ -809,8 +809,10 @@ a command at that expiry and reports that the credential expired, with
 obtain a new credential; the command's own behavior determines how work resumes.
 The old credential is not extended or renewed.
 Child exit codes and Unix terminating signals are preserved: expiry normally
-terminates with SIGTERM (shell status 143), while a child that handles the signal
-keeps its own exit code. The wrapper requests revocation after success, failure,
+terminates with SIGTERM (shell status 143); a process still running after the
+existing three-second grace is killed with SIGKILL (shell status 137). A child
+that handles the signal keeps its own exit code. There is no separate synthetic
+expiry failure code: the expiry message distinguishes it from a child failure. The wrapper requests revocation after success, failure,
 signals or spawn failure; SIGKILL,
 crashes, network loss and lost acknowledgements may leave a token until server
 expiry. Cleanup has
