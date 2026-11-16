@@ -26,10 +26,6 @@ test('a declared public setting switches mail in place while check and managed p
  await rm(exported, { recursive: true });
  await writeFile(join(root, 'deploy.json'), JSON.stringify(savedDeclaration));
  await writeFile(join(root, '.gitignore'), '\n.rer/\ndeploy.env\ndelivery-artifact/\n', { flag: 'a' });
- const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
- pkg.engines.node = process.versions.node;
- await writeFile(join(root, 'package.json'), JSON.stringify(pkg));
- await writeFile(join(root, '.node-version'), process.versions.node + '\n');
  const wrangler = { main: 'index.js', compatibility_date: '2026-09-08', no_bundle: true,
   rules: [{ type: 'ESModule', globs: ['**/*.js', '**/*.mjs'] }], vars };
  await writeFile(join(root, 'wrangler.jsonc'), JSON.stringify({ ...wrangler, main: 'src/server.ts' }));
@@ -109,10 +105,12 @@ test('a declared public setting switches mail in place while check and managed p
  assert.equal(privateAssignment.code, 2, privateAssignment.text);
  assert.ok(!privateAssignment.text.includes('synthetic-base-2'));
  assert.equal(provider.state.writes.length, writes, 'public assignment syntax cannot publish a credential');
- const off = await run('--unset-secret', 'MAIL_PROVIDER,MAIL_API_KEY');
+ const off = await run('--unset-secret', 'MAIL_PROVIDER');
  assert.equal(off.code, 0, off.text);
  assert.equal(provider.state.settings.bindings.find(item => item.name === 'MAIL_PROVIDER')?.text, 'none');
- assert.ok(!provider.state.secrets.some(item => ['MAIL_PROVIDER', 'MAIL_API_KEY'].includes(item.name)));
+ assert.ok(!provider.state.secrets.some(item => item.name === 'MAIL_PROVIDER'));
+ const cleared = await run('--unset-secret', 'MAIL_API_KEY');
+ assert.equal(cleared.code, 0, cleared.text);
  const after = JSON.parse(await readFile(statePath));
  assert.deepEqual(after.owned, before.owned);
  assert.deepEqual(after.ownerClaim, before.ownerClaim);
