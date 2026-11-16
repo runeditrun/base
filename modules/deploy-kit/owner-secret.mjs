@@ -41,7 +41,7 @@ export async function ownerSecret({api: provider, target, statePath, changes, fe
     assert(names, 'invalid-secret-list');
     // Removing secrets the Worker does not hold changes nothing; the rest of a removal still runs.
     const writes = present ? changes : changes.filter(change => names.includes(change.binding));
-    const existed = writes.some(change => names.includes(change.binding)), changed = writes.length > 0, copy = writes.length > 1;
+    const existed = writes.some(change => names.includes(change.binding)), changed = writes.length > 0, copy = writes.length > 1 || writes.some(change => change.publicDefault !== undefined);
     state.pendingSecret = {bindings, present, versionId:state.receipt.provider.versionId, names:names.filter(name => !bindings.includes(name)).sort(), ...(copy ? {copy:randomBytes(16).toString('hex')} : {})};
     await writeOwnerState(statePath, state);
     let failure, unchanged = false, confirming = false, uploaded = false;

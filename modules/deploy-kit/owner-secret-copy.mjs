@@ -17,7 +17,8 @@ export async function uploadSecretCopy(api, worker, live, {changes, marker}) {
   const named = new Set(changes.map(change => change.binding));
   const metadata = {main_module:entry, compatibility_date:runtime.compatibility_date, compatibility_flags:runtime.compatibility_flags ?? [],
     bindings:[...bindings.filter(row => !named.has(row.name)).map(row => ({type:'inherit',name:row.name})),
-      ...changes.filter(change => change.value !== undefined).map(change => ({type:'secret_text',name:change.binding,text:change.value}))],
+      ...changes.flatMap(change => change.value !== undefined ? [{type:'secret_text',name:change.binding,text:change.value}]
+        : change.publicDefault !== undefined ? [{type:'plain_text',name:change.binding,text:change.publicDefault}] : [])],
     keep_assets:true, annotations:{'workers/message':copyMessage(marker)}};
   const data = new FormData();
   data.set('metadata', new Blob([JSON.stringify(metadata)], {type:'application/json'}));
