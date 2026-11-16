@@ -4,12 +4,13 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import { exportReference } from '../../scripts/export-reference.mjs';
 import { isolatedQueue } from './queue.mjs';
 import { useWorkspaceDependencies } from './workspace-dependencies.mjs';
 import { commandCustody } from '../../onboarding/command-custody.mjs';
-import { createProcessBaseline, createProcessScope, processScopeEnvironment } from '../../onboarding/process-scope.mjs';
+import { createProcessBaseline, createProcessScope } from '../../onboarding/process-scope.mjs';
 
 const base=resolve(import.meta.dirname,'../..');
 export const generatedSQL=`CREATE TABLE computed_entries (
@@ -71,7 +72,9 @@ commandAdapter.portability.export=async context=>{
   t.signal.throwIfAborted();
   assert.ok(!closing,'Fixture is shutting down');
   const scope=createProcessScope(baseline);
-  const child=spawn(process.execPath,args,{cwd:root,env:processScopeEnvironment(scope,{...env,...extraEnv}),stdio:['ignore','pipe','pipe']});children.add(child);
+  const environment={...env,...extraEnv,RER_TEST_COMMAND_SCOPE:scope.token};
+  environment.NODE_OPTIONS=[environment.NODE_OPTIONS,`--import=${pathToFileURL(join(base,'cli/fixtures/command-scope.mjs')).href}`].filter(Boolean).join(' ');
+  const child=spawn(process.execPath,args,{cwd:root,env:environment,stdio:['ignore','pipe','pipe']});children.add(child);
   child.custody=commandCustody(child,scope);
   let stdout='',stderr='';child.stdout.on('data',data=>stdout+=data);child.stderr.on('data',data=>stderr+=data);
   child.done=new Promise(resolve=>child.once('close',resolve));
