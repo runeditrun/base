@@ -5,6 +5,7 @@ import { dirname, join, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { stateDirectory } from './state.mjs';
+import { credentialDirectory } from './credential-file.mjs';
 
 const label = 'com.runeditrun.business', unit = 'rer-business.service';
 const digest = text => createHash('sha256').update(text).digest('hex');
@@ -65,8 +66,9 @@ export async function installService(input = {}) {
  if (!isAbsolute(node) || !isAbsolute(entrypoint) || !(await stat(node)).isFile() || !(await stat(entrypoint)).isFile()) throw new Error('Business requires an absolute Node executable and rer entrypoint.');
  const log = join(o.stateDir, 'service.log'), errorLog = join(o.stateDir, 'service-error.log');
  const environmentPath = `${dirname(node)}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`;
- // A state folder chosen with RER_BUSINESS_STATE_DIR goes with the service.
- const environment = [['HOME', o.home], ['PATH', environmentPath], ...(o.stateDir !== join(o.home, '.rer', 'business') ? [['RER_BUSINESS_STATE_DIR', o.stateDir]] : [])];
+ // Chosen state and credential folders go with the service; only paths, no secrets.
+ const credentials = credentialDirectory();
+ const environment = [['HOME', o.home], ['PATH', environmentPath], ...(o.stateDir !== join(o.home, '.rer', 'business') ? [['RER_BUSINESS_STATE_DIR', o.stateDir]] : []), ...(credentials !== null ? [['RER_BUSINESS_CREDENTIAL_DIR', credentials]] : [])];
  const text = o.platform === 'darwin'
   ? `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>Label</key><string>${label}</string>\n<key>ProgramArguments</key><array>${[node, entrypoint, 'business', 'run'].map(arg => `<string>${xml(arg)}</string>`).join('')}</array>\n<key>EnvironmentVariables</key><dict>${environment.map(([key, value]) => `<key>${key}</key><string>${xml(value)}</string>`).join('')}</dict>\n<key>WorkingDirectory</key><string>${xml(o.home)}</string>\n<key>RunAtLoad</key><true/><key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>\n<key>ThrottleInterval</key><integer>30</integer><key>Umask</key><integer>63</integer>\n<key>StandardOutPath</key><string>${xml(log)}</string><key>StandardErrorPath</key><string>${xml(errorLog)}</string>\n</dict></plist>\n`
   : `[Unit]\nDescription=Run Edit Run Business executor\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart=${[node, entrypoint, 'business', 'run'].map(value => unitValue(value).replaceAll('$', () => '$$')).join(' ')}\nWorkingDirectory=${unitValue(o.home)}\nEnvironment=${environment.map(([key, value]) => unitValue(`${key}=${value}`)).join(' ')}\nRestart=on-failure\nRestartSec=30\nUMask=0077\n\n[Install]\nWantedBy=default.target\n`;
