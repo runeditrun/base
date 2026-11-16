@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
-import {githubApiEdge} from '../../edition-authoring/tests/github-api.mjs';
+import {githubAcquisitionEdge} from '../../edition-authoring/tests/github-acquisition.mjs';
 
 export async function apiArchiveJourney(t, {fixture, write, commit, git}) {
- const {seed, source, revision, result, old, run, env} = await fixture(t);
+ const {seed, source, result, old, run, env} = await fixture(t);
  const origin = 'foundation/runtime/run-site.ts', local = 'src/base/run-site.ts';
  write(source, origin, 'export const runSite = {paths: true};\n');
  fs.chmodSync(path.join(source, origin), 0o755);
@@ -24,6 +24,7 @@ export async function apiArchiveJourney(t, {fixture, write, commit, git}) {
   id: 'run-data-pricing', introduced, origin, guide: 'export/SEED-COMMAND-CONTRACT.md',
   edit: 'Add pricing to edition RunData.', deliver: ['foundation/runtime/run-pricing.ts'],
  }, {id: 'run-data-paths', introduced: beforeIntroduction, origin, guide: 'guide.md', edit: 'Already introduced.', deliver: []}]}));
+ for (let i = 0; i < 200; i++) write(source, `unrelated/file-${i}.txt`, `synthetic unrelated source ${i}\n`);
  const target = commit(source);
  const archive = source + '-archive';
  fs.mkdirSync(archive);
@@ -39,99 +40,70 @@ export async function apiArchiveJourney(t, {fixture, write, commit, git}) {
  assert.match(message(directory), /archive has no Git history/);
  assert.deepEqual(snapshot(), before);
 
- const responses = {};
- for (const pin of [revision, beforeIntroduction, introduced, target]) {
-  const tree = git(source, 'rev-parse', pin + '^{tree}');
-  responses['git/commits/' + pin] = {sha: pin, tree: {sha: tree}};
-  // Serve real immutable Git objects at the existing gh process edge.
-  const entries = git(source, 'ls-tree', '-rz', '--full-tree', pin).split('\0').filter(Boolean).map(line => {
-   const [mode, type, sha, name] = line.split(/[\t ]/);
-   return {path: name, mode, type, sha};
-  });
-  responses['git/trees/' + tree + '?recursive=1'] = {sha: tree, truncated: false, tree: entries};
-  for (const entry of entries) {
-   const data = execFileSync('git', ['-C', source, 'cat-file', 'blob', entry.sha]);
-   responses['git/blobs/' + entry.sha] = {sha: entry.sha, encoding: 'base64', size: data.length, content: data.toString('base64')};
-  }
- }
- const compare = (ancestor, status, merge = ancestor) => ({base_commit: {sha: ancestor}, merge_base_commit: {sha: merge}, status});
- const targetComparison = 'compare/' + introduced + '...' + target + '?per_page=1';
- const oldComparison = 'compare/' + introduced + '...' + beforeIntroduction + '?per_page=1';
- responses[targetComparison] = compare(introduced, 'ahead');
- responses[oldComparison] = compare(introduced, 'behind', beforeIntroduction);
- responses['compare/' + beforeIntroduction + '...' + target + '?per_page=1'] = compare(beforeIntroduction, 'ahead');
- responses['compare/' + beforeIntroduction + '...' + beforeIntroduction + '?per_page=1'] = compare(beforeIntroduction, 'identical');
- const tools = path.join(path.dirname(source), 'api-tools'), edge = githubApiEdge(tools, responses);
+ git(source, 'config', 'uploadpack.allowFilter', 'true');
+ git(source, 'config', 'uploadpack.allowAnySHA1InWant', 'true');
+ const tools = path.join(path.dirname(source), 'api-tools'), edge = githubAcquisitionEdge(tools);
  env.PATH = tools + path.delimiter + env.PATH;
  const refused = run('refresh-base', '--ref', target, '--from-api');
  assert.equal(refused.status, 4, refused.stdout + refused.stderr);
  assert.match(message(refused), /Edition migrations require consent/);
- assert.match(message(refused), /run-data-pricing/);
  assert.match(message(refused), /--from-api.*--edition-migration run-data-pricing/);
- assert.deepEqual(snapshot(), before, 'API consent refusal changes no bytes, modes or records');
+ assert.deepEqual(snapshot(), before, 'consent refusal changes no bytes, modes or records');
  const checkout = run('refresh-base', '--ref', target, '--base', source);
  assert.equal(checkout.status, 4);
  assert.match(message(checkout), /run-data-pricing/);
  assert.deepEqual(snapshot(), before);
  const expected = result('refresh-base', '--ref', target, '--base', source, '--edition-migration', 'run-data-pricing');
  const afterCheckout = snapshot();
- // Return to the exact same unadapted seed before using the API source.
  for (const name of Object.keys(snapshot())) if (!Object.hasOwn(before, name)) fs.rmSync(path.join(seed, name));
  for (const [name, [data, mode]] of Object.entries(before)) {
   write(seed, name, Buffer.from(data, 'base64')); fs.chmodSync(path.join(seed, name), mode);
  }
  assert.deepEqual(fs.readFileSync(path.join(seed, local)), bytes);
  assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
- // Provider failure, unknown ancestry, and invalid proofs all refuse, even with consent.
- for (const change of [
-  values => { delete values[oldComparison]; },
-  values => { values[targetComparison].status = 'unknown'; },
-  values => { values[targetComparison].merge_base_commit.sha = beforeIntroduction; },
-  values => { values['git/commits/' + target].sha = introduced; },
-  values => { values['git/trees/' + git(source, 'rev-parse', target + '^{tree}') + '?recursive=1'].sha = introduced; },
-  values => { values['git/blobs/' + git(source, 'rev-parse', target + ':' + origin)].content = Buffer.from('changed').toString('base64'); },
- ]) {
-  const values = structuredClone(responses); change(values); edge.save(values);
-  const invalid = run('refresh-base', '--ref', target, '--from-api', '--edition-migration', 'run-data-pricing');
-  assert.equal(invalid.status, 4, invalid.stdout + invalid.stderr);
-  if (!Object.hasOwn(values, oldComparison)) assert.match(message(invalid), /GitHub API \(HTTP 404\)/);
-  assert.deepEqual(snapshot(), before);
- }
- edge.save(responses);
  for (const flags of [['--offline'], ['--base', source], ['--base-archive', archive]]) {
   assert.equal(run('refresh-base', '--ref', target, '--from-api', ...flags).status, 4);
   assert.deepEqual(snapshot(), before);
  }
- const unrelated = structuredClone(responses); delete unrelated[targetComparison]; edge.save(unrelated);
- assert.equal(run('refresh-base', '--ref', target, '--from-api', '--edition-migration', 'run-data-pricing').status, 4);
+ edge.failFetch(true);
+ const failure = run('refresh-base', '--ref', target, '--from-api', '--edition-migration', 'run-data-pricing');
+ assert.equal(failure.status, 4);
+ assert.ok(message(failure).includes('https://github.com/runeditrun/base.git ' + target));
+ assert.doesNotMatch(failure.stdout + failure.stderr, /private transport diagnostic/);
  assert.deepEqual(snapshot(), before);
- // Compare status diverged also does not prove introduction in the old copy.
- const diverged = structuredClone(responses);
- diverged[oldComparison].status = 'diverged'; edge.save(diverged);
- assert.match(message(run('refresh-base', '--ref', target, '--from-api')), /run-data-pricing/);
- assert.deepEqual(snapshot(), before);
- // Truncated recursive responses are completed through immutable child trees.
- const fallback = structuredClone(responses), rootTree = git(source, 'rev-parse', target + '^{tree}');
- fallback['git/trees/' + rootTree + '?recursive=1'] = {sha: rootTree, truncated: true, tree: []};
- const addTree = identity => {
-  const entries = git(source, 'ls-tree', '-z', identity).split('\0').filter(Boolean).map(line => {
-   const [mode, type, sha, name] = line.split(/[\t ]/); return {path: name, mode, type, sha};
-  });
-  fallback['git/trees/' + identity] = {sha: identity, truncated: false, tree: entries};
-  fallback['git/trees/' + identity + '?recursive=1'] ??= {sha: identity, truncated: true, tree: []};
-  for (const entry of entries) if (entry.type === 'tree') addTree(entry.sha);
- };
- addTree(rootTree); edge.save(fallback);
+ edge.failFetch(false);
+ const start = edge.requests().length;
  const actual = result('refresh-base', '--ref', target, '--from-api', '--edition-migration', 'run-data-pricing');
+ const requests = edge.requests().slice(start);
+ assert.ok(requests.filter(args => args[0] === 'api').length <= 10, 'REST requests stay bounded independently of tree size');
+ assert.ok(requests.some(args => args[0] === 'fetch'), 'real Git pack acquisition runs at the process edge');
  assert.deepEqual(actual, expected);
- assert.deepEqual(snapshot(), afterCheckout, 'API and full-history refresh have identical source, records and modes');
+ assert.deepEqual(snapshot(), afterCheckout, 'source, copies and edition metadata are byte-identical to the checkout path');
  assert.deepEqual(actual.editionMigrations.map(step => step.id), ['run-data-pricing']);
  const repeat = result('refresh-base', '--ref', target, '--from-api');
  assert.deepEqual(repeat.editionMigrations, []);
  assert.equal(repeat.copies.flatMap(copy => copy.added).length, 0);
  assert.deepEqual(snapshot(), afterCheckout);
  old('verify-base', '--offline');
- assert.ok(edge.requests().some(args => args[1] === 'repos/runeditrun/base/' + targetComparison));
- assert.ok(edge.requests().every(args => args[0] === 'api' && !args[1].includes('/main')));
- t.diagnostic('API archive: before exit=4 no Git history; without consent exit=4 naming run-data-pricing; consent exit=0 matches full-history; repeat adds=0; unknown/unrelated API ancestry and corrupt objects refuse before writes; consent adds=' + actual.copies.flatMap(copy => copy.added).length + '; consent migrations=' + actual.editionMigrations.length + '; repeat migrations=' + repeat.editionMigrations.length);
+ // Unavailable ancestry still refuses with the exact immutable request.
+ const migrationData = fs.readFileSync(path.join(source, 'foundation/edition-migrations.json'));
+ const unavailable = execFileSync('git', ['-C', source, 'hash-object', '--stdin'], {input: 'synthetic unavailable introduction', encoding: 'utf8'}).trim();
+ const invalid = JSON.parse(migrationData.toString()); invalid.migrations[0].introduced = unavailable;
+ write(source, 'foundation/edition-migrations.json', JSON.stringify(invalid));
+ const invalidPin = commit(source), unknownBefore = snapshot();
+ const unknown = run('refresh-base', '--ref', invalidPin, '--from-api', '--edition-migration', 'run-data-pricing');
+ assert.equal(unknown.status, 4);
+ assert.ok(message(unknown).includes(unavailable));
+ assert.deepEqual(snapshot(), unknownBefore);
+ // Having full Git ancestry must not broaden snapshot-only workflow adoption.
+ write(source, 'foundation/edition-migrations.json', migrationData);
+ write(source, 'export/verify.yml', 'jobs: {}\n'); commit(source);
+ write(seed, '.github/workflows/verify.yml', 'jobs: {}\n'); commit(seed);
+ write(source, 'export/verify.yml', 'name: Verify\njobs: {}\n');
+ const workflowPin = commit(source), workflowBefore = fs.readFileSync(path.join(seed, '.github/workflows/verify.yml'));
+ const workflow = result('refresh-base', '--ref', workflowPin, '--from-api');
+ assert.deepEqual(workflow.templateAdoptions, []);
+ assert.deepEqual(fs.readFileSync(path.join(seed, '.github/workflows/verify.yml')), workflowBefore);
+ assert.ok(workflow.notices.some(notice => notice.includes('.github/workflows/verify.yml')));
+ t.diagnostic('GitHub acquisition: REST calls=' + requests.filter(args => args[0] === 'api').length + '; Git pack fetches=' + requests.filter(args => args[0] === 'fetch').length + '; consent, atomic transport refusal, byte equality and repeat passed');
 }

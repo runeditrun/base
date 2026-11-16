@@ -1,11 +1,10 @@
 import test from 'node:test'
-import {githubApiEdge} from '../edition-authoring/tests/github-api.mjs'
+import {githubAcquisitionEdge} from '../edition-authoring/tests/github-acquisition.mjs'
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createHash } from 'node:crypto'
 
 const fixtures = join(import.meta.dirname, 'fixtures/contract-docs')
 const read = (root, path) => readFile(join(root, path), 'utf8')
@@ -59,18 +58,13 @@ test('source claims survive conversion and Base copies record through the public
     await edit(root, 'CONTRACT.md', converted.replace(row + '\n', ''))
     assert.notEqual(cli(root, 'check').status, 0, 'a dropped source claim passed')
     await edit(root, 'CONTRACT.md', converted)
-    const revision = git(base, 'rev-parse', 'HEAD'), tree = git(base, 'rev-parse', 'HEAD^{tree}')
-    const bytes = await readFile(join(base, 'README.md'))
-    const object = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex')
-    const response = {
-      [`git/commits/${revision}`]: { sha: revision, tree: { sha: tree } },
-      [`git/trees/${tree}?recursive=1`]: { sha: tree, truncated: false, tree: [{ path: 'README.md', type: 'blob', mode: '100644', sha: object }] },
-      [`git/blobs/${object}`]: { sha: object, encoding: 'base64', size: bytes.length, content: bytes.toString('base64') },
-    }
-    const tools = join(root, 'tools')
-    githubApiEdge(tools, response)
+    const revision = git(base, 'rev-parse', 'HEAD')
+    const tools = join(root, 'tools'), edge = githubAcquisitionEdge(tools)
+    git(base, 'config', 'uploadpack.allowFilter', 'true')
+    git(base, 'config', 'uploadpack.allowAnySHA1InWant', 'true')
     const record = (...args) => spawnSync(process.execPath, [join(import.meta.dirname, '../edition-authoring/cli.mjs'), 'record-base', 'README.md', 'README.md', revision, ...args], {
-      cwd: root, encoding: 'utf8', env: { ...process.env, PATH: tools + ':' + process.env.PATH },
+      cwd: root, encoding: 'utf8', env: { ...process.env, PATH: tools + ':' + process.env.PATH, GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: `url.${base}.insteadOf`, GIT_CONFIG_VALUE_0: 'https://github.com/runeditrun/base.git' },
     })
     let result = record('--base', base)
     assert.equal(result.status, 0, result.stderr)
@@ -78,5 +72,6 @@ test('source claims survive conversion and Base copies record through the public
     result = record('--from-api')
     assert.equal(result.status, 0, result.stderr)
     assert.equal(await read(root, 'base-copies.json'), expected, 'API and checkout records differ')
+    assert.ok(edge.requests().filter(args => args[0] === 'api').length <= 10)
   } finally { await Promise.all([root, base].map(root => rm(root, { recursive: true, force: true }))) }
 })
