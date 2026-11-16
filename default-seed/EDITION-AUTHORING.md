@@ -63,23 +63,26 @@ refresh writes, naming both revisions, the remote and a complete one-line repair
 command. Offline refresh never fetches; incomplete ancestry gets the same repair
 guidance for use when online.
 
-When Git cloning is unavailable but authenticated `gh api` works, use:
+For a GitHub source, the compatibility flag `--from-api` now uses Git over HTTPS:
 
 ```sh
 rer refresh-base --ref FULL_40_HEX_BASE_COMMIT --from-api
 ```
 
-This reads committed trees and verified blobs by immutable identity, completing
-truncated recursive trees through their child tree IDs. GitHub compare
-`INTRODUCED...REVISION` establishes ancestry only for `ahead` or `identical`;
-unknown or unavailable comparisons refuse before writes. Required edition edits
-still refuse without their named `--edition-migration ID` consents, and consent
-leaves the edition-owned edits owed. Repeating a refresh adds no new copies.
-The API source shares `record-base --from-api`'s authenticated reader and does
-not retry or run source scripts. Choose it separately from `--base`,
-`--base-archive` and `--offline`. Plain extracted directories still cannot
-establish migration ancestry. API workflow-template matching uses the requested
-snapshot, preserving unmatched seed-owned workflows.
+It spends at most **0 GitHub REST calls**, measured at the process edge, regardless
+of tree size. Immutable commits, full ancestry and blobs arrive in Git packs;
+blob hashes are verified locally and cached within the process. This requires
+Git HTTPS access and uses Git's existing authentication configuration, without
+reading a token. `--base <blobless clone>` also spends no REST allowance.
+
+Required edition edits still refuse without their named `--edition-migration ID`
+consents, and consent leaves the edition-owned edits owed. Repeating a refresh
+adds no new copies. Acquisition failures identify the exact repository and
+immutable commit that failed before changing files or records; transport stderr
+is withheld. There are no automatic retries or source scripts. Choose this flag
+separately from `--base`, `--base-archive` and `--offline`. Plain extracted
+directories cannot establish migration ancestry. Workflow-template matching
+remains limited to the requested snapshot, preserving unmatched seed-owned workflows.
 
 For offline use, supply `--offline --base CHECKOUT`. Without a checkout refresh
 refuses plainly; it cannot refresh from hashes alone. Offline Git reads use an isolated
