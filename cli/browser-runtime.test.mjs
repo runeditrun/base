@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, writeFile, chmod, rm, readdir, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, chmod, rm, readdir, symlink, realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { browserDoctor, browsersPresent, ensureChromium } from './browser-runtime.mjs';
@@ -9,7 +9,7 @@ import { browserDoctor, browsersPresent, ensureChromium } from './browser-runtim
 // Synthetic checkout registry: paths belong to its pin/cache, and running either
 // Playwright's CLI or a browser is an error. No installed Playwright is needed.
 async function fixture(t) {
- const root = await mkdtemp(join(tmpdir(), 'rer-synthetic-browser-'));
+ const root = await realpath(await mkdtemp(join(tmpdir(), 'rer-synthetic-browser-')));
  t.after(() => rm(root, { recursive: true, force: true }));
  const core = join(root, 'node_modules/playwright-core'), browsers = join(root, 'browsers'), home = join(root, 'home'), bin = join(root, 'empty-bin');
  await Promise.all([mkdir(join(core, 'lib/server/registry'), { recursive: true }), mkdir(join(root, 'scripts')), mkdir(browsers), mkdir(home), mkdir(bin)]);
@@ -29,8 +29,13 @@ exports.registry = { findExecutable(name) {
  return { executablePath() { return join(${JSON.stringify(browsers)}, name); } };
 } };\n`);
  const present = async name => { const path = join(browsers, name); await writeFile(path, '#!/bin/sh\nexit 97\n'); await chmod(path, 0o755); };
+ // describe stamps the CLI version from Base's Git checkout, not this seed.
+ // CI owns that checkout under another uid; the isolated HOME loses its trust.
+ const env = { HOME: home, PATH: bin, PLAYWRIGHT_BROWSERS_PATH: browsers, RER_NODE_AUTO: '0',
+  GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'safe.directory', GIT_CONFIG_VALUE_0: resolve(import.meta.dirname, '..') };
  const run = async (entry, verb, json = true) => {
-  const child = spawn(process.execPath, [resolve(import.meta.dirname, entry), verb, ...(json ? ['--json'] : [])], { cwd: root, env: { HOME: home, PATH: bin, PLAYWRIGHT_BROWSERS_PATH: browsers, RER_NODE_AUTO: '0' }, stdio: ['ignore', 'pipe', 'pipe'], signal: t.signal });
+  const child = spawn(process.execPath, [resolve(import.meta.dirname, entry), verb, ...(json ? ['--json'] : [])], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], signal: t.signal });
   let stdout = '', stderr = '';
   child.stdout.setEncoding('utf8').on('data', text => { stdout += text; });
   child.stderr.setEncoding('utf8').on('data', text => { stderr += text; });
