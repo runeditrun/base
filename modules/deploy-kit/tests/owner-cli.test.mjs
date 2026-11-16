@@ -250,6 +250,7 @@ test('cancelling owner deployment closes reads and waits, retains ownership and 
   for (const phase of ['provider-request','provider-body','health-body','health-wait','asset-wait','listing-wait']) {
     const provider = ownerProvider(); t.after(() => provider.close());
     const root = await seed(t), controller = new AbortController();
+    await writeFile(join(root,'dist/client/app.js'),'export const application = true;');
     const reason = new Error('deployment-cancelled');
     const args = ['deploy','--declaration','deploy.json','--environment','production'];
     let entered = false, closed = false, timer, cancelledAt;
@@ -282,7 +283,7 @@ test('cancelling owner deployment closes reads and waits, retains ownership and 
       }
       return response;
     };
-    await assert.rejects(main(args,inputs(provider),{fetch:request,cwd:root,signal:controller.signal,notice:() => {}}));
+    await assert.rejects(main(args,inputs(provider),{fetch:request,cwd:root,signal:controller.signal,notice:() => {}}), undefined, phase);
     assert.equal(entered,true,`${phase}: reached the cancellation boundary`);
     assert.ok(performance.now()-cancelledAt < 3000,`${phase}: cancellation returns promptly`);
     if (phase.endsWith('body') || phase === 'provider-request') assert.equal(closed,true,`${phase}: the active read was closed`);
