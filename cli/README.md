@@ -92,8 +92,8 @@ the application; no `/setup` path is assumed. Preview and demo also verify their
 native owner entry, then issue a fresh single-use link for the owner.
 
 This uses the checkout's locked Playwright and provisions its headless browser
-on first use, as verification does. After provisioning, owner readiness has a
-60-second elapsed deadline, including browser launch and navigation. Set
+on first use, as verification does. Owner readiness has a 60-second elapsed
+deadline, including provisioning, browser launch and navigation. Set
 `RER_OWNER_READY_TIMEOUT_MS` to positive integer milliseconds to change it.
 Expiry exits 1 with `owner_entry_not_ready`, naming the entry and last destination
 without credentials, for example: `Destination http://127.0.0.1:8787/workspace/start-here:

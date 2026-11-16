@@ -7,9 +7,7 @@ import { invalid, missing, RerError } from './errors.mjs';
 export async function ownerEntryReady(root, link, signal, store) {
  const timeout = Number(process.env.RER_OWNER_READY_TIMEOUT_MS ?? 60000);
  if (!Number.isSafeInteger(timeout) || timeout <= 0 || timeout > 2147483647) throw invalid('RER_OWNER_READY_TIMEOUT_MS must be positive integer milliseconds, at most 2147483647.');
- if (store) await ensureChromium(root, store, signal);
- else if (!await browsersPresent(root)) throw missing('Owner entry verification needs the checkout’s headless browser. Run rer verify to provision it, then run the command again.');
- const { playwright } = checkoutPlaywright(root), entry = new URL(link), deadline = performance.now() + timeout;
+ const entry = new URL(link), deadline = performance.now() + timeout;
  const bounded = AbortSignal.any([signal, AbortSignal.timeout(timeout)].filter(Boolean));
  let browser, page, destination = entry, last = 'browser did not open the entry', documents = 0, status, exchanged = !entry.hash, lastReload = 0;
  const remaining = () => Math.max(1, Math.ceil(deadline - performance.now()));
@@ -17,6 +15,12 @@ export async function ownerEntryReady(root, link, signal, store) {
  const close = () => { void browser?.close().catch(() => {}); };
  bounded.addEventListener('abort', close, { once: true });
  try {
+  last = 'headless browser prerequisites did not become ready';
+  if (store) await ensureChromium(root, store, bounded);
+  else if (!await browsersPresent(root)) throw missing('Owner entry verification needs the checkout’s headless browser. Run rer verify to provision it, then run the command again.');
+  const { playwright } = checkoutPlaywright(root);
+  bounded.throwIfAborted();
+  last = 'browser did not open the entry';
   browser = await playwright.chromium.launch({ headless: true, timeout: remaining(), args: ['--use-mock-keychain', '--password-store=basic'] });
   bounded.throwIfAborted();
   const context = await browser.newContext();
@@ -55,8 +59,9 @@ export async function ownerEntryReady(root, link, signal, store) {
    }
    await pause(Math.min(100, remaining()), undefined, { signal: bounded }).catch(() => {});
   }
- } catch {
+ } catch (error) {
   signal?.throwIfAborted();
+  if (error instanceof RerError && !bounded.aborted) throw error;
  } finally {
   bounded.removeEventListener('abort', close);
   await browser?.close();

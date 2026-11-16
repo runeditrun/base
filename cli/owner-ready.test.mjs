@@ -14,7 +14,7 @@ test('rer dev announces the owner entry only after its redirected Setup answers,
   }
  }
  for (const json of [true, false]) {
-  await f.configure({ busyMs: 2000, status: 200 });
+  await f.configure({ busyMs: 2000, status: 200, ...(json ? { clientMs: 1500 } : {}) });
   const child = f.start(json);
   await until(async () => (await f.observations()).some(row => row.busy), child);
   assert.doesNotMatch(child.output, /"event":"ready"|RER_READY|RER_OPEN/, 'persona readiness cannot announce a busy owner destination');
