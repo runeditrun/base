@@ -58,6 +58,7 @@ export async function secretBindings(api, worker, plan, env, exists) {
   }
   for (const item of plan.secrets) {
     if (names.includes(item.binding)) bindings.push({type:'inherit',name:item.binding});
+    else if (unset.includes(item.binding) && item.publicDefault !== undefined) bindings.push({type:'plain_text',name:item.binding,text:item.publicDefault});
     else if (!unset.includes(item.binding)) {
       bindings.push({type:'secret_text',name:item.binding,text:env[item.environment]});
     }

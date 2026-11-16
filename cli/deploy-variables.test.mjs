@@ -69,6 +69,9 @@ test('rer check reports every plain var / deploy secret overlap before a build',
  const human = run();
  assert.equal(human.status, 1);
  assert.ok(human.stdout.includes('deploy.vars-secrets: ' + failed.clause.message), human.stdout);
+ const doctor = spawnSync(process.execPath, [join(base, 'bin/rer.mjs'), 'doctor', '--cwd', root, '--json'], { encoding: 'utf8', timeout: 30000 });
+ const diagnostic = JSON.parse(doctor.stdout.trim().split('\n').at(-1));
+ assert.ok(diagnostic.diagnostics.warnings.some(warning => warning.includes('publicSettings') && warning.includes('optional: true')), doctor.stdout + doctor.stderr);
 
  // Additional deploy templates are checked even when the root is clean.
  await writeFile(configPath, original);

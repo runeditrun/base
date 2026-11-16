@@ -265,6 +265,10 @@ export async function doctor(project, store, signal) {
  }
  const setupNeeded = firstParty ? !(await localState(project)).prepared : false;
  const warnings = project.profile === 'first-party' ? await cacheWarnings(project.root) : [];
+ if (firstParty) {
+  const variables = await deployVariableClause(project.root, project.adapter);
+  if (!variables.ok) warnings.push(`Deployment declaration: ${variables.message}`);
+ }
  return { dependencies, warnings, browser, operations: diagnostic, ok: browser?.ok !== false && !aiIssues.length && dependencies.every(d=>d.ok) && diagnostic.ok && stateValid && !inputs.length && (project.profile !== 'first-party' || (Boolean(expectedPnpm) && process.versions.node === expectedNode && pnpm === expectedPnpm)),
   node: { actual: process.versions.node, expected: expectedNode },
   pnpm: project.profile === 'first-party' ? { actual: pnpm, expected: expectedPnpm ?? null, ...(pnpmIssues.length ? { issue: [...new Set(pnpmIssues)].join('\n') } : {}) } : undefined,

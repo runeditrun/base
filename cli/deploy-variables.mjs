@@ -7,6 +7,7 @@ import { tomlEntries } from './business/parsers-config.mjs';
 import { imageVariableSecrets } from '../modules/container/image-variables.mjs';
 import { publicMailSender, validateMailSenders } from '../modules/delivery-producer/mail.mjs';
 import { deliveryDeclarationSources } from './delivery-declarations.mjs';
+import { switchableDefaults, switchableDeclarationHelp } from './deploy-settings.mjs';
 
 const id = 'deploy.vars-secrets';
 const lineAt = (source, offset) => source.slice(0, offset).split('\n').length;
@@ -71,6 +72,7 @@ export async function deployVariableClause(root, adapter) {
    privateSender ||= [...(spec.secretNames ?? []), ...(spec.optionalSecretNames ?? [])].includes('MAIL_FROM');
    senders.push({ source: `${path} publicVariables.MAIL_FROM`, value: spec.publicVariables?.MAIL_FROM });
   }
+  const defaults = await switchableDefaults(declaration);
   const overlaps = [];
   for (const path of deployConfigPaths(adapter)) {
    for (const entry of await variableEntries(root, path)) {
@@ -78,12 +80,16 @@ export async function deployVariableClause(root, adapter) {
     if (binding === 'MAIL_FROM') senders.push(entry);
     const matched = new Set(imageVariableSecrets({ [binding]: value }, secrets).map(secret => secret.binding));
     if (!matched.has(binding)) continue;
+    if (Object.hasOwn(defaults, binding)) {
+     if (value !== defaults[binding]) throw Error(`${binding}: ${entry.source} must match the public default in ${declarationPath} vars.${binding}.`);
+     continue;
+    }
     if (binding === 'MAIL_FROM' && publicSender && !privateSender) continue;
     for (const [index, secret] of secrets.entries()) if (secret.binding === binding) overlaps.push(
       `${binding}: ${entry.location} and ${declarationPath}:${secretLocations.get(index)} (secrets)`);
    }
   }
   validateMailSenders(senders);
-  return overlaps.length ? { id, ok: false, message: overlaps.join('\n') + '\nremove it from wrangler vars; the deploy sets it as a secret' } : { id, ok: true };
+  return overlaps.length ? { id, ok: false, message: overlaps.join('\n') + '\nremove it from wrangler vars; the deploy sets it as a secret. ' + switchableDeclarationHelp(declarationPath) } : { id, ok: true };
  } catch (error) { return { id, ok: false, message: error.message }; }
 }
