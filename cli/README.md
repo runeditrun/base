@@ -100,6 +100,25 @@ For older installations without an answer record, a runtime selection outside
 the installer field's choices cannot replace an adapter-declared local choice.
 Explicit answers and recorded installer choices still undergo strict validation.
 
+## Browser prerequisites
+
+Signed: Run Edit Run fleet, 2026-11-16.
+
+`rer doctor` and `rer describe` inspect the checkout's Playwright registry
+without launching or downloading a browser. Headless verification needs only
+`chromium-headless-shell` when that Playwright pin provides it; older pins use
+`chromium`. A checkout that also runs headed Chromium declares
+`browser: { headless: false }` in its command adapter. That adds full Chromium
+to verification's headless prerequisite. `rer run` also honors `--headed` and
+`--debug` in the selected Playwright script or its forwarded arguments.
+
+Missing executables are named with their use and one browser-only command
+using the checkout's resolved Playwright CLI. Run that command from the checkout
+root to acquire browsers without verification. `rer install` installs locked
+dependencies without browsers. The first `rer verify` (or declared Playwright
+`rer run`) downloads the required target; a headless-only checkout downloads
+only the headless shell, using the pin's own platform and revision.
+
 ## Back up and restore this installation
 
 Use `rer export` / `rer import` to back up and restore this installation. This

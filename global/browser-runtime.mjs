@@ -1,14 +1,18 @@
 // An older checkout pin still runs its own verbs. The installed launcher
 // supplies the browser prerequisite those pins did not yet provision.
-import { browserDoctor, ensureChromium } from '../cli/browser-runtime.mjs';
+import { browserDoctor, browsersPresent, ensureChromium } from '../cli/browser-runtime.mjs';
+import { resolveProject } from '../cli/project.mjs';
 import { output } from '../cli/output.mjs';
 import { RerError } from '../cli/errors.mjs';
 import { shared } from '../cli/shared.mjs';
 
 export async function browserPreflight(root, argv) {
  const verb = argv[0], out = output({ verb, json: argv.includes('--json') });
+ let use;
+ try { use = (await resolveProject(root)).adapter?.browser; } catch { /* The checkout's command reports invalid declarations. */ }
+ if (argv.includes('--headed') || argv.includes('--debug')) use = { ...use, headless: false };
  if (verb === 'doctor') {
-  const browser = await browserDoctor(root);
+  const browser = await browserDoctor(root, use);
   if (browser.ok) return;
   const diagnostics = { browser, ok: false, scope: 'browser-prerequisite' };
   if (!argv.includes('--json')) out.human(JSON.stringify(diagnostics, null, 2));
@@ -16,7 +20,7 @@ export async function browserPreflight(root, argv) {
   return 3;
  }
  // Installed browsers need no download, and no log.
- if ((await browserDoctor(root).catch(() => ({ ok: false }))).ok) return;
+ if (await browsersPresent(root, use)) return;
  const cancellation = new AbortController();
  const state = { logs: [], step: 'Checking the checkout’s Playwright browsers' };
  let store, termination;
@@ -30,7 +34,7 @@ export async function browserPreflight(root, argv) {
   store.setCommandSignal(cancellation.signal);
   // A fresh vendored pin installs its own dependencies; verify will acquire
   // their browser on first need. Package pins have already been bootstrapped.
-  await ensureChromium(root, store, cancellation.signal, { required: verb === 'verify' });
+  await ensureChromium(root, store, cancellation.signal, { ...use, required: verb === 'verify' });
  } catch (error) {
   const failure = termination ? new RerError('cancelled', `Stopped by ${termination} after owned children were stopped.`, termination === 'SIGINT' ? 130 : 143) : await browserStepError(error, store, state, root);
   out.error(failure); out.result(false, failure.exitCode);
@@ -47,5 +51,5 @@ async function browserStepError(error, store, state, root) {
  const { checkoutPath, stepDiagnostic, stepFailureText } = await shared('step-failure.mjs');
  const step = approvedFailure(error)?.step ?? stepDiagnostic({ name: state.step, output: state.logs, log: store ? store.redact(checkoutPath(root, store.logPath)) : null });
  const cause = error instanceof RerError ? `\n${error.message}` : /^[A-Z][A-Z0-9_]{1,63}$/.test(error?.code ?? '') ? `\nCause: ${error.code}` : '';
- return new RerError(error instanceof RerError ? error.code : 'browser_install_failed', `${stepFailureText(step)}${cause}\nRun rer install to retry.`, error instanceof RerError ? error.exitCode : 1, { step });
+ return new RerError(error instanceof RerError ? error.code : 'browser_install_failed', `${stepFailureText(step)}${cause}\nRetry the browser-only install command shown above.`, error instanceof RerError ? error.exitCode : 1, { step });
 }
