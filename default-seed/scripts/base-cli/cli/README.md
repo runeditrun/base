@@ -543,8 +543,11 @@ Dry runs bypass custom deploy hooks and their owner-email preflight: they valida
 the local plan, while a real deployment validates the hosted identity before upload.
 
 `--env-file` values are available in the command's preflight, custom hook and
-child build environment and are redacted; the caller environment is restored
-on success and failure. `--remove`, `--set-secret` and `--unset-secret` always go
+child build environment and are redacted. If the caller already holds a nonblank
+`CLOUDFLARE_API_TOKEN`, any `CLOUDFLARE_*` or `CF_*` key in that file
+refuses deployment before a provider call, naming the file and key without the
+value. With no caller token, the file keeps its usual precedence. The caller
+environment is restored on success and failure. `--remove`, `--set-secret` and `--unset-secret` always go
 through the owner-account controller, without invoking the application's build
 or deploy hook. `--set-secret A,B` (or the flag repeated) changes several
 secrets in one Worker version or none, after checking that each is declared
@@ -808,8 +811,8 @@ a command at that expiry and reports that the credential expired, with
 `run it again to resume` and the caller exit status. Invoke the command again to
 obtain a new credential; the command's own behavior determines how work resumes.
 The old credential is not extended or renewed.
-Child exit codes and Unix terminating signals are preserved: expiry normally
-terminates with SIGTERM (shell status 143); a process still running after the
+Child exit codes and Unix terminating signals are preserved: shell status 143
+applies to a command that exits on SIGTERM; a process still running after the
 existing three-second grace is killed with SIGKILL (shell status 137). A child
 that handles the signal keeps its own exit code. There is no separate synthetic
 expiry failure code: the expiry message distinguishes it from a child failure. The wrapper requests revocation after success, failure,
@@ -821,5 +824,11 @@ The safe lease ID in that status supports `rer business cleanup LEASE` to retry
 revocation and `rer business cleanup LEASE --status` to read its status. Cleanup
 needs the original pairing, but does not require the removed deploy action or an
 active grant. No child token is saved in state, OS storage, logs or MCP output.
+
+`rer deploy` cancels provider requests, polling waits and owned children on
+SIGTERM, releases its deployment lock and exits with status 143 (130 on SIGINT).
+It retains the deployment record, including pending operations, so the same
+command under a fresh grant can resume without recreating confirmed resources.
+An unconfirmed create still requires ownership inspection before proceeding.
 
 Expiry guidance: Codex, 17 November 2026.

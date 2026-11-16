@@ -1,6 +1,8 @@
 import { readinessWindow, rememberReadiness } from './readiness-window.mjs';
 import { deploymentDiagnostics, deployDiagnostic } from './diagnostics.mjs';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { combinedSignal } from './cancellation.mjs';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -26,18 +28,41 @@ const usage = 'usage: owner-cli.mjs deploy|dry-run|local-plan|health|remove|insp
 // The public offline command also contains legacy hooks that call kit dry-run.
 // Keep their plan local without changing direct kit callers or real deploys.
 const localPlans = new AsyncLocalStorage();
+const ownerSignals = new AsyncLocalStorage();
+export const withOwnerDeploySignal = (signal, run) => ownerSignals.run(signal, run);
+const execute = promisify(execFile);
 export const withLocalDeployPlan = run => localPlans.run(true, run);
 
 /** The owner's committed source and existing local build. Run the seed's build first. */
-async function ownerArtifact(root, product) {
-  const git = (...args) => { try { return execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim(); } catch { throw new Error('owner-source-not-a-git-checkout'); } };
-  const source = {sha:git('rev-parse','HEAD'),tree:git('rev-parse','HEAD^{tree}')};
-  assert(!git('status','--porcelain','--untracked-files=no'),'owner-source-not-committed');
+async function ownerArtifact(root, product, signal) {
+  const git = async (...args) => {
+    signal?.throwIfAborted();
+    const grouped = process.platform !== 'win32';
+    const pending = execute('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe'],detached:grouped});
+    // Git may invoke a configured helper. End this invocation's entire process
+    // group, and await execFile's close callback before returning cancellation.
+    const abort = () => {
+      if (!pending.child.pid) return;
+      try { process.kill(grouped ? -pending.child.pid : pending.child.pid,'SIGKILL'); }
+      catch (error) { if (error.code !== 'ESRCH') pending.child.kill('SIGKILL'); }
+    };
+    signal?.addEventListener('abort',abort,{once:true});
+    if (signal?.aborted) abort();
+    try { const result = await pending; signal?.throwIfAborted(); return result.stdout.trim(); }
+    catch { signal?.throwIfAborted(); throw new Error('owner-source-not-a-git-checkout'); }
+    finally { signal?.removeEventListener('abort',abort); }
+  };
+  const source = {sha:await git('rev-parse','HEAD'),tree:await git('rev-parse','HEAD^{tree}')};
+  assert(!await git('status','--porcelain','--untracked-files=no'),'owner-source-not-committed');
+  signal?.throwIfAborted();
   return packageBuild({root,source,runIdentity:{id:'0',attempt:'1'},productDirectory:product});
 }
 
 /** Inputs: CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, plus the secrets the declaration names on first deploy. */
-export async function main(argv = process.argv.slice(2), env = process.env, {fetch = globalThis.fetch, cwd = process.cwd(), healthOptions, propagation, settle, localOnlyKeys = [], notice = line => console.error(line), onCreated} = {}) {
+export async function main(argv = process.argv.slice(2), env = process.env, {fetch = globalThis.fetch, cwd = process.cwd(), healthOptions, propagation, settle, signal = ownerSignals.getStore(), localOnlyKeys = [], notice = line => console.error(line), onCreated} = {}) {
+  signal?.throwIfAborted();
+  healthOptions = {...healthOptions,signal,...(healthOptions?.readiness ? {readiness:{...healthOptions.readiness,signal}} : {})};
+  settle = {...settle,signal};
   let parsed;
   try { parsed = parseArgs({args:argv,allowPositionals:true,strict:true,options:{declaration:{type:'string'},environment:{type:'string'},product:{type:'string',default:''},state:{type:'string'},set:{type:'string',multiple:true},unset:{type:'string',multiple:true},outcome:{type:'string'}}}); }
   catch { throw new Error('usage'); }
@@ -82,20 +107,23 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   let requestWindow = propagation?.uploaded ? propagation.window : undefined;
   const request = fetch;
   const guardedRequest = (input, init = {}) => {
+    signal?.throwIfAborted();
     init.signal?.throwIfAborted();
     // The window clock can expire before its shared abort timer fires.
     assert(!requestWindow?.active || requestWindow.remaining() > 0, 'deployment-readiness-timeout');
     return request(input, init);
   };
   const requestSignal = () => {
-    if (!requestWindow?.active) return undefined;
+    signal?.throwIfAborted();
+    if (!requestWindow?.active) return signal;
     const remaining = requestWindow.remaining();
     assert(remaining > 0, 'deployment-readiness-timeout');
-    return requestWindow.timeout(Math.max(1, Math.ceil(remaining)));
+    return combinedSignal(signal, requestWindow.timeout(Math.max(1, Math.ceil(remaining))));
   };
   fetch = (input, init = {}) => {
-    const deadline = requestSignal();
-    return request(input, {...init,...(deadline ? {signal:init.signal ? AbortSignal.any([init.signal,deadline]) : deadline} : {})});
+    const requestAbort = combinedSignal(init.signal, requestSignal());
+    requestAbort?.throwIfAborted();
+    return request(input, {...init,signal:requestAbort});
   };
   // Transport must see the same outer signal when deciding whether to retry.
   const api = deploymentDiagnostics(cloudflare({accountId:env.CLOUDFLARE_ACCOUNT_ID,token:env.CLOUDFLARE_API_TOKEN,fetch:guardedRequest,requestSignal,budgetMigrations:command === 'deploy',...(command === 'remove' ? {maxRequests:Infinity,removal:true} : {})}),{onCreated});
@@ -107,7 +135,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     : command === 'remove'
     ? {accountId:api.accountId,project:declaration.project,environment:values.environment,worker:ownerWorkerName(declaration.project,values.environment)}
     : await ownerTarget(api,{project:declaration.project,environment:values.environment});
-  if (command === 'remove') return {ok:true,...await ownerRemove({api,target,statePath}).catch(error => { throw api.annotateFailure(error,'remove'); })};
+  if (command === 'remove') return {ok:true,...await ownerRemove({api,target,statePath,signal}).catch(error => { throw api.annotateFailure(error,'remove'); })};
   if (command === 'rekey') return ownerRekey({api,target,statePath,declaration,env,notice});
   if (command === 'secret') {
     // Every named secret is changed in one Worker version, or none is.
@@ -115,7 +143,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     const undeclared = named.filter(binding => !declared.some(entry => entry?.binding === binding));
     if (undeclared.length) { const error = new Error('undeclared-secret'); error.resource = undeclared.map(binding => `secret:${binding}`).join(', '); throw error; }
     const changes = named.map(binding => ({binding, value:values.set === undefined ? undefined : env[declared.find(entry => entry?.binding === binding).environment], ...(values.unset !== undefined && Object.hasOwn(publicDefaults,binding) ? {publicDefault:publicDefaults[binding]} : {})}));
-    return {ok:true,...await ownerSecret({api,target,statePath,changes,fetch,healthOptions,settle}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
+    return {ok:true,...await ownerSecret({api,target,statePath,changes,fetch,healthOptions,settle,signal}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
   }
   // A secret rer retired (the spent setup token) is no longer part of the plan.
   // A dry run only reads state: settling an interrupted change may write it.
@@ -146,7 +174,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     return {ok:true, origin:state.receipt.origin ?? target.origin, versionId:live.versionId, retiredSecrets, ownerClaim:state.ownerClaim, liveSecrets:rows.map(row => row.name)};
   }
   const current = retiredSecrets.length && Array.isArray(declaration.secrets) ? {...declaration,secrets:declaration.secrets.filter(item => !retiredSecrets.includes(item?.binding))} : declaration;
-  artifact ??= await ownerArtifact(root,values.product);
+  artifact ??= await ownerArtifact(root,values.product,signal);
   const plan = ownerPlan(target,current,artifact,{localOnlyKeys,env,publicDefaults});
   if (command === 'dry-run') {
     const checked = withScopeHints(api);
@@ -156,7 +184,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   }
   if (command === 'health') {
     const readiness = {...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}),
-      ...healthOptions?.readiness,single:true,totalMs:30000,
+      ...healthOptions?.readiness,signal,single:true,totalMs:30000,
       ...(propagation ? {window:propagation.window,freshUpload:propagation.uploaded && propagation.versionId === state.receipt?.provider.versionId} : {})};
     await ownerHealth({api,target,plan,statePath,fetch,healthOptions:{...healthOptions,readiness}}).catch(error=>{throw api.annotateFailure(error,'health');});
     return {ok:true,worker:target.worker,origin:target.origin};
@@ -165,9 +193,9 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   if (plan.crons.length) notice(cronNotice);
   // The fingerprint names every declared secret, retired ones too: an untouched repeat after the claim is a no-op.
   const declaredSecrets = current === declaration ? plan.secrets : ownerPlan(target,declaration,artifact,{localOnlyKeys,env,publicDefaults}).secrets;
-  const window = readinessWindow({...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}), ...healthOptions?.readiness});
+  const window = readinessWindow({...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}), ...healthOptions?.readiness,signal});
   requestWindow = window;
-  const {receipt,created,sentSecrets,unsetSecrets,freshUpload} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,readiness:{...healthOptions?.readiness,window},settle,declaredSecrets}).catch(error => {
+  const {receipt,created,sentSecrets,unsetSecrets,freshUpload} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,readiness:{...healthOptions?.readiness,window,signal},settle,declaredSecrets}).catch(error => {
     api.annotateFailure(error,error.message.startsWith('missing-secret-') ? 'secrets' : undefined);
     throw error;
   });

@@ -13,12 +13,14 @@ import { keptSecrets, rotations, savedSecrets } from './deploy-secrets.mjs';
 // the value kept for this environment (deploy-secrets.mjs), else a fresh one
 // (`generated`; always fresh for the one-time setup token and --rotate-secret).
 // The owner kit sends a value only to a Worker that lacks that secret.
-export async function deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys = [] }) {
+export async function deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys = [], refuseProviderKeys = false }) {
  const env = { ...process.env }, supplied = [];
  if (options.envFile) {
   let values;
   try { values = await readDeployEnvFile(root, options.envFile, localOnlyKeys); }
   catch (error) { throw invalid(`The --env-file ${options.envFile} could not be used: ${error.code === 'ENOENT' ? 'no such file' : error.message}.`); }
+  const providerKey = refuseProviderKeys && Object.keys(values).find(key => /^(CLOUDFLARE_|CF_)/.test(key));
+  if (providerKey) throw refuse(`The --env-file ${options.envFile} contains ${providerKey}, which is refused while CLOUDFLARE_API_TOKEN is set in the environment. Remove all CLOUDFLARE_* and CF_* keys from the file and run the same command again.`);
   Object.assign(env, values);
  }
  await applyPublicAssignments(env, options, declaration, setupManifest);
@@ -74,7 +76,9 @@ export async function deployEnvironment({ root, options, declaration, setupManif
 // declare it.
 export async function withDeployEnvironment(project, options, out, run) {
  const saved = { ...process.env };
- const { env } = await deployEnvironment({ root: project.root, options, declaration: {} });
+ // Guard the caller's provider inputs before installing the file into process.env.
+ // Later reads by the adapter must still accept a token supplied only by the file.
+ const { env } = await deployEnvironment({ root: project.root, options, declaration: {}, refuseProviderKeys: !!saved.CLOUDFLARE_API_TOKEN?.trim() });
  const { createRedaction } = await shared('redaction.mjs');
  const { declaredSettings, settingKinds, undeclaredNotice } = await import('./deploy-settings.mjs');
  const declared = await declaredSettings(project), kinds = await settingKinds(declared);
