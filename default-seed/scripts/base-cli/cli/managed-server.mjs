@@ -1,5 +1,6 @@
 import { launchSummary } from './run-transfers.mjs';
 import { readySummary } from './ready-summary.mjs';
+import { ownerEntryReady } from './owner-entry-ready.mjs';
 import { nativeOwnerEntry } from './native-owner-entry.mjs';
 import { prepareLiveModels } from './ai-local.mjs';
 import {fileURLToPath} from 'node:url';
@@ -85,8 +86,9 @@ export async function managedServer(project,options,out,{clock={}}={}){
    if(devIdentity)devKey=await requireDevKey(project.root);
    // A key is sent (or printed) for a door origin only once the door proves it is ours.
    if(devIdentity)await verifyDoorFor(running.url);
-   const dev=devIdentity&&options.verb==='dev'&&await devReady(running.url,devKey,options,controller.signal);
-   await emitReady(out,options,project.root,running.url,dev,running.siteUrl,running.demo,(await registry.ownerEntry(running)).ownerOpenUrl);return {reused:true};
+   const dev=devIdentity&&options.verb==='dev'&&await devReady(project.root,running.url,devKey,options,controller.signal);
+   const ownerOpenUrl=await checkedNativeEntry(project.root,()=>registry.ownerEntry(running).then(value=>value.ownerOpenUrl),controller.signal);
+   await emitReady(out,options,project.root,running.url,dev,running.siteUrl,running.demo,ownerOpenUrl);return {reused:true};
   }
   await registry.serve(async action=>{
    if(action==='status')return {...activity?.snapshot(),url:selected?.url,probe:proxy?.probe,siteUrl:site?.url,demo};
@@ -143,7 +145,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
   // A key is sent (or printed) for a door origin only once the door proves it is ours.
   if(devKey)await verifyDoorFor(selected.url);
   if(demo)await demoGuarded(selected.url,demo.state,controller.signal);
-  const dev=devIdentity&&options.verb==='dev'&&await devReady(selected.url,devKey,options,controller.signal);
+  const dev=devIdentity&&options.verb==='dev'&&await devReady(project.root,selected.url,devKey,options,controller.signal,store);
   if(options.verb==='dev'&&project.adapter.site){
    const {devSite}=await import('./site.mjs');
    try {
@@ -155,7 +157,8 @@ export async function managedServer(project,options,out,{clock={}}={}){
     if(options.json)out.event('warning',{code:error.code,message});else out.progress(`Warning: ${message}\n`);
    }
   }
-  activity.ready();await emitReady(out,options,project.root,selected.url,dev,site?.url,demo,ownerEntry?.issue());
+  const ownerOpenUrl=await checkedNativeEntry(project.root,()=>ownerEntry?.issue(),controller.signal,store);
+  activity.ready();await emitReady(out,options,project.root,selected.url,dev,site?.url,demo,ownerOpenUrl);
   if(crons.length){
    out.progress(`Running ${crons.length===1?'the scheduled trigger':'the scheduled triggers'} locally: ${crons.join(' | ')}\n`);
    void runScheduled({crons,url:`http://127.0.0.1:${proxy.runtimePort}`,path:options.verb==='preview'?'/cdn-cgi/local/scheduled':undefined,signal:scheduling.signal,report:run=>reportScheduled(out,options,run)});
@@ -182,9 +185,19 @@ async function emitReady(out,options,root,url,dev,siteUrl,demo,ownerOpenUrl){
  }
  await ready(out,url,dev||(ownerOpenUrl?{openUrl:ownerOpenUrl,native:true}:undefined),options.json,siteUrl,demo,options.verb === 'dev' && !options.demo ? root : undefined,ownerOpenUrl);
 }
-async function devReady(url,key,options,signal){
+async function devReady(root,url,key,options,signal,store){
  const as=options.as??'owner',persona=await resolvePersona(url,key,as,signal);
  // The owner persona names the owner the session will actually have (the
  // remaining owner once the setup owner has left), or none when none is left.
- return {identity:true,signedInAs:persona.email??null,ownerLeft:as==='owner'&&!persona.email,openUrl:openUrl(url,key,{path:'/__dev/key',as:persona.as})};
+ const link=openUrl(url,key,{path:'/__dev/key',as:persona.as});
+ await ownerEntryReady(root,link,signal,store);
+ return {identity:true,signedInAs:persona.email??null,ownerLeft:as==='owner'&&!persona.email,openUrl:link};
+}
+async function checkedNativeEntry(root,issue,signal,store){
+ const link=await issue();
+ if(!link)return;
+ await ownerEntryReady(root,link,signal,store);
+ // The probe redeemed its single-use grant. Announce a fresh grant through
+ // that same checked public entry, leaving its redemption to the owner.
+ return issue();
 }

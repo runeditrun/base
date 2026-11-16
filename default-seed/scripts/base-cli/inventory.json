@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.120-dev.g9a401f97",
+  "cliVersion": "0.2.120-dev.g7d8cd29b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,7 +391,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "8c6d10982ad67b1488cddbd002f6cefd403a515921d780c1ef155d67beb4004b"
+      "sha256": "1d79683e9d46cc42ef1ffc6a5a4fb93efe398286fbea7fd36b0f482a5af1b00c"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -1079,7 +1079,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "45722f6ff5d2048b59de0f60ce42883ac49c1151de55ab5c4aa12455e44b705b"
+      "sha256": "2adf2a76aafb804a9d91150dbd0f29b39fa28918c7cd87162576a4cd48e9525b"
     },
     "cli/native-owner-entry.mjs": {
       "source": "cli/native-owner-entry.mjs",
@@ -1104,6 +1104,10 @@
     "cli/output.mjs": {
       "source": "cli/output.mjs",
       "sha256": "648b8afd2fa7bb5793e168d47bf7095dae2e67a81ddba8189e4cd31cab391b27"
+    },
+    "cli/owner-entry-ready.mjs": {
+      "source": "cli/owner-entry-ready.mjs",
+      "sha256": "07138b1429aeff349d1b73007ba2dd92b1982f30bd1cfdd2ba05b83f0bdaa858"
     },
     "cli/package-calls.mjs": {
       "source": "cli/package-calls.mjs",
