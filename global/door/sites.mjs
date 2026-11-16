@@ -89,7 +89,7 @@ export function doorSites({ env, door, log = () => {} }) {
   if (record?.routable && (record.door ? record.port : record.url && !doorSite(record.url))) {
    return { ...result, state: 'running', url: record.url, ...(record.door ? { proxyPort: record.port, secret: record.door.secret } : {}), record };
   }
-  if (starts.has(site.name) || record) return { ...result, state: 'starting', url: result.mode === 'door' ? doorUrl : site.origin ?? doorUrl };
+  if (starts.has(site.name) || record) return { ...result, state: 'starting', url: result.mode === 'door' ? doorUrl : site.origin ?? doorUrl, record };
   const failure = failures.get(site.name);
   if (failure && Date.now() - failure.at < failureShownMs) return { ...result, state: 'failed', reason: failure.reason, url: doorUrl };
   return { ...result, state: 'stopped', url: result.mode === 'door' ? doorUrl : site.origin ?? doorUrl };
