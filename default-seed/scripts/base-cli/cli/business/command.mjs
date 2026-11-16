@@ -41,7 +41,18 @@ Advanced commands (Usage: rer business VERB)
   disconnect                     Revoke this computer, then remove local credentials and additions;
                                  inside an agent sandbox it names the one command that finishes
 State lives in $RER_BUSINESS_STATE_DIR when set, otherwise in ~/.rer/business.
-In an agent sandbox that writes only inside its working folder, use RER_BUSINESS_STATE_DIR="$PWD/.rer-business".
+Device credentials use OS Keychain/Secret Service unless RER_BUSINESS_CREDENTIAL_DIR is set.
+When set, all public Business commands use atomic 0600 device credential files there,
+in a caller-owned 0700 directory that is not a symlink; unsafe directories are refused.
+Names use a digest of origin and Business ID; secrets never enter names or storage diagnostics.
+This selection never touches OS device credential storage; no automatic migration occurs.
+A sealed launcher must set both directories consistently for every Business invocation,
+including its service process. Example private per-session directories:
+  umask 077
+  business_session_dir="$(mktemp -d)"
+  mkdir "$business_session_dir/state" "$business_session_dir/credentials"
+  export RER_BUSINESS_STATE_DIR="$business_session_dir/state"
+  export RER_BUSINESS_CREDENTIAL_DIR="$business_session_dir/credentials"
 ${agentUsage}${appSignInHelp}
 `;
 
@@ -78,7 +89,12 @@ Exits 0 completed, idle or waiting for the owner; 1 failed; 2 usage.
  connect: `Usage: rer business connect --business ID [--origin URL] [--timeout SECONDS]
 Pair this computer with a Business. Prints a code and a link: the owner opens the
 link in a signed-in browser, checks the code and approves. Waits for that (up to
-the code's 10 minutes), then keeps the credential in OS credential storage.
+the code's 10 minutes), then keeps the device credential in OS Keychain/Secret Service,
+or an atomic 0600 file when RER_BUSINESS_CREDENTIAL_DIR is set. That directory must
+be caller-owned, mode 0700, and not a symlink; unsafe directories are refused.
+File storage never touches OS device credential storage and does not migrate it.
+Keep both RER_BUSINESS_STATE_DIR and RER_BUSINESS_CREDENTIAL_DIR consistent across
+all Business invocations, including the service process.
   --business ID      The Business to join; the Connect prompt names it.
   --origin URL       Business platform address (default: ${appAddress}).
   --timeout SECONDS  Wait at most this long, then exit 75 with the pairing kept;
