@@ -17,15 +17,16 @@ import { siteEnvironment } from './policy.mjs';
 const rerEntry = join(ownRoot, 'global/rer.mjs');
 const startTimeoutMs = 15 * 60_000, failureShownMs = 30_000;
 
-// A registered server's own status: whether it has finished starting.
-function serverReady(record) {
+// Forwarding may begin before readiness: the readiness browser must traverse
+// this door itself. Older servers expose only ready, which also permits routing.
+function serverRoutable(record) {
  return new Promise(resolve => {
   const socket = createConnection(record.control);
   let text = '';
   socket.setTimeout(2000, () => socket.destroy());
   socket.on('connect', () => socket.end(JSON.stringify({ token: record.token, action: 'status' })));
   socket.on('data', chunk => { text += chunk; if (text.length > 16384) socket.destroy(); });
-  socket.on('end', () => { try { const value = JSON.parse(text); resolve(value.token === record.token && value.ready === true); } catch { resolve(false); } });
+  socket.on('end', () => { try { const value = JSON.parse(text); resolve(value.token === record.token && (value.ready === true || record.door && value.forwarding === true)); } catch { resolve(false); } });
   socket.on('error', () => resolve(false));
   socket.on('close', () => resolve(false));
  });
@@ -58,7 +59,7 @@ export function doorSites({ env, door, log = () => {} }) {
  async function running(force = false) {
   if (force || Date.now() - records.at > 1000) {
    const live = await liveServers(serverEnv);
-   records = { at: Date.now(), list: await Promise.all(live.map(async record => ({ ...record, ready: await serverReady(record) }))) };
+   records = { at: Date.now(), list: await Promise.all(live.map(async record => ({ ...record, routable: await serverRoutable(record) }))) };
   }
   return records.list;
  }
@@ -84,8 +85,8 @@ export function doorSites({ env, door, log = () => {} }) {
   const doorUrl = doorOrigin(site.name, door.port);
   const result = { name: site.name, path: site.checkout, mode: record ? (record.door || doorSite(record.url) ? 'door' : 'direct') : site.mode === 'door' ? 'door' : 'direct', doorUrl };
   if (record?.door && record.door.v !== doorProtocol) return { ...result, state: 'failed', url: doorUrl, reason: `This checkout's server speaks door protocol ${record.door.v}; restart the door with the installed rer (rer door restart).` };
-  // A door-mode server is routable once it has recorded its proxy and is ready.
-  if (record?.ready && (record.door ? record.port : record.url && !doorSite(record.url))) {
+  // The proxy is usable during the public browser check, before RER_READY.
+  if (record?.routable && (record.door ? record.port : record.url && !doorSite(record.url))) {
    return { ...result, state: 'running', url: record.url, ...(record.door ? { proxyPort: record.port, secret: record.door.secret } : {}), record };
   }
   if (starts.has(site.name) || record) return { ...result, state: 'starting', url: result.mode === 'door' ? doorUrl : site.origin ?? doorUrl };
