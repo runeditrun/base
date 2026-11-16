@@ -46,8 +46,11 @@ export async function grantCommand(args) {
   // No automatic retry: a lost response may already have minted a child. Cleanup uses the preselected lease id.
   lease = await api.post(route, {grant_id: args[1], lease_id: id}, {quiet: true, signal: stop.signal});
   if (!validLease(lease, state, args[1], id) || lease.credential === credential) throw Error('invalid credential exchange');
+  const expiry = new Date(lease.credential_expires_at).toISOString(), minutes = Math.ceil((Date.parse(expiry) - Date.now()) / 60000);
+  process.stderr.write(`Cloud credential expiry: ${expiry} (${minutes} ${minutes === 1 ? 'minute' : 'minutes'} remaining).\n`);
   const result = await runChild(args.slice(3), lease, {signal: stop.signal});
   code = result.code; exitSignal = result.signal;
+  if (result.credentialExpired) process.stderr.write(`Command stopped because the credential expired; run it again to resume. Caller exit status: ${code}${exitSignal ? ` (${exitSignal})` : ''}.\n`);
  } catch {
   code = stop.signal.aborted ? signalCode(stop.signal.reason.signal) : 1;
   process.stderr.write('Business command refused or its credential exchange failed. Check pairing, selected account, deploy action, grant and Cloudflare consent in Business.\n');
