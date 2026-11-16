@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { checkout } from './owner-deploy.mjs';
 import { ownerProvider } from '../../modules/deploy-kit/tests/owner-provider.mjs';
 import { fixture, entry } from './business/run-grant.mjs';
@@ -59,7 +60,7 @@ const lifecycle={run:async()=>{},settings:[],hooks:{owner:{}}};
 export const commandAdapter={...lifecycle,deploy:ownerDeploy('deploy.json',lifecycle)};`);
  await writeFile(join(root,'OPERATIONS.json'),JSON.stringify({version:2,project:'tests/fixture',runtime:{requirements:[]},requiredEnvironment:[],seedContract:{version:1,profile:'first-party',adapter:'adapter.mjs'},commands:{deploy:{argv:['node','adapter.mjs'],inputs:['adapter.mjs','deploy.json'],effects:'Deploy to the fixture provider.'}}}));
  git('add','.');git('commit','-qm','public deploy fixture');
- const env = {AUTH_TEST_DEPLOY_EDGE:`http://127.0.0.1:${edge.address().port}`,AUTH_TEST_DEPLOY_ORIGIN:'https://fixture-production.fixture-account.workers.dev',
+ const env = {COREPACK_HOME:process.env.COREPACK_HOME ?? join(process.env.XDG_CACHE_HOME ?? join(homedir(),'.cache'),'node/corepack'),AUTH_TEST_DEPLOY_EDGE:`http://127.0.0.1:${edge.address().port}`,AUTH_TEST_DEPLOY_ORIGIN:'https://fixture-production.fixture-account.workers.dev',
   NODE_OPTIONS:`--import=${new URL('./business/register.mjs',import.meta.url).pathname} --import=${new URL('./deploy-network.mjs',import.meta.url).pathname}`,
   SETUP_TOKEN:'synthetic-base-setup-token',OWNER_EMAIL:'owner@example.test',SESSION_SECRET:'synthetic-base-session-secret'};
  const run = async (point) => {
