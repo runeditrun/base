@@ -8,6 +8,8 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:net';
 import { isolatedQueue } from './fixtures/queue.mjs';
+import { buildPackage } from '../scripts/rer-package.mjs';
+import { readPackage, writePackage } from '../global/update/archive.mjs';
 
 const base = join(import.meta.dirname, '..');
 const source = path => pathToFileURL(join(base, path)).href;
@@ -100,6 +102,24 @@ commandAdapter.prepareData=async(root,store)=>{
   assert.match(log,/command_failed: Inspecting local export data failed \(RangeError\)/);
   assert.doesNotMatch(log,/private row diagnostic sentinel/);
  }
+ // The dispatcher is outside the checkout's installed package, as when an
+ // agent explicitly invokes an updated CLI on a checkout with an older pin.
+ // Use a real packed copy: its refusal must retain the selected CLI's status.
+ const packed=await buildPackage(base,join(root,'packed'));
+ await writePackage(readPackage(await readFile(packed)),join(root,'node_modules/@runeditrun/rer'));
+ await writeFile(join(root,'adapter.mjs'),`
+import {localInstaller} from ${JSON.stringify(source('onboarding/adapter.mjs'))};
+import {commandAdapter as declare} from ${JSON.stringify(source('cli/adapter.mjs'))};
+import {localPortability} from '@runeditrun/rer/portability';
+export const commandAdapter=declare(localInstaller({tools:[]}),{
+ portability:localPortability({database:'unused',policy:{product:'synthetic-command-failure',exportRow:row=>row}}),scheduled:false,
+});
+`);
+ const policyRefusal=run(['export','--output','exports/refused.rer','--json']);
+ assert.equal(policyRefusal.status,4,policyRefusal.stdout+policyRefusal.stderr);
+ const policyError=policyRefusal.stdout.trim().split('\n').map(JSON.parse).find(event=>event.event==='error');
+ assert.equal(policyError.code,'safety_refusal');
+ assert.match(policyError.message,/policy_module_required/);
  // Independent verbs use the same diagnostic and keep their full log after
  // returning the declared command's original numeric or signal status.
  delete descriptor.seedContract;
