@@ -1,14 +1,15 @@
+import { readChunk } from './cancellation.mjs';
 import { transportReason } from './provider-transport.mjs';
 
 // Import replies only need a bounded diagnostic prefix. A large refusal must
 // keep its HTTP status rather than becoming a generic response-size failure.
-export async function importResponseText(response, onReadError) {
+export async function importResponseText(response, onReadError, signal) {
   if (!response.body) return '';
   const reader = response.body.getReader(), chunks = []; let length = 0;
   try {
     while (length < 64 * 1024) {
       let part;
-      try { part = await reader.read(); } catch (cause) { throw onReadError(cause); }
+      try { part = await readChunk(reader,signal); } catch (cause) { throw onReadError(cause); }
       if (part.done) break;
       const bytes = part.value.subarray(0,64 * 1024-length);
       chunks.push(bytes); length += bytes.length;

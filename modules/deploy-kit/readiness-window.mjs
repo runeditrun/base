@@ -1,17 +1,18 @@
+import { pause, combinedSignal } from './cancellation.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { assert } from './validation.mjs';
 
 // A single, in-memory deadline travels with this upload. It is deliberately not
 // persisted: an old receipt is not evidence of a fresh propagation window.
-export function readinessWindow({ totalMs = 90000, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), timeout = ms => AbortSignal.timeout(ms) } = {}) {
+export function readinessWindow({ totalMs = 90000, clock = () => performance.now(), sleep, signal, timeout = ms => AbortSignal.timeout(ms) } = {}) {
  assert(Number.isFinite(totalMs) && totalMs > 0 && totalMs <= 90000, 'invalid-health-bound');
  let start;
  return {
-  clock, sleep, timeout,
+  clock, signal, sleep:ms => pause(ms,signal,sleep), timeout:ms => combinedSignal(signal,timeout(ms)),
   get active() { return start !== undefined; },
   start() { start ??= clock(); },
   remaining() { return start === undefined ? totalMs : Math.max(0, totalMs - (clock() - start)); },
-  async pause() { const left = this.remaining(); if (left > 0) await sleep(Math.min(2000, left)); },
+  async pause() { const left = this.remaining(); if (left > 0) await this.sleep(Math.min(2000, left)); },
  };
 }
 
@@ -24,6 +25,7 @@ export const observedReadiness = origin => observations.getStore()?.get(origin);
 
 export function readinessAPI(api, window, failure = 'deployment-readiness-timeout') {
  return {...api, request(path, options = {}) {
+  window.signal?.throwIfAborted();
   const remaining = window.remaining();
   assert(remaining > 0, failure);
   const deadline = window.timeout(Math.max(1, Math.ceil(remaining)));

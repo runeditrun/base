@@ -1,3 +1,4 @@
+import { pause, combinedSignal } from './cancellation.mjs';
 import { servedAsset } from './asset-health.mjs';
 import { readinessAPI } from './readiness-window.mjs';
 import { verifyServiceGrants } from './service-grants.mjs';
@@ -23,15 +24,17 @@ export async function waitForDeploymentHealth(url, {
   headers,
   fetchImpl = globalThis.fetch,
   now = Date.now,
-  sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+  sleep, signal,
 } = {}) {
   const deadline = now() + timeoutMs;
   let lastResult = 'no response';
   while (now() < deadline) {
+    signal?.throwIfAborted();
     let response;
     try {
-      response = await fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(Math.max(1, Math.min(attemptTimeoutMs, deadline - now()))), ...(headers ? { headers } : {}) });
+      response = await fetchImpl(url, { redirect: 'manual', signal: combinedSignal(signal,AbortSignal.timeout(Math.max(1, Math.min(attemptTimeoutMs, deadline - now())))), ...(headers ? { headers } : {}) });
     } catch {
+      signal?.throwIfAborted();
       lastResult = 'network error';
     }
     if (response) {
@@ -43,7 +46,7 @@ export async function waitForDeploymentHealth(url, {
       }
     }
     const remaining = deadline - now();
-    if (remaining > 0) await sleep(Math.min(intervalMs, remaining));
+    if (remaining > 0) await pause(Math.min(intervalMs, remaining),signal,sleep);
   }
   throw healthError(`Deployment did not become healthy at ${url} within ${timeoutMs}ms; last result: ${lastResult}.`, lastResult === 'network error' ? 'health-transport-failed' : 'health-http-failed', lastResult);
 }
@@ -52,7 +55,7 @@ export async function waitForDeploymentHealth(url, {
  * Without `readiness`, /health gets the single bounded window of waitForDeploymentHealth.
  * With `readiness` (deploy after an upload) it gets the recorded 90-second wait of health-request.mjs.
  * `asset`, a built file's path, must answer 200 after at most one transient replay. */
-export async function verifyHealth({api,plan,receipt,fetch:request=globalThis.fetch,timeoutMs=30000,intervalMs=2000,now,sleep,readiness,asset}) {
+export async function verifyHealth({api,plan,receipt,fetch:request=globalThis.fetch,timeoutMs=30000,intervalMs=2000,now,sleep,readiness,asset,signal}) {
   if (readiness?.window) api = readinessAPI(api, readiness.window);
   assert(receipt?.version === 1 && receipt.accountId === api.accountId && receipt.worker === plan.worker,'receipt-target-mismatch');
   await verifyServiceGrants(api, plan);
@@ -79,28 +82,28 @@ export async function verifyHealth({api,plan,receipt,fetch:request=globalThis.fe
   let health;
   // A Worker without a public route (reached only through service bindings) has no /health to request.
   if (plan.workersDev === false) health = {ok:true,versionId:current.versionId,route:'none'};
-  else if (readiness) health = await waitHealth({origin,receipt,versionId:current.versionId,request,timeoutMs,...readiness});
+  else if (readiness) health = await waitHealth({origin,receipt,versionId:current.versionId,request,timeoutMs,signal,...readiness});
   else {
     // A secret change makes a new version of the same build; until it reaches
     // every edge, a healthy answer can still name the previous version. Ask again
     // within the window; any other wrong identity fails at once.
-    const clock = now ?? Date.now, wait = sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms))), start = clock();
+    const clock = now ?? Date.now, start = clock();
     let body;
     for (;;) {
       let response;
       try {
-        response = await waitForDeploymentHealth(`${origin}/health`,{timeoutMs,intervalMs,attemptTimeoutMs:timeoutMs,headers:{'Cache-Control':'no-cache','Accept':'application/json'},fetchImpl:request,...(now ? {now} : {}),...(sleep ? {sleep} : {})});
-      } catch (error) { throw new Error(error.code ?? 'health-transport-failed'); }
+        response = await waitForDeploymentHealth(`${origin}/health`,{timeoutMs,intervalMs,attemptTimeoutMs:timeoutMs,headers:{'Cache-Control':'no-cache','Accept':'application/json'},fetchImpl:request,signal,...(now ? {now} : {}),...(sleep ? {sleep} : {})});
+      } catch (error) { signal?.throwIfAborted(); throw new Error(error.code ?? 'health-transport-failed'); }
       assert(response.ok && response.status === 200 && !response.redirected,'health-http-failed');
-      body = await boundedJSON(response,65536);
+      body = await boundedJSON(response,65536,signal);
       const other = body?.ok === true && typeof body.deployment?.versionId === 'string' && body.deployment.versionId !== current.versionId;
       if (!other || clock() - start + intervalMs > timeoutMs) break;
-      await wait(intervalMs);
+      await pause(intervalMs,signal,sleep);
     }
     assert(body?.ok === true && body.deployment?.sourceSha === receipt.source.sha && body.deployment?.fingerprint === receipt.fingerprint && body.deployment?.versionId === current.versionId,'health-identity-mismatch');
     health = {ok:true,versionId:current.versionId};
   }
-  if (asset && origin) health.asset = await servedAsset(origin,asset,request,timeoutMs,readiness ? {window:readiness.window,windowMs:60000,...(readiness.clock ? {clock:readiness.clock} : {}),...(readiness.sleep ? {sleep:readiness.sleep} : {})} : {});
+  if (asset && origin) health.asset = await servedAsset(origin,asset,request,timeoutMs,readiness ? {signal,window:readiness.window,windowMs:60000,...(readiness.clock ? {clock:readiness.clock} : {}),...(readiness.sleep ? {sleep:readiness.sleep} : {})} : {signal});
   const after = await activeWorker(api,plan.worker);
   assert(after.versionId === current.versionId && after.deploymentId === current.deploymentId && after.etag === current.etag,'deployment-changed-during-health');
   await verifyServiceGrants(api, plan);
