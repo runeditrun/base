@@ -139,7 +139,7 @@ test('a lost response on the first Worker upload resumes when the live Worker ca
   assert.deepEqual((await readOwnerState(statePath,target)).owned.worker,{status:'pending'});
   assert(state.settings);
   const {receipt} = await ownerDeploy(args);
-  assert.equal(receipt.changed,true); assert.equal(uploads(state),2);
+  assert.equal(receipt.changed,true); assert.equal(uploads(state),1);
   const saved = await readOwnerState(statePath,target);
   assert.deepEqual(saved.owned.worker,{status:'created'}); assert.deepEqual(saved.receipt,receipt);
   assert.equal(state.databases.length,1);

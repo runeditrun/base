@@ -802,12 +802,22 @@ approved credential, never retries with broader or ambient access, and does not
 protect a process from its own deliberate credential loading.
 
 The child expires after at most 15 minutes, bounded also by the grant and the
-provider authorization. The wrapper interrupts a command at that expiry. It
-requests revocation after success, failure, signals or spawn failure; SIGKILL,
+provider authorization. Before starting the command, stderr shows the child's
+UTC credential expiry and minutes remaining, rounded up. The wrapper interrupts
+a command at that expiry and reports that the credential expired, with
+`run it again to resume` and the caller exit status. Invoke the command again to
+obtain a new credential; the command's own behavior determines how work resumes.
+The old credential is not extended or renewed.
+Child exit codes and Unix terminating signals are preserved: expiry normally
+terminates with SIGTERM (shell status 143), while a child that handles the signal
+keeps its own exit code. The wrapper requests revocation after success, failure,
+signals or spawn failure; SIGKILL,
 crashes, network loss and lost acknowledgements may leave a token until server
-expiry. Child exit codes and Unix terminating signals are preserved. Cleanup has
+expiry. Cleanup has
 its own stderr status, including **unconfirmed**, which is never called revoked.
 The safe lease ID in that status supports `rer business cleanup LEASE` to retry
 revocation and `rer business cleanup LEASE --status` to read its status. Cleanup
 needs the original pairing, but does not require the removed deploy action or an
 active grant. No child token is saved in state, OS storage, logs or MCP output.
+
+Expiry guidance: Codex, 17 November 2026.
