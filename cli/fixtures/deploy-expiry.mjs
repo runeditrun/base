@@ -24,7 +24,7 @@ export async function expiryDeploy(t) {
    const destination = new URL(request.headers['x-test-destination']);
    const path = destination.pathname.replace(`/client/v4/accounts/${provider.accountId}`,''), method = request.method;
    const chunks = []; for await (const chunk of request) chunks.push(chunk);
-   const bytes = Buffer.concat(chunks), headers = {...request.headers,Origin:request.headers.origin,Authorization:request.headers.authorization};
+   const bytes = Buffer.concat(chunks), headers = {...request.headers,Origin:request.headers.origin,Authorization:request.headers.authorization,'Content-Length':request.headers['content-length']};
    if (destination.origin === 'https://api.cloudflare.com' && path !== '/workers/assets/upload') {
     const lease = [...business.state.leases.values()].find(row => `Bearer ${business.state.credentials.get(row.lease_id)}` === headers.Authorization);
     assert.ok(lease, 'provider authority is a minted child');
