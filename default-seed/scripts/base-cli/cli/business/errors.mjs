@@ -1,3 +1,5 @@
+import { maskDeviceText } from './run-mask.mjs';
+
 // Every message rer business prints names its cause: a server's reason, a
 // local system cause, or this CLI's own explanation. Device and task bearers
 // are redacted wherever a message came from.
@@ -9,7 +11,7 @@ const causes = {
 const actions = { open: 'open', mkdir: 'create', write: 'write', rename: 'replace', unlink: 'remove', rmdir: 'remove', rm: 'remove', chmod: 'protect', read: 'read', lstat: 'check', stat: 'check', scandir: 'list', access: 'check' };
 
 export const localCause = error => typeof error?.code === 'string' ? causes[error.code] ? `${causes[error.code]} (${error.code})` : error.code : null;
-export const redact = text => String(text).replace(/bz_[a-z]+_[A-Za-z0-9_-]+/g, '[credential]').replace(/[\x00-\x08\x0b-\x1f\x7f]/g, ' ');
+export const redact = text => maskDeviceText(text).replace(/bz_[a-z]+_[A-Za-z0-9_-]+/g, '[credential]').replace(/[\x00-\x08\x0b-\x1f\x7f]/g, ' ');
 
 export function describe(error) {
  if (typeof error?.syscall === 'string' && typeof error.code === 'string') {
