@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.121
+
+Signed: Run Edit Run fleet, 2026-11-16.
+
+### Browser prerequisites by declared use
+
+- `rer doctor` and `rer describe` inspect the checkout's Playwright registry without downloading or launching a browser. Missing executables include their purpose and a browser-only install command using that checkout's resolved CLI.
+- Headless verification provisions only `chromium-headless-shell` when the Playwright pin supplies it, otherwise Chromium. An adapter declaring `browser: { headless: false }` also requires full Chromium; `rer run` honors `--headed` and `--debug` in Playwright scripts and forwarded arguments. `rer install` installs dependencies without browsers; verification and declared Playwright runs acquire the required browser on first use. The installed launcher also provisions missing browsers for older checkout pins.
+
+### Switchable public deployment settings
+
+- Seeds can opt a public selector such as `MAIL_PROVIDER` into in-place changes by declaring it in `publicSettings`, giving it a public default in `vars`, and retaining an optional secret transport with its environment mapping. Wrangler defaults must agree. `rer check` accepts this combination and reports conflicting defaults; `rer doctor` explains a refused overlap. Managed specs retain the selector as public, outside secret names.
+- `rer deploy --set-secret NAME=VALUE` accepts assignments only for opted-in public settings. Name-only inputs still use the declared environment mapping; credentials come from the environment or an owned 0600 `--env-file` and remain masked. Unsetting the selector restores its declared public default in the grouped Worker version, and a plain deploy preserves a held override. Existing ownership, grouped-version and recovery handling remains in use.
+
+These changes require seed adoption and the explicit deployment declaration where applicable. This preparation establishes no provider delivery, deployment, seed adoption or production result. The source diff changes no portability, import-kit, product migrations or archive format identity.
+
 ## 0.2.120
 
 ### Commands under an approved Business grant
