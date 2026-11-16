@@ -68,6 +68,10 @@ ${appSignInHelp}
 Run any software command under this paired agent’s explicit deploy action and grant.
 The scoped Cloudflare token and account reach only the child environment. Output
 is masked and cleanup is reported separately; the child’s exit status is kept.
+Before starting, stderr shows the credential's UTC expiry and minutes remaining
+(rounded up). At expiry the command is interrupted and says: run it again to resume.
+The reported caller exit status keeps the child's code or terminating signal
+(normally SIGTERM, shell status 143); a child that handles it keeps its own code.
 
 Usage: rer business run [--once]
 Work this computer's tasks (the folder scan the owner allows) and check in every
