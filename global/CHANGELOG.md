@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.119
+
+### Large installation archive inventories
+
+- Archive export and restore store large object inventories in bounded internal rows instead of one oversized job-metadata value, addressing the D1 cell limit reached by a company-copy export with 13,879 objects. Small jobs keep their existing metadata representation. Archive parts can group multiple small objects, and restore reuses a shared part while reading its objects. The archive format and version are unchanged.
+- Managed intake accounts for the internal inventory table. Native archive failures name the transfer stage without printing SQL, object keys, row values or filesystem paths.
+
+### Publication scan copy pointers
+
+- Publication scans locate Gitleaks full matches within their reported lines when directory-fragment columns are relative to a fragment beginning mid-line. Every possible occurrence must satisfy the existing copy-pointer or checksum content proof; unresolved matches and unproved occurrences retain their finding.
+
+### Deploy output and timing checks
+
+- Declared public deployment settings, including `MAIL_PROVIDER`, remain readable even when carried through secret transport. Credential-named bindings and aliases, private setup fields and credential-shaped values stay masked.
+- Nested deploy hooks defer their dry-run completion and needs summary to the outer command, so the combined summary prints once after local planning succeeds.
+- The real 20-second listing-backoff test still uses the native timer and high-resolution timestamps, observes the configured delay and compares elapsed time at Node's millisecond timer precision to avoid a fractional early-wake failure. Runtime backoff behavior is unchanged.
+
+These changes become available after adopting the released package or refreshed source. This preparation establishes no company-copy export result, seed adoption, deployment or production result. The actual diff changes portability inventory storage and archive-part grouping, adds no product migrations, changes no import-kit source and preserves the archive format identity.
+
 ## 0.2.118
 
 ### Local diagnostics and Move in guidance
