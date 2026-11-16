@@ -1,49 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createServer} from 'node:http';
-import {spawn} from 'node:child_process';
-import {once} from 'node:events';
-import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
-import {credentialHandle} from './business/state.mjs';
-
-const base=resolve(import.meta.dirname,'..'),entry=join(base,'bin/rer.mjs');
-const device='bz_device_synthetic-command-computer',secret='synthetic-scoped-command-secret',account='a'.repeat(32);
-async function fixture(t) {
- const home=await mkdtemp(join(base,'.business-connect-command-'));t.after(()=>rm(home,{recursive:true,force:true}));
- const state={issued:0,revocations:0,refuse:false,cleanupFails:false,expiryMs:900000,leases:new Map()};
- const server=createServer(async(req,res)=>{
-  let text='';for await(const data of req)text+=data;
-  const body=text?JSON.parse(text):{},root='/api/business/executors/cloudflare-token';
-  const json=(status,value)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(value));};
-  if(req.headers.authorization!=='Bearer '+device)return json(401,{error:'pairing refused'});
-  if(req.url===root&&req.method==='POST'){
-   state.issued++;if(state.refuse)return json(403,{error:secret});
-   const lease={lease_id:body.lease_id,grant_id:body.grant_id,business_id:'business',executor_id:'computer',account_id:account,credential_expires_at:new Date(Date.now()+state.expiryMs).toISOString(),cleanup_status:'active',provider_credential_revoked:false};
-   state.leases.set(lease.lease_id,lease);return json(200,{...lease,credential:secret});
-  }
-  const id=req.url.slice(root.length+1).split('/')[0],lease=state.leases.get(id);
-  if(!lease)return json(404,{error:'no such command'});
-  if(req.url.endsWith('/revoke')){state.revocations++;return json(200,{...lease,cleanup_status:state.cleanupFails?'unconfirmed':'revoked',provider_credential_revoked:!state.cleanupFails});}
-  return json(200,lease);
- });
- await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
- t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
- const origin=`http://127.0.0.1:${server.address().port}`;
- await mkdir(join(home,'.rer/business'),{recursive:true});
- await writeFile(join(home,'.rer/business/state.json'),JSON.stringify({origin,businessId:'business',executorId:'computer',credentialVersion:2}));
- await writeFile(join(home,'fake-keychain.json'),JSON.stringify({[credentialHandle(origin,'business')]:device}));
- const env={PATH:process.env.PATH,HOME:home,RER_NO_UPDATE_CHECK:'1',CI:'true',NODE_OPTIONS:`--import=${new URL('./fixtures/business/register.mjs',import.meta.url).pathname}`,
-  CLOUDFLARE_API_TOKEN:'ambient-broad-token',CLOUDFLARE_ACCOUNT_ID:'f'.repeat(32),CF_API_TOKEN:'ambient-alias-token'};
- const start=args=>{
-  const child=spawn(process.execPath,[entry,'business',...args],{cwd:home,env,stdio:['pipe','pipe','pipe']});let stdout='',stderr='';
-  child.stdout.on('data',data=>stdout+=data);child.stderr.on('data',data=>stderr+=data);child.stdin.end();
-  const result=once(child,'close').then(([code,signal])=>({code,signal,stdout,stderr}));
-  return {child,result,output:()=>stdout+stderr};
- };
- const run=async command=>(await start(['run','--grant','grant-1','--',...command]).result);
- return {home,state,start,run};
-}
+import {join} from 'node:path';
+import {constants} from 'node:os';
+import {fixture,base,entry,device,secret,account} from './fixtures/business/run-grant.mjs';
 
 test('business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors',async t=>{
  const f=await fixture(t);
@@ -53,6 +12,11 @@ test('business run preserves arguments and exits, injects only the scoped child 
   assert.equal(result.code,code,result.stderr);assert.equal(result.signal,null);
   assert.ok(result.stdout.includes(JSON.stringify([String(code),'argument with spaces','--help','$(literal)',''])));
   assert.match(result.stdout,/\[credential\]/);assert.match(result.stderr,/cleanup: revoked/);
+  const expiry=result.stderr.match(/Cloud credential expiry: (\S+) \((\d+) minutes? remaining\)/);
+  assert.ok(expiry,'the caller sees its time limit');
+  assert.equal(expiry[1],[...f.state.leases.values()].at(-1).credential_expires_at);
+  assert.ok(Number(expiry[2])>0);assert.ok(Number(expiry[2])<=Math.ceil(f.state.expiryMs/60000));
+  assert.ok(!result.stderr.includes('credential expired'));
   for(const value of [secret,account,device,'ambient-broad-token','ambient-alias-token'])assert.ok(!(result.stdout+result.stderr).includes(value));
  }
  const missing=await f.run(['/missing-command-for-business-run']);assert.equal(missing.code,127);assert.match(missing.stderr,/cleanup: revoked/);
@@ -76,11 +40,22 @@ test('business run forwards signals and enforces credential expiry, then revokes
   const running=f.start(['run','--grant','grant-1','--',process.execPath,'-e','console.log("COMMAND_READY");setInterval(()=>{},1000)']);
   await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('child did not start')),15000);const see=()=>{if(running.output().includes('COMMAND_READY')){clearTimeout(timeout);running.child.stdout.off('data',see);resolve();}};running.child.stdout.on('data',see);see();});
   running.child.kill(signal);const result=await running.result;
-  assert.equal(result.signal,signal);assert.match(result.stderr,/cleanup: revoked/);
+  assert.equal(result.signal,signal);assert.match(result.stderr,/cleanup: revoked/);assert.ok(!result.stderr.includes('credential expired'));
  }
  f.state.expiryMs=1000;
- const expired=await f.run([process.execPath,'-e','setInterval(()=>{},1000)']);assert.equal(expired.signal,'SIGTERM');assert.match(expired.stderr,/cleanup: revoked/);
- assert.equal(f.state.revocations,3);
+ for(const childExit of [undefined,19]){
+  const script=childExit===undefined?'setInterval(()=>{},1000)':`process.on('SIGTERM',()=>process.exit(${childExit}));setInterval(()=>{},1000)`;
+  const expired=await f.run([process.execPath,'-e',script]);
+  assert.equal(expired.signal,childExit===undefined?'SIGTERM':null);assert.equal(expired.code,childExit??null);
+  assert.match(expired.stderr,/credential expired; run it again to resume/);
+  const status=childExit??(128+constants.signals.SIGTERM);
+  const reportedStatus=expired.stderr.match(/Caller exit status: (\d+)(?: \((\w+)\))?\./);
+  assert.ok(reportedStatus);assert.equal(Number(reportedStatus[1]),status);
+  assert.equal(reportedStatus[2],expired.signal??undefined);
+  assert.match(expired.stderr,/cleanup: revoked/);
+  for(const value of [secret,account,device])assert.ok(!(expired.stdout+expired.stderr).includes(value));
+ }
+ assert.equal(f.state.revocations,4);
 });
 
 test('business run reaches the ordinary rer deploy dry-run child without live provider mutation',{timeout:300000},async t=>{
