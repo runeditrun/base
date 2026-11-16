@@ -18,6 +18,7 @@ import { ownerRekey } from './owner-rekey.mjs';
 import { refuseLocalModels } from './local-only.mjs';
 import { validateMigrations } from './migrations.mjs';
 import { publicOrigin } from './public-origin.mjs';
+import { switchableDefaults } from '../../cli/deploy-settings.mjs';
 
 export const cronNotice = 'This Worker has a Cron Trigger. Cloudflare may take up to about two hours to start its first scheduled run on some accounts.';
 const usage = 'usage: owner-cli.mjs deploy|dry-run|local-plan|health|remove|inspect|record-owner|signin|rekey|settle --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
@@ -59,11 +60,12 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   assert(typeof declaration?.project === 'string','missing-owner-project');
   // Validate even direct kit invocations before any provider request or write.
   publicOrigin(declaration, env);
+  const publicDefaults = await switchableDefaults(declaration);
   let artifact;
   if (command === 'dry-run' || command === 'local-plan') {
     artifact = await packageBuild({root,source:{sha:'0'.repeat(40),tree:'0'.repeat(40)},runIdentity:{id:'0',attempt:'1'},productDirectory:values.product});
     const worker = ownerWorkerName(declaration.project,values.environment);
-    const plan = ownerPlan({project:declaration.project,environment:values.environment,worker,origin:`https://${worker}.example.invalid`},declaration,artifact,{localOnlyKeys,env});
+    const plan = ownerPlan({project:declaration.project,environment:values.environment,worker,origin:`https://${worker}.example.invalid`},declaration,artifact,{localOnlyKeys,env,publicDefaults});
     if (command === 'local-plan') for (const item of plan.d1) validateMigrations(item.migrations);
     // Print names only: configuration values and migration SQL stay local.
     // Return before constructing a provider client or resolving an account.
@@ -112,7 +114,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     const named = [...new Set(values.set ?? values.unset)], declared = Array.isArray(declaration.secrets) ? declaration.secrets : [];
     const undeclared = named.filter(binding => !declared.some(entry => entry?.binding === binding));
     if (undeclared.length) { const error = new Error('undeclared-secret'); error.resource = undeclared.map(binding => `secret:${binding}`).join(', '); throw error; }
-    const changes = named.map(binding => ({binding, value:values.set === undefined ? undefined : env[declared.find(entry => entry?.binding === binding).environment]}));
+    const changes = named.map(binding => ({binding, value:values.set === undefined ? undefined : env[declared.find(entry => entry?.binding === binding).environment], ...(values.unset !== undefined && Object.hasOwn(publicDefaults,binding) ? {publicDefault:publicDefaults[binding]} : {})}));
     return {ok:true,...await ownerSecret({api,target,statePath,changes,fetch,healthOptions,settle}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
   }
   // A secret rer retired (the spent setup token) is no longer part of the plan.
@@ -145,7 +147,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   }
   const current = retiredSecrets.length && Array.isArray(declaration.secrets) ? {...declaration,secrets:declaration.secrets.filter(item => !retiredSecrets.includes(item?.binding))} : declaration;
   artifact ??= await ownerArtifact(root,values.product);
-  const plan = ownerPlan(target,current,artifact,{localOnlyKeys,env});
+  const plan = ownerPlan(target,current,artifact,{localOnlyKeys,env,publicDefaults});
   if (command === 'dry-run') {
     const checked = withScopeHints(api);
     const exists = await workerSettings(checked,target.worker) !== null;
@@ -162,7 +164,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   // Dispatch is the provider's: on some accounts a new Cron starts only at the account scheduler's next refresh.
   if (plan.crons.length) notice(cronNotice);
   // The fingerprint names every declared secret, retired ones too: an untouched repeat after the claim is a no-op.
-  const declaredSecrets = current === declaration ? plan.secrets : ownerPlan(target,declaration,artifact,{localOnlyKeys,env}).secrets;
+  const declaredSecrets = current === declaration ? plan.secrets : ownerPlan(target,declaration,artifact,{localOnlyKeys,env,publicDefaults}).secrets;
   const window = readinessWindow({...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}), ...healthOptions?.readiness});
   requestWindow = window;
   const {receipt,created,sentSecrets,unsetSecrets,freshUpload} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,readiness:{...healthOptions?.readiness,window},settle,declaredSecrets}).catch(error => {

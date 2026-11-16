@@ -91,7 +91,17 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  if (options.profile !== undefined && options.profile !== 'first-party') throw invalid('The supported explicit profile is first-party.');
  if (options.environment !== undefined && !/^[a-z][a-z0-9-]{0,39}$/.test(options.environment)) throw invalid('Provide a valid deployment environment name.');
  for (const key of ['setSecret', 'unsetSecret']) if (options[key] !== undefined) {
-  const names = [...new Set(options[key].split(','))];
+  const entries = options[key].split(',');
+  const assignments = key === 'setSecret' ? entries.filter(entry => entry.includes('=')) : [];
+  if (assignments.length) {
+   options.setSecretValues = {};
+   for (const entry of assignments) {
+    const at = entry.indexOf('='), name = entry.slice(0, at), value = entry.slice(at + 1);
+    if (!value.trim() || value.length > 1024 || /[\u0000-\u001f\u007f]/.test(value) || Object.hasOwn(options.setSecretValues, name)) throw invalid('--set-secret NAME=VALUE requires one nonempty public setting value per binding.');
+    options.setSecretValues[name] = value;
+   }
+  }
+  const names = [...new Set(entries.map(entry => key === 'setSecret' ? entry.split('=', 1)[0] : entry))];
   if (names.length > 16 || !names.every(name => /^[A-Z][A-Z0-9_]{0,63}$/.test(name))) throw invalid(`--${key === 'setSecret' ? '' : 'un'}set-secret names declared secret bindings, repeated or separated by commas, such as SESSION_SECRET or MAIL_API_KEY,MAIL_FROM.`);
   options[key] = names.join(',');
  }
