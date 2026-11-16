@@ -109,21 +109,36 @@ async function workerOrigin(provider, worker) {
   assert(/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(result.subdomain),'invalid-account-subdomain');
   return `https://${worker}.${result.subdomain}.workers.dev`;
 }
-export async function ownerTarget(api, {project, environment}) {
-  const worker = ownerWorkerName(project, environment);
-  return {accountId:api.accountId,project,environment,worker,origin:await workerOrigin(api,worker)};
+export async function ownerTarget(api, {project, environment, statePath}) {
+  const target = await ownerStateTarget(api,{project,environment,statePath});
+  return {...target,origin:target.origin ?? await workerOrigin(api,target.worker)};
 }
 
-/** Signin follows the selected app record, including native uploaders' custom names.
- * The caller still supplies the account, project and environment to validate it.
- * Later state reads and the live provider check must corroborate this identity. */
-export async function recordedOwnerTarget(api, {project, environment, statePath}) {
-  ownerWorkerName(project, environment); // Validate the caller's project and environment as usual.
+/** Native uploaders record their resolved Worker name. Follow it only within the
+ * caller's account, project and environment. An absent record keeps the original
+ * derived name; partial records remain usable for recovery and removal. */
+export async function ownerStateTarget(api, {project, environment, statePath}) {
+  const worker = ownerWorkerName(project, environment);
+  const target = {accountId:api.accountId,project,environment,worker};
+  if (statePath === undefined) return target;
   let recorded;
   try { recorded = JSON.parse(await regularBytes(statePath, 4 * 1024 * 1024)); }
-  catch (error) { throw new Error(error.code === 'ENOENT' ? 'missing-owner-receipt' : 'invalid-owner-state'); }
+  catch (error) { if (error.code === 'ENOENT') return target; throw new Error('invalid-owner-state'); }
   assert(resourceName(recorded?.worker), 'invalid-owner-state');
-  const target = {accountId:api.accountId,project,environment,worker:recorded.worker};
+  const selected = {...target,worker:recorded.worker};
+  let state;
+  try { state = await readOwnerState(statePath,selected); }
+  catch (error) {
+    if (error.message === 'owner-state-target-mismatch') error.ownerTargetMismatch.requestedWorker = worker;
+    throw error;
+  }
+  return {...selected,...(state.receipt?.origin ? {origin:state.receipt.origin} : {})};
+}
+
+/** Signin requires a completed record and never discovers a sibling Worker. */
+export async function recordedOwnerTarget(api, options) {
+  const target = await ownerStateTarget(api,options);
+  const {statePath} = options;
   const state = await readOwnerState(statePath,target);
   assert(state.receipt, 'missing-owner-receipt');
   return {...target,origin:state.receipt.origin ?? await workerOrigin(api,target.worker)};
@@ -218,7 +233,11 @@ export async function readOwnerState(path, target) {
     && (pending.names === undefined || validSecretNames(pending.names) && !pending.names.some(name => pending.bindings.includes(name))), 'invalid-owner-state');
   assert(state.ownerClaim === undefined || ['claimed','kept'].includes(state.ownerClaim?.outcome), 'invalid-owner-state');
   assert(state.retiredSecrets === undefined || Array.isArray(state.retiredSecrets) && state.retiredSecrets.every(identifier), 'invalid-owner-state');
-  assert(state.accountId === target.accountId && state.project === target.project && state.environment === target.environment && state.worker === target.worker, 'owner-state-target-mismatch');
+  if (state.accountId !== target.accountId || state.project !== target.project || state.environment !== target.environment || state.worker !== target.worker) {
+    const error = new Error('owner-state-target-mismatch');
+    error.ownerTargetMismatch = {recordedWorker:state.worker,requestedWorker:target.worker};
+    throw error;
+  }
   return state;
 }
 export async function writeOwnerState(path, state) {
