@@ -10,7 +10,7 @@ import { RerError } from './errors.mjs';
 import { shared } from './shared.mjs';
 
 export const browserRepair = 'rer install';
-export const browserDownload = 'rer verify downloads them the first time it runs';
+export const browserDownload = 'rer verify downloads the required browser on first use; rer install installs dependencies, not browsers';
 
 export function checkoutPlaywright(root, { required = true } = {}) {
  const require = createRequire(join(root, 'package.json'));
@@ -33,42 +33,57 @@ export function checkoutPlaywright(root, { required = true } = {}) {
  if (required) throw new RerError('browser_dependency_missing', `The checkout's Playwright is missing. Run ${browserRepair} to install its locked dependencies; verification requires playwright-core, @playwright/test or playwright.`, 3);
 }
 
-export async function browserDoctor(root) {
+// Verification uses headless Chromium. A checkout that also needs headed
+// Chromium declares commandAdapter.browser = { headless: false }.
+export async function browserDoctor(root, { headless = true } = {}) {
  let resolved;
  try { resolved = checkoutPlaywright(root); }
  catch (error) { return { ok: false, issue: error instanceof RerError ? error.message : `The checkout's Playwright could not be inspected. Run ${browserRepair}.`, fix: browserRepair, executables: [] }; }
+ const shell = resolved.registry.findExecutable('chromium-headless-shell');
+ const names = headless && shell ? ['chromium-headless-shell'] : ['chromium', ...(shell ? ['chromium-headless-shell'] : [])];
  const executables = [];
- for (const name of ['chromium', 'chromium-headless-shell']) {
+ for (const name of names) {
   // Releases before the separate headless shell use the Chromium executable.
-  const executable = resolved.registry.findExecutable(name);
-  if (!executable && name === 'chromium-headless-shell') continue;
+  const executable = name === 'chromium-headless-shell' ? shell : resolved.registry.findExecutable(name);
   const path = executable?.executablePath();
   let ok = false;
   if (path) try { await access(path, process.platform === 'win32' ? constants.F_OK : constants.X_OK); ok = true; } catch {}
-  executables.push({ name, ...(path ? { path } : {}), ok });
+  const reason = name === 'chromium-headless-shell' ? 'headless verification' : headless ? 'headless verification with this Playwright pin (no separate headless shell)' : 'declared headed browser use';
+  executables.push({ name, ...(path ? { path } : {}), ok, reason });
  }
  // Not yet downloaded is the normal state until a command needs the browser.
- const missing = executables.filter(executable => !executable.ok).map(executable => executable.name);
- return { ok: true, package: resolved.name, executables, ...(missing.length ? { note: `Playwright browsers not downloaded yet: ${missing.join(', ')}; ${browserDownload}.` } : {}) };
+ const missing = executables.filter(executable => !executable.ok);
+ const target = headless && shell ? 'chromium-headless-shell' : 'chromium';
+ const command = browserInstallCommand(root, resolved.cli, target);
+ return { ok: true, package: resolved.name, headless, executables, ...(missing.length ? { command, note: `Playwright browser not downloaded yet: ${missing.map(({ name, reason }) => `${name} (needed for ${reason})`).join(', ')}. Browser-only install: ${command}; ${browserDownload}.` } : {}) };
 }
 
-export async function ensureChromium(root, store, signal, { required = true } = {}) {
+// Quote project-relative paths for a command copied into the checkout's shell.
+function browserInstallCommand(root, cli, target) {
+ const path = relative(root, cli).split('\\').join('/');
+ const quoted = /^[a-zA-Z0-9_./@-]+$/.test(path) ? path : process.platform === 'win32' ? `"${path}"` : "'" + path.replaceAll("'", "'\\''") + "'";
+ return `pnpm exec node ${quoted} install ${target}`;
+}
+
+export async function ensureChromium(root, store, signal, { required = true, ...use } = {}) {
  // A first-party adapter without browser dependencies remains valid.
  // Verification requires Playwright; rer run provisions it when declared.
  const resolved = checkoutPlaywright(root, { required });
  if (!resolved) return;
- if (await browsersPresent(root)) return;
- const { cli } = resolved;
+ const browser = await browserDoctor(root, use);
+ if (!browser.note) return;
+ const target = browser.headless && resolved.registry.findExecutable('chromium-headless-shell') ? 'chromium-headless-shell' : 'chromium';
  const { dependencyEnvironment } = await shared('dependency-environment.mjs');
  const env = dependencyEnvironment();
  if (process.env.PLAYWRIGHT_BROWSERS_PATH !== undefined) env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH;
- await store.run('Installing Chromium and its headless shell from the checkout’s Playwright', 'pnpm', ['exec', 'node', cli, 'install', 'chromium'], { cwd: root, signal, env, display: `pnpm exec node ${relative(root, cli)} install chromium` });
- const absent = (await browserDoctor(root)).executables.filter(executable => !executable.ok).map(executable => executable.name);
- if (absent.length) throw new RerError('browser_install_incomplete', `The checkout's Playwright did not install every browser it pins (missing: ${absent.join(', ')}). Run the same command again; it retries the download.`, 3);
+ await store.run(`Installing ${target} from the checkout’s Playwright`, 'pnpm', ['exec', 'node', resolved.cli, 'install', target], { cwd: root, signal, env, display: browser.command });
+ const after = await browserDoctor(root, use);
+ const absent = after.executables.filter(executable => !executable.ok).map(executable => executable.name);
+ if (absent.length) throw new RerError('browser_install_incomplete', `The checkout's Playwright did not install the required browser (missing: ${absent.join(', ')}). Run ${browser.command} again; it retries the download.`, 3);
 }
 
-// Whether every browser the checkout's Playwright pins is on disk.
-export async function browsersPresent(root) {
- const browser = await browserDoctor(root).catch(() => undefined);
+// Whether the executables needed by this checkout's declared use are on disk.
+export async function browsersPresent(root, use) {
+ const browser = await browserDoctor(root, use).catch(() => undefined);
  return Boolean(browser?.ok && !browser.note);
 }
