@@ -718,6 +718,40 @@ On loopback, `rer preview` prints `RER_OPEN` for native owner entry.
 owner session in its isolated demo data. These native entry links work once,
 expire within 15 minutes and are never saved. Restarting retires them.
 
+## Business device credential storage
+
+Business state lives in `$RER_BUSINESS_STATE_DIR` when set, otherwise in
+`~/.rer/business`. Device credentials use the OS Keychain on macOS or Secret
+Service on Linux by default; leaving `RER_BUSINESS_CREDENTIAL_DIR` unset preserves
+that behavior.
+
+Set `RER_BUSINESS_CREDENTIAL_DIR` to keep the device credential in an atomic
+`0600` file in that directory instead. The directory must be caller-owned, mode
+`0700`, and must not be a symbolic link; unsafe directories are refused. Filenames use a
+digest derived from the platform origin and Business ID. Device secrets never
+appear in filenames or storage diagnostics. With this variable set, device
+credential operations never touch OS credential storage. There is no automatic
+migration between stores: use the same selection to access an existing pairing.
+All public Business commands use the selected backend when accessing device
+credentials.
+
+A sealed launcher must set both directories consistently for **every** Business
+invocation, including the service process. Setting the state directory alone does
+not select file credential storage. For a private, per-session pair of directories:
+
+```sh
+umask 077
+business_session_dir="$(mktemp -d)"
+mkdir "$business_session_dir/state" "$business_session_dir/credentials"
+export RER_BUSINESS_STATE_DIR="$business_session_dir/state"
+export RER_BUSINESS_CREDENTIAL_DIR="$business_session_dir/credentials"
+rer business connect --business ID
+rer business status
+```
+
+Keep both values available to subsequent commands and service invocations for
+that session.
+
 ## Run your business demo
 
 ```sh

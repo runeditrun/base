@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
-import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {credentialHandle} from './business/state.mjs';
 
 const base=resolve(import.meta.dirname,'..'),entry=join(base,'bin/rer.mjs');
 const device='bz_device_synthetic-command-computer',secret='synthetic-scoped-command-secret',account='a'.repeat(32);
-async function fixture(t) {
+async function fixture(t, {fileBacked = false} = {}) {
  const home=await mkdtemp(join(base,'.business-connect-command-'));t.after(()=>rm(home,{recursive:true,force:true}));
  const state={issued:0,revocations:0,refuse:false,cleanupFails:false,expiryMs:900000,leases:new Map()};
  const server=createServer(async(req,res)=>{
@@ -24,7 +24,7 @@ async function fixture(t) {
   }
   const id=req.url.slice(root.length+1).split('/')[0],lease=state.leases.get(id);
   if(!lease)return json(404,{error:'no such command'});
-  if(req.url.endsWith('/revoke')){state.revocations++;return json(200,{...lease,cleanup_status:state.cleanupFails?'unconfirmed':'revoked',provider_credential_revoked:!state.cleanupFails});}
+  if(req.url.endsWith('/revoke')){state.revocations++;const updated={...lease,cleanup_status:state.cleanupFails?'unconfirmed':'revoked',provider_credential_revoked:!state.cleanupFails};state.leases.set(id,updated);return json(200,updated);}
   return json(200,lease);
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -32,9 +32,12 @@ async function fixture(t) {
  const origin=`http://127.0.0.1:${server.address().port}`;
  await mkdir(join(home,'.rer/business'),{recursive:true});
  await writeFile(join(home,'.rer/business/state.json'),JSON.stringify({origin,businessId:'business',executorId:'computer',credentialVersion:2}));
- await writeFile(join(home,'fake-keychain.json'),JSON.stringify({[credentialHandle(origin,'business')]:device}));
+ const calls=join(home,'keychain-calls'); await writeFile(calls,'');
+ const credentials=join(home,'credentials');
+ if(fileBacked){await mkdir(credentials,{mode:0o700});await writeFile(join(credentials,`${credentialHandle(origin,'business').slice(7)}.credential`),device,{mode:0o600});}
+ else await writeFile(join(home,'fake-keychain.json'),JSON.stringify({[credentialHandle(origin,'business')]:device}));
  const env={PATH:process.env.PATH,HOME:home,RER_NO_UPDATE_CHECK:'1',CI:'true',NODE_OPTIONS:`--import=${new URL('./fixtures/business/register.mjs',import.meta.url).pathname}`,
-  CLOUDFLARE_API_TOKEN:'ambient-broad-token',CLOUDFLARE_ACCOUNT_ID:'f'.repeat(32),CF_API_TOKEN:'ambient-alias-token'};
+  CLOUDFLARE_API_TOKEN:'ambient-broad-token',CLOUDFLARE_ACCOUNT_ID:'f'.repeat(32),CF_API_TOKEN:'ambient-alias-token',RER_TEST_KEYCHAIN_CALLS:calls,...(fileBacked?{RER_BUSINESS_CREDENTIAL_DIR:credentials}:{})};
  const start=args=>{
   const child=spawn(process.execPath,[entry,'business',...args],{cwd:home,env,stdio:['pipe','pipe','pipe']});let stdout='',stderr='';
   child.stdout.on('data',data=>stdout+=data);child.stderr.on('data',data=>stderr+=data);child.stdin.end();
@@ -42,8 +45,20 @@ async function fixture(t) {
   return {child,result,output:()=>stdout+stderr};
  };
  const run=async command=>(await start(['run','--grant','grant-1','--',...command]).result);
- return {home,state,start,run};
+ return {home,state,start,run,calls};
 }
+
+test('business run and cleanup use the private device credential file and mask its encoded forms without keychain access',async t=>{
+ const f=await fixture(t,{fileBacked:true});
+ const script=String.raw`const fs=require('node:fs'),path=require('node:path');const folder=process.env.RER_BUSINESS_CREDENTIAL_DIR;const device=fs.readFileSync(path.join(folder,fs.readdirSync(folder)[0]),'utf8');for(const value of [device,encodeURIComponent(device),Buffer.from(device).toString('hex'),Buffer.from(device).toString('base64'),Buffer.from(device).toString('base64url')]){process.stdout.write(value.slice(0,5));process.stdout.write(value.slice(5)+'\n');process.stderr.write(value+'\n');}console.log('COMMAND_OK');`;
+ const result=await f.run([process.execPath,'-e',script]);
+ assert.equal(result.code,0,result.stderr);assert.match(result.stdout,/COMMAND_OK/);assert.match(result.stderr,/cleanup: revoked/);
+ for(const value of [device,Buffer.from(device).toString('hex'),Buffer.from(device).toString('base64'),Buffer.from(device).toString('base64url')])assert.ok(!(result.stdout+result.stderr).includes(value));
+ const lease=[...f.state.leases.keys()][0];
+ assert.equal((await f.start(['cleanup',lease,'--status']).result).code,0);
+ assert.equal((await f.start(['cleanup',lease]).result).code,0);
+ assert.equal(f.state.issued,1);assert.equal(await readFile(f.calls,'utf8'),'');
+});
 
 test('business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors',async t=>{
  const f=await fixture(t);
