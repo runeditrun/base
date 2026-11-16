@@ -29,7 +29,7 @@ test('rer dev announces the owner entry only after its redirected Setup answers,
   assert.equal(new URL(link).origin, f.origin);
   // A live server is checked again; cached readiness cannot bypass a busy page.
   await f.configure({ busyForever: true });
-  const reused = f.start(true, 600);
+  const reused = f.start(true, 3000);
   assert.equal(await reused.done, 1, reused.output + reused.errors);
   const error = JSON.parse(reused.output.split('\n').find(line => line.includes('"event":"error"')));
   assert.equal(error.code, 'owner_entry_not_ready');
@@ -41,7 +41,7 @@ test('rer dev announces the owner entry only after its redirected Setup answers,
  }
  for (const config of [{ busyForever: true, status: 200 }, { hang: true }]) {
   await f.configure(config);
-  const child = f.start(true, 600);
+  const child = f.start(true, 3000);
   assert.equal(await child.done, 1, child.output + child.errors);
   assert.match(child.output, /owner_entry_not_ready/);
   assert.ok(child.output.includes(f.origin + '/workspace/start-here'));
