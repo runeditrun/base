@@ -77,6 +77,29 @@ export const commandAdapter = declare(lifecycle, { scheduled: false });
  const json = run(['dev', '--json']);
  assert.equal(json.status, 1, json.stdout + json.stderr);
  await check(json.stdout.trim().split('\n').map(JSON.parse).find(row => row.event === 'error').message);
+ // A transfer hook can fail inside rer rather than in a captured subprocess.
+ // Its native message stays private; the named log contains the safe failure.
+ await writeFile(join(root,'adapter.mjs'),await readFile(join(root,'adapter.mjs'),'utf8')+`
+commandAdapter.portability={export:async()=>{throw new Error('unreachable export');}};
+commandAdapter.prepareData=async(root,store)=>{
+ await store.step('Inspecting local export data');
+ throw new RangeError('private row diagnostic sentinel');
+};
+`);
+ descriptor.commands.export={argv:['node','adapter.mjs'],inputs:['adapter.mjs'],effects:'Export local installation data.'};
+ await writeFile(join(root,'OPERATIONS.json'),JSON.stringify(descriptor));
+ for(const json of [false,true]) {
+  const failure=run(['export','--output','exports/failed.rer',...(json?['--json']:[])]);
+  assert.equal(failure.status,1,failure.stdout+failure.stderr);
+  const message=json?failure.stdout.trim().split('\n').map(JSON.parse).find(event=>event.event==='error').message:failure.stderr;
+  assert.match(message,/Inspecting local export data failed \(RangeError\)/);
+  assert.doesNotMatch(failure.stdout+failure.stderr,/private row diagnostic sentinel/);
+  const path=/Full output: (.+)/.exec(message)?.[1];
+  assert.ok(path,message);
+  const log=await readFile(join(root,path),'utf8');
+  assert.match(log,/command_failed: Inspecting local export data failed \(RangeError\)/);
+  assert.doesNotMatch(log,/private row diagnostic sentinel/);
+ }
  // Independent verbs use the same diagnostic and keep their full log after
  // returning the declared command's original numeric or signal status.
  delete descriptor.seedContract;
