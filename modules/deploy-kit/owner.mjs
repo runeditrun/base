@@ -2,7 +2,7 @@ import { shared } from '../../cli/shared.mjs';
 import { readinessWindow } from './readiness-window.mjs';
 import { uploadedWorker } from './uploaded-worker.mjs';
 import { ingressBindings } from './container-config.mjs';
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { assert, hash, identifier, resourceName, uuid, validatePlan } from './validation.mjs';
 import { definiteProviderRefusal } from './provider.mjs';
