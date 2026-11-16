@@ -1,7 +1,8 @@
+import { shared } from '../../cli/shared.mjs';
 import { readinessWindow } from './readiness-window.mjs';
 import { uploadedWorker } from './uploaded-worker.mjs';
 import { ingressBindings } from './container-config.mjs';
-import { mkdir, open, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { assert, hash, identifier, resourceName, uuid, validatePlan } from './validation.mjs';
 import { definiteProviderRefusal } from './provider.mjs';
@@ -373,18 +374,13 @@ async function checkOwnedWorker(api, plan, state, save) {
   return checkWorkerIdentity(api, plan, state, save);
 }
 
-/** One deploy at a time per state file: an exclusive lock file for the whole run. */
+/** One deploy per state file. A killed writer's lock is reclaimed only after
+ * its PID/start identity is dead, using the local operation's exclusive takeover. */
 export async function withStateLock(path, run) {
   await mkdir(dirname(path),{recursive:true,mode:0o700});
-  const lock = `${path}.lock`;
-  let handle;
-  try { handle = await open(lock,'wx',0o600); }
-  catch (error) { throw error.code === 'EEXIST' ? new Error('owner-state-locked') : error; }
-  try {
-    await handle.writeFile(`${process.pid}\n`);
-    await handle.close();
-    return await run();
-  } finally { try { await handle.close(); } finally { await rm(lock,{force:true}); } }
+  const { fileOperation } = await shared('local/operation.mjs');
+  const lock = await fileOperation(`${path}.lock`, undefined, () => new Error('owner-state-locked'));
+  try { return await run(); } finally { await lock.release(); }
 }
 
 /** Find or create every declared resource under the owner's account, migrate, upload and check health.
@@ -446,7 +442,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
     }
     return result;
   }};
-  const receipt = await deploy({api:observed, plan, artifact, artifactSha256:hash(artifact), previousReceipt:state.receipt ?? undefined,
+  const receipt = await deploy({api:observed, plan, artifact, artifactSha256:hash(artifact), previousReceipt:state.receipt ?? undefined, pendingUpload:state.pendingUpload,
     // Migrations run inside this run's state lock: no other deploy of this install is running.
     createResources:false, uploadWithoutReceipt:true, locked:true, env, fetch, healthOptions, readiness, declaredSecrets,
     onReceipt: async candidate => { if (candidate.changed || !state.receipt) { state.receipt = candidate; delete state.pendingUpload; delete state.pendingSecret; await save(); } },
