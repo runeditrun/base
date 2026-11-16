@@ -81,6 +81,27 @@ starts waiting on an existing server have one five-minute elapsed deadline,
 including control requests and polling. Loopback HTTP requests use an elapsed
 deadline, so a response that keeps sending bytes cannot extend readiness.
 
+Signed: Run Edit Run fleet, 2026-11-17.
+
+Before announcing `RER_READY`, `RER_OPEN` or the JSON `ready` event, managed
+dev keeps its persona API check and opens the intended owner link in an isolated
+headless browser through the public origin. It follows the fragment exchange,
+cookies and server/client redirects to a 2xx page with visible usable controls,
+without a busy/retry interstitial or loading state. The destination comes from
+the application; no `/setup` path is assumed. Preview and demo also verify their
+native owner entry, then issue a fresh single-use link for the owner.
+
+This uses the checkout's locked Playwright and provisions its headless browser
+on first use, as verification does. Owner readiness has a 60-second elapsed
+deadline, including provisioning, browser launch and navigation. Set
+`RER_OWNER_READY_TIMEOUT_MS` to positive integer milliseconds to change it.
+Expiry exits 1 with `owner_entry_not_ready`, naming the entry and last destination
+without credentials, for example: `Destination http://127.0.0.1:8787/workspace/start-here:
+HTTP 503 (busy/retry interstitial)`. No ready event or open link is emitted.
+An available persona API or health endpoint alone cannot establish that the
+owner's page is ready. Inline recovery-script text is not mistaken for a visible
+busy page.
+
 `rer dev` runs the local migration hook before starting the app and checking its
 owner prerequisites. The shared operator hook reads every SQL file in the seed's
 canonical `migrations/core` inventory, including changes pulled since the last
