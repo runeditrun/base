@@ -171,7 +171,7 @@ test('rer deploy --remove deletes only what this environment created, reads back
  const run = options => deploy({ root, options: { environment: 'production', ...options }, store: store(), setupManifest: manifest });
  // A create whose answer was lost may exist: removal deletes it only once it is confirmed empty.
  provider.fail('POST', /^\/storage\/kv\/namespaces$/, { afterApply: true });
- await assert.rejects(run({}), /Found kv:fixture-production-cache at a pending create name/);
+ await assert.rejects(run({}), /Possibly created: kv:fixture-production-cache/);
  provider.state.kv[0].keys = [{ name: 'not-ours' }];
  await assert.rejects(run({ remove: true, yes: true }), /uncertain-resource-not-empty/);
  assert.equal(provider.state.databases.length + provider.state.buckets.length + provider.state.kv.length, 3, 'a refused removal deletes nothing');
