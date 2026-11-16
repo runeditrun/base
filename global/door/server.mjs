@@ -111,7 +111,10 @@ async function site(req, res, target, retried = false) {
  if (kind === 'never') return text(res, 503, `${view.name} is not running. Open http://${target.host}/ in a browser to start it.`);
  if (view.state === 'failed') return html(res, 200, failurePage(view.name, view.reason, here));
  if (kind === 'confirm' && view.state !== 'starting') return html(res, 200, confirmPage(view.name, here));
- sites.ensureStarted(registered);
+ // An existing server owns its startup. In particular its readiness browser
+ // can arrive before our cached routing status refreshes; do not launch a
+ // competing attachment that outlives that startup (or an explicit stop).
+ if (!view.record) sites.ensureStarted(registered);
  return html(res, 503, startingPage(view.name), { 'retry-after': '2' });
 }
 
