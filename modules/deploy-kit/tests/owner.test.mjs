@@ -114,7 +114,7 @@ test('a resource failure stops the run; the next run resumes without creating an
   assert.equal(state.writes.length,writes);
 });
 
-test('a failed Worker upload resumes with one upload; a failure after upload re-uploads without a receipt', async t => {
+test('a failed Worker upload retries once and an accepted upload finishes without publishing another version', async t => {
   const {args,state,statePath,target,fail} = await setup(t);
   fail('PUT',/^\/workers\/scripts\/penny-production$/);
   await assert.rejects(ownerDeploy(args),/provider-http-500/);
@@ -127,7 +127,7 @@ test('a failed Worker upload resumes with one upload; a failure after upload re-
   const uploads = () => state.writes.filter(x => x.method === 'PUT' && x.path === '/workers/scripts/penny-production').length;
   assert.equal(uploads(),1);
   const {receipt} = await ownerDeploy(args);
-  assert.equal(receipt.changed,true); assert.equal(uploads(),2);
+  assert.equal(receipt.changed,true); assert.equal(uploads(),1);
   assert.deepEqual(state.schedules,[{cron:'* * * * *'}]);
   assert.equal(posts(state,'/d1/database'),1); assert.equal(state.queues.length,2);
   saved = await readOwnerState(statePath,target);
