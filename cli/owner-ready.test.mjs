@@ -18,8 +18,13 @@ test('rer dev announces the owner entry only after its redirected Setup answers,
   const child = f.start(json);
   await until(async () => (await f.observations()).some(row => row.busy), child);
   assert.doesNotMatch(child.output, /"event":"ready"|RER_READY|RER_OPEN/, 'persona readiness cannot announce a busy owner destination');
+  if (json) {
+   await until(async () => (await f.observations()).some(row => !row.busy), child);
+   assert.doesNotMatch(child.output, /"event":"ready"/, 'a 2xx document with client loading cannot announce readiness');
+  }
   await until(() => json ? child.output.includes('"event":"ready"') : child.output.includes('RER_OPEN'), child);
   assert.equal((await f.observations()).at(-1).busy, false, 'Setup answered before ready');
+  if (json) assert.equal((await f.observations()).at(-1).mounted, true, 'client-rendered Setup mounted before ready');
   const link = json ? JSON.parse(child.output.split('\n').find(line => line.includes('"event":"ready"'))).openUrl : /RER_OPEN (.+)/.exec(child.output)[1];
   assert.equal(new URL(link).origin, f.origin);
   // A live server is checked again; cached readiness cannot bypass a busy page.

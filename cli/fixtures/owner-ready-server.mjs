@@ -11,7 +11,7 @@ const server = createServer(async (req, res) => {
  const request = new Request(origin + req.url, { method: req.method, headers: req.headers, ...(body ? { body } : {}) });
  let response;
  if (path === '/health') response = Response.json({ status: 'ok' });
- else if (path === '/mounted') { await appendFile(observations, JSON.stringify({ at: Date.now(), busy: false }) + '\n'); response = new Response(null, { status: 204 }); }
+ else if (path === '/mounted') { await appendFile(observations, JSON.stringify({ at: Date.now(), busy: false, mounted: true }) + '\n'); response = new Response(null, { status: 204 }); }
  else if (path === '/__dev/personas' && await gate.admits(request)) response = Response.json([{ as: 'owner', email: 'owner@example.test' }]);
  else if (path === '/__dev/key') response = await gate.exchange(request);
  else if (path === '/auth/dev/enter' && await gate.admits(request)) response = new Response(null, { status: 303, headers: { location: '/workspace/owner-entry', 'set-cookie': 'synthetic_owner=active; Path=/; HttpOnly' } });
