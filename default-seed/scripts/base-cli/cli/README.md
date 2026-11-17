@@ -113,6 +113,22 @@ build, and prints the applied names. A failed migration stops startup with its
 captured error and `rer setup` guidance. `rer demo` uses the same inventory in
 its isolated state directory.
 
+Signed: Run Edit Run fleet, 2026-11-17.
+
+The shared operator adapter returns a named local prerequisite failure: the
+field, found value and expected value. Secret settings report only set/unset.
+This applies to dev and preview, including missing migration names, the durable
+owner claim and the active owner. Legacy adapters returning false report their
+`localPrerequisites` result.
+Local operator mail requires `MAIL_PROVIDER=development`: some adopting seeds
+select a real sender for hosted values even with local authentication enabled.
+A hosted mail-off declaration (`none`, public settings and `mailOffSignIn`)
+describes hosted behavior and does not establish a seed's local mail behavior.
+Fresh setup refuses a hosted choice by field name and accepted value;
+ordinary repeat `rer setup` repairs an already stored unsupported mail value to
+`development`, preserving the owner, secrets and data. Hosted mail settings
+remain in the deployment declaration and hosted environment.
+
 Successful terminal setup saves declared nonsecret installer answers in owned
 0600 storage under `.seed/installer`. A non-interactive repeat reuses those
 answers, with explicit flags or an answers file taking precedence. Runtime

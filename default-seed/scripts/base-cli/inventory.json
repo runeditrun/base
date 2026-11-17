@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.121-dev.g0ecb7191",
+  "cliVersion": "0.2.121-dev.gf1658c57",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -25,7 +25,7 @@
     },
     "adapter-settings.mjs": {
       "source": "onboarding/adapter-settings.mjs",
-      "sha256": "e432dcceda29922b30a9f8cbecf79edd7afdf3d282f63f3c112101e4ccb509bc"
+      "sha256": "add0b4571780d2074a3d58ffa0423bf46794388efc11179fd78223b3d4dc28aa"
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
@@ -185,7 +185,7 @@
     },
     "operator-installer.mjs": {
       "source": "onboarding/operator-installer.mjs",
-      "sha256": "c87fd90a4d80d53e93186ba50de59a8f082da5fc65ab14f581eede2ecbf4c58c"
+      "sha256": "d54e84a6209b74880d7c1ba6d7b0e755df38c3c6cbc61a73fa2a7223cd08def1"
     },
     "operator-migrations.mjs": {
       "source": "onboarding/operator-migrations.mjs",
@@ -193,7 +193,11 @@
     },
     "operator-prerequisites.mjs": {
       "source": "onboarding/operator-prerequisites.mjs",
-      "sha256": "d914ec57c090ad08e4531ed13f34c891cf5f1162080e5a4348fc2d8adcc63ce2"
+      "sha256": "a442b30664f20f5052b42d491d5698f3e4026b80426168b3062097b44bfb499f"
+    },
+    "operator-settings.mjs": {
+      "source": "onboarding/operator-settings.mjs",
+      "sha256": "e7aa48031a8903fda753e37aae50832032d60c51a95d64a4f1465ccc0cf42098"
     },
     "package.json": {
       "source": "onboarding/package.json",
@@ -391,7 +395,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "57d6920d66f55ab7801dde185e05b9c648fbc6e04088fa38c27aba0da4e2a14f"
+      "sha256": "126c30e81161768b754d2f4e1e33d224c36da636c1ecd51bf6eebb0a9cc48fd5"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -1083,7 +1087,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "1c1a32c640e1fa2ec333f82fc2af474326783f7f8a0ab06eb252ac504f358f9e"
+      "sha256": "5799e63c428a930e7aff7cc9f791b3fb1ddb90d7e0d4414e17df1ea4e3606454"
     },
     "cli/native-owner-entry.mjs": {
       "source": "cli/native-owner-entry.mjs",
