@@ -16,7 +16,7 @@ const adopt = 'See DEMO.md: a seed adopts demo mode with src/demo.ts, withDemo a
 // Check only saved configuration here; migrations and owner bootstrap are
 // verified by starting the application against its fresh demo state.
 export async function demoPreflight(project, vars, seconds) {
- if (requiredLocalSettings(project, vars).length) throw missing('Private owner settings are missing. Run rer setup first.');
+ if (requiredLocalSettings(project, vars).length) throw missing('Private owner settings are missing. Run ~/.local/bin/rer setup first.');
  await demoAdopted(project.root);
  const declaration = JSON.parse(await readFile(await contained(project.root, 'deploy-demo.json'), 'utf8'));
  const resolved = await demoRunDeclaration(declaration, {root: project.root, adapter: project.adapter});

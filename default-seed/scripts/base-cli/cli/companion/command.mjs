@@ -1,3 +1,4 @@
+import { withCommandHelp } from '../command-guidance.mjs';
 import { homedir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { open, unlink } from 'node:fs/promises';
@@ -7,7 +8,7 @@ import { codexAuth, claudeAuth } from './auth.mjs';
 import { assertSandboxPlatform } from './providers/sandbox.mjs';
 import { appSignInHelp } from '../app-address.mjs';
 
-export const usage = `Usage: rer companion VERB
+export const usage = `Usage: ~/.local/bin/rer companion VERB
 Pairs this computer with a Run Edit Run app, then runs the app's change
 requests here with your own Codex or Claude, in isolated checkouts. It makes
 outbound HTTPS requests only and opens no local server. Needs Node 22 or later;
@@ -15,7 +16,7 @@ run needs macOS (sandbox-exec), and refuses on other systems.
 
   map PROJECT_ID OWNER/REPO CHECKOUT
                      Approve one local Git checkout for an app; its origin must be OWNER/REPO.
-  ${pairUsage.replace('rer companion ', '')}
+  ${pairUsage.replace('~/.local/bin/rer companion ', '')}
                      Redeem the one-use code from the app's Devices page. Asks for a
                      missing project or provider in a terminal (default provider codex).
                      The legacy form pair URL CODE PROJECT_ID [PROVIDER] [NAME] still works.
@@ -71,5 +72,5 @@ export async function companionCommand(argv) {
       console.log(JSON.stringify({device:state.device,projects:Object.keys(state.mappings),active:state.active?{job:state.active.job.id,status:state.active.status,identity:state.active.identity}:null,pendingEvents:state.outbox.length},null,2));
     } else { process.stderr.write(usage); return 2; }
     return 0;
-  } catch(error) {process.stderr.write(`${error.message}\n`);return 1;}
+  } catch(error) {process.stderr.write(withCommandHelp(error.message) + '\n');return 1;}
 }

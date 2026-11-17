@@ -13,7 +13,7 @@ export function localOperatorSettings(vars) {
 export async function prepareOperatorMail({root,input}) {
  const saved=(await readSettings(root,{})).values;
  if(input.MAIL_PROVIDER!==undefined&&input.MAIL_PROVIDER!=='development'&&!saved.OWNER_EMAIL) {
-  throw commandFailure(`Local prerequisite MAIL_PROVIDER: found ${JSON.stringify(input.MAIL_PROVIDER)}; expected development; run rer setup with MAIL_PROVIDER=development in the --answers file.`,{});
+  throw commandFailure(`Local prerequisite MAIL_PROVIDER: found ${JSON.stringify(input.MAIL_PROVIDER)}; expected development; run ~/.local/bin/rer setup with MAIL_PROVIDER=development in the --answers file.`,{});
  }
 }
 

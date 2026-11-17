@@ -5,7 +5,7 @@ import { paired } from './local-commands.mjs';
 import { runChild, signalCode } from './run-child.mjs';
 
 const route = '/api/business/executors/cloudflare-token';
-const usage = 'Usage: rer business run --grant G -- <command> [args...]\n';
+const usage = 'Usage: ~/.local/bin/rer business run --grant G -- <command> [args...]\n';
 const refused = 'Business command refused or its credential exchange failed. Check pairing, selected account, deploy action, grant and Cloudflare consent in Business.';
 // A refused exchange can say why its grant cannot mint (409 {state, gap, catalogue}). Only the gap sentence, whether the
 // grant stays pending and the catalogue's two counts are read: no other key, and never a token, header or value.
@@ -38,7 +38,7 @@ async function cleanup(api, id) {
 }
 export async function cleanupCommand(args) {
  if (args.length < 1 || args.length > 2 || args[1] !== undefined && args[1] !== '--status' || !/^[a-f0-9-]{36}$/.test(args[0])) {
-  process.stderr.write('Usage: rer business cleanup LEASE [--status]\n'); return 2;
+  process.stderr.write('Usage: ~/.local/bin/rer business cleanup LEASE [--status]\n'); return 2;
  }
  const {state, credential} = await paired(), api = new Api(state.origin, credential), id = args[0];
  try {
@@ -73,7 +73,7 @@ export async function grantCommand(args) {
  } finally {
   const status = await cleanup(api, id);
   const expiry = lease && Number.isFinite(Date.parse(lease.credential_expires_at)) ? new Date(lease.credential_expires_at).toISOString() : 'the server-enforced expiry (at most 15 minutes)';
-  process.stderr.write(`Cloud credential cleanup: ${status}. Lease ${id}.${status === 'unconfirmed' ? ` Credential expiry: ${expiry}. Retry: rer business cleanup ${id}.` : ''}\n`);
+  process.stderr.write(`Cloud credential cleanup: ${status}. Lease ${id}.${status === 'unconfirmed' ? ` Credential expiry: ${expiry}. Retry: ~/.local/bin/rer business cleanup ${id}.` : ''}\n`);
   lease = undefined;
   for (const [signal, handler] of handlers) process.removeListener(signal, handler);
  }

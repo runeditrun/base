@@ -16,10 +16,10 @@ const moveRecord = '.rer/local/door-move.json';
 // The enabled door this checkout can use, or a refusal saying why not.
 export async function enabledDoor(env = process.env) {
  const state = await readDoorState(env);
- if (!state?.door?.enabled) throw refuse(`The front door is not enabled on this computer (${state?.directory ?? 'RER_DOOR_DIR'}). Enable it with rer door enable, or serve directly with rer dev --direct.`);
+ if (!state?.door?.enabled) throw refuse(`The front door is not enabled on this computer (${state?.directory ?? 'RER_DOOR_DIR'}). Enable it with ~/.local/bin/rer door enable, or serve directly with ~/.local/bin/rer dev --direct.`);
  const running = await runningDoor(env);
  const protocol = running?.protocol ?? state.door.protocol;
- if (protocol !== doorProtocol) throw refuse(`The front door speaks protocol ${protocol}, which this checkout's rer (protocol ${doorProtocol}) does not know. Run rer door restart with the installed rer.`);
+ if (protocol !== doorProtocol) throw refuse(`The front door speaks protocol ${protocol}, which this checkout's rer (protocol ${doorProtocol}) does not know. Run ~/.local/bin/rer door restart with the installed rer.`);
  return state.door;
 }
 
@@ -43,7 +43,7 @@ export async function selectDoor(project, options, previous, fields) {
   return doorSelection(saved.name, saved.port, fields);
  }
  if (!options.door) return undefined;
- if (previous) throw refuse('This checkout is already set up at ' + previous.origin + '. Move it to the front door with rer dev --door, which keeps its data.');
+ if (previous) throw refuse('This checkout is already set up at ' + previous.origin + '. Move it to the front door with ~/.local/bin/rer dev --door, which keeps its data.');
  const door = await enabledDoor(), name = await claimSiteName(process.env, project.root, { mode: 'door' });
  return doorSelection(name, door.port, fields);
 }
@@ -72,7 +72,7 @@ export async function routeRunning(record) {
  const { listeners } = await shared('process-diagnostics.mjs');
  const live = await alive(record.owner).catch(() => false);
  const holds = live && (await listeners([record.owner.pid])).some(row => row.pid === record.owner.pid && row.names.some(name => /^(?:127\.0\.0\.1|\[?::ffff:127\.0\.0\.1\]?):(\d+)$/.exec(name)?.[1] === String(record.port)));
- if (!holds) throw refuse(`This checkout's server (PID ${record.owner?.pid}) is not serving on its recorded port 127.0.0.1:${record.port}, so nothing was sent to it. Stop it with rer dev --stop, then start it again with rer dev.`);
+ if (!holds) throw refuse(`This checkout's server (PID ${record.owner?.pid}) is not serving on its recorded port 127.0.0.1:${record.port}, so nothing was sent to it. Stop it with ~/.local/bin/rer dev --stop, then start it again with ~/.local/bin/rer dev.`);
  const { routeOrigin } = await shared('app-fetch.mjs');
  routeOrigin(record.url, { port: record.port, headers: { [doorSecretHeader]: record.door.secret } });
 }
@@ -103,11 +103,11 @@ export async function moveCheckout(project, options, out, registry) {
  if (!secrets) throw refuse('This checkout declares no saved origin, so it cannot move to or from the front door.');
  const { readSettings, replaceSavedOrigin } = await shared('adapter-settings.mjs');
  const key = localSettingKeys(project).origin, current = (await readSettings(project.root, secrets)).values[key];
- if (!current) throw refuse('This checkout is not set up yet. Run rer dev without --door or --direct; with the door enabled it is set up there.');
+ if (!current) throw refuse('This checkout is not set up yet. Run ~/.local/bin/rer dev without --door or --direct; with the door enabled it is set up there.');
  const atDoor = Boolean(doorSite(current));
  if (options.door === atDoor) return;
  const running = await registry.existing(options.verb, { ...options, supplied: new Set() });
- if (running) throw refuse(`Stop this checkout's running server first (rer dev --stop), then move it.`);
+ if (running) throw refuse(`Stop this checkout's running server first (~/.local/bin/rer dev --stop), then move it.`);
  let target, record;
  const { privateDirectory, readPrivateFile, writePrivateFile } = await shared('private-files.mjs');
  if (options.door) {
@@ -129,6 +129,6 @@ export async function moveCheckout(project, options, out, registry) {
   if (record) { await privateDirectory(project.root, ['.rer', 'local']); await writePrivateFile(join(project.root, moveRecord), JSON.stringify(record) + '\n'); }
   else await rm(join(project.root, moveRecord), { force: true });
  } finally { await operation.release(); }
- const line = options.door ? `Moved this checkout from ${current} to ${target}, through the front door. Its data is kept; rer dev --direct moves it back.` : `Moved this checkout from ${current} back to ${target}. Its data is kept.`;
+ const line = options.door ? `Moved this checkout from ${current} to ${target}, through the front door. Its data is kept; ~/.local/bin/rer dev --direct moves it back.` : `Moved this checkout from ${current} back to ${target}. Its data is kept.`;
  if (options.json) out.event('moved', { from: current, to: target }); else out.human(line);
 }

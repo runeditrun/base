@@ -50,7 +50,7 @@ export async function checkHydration(root, { origin, pages: declared, declaratio
   work.forEach(({ page, item }, index) => { (page.loads ??= []).push({ item, load: loads[index] }); });
   for (const page of pages.filter(page => page.hydrated)) failures.push(...judgePage({ ...page, loads: page.loads ?? [] }));
   const result = {
-   served: server.mode === 'hosted' ? 'production build as rer deploy hosts it' : server.origin,
+   served: server.mode === 'hosted' ? 'production build as ~/.local/bin/rer deploy hosts it' : server.origin,
    pages: pages.map(page => page.skipped ? { path: page.path, skipped: 'plain HTML: React does not hydrate this page and it loads no application script' } : {
     path: page.path,
     sections: page.survey.sections.map(section => `${section.label} (${section.key})`),

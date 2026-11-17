@@ -53,7 +53,7 @@ if (!await claimLaunch(directory, token)) {
   await events.write({ event: 'ready', ready: started.ready, pid, ...(ours ? { log: serverLog } : {}) });
  } catch (error) {
   log(String(error?.stack ?? error));
-  const failure = workerFailure(stopping.signal.aborted ? new LaunchFailure(1, 'rer dev --stop stopped this launch before the app was ready.') : error, { root });
+  const failure = workerFailure(stopping.signal.aborted ? new LaunchFailure(1, '~/.local/bin/rer dev --stop stopped this launch before the app was ready.') : error, { root });
   await events.write({ event: 'failed', exitCode: failure.exitCode, message: failure.message, error: failure.event });
  } finally {
   await releaseLaunch(directory, token);

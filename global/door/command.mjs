@@ -1,3 +1,4 @@
+import { withCommandHelp } from '../../cli/command-guidance.mjs';
 // rer door: the opt-in front door. One process on one port serves every
 // registered checkout at http://NAME.localhost:PORT, starting it on its first
 // visit and stopping it when idle.
@@ -13,40 +14,40 @@ import { rebootNote } from './pages.mjs';
 import { enabledPolicy } from './policy.mjs';
 import { doorSites } from './sites.mjs';
 
-export const doorHelp = `Usage: rer door VERB
+export const doorHelp = `Usage: ~/.local/bin/rer door VERB
 
 The front door serves every registered checkout at http://NAME.localhost:PORT
 from one process on one port. A checkout starts on its first visit in a browser
 and stops when idle. It is opt-in for this computer.
 
-  rer door clauses (--write | --check) [--cwd DIR]
+  ~/.local/bin/rer door clauses (--write | --check) [--cwd DIR]
                         Sync Base agent requirements into a seed contract, preserving judgments.
-  rer door enable [--port N] [--server-limit N] [--idle-timeout S]
+  ~/.local/bin/rer door enable [--port N] [--server-limit N] [--idle-timeout S]
                         Opt this computer in, record the policy and start the door.
                         Defaults: port 8700, 10 servers, 43200 s (12 hours) idle.
                         The policy and the RER_* variables in effect now are stored;
                         sites the door starts get those, never another shell's.
-  rer door disable      Stop the door and opt this computer out.
-  rer door start        Start the enabled door (needed after a reboot or logout).
-  rer door stop         Stop the door. Running sites keep running until idle.
-  rer door restart      Drain and restart the door; open tabs reconnect.
-  rer door add [PATH ...]
+  ~/.local/bin/rer door disable      Stop the door and opt this computer out.
+  ~/.local/bin/rer door start        Start the enabled door (needed after a reboot or logout).
+  ~/.local/bin/rer door stop         Stop the door. Running sites keep running until idle.
+  ~/.local/bin/rer door restart      Drain and restart the door; open tabs reconnect.
+  ~/.local/bin/rer door add [PATH ...]
                         Register checkouts (default: here) for lazy start, printing
                         each URL and, for a set-up door-mode checkout with dev
                         identity, a sign-in link that starts it and signs in.
-  rer door remove NAME  Unregister one checkout. Its name stays reserved for it;
-                        rer dev there, or rer door add, registers it again.
-  rer door status [--json] [--links]
+  ~/.local/bin/rer door remove NAME  Unregister one checkout. Its name stays reserved for it;
+                        ~/.local/bin/rer dev there, or ~/.local/bin/rer door add, registers it again.
+  ~/.local/bin/rer door status [--json] [--links]
                         The door, its policy and every site with its state and URL;
                         --links adds sign-in links.
 
-Fresh checkouts launched with rer dev while the door is enabled are set up at
-their door URL. Move an existing one with rer dev --door (rer dev --direct moves
-it back); rer dev --port N always serves directly.
+Fresh checkouts launched with ~/.local/bin/rer dev while the door is enabled are set up at
+their door URL. Move an existing one with ~/.local/bin/rer dev --door (~/.local/bin/rer dev --direct moves
+it back); ~/.local/bin/rer dev --port N always serves directly.
 `;
 
-const out = text => process.stdout.write(text + '\n');
-const err = text => process.stderr.write(text + '\n');
+const out = text => process.stdout.write(withCommandHelp(text) + '\n');
+const err = text => process.stderr.write(withCommandHelp(text) + '\n');
 
 function flags(args, valued, booleans = []) {
  const result = { positional: [] };
@@ -54,7 +55,7 @@ function flags(args, valued, booleans = []) {
   const arg = args[i];
   if (valued.includes(arg)) { const value = args[++i]; if (value === undefined || value.startsWith('--')) throw new DoorFailure(2, `${arg} needs a value.`); result[arg] = value; }
   else if (booleans.includes(arg)) result[arg] = true;
-  else if (arg.startsWith('-')) throw new DoorFailure(2, `Unsupported flag ${arg}. Run rer door --help.`);
+  else if (arg.startsWith('-')) throw new DoorFailure(2, `Unsupported flag ${arg}. Run ~/.local/bin/rer door --help.`);
   else result.positional.push(arg);
  }
  return result;
@@ -62,7 +63,7 @@ function flags(args, valued, booleans = []) {
 
 async function enabledState(env) {
  const state = await readDoorState(env);
- if (!state?.door?.enabled) throw new DoorFailure(3, 'The front door is not enabled on this computer. Enable it with: rer door enable');
+ if (!state?.door?.enabled) throw new DoorFailure(3, 'The front door is not enabled on this computer. Enable it with: ~/.local/bin/rer door enable');
  return state;
 }
 
@@ -88,7 +89,7 @@ async function replaceDoor(env, change) {
 
 async function enable(args, env) {
  const given = flags(args, ['--port', '--server-limit', '--idle-timeout']);
- if (given.positional.length) throw new DoorFailure(2, 'rer door enable takes only flags. Run rer door --help.');
+ if (given.positional.length) throw new DoorFailure(2, '~/.local/bin/rer door enable takes only flags. Run ~/.local/bin/rer door --help.');
  const chosen = enabledPolicy({ port: given['--port'], serverLimit: given['--server-limit'], idleTimeout: given['--idle-timeout'] }, env);
  const previous = (await readDoorState(env))?.door;
  const port = chosen.port ?? previous?.port ?? defaultDoorPort;
@@ -98,16 +99,16 @@ async function enable(args, env) {
   state.door = { protocol: doorProtocol, enabled: true, port, policy: chosen.policy, directory: chosen.directory, serversDir: chosen.serversDir, environment: chosen.environment, started: state.door?.started ?? [], ...(state.door?.handoff ? { handoff: state.door.handoff } : {}), ...(state.door?.restarting ? { restarting: state.door.restarting } : {}), enabledAt: new Date().toISOString() };
  });
  out(runningLine({ policy: chosen.policy }, record));
- if (previous?.port && previous.port !== port) out(`Checkouts already moved to the door keep their saved port ${previous.port}; move each again with rer dev --direct, then rer dev --door.`);
- out(`Register checkouts with rer door add PATH. ${rebootNote.replace(/<\/?code>/g, '')}`);
+ if (previous?.port && previous.port !== port) out(`Checkouts already moved to the door keep their saved port ${previous.port}; move each again with ~/.local/bin/rer dev --direct, then ~/.local/bin/rer dev --door.`);
+ out(`Register checkouts with ~/.local/bin/rer door add PATH. ${rebootNote.replace(/<\/?code>/g, '')}`);
  return 0;
 }
 
 async function disable(args, env) {
- if (args.length) throw new DoorFailure(2, 'rer door disable takes no arguments.');
+ if (args.length) throw new DoorFailure(2, '~/.local/bin/rer door disable takes no arguments.');
  const stopped = await stopDoor(env);
  if (await readDoorState(env)) await changeDoorState(env, state => { if (state.door) state.door.enabled = false; });
- out(`${stopped ? `Stopped the front door (PID ${stopped.pid}). ` : ''}The front door is disabled on this computer. Registered checkouts stay registered; rer door enable turns it back on.`);
+ out(`${stopped ? `Stopped the front door (PID ${stopped.pid}). ` : ''}The front door is disabled on this computer. Registered checkouts stay registered; ~/.local/bin/rer door enable turns it back on.`);
  return 0;
 }
 
@@ -120,7 +121,7 @@ async function start(env) {
 
 async function stop(env) {
  const stopped = await stopDoor(env);
- out(stopped ? `Stopped the front door (PID ${stopped.pid}). Sites it started keep running until idle; rer door start brings it back.` : 'The front door is not running.');
+ out(stopped ? `Stopped the front door (PID ${stopped.pid}). Sites it started keep running until idle; ~/.local/bin/rer door start brings it back.` : 'The front door is not running.');
  return 0;
 }
 
@@ -167,7 +168,7 @@ async function add(args, env) {
    skipped++; continue;
   }
   let described;
-  try { described = await describeCheckout(root, dispatcher(root).entry, env); } catch (failure) { out(`skipped ${path}: rer describe fails here: ${failure.message.split('\n')[0]}`); skipped++; continue; }
+  try { described = await describeCheckout(root, dispatcher(root).entry, env); } catch (failure) { out(`skipped ${path}: ~/.local/bin/rer describe fails here: ${failure.message.split('\n')[0]}`); skipped++; continue; }
   const saved = described.local && 'origin' in described.local ? described.local.origin : await oldPinOrigin(root, described), site = saved && doorSite(saved), mode = site && site.port === port ? 'door' : 'direct';
   // A door-mode checkout's saved origin names its site, so it registers under
   // that name or not at all; another checkout keeps a name it holds.
@@ -185,7 +186,7 @@ async function add(args, env) {
    await saveCheckoutIdentity(root, id);
   } catch (error) {
    if (!(error instanceof NameHeld)) throw error;
-   out(`skipped ${path}: its saved origin names ${site.name}.localhost, which the front door has registered for ${error.message}. Give it its own name with rer dev --direct, then rer dev --door, in ${root}.`);
+   out(`skipped ${path}: its saved origin names ${site.name}.localhost, which the front door has registered for ${error.message}. Give it its own name with ~/.local/bin/rer dev --direct, then ~/.local/bin/rer dev --door, in ${root}.`);
    skipped++; continue;
   }
   const url = doorOrigin(name, port);
@@ -204,17 +205,17 @@ async function add(args, env) {
 // registers it again.
 async function remove(args, env) {
  const given = flags(args, []);
- if (given.positional.length !== 1) throw new DoorFailure(2, 'Usage: rer door remove NAME');
+ if (given.positional.length !== 1) throw new DoorFailure(2, 'Usage: ~/.local/bin/rer door remove NAME');
  const [name] = given.positional;
  const removed = await changeDoorState(env, state => { const site = state.sites.find(item => item.name === name && !item.removed); if (site) site.removed = true; return site; });
- if (!removed) { err(`No checkout is registered as ${name}. rer door status lists them.`); return 3; }
- out(`Unregistered ${name} (${removed.checkout}). Its checkout and any running server are untouched, and the name stays reserved for it: rer dev there, or rer door add, registers it again.`);
+ if (!removed) { err(`No checkout is registered as ${name}. ~/.local/bin/rer door status lists them.`); return 3; }
+ out(`Unregistered ${name} (${removed.checkout}). Its checkout and any running server are untouched, and the name stays reserved for it: ~/.local/bin/rer dev there, or ~/.local/bin/rer door add, registers it again.`);
  return 0;
 }
 
 async function status(args, env) {
  const given = flags(args, [], ['--json', '--links']);
- if (given.positional.length) throw new DoorFailure(2, 'Usage: rer door status [--json] [--links]');
+ if (given.positional.length) throw new DoorFailure(2, 'Usage: ~/.local/bin/rer door status [--json] [--links]');
  const state = await readDoorState(env), record = await runningDoor(env), version = record?.version ?? ownManifest().version;
  const door = state?.door;
  const views = door ? await doorSites({ env, door }).views() : [];
@@ -227,9 +228,9 @@ async function status(args, env) {
  }
  const sites = views.map(view => ({ name: view.name, path: view.path, mode: view.mode, state: view.state === 'failed' ? 'stopped' : view.state, url: view.url, ...(view.proxyPort && view.state === 'running' ? { proxyPort: view.proxyPort } : {}), ...(view.signIn ? { signIn: view.signIn } : {}) }));
  const result = { running: Boolean(record), enabled: Boolean(door?.enabled), port: door?.port ?? record?.port ?? null, pid: record?.pid ?? null, version, policy: door ? { serverLimit: door.policy.serverLimit, idleSeconds: door.policy.idleSeconds } : null, sites };
- if (given['--json']) { out(JSON.stringify({ ...result, ...(linkNote ? { linksUnavailable: linkNote } : {}), ...(!record && door?.enabled ? { note: 'After a reboot or logout the front door needs rer door start.' } : {}) })); return 0; }
- if (!door) { out('The front door is not enabled on this computer. Enable it with: rer door enable'); return 0; }
- out(record ? runningLine(door, record) : door.enabled ? `The front door is enabled on port ${door.port} but not running. Start it with: rer door start` : 'The front door is disabled on this computer. Enable it with: rer door enable');
+ if (given['--json']) { process.stdout.write(JSON.stringify({ ...result, ...(linkNote ? { linksUnavailable: linkNote } : {}), ...(!record && door?.enabled ? { note: 'After a reboot or logout the front door needs ~/.local/bin/rer door start.' } : {}) }) + '\n'); return 0; }
+ if (!door) { out('The front door is not enabled on this computer. Enable it with: ~/.local/bin/rer door enable'); return 0; }
+ out(record ? runningLine(door, record) : door.enabled ? `The front door is enabled on port ${door.port} but not running. Start it with: ~/.local/bin/rer door start` : 'The front door is disabled on this computer. Enable it with: ~/.local/bin/rer door enable');
  if (sites.length) {
   const width = Math.max(4, ...sites.map(site => site.name.length));
   out(`${'NAME'.padEnd(width)}  STATE     MODE    URL`);
@@ -237,9 +238,9 @@ async function status(args, env) {
    out(`${site.name.padEnd(width)}  ${site.state.padEnd(8)}  ${site.mode.padEnd(6)}  ${site.url}${site.proxyPort ? `  (proxy 127.0.0.1:${site.proxyPort})` : ''}`);
    if (site.signIn) out(`${' '.repeat(width)}  sign in: ${site.signIn}`);
   }
- } else out('No checkouts are registered. Add one with: rer door add PATH');
+ } else out('No checkouts are registered. Add one with: ~/.local/bin/rer door add PATH');
  if (linkNote) out(`No sign-in links: ${linkNote}`);
- if (!record && door.enabled) out('After a reboot or logout the front door needs rer door start (or any rer dev in a door-mode checkout).');
+ if (!record && door.enabled) out('After a reboot or logout the front door needs ~/.local/bin/rer door start (or any ~/.local/bin/rer dev in a door-mode checkout).');
  return 0;
 }
 
@@ -247,10 +248,10 @@ export async function doorCommand(args, env = process.env) {
  // A reader that stops early (rer door status | grep -q) is not a failure.
  process.stdout.on('error', error => { if (error.code === 'EPIPE') process.exit(0); throw error; });
  const [verb, ...rest] = args;
- if (!verb || ['--help', '-h', 'help'].includes(verb) || rest.includes('--help')) { process.stdout.write(doorHelp); return 0; }
+ if (!verb || ['--help', '-h', 'help'].includes(verb) || rest.includes('--help')) { process.stdout.write(withCommandHelp(doorHelp) + '\n'); return 0; }
  const verbs = { enable, disable, add, remove, status, start: (_, e) => start(e), stop: (_, e) => stop(e), restart: (_, e) => restart(e) };
- if (!Object.hasOwn(verbs, verb)) { err(`Unknown rer door command: ${verb}. Run rer door --help.`); return 2; }
- if (['start', 'stop', 'restart'].includes(verb) && rest.length) { err(`rer door ${verb} takes no arguments.`); return 2; }
+ if (!Object.hasOwn(verbs, verb)) { err(`Unknown ~/.local/bin/rer door command: ${verb}. Run ~/.local/bin/rer door --help.`); return 2; }
+ if (['start', 'stop', 'restart'].includes(verb) && rest.length) { err(`~/.local/bin/rer door ${verb} takes no arguments.`); return 2; }
  try { return await verbs[verb](rest, env); }
  catch (error) { if (error instanceof DoorFailure || error.exitCode) { err(error.message); return error.exitCode ?? 1; } throw error; }
 }

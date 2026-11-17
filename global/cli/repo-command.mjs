@@ -1,3 +1,4 @@
+import { withCommandHelp } from '../../cli/command-guidance.mjs';
 import { realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse } from '../../cli/parse.mjs';
@@ -18,7 +19,7 @@ export async function repoCommand(request) {
  if (installed !== 0) return installed;
  await checkoutRepository(request);
  const root = await realpath(request.root);
- const next = command => `cd ${shellQuote(directory)} && rer ${command}`;
+ const next = command => `cd ${shellQuote(directory)} && ~/.local/bin/rer ${command}`;
  if (verb === 'setup') {
   await (await import('../../cli/business/carry.mjs')).refreshCheckout(root);
   const state = await launchDirectory(root), children = new Set(), controller = new AbortController();
@@ -34,7 +35,7 @@ export async function repoCommand(request) {
    await log.close();
   }
  } else {
-  if (verb === 'dev' && !args.includes('--json')) process.stdout.write(`Restart: ${next('dev')}\n`);
+  if (verb === 'dev' && !args.includes('--json')) process.stdout.write(withCommandHelp(`Restart: ${next('dev')}`) + '\n');
   const entry = join(ownRoot, 'global/rer.mjs');
   const code = await runCommand(process.execPath, [entry, verb, ...args], { cwd: root,
    ...(verb === 'dev' ? { onInterrupt: () => runCommand(process.execPath, [entry, 'dev', '--stop'], { cwd: root }) } : {}),
@@ -43,7 +44,7 @@ export async function repoCommand(request) {
  }
  if (verb !== 'dev') {
   const command = next(verb === 'install' ? 'setup' : 'dev');
-  process.stdout.write(args.includes('--json') ? JSON.stringify({ version: 1, verb, event: 'next', command }) + '\n' : `Next: ${command}\n`);
+  process.stdout.write(args.includes('--json') ? JSON.stringify({ version: 1, verb, event: 'next', command }) + '\n' : withCommandHelp(`Next: ${command}`) + '\n');
  }
  return 0;
 }

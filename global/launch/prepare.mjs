@@ -31,11 +31,11 @@ export async function prepare({ root, args, setupArgs = [], env, report, directo
  // pinned package's verbs.
  let installed = false;
  if (pinnedPackage(root)?.ready === false) {
-  if (doorStart) throw new LaunchFailure(3, `${root} is not installed, and the front door starts only prepared checkouts. Run rer dev in it once.`);
+  if (doorStart) throw new LaunchFailure(3, `${root} is not installed, and the front door starts only prepared checkouts. Run ~/.local/bin/rer dev in it once.`);
   const current = await pinPolicy(root, 'package');
   report({ phase: 'check', message: 'checking the server limit' });
   const capacity = await checkCapacity(await realpath(root), { ...env, ...personEnvironment(env, args, current) }, current);
-  if (capacity.own) throw new LaunchFailure(3, `A server of ${root} is running, but its node_modules lacks the rer version it pins. Stop it with rer dev --stop, then run rer dev again.`);
+  if (capacity.own) throw new LaunchFailure(3, `A server of ${root} is running, but its node_modules lacks the rer version it pins. Stop it with ~/.local/bin/rer dev --stop, then run ~/.local/bin/rer dev again.`);
   report({ phase: 'install', message: 'installing dependencies' });
   await recorded(directory, installState, () => installPinned(root, { env, output: text => log(text.trimEnd()), children, signal }));
   installed = true;
@@ -56,7 +56,7 @@ export async function prepare({ root, args, setupArgs = [], env, report, directo
  // Repository setup can supply the same owner/answer inputs as checkout setup.
  const extraSetup = setupArgs.filter((arg, i) => !['--json', '--non-interactive', '--port', '--host', '--door', '--owner-email'].includes(arg) && !['--port', '--host', '--owner-email'].includes(setupArgs[i - 1]));
  const ownerArgs = flagValue(setupArgs, '--owner-email') ? ['--owner-email', flagValue(setupArgs, '--owner-email')] : [];
- const unprepared = what => new LaunchFailure(3, `${checkout} is not ${what}, and the front door starts only prepared checkouts. Run rer dev in it once.`);
+ const unprepared = what => new LaunchFailure(3, `${checkout} is not ${what}, and the front door starts only prepared checkouts. Run ~/.local/bin/rer dev in it once.`);
  if (!installed && await needsInstall(root, await installState.read(directory))) {
   if (doorStart) throw unprepared('installed');
   report({ phase: 'install', message: 'installing dependencies' });

@@ -169,7 +169,7 @@ async function packageClauses(root, pkg) {
  }
  // Delivery operations, the scripts they run and CI workflows call the package too.
  const calls = await vendoredCalls(root);
- clauses.push(['SC-13.package.calls', !calls.length, `Run pnpm exec rer VERB instead of the removed vendored copy (pnpm install --frozen-lockfile first where nothing has installed yet) in ${calls.length} place${calls.length === 1 ? '' : 's'}:\n${calls.slice(0, 20).join('\n')}${calls.length > 20 ? `\n...and ${calls.length - 20} more` : ''}`]);
+ clauses.push(['SC-13.package.calls', !calls.length, `Run pnpm exec ~/.local/bin/rer VERB instead of the removed vendored copy (pnpm install --frozen-lockfile first where nothing has installed yet) in ${calls.length} place${calls.length === 1 ? '' : 's'}:\n${calls.slice(0, 20).join('\n')}${calls.length > 20 ? `\n...and ${calls.length - 20} more` : ''}`]);
  return clauses;
 }
 
@@ -287,7 +287,7 @@ export function doctorSummary(result) {
  if (result.missingInputs.length) {
   lines.push('Missing local inputs:');
   for (const name of result.missingInputs) lines.push(`  ${name}${result.sources[name] ? `: ${result.sources[name]}` : ''}`);
-  if (result.setupNeeded) lines.push('Run rer setup to configure this checkout.');
+  if (result.setupNeeded) lines.push('Run ~/.local/bin/rer setup to configure this checkout.');
  }
  const unavailable = result.operations.commands.filter(command => !command.available);
  if (unavailable.length) lines.push('Unavailable command inputs:', ...unavailable.map(command => `  ${command.name}: restore its declared input files.`));
@@ -316,6 +316,6 @@ async function devIdentityClauses(root, adapter) {
  const configs = (await Promise.all(['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs', 'wrangler.local.jsonc', 'wrangler.local.json', 'wrangler.local.toml'].map(text))).filter(Boolean);
  return [
   ['SC-05.dev-identity.entry', entry && await text(entry) !== null && entry !== main && configs.some(config => config.includes(entry)), 'Declare devIdentity.entry as an existing local-only Worker entry that the local Vite or wrangler configuration loads and that is not the deployed main.'],
-  ['SC-05.dev-identity.exclusion', production !== null && !/operator-auth\/dev\//.test(production) && !production.includes(entry.replace(/\.[a-z]+$/, '')) && Array.isArray(declaration.output) && declaration.output.length > 0, 'Keep the deployed main free of the dev layer and its local entry, and declare devIdentity.output so rer build refuses output containing the dev layer.'],
+  ['SC-05.dev-identity.exclusion', production !== null && !/operator-auth\/dev\//.test(production) && !production.includes(entry.replace(/\.[a-z]+$/, '')) && Array.isArray(declaration.output) && declaration.output.length > 0, 'Keep the deployed main free of the dev layer and its local entry, and declare devIdentity.output so ~/.local/bin/rer build refuses output containing the dev layer.'],
  ];
 }

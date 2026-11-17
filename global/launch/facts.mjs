@@ -16,7 +16,7 @@ export async function describeCheckout(root, entry, env, signal) {
   return JSON.parse(stdout);
  } catch (error) {
   if (signal?.aborted) throw signal.reason;
-  throw new LaunchFailure(error.code ?? 1, (error.stderr?.trim() || `rer describe failed in ${root}.`));
+  throw new LaunchFailure(error.code ?? 1, (error.stderr?.trim() || `~/.local/bin/rer describe failed in ${root}.`));
  }
 }
 
@@ -59,5 +59,5 @@ export async function freePort(ports, claim, env = process.env) {
  const held = new Set(ports.filter(Boolean));
  const found = await searchPort({ host: '127.0.0.1', from, hosts: ['127.0.0.1', '::1'], skip: port => held.has(port), claim, verb: 'dev' });
  if (found.port !== undefined) return found;
- throw new LaunchFailure(4, `No free port from ${found.range[0]} to ${found.range[1]}: all ${found.tried} ports tried were in use. Stop something that holds one, or pass rer dev --port PORT with a free port.`);
+ throw new LaunchFailure(4, `No free port from ${found.range[0]} to ${found.range[1]}: all ${found.tried} ports tried were in use. Stop something that holds one, or pass ~/.local/bin/rer dev --port PORT with a free port.`);
 }

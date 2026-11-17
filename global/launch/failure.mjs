@@ -18,7 +18,7 @@ export function workerFailure(error, { root, env = process.env }) {
   : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, clean(item)])) : value;
  const exitCode = Number.isInteger(error?.exitCode) && error.exitCode > 0 && error.exitCode <= 255 ? error.exitCode : 1;
  const cause = redact(error?.message || error || 'The launch stopped before the app was ready.');
- const retry = `rer dev --cwd '${root.replaceAll("'", "'\\''")}'`;
+ const retry = `~/.local/bin/rer dev --cwd '${root.replaceAll("'", "'\\''")}'`;
  const message = `${cause}\nCorrect the cause, then run ${retry} again.`;
  const event = { version: 1, verb: 'dev', event: 'error', code: 'launch_failed', ...clean(error?.event), message, exitCode };
  return new LaunchFailure(exitCode, message, event);

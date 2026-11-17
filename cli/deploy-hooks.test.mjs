@@ -348,7 +348,7 @@ test('custom deploy retries one reset before HTTP status and names a second rese
     assert.match(error.message,/GET \/workers\/subdomain/);
     assert.match(error.message,/https:\/\/api\.cloudflare\.com\/client\/v4\/accounts\/\[REDACTED\]\/workers\/subdomain/);
     assert.match(error.message,/before any HTTP status after 2 attempts: ECONNRESET/);
-    assert.match(error.message,/run rer deploy --environment production --env-file owner.env again/);
+    assert.match(error.message,/run ~\/\.local\/bin\/rer deploy --environment production --env-file owner.env again/);
     for (const value of [f.provider.accountId,f.provider.token,'private-password','private-signature','private-fragment']) assert.ok(!error.message.includes(value));
     return true;
    });
@@ -373,7 +373,7 @@ test('custom deploy retries a queue create only when its connection failed befor
    assert.equal(attempts,2);
    assert.equal(f.provider.state.queues.length,1);
   } else {
-   await assert.rejects(f.run(), error => /POST \/queues/.test(error.message) && /after 2 attempts: ECONNREFUSED/.test(error.message) && /run rer deploy --environment production --env-file owner.env again/.test(error.message));
+   await assert.rejects(f.run(), error => /POST \/queues/.test(error.message) && /after 2 attempts: ECONNREFUSED/.test(error.message) && /run ~\/\.local\/bin\/rer deploy --environment production --env-file owner.env again/.test(error.message));
    assert.equal(attempts,2);
    assert.equal(f.provider.state.queues.length,0);
   }
@@ -435,7 +435,7 @@ test('a refused pre-hook settle names its cause and the step, and still stops be
   assert.equal(error.exitCode, 1);
   assert.match(error.message, /owner-state-locked/);
   assert.match(error.message, /Failed at settle the recorded secret change/);
-  assert.match(error.message, /run rer deploy --environment production --env-file owner.env again/);
+  assert.match(error.message, /run ~\/\.local\/bin\/rer deploy --environment production --env-file owner.env again/);
   assert.doesNotMatch(error.message, /pnpm|capture log/);
   return true;
  });
@@ -457,7 +457,7 @@ test('missing or ambiguous ownership records refuse success, and denied bootstra
  f.deny(); await assert.rejects(f.run(), error => {
   assert.match(error.message, /owner claim is not confirmed/);
   assert.match(error.message, /POST \/auth\/bootstrap returned HTTP 403 \(owner_claim_denied\)/);
-  assert.match(error.message, /run rer deploy/);
+  assert.match(error.message, /run ~\/\.local\/bin\/rer deploy/);
   return true;
  });
  assert.equal(f.claims.length, 1); assert.ok(f.provider.state.secrets.some(item => item.name === 'SETUP_TOKEN'));
@@ -604,7 +604,7 @@ test('a function owner hook failing after bootstrap names its last hosted call',
  });
  await assert.rejects(f.run(), error => {
   assert.match(error.message,/GET \/setup returned HTTP 503 \(setup_unavailable\)/);
-  assert.match(error.message,/run rer deploy/);
+  assert.match(error.message,/run ~\/\.local\/bin\/rer deploy/);
   return true;
  });
 });

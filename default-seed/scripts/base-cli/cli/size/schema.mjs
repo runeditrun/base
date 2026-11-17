@@ -42,7 +42,7 @@ export async function schemasFromBuild(root, { wrangler = defaultBuild.wrangler 
   const file = join(root, wrangler), build = dirname(file);
   let config;
   try { config = JSON.parse(await readFile(file, 'utf8')); }
-  catch { throw missing(`No production build at ${wrangler}. Run rer build, or point --migrations at a directory of D1 migrations.`); }
+  catch { throw missing(`No production build at ${wrangler}. Run ~/.local/bin/rer build, or point --migrations at a directory of D1 migrations.`); }
   const schemas = [];
   for (const item of config.d1_databases ?? []) {
     const directory = resolve(build, item.migrations_dir ?? 'migrations');

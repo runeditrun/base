@@ -96,7 +96,7 @@ test('an archive made before later additive migrations restores into the upgrade
  const occupied = await seed.run(['import', '--input', 'exports/settings.rer', '--yes'], 4);
  const refusal=occupied.find(event => event.event === 'error').message;
  assert.match(refusal,/empty installation/);
- assert.match(refusal,/rer reset --yes and rer import --input exports\/settings\.rer --yes/);
+ assert.match(refusal,/rer reset --yes and ~\/\.local\/bin\/rer import --input exports\/settings\.rer --yes/);
  assert.doesNotMatch(refusal,/app_settings/);
  assert.deepEqual((await seed.data(settings))[0].results, [{ key: 'currency', value: 'USD' }, { key: 'locale', value: 'en-AU' }, defaults[1]]);
 });

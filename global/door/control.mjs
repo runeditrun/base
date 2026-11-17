@@ -16,10 +16,10 @@ export class DoorFailure extends Error { constructor(exitCode, message) { super(
 
 export async function startDoor(env = process.env) {
  const state = await readDoorState(env);
- if (!state?.door?.enabled) throw new DoorFailure(3, 'The front door is not enabled on this computer. Enable it with: rer door enable');
+ if (!state?.door?.enabled) throw new DoorFailure(3, 'The front door is not enabled on this computer. Enable it with: ~/.local/bin/rer door enable');
  const running = await runningDoor(env);
  if (running) {
-  if (running.protocol !== doorProtocol) throw new DoorFailure(4, `A front door speaking protocol ${running.protocol} is running (PID ${running.pid}); this rer speaks protocol ${doorProtocol}. Run rer door restart.`);
+  if (running.protocol !== doorProtocol) throw new DoorFailure(4, `A front door speaking protocol ${running.protocol} is running (PID ${running.pid}); this rer speaks protocol ${doorProtocol}. Run ~/.local/bin/rer door restart.`);
   return { door: running, already: true };
  }
  const door = state.door, directory = await prepareDoorDirectory(env), logPath = join(directory, 'logs', 'door.log');
@@ -38,7 +38,7 @@ export async function startDoor(env = process.env) {
    if (failed) throw new DoorFailure(1, `The front door could not be started: ${failed.code ?? failed.message}.`);
    // Another start (a rer dev bringing the door back) won the port: use that door.
    if (record?.protocol === doorProtocol) { await verifyDoor(env, record.port); return { door: record, already: true }; }
-   const text = (await readFile(logPath, 'utf8')).slice(from).split('\n').filter(line => line.startsWith('rer door: ')).map(line => line.slice('rer door: '.length));
+   const text = (await readFile(logPath, 'utf8')).slice(from).split('\n').filter(line => line.startsWith('~/.local/bin/rer door: ')).map(line => line.slice('~/.local/bin/rer door: '.length));
    throw new DoorFailure(exited === 4 ? 4 : 1, text.join('\n') || `The front door stopped while starting (exit ${exited}); see ${logPath}.`);
   }
   await delay(100);
