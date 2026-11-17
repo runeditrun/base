@@ -124,7 +124,7 @@ Local operator mail requires `MAIL_PROVIDER=development`: some adopting seeds
 select a real sender for hosted values even with local authentication enabled.
 A hosted mail-off declaration (`none`, public settings and `mailOffSignIn`)
 describes hosted behavior and does not establish a seed's local mail behavior.
-Setup refuses a newly supplied hosted choice by field name and accepted value;
+Fresh setup refuses a hosted choice by field name and accepted value;
 ordinary repeat `rer setup` repairs an already stored unsupported mail value to
 `development`, preserving the owner, secrets and data. Hosted mail settings
 remain in the deployment declaration and hosted environment.
