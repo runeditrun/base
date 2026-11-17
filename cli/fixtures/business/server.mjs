@@ -147,6 +147,21 @@ export async function server(t, { businessId = 'biz' } = {}) {
    object(body);
    const route = request.url;
    state.requests.push({ route, body, authorization: request.headers.authorization, method: request.method });
+   // Compose the agent MCP fixture with this fixture's real pairing lifecycle.
+   if (state.agentOrigin && ['/api/business/executors/token', '/api/business/mcp'].includes(route)) {
+    const result = await fetch(state.agentOrigin + route, { method: request.method, headers: request.headers, body: raw });
+    response.statusCode = result.status; return response.end(await result.text());
+   }
+   if (state.commandCredential && route.startsWith('/api/business/executors/cloudflare-token')) {
+    requireDevice(request);
+    if (route === '/api/business/executors/cloudflare-token') {
+     state.commandLease = { lease_id: body.lease_id, grant_id: body.grant_id, business_id: businessId, executor_id: 'executor1', account_id: 'a'.repeat(32), credential_expires_at: later(600), cleanup_status: 'active', provider_credential_revoked: false };
+     return send({ ...state.commandLease, credential: state.commandCredential });
+    }
+    requireValue(route === `/api/business/executors/cloudflare-token/${state.commandLease?.lease_id}/revoke`);
+    state.commandLease = { ...state.commandLease, cleanup_status: 'revoked', provider_credential_revoked: true };
+    return send(state.commandLease);
+   }
    if (route === '/api/business/executors/self') {
     requireDevice(request);
     // Like the platform, the first device-authenticated request activates the

@@ -1,5 +1,6 @@
 import { Api } from './api.mjs';
 import { createCredentialStore } from './keychain.mjs';
+import { credentialLocation } from './credential-file.mjs';
 import { deviceCredentialHandle, loadState } from './state.mjs';
 import { localCause } from './errors.mjs';
 import { carryCheckouts, firstParty, writeCarry } from './carry-files.mjs';
@@ -31,7 +32,7 @@ function warning(origin, error, checkout, report = true) {
  const reason = error.status ? `the server refused the request (HTTP ${error.status})`
   : error.name === 'TimeoutError' || error.name === 'AbortError' ? 'the server did not answer within 5 seconds'
   : error.message?.startsWith('Could not reach the Business server at ') ? 'the server is unreachable'
-  : error.message === 'credential unavailable' ? 'the Business credential is unavailable in OS credential storage'
+  : error.message === 'credential unavailable' ? `the Business credential is unavailable in ${credentialLocation()}`
   : error.preparation ? error.message
   : localCause(error) ?? (['the response names another Business', 'the Business profile is invalid', 'the checkout is not first-party', 'the carry path is linked or not a regular file', 'the existing file is not a carry for this paired Business', 'the carry registry is invalid', 'the checkout is not set up yet: run rer setup'].includes(error.message) ? error.message : 'the Business profile could not be refreshed');
  const step = error.code === 'ENOENT' ? ' Open the app with rer dev --cwd FOLDER, then run business next again.' : '';
