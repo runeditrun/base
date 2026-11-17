@@ -83,6 +83,8 @@ Before starting, stderr shows the credential's UTC expiry and minutes remaining
 (rounded up). At expiry the command is interrupted and says: run it again to resume.
 The reported caller exit status keeps the child's code or terminating signal
 (normally SIGTERM, shell status 143); a child that handles it keeps its own code.
+A refused exchange starts nothing and exits 1. When Business says why (a pending
+grant's gap), stderr prints it on one line after "Not started:".
 
 Usage: rer business run [--once]
 Work this computer's tasks (the folder scan the owner allows) and check in every

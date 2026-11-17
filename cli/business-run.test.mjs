@@ -47,6 +47,29 @@ test('business run refuses unavailable authority without spawning or retrying an
  assert.equal(f.state.issued,2,'cleanup never reissues a credential');
 });
 
+test('business run names the exchange gap once, with only the pending state and catalogue counts, and keeps its refusal exit',async t=>{
+ const f=await fixture(t),gap='Cloudflare cannot issue the exact selected account permissions with this consent. The grant remains pending.';
+ // The real 409 carries lease fields and a catalogue shape well past 4 KB; none of it but the gap and two counts may print.
+ const groups=Array.from({length:40},(_,index)=>({name:`Workers Scripts Write ${index}`,id_length:36,id_form:'not 32 hex',scopes:['com.cloudflare.api.account.zone'],is_selectable:false,other_keys:['category']}));
+ const expiry=new Date(Date.now()+60000).toISOString(),others={account_id:account,credential:secret,credential_expires_at:expiry,cleanup_status:'unconfirmed',provider_credential_revoked:false,error:'server-prose-marker',requestId:'request-marker-1'};
+ for(const state of ['pending','refused']){
+  f.state.answer={status:409,body:{state,gap,catalogue:{rows:93,workers_rows:7,more_pages:'unknown',groups},...others}};
+  assert.ok(JSON.stringify(f.state.answer.body).length>4096);
+  const result=await f.run([process.execPath,'-e','console.log("SHOULD-NOT-RUN")']),output=result.stdout+result.stderr;
+  assert.equal(result.code,1);assert.ok(!output.includes('SHOULD-NOT-RUN'));
+  assert.equal(output.split(gap).length,2,'the gap is printed once');
+  assert.equal(/stays pending; nothing was issued/.test(output),state==='pending');
+  assert.match(output,/catalogue: 93 rows, 7 mention Workers \(see the audit row cloudflare\.token\.catalogue\)/);
+  assert.ok(!output.includes('refused or its credential exchange failed'));
+  for(const value of [secret,account,device,expiry,'server-prose-marker','request-marker-1','Workers Scripts Write','not 32 hex','category','more_pages'])assert.ok(!output.includes(value),value);
+ }
+ f.state.answer={status:409,body:{...others,error:'This command lease was already requested.',code:'cloudflare_command_already_requested'}};
+ const result=await f.run([process.execPath,'-e','console.log("SHOULD-NOT-RUN")']),output=result.stdout+result.stderr;
+ assert.equal(result.code,1);assert.match(output,/refused or its credential exchange failed/);
+ for(const value of ['Not started','already requested',secret,expiry,'request-marker-1'])assert.ok(!output.includes(value),value);
+ assert.equal(f.state.issued,3);
+});
+
 test('business run forwards signals and enforces credential expiry, then revokes before exiting with the child signal',async t=>{
  const f=await fixture(t);
  for(const signal of ['SIGINT','SIGTERM']){

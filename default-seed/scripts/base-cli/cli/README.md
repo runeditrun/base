@@ -857,3 +857,14 @@ needs the original pairing, but does not require the removed deploy action or an
 active grant. No child token is saved in state, OS storage, logs or MCP output.
 
 Expiry guidance: Codex, 17 November 2026.
+
+When the exchange refuses, the command never starts and the wrapper exits 1.
+If Business names why, stderr shows one line: `Not started:` and Business's gap
+sentence, then `The grant stays pending; nothing was issued.` for a pending
+grant. When the refusal carries the Cloudflare permission catalogue's shape,
+the line ends with its two counts only, for example
+`catalogue: 93 rows, 7 mention Workers (see the audit row cloudflare.token.catalogue)`;
+the rows themselves stay in that audit row. No other part of the refusal is
+printed. Without a gap, the general refusal line names what to check in Business.
+
+Signed: Run Edit Run fleet, 2026-11-17.

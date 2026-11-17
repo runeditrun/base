@@ -24,9 +24,10 @@ export class ApiError extends Error {
  }
 }
 
-async function refusal(response, quiet = false) {
+async function refusal(response, quiet = false, detail) {
  let text = '';
- try { text = (await response.text()).slice(0, 4096); } catch { /* The status alone is the reason. */ }
+ // A caller that reads its own detail gets the platform's whole error envelope (at most 64 KB); others read 4 KB.
+ try { text = (await response.text()).slice(0, detail ? 65_536 : 4096); } catch { /* The status alone is the reason. */ }
  let body = null;
  try { body = JSON.parse(text); } catch { /* A plain-text reason is used as it is. */ }
  const line = value => typeof value === 'string' && value.trim() ? redact(value).replace(/\s+/g, ' ').trim().slice(0, 300) : null;
@@ -35,8 +36,11 @@ async function refusal(response, quiet = false) {
  const code = typeof body?.code === 'string' && /^[a-z][a-z0-9_]{0,79}$/.test(body.code) ? body.code : null;
  // Pairing responses can echo secrets, including the short user code. Only
  // the bounded machine code is needed by that flow, never server prose.
- return new ApiError(response.status, quiet ? null : reason, quiet ? null : requestId, code,
+ const error = new ApiError(response.status, quiet ? null : reason, quiet ? null : requestId, code,
   quiet ? {} : { state: body?.state === 'waiting_for_owner' ? body.state : undefined, link: line(body?.link) });
+ // Only the fields the caller picks and bounds travel with the error, never the body itself.
+ if (detail && body && typeof body === 'object' && !Array.isArray(body)) error.detail = detail(body);
+ return error;
 }
 
 const network = {
@@ -68,12 +72,12 @@ export class Api {
    || !Number.isFinite(Date.parse(result.expires_at)) || Date.parse(result.expires_at) <= Date.now()) throw Error('Business server returned an invalid scoped bearer.');
   return result;
  }
- async post(path, body, { token = this.credential, signal, timeout = 30_000, headers = {}, withStatus = false, quiet = false } = {}) {
-  return this.request('POST', path, body, { token, signal, timeout, headers, withStatus, quiet });
+ async post(path, body, { token = this.credential, signal, timeout = 30_000, headers = {}, withStatus = false, quiet = false, detail } = {}) {
+  return this.request('POST', path, body, { token, signal, timeout, headers, withStatus, quiet, detail });
  }
  async get(path) { return this.request('GET', path); }
  async delete(path) { return this.request('DELETE', path); }
- async request(method, path, body, { token = this.credential, signal, timeout = 30_000, headers = {}, withStatus = false, quiet = false } = {}) {
+ async request(method, path, body, { token = this.credential, signal, timeout = 30_000, headers = {}, withStatus = false, quiet = false, detail } = {}) {
   if (!path.startsWith('/api/business/') || path.includes('..') || path.includes('?') || path.includes('#')) throw Error('Invalid Business route.');
   let response;
   try {
@@ -83,7 +87,7 @@ export class Api {
     ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout),
    });
   } catch (error) { if (signal?.aborted) throw signal.reason; throw unreachable(this.origin, error); }
-  if (!response.ok) throw await refusal(response, quiet);
+  if (!response.ok) throw await refusal(response, quiet, detail);
   // Successful bodies are untrusted: callers validate them and print only fields they template.
   if (response.status === 202 && response.headers.get('content-length') === '0' || response.status === 204) return null;
   const text = await response.text();
