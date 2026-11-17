@@ -148,6 +148,7 @@ export async function prepareSettings(context, hooks) {
  try {
   context.origin = await chooseOrigin(context, hooks);
   context.vars = await moveSavedOrigin(context, hooks.secrets, await writeSecrets(context, hooks.secrets));
+  await hooks.secrets.afterWrite?.(context);
  } finally { await operation.release(); }
 }
 

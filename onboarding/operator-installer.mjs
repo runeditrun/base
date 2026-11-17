@@ -16,10 +16,10 @@ export function operatorInstaller({ database, features, prepare, prepareData }) 
   prepareData,
   guard: async ({ root }) => { await selectLocalState(root); },
   secrets: {
-   keepExisting: true, originKey: 'AUTH_ORIGIN',
+   keepExisting: true, originKey: 'AUTH_ORIGIN', afterWrite: repairOperatorMail,
    values: ({ origin }) => ({ AUTH_LOCAL: 'true', AUTH_ORIGIN: origin, MAIL_PROVIDER: 'development', MAIL_FROM: 'auth@localhost.test' }),
   },
-  build: async context => { await repairOperatorMail(context); return ['pnpm', ['run', '--silent', 'build:app']]; },
+  build: ['pnpm', ['run', '--silent', 'build:app']],
   migrate: context => migrateOperator(context, database),
   // Setup uses the local entry for owner-side dependency approval without mail.
   start: developmentTarget,
