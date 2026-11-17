@@ -27,8 +27,15 @@ export const deployPermissions = declaration => permissions.filter(([, used]) =>
 // Where a person gets the Cloudflare values: the project's guide, else the token page and the permissions.
 function credentialHelp(declaration) {
  const guide = deployGuide(declaration);
+ if (process.env.RER_BUSINESS_GRANT) return [
+  'This run uses a company grant; no API token needs to be created',
+  `Required account permissions: ${deployPermissions(declaration).join(', ')}.`,
+ ];
  if (guide) return [`Follow this project's deploy guide: ${guide}`];
- return [`Create an account API token at ${tokenPage} with these account permissions: ${deployPermissions(declaration).join(', ')}. Copy your account ID from the Cloudflare dashboard.`];
+ return [
+  `Create an account API token at ${tokenPage} with these account permissions: ${deployPermissions(declaration).join(', ')}. Copy your account ID from the Cloudflare dashboard.`,
+  'Or run rer business run --grant <id> -- rer deploy ...; CLOUDFLARE_ACCOUNT_ID and a scoped API token arrive automatically.',
+ ];
 }
 
 export function missingCredentialsMessage(declaration, env, { dryRun = false, signIn } = {}) {

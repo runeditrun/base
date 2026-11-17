@@ -20,7 +20,9 @@ export async function fixture(t, {fileBacked = false} = {}) {
    if(state.answer)return json(state.answer.status,{...state.answer.body,lease_id:body.lease_id,grant_id:body.grant_id});
    const lease={lease_id:body.lease_id,grant_id:body.grant_id,business_id:'business',executor_id:'computer',account_id:account,credential_expires_at:new Date(Date.now()+state.expiryMs).toISOString(),cleanup_status:'active',provider_credential_revoked:false};
    const credential=state.credential??secret;
-   state.leases.set(lease.lease_id,lease);state.credentials.set(lease.lease_id,credential);return json(200,{...lease,credential});
+   state.leases.set(lease.lease_id,lease);state.credentials.set(lease.lease_id,credential);
+   if(state.exchangeFails)return json(500,{error:'exchange acknowledgement lost'});
+   return json(200,{...lease,credential});
   }
   const id=req.url.slice(root.length+1).split('/')[0],lease=state.leases.get(id);
   if(!lease)return json(404,{error:'no such command'});

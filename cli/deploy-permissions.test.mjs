@@ -21,7 +21,20 @@ function assertPermissions(text, expected) {
  for (const permission of permissions) assert.equal(text.includes(permission), expected.includes(permission), `${permission}: ${text}`);
 }
 
-async function fixture(t, resources) {
+function assertCredentialHelp(text, expected, grant) {
+ assertPermissions(text, expected);
+ if (grant) {
+  assert.ok(text.includes('This run uses a company grant; no API token needs to be created'), text);
+  assert.ok(!text.includes('https://dash.cloudflare.com/profile/api-tokens'), text);
+  assert.doesNotMatch(text, /Create an account API token/);
+ } else {
+  assert.ok(text.includes('https://dash.cloudflare.com/profile/api-tokens'), text);
+  assert.ok(text.includes('rer business run --grant <id> -- rer deploy ...'), text);
+  assert.match(text, /CLOUDFLARE_ACCOUNT_ID and a scoped API token arrive automatically/);
+ }
+}
+
+async function fixture(t, resources, grant) {
  const { root, git } = await checkout(t, { project: 'synthetic-base-1', secrets: [], ...resources });
  // A Worker without D1 has no SQL to package into a DB binding.
  if (!resources.d1.length) await rm(join(root, 'migrations/core/0001_owner.sql'));
@@ -45,8 +58,9 @@ globalThis.fetch=async()=>{appendFileSync(${JSON.stringify(requests)},'request\\
   writeFile(join(root, 'deploy.env'), 'CLOUDFLARE_ACCOUNT_ID=synthetic-base-2\nCLOUDFLARE_API_TOKEN=synthetic-base-3\n', { mode: 0o600 }),
  ]);
  git('add', '.'); git('commit', '-qm', 'Declare permission guidance fixture');
- const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(?:CLOUDFLARE_|CF_)/.test(name)));
+ const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(?:CLOUDFLARE_|CF_|RER_BUSINESS_GRANT$)/.test(name)));
  Object.assign(env, { CI: 'true', HOME: root, NODE_OPTIONS: [env.NODE_OPTIONS, `--import=${pathToFileURL(network).href}`].filter(Boolean).join(' ') });
+ if (grant) env.RER_BUSINESS_GRANT = 'synthetic-company-grant';
  return {
   root,
   async run(args, expectedExit = 0) {
@@ -55,29 +69,28 @@ globalThis.fetch=async()=>{appendFileSync(${JSON.stringify(requests)},'request\\
    const text = result.stdout + result.stderr;
    assert.equal(result.code, expectedExit, text);
    assert.equal(await readFile(requests, 'utf8'), '', 'permission guidance makes no provider request');
+   for (const credential of ['synthetic-base-2', 'synthetic-base-3']) assert.ok(!text.includes(credential), 'credential values stay private');
    return { ...result, text };
   },
  };
 }
 
-for (const { name, resources, expected } of cases) {
- test(`public deploy permission guidance follows ${name}`, async t => {
-  const seed = await fixture(t, resources);
+for (const { name, resources, expected } of cases) for (const grant of [false, true]) {
+ test(`public deploy permission guidance follows ${name} ${grant ? 'with' : 'without'} a company grant`, async t => {
+  const seed = await fixture(t, resources, grant);
   const dry = await seed.run(['--dry-run']);
   const planLine = dry.text.split('\n').find(line => line.includes('Cloudflare token permissions:'));
   assert.ok(planLine, dry.text);
   assertPermissions(planLine, expected);
   const needed = dry.text.slice(dry.text.indexOf('Needed for a real deploy'));
-  assertPermissions(needed, expected);
-  assert.ok(needed.includes('https://dash.cloudflare.com/profile/api-tokens'), needed);
+  assertCredentialHelp(needed, expected, grant);
 
   const refused = await seed.run(['--json'], 3);
   const events = refused.stdout.trim().split('\n').map(JSON.parse);
   const failure = events.find(event => event.event === 'error');
   assert.ok(failure, refused.text);
-  assertPermissions(failure.message, expected);
+  assertCredentialHelp(failure.message, expected, grant);
   assert.ok(failure.message.includes('CLOUDFLARE_ACCOUNT_ID') && failure.message.includes('CLOUDFLARE_API_TOKEN'), failure.message);
-  assert.ok(failure.message.includes('https://dash.cloudflare.com/profile/api-tokens'), failure.message);
 
   // Supplied credentials suppress the missing-input hint, but the local plan
   // must still explain which permissions a real deployment will exercise.
@@ -85,5 +98,6 @@ for (const { name, resources, expected } of cases) {
   const suppliedPlan = supplied.text.split('\n').find(line => line.includes('Cloudflare token permissions:'));
   assert.ok(suppliedPlan, supplied.text);
   assertPermissions(suppliedPlan, expected);
+  assert.doesNotMatch(supplied.text, /Create an account API token|This run uses a company grant/);
  });
 }
