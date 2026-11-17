@@ -28,6 +28,9 @@ export function rerCommand(env = process.env) {
 // A rer business command the person can paste into another shell, such as a
 // terminal outside an agent sandbox: it names the state folder when one was chosen.
 export function businessCommand(verb, env = process.env) {
- const folder = env.RER_BUSINESS_STATE_DIR;
- return `${folder && !folder.includes('\0') ? `RER_BUSINESS_STATE_DIR=${word(resolve(folder))} ` : ''}${rerCommand(env)} business ${verb}`;
+ const folders = ['RER_BUSINESS_STATE_DIR', 'RER_BUSINESS_CREDENTIAL_DIR'].map(key => {
+  const folder = env[key];
+  return folder && !folder.includes('\0') ? `${key}=${word(resolve(folder))} ` : '';
+ }).join('');
+ return `${folders}${rerCommand(env)} business ${verb}`;
 }
