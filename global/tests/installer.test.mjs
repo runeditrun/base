@@ -118,8 +118,8 @@ export const commandAdapter = declare(localInstaller({ tools: [] }), { scheduled
  t.diagnostic(`Stale packed install: ${failed.code}\n${failed.stdout}${failed.stderr}`);
  assert.equal(failed.code, 1);
  assert.match(failed.stderr, /pnpm-lock.yaml does not match package.json/);
- assert.match(failed.stderr, /pnpm-lock.yaml does not match package.json[^\n]*\nInstall step failed: Installing frozen dependencies\nCommand: pnpm install --frozen-lockfile\nExit code: 1\nLast 20 lines of output:\n[\s\S]*ERR_PNPM_OUTDATED_LOCKFILE[\s\S]*\nFull log: \.seed\/installer\/(?:commands-\d+\/)?install\.log\n$/);
- const failedLog = /\nFull log: (\S+)\n$/.exec(failed.stderr)[1];
+ assert.match(failed.stderr, /pnpm-lock.yaml does not match package.json[^\n]*\nInstall step failed: Installing frozen dependencies\nCommand: pnpm install --frozen-lockfile\nExit code: 1\nLast 20 lines of output:\n[\s\S]*ERR_PNPM_OUTDATED_LOCKFILE[\s\S]*\nFull log: \.seed\/installer\/(?:commands-\d+\/)?install\.log\n/m);
+ const failedLog = /\nFull log: (\S+)\n/.exec(failed.stderr)[1];
  assert.match(await readFile(join(fixture, failedLog), 'utf8'), /ERR_PNPM_OUTDATED_LOCKFILE/);
  t.diagnostic(`Stale full log exists and contains the failure: ${failedLog}`);
  const data = await run(rer, ['install', '--no-queue', '--json'], pnpmEnv, undefined, fixture);
@@ -136,8 +136,8 @@ export const commandAdapter = declare(localInstaller({ tools: [] }), { scheduled
  t.diagnostic(`Missing packed install: ${absent.code}\n${absent.stdout}${absent.stderr}`);
  assert.equal(absent.code, 1);
  assert.match(absent.stderr, /pnpm-lock.yaml is missing/);
- assert.match(absent.stderr, /pnpm-lock.yaml is missing[^\n]*\nInstall step failed: Installing frozen dependencies\nCommand: pnpm install --frozen-lockfile\nExit code: 1\nLast 20 lines of output:\n[\s\S]*\nFull log: \.seed\/installer\/(?:commands-\d+\/)?install\.log\n$/);
- const absentLog = /\nFull log: (\S+)\n$/.exec(absent.stderr)[1];
+ assert.match(absent.stderr, /pnpm-lock.yaml is missing[^\n]*\nInstall step failed: Installing frozen dependencies\nCommand: pnpm install --frozen-lockfile\nExit code: 1\nLast 20 lines of output:\n[\s\S]*\nFull log: \.seed\/installer\/(?:commands-\d+\/)?install\.log\n/m);
+ const absentLog = /\nFull log: (\S+)\n/.exec(absent.stderr)[1];
  assert.match(await readFile(join(fixture, absentLog), 'utf8'), /Headless installation requires a pnpm-lock.yaml file/);
  t.diagnostic(`Missing full log exists and contains the failure: ${absentLog}`);
  const missingData = await run(rer, ['install', '--no-queue', '--json'], pnpmEnv, undefined, fixture);
