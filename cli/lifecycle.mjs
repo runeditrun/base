@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { shared } from './shared.mjs';
 import { tools, doctor } from './inspect.mjs';
 import { availablePort, selectedOrigin, setupInput, stateSafety, refuseLegacyProcess } from './local.mjs';
-import { missing, refuse, RerError, lifecycleError } from './errors.mjs';
+import { missing, refuse, RerError, lifecycleError, retainTransferFailure } from './errors.mjs';
 import { executeDeclared } from './independent.mjs';
 import { transfer } from './transfers.mjs';
 import { runtimeFrontDoor } from './runtime-front-door.mjs';
@@ -172,8 +172,8 @@ async function runLifecycle(project, options, out, deployRedaction) {
   return {};
  } catch (error) {
   failed = true;
-  if (error instanceof RerError) throw error;
-  throw await lifecycleError(error, store);
+  const failure=await lifecycleError(error,store);
+  throw ['export','import'].includes(options.verb) ? retainTransferFailure(failure,store,project.root) : failure;
  } finally {
   // Every closer runs: one that fails must not leave the job-queue policy socket
   // listening (the process would never exit) or the local operation held, and

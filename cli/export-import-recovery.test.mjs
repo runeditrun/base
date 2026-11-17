@@ -287,4 +287,14 @@ test('export and import print progress; a crashed import is cleaned at the next 
  assert.doesNotMatch(native.stdout + native.stderr, /private row content/);
  assert.deepEqual((await seed.data(unfinished))[0].results[0], { job: null, unfinished: 0 });
  assert.deepEqual(await stagingTables(seed), [], 'a failed import drops its staging');
+ await seed.data("CREATE TRIGGER synthetic_export_failure BEFORE INSERT ON rer_portability_jobs WHEN NEW.kind='export' BEGIN SELECT RAISE(FAIL,'private snapshot diagnostic sentinel'); END");
+ try {
+  const snapshot=await seed.text(['export','--output','exports/refused-snapshot.rer'],1);
+  assert.match(snapshot.stderr,/during export_snapshot/);
+  const path=/Full output: (.+)/.exec(snapshot.stderr)?.[1];
+  assert.ok(path,snapshot.stderr);
+  const capture=await readFile(join(seed.root,path),'utf8');
+  assert.match(capture,/transfer_failed:.*during export_snapshot/);
+  assert.doesNotMatch(snapshot.stdout+snapshot.stderr+capture,/private snapshot diagnostic sentinel/);
+ } finally { await seed.data('DROP TRIGGER synthetic_export_failure'); }
 });
