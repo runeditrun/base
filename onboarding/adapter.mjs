@@ -126,7 +126,7 @@ function createContext(root, input, store, onApp, signal, guard) {
    if (guard) await guard(context);
    try { return await store.run(label, command, args, { cwd: root, signal, ...options }); } catch (error) {
     if (signal?.aborted || options.signal?.aborted || isBusyFailure(error)) throw error;
-    throw installationFailure('command_failed', { step, diagnostic: error });
+    throw Object.assign(installationFailure('command_failed', { step, diagnostic: error }), {cause:error});
    }
   },
   fail(step) { return installationFailure('command_failed', { step }); },
@@ -213,7 +213,7 @@ async function start(context, hooks) {
  let child;
  try { child = store.spawn(labels.start, command, args, { cwd: context.root, signal, ...spawnOptions }); } catch (error) {
   if (signal?.aborted) throw error;
-  throw installationFailure('command_failed', { step: 'start', diagnostic: error });
+  throw Object.assign(installationFailure('command_failed', { step: 'start', diagnostic: error }), {cause:error});
  }
  let announcement,detectedMismatch;
  // Keep context after the number: conservative redaction treats a trailing
@@ -231,7 +231,7 @@ async function start(context, hooks) {
  const readinessLabel=runtimePortHandshake?`${labels.start} (waiting for the bound internal listener)`:`${labels.start} (expected internal port ${expectedPort})`;
  const ownedPorts=async()=>{
   try{return await listenerPorts(child.pid);}
-  catch(error){throw installationFailure('command_failed',{step:'start',diagnostic:error});}
+  catch(error){throw Object.assign(installationFailure('command_failed',{step:'start',diagnostic:error}),{cause:error});}
  };
  // A seed can use the managed IPC handshake without developmentTarget's
  // options (Uptime does). Give that real listener/health journey the same
@@ -275,11 +275,11 @@ async function start(context, hooks) {
   }, { signal, timeoutMs: readinessTimeoutMs, ...(softAfterMs ? { softAfterMs } : {}), ...(intervalMs ? { intervalMs } : {}) });
  } catch (error) {
   if (signal?.aborted) throw error;
-  if(detectedMismatch)throw installationFailure('command_failed',{step:'start',diagnostic:error});
+  if(detectedMismatch)throw Object.assign(installationFailure('command_failed',{step:'start',diagnostic:error}),{cause:error});
   if(runtimePortHandshake&&!announcement){
    const prior=approvedFailure(error);
    const message=`No managed listener was announced after ${Math.round(performance.now()-readinessStarted)} ms (allowed ${readinessTimeoutMs} ms). Check the runtime startup output in the log below, correct the startup error, then run ~/.local/bin/rer ${context.verb??'setup'} again.`;
-   throw installationFailure('command_failed',{step:'start',diagnostic:commandFailure(`${message}\n${prior?.message??readinessLabel}`,prior??{})});
+   throw Object.assign(installationFailure('command_failed',{step:'start',diagnostic:commandFailure(`${message}\n${prior?.message??readinessLabel}`,prior??{})}),{cause:error});
   }
   const ports=await ownedPorts();
   if(ports.length){
@@ -287,9 +287,9 @@ async function start(context, hooks) {
    try { diagnosis=await startOriginDiagnostic(context,hooks,child,health,ready); }
    catch (diagnosticError) { if(signal?.aborted)throw diagnosticError; }
    const message=store.redact(diagnosis??`Application listened on port ${ports.join(', ')}; readiness failed for GET ${url} through expected internal port ${expectedPort}. Check application health and the runtime target's port binding.`);
-   store.report(message);const prior=approvedFailure(error);error=commandFailure(`${prior?.message??readinessLabel}\n${message}`,prior??{});
+   store.report(message);const prior=approvedFailure(error);error=Object.assign(commandFailure(`${prior?.message??readinessLabel}\n${message}`,prior??{}),{cause:error});
   }
-  throw installationFailure('command_failed', { step: 'start', diagnostic: error });
+  throw Object.assign(installationFailure('command_failed', { step: 'start', diagnostic: error }), {cause:error});
  } finally { child.removeListener('message',announced); }
  // Another app can take the loopback port between the port check and the bind;
  // its /health would pass. Claim and sign in only against the process this
@@ -298,7 +298,7 @@ async function start(context, hooks) {
  try { ownership=await listenerOwnership(child.pid,expectedPort,context.runtimePort?'127.0.0.1':new URL(url).hostname,inspectionContext({port:expectedPort,verb:context.verb??'setup',signal})); }
  catch(error){
   if (signal?.aborted) throw error;
-  throw installationFailure('command_failed',{step:'start',diagnostic:error});
+  throw Object.assign(installationFailure('command_failed',{step:'start',diagnostic:error}),{cause:error});
  }
  if (ownership.status !== 'owned') {
   const message = (store.redact??(value=>value))(ownership.status==='other'

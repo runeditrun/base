@@ -1,6 +1,7 @@
 import { transferDiagnostic } from '../modules/portability/http-client.mjs';
 import { nativeFailure } from './portability-progress.mjs';
 import { basename, relative } from 'node:path';
+import { getSystemErrorMessage } from 'node:util';
 
 export class RerError extends Error {
  constructor(code, message, exitCode, details = {}) { super(message); Object.assign(this, { code, exitCode, ...details }); }
@@ -38,7 +39,8 @@ function spawnDiagnostic(error) {
    const tool = typeof error.path === 'string' && error.path ? basename(error.path).slice(0, 80).replace(/[\u0000-\u001f\u007f]/g, '') : 'child process';
    const code = /^E[A-Z0-9_]{1,40}$/.test(error.code ?? '') ? error.code : undefined;
    const errno = Number.isSafeInteger(error.errno) && error.errno < 0 ? error.errno : undefined;
-   const reason = errno === -86 ? 'Bad CPU type in executable' : errno === -85 ? 'Executable damaged or invalid' : code === 'ENOENT' ? 'Executable or interpreter not found' : code === 'ENOEXEC' || errno === -8 ? 'Exec format error' : ['EACCES', 'EPERM'].includes(code) ? 'Permission denied' : 'Operating system refused execution';
+   const nativeReason = errno === undefined ? undefined : getSystemErrorMessage(errno);
+   const reason = process.platform === 'darwin' && errno === -86 ? 'Bad CPU type in executable' : process.platform === 'darwin' && errno === -85 ? 'Executable damaged or invalid' : code === 'ENOENT' ? 'Executable or interpreter not found' : code === 'ENOEXEC' ? 'Exec format error' : ['EACCES', 'EPERM'].includes(code) ? 'Permission denied' : nativeReason ? nativeReason[0].toUpperCase() + nativeReason.slice(1) : 'Operating system refused execution';
    return `Could not run ${tool}: ${reason} (${[code, errno === undefined ? undefined : `spawn errno ${errno}`].filter(Boolean).join('; ') || 'spawn failed'}).`;
   }
   error = error.cause;
