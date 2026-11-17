@@ -17,7 +17,7 @@ export async function expiryDeploy(t) {
   secrets: ['SETUP_TOKEN','OWNER_EMAIL','SESSION_SECRET'].map(binding => ({binding,environment:binding})),
  });
  const statePath = join(root,'.rer/deploy/production.json');
- let barrier, reached = false;
+ let barrier, reached = false, listingReads = 0, terminateWait, terminatedAt;
  const held = new Set(), authorities = [];
  const edge = createServer(async (request, response) => {
   try {
@@ -40,8 +40,16 @@ export async function expiryDeploy(t) {
     else { db.prepare('INSERT INTO owner(id) VALUES (?)').run('owner@example.test'); reply = new Response(null,{status:303}); }
    } else if (destination.pathname === '/api/identity/setup-status') reply = Response.json({setupRequired:!provider.state.databases[0]?.db.prepare('SELECT id FROM owner').get()});
    else reply = await provider.fetch(destination.href,{method,headers,redirect:request.headers['x-test-redirect'],...(!['GET','HEAD'].includes(method)?{body}:{})});
+   // Return a complete but lagging list until the deploy is in its four-second
+   // polling wait. TERM then proves the wait itself is cancellable.
+   if (barrier === 'listing-wait' && path === '/d1/database' && method === 'GET' && provider.state.databases.length) {
+    reply = Response.json({success:true,errors:[],result:[],result_info:{page:1,total_count:0,total_pages:1}});
+    if (++listingReads === 4) {
+     reached = true;
+     setTimeout(() => { terminatedAt = performance.now(); terminateWait(); }, 100);
+    }
+   }
    // Withhold an acknowledged read or response while the credential expires.
-   // The CLI catches TERM, so its wrapper must eventually KILL this blocked run.
    const saved = await readFile(statePath,'utf8').then(JSON.parse,()=>null);
    const stop = barrier === 'unconfirmed-create' && path === '/d1/database' && method === 'POST'
     || barrier === 'after-d1' && path === '/d1/database' && method === 'GET' && saved?.owned.d1['fixture-production-db']?.status === 'created'
@@ -65,12 +73,16 @@ export const commandAdapter={...lifecycle,deploy:ownerDeploy('deploy.json',lifec
   NODE_OPTIONS:`--import=${new URL('./business/register.mjs',import.meta.url).pathname} --import=${new URL('./deploy-network.mjs',import.meta.url).pathname}`,
   SETUP_TOKEN:'synthetic-base-setup-token',OWNER_EMAIL:'owner@example.test',SESSION_SECRET:'synthetic-base-session-secret'};
  const run = async (point) => {
-  barrier=point; reached=false;
+  barrier=point; reached=false; listingReads=0; terminatedAt=undefined;
   business.state.credential=`synthetic-base-child-${business.state.issued+1}`;
-  business.state.expiryMs=point?5000:900000;
-  const result=await business.run([process.execPath,entry,'deploy','--cwd',root,'--json'],{env});
+  business.state.expiryMs=point && point !== 'listing-wait'?15000:900000;
+  const execution=business.start(['run','--grant','grant-1','--',process.execPath,entry,'deploy','--cwd',root,'--json'],{env});
+  terminateWait=()=>execution.child.kill('SIGTERM');
+  const result=await execution.result;
+  const stoppedAt=performance.now(), lease=[...business.state.leases.values()].at(-1);
+  const shutdownMs=terminatedAt === undefined ? Date.now()-Date.parse(lease.credential_expires_at) : stoppedAt-terminatedAt;
   for (const response of held) response.destroy(); held.clear();
-  return {...result,reached};
+  return {...result,reached,shutdownMs};
  };
  return {root,statePath,provider,business,authorities,run};
 }

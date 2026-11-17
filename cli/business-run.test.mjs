@@ -19,9 +19,9 @@ test('business run and cleanup use the private device credential file and mask i
 
 test('business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors',async t=>{
  const f=await fixture(t);
- const script=`const token=process.env.CLOUDFLARE_API_TOKEN; if(token!==${JSON.stringify(secret)}||process.env.CLOUDFLARE_ACCOUNT_ID!==${JSON.stringify(account)}||process.env.CF_API_TOKEN)process.exit(92); console.log(JSON.stringify(process.argv.slice(1))); process.stdout.write(token.slice(0,8)); setTimeout(()=>{process.stdout.write(token.slice(8));process.stderr.write(token.slice(0,11));setTimeout(()=>{process.stderr.write(token.slice(11));console.log(' finished');process.exit(Number(process.argv[1]));},10)},10);`;
+ const script=`const token=process.env.CLOUDFLARE_API_TOKEN; if(token!==${JSON.stringify(secret)}||process.env.CLOUDFLARE_ACCOUNT_ID!==${JSON.stringify(account)}||process.env.RER_BUSINESS_GRANT!=='grant-1'||process.env.CF_API_TOKEN)process.exit(92); console.log(JSON.stringify(process.argv.slice(1))); process.stdout.write(token.slice(0,8)); setTimeout(()=>{process.stdout.write(token.slice(8));process.stderr.write(token.slice(0,11));setTimeout(()=>{process.stderr.write(token.slice(11));console.log(' finished');process.exit(Number(process.argv[1]));},10)},10);`;
  for(const code of [0,17]){
-  const result=await f.run([process.execPath,'-e',script,String(code),'argument with spaces','--help','$(literal)','']);
+  const result=await f.run([process.execPath,'-e',script,String(code),'argument with spaces','--help','$(literal)',''],{env:{RER_BUSINESS_GRANT:'ambient-grant'}});
   assert.equal(result.code,code,result.stderr);assert.equal(result.signal,null);
   assert.ok(result.stdout.includes(JSON.stringify([String(code),'argument with spaces','--help','$(literal)',''])));
   assert.match(result.stdout,/\[credential\]/);assert.match(result.stderr,/cleanup: revoked/);

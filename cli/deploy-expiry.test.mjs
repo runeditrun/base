@@ -4,16 +4,23 @@ import { access, readFile } from 'node:fs/promises';
 import { expiryDeploy, deploymentSummary } from './fixtures/deploy-expiry.mjs';
 
 // One public journey, with checkpoints through the same deploy lifecycle.
-test('rer deploy resumes expired grant runs to the uninterrupted resource, owner and version state',{timeout:180000},async t=>{
+test('rer deploy resumes expired grant runs to the uninterrupted resource, owner and version state',{timeout:300000},async t=>{
  const uninterrupted=await expiryDeploy(t), first=await uninterrupted.run();
  assert.equal(first.code,0,first.stdout+first.stderr);
  const expected=deploymentSummary(uninterrupted.provider);
- for (const point of ['before-upload','after-d1','mid-upload','accepted-upload','unconfirmed-create']) {
+ for (const point of ['before-upload','after-d1','mid-upload','accepted-upload','unconfirmed-create','listing-wait']) {
   const f=await expiryDeploy(t), stopped=await f.run(point);
   assert.equal(stopped.reached,true,`${point}: ${stopped.stdout}\n${stopped.stderr}`);
-  assert.equal(stopped.signal,'SIGKILL',stopped.stdout+stopped.stderr);
-  assert.match(stopped.stderr,/credential expired.*run it again to resume/i);
-  assert.match(stopped.stderr,/exit status: 137/i);
+  if (point === 'listing-wait') assert.equal(stopped.signal,'SIGTERM',stopped.stdout+stopped.stderr);
+  else {
+   assert.equal(stopped.code,143,stopped.stdout+stopped.stderr);
+   assert.equal(stopped.signal,null,stopped.stdout+stopped.stderr);
+   assert.match(stopped.stderr,/credential expired.*run it again to resume/i);
+   assert.match(stopped.stderr,/exit status: 143/i);
+  }
+  t.diagnostic(`${point}: stopped in ${Math.round(stopped.shutdownMs)}ms`);
+  assert.ok(stopped.shutdownMs >= 0 && stopped.shutdownMs < 3000, `${point}: shutdown took ${stopped.shutdownMs}ms`);
+  await assert.rejects(access(`${f.statePath}.lock`),{code:'ENOENT'});
   assert.match(stopped.stderr,/cleanup: revoked/);
   const partial=JSON.parse(await readFile(f.statePath,'utf8'));
   if(point==='unconfirmed-create') {

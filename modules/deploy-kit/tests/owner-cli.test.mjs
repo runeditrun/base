@@ -245,3 +245,59 @@ test('postdeploy readback waits only for fresh workers.dev 1042 within the uploa
  assert.ok(elapsed < redeployDeadline, 'redeploy readback uses its own remaining upload budget');
 
 });
+
+test('cancelling owner deployment closes reads and waits, retains ownership and releases the state lock', {timeout:15000}, async t => {
+  for (const phase of ['provider-request','provider-body','health-body','health-wait','asset-wait','listing-wait']) {
+    const provider = ownerProvider(); t.after(() => provider.close());
+    const root = await seed(t), controller = new AbortController();
+    await writeFile(join(root,'dist/client/app.js'),'export const application = true;');
+    const reason = new Error('deployment-cancelled');
+    const args = ['deploy','--declaration','deploy.json','--environment','production'];
+    let entered = false, closed = false, timer, cancelledAt;
+    const cancel = () => {
+      entered = true;
+      timer ??= setTimeout(() => { cancelledAt = performance.now(); controller.abort(reason); },20);
+    };
+    const heldBody = () => {
+      cancel();
+      return new Response(new ReadableStream({cancel() { closed = true; }}));
+    };
+    t.after(() => clearTimeout(timer));
+    const request = async (input, init = {}) => {
+      const url = new URL(input), method = init.method ?? 'GET';
+      if (controller.signal.aborted) assert.fail(`${phase}: another request after cancellation`);
+      if (phase === 'provider-request' && method === 'POST' && url.pathname.endsWith('/d1/database')) {
+        cancel();
+        return new Promise((resolve,reject) => init.signal.addEventListener('abort',() => { closed = true; reject(init.signal.reason); },{once:true}));
+      }
+      const response = await provider.fetch(input,init);
+      if (phase === 'provider-body' && method === 'POST' && url.pathname.endsWith('/d1/database')) return heldBody();
+      if (url.hostname.endsWith('.workers.dev')) {
+        if (phase === 'health-body' && url.pathname === '/health') return heldBody();
+        if (phase === 'health-wait' && url.pathname === '/health' || phase === 'asset-wait' && url.pathname !== '/health') {
+          cancel(); return new Response('propagating',{status:503});
+        }
+      }
+      if (phase === 'listing-wait' && provider.state.databases.length && method === 'GET' && url.pathname.endsWith('/d1/database')) {
+        cancel(); return Response.json({success:true,result:[],result_info:{page:1,total_pages:1,total_count:1}});
+      }
+      return response;
+    };
+    await assert.rejects(main(args,inputs(provider),{fetch:request,cwd:root,signal:controller.signal,notice:() => {}}), undefined, phase);
+    assert.equal(entered,true,`${phase}: reached the cancellation boundary`);
+    assert.ok(performance.now()-cancelledAt < 3000,`${phase}: cancellation returns promptly`);
+    if (phase.endsWith('body') || phase === 'provider-request') assert.equal(closed,true,`${phase}: the active read was closed`);
+    const statePath = join(root,'.rer/deploy/production.json');
+    const retained = JSON.parse(await readFile(statePath,'utf8'));
+    assert.ok(retained.owned.d1['vector-production-db'],`${phase}: resource intent remains recoverable`);
+    // A lost create response is intentionally uncertain. All other cancelled
+    // runs can resume from their retained state without creating a duplicate.
+    if (phase !== 'provider-body') {
+      assert.equal((await main(args,inputs(provider),{fetch:provider.fetch,cwd:root,notice:() => {}})).ok,true,phase);
+      assert.equal(provider.state.databases.length,1,`${phase}: no duplicate database`);
+    } else {
+      const { withStateLock } = await import('../owner.mjs');
+      await withStateLock(statePath,async () => {});
+    }
+  }
+});

@@ -15,7 +15,7 @@ import { observeOwner, ownerExchangeFailure } from './deploy-observation.mjs';
 import { committedSource } from './deploy-source.mjs';
 import { hookOrigin, waitForSource } from './deploy-hook.mjs';
 import { rememberHookState, hookState } from './deploy-hook-record.mjs';
-import { main as owner, withLocalDeployPlan } from '../modules/deploy-kit/owner-cli.mjs';
+import { main as owner, withLocalDeployPlan, withOwnerDeploySignal } from '../modules/deploy-kit/owner-cli.mjs';
 import { localOnlyBinding, ownerWorkerName } from '../modules/deploy-kit/owner.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { deployDiagnostic, migrationFailure, providerFailure, assetFailure, ownerTargetFailure } from '../modules/deploy-kit/diagnostics.mjs';
@@ -64,7 +64,11 @@ export async function hostedDeployNeeds(project) {
  return neededForRealDeploy({ declaration, env, signIn });
 }
 
-export async function deployCommand(context) {
+export function deployCommand(context) {
+ return withOwnerDeploySignal(context.signal, () => deployScoped(context));
+}
+
+async function deployScoped(context) {
  const { adapter, root, options, store, setupManifest, linkDependencies, localOnlyKeys = [] } = context;
  validateDeployOptions(options);
  try { await refuseLocalModels(root); } catch { throw refuse('Deploy refuses the local-only key file .rer/local/models.json. Remove live-dev credentials before deployment.'); }
@@ -136,7 +140,7 @@ export async function deployCommand(context) {
  // A hook keeping the kit's record in its own state file named it; every kit
  // step after the hook (inspect, secret, record-owner) reads that record.
  let hookRecord = await hookState(root, environment);
- const command = async (verb, extra = [], values = env, more = {}) => owner([verb, '--declaration', path, '--environment', environment, ...(hookRecord ? ['--state', hookRecord] : []), ...(['dry-run', 'local-plan', 'deploy', 'health'].includes(verb) ? await deployProductArguments(root, productDirectory) : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
+ const command = async (verb, extra = [], values = env, more = {}) => owner([verb, '--declaration', path, '--environment', environment, ...(hookRecord ? ['--state', hookRecord] : []), ...(['dry-run', 'local-plan', 'deploy', 'health'].includes(verb) ? await deployProductArguments(root, productDirectory) : []), ...extra], values, { cwd: root, localOnlyKeys, signal: context.signal, ...more });
  // A hook that deployed through the kit's standard record lets rer issue and
  // retire the setup token; a hook keeping an unnamed record of its own keeps its token.
  let recorded, hookReturned = false;
@@ -183,7 +187,7 @@ export async function deployCommand(context) {
    if (claims.some(item => !item.outcome)) { const error = new Error('owner-claim-failed'); error.ownerExchange = claims.find(item => !item.outcome); throw error; }
    claimed = claims.at(-1)?.outcome;
    step = 'wait for the deployed source';
-   await waitForSource({ origin, sourceSha, versionId: state?.versionId ?? (!claims.length && !deployed.owner ? uploaded?.versionId : undefined), again: deployAgain(options) });
+   await waitForSource({ origin, sourceSha, signal: context.signal, versionId: state?.versionId ?? (!claims.length && !deployed.owner ? uploaded?.versionId : undefined), again: deployAgain(options) });
    step = 'claim owner';
    if (typeof deployed.setupToken === 'string' && deployed.setupToken) addSecret(deployed.setupToken);
    const sentSecrets = (uploaded?.sentSecrets ?? []).filter(binding => uploaded.propagation.matchesToken(binding, env[declaration.secrets.find(item => item.binding === binding)?.environment]));

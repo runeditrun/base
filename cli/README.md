@@ -544,7 +544,19 @@ the local plan, while a real deployment validates the hosted identity before upl
 
 `--env-file` values are available in the command's preflight, custom hook and
 child build environment and are redacted; the caller environment is restored
-on success and failure. `--remove`, `--set-secret` and `--unset-secret` always go
+on success and failure. If the caller already holds a non-empty
+`CLOUDFLARE_API_TOKEN` (including a `rer business run --grant` child), any
+`CLOUDFLARE_*` or `CF_*` key in `--env-file` is refused before provider calls.
+The error names the file and key, never its value. Remove those keys from the
+file and repeat the command. Without a caller token, file precedence is unchanged.
+
+SIGTERM cancels provider requests, response reads, polling waits and owned child
+processes, releases the deployment lock and retains deployment state for resume.
+`rer deploy` exits 143 on SIGTERM (130 on SIGINT); repeat the command with fresh
+credentials to resume. An unconfirmed provider create remains uncertain rather
+than being repeated or adopted by name.
+
+`--remove`, `--set-secret` and `--unset-secret` always go
 through the owner-account controller, without invoking the application's build
 or deploy hook. `--set-secret A,B` (or the flag repeated) changes several
 secrets in one Worker version or none, after checking that each is declared
@@ -821,7 +833,9 @@ rer business run --grant GRANT_ID -- any-command 'argument with spaces'
 `cloudflare.token` in the Business MCP describes the exchange without returning a
 credential. Only the paired rer exchange receives a child token; the parent OAuth
 credential stays on the trusted server. The command gets `CLOUDFLARE_API_TOKEN`
-and `CLOUDFLARE_ACCOUNT_ID` in its environment. Cloudflare credential aliases from
+and `CLOUDFLARE_ACCOUNT_ID` in its environment. The child also receives
+`RER_BUSINESS_GRANT` set to the grant ID, so a queue or tool can recognise a
+granted command. This marker contains only the ID, never the credential. Cloudflare credential aliases from
 the caller environment are removed. No shell is inserted and arguments after
 `--`, including help flags, are passed unchanged. Existing `run [--once]` continues
 its computer check-in behavior.

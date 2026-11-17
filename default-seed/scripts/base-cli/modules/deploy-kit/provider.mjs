@@ -1,3 +1,4 @@
+import { readChunk } from './cancellation.mjs';
 import timers from 'node:timers/promises';
 import { providerPages, providerListShape } from './pagination.mjs';
 import { deleteR2Object } from './r2-object-transport.mjs';
@@ -11,13 +12,13 @@ import { providerResponse, transportOutput, transportReason, transportClass } fr
 // A gateway/server error can arrive after a write. An explicit API refusal cannot.
 export const definiteProviderRefusal = error => error.status === 200 || error.status >= 400 && error.status < 500;
 
-async function boundedBytes(response, limit, onReadError, prefix = false) {
+async function boundedBytes(response, limit, onReadError, prefix = false, signal) {
   assert(response.body, 'empty-response');
   const reader = response.body.getReader(); const chunks = []; let length = 0;
   try { while (true) {
     let chunk;
     // Only a failed stream read is transport failure; retain size/shape codes.
-    try { chunk = await reader.read(); } catch (cause) {
+    try { chunk = await readChunk(reader,signal); } catch (cause) {
       if (prefix) { chunks.push(Buffer.from(` [response read failed: ${transportReason(cause)}]`)); break; }
       throw onReadError ? onReadError(cause) : cause;
     }
@@ -29,9 +30,9 @@ async function boundedBytes(response, limit, onReadError, prefix = false) {
   finally { await reader.cancel().catch(() => {}); }
   return Buffer.concat(chunks);
 }
-const boundedText = async (response, limit = 4 * 1024 * 1024, onReadError, prefix) => (await boundedBytes(response, limit, onReadError, prefix)).toString('utf8');
-export async function boundedJSON(response, limit) {
-  try { return JSON.parse(await boundedText(response,limit)); } catch (error) { if (error instanceof SyntaxError) throw new Error('malformed-response'); throw error; }
+const boundedText = async (response, limit = 4 * 1024 * 1024, onReadError, prefix, signal) => (await boundedBytes(response, limit, onReadError, prefix, signal)).toString('utf8');
+export async function boundedJSON(response, limit, signal) {
+  try { return JSON.parse(await boundedText(response,limit,undefined,false,signal)); } catch (error) { if (error instanceof SyntaxError) throw new Error('malformed-response'); throw error; }
 }
 const redactValues = (text, values) => values.filter(Boolean).flatMap(value=>[value,encodeURIComponent(value),JSON.stringify(value).slice(1,-1)]).sort((a,b)=>b.length-a.length).reduce((value,secret)=>{
   value = value.split(secret).join('[REDACTED]');
@@ -91,7 +92,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
       consume:(response,attempts,signal) => {
         onResponse?.({status:response.status,body:''});
         const failedRead = cause => transportFailure(signal.aborted ? signal.reason : cause,attempts,response.status);
-        return onResponse && !response.ok ? importResponseText(response,failedRead) : response.body ? boundedText(response,response.ok ? undefined : 64 * 1024,failedRead,!response.ok) : '';
+        return onResponse && !response.ok ? importResponseText(response,failedRead,signal) : response.body ? boundedText(response,response.ok ? undefined : 64 * 1024,failedRead,!response.ok,signal) : '';
       },
       send:signal => isR2ObjectDelete(path, method) ? objectDelete(`/client/v4/accounts/${accountId}${path}`, {headers:{Authorization:`Bearer ${token}`},signal}) : request(zone ? `https://api.cloudflare.com/client/v4${path}` : `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`, {
       method, redirect: 'error', signal, headers: { Authorization: `Bearer ${assetToken ?? token}`, ...(body && !(body instanceof FormData) ? { 'Content-Type':'application/json' } : {}) },
@@ -186,7 +187,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     };
     const {response,output} = await providerResponse({method:'GET',timeoutMs,callerSignal:deadlineSignal(),reserveRetry:() => requests < maxRequests && (++requests, true),
       send:signal => request(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${worker}/content/v2?version=${versionId}`, {method:'GET',redirect:'error',signal,headers:{Authorization:`Bearer ${token}`}}),
-      consume:(response,attempts,signal) => response.body ? boundedBytes(response,response.ok ? 64 * 1024 * 1024 : 64 * 1024,cause => failure(signal.aborted ? signal.reason : cause,attempts,response.status),!response.ok) : Buffer.alloc(0),failure});
+      consume:(response,attempts,signal) => response.body ? boundedBytes(response,response.ok ? 64 * 1024 * 1024 : 64 * 1024,cause => failure(signal.aborted ? signal.reason : cause,attempts,response.status),!response.ok,signal) : Buffer.alloc(0),failure});
     if (!response.ok) throw retain(Object.assign(new Error(`provider-http-${response.status}`), {status:response.status}),response.status,'HTTP refusal',output.toString('utf8'));
     const type = response.headers.get('content-type') ?? '', entry = response.headers.get('cf-entrypoint');
     assert(type.startsWith('multipart/form-data') && typeof entry === 'string' && entry, 'invalid-worker-content');
@@ -205,9 +206,9 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
       reserveRetry:() => requests < maxRequests && (++requests, true),
       send:signal => request(destination, { method:'PUT', redirect:'error', signal, headers:{'Content-Length':String(bytes.length)}, body:bytes }),
       failure,
-      consume:async (response, attempts) => {
+      consume:async (response, attempts, signal) => {
         if (response.status === 200) { await response.body?.cancel().catch(() => {}); return ''; }
-        return importResponseText(response,cause => failure(cause,attempts,response.status));
+        return importResponseText(response,cause => failure(cause,attempts,response.status),signal);
       },
     });
     let payload; try { payload = JSON.parse(output); } catch { /* R2 may return plain text or XML. */ }

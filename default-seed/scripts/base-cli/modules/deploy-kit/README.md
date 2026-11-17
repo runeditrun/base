@@ -544,3 +544,10 @@ tokens should be left unset so rer issues a fresh one. The existing owner is
 kept, and a successful claim retires the one-time token. A hook that fails
 without an HTTP exchange can only supply its own cause. Seeds copy this guide
 and `RUN-LOCALLY.md` for these recovery instructions.
+
+The owner CLI accepts an AbortSignal as `signal` in its options. The public
+`rer deploy` passes its lifecycle signal through provider requests and response
+reads, health checks, polling waits and owned Git processes. Cancellation retains
+the deployment record and releases its lock before returning. SIGTERM exits
+`rer deploy` with status 143 (SIGINT: 130); a new granted command can resume with
+a fresh credential. Unconfirmed creates retain their ownership uncertainty.
