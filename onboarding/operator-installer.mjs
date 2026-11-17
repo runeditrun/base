@@ -3,6 +3,7 @@ import { privateDirectory } from './private-files.mjs';
 import { localInstaller } from './adapter.mjs';
 import { selectLocalState, LocalStateSafetyError } from './local/state.mjs';
 import {operatorPrerequisites} from './operator-prerequisites.mjs';
+import { localOperatorSettings, prepareOperatorMail, repairOperatorMail } from './operator-settings.mjs';
 import { migrateOperator } from './operator-migrations.mjs';
 import { installOperator } from './operator-install.mjs';
 import { join, delimiter } from 'node:path';
@@ -11,14 +12,14 @@ export function operatorInstaller({ database, features, prepare, prepareData }) 
  const lifecycle=localInstaller({
   features, node: '22.20.0',
   failure: (error,{store})=>error instanceof LocalStateSafetyError ? store.redact(error.message) : undefined,
-  async prepare(context) { context.localState = await selectLocalState(context.root); await privateDirectory(context.root, ['.wrangler', 'state']); await prepare?.(context); },
+  async prepare(context) { await prepareOperatorMail(context); context.localState = await selectLocalState(context.root); await privateDirectory(context.root, ['.wrangler', 'state']); await prepare?.(context); },
   prepareData,
   guard: async ({ root }) => { await selectLocalState(root); },
   secrets: {
    keepExisting: true, originKey: 'AUTH_ORIGIN',
    values: ({ origin }) => ({ AUTH_LOCAL: 'true', AUTH_ORIGIN: origin, MAIL_PROVIDER: 'development', MAIL_FROM: 'auth@localhost.test' }),
   },
-  build: ['pnpm', ['run', '--silent', 'build:app']],
+  build: async context => { await repairOperatorMail(context); return ['pnpm', ['run', '--silent', 'build:app']]; },
   migrate: context => migrateOperator(context, database),
   // Setup uses the local entry for owner-side dependency approval without mail.
   start: developmentTarget,
@@ -27,7 +28,7 @@ export function operatorInstaller({ database, features, prepare, prepareData }) 
  });
   // A demo migrates and claims the owner in its own state, so it never opens the
  // checkout's database: even read-only, SQLite rewrites its -shm index.
- return {...lifecycle,localPrerequisites:async({root,vars,demo})=>vars.AUTH_LOCAL==='true'&&vars.MAIL_PROVIDER==='development'&&Boolean(vars.SESSION_SECRET)&&(demo||await operatorPrerequisites(root)),install:(root,input,store,onApp,signal)=>installOperator(root,input,store,onApp,signal,lifecycle.hooks)};
+ return {...lifecycle,localPrerequisites:async({root,vars,demo})=>localOperatorSettings(vars) ?? (demo ? true : await operatorPrerequisites(root)),install:(root,input,store,onApp,signal)=>installOperator(root,input,store,onApp,signal,lifecycle.hooks)};
 }
 
 // Setup and dev give the real Vite listener one finite fifteen-minute startup

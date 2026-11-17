@@ -107,12 +107,17 @@ export async function managedServer(project,options,out,{clock={}}={}){
   const keys=localSettingKeys(project);
   selected=await selectedOrigin(project,options);
   if(!selected.door)await availablePort(selected.host,selected.port,{root:project.root,saved:!selected.explicitPort&&selected.savedOrigin!==undefined,verb:options.verb});
-  if(!selected.vars[keys.email])throw missing('Private owner settings are missing. Run rer setup first.');
+  if(!selected.vars[keys.email])throw missing(`Local prerequisite ${keys.email}: found unset; expected set; run rer setup.`);
   if(devIdentity&&!devKey)devKey=await requireDevKey(project.root);
   if(devIdentity&&['dev','preview'].includes(options.verb))refuseManagedInstallation(selected.vars,process.env);
   if(options.demo)demo=await demoPreflight(project,selected.vars,options.idleTimeout);
   const prerequisites=async()=>{
-   if(!demo&&project.adapter.localPrerequisites&&!await project.adapter.localPrerequisites({root:project.root,vars:selected.vars,email:selected.vars[keys.email],demo:false}))throw missing('Local migrations, owner or local authentication/mail settings are missing. Run rer setup first.');
+   if(demo||!project.adapter.localPrerequisites)return;
+   const result=await project.adapter.localPrerequisites({root:project.root,vars:selected.vars,email:selected.vars[keys.email],demo:false});
+   if(result===true)return;
+   // Older adapters can still return false; named failures carry only safe values.
+   const {field,found,expected}=result||{field:'localPrerequisites',found:'false',expected:'true'};
+   throw missing(`Local prerequisite ${field}: found ${found}; expected ${expected}; run rer setup.`);
   };
   if(options.verb!=='dev')await prerequisites();
   await registry.update({url:selected.url,host:selected.host,port:selected.port,models:options.models??'fake'});
