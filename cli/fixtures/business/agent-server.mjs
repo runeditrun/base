@@ -12,7 +12,7 @@ export async function agentServer(t, device) {
  const answer = (structuredContent) => ({ content: [{ type: 'text', text: 'ok' }], structuredContent });
  function call(name, args) {
   state.calls.push([name, args]);
-  if (name === 'installations.list') return answer({ installations: [{ installation_id: 'inst_1', app: 'happytohelp', name: 'Support', state: 'running', version: '0.4.1', app_url: 'https://help.example.test' }] });
+  if (name === 'installations.list') return answer({ installations: [{ installation_id: 'inst_1', app: 'happytohelp', name: state.appName ?? 'Support', state: 'running', version: '0.4.1', app_url: 'https://help.example.test' }] });
   if (name === 'change.request') { script = ['working', 'working', 'preview_ready']; return answer({ change: { id: 'chg_1', state: 'working' }, next: 'wait' }); }
   if (name === 'change.follow') {
    const phase = state.stall ? 'working' : script.length > 1 ? script.shift() : script[0];

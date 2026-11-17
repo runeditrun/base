@@ -1,9 +1,16 @@
 import { StringDecoder } from 'node:string_decoder';
 
+// File-backed device credentials stay in memory only. Use the same encodings
+// for server diagnostics, MCP/agent results and scoped command output.
+const deviceCredentials = new Set();
+export const rememberDeviceCredential = secret => { deviceCredentials.add(secret); return secret; };
+export const deviceCredentialValues = () => [...deviceCredentials];
+export const maskDeviceText = text => commandMask(deviceCredentialValues()).text(String(text));
+
 /** Keep a possible credential prefix across writes; neither chunk boundaries nor EOF release it. */
 export function commandMask(values, output) {
  const secrets = [...new Set(values.filter(value => typeof value === 'string' && value).flatMap(value =>
-  [value, encodeURIComponent(value), Buffer.from(value).toString('base64'), Buffer.from(value).toString('base64url')]))].sort((a, b) => b.length - a.length);
+  [value, encodeURIComponent(value), Buffer.from(value).toString('hex'), Buffer.from(value).toString('base64'), Buffer.from(value).toString('base64url')]))].sort((a, b) => b.length - a.length);
  const decoder = new StringDecoder('utf8');
  let pending = '';
  function replace(text) { for (const secret of secrets) text = text.split(secret).join('[credential]'); return text; }
