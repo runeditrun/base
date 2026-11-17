@@ -63,7 +63,7 @@ const waiters = { change, update };
 
 async function work(row, parsed, session, out) {
  const args = place(row, parsed), absent = missing(row, args), { control } = parsed;
- if (absent.length) throw new Usage(`${row.tool} needs ${absent.map(name => `--${name.replaceAll('_', '-')}`).join(', ')}. Run rer business ${row.name.split(' ')[0]} --help.`);
+ if (absent.length) throw new Usage(`${row.tool} needs ${absent.map(name => `--${name.replaceAll('_', '-')}`).join(', ')}. Run ~/.local/bin/rer business ${row.name.split(' ')[0]} --help.`);
  for (const flag of ['wait', 'publish']) {
   if (control[flag] && !(row.wait && (flag === 'wait' || row.tool.startsWith('change.')))) throw new Usage(`${row.name} does not take --${flag}.`);
  }
@@ -101,11 +101,11 @@ export async function agentCommand(argv) {
  let row, tail = rest;
  if (first === 'tools') { row = { name: 'tools' }; tail = [second, ...rest].filter(item => item !== undefined); }
  else if (first === 'call') {
-  if (!/^[a-z][a-z0-9_.]{0,80}$/.test(second ?? '')) return usage('Name the tool: rer business call TOOL [--flag VALUE].');
+  if (!/^[a-z][a-z0-9_.]{0,80}$/.test(second ?? '')) return usage('Name the tool: ~/.local/bin/rer business call TOOL [--flag VALUE].');
   row = { name: `call ${second}`, tool: second };
  } else {
   row = rows[`${first} ${second}`] && { name: `${first} ${second}`, ...rows[`${first} ${second}`] };
-  if (!row) return usage(`Unknown command: rer business ${first}${second ? ` ${clean(second, 40)}` : ''}.`);
+  if (!row) return usage(`Unknown command: ~/.local/bin/rer business ${first}${second ? ` ${clean(second, 40)}` : ''}.`);
  }
  let parsed;
  try { parsed = await parseArguments(tail); } catch (error) { if (error instanceof Usage) return usage(error.message); throw error; }

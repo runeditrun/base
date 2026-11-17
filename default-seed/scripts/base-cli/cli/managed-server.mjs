@@ -33,13 +33,13 @@ export async function ready(out,url,dev,json=false,siteUrl,demo,root,ownerOpenUr
  out.human(`RER_READY ${url}`);
  if(dev){
   if(dev.signedInAs)out.human(`RER_SIGNED_IN ${dev.signedInAs}`);
-  else if(dev.ownerLeft)out.human('No active owner remains in this app. Use rer dev --as PERSONA with an active operator, or rer reset --yes and rer setup for a new owner.');
+  else if(dev.ownerLeft)out.human('No active owner remains in this app. Use ~/.local/bin/rer dev --as PERSONA with an active operator, or ~/.local/bin/rer reset --yes and ~/.local/bin/rer setup for a new owner.');
   out.human(`RER_OPEN ${dev.openUrl}`);
   if (!root && !dev.native) out.human("Open that link on this computer. Its fragment holds this checkout's dev key, which the page keeps only as a cookie; never share the link.");
  }
  if(ownerOpenUrl){out.human(`RER_OWNER_OPEN ${ownerOpenUrl}`);out.human('Native owner entry: open on this computer once within 15 minutes. The link is not saved.');}
  if(siteUrl){if(!root)out.human(`Site: ${siteUrl}`);out.human(`RER_SITE ${siteUrl}`);}
- if(demo){out.human(`RER_DEMO_ENDS_ON_STOP ${demo.state}`);out.human(`This demo runs on its own data in that folder, which is deleted when it stops: rer demo --stop, Ctrl-C, or at its end (${demo.ends.slice(11,16)}). Public reads and checks run for real. This checkout's own data is untouched.`);}
+ if(demo){out.human(`RER_DEMO_ENDS_ON_STOP ${demo.state}`);out.human(`This demo runs on its own data in that folder, which is deleted when it stops: ~/.local/bin/rer demo --stop, Ctrl-C, or at its end (${demo.ends.slice(11,16)}). Public reads and checks run for real. This checkout's own data is untouched.`);}
 }
 export async function managedServer(project,options,out,{clock={}}={}){
  const registry=await serverRegistry(project.root),controller=new AbortController();
@@ -107,7 +107,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
   const keys=localSettingKeys(project);
   selected=await selectedOrigin(project,options);
   if(!selected.door)await availablePort(selected.host,selected.port,{root:project.root,saved:!selected.explicitPort&&selected.savedOrigin!==undefined,verb:options.verb});
-  if(!selected.vars[keys.email])throw missing(`Local prerequisite ${keys.email}: found unset; expected set; run rer setup.`);
+  if(!selected.vars[keys.email])throw missing(`Local prerequisite ${keys.email}: found unset; expected set; run ~/.local/bin/rer setup.`);
   if(devIdentity&&!devKey)devKey=await requireDevKey(project.root);
   if(devIdentity&&['dev','preview'].includes(options.verb))refuseManagedInstallation(selected.vars,process.env);
   if(options.demo)demo=await demoPreflight(project,selected.vars,options.idleTimeout);
@@ -117,7 +117,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
    if(result===true)return;
    // Older adapters can still return false; named failures carry only safe values.
    const {field,found,expected}=result||{field:'localPrerequisites',found:'false',expected:'true'};
-   throw missing(`Local prerequisite ${field}: found ${found}; expected ${expected}; run rer setup.`);
+   throw missing(`Local prerequisite ${field}: found ${found}; expected ${expected}; run ~/.local/bin/rer setup.`);
   };
   if(options.verb!=='dev')await prerequisites();
   await registry.update({url:selected.url,host:selected.host,port:selected.port,models:options.models??'fake'});
@@ -164,7 +164,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
     await registry.update({siteUrl:site.url});
    } catch(error) {
     if(error.code!=='site_private_data')throw error;
-    const message=`Run site preview refused: ${error.message} The app is running; fix the site and run rer build --site before publishing it.`;
+    const message=`Run site preview refused: ${error.message} The app is running; fix the site and run ~/.local/bin/rer build --site before publishing it.`;
     if(options.json)out.event('warning',{code:error.code,message});else out.progress(`Warning: ${message}\n`);
    }
   }

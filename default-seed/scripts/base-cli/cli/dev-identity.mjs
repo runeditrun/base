@@ -31,13 +31,13 @@ export async function readDevKey(root) {
  const { privateDirectory, readPrivateFile } = await shared('private-files.mjs');
  await privateDirectory(root, ['.rer', 'local']);
  const key = KEY.exec(await readPrivateFile(path))?.[1];
- if (!key) throw refuse(`${DEV_KEY_FILE} is malformed. Run rer reset --yes, then rer setup, for a new key.`);
+ if (!key) throw refuse(`${DEV_KEY_FILE} is malformed. Run ~/.local/bin/rer reset --yes, then ~/.local/bin/rer setup, for a new key.`);
  return key;
 }
 
 export async function requireDevKey(root) {
  const key = await readDevKey(root);
- if (!key) throw missing(`The local dev key ${DEV_KEY_FILE} is missing. Run rer setup to create it.`);
+ if (!key) throw missing(`The local dev key ${DEV_KEY_FILE} is missing. Run ~/.local/bin/rer setup to create it.`);
  return key;
 }
 
@@ -66,8 +66,8 @@ export async function resolvePersona(url, key, as, signal) {
  // The people rer can sign in as: each persona with its email, then every
  // invited or active person in this checkout's local database by email.
  const valid = personas.map(entry => entry.as === entry.email || !entry.email ? entry.as : `${entry.as} (${entry.email})`).join(', ');
- if (!as.includes('@')) throw invalid(`Dev persona ${as} is unavailable for sign-in. Run rer dev --as with one of: ${valid}. If this account is inactive, ask an owner or administrator to reactivate it first.`);
- throw invalid(`No one with the email ${as} can sign in to this app locally. rer dev --as takes one of: ${valid}. If this account is inactive, ask an owner or administrator to reactivate it. Someone added only to the app's own records can sign in once the app invites them (its Invite action, which sends no mail locally); then run rer dev --as ${as} again.`);
+ if (!as.includes('@')) throw invalid(`Dev persona ${as} is unavailable for sign-in. Run ~/.local/bin/rer dev --as with one of: ${valid}. If this account is inactive, ask an owner or administrator to reactivate it first.`);
+ throw invalid(`No one with the email ${as} can sign in to this app locally. ~/.local/bin/rer dev --as takes one of: ${valid}. If this account is inactive, ask an owner or administrator to reactivate it. Someone added only to the app's own records can sign in once the app invites them (its Invite action, which sends no mail locally); then run ~/.local/bin/rer dev --as ${as} again.`);
 }
 
 // rer build refuses output that bundles the dev layer, naming the file.

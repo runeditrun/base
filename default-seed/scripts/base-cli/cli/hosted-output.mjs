@@ -90,7 +90,7 @@ export async function serveHosted(root, { declaration: declarationPath = 'deploy
  const build = dirname(join(root, wrangler));
  let config;
  try { config = await read(join(root, wrangler)); }
- catch { throw new RerError('hosted_output_missing', `No production build at ${wrangler}. Run rer build, then rer verify.`, 1); }
+ catch { throw new RerError('hosted_output_missing', `No production build at ${wrangler}. Run ~/.local/bin/rer build, then ~/.local/bin/rer verify.`, 1); }
  // The build's own wrangler file says where its assets are: ../client from dist/server.
  const client = resolve(build, config.assets?.directory ?? '../client');
  let declaration;
@@ -262,7 +262,7 @@ export async function checkHostedOutput(root, options) {
   const deployment = body?.deployment ?? {};
   const wrong = health.status !== 200 ? [`HTTP ${health.status}`] : [...(body?.ok === true ? [] : ['ok']), ...['sourceSha', 'fingerprint', 'versionId'].filter(key => deployment[key] !== identity[key]).map(key => `deployment.${key}`)];
   if (wrong.length) failures.push(`/health lacks the deploy identity (${wrong.join(', ')}); it must answer {ok:true, deployment:{sourceSha, fingerprint, versionId}} from RER_DEPLOY_SOURCE, RER_DEPLOY_FINGERPRINT and RER_VERSION.id`);
-  if (failures.length) throw new RerError('hosted_output_failed', `The production build would break when hosted: rer deploy runs the Worker before static assets (run_worker_first), and served this way:\n  ${failures.join('\n  ')}\nServe built files with staticAssetResponse and answer /health with deploymentHealth (SEED-COMMAND-CONTRACT.md, Hosted assets and deploy identity).`, 1, { failures });
+  if (failures.length) throw new RerError('hosted_output_failed', `The production build would break when hosted: ~/.local/bin/rer deploy runs the Worker before static assets (run_worker_first), and served this way:\n  ${failures.join('\n  ')}\nServe built files with staticAssetResponse and answer /health with deploymentHealth (SEED-COMMAND-CONTRACT.md, Hosted assets and deploy identity).`, 1, { failures });
   return { assets: paths.length, health: 'identity' };
  } finally { await hosted.close(); }
 }

@@ -2,7 +2,7 @@ import { releaseVerb } from './contract.mjs';
 import { parseTimeoutSeconds, timeoutBounds } from '../scripts/publish-check/timeout.mjs';
 
 // Preserve release's accepted parser, producer, receipt and validation exits.
-const releaseHelp = `Usage: rer release --repo DIR --project OWNER/NAME --repository GITHUB_URL --output NEW_DIR [FLAGS]
+const releaseHelp = `Usage: ~/.local/bin/rer release --repo DIR --project OWNER/NAME --repository GITHUB_URL --output NEW_DIR [FLAGS]
 
 Produce local artifacts using the exact source commit's green GitHub Verify,
 frozen installation, local build and publication checks.
@@ -39,12 +39,12 @@ Without --tag, write a preview. This command never pushes, uploads or deploys.
   --help                 Print this help without performing release work.
 
 Stage-only metadata preparation:
-  rer release candidate --tag vVERSION-PRERELEASE [--cwd DIR] [--json]
+  ~/.local/bin/rer release candidate --tag vVERSION-PRERELEASE [--cwd DIR] [--json]
 
 Signing and receipt commands:
-  rer release sign --artifact DIR (--key-file FILE | --key-stdin) [--scope test|rer] [--publisher NAMESPACE]
-  rer release receipt --artifact DIR --anchors FILE [--environment test] [--after VERSION:SHA256]
-  rer release keygen --scope test|rer --publisher NAMESPACE --github-owner LOGIN --github-owner-id ID --anchor-out FILE
+  ~/.local/bin/rer release sign --artifact DIR (--key-file FILE | --key-stdin) [--scope test|rer] [--publisher NAMESPACE]
+  ~/.local/bin/rer release receipt --artifact DIR --anchors FILE [--environment test] [--after VERSION:SHA256]
+  ~/.local/bin/rer release keygen --scope test|rer --publisher NAMESPACE --github-owner LOGIN --github-owner-id ID --anchor-out FILE
     [--not-before YYYY-MM-DDTHH:MM:SSZ] [--not-after YYYY-MM-DDTHH:MM:SSZ]
     [--unsigned-through PROJECT:VERSION ...]
 

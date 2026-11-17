@@ -28,7 +28,7 @@ export async function migrateOperator(context, database) {
  const { root, demo, store } = context;
  const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'));
  const binding = config.d1_databases?.find(item => item.database_name === database || item.binding === database);
- if (!binding) throw new Error(`Local migration database ${database} is missing from the built configuration. Run rer setup.`);
+ if (!binding) throw new Error(`Local migration database ${database} is missing from the built configuration. Run ~/.local/bin/rer setup.`);
  const state = resolve(root, demo?.state ?? await selectLocalState(root));
  const inventory = resolve(root, 'migrations/core');
  const names = (await readdir(inventory)).filter(name => name.endsWith('.sql')).sort();
