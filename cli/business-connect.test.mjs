@@ -81,7 +81,7 @@ test('Business verb help explains each command without pairing or reading a sess
   const result = await cli(home, ['business', verb, '--help']);
   t.diagnostic(`rer business ${verb} --help\n${result.stdout}`);
   assert.equal(result.code, 0, result.stderr);
-  assert.match(result.stdout, new RegExp(`Usage: rer business ${verb}(?:\\s|$)`));
+  assert.match(result.stdout, new RegExp(`Usage: ~\\/\\.local\\/bin\\/rer business ${verb}(?:\\s|$)`));
   if (verb === 'setup') {
    assert.equal(result.stdout.split('\n').filter(line => line === appSignInHelp).length, 1);
    assert.match(result.stdout, /--session-file FILE[^\n]*signed-in session/i);
@@ -146,7 +146,7 @@ test('Business check-ins carry listed prepared and live apps, preserve settings 
  const paired = await connect(home, remote, { env });
  assert.ok(paired.stdout.includes('2 local app carry files'), paired.stdout);
  assert.ok(paired.stderr.includes(JSON.stringify(skipped)) && paired.stderr.includes('not first-party'), paired.stderr);
- assert.ok(paired.stderr.includes(JSON.stringify(unprepared)) && paired.stderr.includes('not set up yet: run rer setup'), paired.stderr);
+ assert.ok(paired.stderr.includes(JSON.stringify(unprepared)) && paired.stderr.includes('not set up yet: run ~/.local/bin/rer setup'), paired.stderr);
  await assert.rejects(stat(carryFile(unprepared)), { code: 'ENOENT' });
  for (const root of [interrupted, broken]) await assert.rejects(stat(carryFile(root)), { code: 'ENOENT' });
  assert.ok(paired.stderr.includes(JSON.stringify(interrupted)) && paired.stderr.includes('not set up yet'), paired.stderr);
@@ -214,7 +214,7 @@ test('Business next echoes the installed launcher or npx invocation and open cho
  const bin = join(home, '.local/bin');
  const result = await cli(home, ['business', 'next'], { installed: true, path: `${bin}:${process.env.PATH}` });
  assert.equal(result.code, 0, result.stderr);
- assert.match(result.stdout, /run rer business next/);
+ assert.match(result.stdout, /run ~\/\.local\/bin\/rer business next/);
  assert.doesNotMatch(result.stdout, /npx -y/);
  const registry = await localRegistry(); t.after(registry.close);
  registry.publish(packed.version, packed.bytes);

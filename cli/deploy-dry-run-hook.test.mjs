@@ -69,7 +69,7 @@ test('a dry run lists the owner name a real deploy still needs until it is suppl
  const run = await standIn(t, '{dryRun:true,deployed:false}');
  const fresh = await run();
  assert.equal(fresh.code, 0, fresh.text);
- assert.match(fresh.result.neededForRealDeploy.join('\n'), /owner name \(--owner-name or rer setup\)/);
+ assert.match(fresh.result.neededForRealDeploy.join('\n'), /owner name \(--owner-name or ~\/\.local\/bin\/rer setup\)/);
  const named = await run('--owner-name', 'Alex Morgan');
  assert.equal(named.code, 0, named.text);
  assert.doesNotMatch((named.result.neededForRealDeploy ?? []).join('\n'), /owner name/);
