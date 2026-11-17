@@ -9,7 +9,7 @@ export async function ownerEntryReady(root, link, signal, store) {
  if (!Number.isSafeInteger(timeout) || timeout <= 0 || timeout > 2147483647) throw invalid('RER_OWNER_READY_TIMEOUT_MS must be positive integer milliseconds, at most 2147483647.');
  const entry = new URL(link), deadline = performance.now() + timeout;
  const bounded = AbortSignal.any([signal, AbortSignal.timeout(timeout)].filter(Boolean));
- let browser, page, destination = entry, last = 'browser did not open the entry', documents = 0, status, exchanged = !entry.hash, lastReload = 0;
+ let browser, page, lastState, destination = entry, last = 'browser did not open the entry', documents = 0, status, exchanged = !entry.hash, lastReload = 0;
  const remaining = () => Math.max(1, Math.ceil(deadline - performance.now()));
  const name = url => url.origin + url.pathname; // Fragments and query values may be credentials.
  const close = () => { void browser?.close().catch(() => {}); };
@@ -45,12 +45,33 @@ export async function ownerEntryReady(root, link, signal, store) {
     const area = document.querySelector('main') ?? document.body, text = area?.innerText.trim() ?? '';
     const retry = /the workspace is busy|trying again in a few seconds/i.test(text);
     const busy = retry || [...document.querySelectorAll('[aria-busy="true"], [role="progressbar"]')].some(visible) || /^loading[.\s…]*$/i.test(text);
-    const usable = !!text && [...(area?.querySelectorAll('input,button,a[href],select,textarea') ?? [])].some(element => visible(element) && !element.disabled);
+    // An owner destination may be a read-only status page. Its controls may
+    // also live outside the light DOM; visible rendered content is enough,
+    // provided all exchange, navigation and interstitial checks below pass.
+    const usable = !!text && !!area && visible(area);
     return { busy, retry, usable, refresh: !!document.querySelector('meta[http-equiv="refresh" i]') };
    }).catch(() => null); // A navigation can replace the execution context.
-   if (state?.busy || state?.refresh) last = `HTTP ${status ?? 'unknown'} (busy/retry interstitial)`;
-   else last = `HTTP ${status ?? 'unknown'} (no usable owner page)`;
-   if (exchanged && (!entry.hash || documents > 1) && status >= 200 && status < 300 && state?.usable && !state.busy && !state.refresh && !destination.hash && destination.origin === entry.origin) return;
+   if (state) lastState = { ...state, status };
+   // Retain observations for diagnostics only. Readiness still requires a
+   // successful read of the current document, never a cached usable page.
+   const observed = lastState;
+   const conditions = [
+    observed && !observed.usable && 'no rendered owner content',
+    observed?.busy && 'busy/retry interstitial',
+    observed?.refresh && 'refresh interstitial',
+   ].filter(Boolean);
+   const failed = [
+    !exchanged && 'entry exchange not observed',
+    entry.hash && documents <= 1 && 'destination document not observed after entry',
+    !(status >= 200 && status < 300) && 'destination status is not 2xx',
+    !state && (observed ? 'destination DOM could not be read again' : 'destination DOM unavailable'),
+    ...conditions,
+    destination.hash && 'destination still has a fragment',
+    destination.origin !== entry.origin && 'destination is cross-origin',
+   ].filter(Boolean);
+   last = `HTTP ${status ?? 'unknown'} (${failed.join('; ')}). Readiness: exchanged=${exchanged}, documents=${documents}, usable=${observed?.usable ?? 'unknown'}, busy=${observed?.busy ?? 'unknown'}, refresh=${observed?.refresh ?? 'unknown'}, fragment=${!!destination.hash}, sameOrigin=${destination.origin === entry.origin}`;
+   if (observed) last += `. Last seen: HTTP ${observed.status ?? 'unknown'} (${conditions.join('; ') || 'rendered owner content'})`;
+   if (!failed.length) return;
    // A server interstitial needs another GET. Client navigation/loading gets
    // time to finish on its own rather than being restarted on every poll.
    if (status && (status >= 400 || state?.retry || state?.refresh) && performance.now() - lastReload > 1000) {
