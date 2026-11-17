@@ -47,4 +47,26 @@ test('rer dev announces the owner entry only after its redirected Setup answers,
   assert.ok(child.output.includes(f.origin + '/workspace/start-here'));
   assert.doesNotMatch(child.output, /"event":"ready"/);
  }
+ // A valid signed-in status page need not contain any interactive controls.
+ await f.configure({ readOnly: true });
+ const readOnly = f.start();
+ await until(() => readOnly.output.includes('"event":"ready"'), readOnly);
+ readOnly.kill('SIGTERM'); await readOnly.done;
+ // Rendered content never overrides the other readiness requirements.
+ for (const [config, reason] of [
+  [{ readOnly: true, busyForever: true, status: 200 }, /busy\/retry interstitial/],
+  [{ readOnly: true, refresh: true }, /refresh interstitial/],
+  [{ readOnly: true, destinationStatus: 500 }, /destination status is not 2xx/],
+  [{ empty: true }, /no rendered owner content/],
+ ]) {
+  await f.configure(config);
+  const child = f.start(true, 3000);
+  assert.equal(await child.done, 1, child.output + child.errors);
+  const error = JSON.parse(child.output.split('\n').find(line => line.includes('"event":"error"')));
+  assert.equal(error.code, 'owner_entry_not_ready');
+  assert.match(error.message, reason);
+  assert.ok(error.message.includes(f.origin + '/workspace/start-here'));
+  assert.ok(!child.output.includes(f.key), 'readiness diagnostics never print the credential');
+  assert.doesNotMatch(child.output, /"event":"ready"/);
+ }
 });

@@ -45,7 +45,10 @@ export async function ownerEntryReady(root, link, signal, store) {
     const area = document.querySelector('main') ?? document.body, text = area?.innerText.trim() ?? '';
     const retry = /the workspace is busy|trying again in a few seconds/i.test(text);
     const busy = retry || [...document.querySelectorAll('[aria-busy="true"], [role="progressbar"]')].some(visible) || /^loading[.\s…]*$/i.test(text);
-    const usable = !!text && [...(area?.querySelectorAll('input,button,a[href],select,textarea') ?? [])].some(element => visible(element) && !element.disabled);
+    // An owner destination may be a read-only status page. Its controls may
+    // also live outside the light DOM; visible rendered content is enough,
+    // provided all exchange, navigation and interstitial checks below pass.
+    const usable = !!text && !!area && visible(area);
     return { busy, retry, usable, refresh: !!document.querySelector('meta[http-equiv="refresh" i]') };
    }).catch(() => null); // A navigation can replace the execution context.
    const failed = [

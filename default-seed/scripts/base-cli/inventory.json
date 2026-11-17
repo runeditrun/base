@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.121-dev.g4a43a4bd",
+  "cliVersion": "0.2.121-dev.g127f34d2",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1111,7 +1111,7 @@
     },
     "cli/owner-entry-ready.mjs": {
       "source": "cli/owner-entry-ready.mjs",
-      "sha256": "15a1f31b77a2a59f0a94cdcb8a6f2c6c8793b99e343ef6ffc6e17892bf764c1b"
+      "sha256": "fe8c11d35cb2dcdac2958feb04a6250b4901919df19c5191bc3d35ecead41012"
     },
     "cli/package-calls.mjs": {
       "source": "cli/package-calls.mjs",
