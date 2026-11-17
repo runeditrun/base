@@ -89,7 +89,7 @@ test('check accepts a checkout that pins the rer package and names the fix for e
   [{ lock: lockfile('0.0.1', '0.0.1') }, 'SC-13.package.lockfile', /pnpm install/],
   [{ declaration: { ...descriptor, commands: { ...descriptor.commands, build: { ...descriptor.commands.build, argv: ['node', 'scripts/rer.mjs', 'build'] } } } }, 'SC-02.target.build', /rer build/],
   [{ packageJson: { ...pkg, scripts: { ...pkg.scripts, build: 'node scripts/rer.mjs build' } } }, 'SC-02.alias.build', /rer build/],
-  [{ extra: { 'rer-project.json': JSON.stringify({ operations: { setup: 'bash scripts/delivery/setup.sh', build: 'node scripts/rer.mjs build' } }) } }, 'SC-13.package.calls', /pnpm exec rer[^]*rer-project\.json operations\.build/],
+  [{ extra: { 'rer-project.json': JSON.stringify({ operations: { setup: 'bash scripts/delivery/setup.sh', build: 'node scripts/rer.mjs build' } }) } }, 'SC-13.package.calls', /pnpm exec ~\/\.local\/bin\/rer[^]*rer-project\.json operations\.build/],
   [{ extra: { 'scripts/delivery/setup.sh': 'node scripts/rer.mjs install\n' } }, 'SC-13.package.calls', /scripts\/delivery\/setup\.sh:1/],
   [{ extra: { '.github/workflows/verify.yml': delivery['.github/workflows/verify.yml'].replace('pnpm exec rer verify', 'node scripts/rer.mjs verify') } }, 'SC-13.package.calls', /verify\.yml:5/],
  ];

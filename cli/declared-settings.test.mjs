@@ -94,7 +94,7 @@ export const commandAdapter = declare(lifecycle, { setup: { manifestFile: 'rer-s
   // settings are valid, while the browser prerequisite is now diagnosed too.
   assert.equal(diagnostic.status, 3);
   assert.equal(diagnostic.event.diagnostics.browser.ok, false);
-  assert.equal(diagnostic.event.diagnostics.browser.fix, 'rer install');
+  assert.equal(diagnostic.event.diagnostics.browser.fix, '~/.local/bin/rer install');
   assert.deepEqual(diagnostic.event.diagnostics.missingInputs, []);
   assert.equal(await readFile(path, 'utf8'), bytes, 'all valid flows preserve private bytes');
   await writeFile(path, encode({ SESSION_SECRET: settings.SESSION_SECRET }), { mode: 0o600 });

@@ -255,7 +255,7 @@ test('an optional secret deploys unset and is set and removed later; a secret ch
  // The provider refuses rer's change; the recovery is that same change, not a plain deploy.
  process.env.SESSION_SECRET = 'rotated';
  provider.fail('PUT', /\/secrets$/);
- await assert.rejects(run({ setSecret: 'SESSION_SECRET' }), /run rer deploy --environment production --set-secret SESSION_SECRET again/);
+ await assert.rejects(run({ setSecret: 'SESSION_SECRET' }), /run ~\/\.local\/bin\/rer deploy --environment production --set-secret SESSION_SECRET again/);
  // The same change then made in the dashboard is not rer's.
  const origin = `https://api.cloudflare.com/client/v4/accounts/${provider.accountId}/workers/scripts/fixture-production/secrets`;
  await provider.fetch(origin, { method: 'PUT', headers: { Authorization: `Bearer ${provider.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'SESSION_SECRET', text: 'x', type: 'secret_text' }) });
