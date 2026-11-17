@@ -14,7 +14,7 @@ import '../../modules/container/adapters/d1-workerd-preload.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, statSync } from 'node:fs';
-import { access, cp, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { access, cp, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { DatabaseSync } from '../../modules/container/adapters/d1-sqlite.mjs';
 import { parseEnv } from 'node:util';
 import { createRequire } from 'node:module';
@@ -27,6 +27,7 @@ import { isolatedQueue } from '../../cli/fixtures/queue.mjs';
 import { freePort, run, sweep } from './harness.mjs';
 import { requireSavedOwnerInput } from './resume-owner.mjs';
 import { launchPath } from '../launch/state.mjs';
+import { ensureDevKey } from '../../cli/dev-identity.mjs';
 
 const base = resolve(import.meta.dirname, '../..');
 const { chromium } = createRequire(join(base, 'default-seed/package.json'))('@playwright/test');
@@ -132,9 +133,7 @@ test('an installed rer launches the package-mode default-seed reference with one
  await requireSavedOwnerInput(root);
  // A test credential, never an owner's key. The real runtime and browser use
  // it, while adapter diagnostics exercise each captured output representation.
- const devKey = 'RerCaptureSentinel_AaBbCcDdEeFfGgHhIiJjKkLlMmNn';
- await mkdir(join(root, '.rer/local'), { recursive: true });
- await writeFile(join(root, '.rer/local/dev-key.env'), `RER_DEV_KEY=${devKey}\n`, { mode: 0o600 });
+ const devKey = await ensureDevKey(root);
  const adapterPath = join(root, 'scripts/installer/local.mjs');
  const escapedKey = [...devKey].map(character => '%' + character.charCodeAt(0).toString(16)).join('');
  await writeFile(adapterPath, `if (process.argv[2] === 'setup') process.stdout.write(${JSON.stringify('SETUP_CAPTURE_MARKER ' + devKey + '\n')});\n` + await readFile(adapterPath, 'utf8') + `
@@ -184,12 +183,22 @@ if (process.argv[2] === 'dev' && !process.argv.includes('--stop')) {
  assert.equal(repeated.code, 0, repeated.stderr + repeated.stdout);
  assert.ok(repeated.stdout.split('\n').includes(`RER_SITE ${lines.RER_SITE}`), 'a repeated rer dev reprints RER_SITE');
  assert.ok(repeated.stdout.includes(lines.RER_OPEN), 'reuse still delivers the private link');
- for (const name of await readdir(dirname(serverLog))) {
-  const text = await readFile(join(dirname(serverLog), name), 'utf8');
-  assert.ok(!text.replace(/\s/g, '').includes(devKey), 'no captured file contains the dev key, including wrapped output');
-  assert.ok(!text.includes(escapedKey), 'no captured file contains the URL-encoded dev key');
-  if (name.startsWith('events-')) for (const line of text.trim().split('\n')) JSON.parse(line);
- }
+ const checkCapture = async phase => {
+  const kinds = new Set();
+  for (const name of await readdir(dirname(serverLog))) {
+   const text = await readFile(join(dirname(serverLog), name), 'utf8');
+   const kind = /^events-.*\.jsonl$/.test(name) ? 'events' : name;
+   kinds.add(kind);
+   const matches = text.split(devKey).length - 1;
+   assert.equal(matches, 0, `${phase} ${kind} key matches`);
+   assert.ok(!text.replace(/\s/g, '').includes(devKey), `${phase} ${kind} contains no wrapped dev key`);
+   assert.ok(!text.includes(escapedKey), `${phase} ${kind} contains no URL-encoded dev key`);
+   if (kind === 'events') for (const line of text.trim().split('\n')) JSON.parse(line);
+  }
+  for (const kind of ['launch.log', 'server.log', 'reuse.log', 'events']) assert.ok(kinds.has(kind), `${phase} exercised ${kind}`);
+  t.diagnostic(`${phase}: launch.log, server.log, reuse.log and events key matches: 0`);
+ };
+ await checkCapture('reuse');
 
  const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--use-mock-keychain', '--password-store=basic', ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? ['--no-sandbox'] : [])] });
  try {
@@ -204,6 +213,7 @@ if (process.argv[2] === 'dev' && !process.argv.includes('--stop')) {
  assert.equal(stopped.code, 0, stopped.stderr);
  await assert.rejects(fetch(url + '/health'), 'rer dev --stop frees the port');
  await assert.rejects(fetch(lines.RER_SITE), 'rer dev --stop frees the run site preview port');
+ await checkCapture('closed server tail');
 
  // The real owner's setup replaces the zero-setup owner in place: the same
  // account under the real address, every local row kept, and rer dev then signs

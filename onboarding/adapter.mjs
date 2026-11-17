@@ -75,7 +75,7 @@ export function localInstaller(hooks = {}) {
    catch (error) {
     if (verb !== 'dev' || signal?.aborted || isBusyFailure(error)) throw error;
     const failure = approvedFailure(error);
-    throw commandFailure(`${store.redact(failure?.message ?? error.message)}\nLocal migrations failed. Fix the error and run ~/.local/bin/rer setup before trying again.`, failure ?? {});
+    throw Object.assign(commandFailure(`${store.redact(failure?.message ?? error.message)}\nLocal migrations failed. Fix the error and run ~/.local/bin/rer setup before trying again.`, failure ?? {}), {cause:error});
    }
   }
   await options.beforeStart?.(context);

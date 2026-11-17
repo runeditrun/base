@@ -69,12 +69,12 @@ export async function buildSite(project, store, signal, { prepare = false, deplo
   try { await store.run('Building the run site', process.execPath, [fileURLToPath(new URL('./site-render.mjs', import.meta.url)), project.root, site.entry, staging, site.config ?? '', JSON.stringify({entries:site.clients ?? {}, config:site.clientConfig, privatePaths:privateSitePaths(project.adapter), hosting, ...(site.runtime ? {runtime:site.runtime, corpus:`${staging}.corpus.json`} : {})})], { cwd: project.root, signal, heavy: false }); }
   catch (error) {
    const code = await readFile(`${staging}.refusal`, 'utf8').catch(() => '');
-   if (code === 'site_private_input') throw new RerError(code, 'Run site client imports a private installation file or a file outside the seed and its declared dependencies.', 4);
-   if (code === 'site_client_server_import') throw new RerError(code, 'Run site client imports a server-only module. Use browser dependencies in every reachable island module.', 4);
+   if (code === 'site_private_input') throw new RerError(code, 'Run site client imports a private installation file or a file outside the seed and its declared dependencies.', 4, {cause:error});
+   if (code === 'site_client_server_import') throw new RerError(code, 'Run site client imports a server-only module. Use browser dependencies in every reachable island module.', 4, {cause:error});
    // Command capture appends its absolute log path after the child output.
    const { approvedFailure, commandFailure } = await shared('failures.mjs');
    const diagnostic = approvedFailure(error);
-   if (diagnostic) throw commandFailure(redactSiteText(diagnostic.message), diagnostic);
+   if (diagnostic) throw Object.assign(commandFailure(redactSiteText(diagnostic.message), diagnostic), {cause:error});
    throw error;
   }
   const privacy = await privateValues(project);
@@ -83,7 +83,7 @@ export async function buildSite(project, store, signal, { prepare = false, deplo
   let runtime;
   if (site.runtime) {
    try { runtime = await buildSiteRuntime(project, site.runtime, `${staging}.corpus.json`, staging, { prepare, domain:deployment?.domain, compatibilityDate:deployment?.compatibilityDate, store, signal }); }
-   catch (error) { if (error instanceof RerError) throw error; throw new RerError('site_search_failed', 'Docs search preparation failed; publication stopped. Check the previous artifact and Workers AI availability.', 1); }
+   catch (error) { if (error instanceof RerError) throw error; throw new RerError('site_search_failed', 'Docs search preparation failed; publication stopped. Check the previous artifact and Workers AI availability.', 1, {cause:error}); }
    if (prepare) checked = await checkSite(staging, checkOptions);
    const corpus = await contained(project.root, site.runtime.corpus, {optional:true});
    await mkdir(dirname(corpus), {recursive:true});
@@ -159,7 +159,7 @@ export async function siteCommand(project, options, store, signal, out) {
   const redaction = createRedaction();
   redaction.addSecrets(names.map(name => process.env[name]));
   const diagnostic = deployDiagnostic(error,redaction.redact), provider = providerFailure(error,redaction.redact);
-  throw new RerError('deploy_refused', redaction.redact(`Run site deploy stopped: ${/^[a-z0-9-]{1,80}$/.test(error.message) ? error.message : 'site-deploy-failed'}${error.resource ? ` (${error.resource})` : ''}.${provider ? ` ${provider}.` : ''}${siteReadbackSummary(error)}`), 1, {step:diagnostic?.step, ...(diagnostic ? {siteDeploy:diagnostic} : {})});
+  throw new RerError('deploy_refused', redaction.redact(`Run site deploy stopped: ${/^[a-z0-9-]{1,80}$/.test(error.message) ? error.message : 'site-deploy-failed'}${error.resource ? ` (${error.resource})` : ''}.${provider ? ` ${provider}.` : ''}${siteReadbackSummary(error)}`), 1, {cause:error, step:diagnostic?.step, ...(diagnostic ? {siteDeploy:diagnostic} : {})});
  }
 }
 
