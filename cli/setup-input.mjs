@@ -81,7 +81,7 @@ export async function setupInput(project, options, vars, signal, { origin } = {}
    shape[key]=privateValue?'<private value>':choices?.[0]??'<value>';
    return `${key} (${type}${choices?`; choices: ${choices.map(value=>JSON.stringify(value)).join(' | ')}`:''})`;
   });
-  throw missing(`Missing or invalid active setup fields: ${details.join(', ')}. Create an owner-only JSON file (chmod 600 answers.json) shaped ${JSON.stringify(shape)}, then run rer setup --answers answers.json --non-interactive. --owner-email EMAIL and --owner-name NAME are also accepted when declared; use manifest field names inside the JSON, never an environment-file wrapper.`);
+  throw missing(`Missing or invalid active setup fields: ${details.join(', ')}. Create an owner-only JSON file (chmod 600 answers.json) shaped ${JSON.stringify(shape)}, then run ~/.local/bin/rer setup --answers answers.json --non-interactive. --owner-email EMAIL and --owner-name NAME are also accepted when declared; use manifest field names inside the JSON, never an environment-file wrapper.`);
  }
  if(!mailbox(answers[names.email]))throw invalid('Provide a valid plain owner mailbox.');
  answers[names.email]=answers[names.email].toLowerCase();
@@ -89,13 +89,13 @@ export async function setupInput(project, options, vars, signal, { origin } = {}
  const {owners,placeholder}=await assertLocalOwner(project.root,answers[names.email],message=>refuse(message),project.adapter.hooks?.localOwner,`${names.email} in ${project.adapter.hooks?.secrets?.file??'.dev.vars'}`);
  // The zero-setup owner gives way to the real one; lifecycle renames it in place.
  if(placeholder&&placeholder.toLowerCase()!==answers[names.email])project.ownerReplacement={from:placeholder,to:answers[names.email]};
- if(savedEmail&&!mailbox(savedEmail))throw refuse('Saved owner is malformed. Restore private settings or run rer reset --yes.');
+ if(savedEmail&&!mailbox(savedEmail))throw refuse('Saved owner is malformed. Restore private settings or run ~/.local/bin/rer reset --yes.');
  if(savedEmail&&savedEmail.toLowerCase()!==answers[names.email]&&(owners.length?!placeholder:savedEmail.toLowerCase()!==zeroSetupOwner(await realpath(project.root)))){
-  if(owners.length)throw refuse(`Private setting ${names.email} differs from the retained database owner. Restore ${names.email} in ${project.adapter.hooks?.secrets?.file??'.dev.vars'} to ${answers[names.email]}, then run rer setup --owner-email ${answers[names.email]}; or back up data and run rer reset --yes. Private bytes were kept.`);
-  throw refuse(`Owner conflicts with the saved installation (${savedEmail}). Run rer setup --owner-email ${savedEmail}, or back up data, run rer dev --stop, then rer reset --yes followed by rer setup --owner-email ${answers[names.email]}. Reset deletes local data.`);
+  if(owners.length)throw refuse(`Private setting ${names.email} differs from the retained database owner. Restore ${names.email} in ${project.adapter.hooks?.secrets?.file??'.dev.vars'} to ${answers[names.email]}, then run ~/.local/bin/rer setup --owner-email ${answers[names.email]}; or back up data and run ~/.local/bin/rer reset --yes. Private bytes were kept.`);
+  throw refuse(`Owner conflicts with the saved installation (${savedEmail}). Run ~/.local/bin/rer setup --owner-email ${savedEmail}, or back up data, run ~/.local/bin/rer dev --stop, then ~/.local/bin/rer reset --yes followed by ~/.local/bin/rer setup --owner-email ${answers[names.email]}. Reset deletes local data.`);
  }
 
- try{return seed.model.validateInput(answers,known);}catch{throw missing('Installer answers are incomplete. Supply the active manifest fields using rer setup --answers answers.json --non-interactive.');}
+ try{return seed.model.validateInput(answers,known);}catch{throw missing('Installer answers are incomplete. Supply the active manifest fields using ~/.local/bin/rer setup --answers answers.json --non-interactive.');}
 }
 
 async function question(label,privateValue,signal){
@@ -103,7 +103,7 @@ async function question(label,privateValue,signal){
  const output=new Writable({write(chunk,_encoding,done){if(!muted)process.stderr.write(chunk);done();}});
  const prompt=createInterface({input:process.stdin,output,terminal:true});
  prompt.on('SIGINT',()=>process.kill(process.pid,'SIGINT'));
- const closed=new Promise((_,reject)=>prompt.once('close',()=>reject(missing('Terminal input closed before setup answers were complete. Use rer setup --answers answers.json --non-interactive.'))));
+ const closed=new Promise((_,reject)=>prompt.once('close',()=>reject(missing('Terminal input closed before setup answers were complete. Use ~/.local/bin/rer setup --answers answers.json --non-interactive.'))));
  try{const pending=prompt.question(label+'\n',{signal});muted=privateValue;return await Promise.race([pending,closed]);}finally{prompt.close();muted=false;output.end();if(privateValue)process.stderr.write('\n');}
 }
 

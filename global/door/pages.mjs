@@ -15,7 +15,7 @@ function page(title, body, { script = '' } = {}) {
  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="origin"><title>${escape(title)}</title><style>${style}</style></head><body><main>${body}</main>${script ? `<script>${script}</script>` : ''}</body></html>`;
 }
 
-export const rebootNote = 'After a reboot or logout the front door needs <code>rer door start</code> (or any <code>rer dev</code> in a door-mode checkout).';
+export const rebootNote = 'After a reboot or logout the front door needs <code>~/.local/bin/rer door start</code> (or any <code>~/.local/bin/rer dev</code> in a door-mode checkout).';
 
 export function indexPage({ port, version, sites }) {
  const rows = sites.map(site => {
@@ -24,8 +24,8 @@ export function indexPage({ port, version, sites }) {
   return `<tr><td><a href="${escape(link)}/">${escape(site.name)}</a>${direct}</td><td>${escape(site.state)}</td><td class="muted"><code>${escape(site.path)}</code></td></tr>`;
  }).join('');
  return page('rer front door', `<h1>rer front door</h1><p class="muted">Port ${port} · rer ${escape(version)}. A site starts when you open it and stops when idle.</p>
-${sites.length ? `<table><thead><tr><th>Site</th><th>State</th><th>Checkout</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No checkouts are registered. Add one with <code>rer door add PATH</code>.</p>'}
-<p class="muted">Add a checkout with <code>rer door add PATH</code>; see sign-in links with <code>rer door status --links</code>. ${rebootNote}</p>`);
+${sites.length ? `<table><thead><tr><th>Site</th><th>State</th><th>Checkout</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No checkouts are registered. Add one with <code>~/.local/bin/rer door add PATH</code>.</p>'}
+<p class="muted">Add a checkout with <code>~/.local/bin/rer door add PATH</code>; see sign-in links with <code>~/.local/bin/rer door status --links</code>. ${rebootNote}</p>`);
 }
 
 const poll = `const fragment=location.hash;async function check(){try{const r=await fetch('/__rer/door/state',{cache:'no-store'});const s=await r.json();
@@ -45,5 +45,5 @@ export function failurePage(name, reason, to) {
 }
 
 export function unknownPage(name, port) {
- return page('No such site', `<h1>No checkout is registered as ${escape(name)}</h1><p>Register a checkout with <code>rer door add PATH</code>, then open <code>http://NAME.localhost:${port}</code>. <a href="http://localhost:${port}/">All sites</a>.</p>`);
+ return page('No such site', `<h1>No checkout is registered as ${escape(name)}</h1><p>Register a checkout with <code>~/.local/bin/rer door add PATH</code>, then open <code>http://NAME.localhost:${port}</code>. <a href="http://localhost:${port}/">All sites</a>.</p>`);
 }

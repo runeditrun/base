@@ -14,7 +14,7 @@ export async function versionCommand(argv) {
  if (pinned) {
   process.stdout.write(pinned.ready
    ? `This checkout (${target.root}) pins rer ${pinned.installed} (package).\n`
-   : `This checkout (${target.root}) pins rer ${pinned.declared} (package), ${pinned.installed ? `but node_modules holds ${pinned.installed}` : 'not installed yet'}: run rer install.\n`);
+   : `This checkout (${target.root}) pins rer ${pinned.declared} (package), ${pinned.installed ? `but node_modules holds ${pinned.installed}` : 'not installed yet'}: run ~/.local/bin/rer install.\n`);
   return 0;
  }
  const { mode, entry } = dispatcher(target.root);

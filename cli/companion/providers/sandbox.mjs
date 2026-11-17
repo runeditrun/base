@@ -12,7 +12,7 @@ function executable(name, env, cwd) {
 // Do not replace this with a provider workspace-write setting (which permits global reads).
 // Other platforms refuse before any job is claimed; nothing runs unconfined.
 export function assertSandboxPlatform() {
-  if (process.platform !== 'darwin' || !existsSync('/usr/bin/sandbox-exec')) throw new Error('Local engineering requires the supported macOS sandbox-exec boundary. rer companion run works only on macOS; it never runs a provider without that boundary.');
+  if (process.platform !== 'darwin' || !existsSync('/usr/bin/sandbox-exec')) throw new Error('Local engineering requires the supported macOS sandbox-exec boundary. ~/.local/bin/rer companion run works only on macOS; it never runs a provider without that boundary.');
 }
 
 export function sandboxCommand(provider, cwd, env) {

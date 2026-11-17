@@ -27,7 +27,7 @@ export async function refuseLocalEnvOutput(root, outputs, { uploaded = false } =
  try { await refuseLocalEnvFiles(root, outputs ?? ['dist']); }
  catch (error) {
   if (!error.resource) throw error;
-  if (uploaded) throw refuse(`The deploy hook's build output holds the local settings file ${error.resource}, and the hook has already uploaded its build, so it may be on the live Worker. Remove what copies it into the build output, rotate every credential in that file, then run rer deploy again.`);
+  if (uploaded) throw refuse(`The deploy hook's build output holds the local settings file ${error.resource}, and the hook has already uploaded its build, so it may be on the live Worker. Remove what copies it into the build output, rotate every credential in that file, then run ~/.local/bin/rer deploy again.`);
   throw refuse(`The build output holds the local settings file ${error.resource}; a deployment never carries one. Remove what puts it there (a file in public/, or a build step that copies it), then run the command again. Nothing was uploaded.`);
  }
 }

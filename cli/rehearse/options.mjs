@@ -1,7 +1,7 @@
 import {resolve} from 'node:path';
 import {invalid} from '../errors.mjs';
 
-export const rehearseHelp = `Usage: rer rehearse [--cwd DIR] [--ref REF] [--json] [FLAGS]
+export const rehearseHelp = `Usage: ~/.local/bin/rer rehearse [--cwd DIR] [--ref REF] [--json] [FLAGS]
 
 Rehearse the first managed build in a fresh two-commit copy, outside this checkout.
 Runs every declared setup, build, verify and artifact operation, in that order,
@@ -27,7 +27,7 @@ Operations are trusted seed code and can install packages and contact the networ
 This is a local build rehearsal; it does not attest, upload or deploy an artifact.
 
 Heavy work: signers and seed lanes must run through .tools/heavy-slot.py:
-  python3 -I /path/to/.tools/heavy-slot.py --remote auto -- rer rehearse --cwd SEED
+  python3 -I /path/to/.tools/heavy-slot.py --remote auto -- ~/.local/bin/rer rehearse --cwd SEED
 Use a clean committed worktree when routing remotely; the selected source must be local
 on that runner. Only declared operations may acquire dependencies over the network.
 `;
@@ -46,7 +46,7 @@ export function rehearseOptions(args) {
     if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value)>86400) throw invalid(`${flag} takes integer seconds from 1 to 86400.`);
     options[key]=Number(value);
    } else options[key]=value;
-  } else throw invalid(`Unsupported rehearsal flag ${flag}. Run rer rehearse --help.`);
+  } else throw invalid(`Unsupported rehearsal flag ${flag}. Run ~/.local/bin/rer rehearse --help.`);
  }
  options.cwd=resolve(options.cwd);
  if (options.ref.startsWith('-')) throw invalid('--ref must name a Git commit or reference.');

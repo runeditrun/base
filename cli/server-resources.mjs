@@ -51,7 +51,7 @@ export async function serverResources(root,{load=()=>loadavg()[0],disk=statfs,en
  // Validate explicit values before doing any measurements.
  let floor=serversDiskFloor(env);
  const measured=threshold===Infinity?0:await load();
- if(!Number.isFinite(measured)||measured>threshold)throw refuse(`Not started: this computer is busy. Its 1-minute load is ${Number.isFinite(measured)?measured.toFixed(1):'unknown'} and a server starts only at ${threshold} or below.\nTry again in a few minutes, or start it anyway with a higher threshold, for example RER_SERVERS_LOAD_THRESHOLD=${Math.ceil(Math.max(threshold,Number.isFinite(measured)?measured:0)*2)} rer dev.`);
+ if(!Number.isFinite(measured)||measured>threshold)throw refuse(`Not started: this computer is busy. Its 1-minute load is ${Number.isFinite(measured)?measured.toFixed(1):'unknown'} and a server starts only at ${threshold} or below.\nTry again in a few minutes, or start it anyway with a higher threshold, for example RER_SERVERS_LOAD_THRESHOLD=${Math.ceil(Math.max(threshold,Number.isFinite(measured)?measured:0)*2)} ~/.local/bin/rer dev.`);
  if(env.RER_SERVERS_DISK_FLOOR_GIB===undefined)floor=serversDiskFloor(env,await seedDiskBytes(root));
  const temporary=resolve(env.TMPDIR||env.TMP||env.TEMP||tmpdir());
  for(const path of new Set([resolve(root),temporary,serversDirectory(env)])){

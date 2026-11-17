@@ -36,7 +36,7 @@ export async function selectedOrigin(project, options, { setup = false } = {}) {
  // Setup on a saved checkout moves it to another port; the host stays.
  let moved;
  if (setup && previous && previous.origin !== url) {
-  if (previous.hostname.replace(/^\[|\]$/g, '') !== host) throw refuse('Setup origin conflicts with the saved installation. Reuse its origin or back up data and run rer reset --yes.');
+  if (previous.hostname.replace(/^\[|\]$/g, '') !== host) throw refuse('Setup origin conflicts with the saved installation. Reuse its origin or back up data and run ~/.local/bin/rer reset --yes.');
   moved = { from: savedPort, to: port };
  }
  return { url, host, port, vars, savedOrigin: previous?.origin, moved, explicitPort: options.port !== undefined, ...(taken ? { skipped: defaultPort } : {}) };
@@ -48,7 +48,7 @@ export async function availablePort(host, port, { root, saved = false, verb = 'd
  const context = inspectionContext({port,verb});
  const result = await probePort(host, port, { context });
  if (result.available) return;
- if (result.code && result.code !== 'EADDRINUSE') throw refuse(`Port ${port} cannot be used on ${host}: ${result.code}. Check the address or use rer setup --port PORT with a free port, then run rer dev again.`);
+ if (result.code && result.code !== 'EADDRINUSE') throw refuse(`Port ${port} cannot be used on ${host}: ${result.code}. Check the address or use ~/.local/bin/rer setup --port PORT with a free port, then run ~/.local/bin/rer dev again.`);
  throw refuse(await busyPortMessage({ port, host, root, saved, context, listener: result.listener ?? null }));
 }
 
@@ -80,7 +80,7 @@ export async function reset(project, options, out) {
 async function resetHeld(project,options,out,operation) {
  await refuseLegacyProcess(project,{reset:true,verb:'reset',operation});
  const { strandedOriginals } = await shared('local/recovery.mjs');
- if ((await strandedOriginals(project.root)).length) throw refuse('An interrupted build holds private settings. Run rer build to recover them before reviewing reset.');
+ if ((await strandedOriginals(project.root)).length) throw refuse('An interrupted build holds private settings. Run ~/.local/bin/rer build to recover them before reviewing reset.');
  // The seed's own safety check (legacy data it still has to recover, for
  // example) runs before the inventory and confirmation; --yes cannot skip it.
  const preflight = project.adapter.resetPreflight;
@@ -124,7 +124,7 @@ export async function refuseLegacyProcess(project,{reset=false,verb='dev',operat
   if(!isolated){
    const {sqliteCustody}=await shared('local/sqlite-custody.mjs');
    const database=await sqliteCustody(project.root);
-   if(database)throw refuse(`Another process holds an active SQLite lock on ${database}. Process inspection did not identify its PID. Stop unmanaged local servers (including Wrangler), then retry. Use rer dev --stop or rer preview --stop for a registered server.`);
+   if(database)throw refuse(`Another process holds an active SQLite lock on ${database}. Process inspection did not identify its PID. Stop unmanaged local servers (including Wrangler), then retry. Use ~/.local/bin/rer dev --stop or ~/.local/bin/rer preview --stop for a registered server.`);
   }
   return {lockProof:true};
  }

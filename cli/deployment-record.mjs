@@ -45,7 +45,7 @@ export async function heldDeployments(root) {
 
 function commandFor(options, environment) {
  const again = deployAgain({ ...options, environment });
- if (options.verb === 'signin') return again.replace(/^rer deploy/, 'rer signin');
+ if (options.verb === 'signin') return again.replace('~/.local/bin/rer deploy', '~/.local/bin/rer signin');
  if (options.remove) return `${again} --remove --yes`;
  if (options.setSecret) return `${again} --set-secret ${options.setSecret}`;
  if (options.reopenInstallationKey) return `${again} --reopen-installation-key ${options.reopenInstallationKey}`;

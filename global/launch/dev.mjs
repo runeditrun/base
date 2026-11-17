@@ -20,7 +20,6 @@ import { printer } from './render.mjs';
 import { access } from 'node:fs/promises';
 import { layout } from '../cli/layout.mjs';
 import { pathAdvice } from '../cli/path-link.mjs';
-import { shellQuote } from '../../cli/node-runtime-cache.mjs';
 import { showBudget } from '../../cli/run-transfers.mjs';
 import { stopLaunch } from './stop.mjs';
 import { launchDirectory, liveWorker } from './state.mjs';
@@ -36,7 +35,7 @@ export async function launchDev(target) {
  const devArgs = args.filter(arg => !['--detach', '--foreground', '--door-start'].includes(arg));
  // A pin from before the front door cannot move to it: say so in one line.
  if ((devArgs.includes('--door') || devArgs.includes('--direct')) && !await doorCapable(target.root)) {
-  process.stderr.write('This checkout\'s pinned Base has no front-door support, so it stays direct. Refresh its Base to serve it through the door; rer door add still lists it and starts it on a visit.\n');
+  process.stderr.write('This checkout\'s pinned Base has no front-door support, so it stays direct. Refresh its Base to serve it through the door; ~/.local/bin/rer door add still lists it and starts it on a visit.\n');
   return 2;
  }
  // An invocation the pinned dispatcher refuses goes straight to it, so the
@@ -52,9 +51,9 @@ export async function launchDev(target) {
  // and not when install.sh closes with its own required PATH step.
  delete process.env.RER_LAUNCH_PATH_STEP;
  const paths = layout();
- if (!process.env.RER_INSTALLER_PATH_STEP && await access(paths.launcher).then(() => true, () => false) && await pathAdvice(paths)) process.env.RER_LAUNCH_PATH_STEP = `Next step, after opening your app: a bare \`rer\` in a new terminal will not be found yet. Run ${shellQuote(paths.launcher)} cli path to see the one line that fixes it; it changes no shell file itself.`;
+ if (!process.env.RER_INSTALLER_PATH_STEP && await access(paths.launcher).then(() => true, () => false) && await pathAdvice(paths)) process.env.RER_LAUNCH_PATH_STEP = `Next step, after opening your app: a bare \`rer\` in a new terminal will not be found yet. Run ~/.local/bin/rer cli path to see the one line that fixes it; it changes no shell file itself.`;
  const here = await realpath(process.cwd()).catch(() => undefined);
- const out = printer({ root: checkout, json: devArgs.includes('--json'), stopHint: `rer dev --stop${here === checkout ? '' : ` --cwd ${JSON.stringify(checkout)}`}`, keyless: doorStart });
+ const out = printer({ root: checkout, json: devArgs.includes('--json'), stopHint: `~/.local/bin/rer dev --stop${here === checkout ? '' : ` --cwd ${JSON.stringify(checkout)}`}`, keyless: doorStart });
  const detach = args.includes('--detach') || (!args.includes('--foreground') && !process.stdout.isTTY);
  return detach ? detached(target, devArgs, directory, out, doorStart) : foreground(target, devArgs, directory, out, doorStart);
 }
@@ -146,6 +145,6 @@ async function follow(directory, token, out, { worker, quiet = false }) {
 }
 
 function missing(directory) {
- process.stderr.write(`rer dev: the launch stopped before it finished. Run rer dev again; its log is ${join(directory, 'launch.log')}.\n`);
+ process.stderr.write(`rer dev: the launch stopped before it finished. Run ~/.local/bin/rer dev again; its log is ${join(directory, 'launch.log')}.\n`);
  return 1;
 }

@@ -29,7 +29,7 @@ export function localOrigin(vars) {
   let url
   try { url = new URL(vars.AUTH_ORIGIN) } catch { /* Use a fixed, non-secret diagnostic. */ }
   if (vars.AUTH_LOCAL !== 'true' || !url || url.protocol !== 'http:' || (url.hostname !== '127.0.0.1' && !isLocalhostName(url.hostname)) || url.origin !== vars.AUTH_ORIGIN || url.username || url.password) {
-    throw new Error('Invalid local origin in .dev.vars: AUTH_ORIGIN must be http://127.0.0.1:PORT (or a front-door http://NAME.localhost:PORT) with AUTH_LOCAL=true. Run rer setup to save a valid one. If you changed AUTH_ORIGIN yourself, put back the http://127.0.0.1:PORT origin setup saved, or pick a port with rer setup --port PORT.')
+    throw new Error('Invalid local origin in .dev.vars: AUTH_ORIGIN must be http://127.0.0.1:PORT (or a front-door http://NAME.localhost:PORT) with AUTH_LOCAL=true. Run ~/.local/bin/rer setup to save a valid one. If you changed AUTH_ORIGIN yourself, put back the http://127.0.0.1:PORT origin setup saved, or pick a port with ~/.local/bin/rer setup --port PORT.')
   }
   return url
 }

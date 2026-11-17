@@ -21,13 +21,13 @@ export function deployDiagnostic(error, redact) {
   const failureCode = detail.code ?? error.message;
   const code = /^[a-zA-Z0-9_-]{1,120}$/.test(failureCode) ? clean(failureCode) : 'deploy-failed';
   return {code,step:clean(detail.step ?? 'deploy'),created:(detail.created ?? []).map(clean),
-    ...(detail.providerRequest ? {providerRequest:{...detail.providerRequest,endpoint:clean(detail.providerRequest.endpoint),step:clean(detail.step ?? 'deploy'),body:redact ? providerText(detail.output ?? '',redact) : '(provider output withheld; rer deploy provides redacted details)'}} : {}),
+    ...(detail.providerRequest ? {providerRequest:{...detail.providerRequest,endpoint:clean(detail.providerRequest.endpoint),step:clean(detail.step ?? 'deploy'),body:redact ? providerText(detail.output ?? '',redact) : '(provider output withheld; ~/.local/bin/rer deploy provides redacted details)'}} : {}),
     ...(typeof error.resource==='string' && /^(?:d1|r2|kv|queues|worker|service):[a-z0-9-]+$/.test(error.resource) ? {resource:clean(error.resource)} : {}),
     ...(detail.providerCodes?.length ? {providerCodes:detail.providerCodes} : {}),
     ...(error.d1Import ? {d1Import:{...error.d1Import,body:importText(error.d1Import.body,redact),
       errors:error.d1Import.errors.map(item => ({...item,...(item.message ? {message:importText(item.message,redact,300)} : {})}))}} : {}),
     ...(redact && providerFailure(error,redact) ? {provider:providerFailure(error,redact)} : {}),
-    output:(detail.output ? (redact ? clean(detail.output) : '(provider output withheld; rer deploy provides redacted details)') : '(no provider output)').split(/\r?\n/).slice(0,8).map(line=>line.slice(0,500)).join('\n')};
+    output:(detail.output ? (redact ? clean(detail.output) : '(provider output withheld; ~/.local/bin/rer deploy provides redacted details)') : '(no provider output)').split(/\r?\n/).slice(0,8).map(line=>line.slice(0,500)).join('\n')};
 }
 // Reuse the D1 upload retention boundary: redact complete text, omit URLs,
 // then bound UTF-8 bytes so a credential cannot straddle the public excerpt.
@@ -51,7 +51,7 @@ export function providerRefusal(error, redact = String) {
 /** What a migration that failed or stays refused means for the next run, from the
  * error's own `migration` or `migrationClaim` (set by any copy of the kit) and its
  * `d1:<name>` resource; undefined otherwise. */
-export function migrationFailure(error, again = 'rer deploy') {
+export function migrationFailure(error, again = '~/.local/bin/rer deploy') {
   const safe = value => String(value).replace(/[^\w. -]/g,'?').slice(0,120);
   const database = /^d1:([a-z0-9-]+)$/.exec(error?.resource ?? '')?.[1];
   const claim = error?.migrationClaim;
@@ -68,7 +68,7 @@ export function migrationFailure(error, again = 'rer deploy') {
     const name = safe(unconfirmed.name).replaceAll(' ','?');
     const run = `npx wrangler d1 execute ${database ?? '<database>'} --remote --command "DELETE FROM d1_migrations WHERE name='${name}' AND sha256='${unconfirmed.sha256}' AND state='applying'"`;
     return `Migration ${name} in ${database ? `D1 ${database}` : 'its D1 database'} was started on bytes this build does not have (SHA-256 ${unconfirmed.sha256.slice(0,12)}) and never confirmed. ${unconfirmed.rewritten
-      ? `A reviewed rewrite in migrations/rewrites.json replaces those bytes; rer deploy retries it under its deploy lock, and this run does not hold one.`
+      ? `A reviewed rewrite in migrations/rewrites.json replaces those bytes; ~/.local/bin/rer deploy retries it under its deploy lock, and this run does not hold one.`
       : `No reviewed rewrite in migrations/rewrites.json replaces those bytes, so rer will not run it again.`} D1 imports a migration and its completion marker as one atomic file, so a claim still applying after that attempt ended means none of it applied. Deleting the claim is safe once that attempt has ended (it failed, or its run was stopped) and no other deploy of this environment is running: ${run}, then run ${again} again. While a deploy may still be running, leave it.`;
   }
   if (typeof error?.migration === 'string') return `Migration ${safe(error.migration)} did not apply; the next ${again} runs it again once rer proves none of it applied.`;

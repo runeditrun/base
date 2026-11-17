@@ -7,6 +7,7 @@ import { basename, join, resolve } from 'node:path';
 import { ownManifest, ownRoot, packageDigest, packageFileList } from '../package-info.mjs';
 import { installRecord, launcherOwner, launcherScript, layout } from './layout.mjs';
 import { pathAdvice } from './path-link.mjs';
+import { commandNotFoundHelp } from '../../cli/command-guidance.mjs';
 import { runningDoor } from '../../cli/door.mjs';
 import { channelOf } from './status.mjs';
 
@@ -41,10 +42,11 @@ async function writeLauncher(paths) {
 }
 
 // The absolute launcher works immediately, without editing shell files.
-const shellQuote = value => "'" + value.replaceAll("'", "'\"'\"'") + "'";
 async function closing(paths) {
  const notices = await pathAdvice(paths, process.env, { includeShellStep: false });
- return (notices ? notices + '\n' : '') + (process.env.RER_INSTALL_NO_NEXT ? '' : `Run a downloaded JavaScript tool with the installed runtime: ${shellQuote(paths.launcher)} run --script ./tool.mjs [ARGS...]\nNext, start an app: ${shellQuote(paths.launcher)} dev <owner>/<repo>\n`);
+ if (process.env.RER_INSTALL_NO_NEXT) return notices ? notices + '\n' : '';
+ const advice = await pathAdvice(paths);
+ return `Run a downloaded JavaScript tool with the installed runtime: ~/.local/bin/rer run --script ./tool.mjs [ARGS...]\nNext, start an app: ~/.local/bin/rer dev <owner>/<repo>\n${commandNotFoundHelp}\n${advice ? advice + '\n' : ''}`;
 }
 
 export async function install({ quiet = false } = {}) {
@@ -53,7 +55,7 @@ export async function install({ quiet = false } = {}) {
  const channel = (process.env.RER_INSTALL_CHANNEL ?? (await channelOf(paths)).channel) === 'script' ? 'script' : 'npx';
  const launcher = await launcherOwner(paths.launcher);
  if (launcher.state === 'foreign') {
-  process.stderr.write(`rer cli install: ${paths.launcher} already exists and was not written by rer cli install (it may be the unrelated npm package "rer"). Nothing was changed. Remove or rename it, then run the install again.\n`);
+  process.stderr.write(`~/.local/bin/rer cli install: ${paths.launcher} already exists and was not written by ~/.local/bin/rer cli install (it may be the unrelated npm package "rer"). Nothing was changed. Remove or rename it, then run the install again.\n`);
   return 4;
  }
  const record = await installRecord(paths), current = await readLink(paths.current);

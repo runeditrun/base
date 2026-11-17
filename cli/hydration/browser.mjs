@@ -12,7 +12,7 @@ export async function launchChromium(root) {
  // Pages fulfilled by the check would otherwise count as public, and Chromium would
  // refuse a dev server's loopback HMR socket from them.
  try { return await playwright.chromium.launch({ args: ['--disable-features=LocalNetworkAccessChecks'] }); }
- catch (error) { throw new RerError('hydration_browser_missing', `The hydration check could not start Chromium from the seed's ${name}: ${String(error.message).split('\n').find(line => line.trim()) ?? error}. Run rer verify, which downloads the browser it pins first.`, 1); }
+ catch (error) { throw new RerError('hydration_browser_missing', `The hydration check could not start Chromium from the seed's ${name}: ${String(error.message).split('\n').find(line => line.trim()) ?? error}. Run ~/.local/bin/rer verify, which downloads the browser it pins first.`, 1); }
 }
 
 const strip = new Set(['content-encoding', 'content-length', 'transfer-encoding', 'connection']);

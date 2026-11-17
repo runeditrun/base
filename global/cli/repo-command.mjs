@@ -18,7 +18,7 @@ export async function repoCommand(request) {
  if (installed !== 0) return installed;
  await checkoutRepository(request);
  const root = await realpath(request.root);
- const next = command => `cd ${shellQuote(directory)} && rer ${command}`;
+ const next = command => `cd ${shellQuote(directory)} && ~/.local/bin/rer ${command}`;
  if (verb === 'setup') {
   await (await import('../../cli/business/carry.mjs')).refreshCheckout(root);
   const state = await launchDirectory(root), children = new Set(), controller = new AbortController();
