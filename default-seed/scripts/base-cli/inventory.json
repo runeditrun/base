@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.121-dev.gc9657494",
+  "cliVersion": "0.2.121-dev.g816a9a0f",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -197,7 +197,7 @@
     },
     "operator-settings.mjs": {
       "source": "onboarding/operator-settings.mjs",
-      "sha256": "e7aa48031a8903fda753e37aae50832032d60c51a95d64a4f1465ccc0cf42098"
+      "sha256": "47ee566c06620cc503262d25405397576ef03fcc7544d30e65567549d18fc9cc"
     },
     "package.json": {
       "source": "onboarding/package.json",
