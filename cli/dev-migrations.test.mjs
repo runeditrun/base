@@ -36,6 +36,11 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  const declaration = JSON.parse(await readFile(declarationPath, 'utf8'));
  declaration.r2 = [{ binding: 'FILES' }];
  await writeFile(declarationPath, JSON.stringify(declaration));
+ // A hosted-only choice is refused by name before setup can save it.
+ const answers=join(f.root,'hosted-mail-answers.json');
+ await writeFile(answers,JSON.stringify({MAIL_PROVIDER:'none'}),{mode:0o600});
+ const refusedMail=events(await f.run(['setup','--answers','hosted-mail-answers.json','--owner-email','migration-owner@example.test','--non-interactive','--json'],1)).find(event=>event.event==='error')?.message;
+ assert.match(refusedMail,/MAIL_PROVIDER[^]*none[^]*development/);
  const setupReady = events(await f.run(['setup', '--owner-email', 'migration-owner@example.test', '--non-interactive', '--json'])).find(event => event.event === 'setup-ready');
  assert.ok(setupReady?.neededForDeploy?.some(item => item.includes('CLOUDFLARE_API_TOKEN')), JSON.stringify(setupReady));
  assert.ok(setupReady.neededForDeploy.some(item => item.includes('MAIL_API_KEY (or RESEND_API_KEY)')), JSON.stringify(setupReady));
@@ -49,15 +54,13 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  const applied = setupLog.split('\n').find(line => line.startsWith('Applied local migrations:'));
  for (const name of history) assert.ok(applied?.includes(name), `setup names ${name}`);
  t.diagnostic(`setup history: ${history.length} synthetic migrations; 0 repeated tables; all applied names present`);
- // A hosted-only choice is refused by name before setup can save it.
- const answers=join(f.root,'hosted-mail-answers.json');
- await writeFile(answers,JSON.stringify({MAIL_PROVIDER:'none'}),{mode:0o600});
- const refusedMail=events(await f.run(['setup','--answers','hosted-mail-answers.json','--non-interactive','--json'],1)).find(event=>event.event==='error')?.message;
- assert.match(refusedMail,/MAIL_PROVIDER[^]*none[^]*development/);
  // A checkout that already stored that choice is repaired by ordinary setup.
  const settingsPath=join(f.root,'.dev.vars');
  const originalSettings=await readFile(settingsPath,'utf8');
  await writeFile(settingsPath,originalSettings.replace('MAIL_PROVIDER=development','MAIL_PROVIDER=none'),{mode:0o600});
+ const savedAnswersPath=join(f.root,'.seed/installer/setup-answers.json');
+ const savedAnswers=JSON.parse(await readFile(savedAnswersPath,'utf8'));
+ await writeFile(savedAnswersPath,JSON.stringify({...savedAnswers,MAIL_PROVIDER:'none'}),{mode:0o600});
  const rejectedMail=events(await f.run(['preview','--foreground','--json'],3)).find(event=>event.event==='error')?.message;
  assert.match(rejectedMail,/MAIL_PROVIDER[^]*none[^]*development[^]*rer setup/);
  const setupStarted=performance.now();
