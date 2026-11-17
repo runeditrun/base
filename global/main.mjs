@@ -85,7 +85,7 @@ export async function main(argv) {
  if (verb === 'run') return (await import('./run.mjs')).runScript(argv.slice(1));
  if (repositoryCommands[verb] && argv.includes('--help')) {
   const { help } = await import('../cli/parse.mjs');
-  process.stdout.write(`${help(verb)}\n${repositoryCommands[verb].usage}\n${repositoryCommands[verb].effects}\n${repositoryHelp}`);
+  process.stdout.write(withCommandHelp(`${help(verb)}\n${repositoryCommands[verb].usage}\n${repositoryCommands[verb].effects}\n${repositoryHelp}`));
   return 0;
  }
  try {
