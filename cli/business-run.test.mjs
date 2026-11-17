@@ -40,11 +40,20 @@ test('business run refuses unavailable authority without spawning or retrying an
  const f=await fixture(t);f.state.refuse=true;
  let result=await f.run([process.execPath,'-e','console.log("SHOULD-NOT-RUN")']);
  assert.equal(result.code,1);assert.ok(!result.stdout.includes('SHOULD-NOT-RUN'));assert.ok(!result.stderr.includes(secret));assert.equal(f.state.issued,1);
+ assert.match(result.stderr,/No cloud credential was issued; there is nothing to clean up\./);assert.doesNotMatch(result.stderr,/unconfirmed/);assert.equal(f.state.leases.size,0);
  f.state.refuse=false;f.state.cleanupFails=true;
  result=await f.run([process.execPath,'-e','process.exit(23)']);assert.equal(result.code,23);assert.match(result.stderr,/cleanup: unconfirmed/);assert.match(result.stderr,/rer business cleanup [a-f0-9-]+/);
- const lease=[...f.state.leases.keys()][0];f.state.cleanupFails=false;
+ const lease=[...f.state.leases.keys()][0];
+ const uncertain=await f.start(['cleanup',lease,'--status']).result;assert.equal(uncertain.code,1);assert.match(uncertain.stderr,/cleanup: unconfirmed/);
+ f.state.cleanupFails=false;
  const cleaned=await f.start(['cleanup',lease]).result;assert.equal(cleaned.code,0);assert.match(cleaned.stderr,/cleanup: revoked/);
  assert.equal(f.state.issued,2,'cleanup never reissues a credential');
+ f.state.leases.set(lease,{...f.state.leases.get(lease),cleanup_status:'expired'});
+ const expired=await f.start(['cleanup',lease,'--status']).result;assert.equal(expired.code,0);assert.match(expired.stderr,/cleanup: expired/);
+ f.state.exchangeFails=true;
+ const lost=await f.run([process.execPath,'-e','console.log("SHOULD-NOT-RUN")']);
+ assert.equal(lost.code,1);assert.match(lost.stderr,/cleanup: revoked/);assert.doesNotMatch(lost.stdout+lost.stderr,/SHOULD-NOT-RUN|nothing to clean up/);
+ assert.equal(f.state.revocations,3);
 });
 
 test('business run names the exchange gap once, with only the pending state and catalogue counts, and keeps its refusal exit',async t=>{
@@ -57,6 +66,7 @@ test('business run names the exchange gap once, with only the pending state and 
   assert.ok(JSON.stringify(f.state.answer.body).length>4096);
   const result=await f.run([process.execPath,'-e','console.log("SHOULD-NOT-RUN")']),output=result.stdout+result.stderr;
   assert.equal(result.code,1);assert.ok(!output.includes('SHOULD-NOT-RUN'));
+  assert.match(output,/No cloud credential was issued; there is nothing to clean up\./);assert.doesNotMatch(output,/unconfirmed/);assert.equal(f.state.leases.size,0);
   assert.equal(output.split(gap).length,2,'the gap is printed once');
   assert.equal(/stays pending; nothing was issued/.test(output),state==='pending');
   assert.match(output,/catalogue: 93 rows, 7 mention Workers \(see the audit row cloudflare\.token\.catalogue\)/);
@@ -68,6 +78,10 @@ test('business run names the exchange gap once, with only the pending state and 
  assert.equal(result.code,1);assert.match(output,/refused or its credential exchange failed/);
  for(const value of ['Not started','already requested',secret,expiry,'request-marker-1'])assert.ok(!output.includes(value),value);
  assert.equal(f.state.issued,3);
+ const missing='00000000-0000-4000-8000-000000000000';
+ for(const args of [['cleanup',missing],['cleanup',missing,'--status']]){
+  const absent=await f.start(args).result;assert.equal(absent.code,1);assert.match(absent.stderr,/No cloud credential was issued; there is nothing to clean up\./);assert.doesNotMatch(absent.stderr,/unconfirmed/);
+ }
 });
 
 test('business run forwards signals and enforces credential expiry, then revokes before exiting with the child signal',async t=>{

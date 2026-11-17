@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.121-dev.g897fca92",
+  "cliVersion": "0.2.121-dev.g52f3bed9",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -655,7 +655,7 @@
     },
     "cli/business/run-grant.mjs": {
       "source": "cli/business/run-grant.mjs",
-      "sha256": "e748e556907c41c1a55defbaea171c8f9e50e570dd0b2c33a9dbbc665104f513"
+      "sha256": "631787fc93cc21b4324070c3e5ca1a0e74c01951269fb3441ac889d7ea9b68a0"
     },
     "cli/business/run-mask.mjs": {
       "source": "cli/business/run-mask.mjs",
@@ -867,7 +867,7 @@
     },
     "cli/deploy-needs.mjs": {
       "source": "cli/deploy-needs.mjs",
-      "sha256": "c0bdd4fd259362941d0288931672a6b8156525c05b5429b4d8ff2c677b15bafc"
+      "sha256": "695215885e382e6b30ca1e92470bb48fba1fa88960dde4e9ab471a606a133648"
     },
     "cli/deploy-observation.mjs": {
       "source": "cli/deploy-observation.mjs",

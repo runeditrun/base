@@ -33,8 +33,15 @@ async function cleanup(api, id) {
   const value = await api.post(`${route}/${id}/revoke`, {}, { quiet: true, timeout: 15000 });
   if (value?.lease_id === id && ['revoked', 'expired'].includes(value.cleanup_status)
    && (value.cleanup_status !== 'revoked' || value.provider_credential_revoked === true)) return value.cleanup_status;
- } catch { /* A lost acknowledgement is unconfirmed, never success. */ }
+ } catch (error) {
+  if (error instanceof ApiError && error.status === 404) return 'not-issued';
+  // A lost acknowledgement is unconfirmed, never success.
+ }
  return 'unconfirmed';
+}
+function cleanupLine(id, status, suffix = '') {
+ return status === 'not-issued' ? 'No cloud credential was issued; there is nothing to clean up.\n'
+  : `Cloud credential cleanup: ${status}. Lease ${id}.${suffix}\n`;
 }
 export async function cleanupCommand(args) {
  if (args.length < 1 || args.length > 2 || args[1] !== undefined && args[1] !== '--status' || !/^[a-f0-9-]{36}$/.test(args[0])) {
@@ -44,9 +51,11 @@ export async function cleanupCommand(args) {
  try {
   const value = args[1] ? await api.request('GET', `${route}/${id}`, undefined, { quiet: true }) : null;
   const status = args[1] ? value?.lease_id === id && ['issuing','active','revoked','unconfirmed','expired'].includes(value.cleanup_status) ? value.cleanup_status : 'unconfirmed' : await cleanup(api, id);
-  process.stderr.write(`Cloud credential cleanup: ${status}. Lease ${id}.\n`);
+  process.stderr.write(cleanupLine(id, status));
   return ['revoked','expired'].includes(status) ? 0 : 1;
- } catch { process.stderr.write(`Cloud credential cleanup: unconfirmed. Lease ${id}.\n`); return 1; }
+ } catch (error) {
+  process.stderr.write(cleanupLine(id, error instanceof ApiError && error.status === 404 ? 'not-issued' : 'unconfirmed')); return 1;
+ }
 }
 export async function grantCommand(args) {
  if (args[0] !== '--grant' || !args[1] || args[2] !== '--' || !args[3]) { process.stderr.write(usage); return 2; }
@@ -73,7 +82,7 @@ export async function grantCommand(args) {
  } finally {
   const status = await cleanup(api, id);
   const expiry = lease && Number.isFinite(Date.parse(lease.credential_expires_at)) ? new Date(lease.credential_expires_at).toISOString() : 'the server-enforced expiry (at most 15 minutes)';
-  process.stderr.write(`Cloud credential cleanup: ${status}. Lease ${id}.${status === 'unconfirmed' ? ` Credential expiry: ${expiry}. Retry: rer business cleanup ${id}.` : ''}\n`);
+  process.stderr.write(cleanupLine(id, status, status === 'unconfirmed' ? ` Credential expiry: ${expiry}. Retry: rer business cleanup ${id}.` : ''));
   lease = undefined;
   for (const [signal, handler] of handlers) process.removeListener(signal, handler);
  }
