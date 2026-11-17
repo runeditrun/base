@@ -192,6 +192,9 @@ NODE
   esac
   printf '\nRequired next step: run the line below; you add ~/.local/bin to PATH in %s. The installer changes no shell file.\n' "$shell_file"
   "$HOME/.local/bin/rer" cli path
+ fi
+ if [ "$1" != business ]; then
+  shell_name=${SHELL:-}
   case "${shell_name##*/}" in zsh|bash) printf 'Open a new Terminal window, then `rer` works by name.\n' ;; esac
  fi
  return "$status"

@@ -46,7 +46,8 @@ async function closing(paths) {
  const notices = await pathAdvice(paths, process.env, { includeShellStep: false });
  if (process.env.RER_INSTALL_NO_NEXT) return notices ? notices + '\n' : '';
  const advice = await pathAdvice(paths);
- return `Run a downloaded JavaScript tool with the installed runtime: ~/.local/bin/rer run --script ./tool.mjs [ARGS...]\nNext, start an app: ~/.local/bin/rer dev <owner>/<repo>\n${commandNotFoundHelp}\n${advice ? advice + '\n' : ''}`;
+ const terminal = !advice && ['zsh', 'bash'].includes(basename(process.env.SHELL ?? '')) ? 'Open a new Terminal window, then `rer` works by name.\n' : '';
+ return `Run a downloaded JavaScript tool with the installed runtime: ~/.local/bin/rer run --script ./tool.mjs [ARGS...]\nNext, start an app: ~/.local/bin/rer dev <owner>/<repo>\n${commandNotFoundHelp}\n${advice ? advice + '\n' : terminal}`;
 }
 
 export async function install({ quiet = false } = {}) {
