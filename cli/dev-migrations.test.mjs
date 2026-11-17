@@ -27,6 +27,11 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  const history = Array.from({ length: 80 }, (_, i) => `${String(8000 + i)}_history.sql`);
  for (const [i, name] of history.entries()) await writeFile(join(f.root, 'migrations/core', name), `CREATE TABLE history_${i}(value TEXT);\n`);
  // Setup ends by naming what a hosted deploy will still need, from deploy.json.
+ // An adopting seed can offer these hosted choices in its setup manifest.
+ const manifestPath=join(f.root,'rer-setup.json');
+ const manifest=JSON.parse(await readFile(manifestPath,'utf8'));
+ manifest.fields.push({name:'MAIL_PROVIDER',label:'Mail provider',kind:'select',default:'development',options:[{value:'development',label:'Local'},{value:'none',label:'Off'},{value:'sendgrid',label:'SendGrid'}]});
+ await writeFile(manifestPath,JSON.stringify(manifest));
  const declarationPath = join(f.root, 'deploy.json');
  const declaration = JSON.parse(await readFile(declarationPath, 'utf8'));
  declaration.r2 = [{ binding: 'FILES' }];
@@ -44,6 +49,17 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  const applied = setupLog.split('\n').find(line => line.startsWith('Applied local migrations:'));
  for (const name of history) assert.ok(applied?.includes(name), `setup names ${name}`);
  t.diagnostic(`setup history: ${history.length} synthetic migrations; 0 repeated tables; all applied names present`);
+ // A hosted-only choice is refused by name before setup can save it.
+ const answers=join(f.root,'hosted-mail-answers.json');
+ await writeFile(answers,JSON.stringify({MAIL_PROVIDER:'none'}));
+ const refusedMail=events(await f.run(['setup','--answers',answers,'--non-interactive','--json'],1)).find(event=>event.event==='error')?.message;
+ assert.match(refusedMail,/MAIL_PROVIDER[^]*none[^]*development/);
+ // A checkout that already stored that choice is repaired by ordinary setup.
+ const settingsPath=join(f.root,'.dev.vars');
+ const originalSettings=await readFile(settingsPath,'utf8');
+ await writeFile(settingsPath,originalSettings.replace('MAIL_PROVIDER=development','MAIL_PROVIDER=none'),{mode:0o600});
+ const rejectedMail=events(await f.run(['preview','--foreground','--json'],3)).find(event=>event.event==='error')?.message;
+ assert.match(rejectedMail,/MAIL_PROVIDER[^]*none[^]*development[^]*rer setup/);
  const setupStarted=performance.now();
  const setup=await f.run(['setup','--owner-email','migration-owner@example.test','--non-interactive']);
  const setupText=setup.stdoutText+setup.stderrText;
@@ -51,12 +67,16 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  const setupCapture=await readFile(join(f.root,'.seed/installer/install.log'),'utf8');
  assert.match(setupCapture,/vite:import-analysis/,'source-import diagnostics remain in the redacted capture');
  assert.match(setupText,/Full output: \S*install\.log/);
+ assert.match(setupText,/MAIL_PROVIDER[^]*development/);
+ assert.equal(await readFile(settingsPath,'utf8'),originalSettings,'repeat setup repairs mail without changing the owner or secrets');
  t.diagnostic(`human rer setup: ${((performance.now()-setupStarted)/1000).toFixed(2)} s; source warnings only in capture`);
  await f.sql("CREATE TABLE saved_before_upgrade(value TEXT); INSERT INTO saved_before_upgrade VALUES('owner content')");
  const path = join(f.root, 'migrations/core/9998_local_upgrade.sql');
  // Simulate git pull after setup: the old build cannot know this migration.
  await writeFile(path, "CREATE TABLE local_upgrade(value TEXT); INSERT INTO local_upgrade VALUES('applied');\n");
  const settings = await readFile(join(f.root, '.dev.vars'));
+ const migrationRefusal=events(await f.run(['preview','--foreground','--json'],3)).find(event=>event.event==='error')?.message;
+ assert.match(migrationRefusal,/migration 9998_local_upgrade\.sql[^]*unapplied[^]*applied[^]*rer setup/);
  // Uptime supplies its own managed runtime target without an explicit timeout.
  // Delay real Vite configuration beyond the old handshake window, then require
  // actual app health. No fake server or readiness event can make this pass.
@@ -100,6 +120,19 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  assert.equal((await fetch(repeated.url + '/health')).status, 200, 'an up-to-date database starts without reapplying SQL');
  await f.stop(restarted);
  assert.deepEqual(await readFile(join(f.root, '.dev.vars')), settings);
+
+ // Real owner and authentication failures identify their own prerequisite.
+ await f.sql("UPDATE oa_operators SET status='inactive' WHERE role='owner'");
+ const missingOwner=events(await f.run(['dev','--foreground','--json'],3)).find(event=>event.event==='error')?.message;
+ assert.match(missingOwner,/oa_operators active owner[^]*0[^]*at least one[^]*rer setup/);
+ await f.sql("UPDATE oa_operators SET status='active' WHERE role='owner'");
+ for(const [field,value,expected] of [['AUTH_LOCAL','false','true'],['SESSION_SECRET','','set']]){
+  await writeFile(settingsPath,settings.toString().replace(new RegExp(`^${field}=.*$`,'m'),`${field}=${value}`),{mode:0o600});
+  const diagnostic=events(await f.run(['preview','--foreground','--json'],3)).find(event=>event.event==='error')?.message;
+  assert.ok(diagnostic.includes(field)&&diagnostic.includes(expected),diagnostic);
+  assert.ok(!diagnostic.includes(/^SESSION_SECRET=(.*)$/m.exec(settings.toString())[1]),'secret value stays private');
+ }
+ await writeFile(settingsPath,settings,{mode:0o600});
 
  await writeFile(join(f.root, 'migrations/core/9999_broken_upgrade.sql'), 'INSERT INTO missing_upgrade_table VALUES (1);\n');
  const failed = events(await f.run(['dev', '--foreground', '--json'], 1));
