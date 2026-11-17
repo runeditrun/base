@@ -1043,7 +1043,7 @@ test('inside an agent sandbox run and next apply the owner\'s choices for its ag
  remote.state.tasks = [{ task_id: 'sandbox-discover', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
  // next has nothing to answer, and says run has work and how to start it.
  const ready = await cli(home, ['business','next'], { env }), escaped = stateDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
- assert.match(ready.stdout, new RegExp(`Ready for run: this computer's names-only scan of the folders the owner allowed\\. Start it with: RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business run --once\n$`), 'an agent step waits, so next never says Nothing yet');
+ assert.match(ready.stdout, new RegExp(`Ready for run: this computer's names-only scan of the folders the owner allowed\\. Start it with: RER_BUSINESS_STATE_DIR=${escaped} (?:~/.local/bin/rer|npx -y @runeditrun/rer) business run --once\n$`), 'an agent step waits, so next never says Nothing yet');
  const scanned = await cli(home, ['business','run','--once'], { env });
  assert.equal(scanned.code, 0, scanned.stderr); assert.equal(remote.state.phase, 'done');
  assert.ok(scanned.stdout.includes('Scanning this computer\'s allowed folders for tool names') && scanned.stdout.includes('discover.local completed'), scanned.stdout);
