@@ -3,6 +3,13 @@ import { importFailureText, importText } from './d1-import-diagnostics.mjs';
 // Provider text is private until the CLI's existing credential redactor approves
 // it. Identity, rather than mutable Error properties, carries this diagnostic.
 const failures = new WeakMap();
+/** Ownership refusals name safe resource identities, never account credentials. */
+export function ownerTargetFailure(error) {
+  const mismatch = error?.ownerTargetMismatch;
+  if (error?.message !== 'owner-state-target-mismatch' || !mismatch) return undefined;
+  const name = value => typeof value === 'string' && /^[a-z][a-z0-9-]{2,62}$/.test(value) ? value : '(invalid Worker name)';
+  return `owner-state-target-mismatch: the deployment record names Worker ${name(mismatch.recordedWorker)}, while the requested deployment names Worker ${name(mismatch.requestedWorker)}. The record does not belong to this account, project, environment or Worker. Use the checkout, Cloudflare account and --environment that created this deployment, or choose a new --environment for a separate deployment. Nothing was changed.`;
+}
 export function recordDeployFailure(error, details) {
   failures.set(error,{...failures.get(error),...details});
   return error;

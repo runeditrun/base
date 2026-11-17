@@ -5,7 +5,7 @@ import { invalid, missing, refuse, RerError } from './errors.mjs';
 import { shared } from './shared.mjs';
 import { settingKinds } from './deploy-settings.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
-import { deployDiagnostic, providerRefusal } from '../modules/deploy-kit/diagnostics.mjs';
+import { deployDiagnostic, providerRefusal, ownerTargetFailure } from '../modules/deploy-kit/diagnostics.mjs';
 
 // rer signin: the owner's way into a hosted install without mail. With the same
 // Cloudflare credentials that deployed it, rer writes a one-time grant (only its
@@ -31,6 +31,7 @@ export async function signinCommand(project, options, out, { fetch } = {}) {
 }
 
 function failure(error, { environment, again, adapter, redact }) {
+ if (ownerTargetFailure(error)) return refuse(redact(ownerTargetFailure(error)));
  const code = deployDiagnostic(error, redact)?.code ?? error.message;
  if (code === 'missing-owner-receipt') return refuse(`This checkout has no completed rer deployment of the ${environment} environment. Run rer signin from the checkout that deployed it (rer deploy --environment ${environment}).`);
  if (code === 'owned-resource-replaced') return refuse(`The ${environment} Worker is no longer the one this checkout deployed, so rer will not sign anyone in to it. Run rer deploy --environment ${environment} first.`);

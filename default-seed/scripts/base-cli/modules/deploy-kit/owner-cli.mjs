@@ -9,7 +9,7 @@ import { assert, hexId } from './validation.mjs';
 import { regularBytes } from './artifact.mjs';
 import { packageBuild } from './prepare.mjs';
 import { cloudflare } from './provider.mjs';
-import { ownerTarget, recordedOwnerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState, workerSettings, withScopeHints } from './owner.mjs';
+import { ownerTarget, ownerStateTarget, recordedOwnerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState, workerSettings, withScopeHints } from './owner.mjs';
 import { activeWorker, secretBindings } from './worker.mjs';
 import { ownerSecret } from './owner-secret.mjs';
 import { ownerRemove } from './owner-remove.mjs';
@@ -100,13 +100,13 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   // Transport must see the same outer signal when deciding whether to retry.
   const api = deploymentDiagnostics(cloudflare({accountId:env.CLOUDFLARE_ACCOUNT_ID,token:env.CLOUDFLARE_API_TOKEN,fetch:guardedRequest,requestSignal,budgetMigrations:command === 'deploy',...(command === 'remove' ? {maxRequests:Infinity,removal:true} : {})}),{onCreated});
   const statePath = values.state ? resolve(root,values.state) : join(root,'.rer','deploy',`${values.environment}.json`);
-  // Signin uses only the selected app record; never discover a sibling page Worker.
-  // Removal needs the recorded account/name identity, not a workers.dev route.
+  // Every follow-up uses the app record's resolved name, including native
+  // uploaders' prefixes. Removal needs no routable origin or completed receipt.
   const target = command === 'signin'
     ? await recordedOwnerTarget(api,{project:declaration.project,environment:values.environment,statePath})
     : command === 'remove'
-    ? {accountId:api.accountId,project:declaration.project,environment:values.environment,worker:ownerWorkerName(declaration.project,values.environment)}
-    : await ownerTarget(api,{project:declaration.project,environment:values.environment});
+    ? await ownerStateTarget(api,{project:declaration.project,environment:values.environment,statePath})
+    : await ownerTarget(api,{project:declaration.project,environment:values.environment,statePath});
   if (command === 'remove') return {ok:true,...await ownerRemove({api,target,statePath}).catch(error => { throw api.annotateFailure(error,'remove'); })};
   if (command === 'rekey') return ownerRekey({api,target,statePath,declaration,env,notice});
   if (command === 'secret') {
