@@ -12,13 +12,14 @@ export function hookOrigin(deployed, again) {
  throw hookFailure(`The deploy hook finished without reporting a live deployment, so rer claimed no owner. A deploy hook returns { deployed: true, origin } once its upload is live. Check the hook's output above, fix the hook, then run ${again} again.`);
 }
 
-export async function waitForSource({ origin, sourceSha, versionId, again }) {
+export async function waitForSource({ origin, sourceSha, versionId, again, signal }) {
  // Finalization gets its own 90 seconds after the hook returns: upload, owner
  // claim and token retirement may have consumed the upload readiness window.
  // Retirement also creates a new version; use the current recorded identity.
- try { await waitHealth({ origin, expected: { sourceSha, ...(versionId ? { versionId } : {}) }, retryIdentityMismatch: true,
+ try { await waitHealth({ origin, signal, expected: { sourceSha, ...(versionId ? { versionId } : {}) }, retryIdentityMismatch: true,
   request: (url, init) => globalThis.fetch(url, init) }); }
  catch (error) {
+  signal?.throwIfAborted();
   const last = error.attempts?.at(-1);
   let named, version;
   try { const identity = JSON.parse(last.body).deployment; named = identity?.sourceSha; version = identity?.versionId; } catch {}

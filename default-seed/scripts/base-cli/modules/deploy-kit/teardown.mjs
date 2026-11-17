@@ -1,3 +1,4 @@
+import { pause } from './cancellation.mjs';
 import { assert, hexId, uuid } from './validation.mjs';
 import { workerConsumerScript } from './queue-consumer.mjs';
 
@@ -32,7 +33,7 @@ async function inventory(api) {
 }
 
 /** Read-only verification. It never deletes, repairs or authorizes deletion. */
-export async function verifyTeardown({api,plan,receipt,prefix=plan?.worker,maxAttempts=4,clock=()=>performance.now(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onAttempt=()=>{}}) {
+export async function verifyTeardown({api,plan,receipt,prefix=plan?.worker,maxAttempts=4,clock=()=>performance.now(),sleep,signal,onAttempt=()=>{}}) {
   assert(receipt?.version === 1 && receipt.accountId === api.accountId && receipt.worker === plan?.worker,'teardown-receipt-target-mismatch');
   assert(name(prefix) && (prefix.startsWith('rer-seedproof-') || /^rer-base-stage-[0-9]{1,20}$/.test(prefix)) && plan.worker === prefix,'teardown-disposable-prefix-required');
   assert(Number.isSafeInteger(maxAttempts) && maxAttempts >= 1 && maxAttempts <= 8,'teardown-invalid-attempt-bound');
@@ -69,7 +70,7 @@ export async function verifyTeardown({api,plan,receipt,prefix=plan?.worker,maxAt
         error.attempts = attempts;
         throw error;
       }
-      await sleep(Math.min(250 * 2 ** (number-1),2000));
+      await pause(Math.min(250 * 2 ** (number-1),2000),signal,sleep);
     }
   }
 }
@@ -80,7 +81,7 @@ export async function verifyTeardown({api,plan,receipt,prefix=plan?.worker,maxAt
  * schedule set first, wait until the provider reports none, and only then delete. A set that does
  * not settle within `maxWaitMs` leaves the Worker in place.
  */
-export async function deleteWorker({api,worker,maxWaitMs=60000,clock=()=>performance.now(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}) {
+export async function deleteWorker({api,worker,maxWaitMs=60000,clock=()=>performance.now(),sleep,signal}) {
   assert(name(worker),'teardown-invalid-worker-name');
   const schedules = `/workers/scripts/${worker}/schedules`;
   await api.request(schedules,{method:'PUT',body:[]});
@@ -94,7 +95,7 @@ export async function deleteWorker({api,worker,maxWaitMs=60000,clock=()=>perform
       error.code = 'teardown-schedules-not-cleared';
       throw error;
     }
-    await sleep(delay);
+    await pause(delay,signal,sleep);
   }
   await api.request(`/workers/scripts/${worker}?force=true`,{method:'DELETE'});
 }

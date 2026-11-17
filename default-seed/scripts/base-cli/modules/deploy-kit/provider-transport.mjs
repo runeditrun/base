@@ -27,7 +27,9 @@ export async function providerResponse({send, method, timeoutMs, callerSignal, r
     const attemptSignal = firstRead ? AbortSignal.any([signal, firstRead.signal]) : signal;
     let readingBody = false, response;
     try {
+      attemptSignal.throwIfAborted();
       response = await send(attemptSignal);
+      attemptSignal.throwIfAborted();
       clearTimeout(timer);
       // A retried delete can observe the first attempt's committed deletion.
       if (removalReplay && method === 'DELETE' && attempt > 1 && response.status === 404) {
