@@ -4,6 +4,7 @@ import { sensitive } from './detector.mjs';
 import { paired, revokedByServer, revokedText } from './local-commands.mjs';
 import { applyChoices } from './choices.mjs';
 import { businessCommand } from './invocation.mjs';
+import { refusalView, toolRefusal, serverSaid } from './refusal.mjs';
 
 const protocolVersion = '2025-11-25';
 const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': protocolVersion };
@@ -34,7 +35,7 @@ export async function mcpClient(api, { taskId, signal } = {}) {
  }
  async function rpc(method, params, notification = false) {
   const result = await exchange(method, params, notification);
-  if (result?.error) throw Error('Business MCP operation was refused.');
+  if (result?.error) throw Error(`Business MCP operation was refused.${serverSaid(refusalView(result.error).sentence)}`);
   return result?.result;
  }
  const initialized = await rpc('initialize', { protocolVersion, capabilities: {}, clientInfo: { name: 'rer-business', version: '1.0.0' } });
@@ -42,12 +43,12 @@ export async function mcpClient(api, { taskId, signal } = {}) {
  await rpc('notifications/initialized', {}, true);
  const call = async (name, args = {}) => {
   const response = await exchange('tools/call', { name, arguments: args });
-  if (response.error) throw Error(`Business MCP refused ${name}${typeof response.error.message === 'string' ? `: ${response.error.message.slice(0, 300)}` : ''}.`);
+  if (response.error) throw Error(`Business MCP refused ${name}.${serverSaid(refusalView(response.error).sentence)}`);
   return response.result;
  };
  return Object.assign(async (name, args = {}) => {
   const result = await call(name, args);
-  if (result?.isError || !result?.structuredContent) throw Error('Business task action is unavailable. Use the browser to check its requirements.');
+  if (result?.isError || !result?.structuredContent) throw Error(`Business task action is unavailable. Use the browser to check its requirements.${serverSaid(toolRefusal(result).message)}`);
   return result.structuredContent;
  }, { call, exchange, initialized });
 }
@@ -164,7 +165,7 @@ export async function next() {
   tasks = await nextQuestions(api, signal);
  } catch (error) {
   if (error.status !== 401) throw error;
-  throw Error(`Business pairing expired or was revoked. This computer was ${revokedText(await revokedByServer(state))}`);
+  throw Error(`Business pairing expired or was revoked. This computer was ${revokedText(await revokedByServer(state))}${serverSaid(error.reason)}`);
  }
  // This computer's agent hears its own steps first, then the owner's.
  const item = tasks.find(task => task.kind === 'classify.row' || moveInStep(task)) ?? tasks.find(task => task.runner === 'owner' || ownerKinds.has(task.kind));
