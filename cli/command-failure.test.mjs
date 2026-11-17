@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { copyFile, chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:net';
@@ -14,7 +14,7 @@ import { readPackage, writePackage } from '../global/update/archive.mjs';
 const base = join(import.meta.dirname, '..');
 const source = path => pathToFileURL(join(base, path)).href;
 
-test('dev respects the caller tool order and reports the failing command, status, redacted tail and readable full log', { timeout: 60000 }, async t => {
+test('dev respects the caller tool order and reports the failing command, status, redacted tail and readable full log', { timeout: 120000 }, async t => {
  const root = await mkdtemp(join(tmpdir(), 'rer-command-failure-'));
  t.after(() => rm(root, { recursive: true, force: true }));
  const home = join(root, 'home'), tools = join(root, 'tools'), runtime = join(root, 'runtime');
@@ -57,8 +57,8 @@ export const commandAdapter = declare(lifecycle, { scheduled: false });
  await writeFile(join(root, '.dev.vars'), `OWNER_EMAIL=owner@example.test\nAUTH_ORIGIN=http://127.0.0.1:${port}\n`, { mode: 0o600 });
  const env = await isolatedQueue(t, { ...process.env, HOME: home, PATH: tools + delimiter + process.env.PATH, CI: 'true' });
  delete env.RER_PNPM_ENTRY;
- const run = args => {
-  const result = spawnSync(node, [join(base, 'bin/rer.mjs'), ...args], { cwd: root, env, encoding: 'utf8', timeout: 20000 });
+ const run = (args, overrides = {}) => {
+  const result = spawnSync(node, [join(base, 'bin/rer.mjs'), ...args], { cwd: root, env:{...env,...overrides}, encoding: 'utf8', timeout: 20000 });
   assert.ifError(result.error); return result;
  };
  const check = async (text, status = 'exit 27') => {
@@ -79,6 +79,46 @@ export const commandAdapter = declare(lifecycle, { scheduled: false });
  const json = run(['dev', '--json']);
  assert.equal(json.status, 1, json.stdout + json.stderr);
  await check(json.stdout.trim().split('\n').map(JSON.parse).find(row => row.event === 'error').message);
+ // The static site checks owner identities with real Git after rendering.
+ // An executable whose interpreter is absent fails at spawn, before Git runs.
+ await symlink(join(base, 'default-seed/node_modules'), join(root, 'node_modules'), 'dir');
+ await writeFile(join(root, 'pages.mjs'), 'export const sitePages=()=>({pages:[{path:"/",html:"<h1>Public</h1>"},{path:"/run",html:"<h1>Run</h1>"}],assets:[]});\n');
+ const originalAdapter = await readFile(join(root, 'adapter.mjs'), 'utf8');
+ await writeFile(join(root, 'adapter.mjs'), originalAdapter + `
+commandAdapter.input={names:{email:'OWNER_EMAIL'}};
+commandAdapter.site={entry:'pages.mjs',output:'dist/site',declaration:'site.json'};
+`);
+ descriptor.commands.build={argv:['node','adapter.mjs'],inputs:['adapter.mjs'],effects:'Build the public run site.'};
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify(descriptor));
+ const spawnFailures = [{name:'ENOENT', bytes:'#!/rer-diagnostic-missing-interpreter\n'}];
+ if (process.platform === 'darwin') {
+  // A real Mach-O for an unsupported CPU produces Darwin's spawn errno -86.
+  const binary = Buffer.alloc(32);
+  binary.writeUInt32LE(0xfeedfacf, 0); binary.writeUInt32LE(0x01000012, 4); binary.writeUInt32LE(2, 12);
+  spawnFailures.push({name:'errno -86', bytes:binary});
+ }
+ await rm(join(runtime, 'git'));
+ const spawnResults = [];
+ for (const {name, bytes} of spawnFailures) {
+  await writeFile(join(tools, 'git'), bytes, {mode:0o700});
+  for (const args of [['build','--site'], ['dev']]) for (const json of [false, true]) {
+   const failure=run([...args,...(json?['--json']:[])],{PATH:tools});
+   assert.equal(failure.status,1,failure.stdout+failure.stderr);
+   const message=json?failure.stdout.trim().split('\n').map(JSON.parse).find(row=>row.event==='error').message:failure.stderr.slice(failure.stderr.indexOf('Could not run git:'));
+   spawnResults.push({name,failure,message});
+  }
+ }
+ for (const {name,failure,message} of spawnResults) {
+   assert.match(message,/Could not run git:/);
+   assert.ok(message.includes(name),message);
+   const path=/Full output: (.+)/.exec(message)?.[1];
+   assert.ok(path,message);
+   const log=await readFile(resolve(root,path),'utf8');
+   assert.ok(log.includes(message.trim()),log);
+   assert.doesNotMatch(failure.stdout+failure.stderr+log,/test-only-failing-tool-token/);
+ }
+ await writeFile(join(tools, 'git'), '#!/bin/sh\necho caller Git cannot run this checkout >&2\necho "Authorization: Bearer test-only-failing-tool-token" >&2\nexit 27\n', {mode:0o700});
+ await writeFile(join(root, 'adapter.mjs'), originalAdapter);
  // A transfer hook can fail inside rer rather than in a captured subprocess.
  // Its native message stays private; the named log contains the safe failure.
  await writeFile(join(root,'adapter.mjs'),await readFile(join(root,'adapter.mjs'),'utf8')+`
@@ -105,6 +145,7 @@ commandAdapter.prepareData=async(root,store)=>{
  // The dispatcher is outside the checkout's installed package, as when an
  // agent explicitly invokes an updated CLI on a checkout with an older pin.
  // Use a real packed copy: its refusal must retain the selected CLI's status.
+ await rm(join(root, 'node_modules'));
  const packed=await buildPackage(base,join(root,'packed'));
  const packageBytes=await readFile(packed);
  await writePackage(readPackage(packageBytes,{integrity:'sha512-'+createHash('sha512').update(packageBytes).digest('base64')}),join(root,'node_modules/@runeditrun/rer'));

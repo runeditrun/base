@@ -69,7 +69,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   const lines=(capture?.snapshot()||'').split('\n');if(lines.at(-1)==='')lines.pop();
   // The step, its command, exit code, last output and log, for callers that name a failed step.
   const step=stepDiagnostic({name:redaction.redact(String(label)),command:capture?.display,exitCode:detail.code,signal:detail.signal,output:lines,log:redaction.redact(checkoutPath(capture?.cwd,logPath))});
-  return Object.assign(commandFailure(`${redaction.redact(String(label))}: ${status}.${detail.lastHealth?` Last health: ${redaction.redact(String(detail.lastHealth))}.`:''}\nCommand: ${capture?.display ?? '(none: the step failed inside rer)'}\nLast output (up to 40 lines):\n${lines.length?lines.slice(-40).join('\n'):'(no output)'}\nLog: ${redaction.redact(logPath)}`,{childExitCode:detail.code,signal:detail.signal,step}),{childExitCode:detail.code,signal:detail.signal});
+  return Object.assign(commandFailure(`${redaction.redact(String(label))}: ${status}.${detail.lastHealth?` Last health: ${redaction.redact(String(detail.lastHealth))}.`:''}\nCommand: ${capture?.display ?? '(none: the step failed inside rer)'}\nLast output (up to 40 lines):\n${lines.length?lines.slice(-40).join('\n'):'(no output)'}\nLog: ${redaction.redact(logPath)}`,{childExitCode:detail.code,signal:detail.signal,step}),{childExitCode:detail.code,signal:detail.signal,...(capture?.cause ? {cause:capture.cause} : {})});
  };
  const track=(label,child,ownershipScope,view)=>{
   if(captures.has(child))return child;
@@ -87,7 +87,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   const sources=[child.stdout,child.stderr].filter(Boolean),data=chunk=>filter.write(chunk);
   for(const source of sources)source.on('data',data);
   let error,finished=false;
-  child.once('error',cause=>{error=true;capture.errorCode=/^[A-Z_]{2,40}$/.test(cause?.code??'')?cause.code:undefined;resolveError({error:true,errorCode:capture.errorCode});});
+  child.once('error',cause=>{error=true;capture.cause=cause;capture.errorCode=/^[A-Z_]{2,40}$/.test(cause?.code??'')?cause.code:undefined;resolveError({error:true,errorCode:capture.errorCode});});
   const exited=(code,terminationSignal)=>{capture.exitResult={code,signal:terminationSignal,error,errorCode:capture.errorCode};resolveExit(capture.exitResult);};
   child.once('exit',exited);
   const finish=(code,terminationSignal)=>{
@@ -150,7 +150,14 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   if(commandSignal?.aborted)throw failure(label,{reason:'cancel'});
   const ownershipScope=createProcessScope(custodyBaseline);redaction.addSecrets([ownershipScope.token,...inheritedScopeTokens(process.env),...inheritedScopeTokens(native.env)]);
   const [program,argv]=toolCommand(command,args,native.env??process.env);
-  const child=spawn(program,argv,{...native,env:processScopeEnvironment(ownershipScope,{...(native.env??process.env),...policy.environment,...(custodyToken?{RER_ONBOARDING_PROCESS_OWNER:[...inheritedScopeTokens(native.env??process.env),custodyToken].join(',')}:{})}),shell:false,detached:process.platform!=='win32',stdio:[Array.isArray(native.stdio)?native.stdio[0]:'ignore','pipe','pipe',...(native.stdio?.includes('ipc')?['ipc']:[])]});
+  let child;
+  try { child=spawn(program,argv,{...native,env:processScopeEnvironment(ownershipScope,{...(native.env??process.env),...policy.environment,...(custodyToken?{RER_ONBOARDING_PROCESS_OWNER:[...inheritedScopeTokens(native.env??process.env),custodyToken].join(',')}:{})}),shell:false,detached:process.platform!=='win32',stdio:[Array.isArray(native.stdio)?native.stdio[0]:'ignore','pipe','pipe',...(native.stdio?.includes('ipc')?['ipc']:[])]}) }
+  catch (error) {
+   // Native synchronous spawn failures can omit their executable. Retain the
+   // original cause and executable, never argv, for the CLI diagnostic.
+   if (/^spawn(?: |$)/.test(error.syscall ?? '') && !error.path) error.path = program;
+   throw error;
+  }
   onChild?.(child);
   ownershipRecords.set(child,{pid:child.pid,token:ownershipScope.token});
   track(label,child,ownershipScope,view?.());
