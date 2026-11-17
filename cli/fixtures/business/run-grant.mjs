@@ -17,6 +17,7 @@ export async function fixture(t, {fileBacked = false} = {}) {
   if(req.headers.authorization!=='Bearer '+device)return json(401,{error:'pairing refused'});
   if(req.url===root&&req.method==='POST'){
    state.issued++;if(state.refuse)return json(403,{error:secret});
+   if(state.answer)return json(state.answer.status,{...state.answer.body,lease_id:body.lease_id,grant_id:body.grant_id});
    const lease={lease_id:body.lease_id,grant_id:body.grant_id,business_id:'business',executor_id:'computer',account_id:account,credential_expires_at:new Date(Date.now()+state.expiryMs).toISOString(),cleanup_status:'active',provider_credential_revoked:false};
    const credential=state.credential??secret;
    state.leases.set(lease.lease_id,lease);state.credentials.set(lease.lease_id,credential);return json(200,{...lease,credential});
