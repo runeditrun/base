@@ -166,7 +166,7 @@ test('standard removal retries safe gateway failures and reports only unconfirme
    const remaining = scenario === 'partial-delete' ? [all[2]] : scenario === 'readback' ? [all[1]] : all;
    assert.match(message,new RegExp(`${remaining.length} resources remain`));
    for (const name of remaining) assert.ok(message.includes(name),message);
-   assert.match(message,/run rer deploy .*--remove --yes again/);
+   assert.match(message,/run ~\/\.local\/bin\/rer deploy .*--remove --yes again/);
    assert.doesNotMatch(message,/Deploy failed|Resources created this attempt/);
    const saved = JSON.parse(await readFile(path,'utf8'));
    for (const kind of ['d1','r2','kv','queues']) {

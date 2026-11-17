@@ -10,7 +10,8 @@ test('the public door CLI refuses an inherited verb and keeps documented help', 
  const refused = run('constructor');
  assert.equal(refused.status, 2);
  assert.equal(refused.stdout, '');
- assert.equal(refused.stderr, 'Unknown rer door command: constructor. Run rer door --help.\n');
+ assert.match(refused.stderr, /Unknown rer door command: constructor/);
+ assert.match(refused.stderr, /~\/\.local\/bin\/rer door --help/);
  const help = run('--help');
  assert.equal(help.status, 0);
  assert.match(help.stdout, /rer door enable/);

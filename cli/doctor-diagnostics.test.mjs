@@ -125,7 +125,7 @@ test('doctor on a set-up checkout does not ask for setup or list inputs only a d
  // Before setup: the person is told to set up, and only the local setting is missing.
  const fresh = await invoke();
  assert.equal(fresh.code, 3, fresh.text);
- assert.match(fresh.text, /Run rer setup to configure this checkout\./);
+ assert.match(fresh.text, /Run ~\/\.local\/bin\/rer setup to configure this checkout\./);
  assert.match(fresh.text, /Missing local inputs:\n {2}OWNER_EMAIL\n {2}AUTH_ORIGIN\n/);
  for (const name of workflow) assert.ok(!fresh.text.includes(name), `${name} is never asked of this computer`);
  // After setup: nothing local is missing, so doctor passes and names deploy inputs only as optional.
