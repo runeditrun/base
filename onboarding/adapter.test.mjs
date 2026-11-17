@@ -412,7 +412,7 @@ test('a dev start held by the machine-load queue says the computer is busy, not 
  assert.ok(outcome, 'the dev start is refused');
  const message = store.redact(outcome.message);
  assert.match(message, /^Not started: this computer is busy\. Its 1-minute load is 40\.0 and jobs start only at 36 or below/);
- assert.match(message, /running ~\/\.local\/bin\/rer dev again/); assert.match(message, /RER_JOBS_LOAD_THRESHOLD=80 rer dev/);
+ assert.match(message, /running ~\/\.local\/bin\/rer dev again/); assert.match(message, /RER_JOBS_LOAD_THRESHOLD=80 ~\/\.local\/bin\/rer dev/);
  assert.doesNotMatch(message, /Local migrations failed|Installation stopped/);
  assert.equal(app, undefined, 'nothing started');
  assert.equal(await readFile(join(f.root, 'migrations.log'), 'utf8'), 'applied\n', 'the held migration did not run again');
