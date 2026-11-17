@@ -412,7 +412,7 @@ test('a dev start held by the machine-load queue says the computer is busy, not 
  assert.ok(outcome, 'the dev start is refused');
  const message = store.redact(outcome.message);
  assert.match(message, /^Not started: this computer is busy\. Its 1-minute load is 40\.0 and jobs start only at 36 or below/);
- assert.match(message, /running rer dev again/); assert.match(message, /RER_JOBS_LOAD_THRESHOLD=80 rer dev/);
+ assert.match(message, /running ~\/\.local\/bin\/rer dev again/); assert.match(message, /RER_JOBS_LOAD_THRESHOLD=80 rer dev/);
  assert.doesNotMatch(message, /Local migrations failed|Installation stopped/);
  assert.equal(app, undefined, 'nothing started');
  assert.equal(await readFile(join(f.root, 'migrations.log'), 'utf8'), 'applied\n', 'the held migration did not run again');
@@ -423,7 +423,7 @@ test('a dev start whose migration really fails keeps its own message with the co
  const { outcome } = await devRun(t, f, { load: 1, migrate: [node, ['-e', "console.error('no such table: widgets'); process.exit(1)"]] });
  assert.match(outcome.message, /Applying database migrations: exit 1, signal none\./);
  assert.match(outcome.message, /no such table: widgets/);
- assert.match(outcome.message, /Local migrations failed\. Fix the error and run rer setup/);
+ assert.match(outcome.message, /Local migrations failed\. Fix the error and run ~\/\.local\/bin\/rer setup/);
  assert.doesNotMatch(outcome.message, /machine is busy|this computer is busy/);
 });
 
