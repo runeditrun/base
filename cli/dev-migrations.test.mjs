@@ -51,8 +51,8 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  t.diagnostic(`setup history: ${history.length} synthetic migrations; 0 repeated tables; all applied names present`);
  // A hosted-only choice is refused by name before setup can save it.
  const answers=join(f.root,'hosted-mail-answers.json');
- await writeFile(answers,JSON.stringify({MAIL_PROVIDER:'none'}));
- const refusedMail=events(await f.run(['setup','--answers',answers,'--non-interactive','--json'],1)).find(event=>event.event==='error')?.message;
+ await writeFile(answers,JSON.stringify({MAIL_PROVIDER:'none'}),{mode:0o600});
+ const refusedMail=events(await f.run(['setup','--answers','hosted-mail-answers.json','--non-interactive','--json'],1)).find(event=>event.event==='error')?.message;
  assert.match(refusedMail,/MAIL_PROVIDER[^]*none[^]*development/);
  // A checkout that already stored that choice is repaired by ordinary setup.
  const settingsPath=join(f.root,'.dev.vars');
