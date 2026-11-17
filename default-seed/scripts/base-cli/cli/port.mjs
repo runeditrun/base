@@ -17,7 +17,7 @@ export async function firstFreePort(host, from = defaultPort) {
  const { searchPort } = await shared('port-probe.mjs');
  const found = await searchPort({ host, from, verb: 'setup' });
  if (found.port !== undefined) return found.port;
- throw refuse(`No free port from ${found.range[0]} to ${found.range[1]}: all ${found.tried} ports tried were in use. Stop something that holds one, or run rer setup --port PORT with a free port.`);
+ throw refuse(`No free port from ${found.range[0]} to ${found.range[1]}: all ${found.tried} ports tried were in use. Stop something that holds one, or run ~/.local/bin/rer setup --port PORT with a free port.`);
 }
 
 // Who holds a port: a server another checkout registered (its path and the
@@ -45,10 +45,10 @@ export async function busyPortMessage({ port, host, root, saved, env = process.e
   await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen({ host, port: 0, exclusive: true }, resolve); });
   next = socket.address().port;
  } finally { if (socket.listening) await new Promise(resolve => socket.close(resolve)); }
- const move = `\nTo move this checkout to a free port and keep its data, run this in its folder:\n  rer setup --port ${next}`;
+ const move = `\nTo move this checkout to a free port and keep its data, run this in its folder:\n  ~/.local/bin/rer setup --port ${next}`;
 
  const kind = saved ? `Port ${port} is saved for this checkout but is` : `Port ${port} is`;
- if (!holder) return `${kind} still unavailable for binding on ${host} after retrying; no listener was identified. Run rer dev or rer setup again.${move}`;
+ if (!holder) return `${kind} still unavailable for binding on ${host} after retrying; no listener was identified. Run ~/.local/bin/rer dev or ~/.local/bin/rer setup again.${move}`;
  if (holder.own) return `${kind} held by this checkout's own ${holder.server.mode} server for ${holder.checkout} (PID ${holder.pid}). Stop it with: ${stopInstruction(holder.server)}${move}`;
  const who = holder.server
   ? `the ${holder.server.mode} server for ${holder.checkout} (PID ${holder.pid})`

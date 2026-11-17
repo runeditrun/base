@@ -26,7 +26,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  if (verb === 'demo' && !independent) return parse(['dev', '--demo', ...args], cwd, { independent, deferTail });
  // Independent projects own verb names; only the common wrapper flags apply
  // to unknown names. Profile resolution rejects undeclared commands later.
- if (!/^[a-z][a-z0-9-]*$/.test(verb)) throw invalid('Unknown rer command. Run rer --help.');
+ if (!/^[a-z][a-z0-9-]*$/.test(verb)) throw invalid('Unknown rer command. Run ~/.local/bin/rer --help.');
  const allowed = new Set(independent ? [...commonFlags,...(['install','setup','build','verify','deploy','release','export','import','dev','preview'].includes(verb)?['--no-queue']:[])] : (verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : verb === 'size' ? sizeVerb : undefined))?.flags ?? commonFlags), options = { verb, cwd: resolve(cwd), forwarded: [], supplied: new Set() };
  let separator = false;
  for (let i = 0; i < args.length; i++) {
@@ -38,11 +38,11 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
   if (!allowed.has(flag)) {
    if(flag==='--strictPort')throw invalid('Unsupported --strictPort. Use --port PORT; strict port binding is automatic.');
    const suggestion=[...allowed].sort((a,b)=>distance(flag,a)-distance(flag,b))[0];
-   throw invalid(`Unsupported flag ${/^--[a-zA-Z-]{1,40}$/.test(flag)?flag:'(invalid)'} for ${verb}.${suggestion?` Did you mean ${suggestion}?`:''} Run rer ${verb} --help.`);
+   throw invalid(`Unsupported flag ${/^--[a-zA-Z-]{1,40}$/.test(flag)?flag:'(invalid)'} for ${verb}.${suggestion?` Did you mean ${suggestion}?`:''} Run ~/.local/bin/rer ${verb} --help.`);
   }
   // Several secrets change in one deploy: --set-secret A --set-secret B is --set-secret A,B.
   const listed = ['--set-secret', '--unset-secret', '--edition-migration'].includes(flag);
-  if (options.supplied.has(flag) && !listed) throw invalid(`Repeated flag ${flag} for ${verb}. Run rer ${verb} --help.`);
+  if (options.supplied.has(flag) && !listed) throw invalid(`Repeated flag ${flag} for ${verb}. Run ~/.local/bin/rer ${verb} --help.`);
   options.supplied.add(flag);
   const key = flag.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
   if (booleans.has(flag)) options[key] = true;
@@ -54,7 +54,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
  }
  if (options.help) return options;
  if (deferTail) { options.cwd=resolve(cwd,options.cwd);return options; }
- if (verb === 'refresh-base' && !independent && !options.ref) throw invalid('Provide --ref with the full immutable Base commit. Run rer refresh-base --help.');
+ if (verb === 'refresh-base' && !independent && !options.ref) throw invalid('Provide --ref with the full immutable Base commit. Run ~/.local/bin/rer refresh-base --help.');
  if (options.detach && options.foreground) throw invalid('Choose one of --detach and --foreground.');
  if(options.stop && ['--port','--host','--idle-timeout','--detach','--foreground','--no-queue','--as','--login','--models','--models-service','--door','--direct'].some(flag=>options.supplied.has(flag)))throw invalid('--stop cannot be combined with start-only flags.');
  // --port and --host always mean direct mode; --door and --direct pick a mode.
@@ -77,7 +77,7 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
   options.idleTimeout=Number(value);
  }
  if (options.port !== undefined) {
-  if (!/^\d+$/.test(options.port) || Number(options.port) < 1 || Number(options.port) > 65535) throw Object.assign(invalid('Port must be a decimal integer from 1 to 65535.'), { humanMessage: `Port ${JSON.stringify(options.port)} is invalid. Use a port from 1 to 65535, for example: rer ${verb} --port 4800` });
+  if (!/^\d+$/.test(options.port) || Number(options.port) < 1 || Number(options.port) > 65535) throw Object.assign(invalid('Port must be a decimal integer from 1 to 65535.'), { humanMessage: `Port ${JSON.stringify(options.port)} is invalid. Use a port from 1 to 65535, for example: ~/.local/bin/rer ${verb} --port 4800` });
   options.port = Number(options.port);
  }
  for(const key of ['httpPort','httpsPort'])if(options[key]!==undefined){if(!/^[0-9]+$/.test(options[key])||Number(options[key])<1||Number(options[key])>65535)throw invalid('Ingress port must be an integer from 1 to 65535.');options[key]=Number(options[key]);}
@@ -119,10 +119,10 @@ export function parse(argv, cwd = process.cwd(), { independent = false, deferTai
 }
 
 export function help(verb) {
- if (!verb) return `Usage: rer VERB [FLAGS]\nCommands: ${Object.keys({...verbs, ...authoringVerbs}).join(', ')}, signin, size, release, listing, rehearse\nRun rer VERB --help for flags.\n${appSignInHelp}\n`;
+ if (!verb) return `Usage: ~/.local/bin/rer VERB [FLAGS]\nCommands: ${Object.keys({...verbs, ...authoringVerbs}).join(', ')}, signin, size, release, listing, rehearse\nRun ~/.local/bin/rer VERB --help for flags.\n${appSignInHelp}\n`;
  const known = verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : verb === 'size' ? sizeVerb : undefined);
- const door = ['export', 'import'].includes(verb) ? 'To move records, start the app and open its signed-in owner import door:\n\n  rer dev\n\nOpen its Move in page (/app/import in the Base reference; the project\'s own docs name its path), then export or upload and review supported records there.\n\nTo back up or restore this installation:\n' : '';
- return `${door}Usage: rer ${verb}${verb === 'refresh-base' ? ' --ref FULL_COMMIT' : ''} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;
+ const door = ['export', 'import'].includes(verb) ? 'To move records, start the app and open its signed-in owner import door:\n\n  ~/.local/bin/rer dev\n\nOpen its Move in page (/app/import in the Base reference; the project\'s own docs name its path), then export or upload and review supported records there.\n\nTo back up or restore this installation:\n' : '';
+ return `${door}Usage: ~/.local/bin/rer ${verb}${verb === 'refresh-base' ? ' --ref FULL_COMMIT' : ''} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;
 }
 
 function distance(a,b){let row=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){const next=[i];for(let j=1;j<=b.length;j++)next[j]=Math.min(next[j-1]+1,row[j]+1,row[j-1]+(a[i-1]===b[j-1]?0:1));row=next;}return row[b.length];}

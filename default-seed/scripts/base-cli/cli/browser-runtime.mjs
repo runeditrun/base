@@ -9,8 +9,8 @@ import { dirname, join, relative } from 'node:path';
 import { RerError } from './errors.mjs';
 import { shared } from './shared.mjs';
 
-export const browserRepair = 'rer install';
-export const browserDownload = 'rer verify downloads the required browser on first use; rer install installs dependencies, not browsers';
+export const browserRepair = '~/.local/bin/rer install';
+export const browserDownload = '~/.local/bin/rer verify downloads the required browser on first use; ~/.local/bin/rer install installs dependencies, not browsers';
 
 export function checkoutPlaywright(root, { required = true } = {}) {
  const require = createRequire(join(root, 'package.json'));

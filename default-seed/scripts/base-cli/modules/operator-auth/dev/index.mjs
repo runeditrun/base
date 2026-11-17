@@ -1,3 +1,4 @@
+import { terminalHelp } from '../terminal-guidance.mjs';
 import { rejectedResponse } from '../rejected-response.mjs';
 // Local dev identity. SERVER-ONLY and LOCAL-ONLY: load this layer only from a
 // local-only Worker entry (a `wrangler dev` or Vite-serve entry), never from the
@@ -46,7 +47,7 @@ export function withDevIdentity(worker, { bindings = env => env, config: authCon
       if (managedInstallation(env)) {
         // Never admit a dev credential here; with dev identity on, serve nothing.
         registerDevAdmission(null);
-        if (env.RER_DEV_IDENTITY !== 'off') return rejectedResponse(request, text(503, 'Dev identity refuses to run beside RER_INSTALLATION_ID with a non-loopback RER_MANAGEMENT_ORIGIN. Remove those bindings from local settings or use rer dev --login.'));
+        if (env.RER_DEV_IDENTITY !== 'off') return rejectedResponse(request, text(503, 'Dev identity refuses to run beside RER_INSTALLATION_ID with a non-loopback RER_MANAGEMENT_ORIGIN. Remove those bindings from local settings or use ~/.local/bin/rer dev --login.' + ' ' + terminalHelp));
         return new URL(request.url).pathname === '/auth/dev/enter' || new URL(request.url).pathname === '/__dev/personas' || new URL(request.url).pathname === '/auth/local/cli-session' ? rejectedResponse(request, devNotFound()) : worker.fetch(request, original, execution);
       }
       const gate = devGate({ key: env.RER_DEV_KEY, origin: env.AUTH_ORIGIN, local: env.AUTH_LOCAL === 'true' });
@@ -160,7 +161,7 @@ async function enter(request, gate, { config, store, hash, current, everyone, ow
   };
   const persona = (await everyone()).find(p => p.as === as);
   if (!persona) return oneClick(as);
-  if (!persona.email) return text(409, 'No active owner remains in this app. Sign in another way, or run rer reset --yes and rer setup for a new owner.');
+  if (!persona.email) return text(409, 'No active owner remains in this app. Sign in another way, or run ~/.local/bin/rer reset --yes and ~/.local/bin/rer setup for a new owner.' + ' ' + terminalHelp);
   let operator = await store.byEmail(persona.email);
   // Someone invited at a persona's address is that person, with the role they were invited to; accepting the invite signs them in.
   if (operator?.status === 'invited') return oneClick(operator.email);
@@ -179,7 +180,7 @@ async function enter(request, gate, { config, store, hash, current, everyone, ow
     }
     operator = await store.byEmail(persona.email);
   }
-  if (!operator) return text(409, 'The owner that rer setup claimed is not in this database. Run rer setup.');
+  if (!operator) return text(409, 'The owner that ~/.local/bin/rer setup claimed is not in this database. Run ~/.local/bin/rer setup.' + ' ' + terminalHelp);
   if (!isActiveOperator(operator, config.allowList)) return signInRefusal(request, config.branding, {
     status: 403,
     message: 'This account is inactive or no longer allowed to sign in to this app. Choose another account, or ask an owner or administrator to restore its access.',

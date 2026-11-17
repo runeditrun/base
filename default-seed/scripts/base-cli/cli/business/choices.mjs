@@ -100,7 +100,7 @@ export async function applyChoices(api, state, { reconnecting = false } = {}) {
    : `No local app carry files changed for ${JSON.stringify(carried.name)}.\n`);
   for (const checkout of carried.unchanged) process.stdout.write(`Already current: ${join(checkout, '.rer/local/business.json')}\n`);
   if (carried.failed) process.stdout.write(`${carried.failed} local app carry ${carried.failed === 1 ? 'file could' : 'files could'} not be refreshed; see the carry warnings.\n`);
-  if (!count && !carried.unchanged.length && !carried.failed) process.stdout.write(`No local apps were found. Run ${businessCommand('next')} in the folder where rer list shows your apps.\n`);
+  if (!count && !carried.unchanged.length && !carried.failed) process.stdout.write(`No local apps were found. Run ${businessCommand('next')} in the folder where ~/.local/bin/rer list shows your apps.\n`);
  }
  return { applied: lines.length, serviceInstalled };
 }
