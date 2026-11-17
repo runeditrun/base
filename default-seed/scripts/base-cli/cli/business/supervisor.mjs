@@ -11,6 +11,8 @@ import { Lease } from './lease.mjs';
 import { runDiscovery } from './discovery-task.mjs';
 import { applyChoices } from './choices.mjs';
 import { businessCommand } from './invocation.mjs';
+import { describe } from './errors.mjs';
+import { serverSaid } from './refusal.mjs';
 
 // The one task this computer performs itself: the names-only folder scan. Move in and every other step is reported by `next`.
 const kinds = new Set(['discover.local']);
@@ -70,6 +72,7 @@ export async function run({ once = false } = {}) {
     progress = {}; await saveProgress(progress);
     held = null;
     if (once) throw error;
+    say(describe(error));
     await pause(checkIn, stop.signal); continue;
    }
    if (!claimed.task || claimed.task.state !== 'leased' || claimed.task.fence !== claimed.fence || Date.parse(claimed.lease_expires_at) <= Date.now()) {
@@ -120,7 +123,7 @@ export async function run({ once = false } = {}) {
  } catch (error) {
   if (error.status === 401) {
    const revoked = await revokedByServer(state);
-   process.stderr.write(`Business pairing expired or was revoked, so this supervisor stopped. This computer was ${revokedText(revoked)}\n`);
+   process.stderr.write(`Business pairing expired or was revoked, so this supervisor stopped. This computer was ${revokedText(revoked)}${serverSaid(error.reason)}\n`);
   } else if (!stop.signal.aborted) throw error;
  } finally {
   await stopCarry?.();

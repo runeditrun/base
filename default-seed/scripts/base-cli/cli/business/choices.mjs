@@ -54,7 +54,10 @@ export async function applyChoices(api, state, { reconnecting = false } = {}) {
  // A server without this route answers a device credential with 403 (or 404):
  // nothing is decided yet. On a new computer this first request activates it.
  try { self = await api.get('/api/business/executors/self'); }
- catch (error) { if (![403, 404].includes(error.status)) throw error; }
+ catch (error) {
+  if (![403, 404].includes(error.status)) throw error;
+  once(`self:${error.message}`, `Business could not read this computer's choices. ${describe(error)}\n`);
+ }
  // Use the server's per-computer scan state, rather than interpreting every
  // unfinished scan as missing consent. Do not persist paths from the response.
  state.localScan = self?.local_scan ? { allowed: self.local_scan.allowed === true, state: self.local_scan.state } : undefined;
