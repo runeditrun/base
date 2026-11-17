@@ -1,4 +1,5 @@
 import { redact } from './errors.mjs';
+import { refusalData, serverSaid } from './refusal.mjs';
 
 const scalar = value => value === null || ['string', 'number', 'boolean'].includes(typeof value);
 export const clean = (value, limit = 300) => redact(typeof value === 'string' ? value : JSON.stringify(value)).replace(/\s+/g, ' ').trim().slice(0, limit);
@@ -27,11 +28,12 @@ export function plain(tool, data) {
 
 /** Why a tool refused, in words the person reading an agent's transcript can act on. */
 export function refusalText(data, ownerPage) {
- const message = typeof data?.message === 'string' && data.message ? clean(data.message, 500) : null;
+ data = refusalData(data);
+ const message = data.message || null;
  if (data?.status === 'not_built') return `Not built yet: ${message ?? 'Business has not built this yet.'}`;
  if (data?.status === 'action_not_granted') {
   const action = typeof data.action === 'string' ? clean(data.action, 80) : 'this action';
-  return `The owner has not let this computer do "${action}". The owner grants it in Business, under Computers: ${ownerPage}`;
+  return `The owner has not let this computer do "${action}". The owner grants it in Business, under Computers: ${ownerPage}${serverSaid(message)}`;
  }
  const code = typeof data?.code === 'string' ? ` (${clean(data.code, 80)})` : '';
  return `Business refused: ${message ?? data?.status ?? 'no reason given'}${code}`;

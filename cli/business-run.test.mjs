@@ -47,9 +47,9 @@ test('business run refuses unavailable authority without spawning or retrying an
  assert.equal(f.state.issued,2,'cleanup never reissues a credential');
 });
 
-test('business run names the exchange gap once, with only the pending state and catalogue counts, and keeps its refusal exit',async t=>{
+test('business run names safe exchange reasons, pending state and catalogue counts and keeps its refusal exit',async t=>{
  const f=await fixture(t),gap='Cloudflare cannot issue the exact selected account permissions with this consent. The grant remains pending.';
- // The real 409 carries lease fields and a catalogue shape well past 4 KB; none of it but the gap and two counts may print.
+ // The real 409 carries lease fields and a catalogue shape well past 4 KB; only prose and two counts may print.
  const groups=Array.from({length:40},(_,index)=>({name:`Workers Scripts Write ${index}`,id_length:36,id_form:'not 32 hex',scopes:['com.cloudflare.api.account.zone'],is_selectable:false,other_keys:['category']}));
  const expiry=new Date(Date.now()+60000).toISOString(),others={account_id:account,credential:secret,credential_expires_at:expiry,cleanup_status:'unconfirmed',provider_credential_revoked:false,error:'server-prose-marker',requestId:'request-marker-1'};
  for(const state of ['pending','refused']){
@@ -61,13 +61,25 @@ test('business run names the exchange gap once, with only the pending state and 
   assert.equal(/stays pending; nothing was issued/.test(output),state==='pending');
   assert.match(output,/catalogue: 93 rows, 7 mention Workers \(see the audit row cloudflare\.token\.catalogue\)/);
   assert.ok(!output.includes('refused or its credential exchange failed'));
-  for(const value of [secret,account,device,expiry,'server-prose-marker','request-marker-1','Workers Scripts Write','not 32 hex','category','more_pages'])assert.ok(!output.includes(value),value);
+  assert.match(output,/The server said: server-prose-marker/);
+  for(const value of [secret,account,device,expiry,'request-marker-1','Workers Scripts Write','not 32 hex','category','more_pages'])assert.ok(!output.includes(value),value);
  }
  f.state.answer={status:409,body:{...others,error:'This command lease was already requested.',code:'cloudflare_command_already_requested'}};
  const result=await f.run([process.execPath,'-e','console.log("SHOULD-NOT-RUN")']),output=result.stdout+result.stderr;
  assert.equal(result.code,1);assert.match(output,/refused or its credential exchange failed/);
- for(const value of ['Not started','already requested',secret,expiry,'request-marker-1'])assert.ok(!output.includes(value),value);
+ assert.match(output,/The server said: This command lease was already requested/);
+ for(const value of ['Not started',secret,expiry,'request-marker-1'])assert.ok(!output.includes(value),value);
  assert.equal(f.state.issued,3);
+ for(const field of ['message','error','detail']){
+  const reason=`The command needs owner approval for ${field}.`;
+  f.state.answer={status:403,body:{[field]:`${reason}\n${device} ${secret}`,credential:secret,headers:{Authorization:'header-secret-canary'}}};
+  const refused=await f.run([process.execPath,'-e','console.log("SHOULD-NOT-RUN")']);
+  assert.equal(refused.code,1);assert.ok(refused.stderr.includes(reason));
+  for(const value of ['SHOULD-NOT-RUN',device,secret,'header-secret-canary'])assert.ok(!(refused.stdout+refused.stderr).includes(value));
+ }
+ f.state.cleanupRefusal={status:403,body:{detail:`The owner must confirm cleanup. ${secret}`,credential:secret}};
+ const cleaned=await f.start(['cleanup','12345678-1234-1234-1234-123456789012','--status']).result;
+ assert.equal(cleaned.code,1);assert.match(cleaned.stderr,/cleanup: unconfirmed.*The owner must confirm cleanup/);assert.ok(!cleaned.stderr.includes(secret));
 });
 
 test('business run forwards signals and enforces credential expiry, then revokes before exiting with the child signal',async t=>{

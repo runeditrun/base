@@ -9,6 +9,7 @@ import { plain, refusalText, clean } from './agent-output.mjs';
 import { waitFor, failedState, stateName, exitStillWaiting } from './agent-wait.mjs';
 import { agentUsage } from './agent-help.mjs';
 import { maskDeviceText } from './run-mask.mjs';
+import { refusalView, refusalData, toolRefusal, serverSaid } from './refusal.mjs';
 
 export const exitNotBuilt = 3;
 
@@ -19,12 +20,17 @@ class Refused extends Error {
 // A tool's structuredContent, or the refusal it came back with.
 async function invoke(session, tool, args) {
  const result = await session.call(tool, args);
- if (result?.isError) throw new Refused(result.structuredContent ?? { status: 'refused', message: result.content?.find?.(part => part?.type === 'text')?.text });
+ if (result?.isError) throw new Refused(toolRefusal(result));
  if (!result?.structuredContent || typeof result.structuredContent !== 'object') throw Error(`Business returned no result for ${tool}.`);
  return result.structuredContent;
 }
 
 const idOf = (data, key) => data[key]?.id ?? data[`${key}_id`];
+
+function failed(data, subject) {
+ const safe = refusalData({ ...data, data: data.change ?? data.update, status: stateName(data) });
+ return Object.assign(Error(`The ${subject} ${clean(stateName(data), 60)}.${serverSaid(safe.message)}`), { exitCode: 1, data: safe });
+}
 
 async function change(row, args, control, session, say) {
  let data = await invoke(session, row.tool, args);
@@ -45,7 +51,7 @@ async function change(row, args, control, session, say) {
  }
  data = waited.data;
  if (!waited.ended) throw Object.assign(Error(`Still working after ${control.timeout ?? 1800} seconds. Keep waiting with: ${businessCommand(`change follow ${id} --wait`)}`), { exitCode: exitStillWaiting, data });
- if (failedState(data)) throw Object.assign(Error(`The change ${stateName(data)}: ${clean(data.change?.message ?? data.message ?? 'no reason given', 300)}`), { exitCode: 1, data });
+ if (failedState(data)) throw failed(data, 'change');
  if (data.next === 'ask_owner') say('The owner needs to answer something in Business before this can go on.');
  else if (data.next === 'publish') say(`Its preview is ready. Publish it with: ${businessCommand(`change publish ${id}`)}`);
  return data;
@@ -56,7 +62,7 @@ async function update(row, args, control, session, say) {
  if (!control.wait) return data;
  const waited = await waitFor(() => invoke(session, 'update.follow', args), { say: state => say(`Update ${args.installation_id}: ${state}`), timeout: control.timeout, interval: control.interval });
  if (!waited.ended) throw Object.assign(Error(`Still working after ${control.timeout ?? 1800} seconds. Keep waiting with: ${businessCommand(`update follow ${args.installation_id} --wait`)}`), { exitCode: exitStillWaiting, data: waited.data });
- if (failedState(waited.data)) throw Object.assign(Error(`The update ${stateName(waited.data)}.`), { exitCode: 1, data: waited.data });
+ if (failedState(waited.data)) throw failed(waited.data, 'update');
  return waited.data;
 }
 const waiters = { change, update };
@@ -84,7 +90,7 @@ async function listTools(session, json) {
  let cursor;
  for (let page = 0; page < 20; page++) {
   const response = await session.exchange('tools/list', cursor ? { cursor } : {});
-  if (response.error) throw Error('Business MCP refused tools/list.');
+  if (response.error) throw Error(`Business MCP refused tools/list.${serverSaid(refusalView(response.error).sentence)}`);
   tools.push(...(Array.isArray(response.result?.tools) ? response.result.tools : []));
   cursor = response.result?.nextCursor;
   if (!cursor) break;
