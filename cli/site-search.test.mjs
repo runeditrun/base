@@ -11,6 +11,7 @@ import { pathToFileURL } from 'node:url';
 import { exportReference } from '../scripts/export-reference.mjs';
 import { siteProvider } from '../modules/deploy-kit/tests/site-provider.mjs';
 import { sitePreview } from './site-preview.mjs';
+import { ensureProjectPnpm } from './project-pnpm.mjs';
 
 const run = promisify(execFile), base = resolve(import.meta.dirname, '..');
 const { chromium } = createRequire(join(base, 'default-seed/package.json'))('@playwright/test');
@@ -62,9 +63,12 @@ test('opt-in site prepares and reuses vectors, serves linked headings, and refus
  await new Promise(resolve => edge.listen(0,'127.0.0.1',resolve));
  t.after(() => new Promise(resolve => {edge.closeAllConnections();edge.close(resolve);}));
  const network = `http://127.0.0.1:${edge.address().port}`;
+ // Resolve the real tool before intercepting provider traffic. A fresh HOME
+ // must not send its package-manager download to the provider fixture.
+ const env = await ensureProjectPnpm(root, {env:{PATH:process.env.PATH,HOME:join(directory,'home'),CI:'true',RER_NO_UPDATE_CHECK:'1'}});
  const command = async (...argv) => {
   try { return {code:0,...await run(process.execPath,['--import',join(base,'cli/fixtures/docs-search/network.mjs'),join(base,'bin/rer.mjs'),...argv,'--site','--json','--no-queue'],{
-   cwd:root,env:{PATH:process.env.PATH,HOME:join(directory,'home'),CI:'true',RER_NO_UPDATE_CHECK:'1',RER_TEST_NETWORK:network,CLOUDFLARE_ACCOUNT_ID:provider.accountId,CLOUDFLARE_API_TOKEN:provider.token},maxBuffer:1024*1024})}; }
+   cwd:root,env:{...env,RER_TEST_NETWORK:network,CLOUDFLARE_ACCOUNT_ID:provider.accountId,CLOUDFLARE_API_TOKEN:provider.token},maxBuffer:1024*1024})}; }
   catch(error) { return {code:error.code,stdout:error.stdout,stderr:error.stderr}; }
  };
  for (const argv of [['build'],['deploy','--dry-run']]) {

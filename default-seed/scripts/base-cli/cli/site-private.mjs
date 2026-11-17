@@ -10,7 +10,15 @@ const run = promisify(execFile);
 export async function unpublishedIdentities(root, identities, privateFiles = []) {
  identities = [...new Set(identities)].filter(value => typeof value === 'string' && value.length);
  if (!identities.length) return [];
- const git = args => run('git', args, {cwd:root, maxBuffer:32 * 1024 * 1024, encoding:'buffer'});
+ const git = async args => {
+  try { return await run('git', args, {cwd:root, maxBuffer:32 * 1024 * 1024, encoding:'buffer'}); }
+  catch (error) {
+   // Synchronous native spawn errors (including Darwin's bad CPU type) omit
+   // path. Keep the actual error and name only the executable at this boundary.
+   if (/^spawn(?: |$)/.test(error.syscall ?? '') && !error.path) error.path = 'git';
+   throw error;
+  }
+ };
  let paths, prefix;
  try {
   prefix = (await git(['rev-parse', '--show-prefix'])).stdout.toString().trim();

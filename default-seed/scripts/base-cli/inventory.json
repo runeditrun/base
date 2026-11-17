@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.121-dev.gcca32468",
+  "cliVersion": "0.2.121-dev.g25955413",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -29,7 +29,7 @@
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
-      "sha256": "4029eac53d096bf8d598e49c7b19deb1f8ed87e909fbf989cec0c7d194176e91"
+      "sha256": "8c17c55a1f625574bf565c951aef3ea7a569341a0a5803a29f06f9517aa645d3"
     },
     "agent-handoff.mjs": {
       "source": "onboarding/agent-handoff.mjs",
@@ -69,7 +69,7 @@
     },
     "commands.mjs": {
       "source": "onboarding/commands.mjs",
-      "sha256": "74ebe91012be73356669071529c75ba1fb3613588ca8a58c317d29c251b66171"
+      "sha256": "00e750b4ac6e7afde73fff4ad4ca91663096147fb049096d7882e9a4240e3275"
     },
     "dependency-approval.mjs": {
       "source": "onboarding/dependency-approval.mjs",
@@ -959,7 +959,7 @@
     },
     "cli/errors.mjs": {
       "source": "cli/errors.mjs",
-      "sha256": "db9c7dccab93aa8e9ec7d0bcb1fbb688243f16a7f2454dd8ebdef8079c6e2fe4"
+      "sha256": "cd8105b8e554a8cec668b3fd9d54f1e2756b7de7a4da357d7245c0d75b2d233c"
     },
     "cli/export-summary.mjs": {
       "source": "cli/export-summary.mjs",
@@ -1359,7 +1359,7 @@
     },
     "cli/site-private.mjs": {
       "source": "cli/site-private.mjs",
-      "sha256": "e06bbe0314160b8458cbd54b828e1d9784c8a3f5fcfd426234ab9edf63fbf6fb"
+      "sha256": "63cd398cb69105d4049fe646b2f7268d1142ac8a9c2c8f7b0cdd09e846cb0e7a"
     },
     "cli/site-references.mjs": {
       "source": "cli/site-references.mjs",
@@ -1379,7 +1379,7 @@
     },
     "cli/site.mjs": {
       "source": "cli/site.mjs",
-      "sha256": "9c4645a5f8b9f8c5777534c8b979bfeec7e74d1e99433760fae2d2a01bf1aff7"
+      "sha256": "77b5c9881fb8abc4d86b2ed18bd3f48926d90b964e19ec7e11ea444ca2ca2bda"
     },
     "cli/size/build-facts.mjs": {
       "source": "cli/size/build-facts.mjs",
