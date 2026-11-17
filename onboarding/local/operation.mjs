@@ -11,7 +11,7 @@ const busy = async (path) => {
  let command='process';
  if(pid)try{command=await processName(pid,inspectionContext({budgetMs:1000}));}catch(error){if(!uncheckedInspection(error))throw error;}
  const identity=pid?`PID ${pid} (${command})`:'an unidentified process';
- return Object.assign(new Error(`An active local operation owns the state: ${identity}. Stop it with rer dev --stop or rer preview --stop; for an unmanaged process, stop PID ${pid ?? 'shown in the lock'} before retrying.`), {code: 'LOCAL_OPERATION_BUSY', ownerPid: pid});
+ return Object.assign(new Error(`An active local operation owns the state: ${identity}. Stop it with ~/.local/bin/rer dev --stop or ~/.local/bin/rer preview --stop; for an unmanaged process, stop PID ${pid ?? 'shown in the lock'} before retrying.`), {code: 'LOCAL_OPERATION_BUSY', ownerPid: pid});
 }
 const graceMs = 10000
 

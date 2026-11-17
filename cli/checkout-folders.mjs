@@ -8,7 +8,7 @@ export async function checkoutFolders(directory) {
   const path = join(directory, item.name);
   try {
    if ((await stat(path)).isDirectory() && (await stat(join(path, 'OPERATIONS.json'))).isFile()) folders.push(await realpath(path));
-  } catch { /* Not a readable checkout, as in rer list. */ }
+  } catch { /* Not a readable checkout, as in ~/.local/bin/rer list. */ }
  }
  return [...new Set(folders)];
 }

@@ -29,7 +29,7 @@ export async function updateNotice(env = process.env) {
   await writeFile(file, JSON.stringify({ checkedAt: Date.now() }) + '\n');
   const latest = await latestVersion(env);
   const current = ownManifest().version;
-  if (latest && compareVersions(latest, current) > 0) process.stderr.write(`rer ${latest} is available (this is ${current}). Update with: rer update\n`);
+  if (latest && compareVersions(latest, current) > 0) process.stderr.write(`rer ${latest} is available (this is ${current}). Update with: ~/.local/bin/rer update\n`);
  } catch {
   // The notice never stands in the way of the command.
  }

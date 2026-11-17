@@ -15,7 +15,7 @@ import { ownManifest, ownRoot, packageDigest, packageName } from '../package-inf
 import { readPackage, writePackage } from './archive.mjs';
 import { compareVersions, packageMetadata, pickRelease, registryUrl, UpdateFailure } from './registry.mjs';
 
-const usage = 'Usage: rer update [--version X]\n';
+const usage = 'Usage: ~/.local/bin/rer update [--version X]\n';
 
 function parse(args) {
  if (!args.length) return {};
@@ -60,14 +60,14 @@ async function npmGlobal(version) {
 
 export async function update(args) {
  const options = parse(args);
- if (!options) { process.stderr.write(`Unsupported: rer update ${args.join(' ')}\n${usage}`); return 2; }
+ if (!options) { process.stderr.write(`Unsupported: ~/.local/bin/rer update ${args.join(' ')}\n${usage}`); return 2; }
  const { channel } = await channelOf(layout()), current = ownManifest().version;
- if (channel === 'source') { process.stderr.write(`This rer runs from a source checkout (${ownRoot}), which rer update does not change. Update the checkout with git, or install rer with: npx -y ${packageName} cli install\n`); return 1; }
+ if (channel === 'source') { process.stderr.write(`This rer runs from a source checkout (${ownRoot}), which ~/.local/bin/rer update does not change. Update the checkout with git, or install rer with: npx -y ${packageName} cli install\n`); return 1; }
  const work = await mkdtemp(join(tmpdir(), 'rer-update-'));
  try {
   const release = pickRelease(await packageMetadata(), options.version);
   if (!options.version && compareVersions(current, release.version) > 0) {
-   process.stdout.write(`rer ${current} is newer than the latest published version (${release.version}); nothing changed. rer update --version ${release.version} installs that one.\n`);
+   process.stdout.write(`rer ${current} is newer than the latest published version (${release.version}); nothing changed. ~/.local/bin/rer update --version ${release.version} installs that one.\n`);
    return 0;
   }
   // The same version counts as current only with the same contents: a
@@ -85,7 +85,7 @@ export async function update(args) {
   return await run(process.execPath, [join(work, 'package/global/rer.mjs'), 'cli', 'install'], { ...process.env, RER_INSTALL_CHANNEL: channel, RER_INSTALL_NO_NEXT: '1' });
  } catch (error) {
   if (!(error instanceof UpdateFailure)) throw error;
-  process.stderr.write(`rer update: ${error.message} rer ${current} is still selected.\n`);
+  process.stderr.write(`~/.local/bin/rer update: ${error.message} rer ${current} is still selected.\n`);
   return 1;
  } finally { await rm(work, { recursive: true, force: true }); }
 }

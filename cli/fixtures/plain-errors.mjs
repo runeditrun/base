@@ -46,7 +46,7 @@ snapshots:
   assert.doesNotMatch(result.stdout + result.stderr, /FetchError|RerError|TypeError|\n\s+at /);
   return result;
  };
- await human(['dev', '--port', '99999'], 2, /Port "99999" is invalid\. Use a port from 1 to 65535, for example: rer dev --port 4800/);
+ await human(['dev', '--port', '99999'], 2, /Port "99999" is invalid\. Use a port from 1 to 65535, for example: ~\/\.local\/bin\/rer dev --port 4800/);
  const port = await invoke(['dev', '--port', '99999', '--json']);
  assert.equal(port.code, 2);
  assert.equal(port.stdout, '');
@@ -79,14 +79,14 @@ snapshots:
  await writeFile(join(root, '.rer/recovery/old.rer'), '', { mode: 0o600 });
  const journal = await human(['import', '--input', '.rer/recovery/old.rer', '--journal', '../latest.rer', '--yes'], 4, /--journal "\.\.\/latest\.rer" must stay inside this checkout/);
  assert.match(journal.stderr, /--input '\.rer\/recovery\/old\.rer' --journal '\.rer\/recovery\/latest\.rer'/);
- await human(['dev'], 1, /Could not download a dependency \(pako 1\.0\.11\) because the package registry at 127\.0\.0\.1:9 refused the connection\. Check your network or registry setting, then run: rer dev --cwd '/);
+ await human(['dev'], 1, /Could not download a dependency \(pako 1\.0\.11\) because the package registry at 127\.0\.0\.1:9 refused the connection\. Check your network or registry setting, then run: ~\/\.local\/bin\/rer dev --cwd '/);
  const download = await invoke(['dev', '--json']);
  assert.equal(download.code, 1);
  const lines = download.stdout.trim().split('\n'), errorLine = lines.find(line => JSON.parse(line).event === 'error'), error = JSON.parse(errorLine);
  assert.equal(error.code, 'install_step_failed');
  assert.ok(error.step.output.some(line => line.includes('FetchError')));
  assert.ok(error.step.output.some(line => /^\s+at /.test(line)));
- const message = `${stepFailureText(error.step)}\nCorrect the cause, then run rer dev --cwd '${root}' again.`;
+ const message = `${stepFailureText(error.step)}\nCorrect the cause, then run ~/.local/bin/rer dev --cwd '${root}' again.`;
  assert.equal(errorLine, JSON.stringify({ version: 1, verb: 'install', event: 'error', code: 'install_step_failed', message, exitCode: 1, step: error.step }));
  assert.equal(lines.at(-1), JSON.stringify({ version: 1, verb: 'dev', event: 'result', ok: false, exitCode: 1 }));
  assert.match(await readFile(join(root, error.step.log), 'utf8'), /FetchError/);

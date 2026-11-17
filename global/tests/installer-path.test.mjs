@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { buildPackage } from '../../scripts/rer-package.mjs';
@@ -39,24 +39,60 @@ test('install.sh with a supplied command ends with one PATH step when ~/.local/b
  const home = join(directory, 'home'), launcher = join(home, '.local/bin');
  const lacking = { PATH: `${bin}:/usr/bin:/bin`, HOME: home, SHELL: '/bin/zsh', TMPDIR: directory, npm_config_registry: registry.url };
  const having = { ...lacking, PATH: `${launcher}:${lacking.PATH}` };
- const step = /^Required next step: /gm, line = 'export PATH="$HOME/.local/bin:$PATH"';
+ const step = /^Required next step: /gm;
 
  // PATH lacks ~/.local/bin: the same install leaves a bare rer unfound, and says so exactly once.
  const missing = await run('sh', [installer, '--', 'cli', 'status'], lacking);
  assert.equal(missing.code, 0, missing.stderr);
  assert.equal(count(missing.stdout, step), 1, missing.stdout);
- assert.equal(count(missing.stdout, /export PATH=/g), 1, 'one line to run, not several');
- assert.ok(missing.stdout.includes(line), missing.stdout);
- assert.ok(missing.stdout.includes(`${launcher} is not on your PATH`) && missing.stdout.includes(`${launcher}/rer cli path`), 'names the real home path');
- assert.ok(missing.stdout.trimEnd().endsWith('This installer changes no shell file.'), 'the step closes the output');
- assert.doesNotMatch(missing.stdout, /Optional/, 'no second, conflicting instruction');
- const fresh = await run('sh', ['-c', 'command -v rer'], lacking);
- assert.notEqual(fresh.code, 0, 'a fresh shell still lacks rer, so the step is what makes it work');
- assert.equal((await run('sh', ['-c', `${line}\nrer --version`], lacking)).stdout.trim(), manifest.version, 'the printed line makes bare rer work');
- const path = await run('sh', ['-c', `"${launcher}/rer" cli path`], lacking);
+ const path = await run('sh', ['-c', '~/.local/bin/rer cli path'], lacking);
  assert.equal(path.code, 0, path.stderr);
- assert.ok(path.stdout.includes(line.replace('$HOME', '~')) || path.stdout.includes('.zshrc'), 'cli path shows the line to run');
- assert.doesNotMatch(path.stdout, /Optional/, 'cli path does not call the step optional either');
+ assert.equal(path.stdout.trim().split('\n').length, 1, 'cli path returns one command');
+ assert.equal(path.stderr, '');
+ assert.ok(missing.stdout.includes(path.stdout.trim()), 'installer prints the command cli path supplies');
+ await assert.rejects(access(join(home, '.zshrc')), 'printing advice does not edit the profile');
+ const fresh = await run('sh', ['-c', 'command -v rer'], lacking);
+ assert.notEqual(fresh.code, 0, 'printing advice leaves the caller PATH alone');
+
+ const redirected = join(home, 'other-zsh');
+ await mkdir(redirected);
+ const untouched = ['.zprofile', '.bash_profile', 'other-zsh/.zshrc'];
+ for (const file of untouched) await writeFile(join(home, file), '# Keep this file intact\n');
+ for (const [shell, profile] of [['zsh', '.zshrc'], ['bash', '.bashrc']]) {
+  const shellEnv = { ...lacking, SHELL: `/bin/${shell}`, ZDOTDIR: redirected };
+  await writeFile(join(home, profile), '# Existing settings without final newline');
+  const before = await readFile(join(home, profile), 'utf8');
+  const printed = await run(join(launcher, 'rer'), ['cli', 'path'], shellEnv);
+  assert.equal(printed.code, 0, printed.stderr);
+  assert.equal(printed.stdout.trim().split('\n').length, 1);
+  assert.equal(printed.stderr, '');
+  assert.equal(await readFile(join(home, profile), 'utf8'), before, 'cli path is read-only');
+  const applied = await run('sh', ['-c', `${printed.stdout}rer --version`], shellEnv);
+  assert.equal(applied.code, 0, applied.stderr);
+  assert.equal(applied.stdout.trim(), manifest.version, 'the printed command activates this terminal');
+  const once = await readFile(join(home, profile), 'utf8');
+  assert.ok(once.startsWith(before), 'existing profile settings survive');
+  const repeated = await run('sh', ['-c', printed.stdout], shellEnv);
+  assert.equal(repeated.code, 0, repeated.stderr);
+  assert.equal(await readFile(join(home, profile), 'utf8'), once, 'executing the line again does not duplicate settings');
+  const newTerminal = await run('sh', ['-c', `. "$HOME/${profile}"; rer --version`], shellEnv);
+  assert.equal(newTerminal.code, 0, newTerminal.stderr);
+  assert.equal(newTerminal.stdout.trim(), manifest.version, 'loading the selected shell profile activates rer');
+  const already = await run(join(launcher, 'rer'), ['cli', 'path'], { ...shellEnv, PATH: having.PATH });
+  assert.equal(already.code, 0, already.stderr);
+  assert.equal(already.stdout, printed.stdout, 'cli path still supplies the command when PATH is configured');
+ }
+ for (const file of untouched) assert.equal(await readFile(join(home, file), 'utf8'), '# Keep this file intact\n');
+ const unknown = await run(join(launcher, 'rer'), ['cli', 'path'], { ...lacking, SHELL: '/bin/sh' });
+ assert.equal(unknown.code, 0, unknown.stderr);
+ const temporary = await run('sh', ['-c', `${unknown.stdout}rer --version`], lacking);
+ assert.equal(temporary.code, 0, temporary.stderr);
+ assert.equal(temporary.stdout.trim(), manifest.version);
+ await assert.rejects(access(join(home, '.profile')), 'unknown shells receive current-session advice without another profile');
+ const fish = await run(join(launcher, 'rer'), ['cli', 'path'], { ...lacking, SHELL: '/bin/fish' });
+ assert.equal(fish.code, 0, fish.stderr);
+ assert.equal(fish.stdout.trim().split('\n').length, 1);
+ await assert.rejects(access(join(home, '.config/fish')), 'fish advice never edits configuration itself');
 
  // A downloaded tool uses the installer's private runtime outside a checkout.
  // The real Node stands in for the runtime download; no Node command is on PATH.

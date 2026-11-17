@@ -24,13 +24,13 @@ import { readHost, startKind } from './routes.mjs';
 import { doorSites } from './sites.mjs';
 
 const say = line => process.stdout.write(`${new Date().toISOString()} ${line}\n`);
-function fail(message, code = 4) { process.stderr.write(`rer door: ${message}\n`); process.exit(code); }
+function fail(message, code = 4) { process.stderr.write(`~/.local/bin/rer door: ${message}\n`); process.exit(code); }
 
 const state = await readDoorState(process.env);
-if (!state?.door?.enabled) fail('The front door is not enabled. Run rer door enable.', 3);
+if (!state?.door?.enabled) fail('The front door is not enabled. Run ~/.local/bin/rer door enable.', 3);
 const { door } = state, port = door.port, version = ownManifest().version;
 const token = (await readPrivate(join(state.directory, 'token')))?.trim();
-if (!token) fail(`The front door's token is missing from ${state.directory}. Run rer door enable.`, 3);
+if (!token) fail(`The front door's token is missing from ${state.directory}. Run ~/.local/bin/rer door enable.`, 3);
 const sites = doorSites({ env: process.env, door, log: say });
 const indexOrigins = new Set(['localhost', '127.0.0.1', '[::1]'].map(host => `http://${host}:${port}`));
 const portOf = name => Number(/:(\d+)$/.exec(name)?.[1]);
@@ -39,7 +39,7 @@ async function holder() {
  const row = (await listeners()).find(item => item.pid !== process.pid && item.names.some(name => portOf(name) === port));
  return row && `PID ${row.pid} (${await processName(row.pid)})`;
 }
-const busy = who => `Port ${port} is held by ${who}. The front door needs 127.0.0.1:${port} and [::1]:${port} to itself. Stop that process, or enable the door on another port with rer door enable --port N.`;
+const busy = who => `Port ${port} is held by ${who}. The front door needs 127.0.0.1:${port} and [::1]:${port} to itself. Stop that process, or enable the door on another port with ~/.local/bin/rer door enable --port N.`;
 
 // --- responses -------------------------------------------------------------
 const send = (res, status, type, body, headers = {}) => { res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...headers }); res.end(body); };

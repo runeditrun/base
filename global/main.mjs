@@ -1,3 +1,4 @@
+import { withCommandHelp } from '../cli/command-guidance.mjs';
 import { humanError } from '../cli/human-error.mjs';
 import { checkoutBootstrap, checkoutVerbs } from '../cli/contract.mjs';
 import { dispatcher, locate, pinnedPackage, unsupportedMessage } from './checkout.mjs';
@@ -8,11 +9,11 @@ import { repositoryCommands, repositoryHelp } from './cli/repository-contract.mj
 import { repoArguments } from './cli/repository.mjs';
 import { appSignInHelp } from '../cli/app-address.mjs';
 
-const help = `Usage: rer VERB [FLAGS]
+const help = `Usage: ~/.local/bin/rer VERB [FLAGS]
 
-  rer dev <repo> [--dir DIR]      Clone, install, set up a local owner and start the app.
-  rer setup <repo> [--dir DIR]    Clone, install and set up, then stop.
-  rer install <repo> [--dir DIR]  Clone and install dependencies, then stop.
+  ~/.local/bin/rer dev <repo> [--dir DIR]      Clone, install, set up a local owner and start the app.
+  ~/.local/bin/rer setup <repo> [--dir DIR]    Clone, install and set up, then stop.
+  ~/.local/bin/rer install <repo> [--dir DIR]  Clone and install dependencies, then stop.
 ${repositoryHelp}
 
 Inside a project (the nearest OPERATIONS.json at or above this folder, or --cwd DIR),
@@ -20,40 +21,40 @@ every verb runs that checkout's own pinned rer: the @runeditrun/rer version its 
 pins (installed first for commands that run project code when node_modules holds another),
 else its vendored scripts/rer.mjs.
 
-  rer dev              Launch a first-party checkout with no setup steps: installs dependencies,
+  ~/.local/bin/rer dev              Launch a first-party checkout with no setup steps: installs dependencies,
                        sets up a local owner and a free port when needed, starts the app and prints
                        RER_READY and a sign-in link. Without a terminal it returns once the app is
                        ready and leaves it running (--detach and --foreground override); allow up
-                       to 10 minutes on a first launch, or rerun it to reattach. rer dev --stop stops it.
-  rer rehearse [--cwd DIR] [--ref REF]
+                       to 10 minutes on a first launch, or rerun it to reattach. ~/.local/bin/rer dev --stop stops it.
+  ~/.local/bin/rer rehearse [--cwd DIR] [--ref REF]
                        Rehearse every managed build operation in a two-commit scratch copy.
-  rer run SCRIPT [ARGS]
+  ~/.local/bin/rer run SCRIPT [ARGS]
                        Run a package.json script with the pnpm and Node the checkout pins (rer keeps
-                       them off PATH): where a project's docs say pnpm run X, run rer run X.
-  rer run --script FILE [ARGS]
+                       them off PATH): where a project's docs say pnpm run X, run ~/.local/bin/rer run X.
+  ~/.local/bin/rer run --script FILE [ARGS]
                        Run a downloaded JavaScript file with rer's Node, including its private runtime.
                        Works outside a checkout; FILE is relative to here (or --cwd DIR).
-  rer list [DIR]       The checkouts in DIR (default: here), newest first, with whether rer dev can
+  ~/.local/bin/rer list [DIR]       The checkouts in DIR (default: here), newest first, with whether ~/.local/bin/rer dev can
                        launch them, whether they are set up, and their running URL. --json for data.
-  rer business ...     Set up your business once and share its name, logo and brand colour
-                       with apps that support Business. Start with rer business connect.
-  rer companion ...    Pair this computer with a Run Edit Run app and run its change requests here
-                       with your own Codex or Claude. rer companion --help lists the commands.
-  rer door ...         The opt-in front door: every checkout at http://NAME.localhost:PORT, started
-                       on its first visit and stopped when idle. rer door --help for its verbs.
-  rer cli status       This rer: version, contents digest, install channel, launcher and other rer
+  ~/.local/bin/rer business ...     Set up your business once and share its name, logo and brand colour
+                       with apps that support Business. Start with ~/.local/bin/rer business connect.
+  ~/.local/bin/rer companion ...    Pair this computer with a Run Edit Run app and run its change requests here
+                       with your own Codex or Claude. ~/.local/bin/rer companion --help lists the commands.
+  ~/.local/bin/rer door ...         The opt-in front door: every checkout at http://NAME.localhost:PORT, started
+                       on its first visit and stopped when idle. ~/.local/bin/rer door --help for its verbs.
+  ~/.local/bin/rer cli status       This rer: version, contents digest, install channel, launcher and other rer
                        commands on PATH. --json for data.
-  rer cli install      Install this package for the current user (~/.local/bin/rer).
-  rer cli path         Show the shell step that makes a bare rer work in new terminals.
-  rer cli uninstall    Remove the launcher and the install root; ~/.rer is untouched.
-  rer update           Move to the latest published rer (--version X for an exact one), the way it
+  ~/.local/bin/rer cli install      Install this package for the current user (~/.local/bin/rer).
+  ~/.local/bin/rer cli path         Show the shell step that makes a bare rer work in new terminals.
+  ~/.local/bin/rer cli uninstall    Remove the launcher and the install root; ~/.rer is untouched.
+  ~/.local/bin/rer update           Move to the latest published rer (--version X for an exact one), the way it
                        was installed: npx and install.sh installs switch atomically, npm installs run npm.
-  rer --version        Print this rer's version; inside a checkout, also the version the checkout pins.
-  rer queue NAME -- COMMAND [ARGS]
+  ~/.local/bin/rer --version        Print this rer's version; inside a checkout, also the version the checkout pins.
+  ~/.local/bin/rer queue NAME -- COMMAND [ARGS]
                        Run COMMAND once this computer's job queue admits it (heavy package scripts
                        of a checkout that pins the rer package use it).
 
-Checkout verbs: ${Object.keys(checkoutVerbs).join(', ')}, listing. Run rer VERB --help in a checkout for its flags.
+Checkout verbs: ${Object.keys(checkoutVerbs).join(', ')}, listing. Run ~/.local/bin/rer VERB --help in a checkout for its flags.
 ${appSignInHelp}
 `;
 
@@ -65,7 +66,7 @@ export async function main(argv) {
  if (verb === 'rehearse') return (await import('../cli/rehearse.mjs')).rehearseCommand(argv.slice(1));
  if (verb === '--version' || verb === '-v') return (await import('./version.mjs')).versionCommand(argv);
  if (verb === 'queue' && argv.length === 2 && argv[1] === '--help') {
-  process.stdout.write('Usage: rer queue NAME -- COMMAND [ARGS]\nRun COMMAND once this computer\'s job queue admits it.\n');
+  process.stdout.write('Usage: ~/.local/bin/rer queue NAME -- COMMAND [ARGS]\nRun COMMAND once this computer\'s job queue admits it.\n');
   return 0;
  }
  // Only the zero-setup launch sets this, for its own setup child; an explicit
@@ -76,8 +77,8 @@ export async function main(argv) {
  if (verb === 'business') return (await import('../cli/business/command.mjs')).businessCommand(argv.slice(1));
  if (verb === 'companion') return (await import('../cli/companion/command.mjs')).companionCommand(argv.slice(1));
  const notice = await import('./update/notice.mjs');
- if (verb !== 'doctor' && notice.wantsNotice(argv)) await notice.updateNotice();
- if (!verb || verb === '--help' || verb === '-h' || verb === 'help') { process.stdout.write(help); return 0; }
+ if (verb !== 'doctor' && !(verb === 'cli' && argv[1] === 'path') && notice.wantsNotice(argv)) await notice.updateNotice();
+ if (!verb || verb === '--help' || verb === '-h' || verb === 'help') { process.stdout.write(withCommandHelp(help)); return 0; }
  if (verb === 'cli') return (await import('./cli/command.mjs')).cliCommand(argv.slice(1));
  if (verb === 'list') return (await import('./list.mjs')).listCommand(argv.slice(1));
  if (verb === 'door' && argv[1] !== 'clauses') return (await import('./door/command.mjs')).doorCommand(argv.slice(1));
@@ -127,7 +128,7 @@ export async function main(argv) {
  }
  if (verb === 'queue') {
   const [, name, separator, command] = argv;
-  if (!name || separator !== '--' || !command) { process.stderr.write('Usage: rer queue NAME -- COMMAND [ARGS]\n'); return 2; }
+  if (!name || separator !== '--' || !command) { process.stderr.write('Usage: ~/.local/bin/rer queue NAME -- COMMAND [ARGS]\n'); return 2; }
   if (mode === 'package') return delegate(target, target.args);
   return (await import('../onboarding/queued-entry.mjs')).queuedCommandLine(argv.slice(1));
  }
@@ -146,7 +147,7 @@ export async function main(argv) {
    if (!(failure instanceof LaunchFailure)) throw failure;
    // A --json caller gets the failed step as data, as the checkout's own verbs report it.
    if (failure.event && target.args.includes('--json')) for (const event of [{ ...failure.event, verb }, { version: 1, verb, event: 'result', ok: false, exitCode: failure.exitCode }]) process.stdout.write(JSON.stringify(event) + '\n');
-   else process.stderr.write(humanError(failure, { retry: `rer ${verb} --cwd '${target.root.replaceAll("'", "'\\''")}'` }) + '\n');
+   else process.stderr.write(humanError(failure, { retry: `~/.local/bin/rer ${verb} --cwd '${target.root.replaceAll("'", "'\\''")}'` }) + '\n');
    return failure.exitCode;
   }
  }

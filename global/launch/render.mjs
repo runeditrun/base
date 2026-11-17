@@ -1,3 +1,4 @@
+import { withCommandHelp } from '../../cli/command-guidance.mjs';
 import { humanError } from '../../cli/human-error.mjs';
 // What `rer dev` prints while it launches: a progress line at least every 30
 // seconds (a `progress` event with --json), then the dispatcher's ready lines.
@@ -24,7 +25,7 @@ export function printer({ json, stopHint, keyless = false, root }) {
  return {
   phase({ phase, message }) { if (phase !== 'note') { if (phase !== currentPhase) phaseStarted = Date.now(); currentPhase = phase; current = message; } progress(phase, message); },
   attaching(startedAt) { progress('attach', `attaching to the launch already preparing this checkout (started ${elapsed(Date.now() - startedAt)} ago)`); },
-  heartbeat() { if (Date.now() - last >= quiet) progress('waiting', `still ${current} (${elapsed(Date.now() - phaseStarted)}). Allow up to 10 minutes; if this command is stopped, run rer dev again to reattach.`); },
+  heartbeat() { if (Date.now() - last >= quiet) progress('waiting', `still ${current} (${elapsed(Date.now() - phaseStarted)}). Allow up to 10 minutes; if this command is stopped, run ~/.local/bin/rer dev again to reattach.`); },
   // The dispatcher's ready event, as its own human ready lines.
   async ready(ready, { log, pid }) {
    if (keyless) { const { openUrl, ...rest } = ready; ready = rest; }
@@ -48,7 +49,7 @@ export function printer({ json, stopHint, keyless = false, root }) {
    if (ready.siteUrl) out.push(...(root ? [] : [`Site: ${ready.siteUrl}`]), `RER_SITE ${ready.siteUrl}`);
    out.push(`The server keeps running in the background${pid ? ` (PID ${pid})` : ''}. Stop it with: ${stopHint}`);
    if (log) out.push(`Server log (private): ${log}`);
-   process.stdout.write(out.join('\n') + '\n');
+   process.stdout.write(withCommandHelp(out.join('\n')) + '\n');
   },
   failure(failure) {
    if (json) {

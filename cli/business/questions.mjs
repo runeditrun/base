@@ -191,7 +191,7 @@ export async function next() {
 export async function answer(id, vendorId, choice, rawConfidence = '1') {
  identifier(id);
  // Reject free text before even looking up the question or minting a bearer.
- if (typeof vendorId !== 'string' || !/^[a-z][a-z0-9-]{0,79}$/.test(vendorId) || sensitive(vendorId)) throw Error('Choose a catalog vendor id from rer business next, or none.');
+ if (typeof vendorId !== 'string' || !/^[a-z][a-z0-9-]{0,79}$/.test(vendorId) || sensitive(vendorId)) throw Error('Choose a catalog vendor id from ~/.local/bin/rer business next, or none.');
  if (!classifications.includes(choice)) throw Error(`Choose an enum: ${classifications.join(', ')}.`);
  if (!/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(rawConfidence)) throw Error('Choose a numeric confidence between 0 and 1.');
  const confidence = Number(rawConfidence);

@@ -9,7 +9,7 @@ export function committedSource(root, options) {
  const again = deployAgain(options);
  let status, sha;
  try { status = git('status', '--porcelain', '-z', '--untracked-files=no'); sha = git('rev-parse', 'HEAD').trim(); }
- catch { throw refuse(`rer deploy publishes the checkout's last Git commit, and this checkout has none. Commit the source with Git, then run ${again} again. Nothing was uploaded.`); }
+ catch { throw refuse(`~/.local/bin/rer deploy publishes the checkout's last Git commit, and this checkout has none. Commit the source with Git, then run ${again} again. Nothing was uploaded.`); }
  const entries = status.split('\0'), paths = [];
  for (let index = 0; index < entries.length; index++) {
   if (!entries[index]) continue;

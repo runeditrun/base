@@ -37,7 +37,7 @@ export async function runCommand(project, options, out) {
 
 async function runLifecycle(project, options, out, deployRedaction) {
  if (project.profile === 'first-party' && ['build','deploy'].includes(options.verb) && !options.demo && !options.site && process.env.RER_DEMO) throw refuse('Production build and deploy refuse the local-only RER_DEMO environment binding. Unset it before retrying.');
- if(project.profile==='first-party'&&options.verb==='outbox')throw refuse('Captured mail has been retired. Run rer dev and open its RER_OPEN link.');
+ if(project.profile==='first-party'&&options.verb==='outbox')throw refuse('Captured mail has been retired. Run ~/.local/bin/rer dev and open its RER_OPEN link.');
  if(project.profile==='first-party'&&['dev','preview'].includes(options.verb))return (await import('./managed-server.mjs')).managedServer(project,options,out);
  const cancellation = new AbortController(), signal = cancellation.signal;
  let termination, operation, store, temporary, proxy, failed = false, installingFrozen = false;
@@ -55,7 +55,7 @@ async function runLifecycle(project, options, out, deployRedaction) {
   }
   if (project.profile === 'first-party' && options.verb !== 'doctor') {
    if (!project.adapter?.run) throw refuse('The first-party command adapter is unavailable. Restore the shared lifecycle adapter.');
-   if (options.forwarded.length) throw refuse('First-party commands do not accept arbitrary forwarded arguments. Run rer VERB --help.');
+   if (options.forwarded.length) throw refuse('First-party commands do not accept arbitrary forwarded arguments. Run ~/.local/bin/rer VERB --help.');
    await stateSafety(project);
    const { localOperation } = await shared('local/operation.mjs');
    // The run site reads no local state: it builds beside a running rer dev.
@@ -106,7 +106,7 @@ async function runLifecycle(project, options, out, deployRedaction) {
     installingFrozen = false;
     // The test browser downloads on first need (verify), not here. Package
     // scripts run with the pinned pnpm through rer run, which keeps pnpm off PATH.
-    if (!options.json) store.report('Run this project\'s package scripts with rer run SCRIPT (it uses the pnpm this project pins).');
+    if (!options.json) store.report('Run this project\'s package scripts with ~/.local/bin/rer run SCRIPT (it uses the pnpm this project pins).');
     return {};
    } catch (error) { if (signal.aborted) throw error; throw await installStepError(error, store, project.root); } finally { installingFrozen = false; }
   }
@@ -115,7 +115,7 @@ async function runLifecycle(project, options, out, deployRedaction) {
    if (!Array.isArray(target)) throw refuse('A complete internal verification target is missing.');
    await ensureChromium(project.root, store, signal, project.adapter?.browser);
    await store.run('Verifying application', target[0], target[1], { cwd: project.root, signal, env: { ...process.env, RER_LOCAL_OPERATION: operation.token } });
-   await store.step('Serving the production build as rer deploy hosts it');
+   await store.step('Serving the production build as ~/.local/bin/rer deploy hosts it');
    const declaration = adapter.deployDeclaration ?? adapter.deploy?.declaration;
    const hosted = await (await import('./hosted-output.mjs')).checkHostedOutput(project.root, { declaration });
    await store.step('Checking that page sections hydrate as separate units');
@@ -165,8 +165,8 @@ async function runLifecycle(project, options, out, deployRedaction) {
    else {
     const { checkoutPath } = await shared('step-failure.mjs');
     out.human(`Setup complete: ${state.migrationsApplied ? `${state.migrationsApplied} migration${state.migrationsApplied === 1 ? '' : 's'} applied` : 'database already up to date'}, owner set up. Full output: ${store.redact(checkoutPath(project.root, store.logPath))}`);
-    out.human(`RER_SETUP_READY ${url}`); out.human(`Next: rer dev opens ${url} signed in as the owner; first-run setup finishes at ${url}/setup. rer preview prints a one-time native owner link on loopback; rer demo also prints a separate native owner entry.`);
-    if (deployNeeds.length) out.human(['To host it on your own Cloudflare account later, rer deploy needs:', ...deployNeeds.map(item => `  - ${item}`), 'Set them in your environment or a private (mode 0600) file passed with --env-file, then check with rer deploy --dry-run.'].join('\n'));
+    out.human(`RER_SETUP_READY ${url}`); out.human(`Next: ~/.local/bin/rer dev opens ${url} signed in as the owner; first-run setup finishes at ${url}/setup. ~/.local/bin/rer preview prints a one-time native owner link on loopback; ~/.local/bin/rer demo also prints a separate native owner entry.`);
+    if (deployNeeds.length) out.human(['To host it on your own Cloudflare account later, ~/.local/bin/rer deploy needs:', ...deployNeeds.map(item => `  - ${item}`), 'Set them in your environment or a private (mode 0600) file passed with --env-file, then check with ~/.local/bin/rer deploy --dry-run.'].join('\n'));
    }
   } else if (options.verb !== 'build') throw refuse('The requested first-party capability is unavailable.');
   return {};
