@@ -64,7 +64,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
   redaction.addSecrets((await settingKinds({ declaration, setupManifest })).privateValues(env));
   const claim = setupManifest?.steps?.find(item => item.type === 'owner-claim');
   const declared = binding => (Array.isArray(declaration.secrets) ? declaration.secrets : []).find(item => item?.binding === binding);
-  const owner = async (command, extra = [], values = env, more = {}) => main([command, '--declaration', declarationPath, '--environment', environment, ...(['dry-run', 'local-plan', 'deploy', 'health'].includes(command) ? await deployProductArguments(root, productDirectory) : []), ...extra], values, { cwd: root, localOnlyKeys, ...more });
+  const owner = async (command, extra = [], values = env, more = {}) => main([command, '--declaration', declarationPath, '--environment', environment, ...(['dry-run', 'local-plan', 'deploy', 'health'].includes(command) ? await deployProductArguments(root, productDirectory) : []), ...extra], values, { cwd: root, localOnlyKeys, signal, ...more });
   // Keep confirmed creation events across deploy and the independent health call.
   const created = [];
   let step = 'deploy', deployed;
