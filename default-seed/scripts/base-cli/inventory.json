@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.121-dev.g46fe61f4",
+  "cliVersion": "0.2.121-dev.gf0c97984",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -391,7 +391,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "9d0d9702b2449de3e9c8a568c48ab8e4b9b7b7c741183864a2c6912e39d899af"
+      "sha256": "17904f2e5bc131f89e1019e62dfeaac272e127bfef7be7e4bf16490e89580d48"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -951,7 +951,7 @@
     },
     "cli/errors.mjs": {
       "source": "cli/errors.mjs",
-      "sha256": "2c53efad1303777b6706a2048a89944fe6bbf4c5a2cd0ba21383367659db90b2"
+      "sha256": "db9c7dccab93aa8e9ec7d0bcb1fbb688243f16a7f2454dd8ebdef8079c6e2fe4"
     },
     "cli/export-summary.mjs": {
       "source": "cli/export-summary.mjs",
@@ -1047,7 +1047,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "a12cff34fd9bed93394995d81e07ebaf9d6c59e0942202835d4827d86b2dc599"
+      "sha256": "ac623a9914dad7bb62160f7d8bd5f6b5d76ba1c996347018bdbe37941a49e26b"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
@@ -1169,6 +1169,10 @@
       "source": "cli/portability-progress.mjs",
       "sha256": "9a3f1f1f182b18895d38a2d8d86904ff0590e6d987435b8e78f971411331bb14"
     },
+    "cli/portability-runtime.mjs": {
+      "source": "cli/portability-runtime.mjs",
+      "sha256": "ff2f4f6592d6ef7b52c16e6032f80fc8bebbaa644aba78af2dbcbc42bdb6a5fe"
+    },
     "cli/portability-worker.mjs": {
       "source": "cli/portability-worker.mjs",
       "sha256": "51dc3c8365bf52d37520cd6913b91a445c6de930dd121f4b8ed27b1775ab38bf"
@@ -1195,7 +1199,7 @@
     },
     "cli/project.mjs": {
       "source": "cli/project.mjs",
-      "sha256": "bbe4232614d2b9033932ecad4d758521c64975dc697a93fed2cfa34b511c0f91"
+      "sha256": "0819f416612ca1da538de61d9e140f46662809acf9b02c9c4c6a8635c14906e9"
     },
     "cli/ready-summary.mjs": {
       "source": "cli/ready-summary.mjs",
