@@ -98,17 +98,12 @@ commandAdapter.site={entry:'pages.mjs',output:'dist/site',declaration:'site.json
   spawnFailures.push({name:'errno -86', bytes:binary});
  }
  await rm(join(runtime, 'git'));
- const spawnResults = [];
  for (const {name, bytes} of spawnFailures) {
   await writeFile(join(tools, 'git'), bytes, {mode:0o700});
   for (const args of [['build','--site'], ['dev']]) for (const json of [false, true]) {
    const failure=run([...args,...(json?['--json']:[])],{PATH:tools});
    assert.equal(failure.status,1,failure.stdout+failure.stderr);
    const message=json?failure.stdout.trim().split('\n').map(JSON.parse).find(row=>row.event==='error').message:failure.stderr.slice(failure.stderr.indexOf('Could not run git:'));
-   spawnResults.push({name,failure,message});
-  }
- }
- for (const {name,failure,message} of spawnResults) {
    assert.match(message,/Could not run git:/);
    assert.ok(message.includes(name),message);
    const path=/Full output: (.+)/.exec(message)?.[1];
@@ -116,6 +111,7 @@ commandAdapter.site={entry:'pages.mjs',output:'dist/site',declaration:'site.json
    const log=await readFile(resolve(root,path),'utf8');
    assert.ok(log.includes(message.trim()),log);
    assert.doesNotMatch(failure.stdout+failure.stderr+log,/test-only-failing-tool-token/);
+  }
  }
  await writeFile(join(tools, 'git'), '#!/bin/sh\necho caller Git cannot run this checkout >&2\necho "Authorization: Bearer test-only-failing-tool-token" >&2\nexit 27\n', {mode:0o700});
  await writeFile(join(root, 'adapter.mjs'), originalAdapter);
