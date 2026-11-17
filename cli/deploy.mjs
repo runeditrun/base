@@ -171,7 +171,8 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
   const count = Array.isArray(remaining) ? `${remaining.length} resources remain (${remaining.join(', ') || 'none'})` : 'the remaining resource count could not be read';
   const detail = providerFailure(error, redact);
   const failed = error.failed?.map(item => `${item.resource}: ${providerFailure(item.error, redact) ?? item.code}`).join('; ');
-  return redact(`Removal failed: ${count}; run ${retry} again. Cause: ${cause}${detail ? ` (${detail})` : ''}${failed ? `; ${failed}` : ''}.`);
+  const removed = Array.isArray(error.removed) ? error.removed.join(', ') || 'nothing' : 'nothing confirmed';
+  return redact(`Removed ${removed}. Removal failed: ${count}; run ${retry} again.${cause === 'remove-incomplete' ? '' : ` Cause: ${cause}${detail ? ` (${detail})` : ''}.`}${failed ? ` ${failed}.` : ''}`);
  }
  const setup = hostedSetupFailure(error, { origin: deployed?.origin, again });
  if (setup) return redact(setup);

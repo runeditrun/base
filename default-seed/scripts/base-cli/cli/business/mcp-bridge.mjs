@@ -4,6 +4,7 @@ import { mcpClient } from './questions.mjs';
 import { paired } from './local-commands.mjs';
 import { describe } from './errors.mjs';
 import { maskDeviceText } from './run-mask.mjs';
+import { refusalView, toolRefusal, serverSaid } from './refusal.mjs';
 
 const protocolVersion = '2025-11-25';
 const forwarded = /^(tools|resources|prompts|completion|logging)\//;
@@ -34,8 +35,12 @@ export async function bridge({ input = process.stdin, output = process.stdout, e
    if (!forwarded.test(method)) return fail(id, -32601, `Method not found: ${method.slice(0, 80)}`);
    const response = await upstream.exchange(method, params ?? {});
    if (response.error) {
-    const { code, message: text, data } = response.error;
-    return send({ id, error: { code: Number.isInteger(code) ? code : -32000, message: describe(Error(String(text ?? 'Business refused the request.'))), ...(data !== undefined ? { data } : {}) } });
+    const { code } = response.error;
+    return send({ id, error: { code: Number.isInteger(code) ? code : -32000, message: `Business MCP refused ${method}.${serverSaid(refusalView(response.error).sentence)}` } });
+   }
+   if (response.result?.isError) {
+    const data = toolRefusal(response.result);
+    return send({ id, result: { isError: true, content: [{ type: 'text', text: `Business refused.${serverSaid(data.message)}` }], structuredContent: data } });
    }
    send({ id, result: response.result });
   } catch (error) {

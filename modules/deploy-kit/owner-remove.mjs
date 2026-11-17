@@ -5,6 +5,7 @@ import { assert, hexId } from './validation.mjs';
 import { resourceKinds, findResource } from './resources.mjs';
 import { activeWorker } from './worker.mjs';
 import { deleteWorker } from './teardown.mjs';
+import { recordDeployFailure } from './diagnostics.mjs';
 import { query } from './migrations.mjs';
 import { KINDS, readOwnerState, writeOwnerState, withStateLock, withScopeHints, withSettledLists, workerSettings, sameDeployment, resourceId, checkResourceIdentity, refuse, settlePendingSecret } from './owner.mjs';
 
@@ -81,15 +82,24 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
           await api.request(`/queues/${queue.id}/consumers/${consumer.consumer_id}`, {method:'DELETE'});
         }
       }
-      if (worker) { await deleteWorker({api, worker, signal, ...(clock ? {clock} : {}), ...(sleep ? {sleep} : {})}); removed.push(`worker:${worker}`); }
-      for (const item of doomed) {
+      let workerGone = true;
+      if (worker) {
+        try { await deleteWorker({api, worker, signal, ...(clock ? {clock} : {}), ...(sleep ? {sleep} : {})}); }
+        catch (error) {
+          failed.push({resource:`worker:${worker}`, code:error.message, error});
+          // Keep a surviving Worker's data. An applied delete with a failed
+          // acknowledgement may proceed only after a successful absence read.
+          workerGone = false;
+          try { workerGone = await workerSettings(api, target.worker) === null; } catch { /* Final readback below retains unverified resources. */ }
+        }
+      }
+      for (const item of workerGone ? doomed : []) {
         try {
           if (item.kind === 'r2') await removeBucket(api, item);
           else {
             await remove[item.kind](api, item.id, item.name);
             if (item.kind === 'queues') await waitForQueueRemoval(api,item,{clock,sleep,signal});
           }
-          removed.push(`${item.kind}:${item.name}`);
         }
         catch (error) { failed.push({resource:`${item.kind}:${item.name}`, code:error.message, error}); }
       }
@@ -119,6 +129,11 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
           }
         });
       }
+      // A failed response can follow an applied delete or an ancillary cleanup
+      // refusal. Only the independent readback decides what was removed.
+      for (const resource of [ ...(worker ? [`worker:${worker}`] : []), ...doomed.map(({kind,name}) => `${kind}:${name}`) ]) {
+        if (!remaining.has(resource)) removed.push(resource);
+      }
       if (remaining.size || readFailure) {
         // Keep proof for every survivor or resource whose absence is unverified.
         for (const kind of KINDS) for (const name of Object.keys(state.owned[kind])) if (!remaining.has(`${kind}:${name}`)) delete state.owned[kind][name];
@@ -127,13 +142,16 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
           delete state.ownerClaim; delete state.retiredSecrets;
         }
         await writeOwnerState(statePath, state);
-        throw readFailure ?? new Error('remove-incomplete');
+        if (readFailure) throw readFailure;
+        const workerFailure = failed.find(item => item.resource === `worker:${target.worker}` && remaining.has(item.resource));
+        if (workerFailure) throw workerFailure.error;
+        throw recordDeployFailure(new Error(`Removed ${removed.join(', ') || 'nothing'}; ${remaining.size} resources remain (${[...remaining].join(', ')}). Run the same removal command again after correcting the cause.`), {code:'remove-incomplete',step:'remove'});
       }
       await rm(statePath, {force:true});
       return {worker:target.worker, removed, remaining:[]};
     } catch (error) {
       error.remaining = [...remaining];
-      error.failed = failed;
+      error.failed = failed.filter(item => remaining.has(item.resource));
       error.removed = removed.filter(resource => !remaining.has(resource));
       throw error;
     }
