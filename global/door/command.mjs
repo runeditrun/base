@@ -1,3 +1,4 @@
+import { withCommandHelp } from '../../cli/command-guidance.mjs';
 // rer door: the opt-in front door. One process on one port serves every
 // registered checkout at http://NAME.localhost:PORT, starting it on its first
 // visit and stopping it when idle.
@@ -45,8 +46,8 @@ their door URL. Move an existing one with ~/.local/bin/rer dev --door (~/.local/
 it back); ~/.local/bin/rer dev --port N always serves directly.
 `;
 
-const out = text => process.stdout.write(text + '\n');
-const err = text => process.stderr.write(text + '\n');
+const out = text => process.stdout.write(withCommandHelp(text) + '\n');
+const err = text => process.stderr.write(withCommandHelp(text) + '\n');
 
 function flags(args, valued, booleans = []) {
  const result = { positional: [] };
@@ -227,7 +228,7 @@ async function status(args, env) {
  }
  const sites = views.map(view => ({ name: view.name, path: view.path, mode: view.mode, state: view.state === 'failed' ? 'stopped' : view.state, url: view.url, ...(view.proxyPort && view.state === 'running' ? { proxyPort: view.proxyPort } : {}), ...(view.signIn ? { signIn: view.signIn } : {}) }));
  const result = { running: Boolean(record), enabled: Boolean(door?.enabled), port: door?.port ?? record?.port ?? null, pid: record?.pid ?? null, version, policy: door ? { serverLimit: door.policy.serverLimit, idleSeconds: door.policy.idleSeconds } : null, sites };
- if (given['--json']) { out(JSON.stringify({ ...result, ...(linkNote ? { linksUnavailable: linkNote } : {}), ...(!record && door?.enabled ? { note: 'After a reboot or logout the front door needs ~/.local/bin/rer door start.' } : {}) })); return 0; }
+ if (given['--json']) { process.stdout.write(JSON.stringify({ ...result, ...(linkNote ? { linksUnavailable: linkNote } : {}), ...(!record && door?.enabled ? { note: 'After a reboot or logout the front door needs ~/.local/bin/rer door start.' } : {}) }) + '\n'); return 0; }
  if (!door) { out('The front door is not enabled on this computer. Enable it with: ~/.local/bin/rer door enable'); return 0; }
  out(record ? runningLine(door, record) : door.enabled ? `The front door is enabled on port ${door.port} but not running. Start it with: ~/.local/bin/rer door start` : 'The front door is disabled on this computer. Enable it with: ~/.local/bin/rer door enable');
  if (sites.length) {
@@ -247,7 +248,7 @@ export async function doorCommand(args, env = process.env) {
  // A reader that stops early (rer door status | grep -q) is not a failure.
  process.stdout.on('error', error => { if (error.code === 'EPIPE') process.exit(0); throw error; });
  const [verb, ...rest] = args;
- if (!verb || ['--help', '-h', 'help'].includes(verb) || rest.includes('--help')) { process.stdout.write(doorHelp); return 0; }
+ if (!verb || ['--help', '-h', 'help'].includes(verb) || rest.includes('--help')) { process.stdout.write(withCommandHelp(doorHelp) + '\n'); return 0; }
  const verbs = { enable, disable, add, remove, status, start: (_, e) => start(e), stop: (_, e) => stop(e), restart: (_, e) => restart(e) };
  if (!Object.hasOwn(verbs, verb)) { err(`Unknown ~/.local/bin/rer door command: ${verb}. Run ~/.local/bin/rer door --help.`); return 2; }
  if (['start', 'stop', 'restart'].includes(verb) && rest.length) { err(`~/.local/bin/rer door ${verb} takes no arguments.`); return 2; }

@@ -1,3 +1,4 @@
+import { humanError } from '../../cli/human-error.mjs';
 // Zero-setup `rer dev` for a first-party checkout. With stdout not a terminal
 // (an agent's shell tool) the preparation and start run in a detached worker
 // and this command returns once the app is ready, leaving it running; in a
@@ -44,7 +45,7 @@ export async function launchDev(target) {
  const checkout = await realpath(target.root), directory = await launchDirectory(checkout);
  if (devArgs.includes('--stop')) {
   try { return await stopLaunch(target, devArgs, { checkout, directory }); }
-  catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; process.stderr.write(failure.message + '\n'); return failure.exitCode; }
+  catch (failure) { if (!(failure instanceof LaunchFailure)) throw failure; process.stderr.write(humanError(failure) + '\n'); return failure.exitCode; }
  }
  showBudget(devArgs);
  // The launch never asks for shell edits. Name the PATH step only at ready,
