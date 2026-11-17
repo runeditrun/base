@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.2.122
+
+Signed: Run Edit Run fleet, 2026-11-17.
+
+### Owner entry readiness
+
+- Managed dev, preview and demo verify the declared native owner entry in an isolated headless browser through the public origin before announcing `RER_READY`, `RER_OPEN` or a JSON ready event. Readiness follows the application's fragment exchange and redirects to a usable 2xx destination, without assuming a setup path. Demo checks native entry before exchanging its persona dev key, then issues a fresh owner link.
+- The local public door can route startup requests before registry readiness, while repeated startup visits stay attached to the server already starting. CLI test fixtures also keep their ports and child processes scoped to each run.
+
+### Business grants and private device credentials
+
+- `rer business run --grant G -- <command>` prints the child's UTC credential expiry and rounded-up minutes remaining. Expiry interrupts the child and says to run it again to resume; the caller retains the child's exit code or terminating signal. The child also receives the grant ID as `RER_BUSINESS_GRANT`.
+- A refused credential exchange prints Business's bounded, redacted gap after `Not started:`, says when the grant remains pending, and includes only catalogue row and Workers counts when supplied. No child starts on refusal; without a gap the general guidance remains.
+- Setting `RER_BUSINESS_CREDENTIAL_DIR` selects atomic 0600 device credential files in a caller-owned, nonsymlink 0700 directory for all public Business commands. This selection does not consult OS credential storage or migrate existing credentials. Launchers must keep this directory and `RER_BUSINESS_STATE_DIR` consistent across invocations, including the service process.
+
+### Deployment interruption and recorded targets
+
+- Deploy cancellation reaches provider requests, response reads, health checks, waits and owned Git processes, retains the deployment record and releases its lock. Dead writer locks can be reclaimed without removing a live writer's lock. Repeating an interrupted matching upload resumes its authenticated accepted version without creating another code version; uncertain resource creates retain their ownership refusal.
+- Owner finalization, redeploy, secret changes, health, sign-in and removal follow the recorded Worker within the supplied account, project and environment, including a native uploader's custom resource prefix. Permission guidance follows declared resources. Target mismatches and replaced Workers still refuse.
+- While the environment supplies `CLOUDFLARE_API_TOKEN`, deploy refuses an `--env-file` containing any `CLOUDFLARE_*` or `CF_*` key, protecting a granted credential from replacement.
+
+### Source refresh and installation archives
+
+- `rer refresh-base --from-api` acquires immutable Git objects and ancestry in HTTPS packs with zero GitHub REST calls, independent of tree size. It checks blob identities locally and retains snapshot semantics and migration consent requirements. Missing objects and acquisition failures refuse before changing copies or records.
+- Installation archive adapters resolve the portability factory from the selected CLI, including when a checkout pins an older rer. Export and import failures retain classified diagnostics in a private capture log and name it only after writing the failure entry.
+
+ChargeDesk checkouts pin rer 0.2.118 (and other seeds have older pins) and need a re-pin to receive deploy-kit and export fixes.
+
+These changes require adoption of the released package or refreshed source. This preparation establishes no seed adoption, live-provider deployment or production result. The actual source diff changes neither `modules/portability` nor `modules/import-kit`, product migrations or archive format identity.
+
 ## 0.2.121
 
 Signed: Run Edit Run fleet, 2026-11-16.
