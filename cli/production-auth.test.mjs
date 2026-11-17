@@ -258,6 +258,9 @@ export const commandAdapter = {...seed${signIn ? `, mailOffSignIn: ${JSON.string
  const text = dry.stdout + dry.stderr;
  assert.match(text, /Outbound email is off/); assert.ok(text.includes(signIn), text);
  assert.doesNotMatch(text, /production sign-in mail/);
+ await wrap('rer signin');
+ const supplied = await seed.text(['deploy', '--dry-run', '--env-file', 'production.env', '--owner-name', 'Maya Chen']);
+ assert.ok((supplied.stdout + supplied.stderr).includes('~/.local/bin/rer signin'), 'adapter-provided rer commands use the installed launcher');
  // It cannot be combined with anything that binds a way to send.
  await env('MAIL_PROVIDER=none\nMAIL_API_KEY=test-only-mail-credential\n');
  const conflict = await refusal();
