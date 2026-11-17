@@ -1,3 +1,4 @@
+import { terminalHelpHtml } from '../../modules/operator-auth/terminal-guidance.mjs';
 // The door's own small pages: the index, starting, start button, failure and
 // unknown-name pages. Plain HTML; the starting page polls the door's state
 // path (a fetch, which never starts a site) and reloads, keeping the fragment.
@@ -12,7 +13,7 @@ a{color:var(--accent)}code{font:13px ui-monospace,monospace}button{font:inherit;
 pre{white-space:pre-wrap;background:rgba(127,127,127,.12);padding:12px;border-radius:6px;font:13px ui-monospace,monospace}`;
 
 function page(title, body, { script = '' } = {}) {
- return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="origin"><title>${escape(title)}</title><style>${style}</style></head><body><main>${body}</main>${script ? `<script>${script}</script>` : ''}</body></html>`;
+ return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="origin"><title>${escape(title)}</title><style>${style}</style></head><body><main>${body}${body.includes("~/.local/bin/rer ") ? `<p>${terminalHelpHtml}</p>` : ""}</main>${script ? `<script>${script}</script>` : ''}</body></html>`;
 }
 
 export const rebootNote = 'After a reboot or logout the front door needs <code>~/.local/bin/rer door start</code> (or any <code>~/.local/bin/rer dev</code> in a door-mode checkout).';

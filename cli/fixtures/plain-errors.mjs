@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { buildPackage } from '../../scripts/rer-package.mjs';
@@ -8,7 +8,7 @@ import { stepFailureText } from '../../onboarding/step-failure.mjs';
 
 // Exercise installed package bytes, with no inherited environment or credentials.
 export async function plainErrors(t, base) {
- const directory = await mkdtemp(join(tmpdir(), 'rer-plain-')), root = join(directory, 'seed'), home = join(directory, 'home');
+ const directory = await realpath(await mkdtemp(join(tmpdir(), 'rer-plain-'))), root = join(directory, 'seed'), home = join(directory, 'home');
  t.after(() => rm(directory, { recursive: true, force: true }));
  await mkdir(join(root, 'scripts'), { recursive: true });
  await mkdir(home);
