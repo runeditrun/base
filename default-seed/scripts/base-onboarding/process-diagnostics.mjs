@@ -41,7 +41,7 @@ const run=async(command,args,context=inspectionContext(),{maxBuffer=1024*1024,no
  }
  const subject=context.port?`who uses port ${context.port}`:'local process ownership';
  const cause=failure?.startsWith('timed out')||performance.now()>=context.deadline?'in time (system busy)':'because the system process check failed';
- throw commandFailure(`Could not check ${subject} ${cause}. Run rer ${context.verb??'dev'} again. No other owner was identified.\nOwnership check: ${invocation} ${failure??'total inspection deadline exhausted'} (at most 2 attempts; shared total bound ${context.budgetMs??15000} ms).`,{ownershipUnchecked:true});
+ throw commandFailure(`Could not check ${subject} ${cause}. Run ~/.local/bin/rer ${context.verb??'dev'} again. No other owner was identified.\nOwnership check: ${invocation} ${failure??'total inspection deadline exhausted'} (at most 2 attempts; shared total bound ${context.budgetMs??15000} ms).`,{ownershipUnchecked:true});
 };
 
 export async function processName(pid,context=inspectionContext()){
@@ -141,7 +141,7 @@ function matchingListener(rows,port,host){
  const row=rows.find(row=>row.sockets.some(socket=>serves(socket,port,host)===true));
  if(row)return row;
  if(rows.some(row=>row.sockets.some(socket=>serves(socket,port,host)===undefined))){
-  throw commandFailure(`Could not check who uses port ${port}: a wildcard socket's address family does not prove it serves ${host}. No other owner was identified. Bind the application to the health address explicitly, then run rer dev again.`,{ownershipUnchecked:true});
+  throw commandFailure(`Could not check who uses port ${port}: a wildcard socket's address family does not prove it serves ${host}. No other owner was identified. Bind the application to the health address explicitly, then run ~/.local/bin/rer dev again.`,{ownershipUnchecked:true});
  }
 }
 export async function portListener(port,host,context=inspectionContext()){

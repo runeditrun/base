@@ -17,7 +17,7 @@ export async function ownerEntryReady(root, link, signal, store) {
  try {
   last = 'headless browser prerequisites did not become ready';
   if (store) await ensureChromium(root, store, bounded);
-  else if (!await browsersPresent(root)) throw missing('Owner entry verification needs the checkout’s headless browser. Run rer verify to provision it, then run the command again.');
+  else if (!await browsersPresent(root)) throw missing('Owner entry verification needs the checkout’s headless browser. Run ~/.local/bin/rer verify to provision it, then run the command again.');
   const { playwright } = checkoutPlaywright(root);
   bounded.throwIfAborted();
   last = 'browser did not open the entry';

@@ -1,3 +1,4 @@
+import { withCommandHelp } from './command-guidance.mjs';
 import { humanError } from './human-error.mjs';
 import { handleBrokenPipes } from './stdio.mjs';
 import { exportSummary } from './export-summary.mjs';
@@ -14,7 +15,7 @@ export function output(options) {
  const write = (fd, text) => { const stream = fd === 1 ? process.stdout : process.stderr; if (!stream.destroyed) stream.write(text); };
  return {
   event(event, details = {}) { write(1, JSON.stringify({ version: 1, verb: options.verb ?? 'unknown', event, ...details }) + '\n'); },
-  human(text) { write(1, text + '\n'); },
+  human(text) { write(1, (options.json || structuredResult || options.verb === 'describe' ? text : withCommandHelp(text)) + '\n'); },
   progress(text) { write(2, text); },
   result(ok, exitCode, details = {}) {
    if (finished) throw Error('Duplicate CLI result'); finished = true;

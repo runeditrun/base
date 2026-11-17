@@ -24,6 +24,6 @@ export async function refuseHostedExport(project, options) {
   ...exports,
   ...(databases.length ? [] : ['  (npx wrangler d1 list names the hosted databases.)']),
   ...(buckets.length ? [`Files the hosted install keeps in R2 (${buckets.join(', ')}) are not in that export.`] : []),
-  'To export the local copy, run: rer export --output exports/local.rer',
+  'To export the local copy, run: ~/.local/bin/rer export --output exports/local.rer',
  ].join('\n'));
 }

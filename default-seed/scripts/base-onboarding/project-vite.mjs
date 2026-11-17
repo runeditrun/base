@@ -8,7 +8,7 @@ import {dirname,join,resolve} from 'node:path';
 export function projectViteBinary(root){
  let manifest;
  try{manifest=createRequire(join(resolve(root),'package.json')).resolve('vite/package.json');}
- catch{throw new Error('The project\'s vite is not installed. Run rer install first.');}
+ catch{throw new Error('The project\'s vite is not installed. Run ~/.local/bin/rer install first.');}
  const bin=JSON.parse(readFileSync(manifest,'utf8')).bin;
  return join(dirname(manifest),typeof bin==='string'?bin:bin.vite);
 }
