@@ -1,3 +1,4 @@
+import { pause } from './cancellation.mjs';
 import { randomBytes } from 'node:crypto';
 import { assert, identifier } from './validation.mjs';
 import { activeWorker } from './worker.mjs';
@@ -20,8 +21,8 @@ import { uploadSecretCopy, deploySecretCopy } from './owner-secret-copy.mjs';
  * deployment is still live. An ambiguous one-secret rotation
  * re-PUTs the value before accepting its successor as proof of the rotation.
  * A removed declared secret is retired: later plans omit it until it is set again. */
-export async function ownerSecret({api: provider, target, statePath, changes, fetch = globalThis.fetch, healthOptions = {}, settle = {}, windowMs = 30000, clock = () => performance.now(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms))}) {
-  const api = withSettledLists(withScopeHints(provider),settle);
+export async function ownerSecret({api: provider, target, statePath, changes, fetch = globalThis.fetch, healthOptions = {}, settle = {}, windowMs = 30000, clock = () => performance.now(), sleep, signal}) {
+  const api = withSettledLists(withScopeHints(provider),{...settle,signal});
   const bindings = changes.map(change => change.binding), present = changes[0]?.value !== undefined;
   assert(bindings.length && bindings.every(identifier) && validSecretNames(bindings), 'invalid-secret-name');
   assert(changes.every(change => (change.value !== undefined) === present), 'mixed-secret-change');
@@ -59,11 +60,12 @@ export async function ownerSecret({api: provider, target, statePath, changes, fe
       // pending: the same command deploys it next time, as this change and no other.
       if (definiteProviderRefusal(error) && !uploaded) { delete state.pendingSecret; await writeOwnerState(statePath, state); throw error; }
       if (definiteProviderRefusal(error)) { await writeOwnerState(statePath, state); throw error; }
+      signal?.throwIfAborted();
       failure = error;
     }
     try {
       if (!changed) recordSecretChange(state, live, state.pendingSecret);
-      else for (const start = clock(); ; await sleep(2000)) {
+      else for (const start = clock(); ; await pause(2000,signal,sleep)) {
         try {
           if (await settlePendingSecret(api, target.worker, state, {
             observe: current => { unchanged = sameDeployment(current, state.receipt.provider); },
@@ -79,6 +81,7 @@ export async function ownerSecret({api: provider, target, statePath, changes, fe
           })) break;
         }
         catch (error) {
+          signal?.throwIfAborted();
           unchanged = false;
           // Another ambiguous PUT cannot prove a rotation by presence either.
           // Keep both starting versions for recovery; do not report it done.
@@ -101,7 +104,7 @@ export async function ownerSecret({api: provider, target, statePath, changes, fe
       if (state.receipt.origin) await waitHealth({
         origin:state.receipt.origin, receipt:state.receipt, versionId:result.versionId, request:fetch,
         timeoutMs:healthOptions.timeoutMs,
-        clock:healthOptions.now, sleep:healthOptions.sleep, ...healthOptions.readiness,
+        clock:healthOptions.now, sleep:healthOptions.sleep, signal, ...healthOptions.readiness,
       });
       const after = await activeWorker(api, target.worker);
       assert(after && sameDeployment(after, state.receipt.provider), 'deployment-changed-during-health');

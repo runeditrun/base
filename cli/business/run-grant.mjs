@@ -64,7 +64,7 @@ export async function grantCommand(args) {
   if (!validLease(lease, state, args[1], id) || lease.credential === credential) throw Error('invalid credential exchange');
   const expiry = new Date(lease.credential_expires_at).toISOString(), minutes = Math.ceil((Date.parse(expiry) - Date.now()) / 60000);
   process.stderr.write(`Cloud credential expiry: ${expiry} (${minutes} ${minutes === 1 ? 'minute' : 'minutes'} remaining).\n`);
-  const result = await runChild(args.slice(3), lease, {signal: stop.signal});
+  const result = await runChild(args.slice(3), lease, {signal: stop.signal, source: {...process.env, RER_BUSINESS_GRANT: args[1]}});
   code = result.code; exitSignal = result.signal;
   if (result.credentialExpired) process.stderr.write(`Command stopped because the credential expired; run it again to resume. Caller exit status: ${code}${exitSignal ? ` (${exitSignal})` : ''}.\n`);
  } catch (error) {
