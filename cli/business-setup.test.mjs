@@ -72,6 +72,14 @@ test('packed Business setup creates the Business and its profile through owner r
  remote.refusal = { code: session, message: cookie };
  const reflected = await cli([...args, '--confirm-demo', '--json']);
  assert.equal(reflected.code, 1); assert.equal(JSON.parse(reflected.stderr).code, 'demo_session_in_response');
+ for (const field of ['message', 'error', 'detail']) {
+  const secret = 'synthetic-setup-refusal-secret-canary', reason = `The owner must approve setup for ${field}.`;
+  remote.refusal = { code: 'owner_approval_required', [field]: `${reason}\n${cookie} ${secret}`, credential: secret, unrelated: 'setup-unrelated-canary' };
+  const result = await cli([...args, '--confirm-demo', '--json']);
+  assert.equal(result.code, 1); assert.equal(JSON.parse(result.stderr).code, 'owner_approval_required');
+  assert.ok(JSON.parse(result.stderr).message.includes(reason));
+  for (const value of [secret, 'setup-unrelated-canary']) assert.ok(!(result.stdout + result.stderr).includes(value));
+ }
  delete remote.refusal;
  for (const launcher of [join(base, 'bin/rer.mjs'), join(base, 'default-seed/scripts/rer.mjs')]) {
   assert.equal((await cli(['--help'], launcher)).code, 0);
