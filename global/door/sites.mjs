@@ -44,7 +44,7 @@ async function failureReason(path, from) {
   if (!line.startsWith('{')) continue;
   try { const event = JSON.parse(line); if (event.event === 'error' && typeof event.message === 'string') reasons.push(event.message); } catch {}
  }
- return reasons.at(-1) ?? 'The launch stopped without a reason. Run rer dev in the checkout to see it.';
+ return reasons.at(-1) ?? 'The launch stopped without a reason. Run ~/.local/bin/rer dev in the checkout to see it.';
 }
 
 export function doorSites({ env, door, log = () => {} }) {
@@ -84,7 +84,7 @@ export function doorSites({ env, door, log = () => {} }) {
   const record = (await running(force)).find(item => item.checkout === site.checkout);
   const doorUrl = doorOrigin(site.name, door.port);
   const result = { name: site.name, path: site.checkout, mode: record ? (record.door || doorSite(record.url) ? 'door' : 'direct') : site.mode === 'door' ? 'door' : 'direct', doorUrl };
-  if (record?.door && record.door.v !== doorProtocol) return { ...result, state: 'failed', url: doorUrl, reason: `This checkout's server speaks door protocol ${record.door.v}; restart the door with the installed rer (rer door restart).` };
+  if (record?.door && record.door.v !== doorProtocol) return { ...result, state: 'failed', url: doorUrl, reason: `This checkout's server speaks door protocol ${record.door.v}; restart the door with the installed rer (~/.local/bin/rer door restart).` };
   // The proxy is usable during the public browser check, before RER_READY.
   if (record?.routable && (record.door ? record.port : record.url && !doorSite(record.url))) {
    return { ...result, state: 'running', url: record.url, ...(record.door ? { proxyPort: record.port, secret: record.door.secret } : {}), record };
@@ -111,7 +111,7 @@ export function doorSites({ env, door, log = () => {} }) {
  // before admission, so nothing is stopped to make room for it.
  async function present(site) {
   const folder = await stat(site.checkout).catch(() => undefined);
-  if (!folder?.isDirectory()) throw Error(`The checkout folder ${site.checkout} no longer exists, so ${site.name} was not started. If it moved, run rer dev in its new folder (or rer door add NEW_PATH): it keeps the name ${site.name}, its address and its sign-in. Otherwise unregister it with rer door remove ${site.name}.`);
+  if (!folder?.isDirectory()) throw Error(`The checkout folder ${site.checkout} no longer exists, so ${site.name} was not started. If it moved, run ~/.local/bin/rer dev in its new folder (or ~/.local/bin/rer door add NEW_PATH): it keeps the name ${site.name}, its address and its sign-in. Otherwise unregister it with ~/.local/bin/rer door remove ${site.name}.`);
  }
 
  // Admission is serial. Each start in turn counts the servers running, the
@@ -137,10 +137,10 @@ export function doorSites({ env, door, log = () => {} }) {
   const mine = await doorStarted();
   const victim = staying.filter(record => mine.has(record.generation) && !admitted.has(record.checkout)).sort((a, b) => (a.lastActivity ?? 0) - (b.lastActivity ?? 0))[0];
   if (!victim) throw Error([
-   `The server limit is ${cap}, and every place is held by a server someone started with rer dev or by a start already under way, so none was stopped for ${site.name}:`,
-   ...staying.map(record => `  ${record.mode} for ${record.checkout} (PID ${record.owner?.pid})${admitted.has(record.checkout) ? ', starting for another visit' : ', started with rer dev'}`),
+   `The server limit is ${cap}, and every place is held by a server someone started with ~/.local/bin/rer dev or by a start already under way, so none was stopped for ${site.name}:`,
+   ...staying.map(record => `  ${record.mode} for ${record.checkout} (PID ${record.owner?.pid})${admitted.has(record.checkout) ? ', starting for another visit' : ', started with ~/.local/bin/rer dev'}`),
    ...starting.map(checkout => `  starting ${checkout} for another visit`),
-   'Stop one with rer dev --stop in its checkout, or raise the limit with rer door enable --server-limit N.',
+   'Stop one with ~/.local/bin/rer dev --stop in its checkout, or raise the limit with ~/.local/bin/rer door enable --server-limit N.',
   ].join('\n'));
   evicting.add(victim.generation); admitted.add(site.checkout);
   return victim;

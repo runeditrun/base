@@ -156,9 +156,9 @@ NODE
  no_next=
  if [ "$#" -gt 0 ]; then no_next=1; fi
  RER_INSTALL_CHANNEL=script RER_INSTALL_NO_NEXT=$no_next "$node_binary" "$work/stage/package/global/rer.mjs" cli install </dev/null \
-  || fail "rer cli install failed; any previous install is still selected."
+  || fail "~/.local/bin/rer cli install failed; any previous install is still selected."
  if [ "$#" -eq 0 ]; then
-  printf 'For Business setup: %s business setup --help\n' "$HOME/.local/bin/rer"
+  printf 'For Business setup: ~/.local/bin/rer business setup --help\n'
   return
  fi
  # The command can tell the person how to run rer again from their own shell,
@@ -179,10 +179,20 @@ NODE
  status=0
  "$HOME/.local/bin/rer" "$@" || status=$?
  if [ "$1" != business ]; then
-  printf 'Run a downloaded JavaScript tool with the installed runtime: "%s/.local/bin/rer" run --script ./tool.mjs [ARGS...]\n' "$HOME"
+  printf 'Run a downloaded JavaScript tool with the installed runtime: ~/.local/bin/rer run --script ./tool.mjs [ARGS...]\n'
+  printf "%s\n" "If you see 'command not found', run \`~/.local/bin/rer cli path\` and paste the line it prints."
  fi
  if [ -n "$path_step" ]; then
-  printf '\nRequired next step: %s/.local/bin is not on your PATH, so a bare `rer` in a new terminal says "rer: command not found". Run this in the terminal you will use, and add the same line to your shell startup file (~/.zshrc for zsh, ~/.bashrc for bash):\n  export PATH="$HOME/.local/bin:$PATH"\nOther shells, such as fish: run %s/.local/bin/rer cli path to see the line for yours. Until then, start rer with %s/.local/bin/rer. This installer changes no shell file.\n' "$HOME" "$HOME" "$HOME"
+  shell_name=${SHELL:-}
+  case "${shell_name##*/}" in
+   zsh) shell_file='~/.zshrc' ;;
+   bash) shell_file='~/.bashrc' ;;
+   fish) shell_file='fish user path configuration' ;;
+   *) shell_file='this terminal only' ;;
+  esac
+  printf '\nRequired next step: run the line below; you add ~/.local/bin to PATH in %s. The installer changes no shell file.\n' "$shell_file"
+  "$HOME/.local/bin/rer" cli path
+  case "${shell_name##*/}" in zsh|bash) printf 'Open a new Terminal window, then `rer` works by name.\n' ;; esac
  fi
  return "$status"
 }

@@ -11,7 +11,7 @@ import { checkoutFolders } from '../cli/checkout-folders.mjs';
 
 const run = promisify(execFile);
 const reasons = {
- independent: 'independent project: rer runs its declared commands; zero-setup rer dev applies to first-party seeds only',
+ independent: 'independent project: rer runs its declared commands; zero-setup ~/.local/bin/rer dev applies to first-party seeds only',
  unreadable: 'OPERATIONS.json cannot be read',
 };
 
@@ -39,9 +39,9 @@ async function entry(path, running) {
 
 export async function listCommand(args) {
  const json = args.includes('--json'), positional = args.filter(arg => arg !== '--json');
- if (positional.length > 1 || positional.some(arg => arg.startsWith('-'))) { process.stderr.write('Usage: rer list [DIR] [--json]\n'); return 2; }
+ if (positional.length > 1 || positional.some(arg => arg.startsWith('-'))) { process.stderr.write('Usage: ~/.local/bin/rer list [DIR] [--json]\n'); return 2; }
  let directory;
- try { directory = await realpath(resolve(positional[0] ?? '.')); } catch { process.stderr.write(`rer list: ${resolve(positional[0] ?? '.')} is not a folder.\n`); return 3; }
+ try { directory = await realpath(resolve(positional[0] ?? '.')); } catch { process.stderr.write(`~/.local/bin/rer list: ${resolve(positional[0] ?? '.')} is not a folder.\n`); return 3; }
  const running = new Map((await liveServers()).map(record => [record.checkout, record.url]));
  const folders = await checkoutFolders(directory);
  const checkouts = [];
@@ -51,6 +51,6 @@ export async function listCommand(args) {
  if (!checkouts.length) { process.stdout.write(`No checkouts with an OPERATIONS.json in ${directory}.\n`); return 0; }
  const width = Math.max(4, ...checkouts.map(item => item.name.length));
  const rows = checkouts.map(item => `${item.name.padEnd(width)}  ${item.profile.padEnd(11)}  ${(item.launchable ? 'yes' : 'no').padEnd(6)}  ${(item.prepared === null ? '-' : item.prepared ? 'yes' : 'no').padEnd(8)}  ${item.url ?? (item.launchable ? '-' : item.reason)}`);
- process.stdout.write([`${'NAME'.padEnd(width)}  ${'PROFILE'.padEnd(11)}  LAUNCH  PREPARED  URL`, ...rows, '', 'Launch one with: rer dev --cwd FOLDER'].join('\n') + '\n');
+ process.stdout.write([`${'NAME'.padEnd(width)}  ${'PROFILE'.padEnd(11)}  LAUNCH  PREPARED  URL`, ...rows, '', 'Launch one with: ~/.local/bin/rer dev --cwd FOLDER'].join('\n') + '\n');
  return 0;
 }

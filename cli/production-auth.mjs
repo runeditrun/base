@@ -11,10 +11,10 @@ import { productionMail, mailOffSignInCommand } from './production-mail.mjs';
 export function mailOffNotice({ signIn, credentialNames = [] }, environment = 'production', live) {
  if (credentialNames.length && Array.isArray(live)) {
   const bound = credentialNames.filter(name => live.includes(name));
-  if (bound.length) return `Outbound email is configured by the secrets bound on this environment's Worker: ${bound.join(', ')} (names only; values are never printed). This deploy's MAIL_PROVIDER=none setting does not remove them; turn mail off with rer deploy --environment ${environment} --unset-secret and these names. Sign in without mail with \`${signIn}\` for the ${environment} environment, from this checkout with the Cloudflare credentials that deployed it.`;
+  if (bound.length) return `Outbound email is configured by the secrets bound on this environment's Worker: ${bound.join(', ')} (names only; values are never printed). This deploy's MAIL_PROVIDER=none setting does not remove them; turn mail off with ~/.local/bin/rer deploy --environment ${environment} --unset-secret and these names. Sign in without mail with \`${signIn}\` for the ${environment} environment, from this checkout with the Cloudflare credentials that deployed it.`;
  }
  const unread = credentialNames.length && !Array.isArray(live) ? ` The bound secrets were not read: if one of ${credentialNames.join(', ')} is bound on the Worker, outbound email is configured by it.` : '';
- return `Outbound email is off (MAIL_PROVIDER=none): no mail credential is bound and this installation sends nothing. Sign in without mail with \`${signIn}\` for the ${environment} environment, from this checkout with the Cloudflare credentials that deployed it. Turn mail on later with rer deploy --environment ${environment} --set-secret and the provider inputs.${unread}`;
+ return `Outbound email is off (MAIL_PROVIDER=none): no mail credential is bound and this installation sends nothing. Sign in without mail with \`${signIn}\` for the ${environment} environment, from this checkout with the Cloudflare credentials that deployed it. Turn mail on later with ~/.local/bin/rer deploy --environment ${environment} --set-secret and the provider inputs.${unread}`;
 }
 
 // Validate the shared email/identity contract using the bindings that will reach

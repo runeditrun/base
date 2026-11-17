@@ -5,7 +5,7 @@ import { resolve, relative, isAbsolute } from 'node:path';
 import { parseContract, plainText } from '../foundation/runtime/seed-contract.mjs';
 import { RerError } from './errors.mjs';
 
-export const clausesHelp = `Usage: rer door clauses (--write | --check) [--cwd DIR]
+export const clausesHelp = `Usage: ~/.local/bin/rer door clauses (--write | --check) [--cwd DIR]
 
 Synchronize BASE-AGENT-001 through BASE-AGENT-013 in CONTRACT.md.
 --write adds or updates Base's requirements, preserving existing status,
@@ -163,7 +163,7 @@ export async function doorClausesCommand(args, env = process.env) {
   if (!mode) throw new RerError('invalid_arguments', clausesHelp, 2);
   root = resolve(root);
   const file = resolve(root, 'CONTRACT.md');
-  if (!existsSync(file)) fail('No CONTRACT.md found. Run rer door clauses from the seed root or pass --cwd DIR.');
+  if (!existsSync(file)) fail('No CONTRACT.md found. Run ~/.local/bin/rer door clauses from the seed root or pass --cwd DIR.');
   const original = read(file);
   const inherited = sharedDuties(original, mode === '--write');
   const { text, changed } = synchronize(original, definitions(canonical(root)).filter(clause => !inherited.has(clause.id)));

@@ -1,7 +1,7 @@
 import {resolve} from 'node:path';
 import {prepareCandidate} from '../modules/release/candidate.mjs';
 
-export const candidateHelp = `Usage: rer release candidate --tag vVERSION-PRERELEASE [--cwd DIR] [--json]
+export const candidateHelp = `Usage: ~/.local/bin/rer release candidate --tag vVERSION-PRERELEASE [--cwd DIR] [--json]
 
 Prepare stage-only version metadata in one local commit on the caller's checkout.
 Updates only version in seed.json, package.json and RELEASE.json; requires a clean
@@ -24,7 +24,7 @@ export async function candidateCommand(args) {
    if (seen.has(flag)) throw Error(`Repeated candidate flag ${flag}.`); seen.add(flag);
    if (flag==='--help') {console.log(candidateHelp);return 0;}
    if (flag==='--json' || flag==='--non-interactive') continue;
-   if (!['--cwd','--tag'].includes(flag) || !args[index+1]?.trim() || args[index+1].startsWith('--')) throw Error('Use rer release candidate --tag vVERSION-PRERELEASE [--cwd DIR] [--json].');
+   if (!['--cwd','--tag'].includes(flag) || !args[index+1]?.trim() || args[index+1].startsWith('--')) throw Error('Use ~/.local/bin/rer release candidate --tag vVERSION-PRERELEASE [--cwd DIR] [--json].');
    const value=args[++index]; if(flag==='--cwd')cwd=resolve(value);else tag=value;
   }
   console.log(JSON.stringify(prepareCandidate(cwd, tag), null, 2));return 0;

@@ -24,7 +24,7 @@ export async function transfer(project, options, signal, custody) {
    if (error.code === 'safety_refusal' && error.message === 'Path must be a contained checkout path without traversal.') {
     const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
     const staged = value => `.rer/recovery/${basename(value.replaceAll('\\', '/'))}`;
-    const args = ['rer import', '--input', quote(flag === '--input' ? staged(options.input) : options.input), ...(options.journal ? ['--journal', quote(staged(options.journal))] : []), '--yes', '--cwd', quote(project.root)];
+    const args = ['~/.local/bin/rer import', '--input', quote(flag === '--input' ? staged(options.input) : options.input), ...(options.journal ? ['--journal', quote(staged(options.journal))] : []), '--yes', '--cwd', quote(project.root)];
     error.humanMessage = `${flag} ${JSON.stringify(options[flag.slice(2)])} must stay inside this checkout, without .. or an absolute path, for example .rer/recovery/<name>.rer. Stage the archives there as owned private files (0600), then run: ${args.join(' ')}`;
    }
    throw error;
@@ -47,8 +47,8 @@ export async function transfer(project, options, signal, custody) {
  // The archive's size, for the line a finished export ends with.
  if(direction==='export')return {...result,target,...(target==='remote'&&options.origin?{origin:new URL(options.origin).origin}:{}),output:result.output??relative(project.root,path),bytes:(await stat(path)).size,captureLog:relative(project.root,custody.store.logPath)};
  if(direction==='import' && target==='local' && (await localDependencyLinks(project.root)).some(link=>link.needs_relink)) {
-  custody.store.report('Imported provider links need fresh approval. Run rer setup with RER_LINK_TOKEN_FILE to re-link this installation.');
-  return {...result,needsRelink:true,nextCommand:'rer setup'};
+  custody.store.report('Imported provider links need fresh approval. Run ~/.local/bin/rer setup with RER_LINK_TOKEN_FILE to re-link this installation.');
+  return {...result,needsRelink:true,nextCommand:'~/.local/bin/rer setup'};
  }
- return direction === 'import' ? { ...result, captureLog: relative(project.root, custody.store.logPath), nextCommand: 'rer setup' } : result;
+ return direction === 'import' ? { ...result, captureLog: relative(project.root, custody.store.logPath), nextCommand: '~/.local/bin/rer setup' } : result;
 }
