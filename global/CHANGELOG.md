@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.2.122
+
+Signed: Run Edit Run fleet, 2026-11-17.
+
+### Owner entry and local prerequisites
+
+- Managed dev, preview and demo verify the declared owner entry through its public origin before announcing `RER_READY`, `RER_OPEN` or JSON readiness. The headless browser follows the entry exchange and redirects to a same-origin 2xx destination with visible rendered content, including read-only owner pages. Busy, loading and refresh interstitials do not qualify. Native single-use entries are checked before issuing a fresh link for the owner; startup visits stay attached to the server already starting.
+- Readiness failures name the destination status and unmet exchange, navigation or content conditions without printing credential fragments or query values. `rer dev` names the failed local prerequisite, its safe found/expected values and the setup command, including missing migrations, owner state and local authentication/mail settings.
+- Setup and the local installer repair stored hosted mail choices to local `MAIL_PROVIDER=development` before build isolation, suppressing local mail while keeping stored installer choices separate. Fresh local answers that request a hosted mail provider are refused with repair guidance.
+
+### Commands in a new terminal
+
+- Printed restart, stop and recovery commands use `~/.local/bin/rer`, including direct CLI, browser and adapter sign-in guidance, so the command works before PATH is configured.
+- `rer cli path` prints the shell command to add `~/.local/bin` to PATH. For zsh and bash, executing that command adds the exact PATH line to `~/.zshrc` or `~/.bashrc` only if absent and updates the current terminal. The installer prints this step and new-terminal guidance; it does not edit shell files itself. Fish receives `fish_add_path`; other shells receive a current-terminal export.
+
+### Granted deployments and recovery
+
+- Business command grants report the scoped credential's expiry and distinguish an expiry stop from the child's result. A refused exchange can print Business's gap sentence, pending state and permission-catalogue counts while keeping other response fields private. Sealed launchers can select `RER_BUSINESS_CREDENTIAL_DIR` for owned 0700 directory/0600 file storage instead of OS credential storage, with device credentials masked in command and agent output.
+- Deploy recovery follows the recorded Worker name, including native uploaders with a custom prefix, and refuses mismatched account/project/environment or provider identity. A dead writer's lock can be recovered; live writers stay protected. An authenticated matching interrupted upload completes without creating another code version; partial asset uploads restart in a new session. Unconfirmed resource creates retain their ownership uncertainty.
+- An ambient Cloudflare token cannot be replaced by provider keys from `--env-file`. Cancellation reaches provider requests, response reads, health waits and owned Git processes, preserves deploy state and releases the lock. Resume uses the same checkout, account and environment under a fresh grant.
+
+### Source refresh, archives and test isolation
+
+- `rer refresh-base --from-api` acquires immutable Git objects in packs over HTTPS without spending GitHub REST core allowance, retaining full-commit selection and snapshot semantics.
+- Installation archive adapters use the selected CLI's portability runtime even when the checkout pins another rer. Failed export/import commands retain their redacted capture-log path. The archive format and identity are unchanged.
+- CLI fixtures scope their test ports and journey processes to each run and keep fixture ownership separate from top-level CLI context.
+
+ChargeDesk checkouts pin rer 0.2.118 (and other seeds have older pins) and need a re-pin to receive deploy-kit, export and PATH fixes.
+
+These changes require adoption through the seed's pinned package or refreshed source. This preparation establishes no seed adoption, provider delivery, deployment or production result. The source range changes no import-kit or portability module, product migration or archive format identity.
+
 ## 0.2.121
 
 Signed: Run Edit Run fleet, 2026-11-16.
