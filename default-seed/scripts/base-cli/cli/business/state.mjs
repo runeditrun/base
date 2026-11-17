@@ -39,7 +39,7 @@ export async function clearPending() {
 }
 
 // Only non-secret configuration and progress belong here. Credentials and task
-// grants remain in the keychain and memory, respectively.
+// grants remain in the selected credential store and memory, respectively.
 export async function saveState(state) {
  return saveJson('state.json', state);
 }

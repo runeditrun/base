@@ -1,8 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
+import {readFile} from 'node:fs/promises';
 import {constants} from 'node:os';
 import {fixture,base,entry,device,secret,account} from './fixtures/business/run-grant.mjs';
+
+test('business run and cleanup use the private device credential file and mask its encoded forms without keychain access',async t=>{
+ const f=await fixture(t,{fileBacked:true});
+ const script=String.raw`const fs=require('node:fs'),path=require('node:path');const folder=process.env.RER_BUSINESS_CREDENTIAL_DIR;const device=fs.readFileSync(path.join(folder,fs.readdirSync(folder)[0]),'utf8');for(const value of [device,encodeURIComponent(device),Buffer.from(device).toString('hex'),Buffer.from(device).toString('base64'),Buffer.from(device).toString('base64url')]){process.stdout.write(value.slice(0,5));process.stdout.write(value.slice(5)+'\n');process.stderr.write(value+'\n');}console.log('COMMAND_OK');`;
+ const result=await f.run([process.execPath,'-e',script]);
+ assert.equal(result.code,0,result.stderr);assert.match(result.stdout,/COMMAND_OK/);assert.match(result.stderr,/cleanup: revoked/);
+ for(const value of [device,Buffer.from(device).toString('hex'),Buffer.from(device).toString('base64'),Buffer.from(device).toString('base64url')])assert.ok(!(result.stdout+result.stderr).includes(value));
+ const lease=[...f.state.leases.keys()][0];
+ assert.equal((await f.start(['cleanup',lease,'--status']).result).code,0);
+ assert.equal((await f.start(['cleanup',lease]).result).code,0);
+ assert.equal(f.state.issued,1);assert.equal(await readFile(f.calls,'utf8'),'');
+});
 
 test('business run preserves arguments and exits, injects only the scoped child environment, masks split output and cleans success, failure and spawn errors',async t=>{
  const f=await fixture(t);

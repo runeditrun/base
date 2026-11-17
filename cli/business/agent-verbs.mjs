@@ -8,6 +8,7 @@ import { parseArguments, place, missing, Usage } from './agent-args.mjs';
 import { plain, refusalText, clean } from './agent-output.mjs';
 import { waitFor, failedState, stateName, exitStillWaiting } from './agent-wait.mjs';
 import { agentUsage } from './agent-help.mjs';
+import { maskDeviceText } from './run-mask.mjs';
 
 export const exitNotBuilt = 3;
 
@@ -73,8 +74,8 @@ async function work(row, parsed, session, out) {
 // Lines for a person go to stdout; with --json only the final structuredContent does, and progress goes to stderr.
 function output(json) {
  return {
-  line: text => (json ? process.stderr : process.stdout).write(text + '\n'),
-  result: (tool, data) => { if (json) process.stdout.write(JSON.stringify(data) + '\n'); else for (const line of plain(tool, data)) process.stdout.write(line + '\n'); },
+  line: text => (json ? process.stderr : process.stdout).write(maskDeviceText(text) + '\n'),
+  result: (tool, data) => { if (json) process.stdout.write(maskDeviceText(JSON.stringify(data)) + '\n'); else for (const line of plain(tool, data)) process.stdout.write(line + '\n'); },
  };
 }
 
@@ -88,7 +89,7 @@ async function listTools(session, json) {
   cursor = response.result?.nextCursor;
   if (!cursor) break;
  }
- if (json) process.stdout.write(JSON.stringify({ tools }) + '\n');
+ if (json) process.stdout.write(maskDeviceText(JSON.stringify({ tools })) + '\n');
  else for (const tool of tools) process.stdout.write(`${clean(tool.name, 80)}  ${clean(String(tool.description ?? '').split('\n')[0], 160)}`.trimEnd() + '\n');
 }
 
@@ -121,11 +122,11 @@ export async function agentCommand(argv) {
   if (error instanceof Usage) return usage(error.message);
   if (error instanceof Refused) {
    const text = refusalText(error.data, ownerLink(state));
-   if (parsed.control.json) process.stdout.write(JSON.stringify(error.data ?? {}) + '\n');
+   if (parsed.control.json) process.stdout.write(maskDeviceText(JSON.stringify(error.data ?? {})) + '\n');
    process.stderr.write(text + '\n');
    return error.data?.status === 'not_built' ? exitNotBuilt : 1;
   }
-  if (error.data && parsed.control.json) process.stdout.write(JSON.stringify(error.data) + '\n');
+  if (error.data && parsed.control.json) process.stdout.write(maskDeviceText(JSON.stringify(error.data)) + '\n');
   process.stderr.write(describe(error) + '\n');
   return error.exitCode ?? 1;
  }

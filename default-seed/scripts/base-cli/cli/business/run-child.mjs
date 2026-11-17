@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { constants } from 'node:os';
-import { commandMask } from './run-mask.mjs';
+import { commandMask, deviceCredentialValues } from './run-mask.mjs';
 
 export const signalCode = signal => 128 + (constants.signals[signal] ?? 1);
 export function childEnvironment(source, credential, account) {
@@ -9,7 +9,7 @@ export function childEnvironment(source, credential, account) {
 }
 /** Own one process group, forward interruption, and bound its lifetime to the credential's server expiry. */
 export async function runChild(command, lease, { signal, source = process.env, output = process.stdout, errors = process.stderr } = {}) {
- const values = [lease.credential, lease.account_id], stdout = commandMask(values, output), stderr = commandMask(values, errors);
+ const values = [lease.credential, lease.account_id, ...deviceCredentialValues()], stdout = commandMask(values, output), stderr = commandMask(values, errors);
  let child, escalation, expiry, stopped, credentialExpired = false;
  const stop = reason => {
   stopped ??= reason;
