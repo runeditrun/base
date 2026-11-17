@@ -1,3 +1,4 @@
+import { withCommandHelp } from '../command-guidance.mjs';
 import { homedir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { open, unlink } from 'node:fs/promises';
@@ -71,5 +72,5 @@ export async function companionCommand(argv) {
       console.log(JSON.stringify({device:state.device,projects:Object.keys(state.mappings),active:state.active?{job:state.active.job.id,status:state.active.status,identity:state.active.identity}:null,pendingEvents:state.outbox.length},null,2));
     } else { process.stderr.write(usage); return 2; }
     return 0;
-  } catch(error) {process.stderr.write(`${error.message}\n`);return 1;}
+  } catch(error) {process.stderr.write(withCommandHelp(error.message) + '\n');return 1;}
 }
