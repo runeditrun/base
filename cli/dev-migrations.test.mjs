@@ -72,6 +72,7 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  assert.match(setupText,/Full output: \S*install\.log/);
  assert.match(setupText,/MAIL_PROVIDER[^]*development/);
  assert.equal(await readFile(settingsPath,'utf8'),originalSettings,'repeat setup repairs mail without changing the owner or secrets');
+ await f.run(['setup','--non-interactive','--json']);
  t.diagnostic(`human rer setup: ${((performance.now()-setupStarted)/1000).toFixed(2)} s; source warnings only in capture`);
  await f.sql("CREATE TABLE saved_before_upgrade(value TEXT); INSERT INTO saved_before_upgrade VALUES('owner content')");
  const path = join(f.root, 'migrations/core/9998_local_upgrade.sql');
