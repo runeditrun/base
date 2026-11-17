@@ -44,7 +44,7 @@ test('owned R2 removal retains proof on interrupted purge and refuses replacemen
   });
   if (scenario === 'partial-delete') f.fail('DELETE', /\/objects\/z%20last$/, {status:403});
   await assert.rejects(f.remove(), error => {
-   assert.equal(error.message,'remove-incomplete');
+   assert.match(error.message,new RegExp(`resources remain \\(r2:${f.name}\\)`));
    assert.deepEqual(error.remaining,[`r2:${f.name}`]);
    if (scenario.startsWith('replacement')) assert.equal(error.failed[0].code,'owned-resource-replaced');
    if (scenario === 'partial-delete') assert.equal(error.failed[0].code,'token-scope-missing-r2');
@@ -102,7 +102,7 @@ test('owned R2 removal purges short object listings without metadata and refuses
    assert.equal(listed.length,scenario === 'cursor' ? 2 : 1);
   } else {
    await assert.rejects(f.remove(), error => {
-    assert.equal(error.message,'remove-incomplete');
+    assert.match(error.message,new RegExp(`resources remain \\(r2:${f.name}\\)`));
     assert.deepEqual(error.remaining,[`r2:${f.name}`]);
     assert.equal(error.failed[0].code,scenario.startsWith('full-') ? 'provider-incomplete-pagination' : scenario === 'duplicate' ? 'invalid-r2-object-list' : scenario === 'missing-cursor' ? 'provider-incomplete-pagination' : 'provider-invalid-cursor');
     return true;

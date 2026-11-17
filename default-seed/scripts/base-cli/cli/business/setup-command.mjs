@@ -1,5 +1,7 @@
 import { constants } from 'node:fs';
 import { open, readFile } from 'node:fs/promises';
+import { ApiError } from './api.mjs';
+import { refusalView } from './refusal.mjs';
 
 const company = JSON.parse(await readFile(new URL('./setup-company.json', import.meta.url), 'utf8'));
 
@@ -9,7 +11,7 @@ export async function setupCommand(args) {
  catch (error) {
   // Paths, cookies and peer bodies must never appear in diagnostics.
   const code=typeof error?.message==='string'&&/^[a-z0-9_]{1,100}$/.test(error.message)?error.message:'business_setup_failed';
-  process.stderr.write(JSON.stringify({code})+'\n');return 1;
+  process.stderr.write(JSON.stringify({code,...(error.refusalReason?{message:error.refusalReason}:{})})+'\n');return 1;
  }
 }
 
@@ -53,7 +55,10 @@ async function createBusiness({origin,cookie,hosting}){
   try{response=await fetch(new URL(path,origin),{method,redirect:'manual',signal:AbortSignal.timeout(60000),headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})});}
   catch{throw Error('platform_transport_unavailable');}
   let answer;try{answer=await response.json();}catch{throw Error(`platform_http_${response.status}`);}
-  if(!response.ok){const code=answer?.code;throw Error(typeof code==='string'&&/^[a-z0-9_]{1,100}$/.test(code)?code:`platform_http_${response.status}`);}
+  if(!response.ok){
+   const code=answer?.code,reason=refusalView(answer,300,[cookie,cookie.slice(cookie.indexOf('=')+1)]).sentence;
+   throw Object.assign(Error(typeof code==='string'&&/^[a-z0-9_]{1,100}$/.test(code)?code:`platform_http_${response.status}`),{refusalReason:reason?new ApiError(response.status,reason).message:null});
+  }
   return answer;
  };
  let business=(await api('/api/business')).businesses?.find(row=>row.name===company.name);

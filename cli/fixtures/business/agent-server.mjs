@@ -28,6 +28,10 @@ export async function agentServer(t, device) {
   let text = ''; for await (const chunk of request) text += chunk;
   const body = text ? JSON.parse(text) : {};
   const json = (status, value) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(value)); };
+  if (state.httpRefusal && request.url === state.httpRefusal.route) {
+   if (state.httpRefusal.raw !== undefined) { response.writeHead(state.httpRefusal.status, { 'content-type': 'application/json' }); return response.end(state.httpRefusal.raw); }
+   return json(state.httpRefusal.status, state.httpRefusal.body);
+  }
   const token = (request.headers.authorization ?? '').replace(/^Bearer /, '');
   if (request.url === '/api/business/executors/token') {
    if (token !== device) return json(401, { error: 'unknown device' });
@@ -37,10 +41,11 @@ export async function agentServer(t, device) {
   if (request.url !== '/api/business/mcp') return json(404, { error: 'no route' });
   if (!state.bearers.has(token) || state.stale.has(token)) return json(401, { error: 'bearer expired' });
   const reply = result => json(200, { jsonrpc: '2.0', id: body.id, result });
+  if (state.rpcRefusal?.method === body.method) return json(200, { jsonrpc: '2.0', id: body.id, error: state.rpcRefusal.error });
   if (body.method === 'initialize') return reply({ protocolVersion: '2025-11-25', capabilities: { tools: {} }, serverInfo: { name: 'business', version: '1' } });
   if (body.method === 'notifications/initialized') { response.writeHead(202, { 'content-length': 0 }); return response.end(); }
   if (body.method === 'tools/list') return reply({ tools: tools.map(([name, description]) => ({ name, description, inputSchema: { type: 'object' } })) });
-  if (body.method === 'tools/call') return reply(call(body.params.name, body.params.arguments));
+  if (body.method === 'tools/call') return reply(state.toolResult ?? call(body.params.name, body.params.arguments));
   return json(200, { jsonrpc: '2.0', id: body.id, error: { code: -32601, message: 'Method not found' } });
  });
  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));

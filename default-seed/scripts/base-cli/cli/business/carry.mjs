@@ -3,6 +3,7 @@ import { createCredentialStore } from './keychain.mjs';
 import { credentialLocation } from './credential-file.mjs';
 import { deviceCredentialHandle, loadState } from './state.mjs';
 import { localCause } from './errors.mjs';
+import { serverSaid } from './refusal.mjs';
 import { carryCheckouts, firstParty, writeCarry } from './carry-files.mjs';
 export { removeCarries } from './carry-files.mjs';
 
@@ -28,8 +29,8 @@ export function buildCarry(state, self) {
 }
 
 function warning(origin, error, checkout, report = true) {
- // Do not echo server text, response fields or transport messages: they can contain credentials.
- const reason = error.status ? `the server refused the request (HTTP ${error.status})`
+ // Only the API's bounded, redacted reason can accompany a server refusal.
+ const reason = error.status ? `the server refused the request (HTTP ${error.status}).${serverSaid(error.reason)}`
   : error.name === 'TimeoutError' || error.name === 'AbortError' ? 'the server did not answer within 5 seconds'
   : error.message?.startsWith('Could not reach the Business server at ') ? 'the server is unreachable'
   : error.message === 'credential unavailable' ? `the Business credential is unavailable in ${credentialLocation()}`

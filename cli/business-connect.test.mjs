@@ -674,10 +674,11 @@ test('connect starts and resumes device approval, respects poll intervals and pr
  }
  delete remote.state.pollRefusal;
  const denied = await connectWhile(home, args, () => {
-  remote.state.refusalText = [remote.state.devicePairing.device_code, remote.state.devicePairing.user_code, remote.device].join(' ');
+  remote.state.refusalText = ['The owner refused this pairing for this computer.', remote.state.devicePairing.device_code, remote.state.devicePairing.user_code, remote.device].join(' ');
   return deviceOwner(remote, 'deny');
  });
  assert.equal(denied.code, 1); assert.match(denied.stderr, /pairing_denied/); await absent();
+ assert.match(denied.stderr, /The server said: The owner refused this pairing for this computer/);
  for (const sentinel of [remote.state.devicePairing.device_code, remote.state.devicePairing.user_code, remote.device]) assert.ok(!denied.stderr.includes(sentinel), 'untrusted refusal prose cannot echo a secret');
  delete remote.state.refusalText;
  remote.state.pairingSeconds = 1;
@@ -1217,7 +1218,8 @@ test('a refused claim fails once with its original message, clears the saved cla
   for (const args of status === 409 ? [['run', '--once']] : [['run', '--once'], ['run']]) {
    const refused = await cli(home, ['business', ...args], { env });
    assert.equal(refused.code, 1);
-   assert.ok(refused.stderr.includes(`HTTP ${status}`) && refused.stderr.includes(message), refused.stderr);
+   assert.ok(refused.stderr.includes(`HTTP ${status}`), refused.stderr);
+   if (!raw) assert.ok(refused.stderr.includes(message), refused.stderr);
   }
   if (status === 409) {
    assert.deepEqual(JSON.parse(await readFile(join(stateDir, 'progress.json'), 'utf8')), {}, 'once clears a refused claim');
@@ -1231,6 +1233,7 @@ test('a refused claim fails once with its original message, clears the saved cla
    clearTimeout(stopTimer); remote.state.onSelf = null;
    assert.equal(continuous.code, 0, continuous.stderr);
    assert.equal(continuous.stderr, '');
+   assert.ok(continuous.stdout.includes(raw ? `HTTP ${status}` : message), 'continuous claims retain the safe server reason while waiting to retry');
    assert.ok(retryChecked, 'continuous survives to its next check-in');
    const retried = remote.state.requests.filter(request => request.route === '/api/business/executors/claim').slice(claims);
    assert.equal(retried.length, 2, 'one fresh claim after the check-in');

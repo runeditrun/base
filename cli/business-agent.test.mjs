@@ -30,8 +30,78 @@ async function paired(t) {
   child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; });
   child.on('close', code => done({ code, stdout, stderr })); child.stdin.end();
  });
- return { remote, rer, start, calls };
+ return { remote, rer, start, calls, home };
 }
+
+test('Business HTTP and MCP refusals retain server reasons in commands, JSON and the stdio bridge without forwarding secret fields', async t => {
+ const { remote, rer, start, home } = await paired(t);
+ const secret = 'synthetic-opaque-refusal-secret-canary', fields = { credential: secret, headers: { Authorization: 'private-header-canary' }, unrelated: 'unrelated-body-canary' };
+ const absent = output => {
+  for (const value of [device, secret, 'private-header-canary', 'unrelated-body-canary', Buffer.from(secret).toString('base64'), 'bz_task_refusal-canary']) assert.ok(!output.includes(value), `a secret or unrelated field escaped`);
+ };
+ // Both token minting and MCP HTTP errors use the shared HTTP error door.
+ for (const [route, key, status] of [['/api/business/executors/token', 'message', 403], ['/api/business/mcp', 'error', 409], ['/api/business/mcp', 'detail', 422]]) {
+  const reason = `The selected account needs approval for ${key}.`;
+  remote.httpRefusal = { route, status, body: { [key]: `${reason}\n${device} ${secret} bz_task_refusal-canary`, ...fields } };
+  const result = await rer(['installations', 'list']);
+  assert.equal(result.code, 1); assert.match(result.stderr, /Business server refused[\s\S]*The server said:/); assert.ok(result.stderr.includes(reason)); absent(result.stdout + result.stderr);
+ }
+ for (const field of ['error', 'detail']) {
+  remote.httpRefusal = { route: '/api/business/mcp', status: 409, body: { [field]: { message: `Owner approval expired for ${field}. ${secret}`, ...fields } } };
+  const result = await rer(['tools']);
+  assert.equal(result.code, 1); assert.ok(result.stderr.includes(`Owner approval expired for ${field}.`)); absent(result.stdout + result.stderr);
+ }
+ for (const raw of [`{"credential":"${secret}","message":`, JSON.stringify({ credential: secret, unrelated: 'x'.repeat(70_000), message: 'A later reason.' })]) {
+  remote.httpRefusal = { route: '/api/business/mcp', status: 409, raw };
+  const result = await rer(['tools']);
+  assert.equal(result.code, 1); assert.match(result.stderr, /HTTP 409/); absent(result.stdout + result.stderr);
+ }
+ delete remote.httpRefusal;
+ // Protocol errors can occur at initialization, listing or the tool call itself.
+ for (const [method, args] of [['initialize', ['tools']], ['tools/list', ['tools']], ['tools/call', ['call', 'next_question']]]) {
+  remote.rpcRefusal = { method, error: { code: -32000, detail: `Owner approval is required for ${method}. ${secret}`, ...fields } };
+  const result = await rer(args);
+  assert.equal(result.code, 1); assert.ok(result.stderr.includes(`Owner approval is required for ${method}.`)); absent(result.stdout + result.stderr);
+ }
+ delete remote.rpcRefusal;
+ remote.toolResult = { isError: true, content: [{ type: 'text', text: JSON.stringify({ error: { message: `The provider refused this task. ${secret}` }, ...fields }) }] };
+ const textOnly = await rer(['call', 'next_question', '--json']);
+ assert.equal(textOnly.code, 1); assert.match(textOnly.stderr, /The provider refused this task/); absent(textOnly.stdout + textOnly.stderr);
+ for (const status of ['not_built', 'action_not_granted', 'refused']) {
+  const reason = `The requested tool needs a decision for ${status}.`;
+  remote.toolResult = { isError: true, content: [{ type: 'text', text: reason }], structuredContent: { status, action: 'app.send_sign_in_link', detail: `${reason} ${secret}`, ...fields } };
+  const result = await rer(['call', 'app.send_sign_in_link', '--json']);
+  assert.equal(result.code, status === 'not_built' ? 3 : 1); assert.ok(result.stderr.includes(reason)); assert.ok(JSON.parse(result.stdout).message.includes(reason)); absent(result.stdout + result.stderr);
+ }
+ // Completed change/update refusals carry their explanation inside the followed object.
+ for (const subject of ['change', 'update']) {
+  const reason = `The ${subject} was refused because owner approval ended.`;
+  remote.toolResult = { structuredContent: { [subject]: { id: 'work_1', state: 'failed', detail: `${reason} ${secret}`, ...fields }, next: 'done' } };
+  const result = await rer([subject, 'follow', 'work_1', '--wait', '--json']);
+  assert.equal(result.code, 1); assert.ok(result.stderr.includes(reason)); assert.ok(JSON.parse(result.stdout).message.includes(reason)); absent(result.stdout + result.stderr);
+ }
+ remote.toolResult = { isError: true, content: [{ type: 'text', text: 'The requested tool needs a decision.' }], structuredContent: { status: 'refused', detail: `The requested tool needs a decision. ${secret}`, ...fields } };
+ const next = await rer(['next']);
+ assert.equal(next.code, 1); assert.match(next.stderr, /The requested tool needs a decision/); absent(next.stdout + next.stderr);
+ const child = start(['mcp']); t.after(() => child.kill());
+ let stderr = ''; child.stderr.on('data', chunk => { stderr += chunk; });
+ const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]();
+ const ask = async (id, method) => { child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params: { name: 'next_question' } }) + '\n'); return JSON.parse((await lines.next()).value); };
+ const refused = await ask(1, 'tools/call');
+ assert.equal(refused.result.isError, true); assert.ok(refused.result.structuredContent.message.includes('requested tool needs a decision')); absent(JSON.stringify(refused));
+ remote.rpcRefusal = { method: 'tools/list', error: { code: -32001, message: `The catalogue is paused. ${secret}`, data: fields } };
+ const rpc = await ask(2, 'tools/list');
+ assert.equal(rpc.error.code, -32001); assert.match(rpc.error.message, /Business MCP refused tools\/list.*The catalogue is paused/); assert.equal(rpc.error.data, undefined); absent(JSON.stringify(rpc));
+ remote.rpcRefusal = { method: 'tools/list', error: { message: 'The catalogue is paused. ' + 'More context. '.repeat(2000) + 'TAIL_CANARY' } };
+ const capped = await ask(3, 'tools/list');
+ assert.ok(capped.error.message.length < 700); assert.ok(!capped.error.message.includes('TAIL_CANARY'));
+ child.stdin.end(); await new Promise(done => child.on('close', done)); absent(stderr);
+ // Pairing start uses a quiet exchange, but its safe reason still reaches stderr.
+ await rm(join(home, '.rer/business/state.json'));
+ remote.httpRefusal = { route: '/api/business/executors/device-pairings', status: 403, body: { message: `The owner paused pairing. ${secret}`, ...fields } };
+ const pairing = await rer(['connect', '--business', 'biz', '--origin', remote.origin]);
+ assert.equal(pairing.code, 1); assert.match(pairing.stderr, /The owner paused pairing/); absent(pairing.stdout + pairing.stderr);
+});
 
 test('an outside agent acts on installed apps through the agent verbs and the stdio bridge', async t => {
  const { remote, rer, start, calls } = await paired(t);

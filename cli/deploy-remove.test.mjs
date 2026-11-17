@@ -123,7 +123,7 @@ test('rer deploy --remove refuses ambiguous full pages and malformed R2 paginati
 
 
 test('standard removal retries safe gateway failures and reports only unconfirmed resources through the CLI', async t => {
- for (const scenario of ['read-once','delete-applied','preflight-gateway','preflight-forbidden','worker-delete','partial-delete','readback']) await t.test(scenario, async t => {
+ for (const scenario of ['read-once','delete-applied','worker-delete-applied','worker-cleanup-forbidden','kv-delete-applied-forbidden','kv-delete-forbidden','preflight-gateway','preflight-forbidden','worker-delete','partial-delete','readback']) await t.test(scenario, async t => {
   const {root,provider,run} = await removalFixture(t,{d1:[{binding:'DB'}],kv:[{binding:'CACHE'}],queues:[{binding:'JOBS'}]});
   assert.equal(await run(),0);
   const path = join(root,'.rer/deploy/production.json');
@@ -135,15 +135,17 @@ test('standard removal retries safe gateway failures and reports only unconfirme
    const workerSettings = method === 'GET' && url.pathname.endsWith('/workers/scripts/fixture-production/settings');
    const workerDelete = method === 'DELETE' && url.pathname.endsWith('/workers/scripts/fixture-production');
    const bucketDelete = method === 'DELETE' && url.pathname.endsWith('/r2/buckets/fixture-production-files');
+   const kvDelete = method === 'DELETE' && url.pathname.includes('/storage/kv/namespaces/');
    const databaseList = method === 'GET' && url.pathname.endsWith('/d1/database');
    const selected = scenario === 'read-once' || scenario.startsWith('preflight-') ? workerSettings
-    : scenario === 'worker-delete' ? workerDelete
+    : scenario.startsWith('worker-') ? workerDelete
+    : scenario.startsWith('kv-delete') ? kvDelete
     : scenario === 'partial-delete' || scenario === 'delete-applied' ? bucketDelete
     : scenario === 'readback' && deleted && databaseList;
    if (selected) {
     hits++;
-    if (scenario === 'delete-applied' && hits === 1) await provider.fetch(input,init);
-    if (!['read-once','delete-applied'].includes(scenario) || hits === 1) return new Response('provider unavailable',{status:scenario === 'preflight-forbidden' ? 403 : 502});
+    if ((scenario.includes('applied') || scenario === 'worker-cleanup-forbidden') && hits === 1) { await provider.fetch(input,init); deleted = true; }
+    if (!['read-once','delete-applied'].includes(scenario) || hits === 1) return new Response(scenario === 'worker-cleanup-forbidden' ? 'KV cleanup not authorized' : 'provider unavailable',{status:scenario.includes('forbidden') ? 403 : 502});
    }
    const response = await provider.fetch(input,init);
    if (method === 'DELETE') deleted = true;
@@ -153,21 +155,27 @@ test('standard removal retries safe gateway failures and reports only unconfirme
   const capture = t.mock.method(process.stdout,'write',chunk => { output.push(String(chunk)); return true; });
   const result = await run('--remove','--yes');
   capture.mock.restore();
-  if (['read-once','delete-applied'].includes(scenario)) {
+  if (['read-once','delete-applied','worker-delete-applied','worker-cleanup-forbidden','kv-delete-applied-forbidden'].includes(scenario)) {
    assert.equal(result,0);
-   assert.equal(hits,scenario === 'read-once' ? 4 : 2); // preflight retry, identity check, final settings read
+   assert.equal(hits,scenario === 'read-once' ? 4 : scenario === 'delete-applied' ? 2 : scenario === 'worker-delete-applied' ? 3 : 1);
+   const message = output.flatMap(text => text.trim().split('\n')).map(text => JSON.parse(text)).filter(event => event.event === 'progress').map(event => event.message).join('\n');
+   // The result must count a delete proved by readback even if its response failed.
+   const resultEvent = output.flatMap(text => text.trim().split('\n')).map(text => JSON.parse(text)).find(event => event.event === 'result');
+   assert.deepEqual([...resultEvent.removed].sort(), [...all].sort(), message);
    await assert.rejects(access(path),{code:'ENOENT'});
    assert.equal(provider.state.settings,null);
    assert.deepEqual([provider.state.databases.length,provider.state.buckets.length,provider.state.kv.length,provider.state.queues.length],[0,0,0,0]);
   } else {
    assert.equal(result,1);
-   assert.equal(hits,scenario === 'preflight-forbidden' ? 1 : 3);
+   assert.equal(hits,scenario.includes('forbidden') ? 1 : 3);
    const message = output.flatMap(text => text.trim().split('\n')).map(text => JSON.parse(text)).find(event => event.event === 'error').message;
-   const remaining = scenario === 'partial-delete' ? [all[2]] : scenario === 'readback' ? [all[1]] : all;
+   const remaining = scenario === 'partial-delete' ? [all[2]] : scenario === 'readback' ? [all[1]] : scenario === 'kv-delete-forbidden' ? [all[3]] : all;
    assert.match(message,new RegExp(`${remaining.length} resources remain`));
    for (const name of remaining) assert.ok(message.includes(name),message);
    assert.match(message,/run ~\/\.local\/bin\/rer deploy .*--remove --yes again/);
    assert.doesNotMatch(message,/Deploy failed|Resources created this attempt/);
+   assert.doesNotMatch(message,/remove-incomplete/);
+   assert.match(message,/Removed /);
    const saved = JSON.parse(await readFile(path,'utf8'));
    for (const kind of ['d1','r2','kv','queues']) {
     const expected = Object.fromEntries(Object.entries(original.owned[kind]).filter(([name]) => remaining.includes(`${kind}:${name}`)));

@@ -213,10 +213,13 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
 /** Prints refusal codes and resource names only; never inputs, tokens or provider bodies. */
 export function report(error) {
   const diagnostic = deployDiagnostic(error);
-  if (diagnostic) return {ok:false,...diagnostic,...(error.missingSecrets ? {missingSecrets:error.missingSecrets} : {})};
+  const names = values => Array.isArray(values) ? values.filter(value => typeof value === 'string' && /^(?:worker|d1|r2|kv|queues|durable-object):[a-zA-Z0-9_.-]{1,128}$/.test(value)) : [];
+  const remaining = names(error.remaining), removed = names(error.removed);
+  const removal = Array.isArray(error.remaining) ? {removed,remaining,message:`Removed ${removed.join(', ') || 'nothing'}; ${remaining.length} resources remain or could not be verified absent (${remaining.join(', ') || 'none named'}). Keep the deployment record and run the removal again after correcting the cause.`} : {};
+  if (diagnostic) return {ok:false,...diagnostic,...removal,...(error.missingSecrets ? {missingSecrets:error.missingSecrets} : {})};
   if (error.message === 'missing-input') return {ok:false,code:'missing-input',inputs:error.inputs};
   if (error.message === 'usage') return {ok:false,code:'usage',usage};
-  return {ok:false,code:/^[a-zA-Z0-9_-]{1,120}$/.test(error.message) ? error.message : 'owner-deploy-failed',...(error.resource ? {resource:error.resource} : {}),...(error.missingSecrets ? {missingSecrets:error.missingSecrets} : {})};
+  return {ok:false,code:/^[a-zA-Z0-9_-]{1,120}$/.test(error.message) ? error.message : 'owner-deploy-failed',...removal,...(error.resource ? {resource:error.resource} : {}),...(error.missingSecrets ? {missingSecrets:error.missingSecrets} : {})};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try { console.log(JSON.stringify(await main())); }
