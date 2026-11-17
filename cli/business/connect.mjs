@@ -9,6 +9,7 @@ import { rerCommand, businessCommand } from './invocation.mjs';
 import { Stopped } from './errors.mjs';
 import { agentKind, deviceName, workingFolder, operatingSystem } from './device.mjs';
 import { revokedText } from './local-commands.mjs';
+import { serverSaid } from './refusal.mjs';
 
 // Approval moves the server's pairing expiry to ten minutes after approval, and
 // approval can come up to the code's own expiry. Keep the pending pairing until
@@ -133,7 +134,7 @@ async function connectDevice({ business, origin, timeout } = {}) {
  } catch (error) {
   if (!stop.signal.aborted) {
    const ended = terminalPairing.get(error.code);
-   if (ended && error.status === ended[0]) { await clearPending(); throw Error(`Business pairing ${ended[1]} (${error.code}). Run connect again.`); }
+   if (ended && error.status === ended[0]) { await clearPending(); throw Error(`Business pairing ${ended[1]} (${error.code}). Run connect again.${serverSaid(error.reason)}`); }
    throw error;
   }
  } finally {

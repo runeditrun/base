@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { redact } from './errors.mjs';
 import { appAddress } from '../app-address.mjs';
+import { refusalView, serverSaid } from './refusal.mjs';
 
 export function originUrl(value = appAddress) {
  let url;
@@ -16,7 +17,7 @@ export function originUrl(value = appAddress) {
 // {error, requestId}. It is shown as one bounded line of text, never as markup.
 export class ApiError extends Error {
  constructor(status, reason = null, requestId = null, code = null, { state, link } = {}) {
-  const said = reason ? ` The server said: ${reason}${/[.!?]$/.test(reason) ? '' : '.'}` : '';
+  const said = serverSaid(reason);
   const reference = requestId ? ` Reference ${requestId}.` : '';
   super((status === 401 ? 'Business pairing was revoked or expired. Reconnect in your browser.' : `Business server refused the request (HTTP ${status}).`) + said + reference);
   this.status = status; this.reason = reason; this.requestId = requestId; this.code = code;
@@ -26,17 +27,19 @@ export class ApiError extends Error {
 
 async function refusal(response, quiet = false, detail) {
  let text = '';
- // A caller that reads its own detail gets the platform's whole error envelope (at most 64 KB); others read 4 KB.
- try { text = (await response.text()).slice(0, detail ? 65_536 : 4096); } catch { /* The status alone is the reason. */ }
+ // Parse a bounded envelope before selecting prose; never print a truncated
+ // JSON object as plain text, where credential fields could become the reason.
+ try { text = (await response.text()).slice(0, 65_536); } catch { /* The status alone is the reason. */ }
  let body = null;
  try { body = JSON.parse(text); } catch { /* A plain-text reason is used as it is. */ }
- const line = value => typeof value === 'string' && value.trim() ? redact(value).replace(/\s+/g, ' ').trim().slice(0, 300) : null;
- const reason = body && typeof body === 'object' ? line(body.error) ?? line(body.message) : /^\s*</.test(text) ? null : line(text);
- const requestId = body && typeof body === 'object' && typeof body.requestId === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(body.requestId) ? body.requestId : null;
+ const view = refusalView(body ?? (/^\s*[<\[{]/.test(text) ? null : text), 300);
+ const line = view.line;
+ const reason = view.sentence;
+ const requestId = body && typeof body === 'object' && typeof body.requestId === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(body.requestId) ? line(body.requestId) : null;
  const code = typeof body?.code === 'string' && /^[a-z][a-z0-9_]{0,79}$/.test(body.code) ? body.code : null;
- // Pairing responses can echo secrets, including the short user code. Only
- // the bounded machine code is needed by that flow, never server prose.
- const error = new ApiError(response.status, quiet ? null : reason, quiet ? null : requestId, code,
+ // Quiet exchanges still retain safe prose; request references and ancillary
+ // fields remain suppressed on credential and pairing routes.
+ const error = new ApiError(response.status, reason, quiet ? null : requestId, code,
   quiet ? {} : { state: body?.state === 'waiting_for_owner' ? body.state : undefined, link: line(body?.link) });
  // Only the fields the caller picks and bounds travel with the error, never the body itself.
  if (detail && body && typeof body === 'object' && !Array.isArray(body)) error.detail = detail(body);

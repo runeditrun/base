@@ -29,8 +29,8 @@ async function seed(t) {
 }
 function inputs(provider, extra = {}) { return {CLOUDFLARE_ACCOUNT_ID:provider.accountId,CLOUDFLARE_API_TOKEN:provider.token,SESSION_SECRET:'test-only-session-value',...extra}; }
 
-test('owner CLI deploys with only the owner token and account id, then re-runs and checks health without writes', async t => {
-  const provider = ownerProvider(); t.after(() => provider.close());
+test('owner CLI deploys, checks health without writes, names removal survivors and completes on the next run', async t => {
+  const provider = ownerProvider({creationDates:true}); t.after(() => provider.close());
   const root = await seed(t);
   const notices = [], options = {fetch:provider.fetch,cwd:root,notice:line => notices.push(line)};
   const argv = ['deploy','--declaration','deploy.json','--environment','production'];
@@ -54,6 +54,19 @@ test('owner CLI deploys with only the owner token and account id, then re-runs a
   assert.equal(answers,2);
   assert.equal(provider.state.writes.length,writes);
   assert.deepEqual(await readFile(first.state),bytes);
+  const removal = ['remove','--declaration','deploy.json','--environment','production'];
+  provider.fail('DELETE', /^\/r2\/buckets\//, {status:403});
+  await assert.rejects(main(removal,inputs(provider),options), error => {
+    const result = report(error);
+    assert.deepEqual(result.remaining,['r2:vector-production-files']);
+    assert.deepEqual(result.removed,['worker:vector-production','d1:vector-production-db']);
+    assert.ok(result.message.includes(result.remaining[0]));
+    assert.ok(result.removed.every(name => result.message.includes(name)));
+    assert.ok(!JSON.stringify(result).includes(provider.token));
+    return true;
+  });
+  assert.deepEqual((await main(removal,inputs(provider),options)).remaining,[]);
+  await assert.rejects(readFile(first.state),{code:'ENOENT'});
 });
 
 test('owner CLI inspection uses the native receipt origin even when current settings differ or are absent', async t => {

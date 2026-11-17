@@ -1,23 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import { Api, ApiError, identifier } from './api.mjs';
-import { redact } from './errors.mjs';
+import { refusalView, serverSaid } from './refusal.mjs';
 import { paired } from './local-commands.mjs';
 import { runChild, signalCode } from './run-child.mjs';
 
 const route = '/api/business/executors/cloudflare-token';
 const usage = 'Usage: ~/.local/bin/rer business run --grant G -- <command> [args...]\n';
 const refused = 'Business command refused or its credential exchange failed. Check pairing, selected account, deploy action, grant and Cloudflare consent in Business.';
-// A refused exchange can say why its grant cannot mint (409 {state, gap, catalogue}). Only the gap sentence, whether the
-// grant stays pending and the catalogue's two counts are read: no other key, and never a token, header or value.
+// Read only safe prose, the pending flag and the catalogue's two counts.
 function exchangeGap(body) {
- const gap = typeof body.gap === 'string' ? redact(body.gap).replace(/\s+/g, ' ').trim() : '';
+ const view = refusalView(body, 2000), gap = view.line(body.gap);
  const count = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
  const rows = count(body.catalogue?.rows), workers = count(body.catalogue?.workers_rows);
- return { gap: gap.length > 2000 ? `${gap.slice(0, 1999)}…` : gap, pending: body.state === 'pending',
+ return { gap, reason: refusalView({ ...body, gap: undefined }, 500).sentence, pending: body.state === 'pending',
   catalogue: rows === null || workers === null ? null : { rows, workers } };
 }
-function refusalLine({ gap, pending, catalogue } = {}) {
- return [gap ? `Not started: ${gap}${/[.!?…]$/.test(gap) ? '' : '.'}` : refused, pending && 'The grant stays pending; nothing was issued.',
+function refusalLine({ gap, reason, pending, catalogue } = {}) {
+ return [(gap ? `Not started: ${gap}${/[.!?…]$/.test(gap) ? '' : '.'}` : refused) + serverSaid(reason), pending && 'The grant stays pending; nothing was issued.',
   catalogue && `catalogue: ${catalogue.rows} rows, ${catalogue.workers} mention Workers (see the audit row cloudflare.token.catalogue)`]
   .filter(Boolean).join(' ') + '\n';
 }
@@ -32,9 +31,9 @@ async function cleanup(api, id) {
  try {
   const value = await api.post(`${route}/${id}/revoke`, {}, { quiet: true, timeout: 15000 });
   if (value?.lease_id === id && ['revoked', 'expired'].includes(value.cleanup_status)
-   && (value.cleanup_status !== 'revoked' || value.provider_credential_revoked === true)) return value.cleanup_status;
- } catch { /* A lost acknowledgement is unconfirmed, never success. */ }
- return 'unconfirmed';
+   && (value.cleanup_status !== 'revoked' || value.provider_credential_revoked === true)) return { status: value.cleanup_status };
+ } catch (error) { return { status: 'unconfirmed', reason: error instanceof ApiError ? error.reason : null }; }
+ return { status: 'unconfirmed' };
 }
 export async function cleanupCommand(args) {
  if (args.length < 1 || args.length > 2 || args[1] !== undefined && args[1] !== '--status' || !/^[a-f0-9-]{36}$/.test(args[0])) {
@@ -43,10 +42,10 @@ export async function cleanupCommand(args) {
  const {state, credential} = await paired(), api = new Api(state.origin, credential), id = args[0];
  try {
   const value = args[1] ? await api.request('GET', `${route}/${id}`, undefined, { quiet: true }) : null;
-  const status = args[1] ? value?.lease_id === id && ['issuing','active','revoked','unconfirmed','expired'].includes(value.cleanup_status) ? value.cleanup_status : 'unconfirmed' : await cleanup(api, id);
-  process.stderr.write(`Cloud credential cleanup: ${status}. Lease ${id}.\n`);
+  const { status, reason } = args[1] ? { status: value?.lease_id === id && ['issuing','active','revoked','unconfirmed','expired'].includes(value.cleanup_status) ? value.cleanup_status : 'unconfirmed' } : await cleanup(api, id);
+  process.stderr.write(`Cloud credential cleanup: ${status}. Lease ${id}.${serverSaid(reason)}\n`);
   return ['revoked','expired'].includes(status) ? 0 : 1;
- } catch { process.stderr.write(`Cloud credential cleanup: unconfirmed. Lease ${id}.\n`); return 1; }
+ } catch (error) { process.stderr.write(`Cloud credential cleanup: unconfirmed. Lease ${id}.${serverSaid(error instanceof ApiError ? error.reason : null)}\n`); return 1; }
 }
 export async function grantCommand(args) {
  if (args[0] !== '--grant' || !args[1] || args[2] !== '--' || !args[3]) { process.stderr.write(usage); return 2; }
@@ -69,11 +68,11 @@ export async function grantCommand(args) {
   if (result.credentialExpired) process.stderr.write(`Command stopped because the credential expired; run it again to resume. Caller exit status: ${code}${exitSignal ? ` (${exitSignal})` : ''}.\n`);
  } catch (error) {
   code = stop.signal.aborted ? signalCode(stop.signal.reason.signal) : 1;
-  process.stderr.write(refusalLine(error instanceof ApiError ? error.detail : undefined));
+  process.stderr.write(refusalLine(error instanceof ApiError ? error.detail ?? { reason: error.reason } : undefined));
  } finally {
-  const status = await cleanup(api, id);
+  const { status, reason } = await cleanup(api, id);
   const expiry = lease && Number.isFinite(Date.parse(lease.credential_expires_at)) ? new Date(lease.credential_expires_at).toISOString() : 'the server-enforced expiry (at most 15 minutes)';
-  process.stderr.write(`Cloud credential cleanup: ${status}. Lease ${id}.${status === 'unconfirmed' ? ` Credential expiry: ${expiry}. Retry: ~/.local/bin/rer business cleanup ${id}.` : ''}\n`);
+  process.stderr.write(`Cloud credential cleanup: ${status}. Lease ${id}.${serverSaid(reason)}${status === 'unconfirmed' ? ` Credential expiry: ${expiry}. Retry: ~/.local/bin/rer business cleanup ${id}.` : ''}\n`);
   lease = undefined;
   for (const [signal, handler] of handlers) process.removeListener(signal, handler);
  }

@@ -84,7 +84,10 @@ async function stopSupervisor(directory) {
 // server without this route does); otherwise 'unconfirmed'.
 async function revoke(origin, credential) {
  try { return (await new Api(origin, credential).delete('/api/business/executors/self'))?.revoked === true ? 'revoked' : 'unconfirmed'; }
- catch (error) { return error.status === 401 ? 'revoked' : [403, 404].includes(error.status) ? 'unsupported' : 'unconfirmed'; }
+ catch (error) {
+  if (error.status) process.stderr.write(describe(error) + '\n');
+  return error.status === 401 ? 'revoked' : [403, 404].includes(error.status) ? 'unsupported' : 'unconfirmed';
+ }
 }
 
 /** Revoke on the server first, then remove the local service, rules, keys and
