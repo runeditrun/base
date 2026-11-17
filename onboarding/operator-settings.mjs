@@ -18,7 +18,7 @@ export async function prepareOperatorMail({root,input}) {
 }
 
 export async function repairOperatorMail(context) {
- if(!['installer','setup'].includes(context.verb)||context.vars.MAIL_PROVIDER==='development')return;
+ if((context.verb&&!['installer','setup'].includes(context.verb))||context.vars.MAIL_PROVIDER==='development')return;
  const current=await readSettings(context.root,{});
  if(current.values.MAIL_PROVIDER===undefined){
   await writePrivateFile(current.path,current.text.replace(/\n*$/,'\n')+'MAIL_PROVIDER=development\n');
