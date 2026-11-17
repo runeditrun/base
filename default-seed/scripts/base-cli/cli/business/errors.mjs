@@ -1,3 +1,4 @@
+import { withCommandHelp } from '../command-guidance.mjs';
 import { maskDeviceText } from './run-mask.mjs';
 
 // Every message rer business prints names its cause: a server's reason, a
@@ -19,7 +20,7 @@ export function describe(error) {
  }
  const message = error instanceof Error ? error.message : String(error);
  const unexpected = [TypeError, RangeError, SyntaxError, ReferenceError].some(type => error instanceof type);
- return redact(unexpected || !message ? `Business command failed unexpectedly: ${message || 'no reason given'}` : message);
+ return withCommandHelp(redact(unexpected || !message ? `Business command failed unexpectedly: ${message || 'no reason given'}` : message));
 }
 
 // An exit status other than 1 travels with the error (130 after Ctrl-C).

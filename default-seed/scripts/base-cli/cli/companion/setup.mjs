@@ -5,11 +5,11 @@ import { Api } from './api.mjs';
 import { validateCommands } from './commands.mjs';
 import { git } from './workspace.mjs';
 
-export const pairUsage = 'rer companion pair URL CODE [--project PROJECT_ID] [--provider codex|claude] [--name NAME]';
+export const pairUsage = '~/.local/bin/rer companion pair URL CODE [--project PROJECT_ID] [--provider codex|claude] [--name NAME]';
 
 // A project maps to one checkout whose origin is exactly the named repository.
 async function mapProject(root,state,projectId,repository,path) {
-  if(!projectId||!repository||!path) throw new Error('Usage: rer companion map PROJECT_ID OWNER/REPO CHECKOUT');
+  if(!projectId||!repository||!path) throw new Error('Usage: ~/.local/bin/rer companion map PROJECT_ID OWNER/REPO CHECKOUT');
   const checkout=await realpath(path);const remote=await git(checkout,'remote','get-url','origin');
   if(![ `https://github.com/${repository}.git`,`https://github.com/${repository}`,`git@github.com:${repository}.git`].includes(remote)) throw new Error('Repository identity and checkout origin differ.');
   state.mappings[projectId]={repository,checkout,remote};await saveState(root,state);console.log(`Approved ${projectId}: ${repository} at ${checkout}`);
@@ -53,7 +53,7 @@ export async function pair(root,state,args) {
     let projectId=options.project;const mapped=Object.keys(state.mappings);
     if(!projectId&&mapped.length===1)projectId=mapped[0];
     if(!projectId&&terminal)projectId=await ask(terminal,mapped.length?`Project ID (${mapped.join(', ')}): `:'Project ID (the app id in its Devices page command): ');
-    if(!projectId)throw new Error(mapped.length?`Several projects are mapped. Run ${pairUsage} with --project.`:'Map the checkout locally before pairing: rer companion map PROJECT_ID OWNER/REPO CHECKOUT');
+    if(!projectId)throw new Error(mapped.length?`Several projects are mapped. Run ${pairUsage} with --project.`:'Map the checkout locally before pairing: ~/.local/bin/rer companion map PROJECT_ID OWNER/REPO CHECKOUT');
     if(!state.mappings[projectId]&&terminal) {
       console.log('Approve the local Git checkout this app may change.');
       await mapProject(root,state,projectId,await ask(terminal,'Repository (OWNER/REPO): '),await ask(terminal,'Checkout folder: '));
@@ -66,6 +66,6 @@ export async function pair(root,state,args) {
     if(paired.repository!==state.mappings[projectId].repository) throw new Error('Paired installation repository differs from local mapping. Revoke this device.');
     Object.assign(state,{server:options.server,token:paired.token,device:paired.device,provider});await saveState(root,state);
     console.log(`Paired device ${paired.device.id} to ${paired.repository}. Selected requests and provider progress are relayed to RER; provider credentials stay here.`);
-    console.log(`Next: rer companion ${provider}-auth, then rer companion run.`);
+    console.log(`Next: ~/.local/bin/rer companion ${provider}-auth, then ~/.local/bin/rer companion run.`);
   } finally { terminal?.close(); }
 }

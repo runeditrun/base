@@ -65,13 +65,13 @@ export async function checkCapacity(checkout, env, pin) {
   `Not started: ${holders.length === 1 ? 'a server' : 'servers'} started with a limit of ${cap} hold${holders.length === 1 ? 's' : ''} this checkout's rer copy to ${cap} running servers, and ${counted.length} ${counted.length === 1 ? 'is' : 'are'} running:`,
   ...holders.map(record => `  ${record.mode} for ${record.checkout} (PID ${record.owner?.pid})`),
   `Restart ${holders.length === 1 ? 'it' : 'each'} under rer, which records ${personDefaults.limit} servers:`,
-  ...holders.flatMap(record => [`  rer ${record.mode} --stop --cwd ${JSON.stringify(record.checkout)}`, `  rer ${record.mode} --cwd ${JSON.stringify(record.checkout)}`]),
+  ...holders.flatMap(record => [`  ~/.local/bin/rer ${record.mode} --stop --cwd ${JSON.stringify(record.checkout)}`, `  ~/.local/bin/rer ${record.mode} --cwd ${JSON.stringify(record.checkout)}`]),
   'rer never stops another checkout\'s server itself.',
  ].join('\n'));
  throw new LaunchFailure(4, [
   `Not started: ${counted.length} dev or preview ${counted.length === 1 ? 'server is' : 'servers are'} running on this computer and the limit is ${cap}.`,
   'Running now:', ...counted.map(listing),
   file ? `The limit is ${cap} because ${file.path} (RER_SERVER_LIMIT_FILE) says ${cap}. To make room, stop one with its command above, or raise the number in that file.`
-   : `To make room, stop one with its command above, or start this one with a higher limit, for example RER_SERVER_LIMIT=${cap * 2} rer dev.`,
+   : `To make room, stop one with its command above, or start this one with a higher limit, for example RER_SERVER_LIMIT=${cap * 2} ~/.local/bin/rer dev.`,
  ].join('\n'));
 }

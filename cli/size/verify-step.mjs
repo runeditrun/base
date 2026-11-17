@@ -14,7 +14,7 @@ function failureText({ statements, size = {}, flows = [] }) {
   for (const name of ['small', 'large']) if (size[name]?.error) parts.push(`the ${name} size did not build: ${size[name].error}`);
   const failing = flows.filter(flow => !flow.ok);
   if (failing.length) parts.push(`${failing.length} of ${flows.length} declared flows fail: ${join(failing.map(flow => `${flow.name} (${[...new Set(flow.failures.map(failure => failure.rule))].join(', ')})`))}`);
-  return `Size check failed: ${parts.join('; ')}. Run rer size for the full report.`;
+  return `Size check failed: ${parts.join('; ')}. Run ~/.local/bin/rer size for the full report.`;
 }
 
 /**

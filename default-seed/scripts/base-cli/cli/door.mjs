@@ -201,8 +201,8 @@ export async function claimSiteName(env, checkout, { preferred, mode, origin, ex
  const claimed = await changeDoorState(env, state => {
   const { entry, holder } = claimEntry(state, checkout, preferred, held);
   if (exact && entry.name !== preferred) throw refuse(holder
-   ? `This checkout's saved origin names ${preferred}.localhost, which the front door has registered for another checkout (${holder.checkout}). Nothing was started and no sign-in link was printed. Give this checkout its own name: rer dev --direct, then rer dev --door.`
-   : `This checkout's saved origin names ${preferred}.localhost, but the front door has it registered as ${entry.name}. Nothing was started and no sign-in link was printed. Move it again: rer dev --direct, then rer dev --door.`);
+   ? `This checkout's saved origin names ${preferred}.localhost, which the front door has registered for another checkout (${holder.checkout}). Nothing was started and no sign-in link was printed. Give this checkout its own name: ~/.local/bin/rer dev --direct, then ~/.local/bin/rer dev --door.`
+   : `This checkout's saved origin names ${preferred}.localhost, but the front door has it registered as ${entry.name}. Nothing was started and no sign-in link was printed. Move it again: ~/.local/bin/rer dev --direct, then ~/.local/bin/rer dev --door.`);
   describe(entry);
   return { name: entry.name, id: entry.id };
  });
@@ -246,19 +246,19 @@ async function verifyOnce(env, port) {
  const holders = (await listeners(undefined,context,port)).filter(row => row.names.some(name => portOf(name) === port));
  const foreign = holders.find(row => row.pid !== record?.pid);
  const withheld = 'No sign-in link was printed.';
- if (foreign) throw refuse(`Port ${port} is held by PID ${foreign.pid} (${await processName(foreign.pid,context)}), which is not this account's front door${record ? ` (PID ${record.pid})` : ''}. ${withheld} Stop PID ${foreign.pid}, then run rer door restart.`);
- if (!record || record.port !== port) throw refuse(`The front door is not running on port ${port}. ${withheld} Start it with rer door start, then run this again.`);
+ if (foreign) throw refuse(`Port ${port} is held by PID ${foreign.pid} (${await processName(foreign.pid,context)}), which is not this account's front door${record ? ` (PID ${record.pid})` : ''}. ${withheld} Stop PID ${foreign.pid}, then run ~/.local/bin/rer door restart.`);
+ if (!record || record.port !== port) throw refuse(`The front door is not running on port ${port}. ${withheld} Start it with ~/.local/bin/rer door start, then run this again.`);
  const token = (await readPrivate(join(directory, 'token')))?.trim();
- if (!token) throw refuse(`The front door's token is missing from ${directory}. ${withheld} Run rer door restart.`);
+ if (!token) throw refuse(`The front door's token is missing from ${directory}. ${withheld} Run ~/.local/bin/rer door restart.`);
  for (const host of ['127.0.0.1', '::1']) {
   let answer;
   try { answer = await challenge(host, port, token); }
   catch (error) {
    // No IPv6 loopback, or nothing on [::1]:P while the door serves only 127.0.0.1.
    if (host === '::1' && ['ECONNREFUSED', 'EADDRNOTAVAIL', 'EAFNOSUPPORT', 'ENETUNREACH'].includes(error.code) && !record.addresses?.includes('::1')) continue;
-   throw refuse(`The front door (PID ${record.pid}) did not answer on ${host === '::1' ? '[::1]' : host}:${port}: ${error.code ?? error.message}. ${withheld} Run rer door restart.`);
+   throw refuse(`The front door (PID ${record.pid}) did not answer on ${host === '::1' ? '[::1]' : host}:${port}: ${error.code ?? error.message}. ${withheld} Run ~/.local/bin/rer door restart.`);
   }
-  if (!answer || answer.pid !== record.pid) throw refuse(`Something other than this account's front door (PID ${record.pid}) answers on ${host === '::1' ? '[::1]' : host}:${port}. ${withheld} Find and stop it, then run rer door restart.`);
+  if (!answer || answer.pid !== record.pid) throw refuse(`Something other than this account's front door (PID ${record.pid}) answers on ${host === '::1' ? '[::1]' : host}:${port}. ${withheld} Find and stop it, then run ~/.local/bin/rer door restart.`);
  }
  return record;
 }

@@ -21,4 +21,4 @@ export async function liveServers(env = process.env) {
  return live;
 }
 
-export const stopCommand = record => `rer ${record.mode} --stop --cwd ${JSON.stringify(record.checkout)}`;
+export const stopCommand = record => `~/.local/bin/rer ${record.mode} --stop --cwd ${JSON.stringify(record.checkout)}`;

@@ -10,12 +10,12 @@ import { appAddress, appSignInHelp } from '../app-address.mjs';
 import { agentUsage, agentHelp } from './agent-help.mjs';
 import { agentFamilies } from './agent-table.mjs';
 
-const usage = `Set up your business: rer business connect --business ID
+const usage = `Set up your business: ~/.local/bin/rer business connect --business ID
 The Business Connect page names the ID.
 Business keeps your business name, logo and brand colour together for the apps
 that support shared Business settings. Choose what to share in your browser.
 
-Advanced commands (Usage: rer business VERB)
+Advanced commands (Usage: ~/.local/bin/rer business VERB)
   setup --origin URL --session-file FILE --confirm-demo
                                  Create the synthetic demo company's Business and its profile
                                  --hosting managed|assisted|self_host (default: managed); --json
@@ -58,7 +58,7 @@ ${agentUsage}${appSignInHelp}
 
 const verbHelp = {
  ...agentHelp,
- setup: `Usage: rer business setup --origin URL --session-file FILE --confirm-demo [--hosting managed|assisted|self_host] [--json]
+ setup: `Usage: ~/.local/bin/rer business setup --origin URL --session-file FILE --confirm-demo [--hosting managed|assisted|self_host] [--json]
 Create the Business for the synthetic demo company in setup-company.json and save
 its profile, through the platform's owner routes. A repeat reuses that Business and
 changes nothing when its profile already matches. It provisions no seeds.
@@ -75,7 +75,7 @@ changes nothing when its profile already matches. It provisions no seeds.
 Exits 0 when the Business exists with that profile; 1 with a named {code} on stderr.
 ${appSignInHelp}
 `,
- run: `Usage: rer business run --grant G -- <command> [args...]
+ run: `Usage: ~/.local/bin/rer business run --grant G -- <command> [args...]
 Run any software command under this paired agent’s explicit deploy action and grant.
 The scoped Cloudflare token and account reach only the child environment. Output
 is masked and cleanup is reported separately; the child’s exit status is kept.
@@ -86,13 +86,13 @@ The reported caller exit status keeps the child's code or terminating signal
 A refused exchange starts nothing and exits 1. When Business says why (a pending
 grant's gap), stderr prints it on one line after "Not started:".
 
-Usage: rer business run [--once]
+Usage: ~/.local/bin/rer business run [--once]
 Work this computer's tasks (the folder scan the owner allows) and check in every
 25 seconds until stopped. Steps for this computer's agent, such as a seed's Move in,
-are shown by rer business next. --once returns after one check-in.
+are shown by ~/.local/bin/rer business next. --once returns after one check-in.
 Exits 0 completed, idle or waiting for the owner; 1 failed; 2 usage.
 `,
- connect: `Usage: rer business connect --business ID [--origin URL] [--timeout SECONDS]
+ connect: `Usage: ~/.local/bin/rer business connect --business ID [--origin URL] [--timeout SECONDS]
 Pair this computer with a Business. Prints a code and a link: the owner opens the
 link in a signed-in browser, checks the code and approves. Waits for that (up to
 the code's 10 minutes), then keeps the device credential in OS Keychain/Secret Service,
@@ -107,10 +107,10 @@ all Business invocations, including the service process.
                      run the same command again to keep waiting (same code).
 Exits 0 connected, 1 ended (refused, expired or failed), 2 usage, 75 still waiting.
 `,
- token: `Usage: rer business token
+ token: `Usage: ~/.local/bin/rer business token
 Print an MCP Authorization header object for this computer's paired Business.
 Send this headersHelper output directly to the MCP client; it contains a credential.
-Requires an existing pairing: rer business connect --business ID (the Connect page names the ID).
+Requires an existing pairing: ~/.local/bin/rer business connect --business ID (the Connect page names the ID).
 `,
 };
 

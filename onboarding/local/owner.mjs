@@ -44,7 +44,7 @@ export async function assertLocalOwner(root,email,failure=message=>Error(message
  if(placeholder)return {owners,placeholder};
  if(owners.length&&!owners.some(owner=>owner.toLowerCase()===email.toLowerCase())){
   const address=safeOwner(owners[0]);
-  throw failure(`Local database already belongs to ${address}. Restore ${setting} to ${address}, then run rer setup --owner-email ${address}; or back up data, run rer dev --stop, then rer reset --yes followed by rer setup --owner-email ${safeOwner(email)}. Reset deletes local data. Existing data and private settings were kept.`);
+  throw failure(`Local database already belongs to ${address}. Restore ${setting} to ${address}, then run ~/.local/bin/rer setup --owner-email ${address}; or back up data, run ~/.local/bin/rer dev --stop, then ~/.local/bin/rer reset --yes followed by ~/.local/bin/rer setup --owner-email ${safeOwner(email)}. Reset deletes local data. Existing data and private settings were kept.`);
  }
  return {owners};
 }
@@ -57,7 +57,7 @@ export async function replaceLocalOwner(root,from,to,failure=message=>Error(mess
   try{
    const tables=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name));
    if(!tables.has('oa_operators'))continue;
-   if(db.prepare('SELECT 1 FROM oa_operators WHERE lower(email)=lower(?) AND lower(email)<>lower(?)').get(to,from))throw failure(`${safeOwner(to)} already has an account in the local database, so the zero-setup owner ${safeOwner(from)} was kept. Run rer setup --owner-email ${safeOwner(from)}, or back up data and run rer reset --yes.`);
+   if(db.prepare('SELECT 1 FROM oa_operators WHERE lower(email)=lower(?) AND lower(email)<>lower(?)').get(to,from))throw failure(`${safeOwner(to)} already has an account in the local database, so the zero-setup owner ${safeOwner(from)} was kept. Run ~/.local/bin/rer setup --owner-email ${safeOwner(from)}, or back up data and run ~/.local/bin/rer reset --yes.`);
    db.prepare("UPDATE oa_operators SET email=?,version=version+1 WHERE lower(email)=lower(?) AND role='owner' AND status='active'").run(to,from);
   }finally{db.close();}
  }

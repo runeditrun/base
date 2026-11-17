@@ -17,7 +17,7 @@ export function positive(value, name, fallback) {
  if(!/^[1-9][0-9]*$/.test(String(value)) || !Number.isSafeInteger(Number(value)))throw invalid(`${name} must be positive integer seconds/count.`);
  return Number(value);
 }
-export const stopInstruction = record => `rer ${record.mode} --cwd ${JSON.stringify(record.checkout)} --stop`;
+export const stopInstruction = record => `~/.local/bin/rer ${record.mode} --cwd ${JSON.stringify(record.checkout)} --stop`;
 // Plain-words listing of one running server for the limit refusal.
 const listing = record => `  ${record.mode} on port ${record.port ?? '(starting)'} in ${record.checkout}\n    stop it with: ${stopInstruction(record)}`;
 export const description = record => `${record.mode} ${record.url ?? '(starting)'} for ${record.checkout}; stop it with: ${stopInstruction(record)}`;
@@ -56,7 +56,7 @@ function memoryMessage(counted,available,floor,mode) {
  const gib=bytes=>(bytes/1024**3).toFixed(1);
  const head=`Not started: this computer is short of memory. ${gib(available)} GiB is available and a new server starts only at ${gib(floor)} GiB or more.`;
  const list=counted.length?`Running now:\n${counted.map(listing).join('\n')}\nA dev server holds about 0.5-1.3 GiB and a preview 0.4-0.8 GiB; stopping one with its command above frees that.`:'No dev or preview server is running, so something else is using the memory.';
- return `${head}\n${list}\nTo start anyway, lower the floor, for example RER_SERVERS_MIN_MEMORY_BYTES=${Math.floor(floor/2)} rer ${mode} (0 turns it off).`;
+ return `${head}\n${list}\nTo start anyway, lower the floor, for example RER_SERVERS_MIN_MEMORY_BYTES=${Math.floor(floor/2)} ~/.local/bin/rer ${mode} (0 turns it off).`;
 }
 function limitMessage(counted,cap,explicit,mode,file) {
  const holders=explicit?[]:counted.filter(item=>item.explicit&&item.limit===cap);
@@ -67,7 +67,7 @@ function limitMessage(counted,cap,explicit,mode,file) {
   :holders.length
   ?`The limit is ${cap} because ${holders.length===1?'a server was':'servers were'} started with RER_SERVER_LIMIT=${cap} (${holders.map(item=>item.checkout).join(', ')}). Stop ${holders.length===1?'it':'them'} and start again, or start everything with a higher RER_SERVER_LIMIT=N.`
   :explicit?`This start set RER_SERVER_LIMIT=${cap}; to allow more, start it with a higher RER_SERVER_LIMIT=N.`
-  :`To allow more, start this one with a higher limit, for example RER_SERVER_LIMIT=${cap*2} rer ${mode}. Servers started without RER_SERVER_LIMIT allow ${defaultServerLimit}.`;
+  :`To allow more, start this one with a higher limit, for example RER_SERVER_LIMIT=${cap*2} ~/.local/bin/rer ${mode}. Servers started without RER_SERVER_LIMIT allow ${defaultServerLimit}.`;
  return `${head}\n${list}\nTo make room, stop one with its command above. ${raise}`;
 }
 // A server is only ever stopped by the checkout that owns it, through its own

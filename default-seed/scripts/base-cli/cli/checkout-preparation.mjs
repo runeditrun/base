@@ -66,18 +66,18 @@ export async function checkoutPreparation(checkout, env = process.env) {
  let describing = true;
  try {
   const entry = await pinnedEntry(checkout);
-  if (!entry) return { prepared: false, reason: 'the pinned rer package is not installed: run rer install' };
+  if (!entry) return { prepared: false, reason: 'the pinned rer package is not installed: run ~/.local/bin/rer install' };
   const { stdout } = await promisify(execFile)(process.execPath, [entry, 'describe', '--json'], { cwd: checkout, env, maxBuffer: 16 * 1024 * 1024, timeout: 30000 });
   const described = JSON.parse(stdout);
   describing = false;
   const last = await readJson(join(launchPath(checkout, env), 'setup.json'));
   const needed = await setupNeeded(checkout, described, last);
-  return { prepared: !needed, ...(needed ? { reason: 'the checkout is not set up yet: run rer setup' } : {}) };
+  return { prepared: !needed, ...(needed ? { reason: 'the checkout is not set up yet: run ~/.local/bin/rer setup' } : {}) };
  } catch (error) {
   const { createRedaction, credentialValues } = await shared('redaction.mjs');
   const redaction = createRedaction();
   redaction.addSecrets(credentialValues(env));
-  const cause = error.stderr?.trim() || (describing ? `rer describe failed in ${checkout}.` : error.message);
-  return { prepared: null, reason: `rer describe fails here: ${redaction.redact(cause.split('\n')[0])}` };
+  const cause = error.stderr?.trim() || (describing ? `~/.local/bin/rer describe failed in ${checkout}.` : error.message);
+  return { prepared: null, reason: `~/.local/bin/rer describe fails here: ${redaction.redact(cause.split('\n')[0])}` };
  }
 }

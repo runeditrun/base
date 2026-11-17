@@ -10,11 +10,11 @@ import { delimiter, dirname, join, resolve } from 'node:path';
 import { locate } from './checkout.mjs';
 import { shared } from '../cli/shared.mjs';
 
-export const runUsage = `Usage: rer run [--cwd DIR] [SCRIPT [ARGS...]]
-       rer run [--cwd DIR] --script FILE [ARGS...]
+export const runUsage = `Usage: ~/.local/bin/rer run [--cwd DIR] [SCRIPT [ARGS...]]
+       ~/.local/bin/rer run [--cwd DIR] --script FILE [ARGS...]
 Runs a package.json script of this checkout as pnpm run SCRIPT ARGS would, with the
 pnpm and Node the checkout pins (rer keeps them off PATH). Without SCRIPT it lists
-the scripts. Where a project's docs say pnpm run X -- ARGS, run rer run X -- ARGS.
+the scripts. Where a project's docs say pnpm run X -- ARGS, run ~/.local/bin/rer run X -- ARGS.
 With --script, runs a JavaScript file with the Node running rer, including the
 installer's private runtime. No checkout or package manager is needed. FILE is
 relative to the current folder (or --cwd DIR); remaining arguments go to the file.
@@ -49,7 +49,7 @@ export async function runScript(args) {
  }
  const target = locate(cwd ? ['run', '--cwd', cwd] : ['run']);
  if (!target.root || !['first-party', 'independent'].includes(target.profile)) {
-  process.stderr.write(`rer run runs inside a checkout: a folder with OPERATIONS.json at or above this one, or --cwd DIR.\n`);
+  process.stderr.write(`~/.local/bin/rer run runs inside a checkout: a folder with OPERATIONS.json at or above this one, or --cwd DIR.\n`);
   return 2;
  }
  let scripts = {};

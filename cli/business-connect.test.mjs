@@ -81,7 +81,7 @@ test('Business verb help explains each command without pairing or reading a sess
   const result = await cli(home, ['business', verb, '--help']);
   t.diagnostic(`rer business ${verb} --help\n${result.stdout}`);
   assert.equal(result.code, 0, result.stderr);
-  assert.match(result.stdout, new RegExp(`Usage: rer business ${verb}(?:\\s|$)`));
+  assert.match(result.stdout, new RegExp(`Usage: ~\\/\\.local\\/bin\\/rer business ${verb}(?:\\s|$)`));
   if (verb === 'setup') {
    assert.equal(result.stdout.split('\n').filter(line => line === appSignInHelp).length, 1);
    assert.match(result.stdout, /--session-file FILE[^\n]*signed-in session/i);
@@ -146,7 +146,7 @@ test('Business check-ins carry listed prepared and live apps, preserve settings 
  const paired = await connect(home, remote, { env });
  assert.ok(paired.stdout.includes('2 local app carry files'), paired.stdout);
  assert.ok(paired.stderr.includes(JSON.stringify(skipped)) && paired.stderr.includes('not first-party'), paired.stderr);
- assert.ok(paired.stderr.includes(JSON.stringify(unprepared)) && paired.stderr.includes('not set up yet: run rer setup'), paired.stderr);
+ assert.ok(paired.stderr.includes(JSON.stringify(unprepared)) && paired.stderr.includes('not set up yet: run ~/.local/bin/rer setup'), paired.stderr);
  await assert.rejects(stat(carryFile(unprepared)), { code: 'ENOENT' });
  for (const root of [interrupted, broken]) await assert.rejects(stat(carryFile(root)), { code: 'ENOENT' });
  assert.ok(paired.stderr.includes(JSON.stringify(interrupted)) && paired.stderr.includes('not set up yet'), paired.stderr);
@@ -214,7 +214,7 @@ test('Business next echoes the installed launcher or npx invocation and open cho
  const bin = join(home, '.local/bin');
  const result = await cli(home, ['business', 'next'], { installed: true, path: `${bin}:${process.env.PATH}` });
  assert.equal(result.code, 0, result.stderr);
- assert.match(result.stdout, /run rer business next/);
+ assert.match(result.stdout, /run ~\/\.local\/bin\/rer business next/);
  assert.doesNotMatch(result.stdout, /npx -y/);
  const registry = await localRegistry(); t.after(registry.close);
  registry.publish(packed.version, packed.bytes);
@@ -1043,7 +1043,7 @@ test('inside an agent sandbox run and next apply the owner\'s choices for its ag
  remote.state.tasks = [{ task_id: 'sandbox-discover', kind: 'discover.local', state: 'ready', runner: 'executor', fence: 0 }];
  // next has nothing to answer, and says run has work and how to start it.
  const ready = await cli(home, ['business','next'], { env }), escaped = stateDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
- assert.match(ready.stdout, new RegExp(`Ready for run: this computer's names-only scan of the folders the owner allowed\\. Start it with: RER_BUSINESS_STATE_DIR=${escaped} (?:rer|npx -y @runeditrun/rer) business run --once\n$`), 'an agent step waits, so next never says Nothing yet');
+ assert.match(ready.stdout, new RegExp(`Ready for run: this computer's names-only scan of the folders the owner allowed\\. Start it with: RER_BUSINESS_STATE_DIR=${escaped} (?:~/.local/bin/rer|npx -y @runeditrun/rer) business run --once\n$`), 'an agent step waits, so next never says Nothing yet');
  const scanned = await cli(home, ['business','run','--once'], { env });
  assert.equal(scanned.code, 0, scanned.stderr); assert.equal(remote.state.phase, 'done');
  assert.ok(scanned.stdout.includes('Scanning this computer\'s allowed folders for tool names') && scanned.stdout.includes('discover.local completed'), scanned.stdout);

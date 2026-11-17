@@ -35,7 +35,7 @@ const ASSETS = 'site-assets';
 
 let vite;
 try { vite = await import(pathToFileURL(createRequire(join(root, 'package.json')).resolve('vite')).href); }
-catch { fail('The run site renders with the checkout\'s own Vite. Run rer install first.'); }
+catch { fail('The run site renders with the checkout\'s own Vite. Run ~/.local/bin/rer install first.'); }
 process.env.NODE_ENV ??= 'production';
 
 let contract;

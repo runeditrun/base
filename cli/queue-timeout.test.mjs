@@ -38,7 +38,7 @@ test('bounded CLI queue timeouts refuse without starting and name the wait and r
   assert.match(message, /Not started:/);
   assert.match(message, /did not admit.*within \d+ seconds/);
   assert.match(message, /all job slots are in use/);
-  assert.ok(message.includes(`running rer ${verb} again`), message);
+  assert.ok(message.includes(`running ~/.local/bin/rer ${verb} again`), message);
   assert.doesNotMatch(result.stdout + result.stderr, /Bounded command ended/);
   if (json) {
    assert.equal(error.code, 'safety_refusal');

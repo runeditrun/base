@@ -21,8 +21,8 @@ export function rerCommand(env = process.env) {
  // The running entry identifies the invocation even when its dispatcher was
  // delegated to a checkout's pinned copy in another package/cache directory.
  if ((process.argv[1] ?? '').split(sep).includes('_npx')) return npx;
- if (env.RER_INVOKED_AS) return word(env.RER_INVOKED_AS);
- return onPath(env.PATH) ? 'rer' : npx;
+ if (env.RER_INVOKED_AS) return env.RER_INVOKED_AS === 'rer' ? '~/.local/bin/rer' : word(env.RER_INVOKED_AS);
+ return onPath(env.PATH) ? '~/.local/bin/rer' : npx;
 }
 
 // A rer business command the person can paste into another shell, such as a

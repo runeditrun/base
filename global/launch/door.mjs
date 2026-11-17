@@ -18,7 +18,7 @@ export async function doorPlan(described, args, env) {
  const running = door?.enabled ? await runningDoor(env).catch(() => undefined) : undefined;
  const protocol = running?.protocol ?? door?.protocol;
  const known = Boolean(door?.enabled) && protocol === doorProtocol;
- const note = door?.enabled && !known ? `The front door speaks protocol ${protocol}, which this rer does not know, so this checkout stays direct. Run rer door restart.` : undefined;
+ const note = door?.enabled && !known ? `The front door speaks protocol ${protocol}, which this rer does not know, so this checkout stays direct. Run ~/.local/bin/rer door restart.` : undefined;
  const saved = Boolean(described?.local?.origin && doorSite(described.local.origin));
  return { door, known, note, freshAtDoor: known && capable && !direct, atDoor: !direct && (saved || has(args, '--door')) };
 }

@@ -28,7 +28,7 @@ async function loadJson(name) {
  // Under a path that is not a folder (ENOTDIR) nothing can have been saved yet.
  catch (error) { if (['ENOENT', 'ENOTDIR'].includes(error.code)) return null; throw error; }
  try { return JSON.parse(text); }
- catch { throw Error(`Business could not read ${path}: it is not valid JSON. Remove it, or run rer business disconnect, then connect again.`); }
+ catch { throw Error(`Business could not read ${path}: it is not valid JSON. Remove it, or run ~/.local/bin/rer business disconnect, then connect again.`); }
 }
 
 export const loadState = () => loadJson('state.json');

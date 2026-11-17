@@ -101,7 +101,7 @@ export async function productionMail(root, declaration, env, declarationPath = '
  catch (error) { throw refuse(`${error.message} Nothing was built or uploaded.`); }
  let senderIssue;
  if (present(bindings.MAIL_FROM) && (!sender(bindings.MAIL_FROM) || placeholderSender(bindings.MAIL_FROM))) {
-  senderIssue = `MAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>). ${senderFix}, then run rer deploy --dry-run again.`;
+  senderIssue = `MAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>). ${senderFix}, then run ~/.local/bin/rer deploy --dry-run again.`;
  }
  const provider = bindings.MAIL_PROVIDER;
  const deferred = !provider || provider === 'later';

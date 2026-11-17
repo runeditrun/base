@@ -75,7 +75,7 @@ export function localInstaller(hooks = {}) {
    catch (error) {
     if (verb !== 'dev' || signal?.aborted || isBusyFailure(error)) throw error;
     const failure = approvedFailure(error);
-    throw commandFailure(`${store.redact(failure?.message ?? error.message)}\nLocal migrations failed. Fix the error and run rer setup before trying again.`, failure ?? {});
+    throw commandFailure(`${store.redact(failure?.message ?? error.message)}\nLocal migrations failed. Fix the error and run ~/.local/bin/rer setup before trying again.`, failure ?? {});
    }
   }
   await options.beforeStart?.(context);
@@ -278,7 +278,7 @@ async function start(context, hooks) {
   if(detectedMismatch)throw installationFailure('command_failed',{step:'start',diagnostic:error});
   if(runtimePortHandshake&&!announcement){
    const prior=approvedFailure(error);
-   const message=`No managed listener was announced after ${Math.round(performance.now()-readinessStarted)} ms (allowed ${readinessTimeoutMs} ms). Check the runtime startup output in the log below, correct the startup error, then run rer ${context.verb??'setup'} again.`;
+   const message=`No managed listener was announced after ${Math.round(performance.now()-readinessStarted)} ms (allowed ${readinessTimeoutMs} ms). Check the runtime startup output in the log below, correct the startup error, then run ~/.local/bin/rer ${context.verb??'setup'} again.`;
    throw installationFailure('command_failed',{step:'start',diagnostic:commandFailure(`${message}\n${prior?.message??readinessLabel}`,prior??{})});
   }
   const ports=await ownedPorts();
@@ -303,7 +303,7 @@ async function start(context, hooks) {
  if (ownership.status !== 'owned') {
   const message = (store.redact??(value=>value))(ownership.status==='other'
    ? `Another process answered on port ${expectedPort}; the application did not bind it. Listener PID ${ownership.pid}. Nothing was sent. Stop that process or choose another port, then run setup again.`
-   : `Could not confirm the application on port ${expectedPort}: repeated inspection found no listener on the health address. Nothing was sent. Check the application binding, then run rer ${context.verb??'setup'} again.`);
+   : `Could not confirm the application on port ${expectedPort}: repeated inspection found no listener on the health address. Nothing was sent. Check the application binding, then run ~/.local/bin/rer ${context.verb??'setup'} again.`);
   store.report?.(message);
   throw installationFailure('command_failed', { step: 'start', diagnostic: commandFailure(message, {}) });
  }

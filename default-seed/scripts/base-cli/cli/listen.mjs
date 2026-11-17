@@ -17,7 +17,7 @@ export async function listen(server, host, port) {
    });
    return;
   } catch (error) {
-   if (error.code !== 'EADDRINUSE') throw refuse(`Could not listen on ${host} port ${port}: ${error.code === 'EACCES' ? 'permission denied' : error.code ?? 'socket error'}. Check the address and permissions, then run rer dev again or use rer setup --port PORT with a free port.`);
+   if (error.code !== 'EADDRINUSE') throw refuse(`Could not listen on ${host} port ${port}: ${error.code === 'EACCES' ? 'permission denied' : error.code ?? 'socket error'}. Check the address and permissions, then run ~/.local/bin/rer dev again or use ~/.local/bin/rer setup --port PORT with a free port.`);
    const unavailable = async listener => refuse(await busyPortMessage({ port, host, root: process.cwd(), context, listener: listener ?? null }));
    if (context && performance.now() >= context.deadline) throw await unavailable();
    const { inspectionContext } = await shared('process-diagnostics.mjs');

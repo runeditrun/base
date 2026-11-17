@@ -4,7 +4,7 @@ import {refreshCopies, options as copyOptions} from '../edition-authoring/base-c
 import {refuse, invalid} from './errors.mjs';
 
 export function authoringCommand(options) {
- if (options.verb === 'refresh-base' && !options.ref) throw invalid('Provide --ref with the full immutable Base commit. Run rer refresh-base --help.');
+ if (options.verb === 'refresh-base' && !options.ref) throw invalid('Provide --ref with the full immutable Base commit. Run ~/.local/bin/rer refresh-base --help.');
  try {
   return options.verb === 'adopt-edition' ? adoptEdition(options.cwd) : refreshCopies(options.cwd, copyOptions([
    ...(options.editionMigration ? options.editionMigration.split(',').flatMap(id => ['--edition-migration', id]) : []),

@@ -1,7 +1,7 @@
 import { scan } from './scan.mjs';
 import { localCause } from './errors.mjs';
 
-const usage = 'Usage: rer business scan [DIR...] [--json]\nNames-only local discovery; returns rer-business-signals/1 JSON. No network calls.\n';
+const usage = 'Usage: ~/.local/bin/rer business scan [DIR...] [--json]\nNames-only local discovery; returns rer-business-signals/1 JSON. No network calls.\n';
 
 export async function scanCommand(argv) {
  if (!argv.length || argv.length === 1 && ['--help', '-h'].includes(argv[0]) || argv[0] === 'scan' && argv.slice(1).some(arg => ['--help', '-h'].includes(arg))) {

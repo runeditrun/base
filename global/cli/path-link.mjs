@@ -9,28 +9,15 @@ export async function ownedPathLink(path, launcher) {
  catch (error) { if (error.code === 'ENOENT' || error.code === 'EINVAL') return false; throw error; }
 }
 
-const exists = path => access(path).then(() => true, () => false);
-
-// The files a new terminal of this shell reads, and the one line that puts
-// ~/.local/bin on PATH in this terminal and, through the startup file, in new
-// ones. rer never runs it: the person does.
-export async function shellStartup(home, env = process.env, platform = process.platform) {
+// Only the person executing the printed command edits their shell file.
+// Match the complete PATH line before appending so repeated execution is safe.
+export async function shellStartup(home, env = process.env) {
  const shell = basename(env.SHELL ?? ''), add = 'export PATH="$HOME/.local/bin:$PATH"';
- if (shell === 'fish') return { files: ['.config/fish/config.fish', '.config/fish/fish_variables'].map(file => join(home, file)), line: 'fish_add_path ~/.local/bin' };
- if (shell === 'zsh') {
-  const directory = env.ZDOTDIR || home;
-  return { files: ['.zshenv', '.zprofile', '.zshrc', '.zlogin'].map(file => join(directory, file)), line: `echo '${add}' >> ${env.ZDOTDIR ? '"$ZDOTDIR/.zshrc"' : '~/.zshrc'} && ${add}` };
- }
- const files = shell === 'bash' ? ['.bash_profile', '.bash_login', '.profile', '.bashrc'] : ['.profile'];
- // macOS terminals start bash as a login shell, which reads only the first of
- // its profiles that exists; elsewhere a terminal's bash reads ~/.bashrc.
- let file = '.profile';
- if (shell === 'bash' && platform !== 'darwin') file = '.bashrc';
- else if (shell === 'bash') {
-  file = '.bash_profile';
-  for (const candidate of files.slice(0, 3)) if (await exists(join(home, candidate))) { file = candidate; break; }
- }
- return { files: files.map(name => join(home, name)), line: `echo '${add}' >> ~/${file} && ${add}` };
+ if (shell === 'fish') return { files: ['.config/fish/config.fish', '.config/fish/fish_variables'].map(file => join(home, file)), target: '~/.config/fish', line: 'fish_add_path ~/.local/bin' };
+ if (!['zsh', 'bash'].includes(shell)) return { files: [], line: add };
+ const file = shell === 'zsh' ? '.zshrc' : '.bashrc';
+ const target = `~/${file}`;
+ return { files: [join(home, file)], target, line: `(grep -Fqx '${add}' ${target} 2>/dev/null || printf '\\n%s\\n' '${add}' >> ${target}) && ${add}` };
 }
 
 // Whether a startup file already puts ~/.local/bin on PATH for new terminals.
@@ -63,6 +50,8 @@ export async function pathAdvice(paths, env = process.env, { includeShellStep = 
  const first = entries.includes(bin) && firstCommand === paths.launcher;
  if (first && await persistent(startup.files)) return lines.join('\n');
  const why = first ? 'New terminals will not find rer yet.' : firstCommand ? `Another rer (${firstCommand}) comes first on your PATH.` : 'rer is not on your PATH yet.';
- lines.push(`Next step, so a bare \`rer\` works in new terminals: ${why} Running the following line adds ~/.local/bin to your shell's startup file and this terminal. rer changes no shell file itself:`, `  ${startup.line}`);
+ const effect = basename(env.SHELL ?? '') === 'fish' ? 'fish saves ~/.local/bin in its user path configuration' : startup.target ? `you add ~/.local/bin to PATH in ${startup.target} and this terminal` : 'you add ~/.local/bin to PATH for this terminal only';
+ lines.push(`Next step: ${why} Run this line; ${effect}. The installer changes no shell file:`, `  ${startup.line}`);
+ if (['zsh', 'bash'].includes(basename(env.SHELL ?? ''))) lines.push('Open a new Terminal window, then `rer` works by name.');
  return lines.join('\n');
 }
