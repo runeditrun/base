@@ -103,8 +103,9 @@ commandAdapter.site={entry:'pages.mjs',output:'dist/site',declaration:'site.json
   for (const args of [['build','--site'], ['dev']]) for (const json of [false, true]) {
    const failure=run([...args,...(json?['--json']:[])],{PATH:tools});
    assert.equal(failure.status,1,failure.stdout+failure.stderr);
-   const message=json?failure.stdout.trim().split('\n').map(JSON.parse).find(row=>row.event==='error').message:failure.stderr.slice(failure.stderr.indexOf('Could not run git:'));
-   assert.match(message,/Could not run git:/);
+   const output=json?failure.stdout.trim().split('\n').map(JSON.parse).find(row=>row.event==='error').message:failure.stderr;
+   const message=/Could not run git:[^\n]*\nFull output: [^\n]*/.exec(output)?.[0];
+   assert.ok(message,output);
    assert.ok(message.includes(name),message);
    const path=/Full output: (.+)/.exec(message)?.[1];
    assert.ok(path,message);
