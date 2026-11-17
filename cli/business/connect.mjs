@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { Api, originUrl, identifier, pause } from './api.mjs';
 import { loadState, saveState, credentialHandle, deviceCredentialHandle, loadPending, savePending, clearPending, checkStateWritable, lockPairing } from './state.mjs';
 import { createCredentialStore } from './keychain.mjs';
+import { credentialLocation } from './credential-file.mjs';
 import { applyChoices } from './choices.mjs';
 import { rerCommand, businessCommand } from './invocation.mjs';
 import { Stopped } from './errors.mjs';
@@ -65,7 +66,7 @@ async function connectDevice({ business, origin, timeout } = {}) {
    if (stored.revoked) throw Error(`This computer was ${revokedText(stored)}`);
    if (stored.origin !== origin || stored.businessId !== business) throw Error(`This state folder is connected to Business ${identifier(stored.businessId)} at ${originUrl(stored.origin)}. Run disconnect, or use another RER_BUSINESS_STATE_DIR.`);
    const credential = await createCredentialStore().get(deviceCredentialHandle(stored));
-   if (!credential) throw Error('This computer\'s Business credential is missing from OS credential storage. Run disconnect, then connect again.');
+   if (!credential) throw Error(`This computer's Business credential is missing from ${credentialLocation()}. Run disconnect, then connect again.`);
    await unlock(); unlock = undefined;
    return await connected(new Api(origin, credential), stored, { reconnecting: true });
   }
@@ -75,8 +76,7 @@ async function connectDevice({ business, origin, timeout } = {}) {
    validateDevicePairing({ ...pending, business_id: pending.businessId }, origin, business);
    if (!timestampValid(pending.keep_until) || Date.parse(pending.keep_until) > Date.parse(pending.expires_at) + approvalWindow) throw Error('The saved Business pairing is invalid. Run business disconnect, then connect again.');
   }
-  // Both probes precede even the unauthenticated start. Keychain / Secret
-  // Service handling and the device credential's account are unchanged.
+  // Both storage probes precede even the unauthenticated pairing start.
   const store = createCredentialStore();
   resume = `${rerCommand()} business connect --business ${business} --origin ${origin}${timeout === undefined ? '' : ` --timeout ${timeout}`}`;
   try { await store.check(); }
@@ -120,7 +120,7 @@ async function connectDevice({ business, origin, timeout } = {}) {
      await store.set(handle, result.device_credential);
      try { await saveState(state); } catch (error) { await store.delete(handle); throw error; }
      await clearPending();
-     process.stdout.write('Approved. Device credential stored in OS credential storage.\n');
+     process.stdout.write(`Approved. Device credential stored in ${credentialLocation()}.\n`);
      return await connected(new Api(origin, result.device_credential), state);
     } finally { await clearPending(); }
    }

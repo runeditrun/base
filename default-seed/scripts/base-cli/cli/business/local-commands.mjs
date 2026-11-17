@@ -2,6 +2,7 @@ import { writeFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadState, loadPending, saveState, stateDirectory, removeStateDirectory, removeWorkFiles, deviceCredentialHandle, liveSupervisor } from './state.mjs';
 import { createCredentialStore } from './keychain.mjs';
+import { credentialDirectory, credentialLocation, fileCredentialStore } from './credential-file.mjs';
 import { removeService, serviceStatus } from './service.mjs';
 import { removePermissions, permissionsAdded } from './permissions.mjs';
 import { Api, pause } from './api.mjs';
@@ -16,7 +17,7 @@ export async function paired() {
  if (!state?.origin || !state.businessId || !state.executorId) throw Error(`This computer is not paired. Run ${rerCommand()} business connect --business ID; the Business Connect page names the ID.`);
  if (state.revoked) throw Error(`This computer was ${revokedText(state)}`);
  const credential = await createCredentialStore().get(deviceCredentialHandle(state));
- if (!credential) throw Error(`This computer's Business credential is missing from OS credential storage. Run ${rerCommand()} business disconnect, then run ${rerCommand()} business connect --business ID; the Connect page at ${state.origin}/business names the ID.`);
+ if (!credential) throw Error(`This computer's Business credential is missing from ${credentialLocation()}. Run ${rerCommand()} business disconnect, then run ${rerCommand()} business connect --business ID; the Connect page at ${state.origin}/business names the ID.`);
  return { state, credential };
 }
 
@@ -115,21 +116,26 @@ export async function disconnect() {
   ? `Business disconnected. Device ${wasRevoked ? 'was already revoked' : 'revoked'}; local service, credentials and added permissions removed.\n`
   : wasRevoked ? 'Business disconnected. Device was already revoked on the server; local service, credentials and added permissions removed.\n'
   : `Business disconnected on this computer: local service, credentials and added permissions removed. Nothing was revoked: no device credential was stored here${page ? `. If this computer still shows in ${page}, revoke it there` : ''}.\n`);
+ if (credential && credentialDirectory() !== null) process.stdout.write(`Device credential file removed from ${credentialLocation()}.\n`);
 }
 
 export async function status({ json = false } = {}) {
+ const directory = credentialDirectory();
+ if (directory !== null) await fileCredentialStore(directory).validate();
+ const location = credentialLocation();
  const state = await loadState();
  if (!state) {
-  process.stdout.write(json ? JSON.stringify({ paired: false, service: 'not_installed', current_task: null, checkpoint: null }) + '\n' : 'Business: not paired.\nService: not installed.\nTask: none.\nCheckpoint: none.\n'); return;
+  process.stdout.write(json ? JSON.stringify({ paired: false, service: 'not_installed', current_task: null, checkpoint: null, credential_storage: location }) + '\n' : `Business: not paired.\nService: not installed.\nTask: none.\nCheckpoint: none.\nCredential storage: ${location}.\n`); return;
  }
  const stored = !state.revoked && state.origin && await createCredentialStore().get(deviceCredentialHandle(state));
  const service = await serviceStatus();
  const active = state.revoked ? null : (await loadProgress()).current;
  if (json) {
-  process.stdout.write(JSON.stringify({ paired: Boolean(stored), ...(state.revoked ? { revoked: true } : {}), service: service.running ? 'running' : service.installed ? 'stopped' : 'not_installed', current_task: supportsTaskKind(active?.kind) ? active.kind : null, checkpoint: active?.checkpoint ? { saved: true, uploaded_bytes: Number.isSafeInteger(active.uploadedBytes) ? active.uploadedBytes : 0 } : null }) + '\n');
+  process.stdout.write(JSON.stringify({ paired: Boolean(stored), ...(state.revoked ? { revoked: true } : {}), service: service.running ? 'running' : service.installed ? 'stopped' : 'not_installed', current_task: supportsTaskKind(active?.kind) ? active.kind : null, checkpoint: active?.checkpoint ? { saved: true, uploaded_bytes: Number.isSafeInteger(active.uploadedBytes) ? active.uploadedBytes : 0 } : null, credential_storage: location }) + '\n');
   return;
  }
  process.stdout.write(`Business: ${state.revoked ? revokedText(state) : stored ? 'paired.' : 'credential missing.'}\nService: ${service.running ? 'running' : service.installed ? 'installed, stopped' : 'not installed'}.\n`);
  process.stdout.write(`Task: ${supportsTaskKind(active?.kind) ? active.kind : 'none'}.\n`);
  process.stdout.write(`Checkpoint: ${active?.checkpoint ? 'saved' : 'none'}${Number.isSafeInteger(active?.uploadedBytes) ? `; ${active.uploadedBytes} bytes uploaded` : ''}.\n`);
+ process.stdout.write(`Credential storage: ${location}.\n`);
 }

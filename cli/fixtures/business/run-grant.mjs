@@ -7,7 +7,7 @@ import {credentialHandle} from '../../business/state.mjs';
 
 export const base=resolve(import.meta.dirname,'../../..'),entry=join(base,'bin/rer.mjs');
 export const device='bz_device_synthetic-command-computer',secret='synthetic-scoped-command-secret',account='a'.repeat(32);
-export async function fixture(t) {
+export async function fixture(t, {fileBacked = false} = {}) {
  const home=await mkdtemp(join(base,'.business-connect-command-'));t.after(()=>rm(home,{recursive:true,force:true}));
  const state={issued:0,revocations:0,refuse:false,cleanupFails:false,expiryMs:900000,leases:new Map(),credentials:new Map()};
  const server=createServer(async(req,res)=>{
@@ -23,7 +23,7 @@ export async function fixture(t) {
   }
   const id=req.url.slice(root.length+1).split('/')[0],lease=state.leases.get(id);
   if(!lease)return json(404,{error:'no such command'});
-  if(req.url.endsWith('/revoke')){state.revocations++;return json(200,{...lease,cleanup_status:state.cleanupFails?'unconfirmed':'revoked',provider_credential_revoked:!state.cleanupFails});}
+  if(req.url.endsWith('/revoke')){state.revocations++;const updated={...lease,cleanup_status:state.cleanupFails?'unconfirmed':'revoked',provider_credential_revoked:!state.cleanupFails};state.leases.set(id,updated);return json(200,updated);}
   return json(200,lease);
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -31,9 +31,12 @@ export async function fixture(t) {
  const origin=`http://127.0.0.1:${server.address().port}`;
  await mkdir(join(home,'.rer/business'),{recursive:true});
  await writeFile(join(home,'.rer/business/state.json'),JSON.stringify({origin,businessId:'business',executorId:'computer',credentialVersion:2}));
- await writeFile(join(home,'fake-keychain.json'),JSON.stringify({[credentialHandle(origin,'business')]:device}));
+ const calls=join(home,'keychain-calls');await writeFile(calls,'');
+ const credentials=join(home,'credentials');
+ if(fileBacked){await mkdir(credentials,{mode:0o700});await writeFile(join(credentials,`${credentialHandle(origin,'business').slice(7)}.credential`),device,{mode:0o600});}
+ else await writeFile(join(home,'fake-keychain.json'),JSON.stringify({[credentialHandle(origin,'business')]:device}));
  const env={PATH:process.env.PATH,HOME:home,RER_NO_UPDATE_CHECK:'1',CI:'true',NODE_OPTIONS:`--import=${new URL('./register.mjs',import.meta.url).pathname}`,
-  CLOUDFLARE_API_TOKEN:'ambient-broad-token',CLOUDFLARE_ACCOUNT_ID:'f'.repeat(32),CF_API_TOKEN:'ambient-alias-token'};
+  CLOUDFLARE_API_TOKEN:'ambient-broad-token',CLOUDFLARE_ACCOUNT_ID:'f'.repeat(32),CF_API_TOKEN:'ambient-alias-token',RER_TEST_KEYCHAIN_CALLS:calls,...(fileBacked?{RER_BUSINESS_CREDENTIAL_DIR:credentials}:{})};
  const start=(args,{env:additional={}}={})=>{
   const child=spawn(process.execPath,[entry,'business',...args],{cwd:home,env:{...env,...additional},stdio:['pipe','pipe','pipe']});let stdout='',stderr='';
   child.stdout.on('data',data=>stdout+=data);child.stderr.on('data',data=>stderr+=data);child.stdin.end();
@@ -41,6 +44,6 @@ export async function fixture(t) {
   return {child,result,output:()=>stdout+stderr};
  };
  const run=async (command,options)=>(await start(['run','--grant','grant-1','--',...command],options).result);
- return {home,state,start,run};
+ return {home,state,start,run,calls};
 }
 

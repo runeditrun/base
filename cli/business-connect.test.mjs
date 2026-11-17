@@ -4,7 +4,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createServer, Server } from 'node:http';
 import { createHash } from 'node:crypto';
 import { server, classificationSchema } from './fixtures/business/server.mjs';
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile, symlink } from 'node:fs/promises';
+import { agentServer } from './fixtures/business/agent-server.mjs';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile, symlink, chmod } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +16,7 @@ import { userInfo } from 'node:os';
 import { realpath } from 'node:fs/promises';
 import { identity } from '../modules/job-queue/identity.mjs';
 import { appSignInHelp } from './app-address.mjs';
+import { credentialHandle } from './business/state.mjs';
 
 const base = resolve(import.meta.dirname, '..');
 const fixture = join(import.meta.dirname, 'fixtures/business');
@@ -307,7 +309,9 @@ async function connect(home, remote, options = {}) {
  remote.state.onSelf = async () => {
   const saved = JSON.parse(await readFile(join(stateDir, 'state.json'), 'utf8'));
   assert.equal(saved.executorId, 'executor1');
-  assert.ok((await readFile(join(home, 'fake-keychain.json'), 'utf8')).includes(remote.device), 'credential is stored before activation');
+  const credentials = options.env?.RER_BUSINESS_CREDENTIAL_DIR;
+  const file = credentials ? join(credentials, `${credentialHandle(remote.origin, remote.state.business.id).slice(7)}.credential`) : join(home, 'fake-keychain.json');
+  assert.ok((await readFile(file, 'utf8')).includes(remote.device), 'credential is stored before activation');
  };
  const result = await connectWhile(home, ['--business',remote.state.business.id,'--origin',remote.origin], async () => {
   assert.equal(remote.state.active, false, 'an unapproved computer is not active');
@@ -328,6 +332,83 @@ async function connect(home, remote, options = {}) {
  assert.ok(!result.stdout.includes(remote.device) && !result.stderr.includes(remote.device), 'device credential stays out of both streams');
  return result;
 }
+
+test('private credential directory pairs, refreshes, reports and disconnects without any keychain access; unset still uses OS storage', async t => {
+ const remote = await fixtureServer(t);
+ remote.state.optIns = { installPermissions: false, awakeConsent: false, installService: true };
+ const home = join(directory, 'private-credential-home'), credentials = join(home, 'sealed', 'credentials');
+ await mkdir(home);
+ const calls = join(home, 'keychain-calls'); await writeFile(calls, '');
+ const env = { RER_BUSINESS_STATE_DIR: join(home, 'sealed', 'state'), RER_BUSINESS_CREDENTIAL_DIR: credentials, RER_TEST_KEYCHAIN_CALLS: calls };
+ const result = await connect(home, remote, { env });
+ const file = join(credentials, `${credentialHandle(remote.origin, 'biz').slice(7)}.credential`);
+ assert.equal((await stat(credentials)).mode & 0o7777, 0o700);
+ assert.equal((await stat(file)).mode & 0o7777, 0o600);
+ assert.equal(await readFile(file, 'utf8'), remote.device);
+ assert.deepEqual(await readdir(credentials), [file.slice(credentials.length + 1)], 'atomic write leaves only the complete credential');
+ assert.ok(result.stdout.includes(credentials));
+ const receipt = JSON.parse(await readFile(join(env.RER_BUSINESS_STATE_DIR, 'service.json'), 'utf8'));
+ assert.ok((await readFile(receipt.path, 'utf8')).includes('RER_BUSINESS_CREDENTIAL_DIR'), 'the service keeps the storage selection');
+ assert.ok((await readFile(receipt.path, 'utf8')).includes(credentials));
+ for (const [terminal, columns] of [[false, 160], [true, 43]]) {
+  const refreshed = await cli(home, ['business', 'connect'], { env, terminal, columns });
+  assert.equal(refreshed.code, 0, refreshed.stderr);
+  const status = await cli(home, ['business', 'status'], { env, terminal, columns });
+  assert.equal(status.code, 0, status.stderr); assert.ok(status.stdout.includes(credentials));
+  t.diagnostic(`business status (${columns} columns)\n${status.stdout}`);
+ }
+ assert.equal((await cli(home, ['business', 'next'], { env })).code, 0);
+ // The very same connect-written file authenticates the grant exchange and an agent verb.
+ remote.state.commandCredential = 'synthetic-scoped-private-command';
+ const command = await cli(home, ['business', 'run', '--grant', 'grant-1', '--', process.execPath, '-e', 'if(!process.env.CLOUDFLARE_API_TOKEN)process.exit(9);console.log("COMMAND_OK")'], { env });
+ assert.equal(command.code, 0, command.stderr); assert.match(command.stdout, /COMMAND_OK/);
+ assert.equal(remote.state.commandLease.cleanup_status, 'revoked');
+ const agent = await agentServer(t, remote.device), agentOrigin = agent.origin;
+ agent.origin = remote.origin; remote.state.agentOrigin = agentOrigin;
+ const listed = await cli(home, ['business', 'installations', 'list', '--json'], { env });
+ assert.equal(listed.code, 0, listed.stderr); assert.equal(JSON.parse(listed.stdout).installations[0].installation_id, 'inst_1');
+ remote.state.agentOrigin = null;
+ const status = await cli(home, ['business', 'status', '--json'], { env });
+ assert.equal(JSON.parse(status.stdout).credential_storage, credentials);
+ assert.equal(await readFile(calls, 'utf8'), '');
+ // Missing files never fall through to an existing OS credential for this business.
+ await writeFile(join(home, 'fake-keychain.json'), JSON.stringify({ [credentialHandle(remote.origin, 'biz')]: remote.device }));
+ await rm(file);
+ const missing = await cli(home, ['business', 'next'], { env });
+ assert.equal(missing.code, 1); assert.ok(missing.stderr.includes(credentials));
+ assert.equal(await readFile(calls, 'utf8'), '');
+ await writeFile(file, remote.device, { mode: 0o600 });
+ const removed = await cli(home, ['business', 'disconnect'], { env });
+ assert.equal(removed.code, 0, removed.stderr); assert.ok(removed.stdout.includes(`file removed from ${credentials}`));
+ assert.deepEqual(await readdir(credentials), []);
+ assert.ok((await readFile(join(home, 'fake-keychain.json'), 'utf8')).includes(remote.device), 'OS item is neither read nor removed');
+ assert.equal(await readFile(calls, 'utf8'), '');
+ for (const value of [remote.device, Buffer.from(remote.device).toString('hex'), Buffer.from(remote.device).toString('base64'), Buffer.from(remote.device).toString('base64url')]) {
+  assert.ok(!(result.stdout + result.stderr + status.stdout + removed.stdout + removed.stderr).includes(value));
+ }
+ const osHome = join(directory, 'default-credential-home'); await mkdir(osHome);
+ const osCalls = join(osHome, 'keychain-calls'); await writeFile(osCalls, '');
+ await connect(osHome, remote, { env: { RER_TEST_KEYCHAIN_CALLS: osCalls } });
+ assert.ok((await readFile(osCalls, 'utf8')).length > 0);
+ assert.equal((await cli(osHome, ['business', 'disconnect'], { env: { RER_TEST_KEYCHAIN_CALLS: osCalls } })).code, 0);
+});
+
+test('connect refuses unsafe credential directories before starting a pairing and never calls the keychain', async t => {
+ const remote = await fixtureServer(t), home = join(directory, 'unsafe-credential-home');
+ await mkdir(home);
+ const calls = join(home, 'keychain-calls'); await writeFile(calls, '');
+ const wide = join(home, 'wide'), linked = join(home, 'linked'), regular = join(home, 'regular');
+ await mkdir(wide, { mode: 0o755 }); await chmod(wide, 0o755);
+ await symlink(wide, linked); await writeFile(regular, '');
+ const unsafe = [[wide, 'mode 0700'], [linked, 'symbolic link'], [regular, 'not a directory']];
+ if (typeof process.getuid === 'function' && process.getuid() !== 0) unsafe.push(['/', 'not owned by the calling user']);
+ for (const [path, reason] of unsafe) {
+  const result = await cli(home, ['business', 'connect', '--business', 'biz', '--origin', remote.origin], { env: { RER_BUSINESS_CREDENTIAL_DIR: path, RER_TEST_KEYCHAIN_CALLS: calls } });
+  assert.equal(result.code, 1); assert.ok(result.stderr.includes(path) && result.stderr.includes(reason), result.stderr);
+  assert.ok(/chmod 700|Set RER_BUSINESS_CREDENTIAL_DIR|Have its owner change ownership/.test(result.stderr), result.stderr);
+ }
+ assert.equal(starts(remote), 0); assert.equal(await readFile(calls, 'utf8'), '');
+});
 
 test('packed CLI pairs only after browser approval and keeps keys and untrusted task text out of agent output', async t => {
  const remote = await fixtureServer(t), home = join(directory, 'pair-home');

@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { credentialDirectory, fileCredentialStore } from './credential-file.mjs';
 
 const service = 'com.runeditrun.business';
 const sandboxed = 'an agent sandbox blocks this. Run this one command outside the sandbox (in Codex, approve running it outside the sandbox when it asks), or in your own terminal';
@@ -56,10 +57,13 @@ function checkedSecret(secret) {
  return secret;
 }
 
-/** Secrets cross only stdin/stdout pipes, never arguments, files, or exceptions.
- * run is a process-edge seam for tests, not a selectable storage backend.
+/** OS secrets cross only stdin/stdout pipes, never arguments or exceptions.
+ * The explicit directory switch is resolved before any OS process can start.
+ * run remains a process-edge seam for tests.
  */
 export function createCredentialStore({ platform = process.platform, env = process.env, run } = {}) {
+ const directory = credentialDirectory(env);
+ if (directory !== null) return fileCredentialStore(directory);
  const command = run ?? ((binary, args, input) => execute(binary, args, input, env));
  if (!['darwin', 'linux'].includes(platform)) throw new Error('OS credential storage is available only on macOS (Keychain) and Linux (Secret Service). No credential was written to a file.');
  const binary = platform === 'darwin' ? 'security' : 'secret-tool';
