@@ -125,8 +125,9 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  await f.stop(restarted);
  assert.deepEqual(await readFile(join(f.root, '.dev.vars')), settings);
 
- // Real owner and authentication failures identify their own prerequisite.
- await f.sql("UPDATE oa_operators SET status='inactive' WHERE role='owner'");
+ // Simulate a damaged installation with no active owner: ordinary writes
+ // correctly refuse removing the last owner, so remove that guard in this fixture.
+ await f.sql("DROP TRIGGER oa_preserve_last_owner_update; UPDATE oa_operators SET status='inactive' WHERE role='owner'");
  const missingOwner=events(await f.run(['dev','--foreground','--json'],3)).find(event=>event.event==='error')?.message;
  assert.match(missingOwner,/oa_operators active owner[^]*0[^]*at least one[^]*rer setup/);
  await f.sql("UPDATE oa_operators SET status='active' WHERE role='owner'");
