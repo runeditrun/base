@@ -22,8 +22,10 @@ const server = createServer(async (req, res) => {
   await appendFile(observations, JSON.stringify({ at: Date.now(), busy }) + '\n');
   if (config.hang) { res.writeHead(200, { 'content-type': 'text/html' }); res.write('<html>'); return; }
   const setup = '<main><h1>Setup</h1><form><label>Workspace name <input value="Synthetic workspace"></label><button>Continue</button></form></main>';
-  const content = config.clientMs ? `<main aria-busy="true">Loading…</main><script>setTimeout(async()=>{document.body.innerHTML=${JSON.stringify(setup)};await fetch('/mounted')},${config.clientMs})</script>` : setup;
-  response = new Response(busy ? '<!doctype html><html><body><h1>The workspace is busy. Trying again in a few seconds</h1></body></html>' : '<!doctype html><html><body>' + content + '<script>const recoveryText="The workspace is busy. Trying again in a few seconds";</script></body></html>', { status: busy ? config.status ?? 503 : 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
+  // Foundation's signed-in /app is a rendered, read-only heading and paragraph.
+  const owner = config.readOnly ? '<main><h1>Synthetic workspace</h1><p>Signed in as Synthetic owner</p></main>' : setup;
+  const content = config.empty ? '<main></main>' : config.clientMs ? `<main aria-busy="true">Loading…</main><script>setTimeout(async()=>{document.body.innerHTML=${JSON.stringify(owner)};await fetch('/mounted')},${config.clientMs})</script>` : owner;
+  response = new Response(busy ? '<!doctype html><html><body><h1>The workspace is busy. Trying again in a few seconds</h1></body></html>' : '<!doctype html><html><head>' + (config.refresh ? '<meta http-equiv="refresh" content="3600">' : '') + '</head><body>' + content + '<script>const recoveryText="The workspace is busy. Trying again in a few seconds";</script></body></html>', { status: busy ? config.status ?? 503 : config.destinationStatus ?? 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
  } else response = new Response('Not found', { status: 404 });
  res.writeHead(response.status, { ...Object.fromEntries(response.headers), ...(response.headers.getSetCookie().length ? { 'set-cookie': response.headers.getSetCookie() } : {}) });
  res.end(Buffer.from(await response.arrayBuffer()));
