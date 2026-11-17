@@ -190,7 +190,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
     if(result?.timedOut)throw busyRefusal({...result,reason:redaction.redact(String(result.reason))},{verb:queuePolicy.verb,maxWait:queuePolicy.maxWait??maxWaitSeconds});
     if(result){if(result.code!==0)throw failure(label,result,captures.get(queuedChild));return result;}
    }
-   let child;try{child=spawnCommand(label,command,args,options);}catch{throw failure(label,options.signal?.aborted||signal?.aborted?{reason:'cancel'}:{error:true},{display:redaction.redact(String(options.display??command)),cwd:options.cwd,snapshot:()=>''});}
+   let child;try{child=spawnCommand(label,command,args,options);}catch(error){throw failure(label,options.signal?.aborted||signal?.aborted?{reason:'cancel'}:{error:true},{cause:error,display:redaction.redact(String(options.display??command)),cwd:options.cwd,snapshot:()=>''});}
    const capture=captures.get(child);
    // Start cleanup at exit: inherited pipes can hold close open indefinitely.
    // Only run's bounded command ends here; spawn's app stays owned until stop.
