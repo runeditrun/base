@@ -1,7 +1,7 @@
 import { requireProductionAuth, mailOffNotice } from './production-auth.mjs';
 import { mailOffSignInCommand } from './production-mail.mjs';
 import { readFile } from 'node:fs/promises';
-import { deployDiagnostic, migrationFailure, providerFailure, assetFailure } from '../modules/deploy-kit/diagnostics.mjs';
+import { deployDiagnostic, migrationFailure, providerFailure, assetFailure, ownerTargetFailure } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
 import { settingKinds, switchableDeclarationHelp } from './deploy-settings.mjs';
 import { contained } from './project.mjs';
@@ -163,6 +163,7 @@ function secretChangeInputs(declaration, options, env, again) {
 
 // The failing step, its redacted cause, what this run created and the command that continues.
 function failureText({ error, step, created, again, retry, secretChange, deployed, redact }) {
+ if (ownerTargetFailure(error)) return redact(ownerTargetFailure(error));
  if (step === 'remove') {
   const remaining = error.remaining;
   if (error.message === 'nothing-to-remove') return `There are no recorded resources to remove; nothing was removed.`;
