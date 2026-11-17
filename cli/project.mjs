@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { containedInput } from '../modules/demo/input-path.mjs';
 import { readOperations } from '../operations/operations.mjs';
 import { invalid, missing, refuse } from './errors.mjs';
+import { activatePortabilityRuntime } from './portability-runtime.mjs';
 
 export function contained(root, path, options = {}) {
  return containedInput(root, path, { ...options, refuse, missing });
@@ -20,6 +21,7 @@ export async function resolveProject(root) {
  let adapter;
  if (marker) {
   await contained(root, marker.adapter);
+  activatePortabilityRuntime();
   try { adapter = (await import(pathToFileURL(resolve(root, marker.adapter)))).commandAdapter; }
   catch { throw invalid('The declared adapter could not be loaded. Restore its portable sources.'); }
  }

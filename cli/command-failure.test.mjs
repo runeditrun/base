@@ -8,6 +8,8 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:net';
 import { isolatedQueue } from './fixtures/queue.mjs';
+import { buildPackage } from '../scripts/rer-package.mjs';
+import { readPackage, writePackage } from '../global/update/archive.mjs';
 
 const base = join(import.meta.dirname, '..');
 const source = path => pathToFileURL(join(base, path)).href;
@@ -77,6 +79,48 @@ export const commandAdapter = declare(lifecycle, { scheduled: false });
  const json = run(['dev', '--json']);
  assert.equal(json.status, 1, json.stdout + json.stderr);
  await check(json.stdout.trim().split('\n').map(JSON.parse).find(row => row.event === 'error').message);
+ // A transfer hook can fail inside rer rather than in a captured subprocess.
+ // Its native message stays private; the named log contains the safe failure.
+ await writeFile(join(root,'adapter.mjs'),await readFile(join(root,'adapter.mjs'),'utf8')+`
+commandAdapter.portability={export:async()=>{throw new Error('unreachable export');}};
+commandAdapter.prepareData=async(root,store)=>{
+ await store.step('Inspecting local export data');
+ throw new RangeError('private row diagnostic sentinel');
+};
+`);
+ descriptor.commands.export={argv:['node','adapter.mjs'],inputs:['adapter.mjs'],effects:'Export local installation data.'};
+ await writeFile(join(root,'OPERATIONS.json'),JSON.stringify(descriptor));
+ for(const json of [false,true]) {
+  const failure=run(['export','--output','exports/failed.rer',...(json?['--json']:[])]);
+  assert.equal(failure.status,1,failure.stdout+failure.stderr);
+  const message=json?failure.stdout.trim().split('\n').map(JSON.parse).find(event=>event.event==='error').message:failure.stderr;
+  assert.match(message,/Inspecting local export data failed \(RangeError\)/);
+  assert.doesNotMatch(failure.stdout+failure.stderr,/private row diagnostic sentinel/);
+  const path=/Full output: (.+)/.exec(message)?.[1];
+  assert.ok(path,message);
+  const log=await readFile(join(root,path),'utf8');
+  assert.match(log,/command_failed: Inspecting local export data failed \(RangeError\)/);
+  assert.doesNotMatch(log,/private row diagnostic sentinel/);
+ }
+ // The dispatcher is outside the checkout's installed package, as when an
+ // agent explicitly invokes an updated CLI on a checkout with an older pin.
+ // Use a real packed copy: its refusal must retain the selected CLI's status.
+ const packed=await buildPackage(base,join(root,'packed'));
+ const packageBytes=await readFile(packed);
+ await writePackage(readPackage(packageBytes,{integrity:'sha512-'+createHash('sha512').update(packageBytes).digest('base64')}),join(root,'node_modules/@runeditrun/rer'));
+ await writeFile(join(root,'adapter.mjs'),`
+import {localInstaller} from ${JSON.stringify(source('onboarding/adapter.mjs'))};
+import {commandAdapter as declare} from ${JSON.stringify(source('cli/adapter.mjs'))};
+import {localPortability} from '@runeditrun/rer/portability';
+export const commandAdapter=declare(localInstaller({tools:[]}),{
+ portability:localPortability({database:'unused',policy:{product:'synthetic-command-failure',exportRow:row=>row}}),scheduled:false,
+});
+`);
+ const policyRefusal=run(['export','--output','exports/refused.rer','--json']);
+ assert.equal(policyRefusal.status,4,policyRefusal.stdout+policyRefusal.stderr);
+ const policyError=policyRefusal.stdout.trim().split('\n').map(JSON.parse).find(event=>event.event==='error');
+ assert.equal(policyError.code,'safety_refusal');
+ assert.match(policyError.message,/policy_module_required/);
  // Independent verbs use the same diagnostic and keep their full log after
  // returning the declared command's original numeric or signal status.
  delete descriptor.seedContract;

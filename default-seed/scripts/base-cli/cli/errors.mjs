@@ -1,4 +1,6 @@
 import { transferDiagnostic } from '../modules/portability/http-client.mjs';
+import { nativeFailure } from './portability-progress.mjs';
+import { relative } from 'node:path';
 
 export class RerError extends Error {
  constructor(code, message, exitCode, details = {}) { super(message); Object.assign(this, { code, exitCode, ...details }); }
@@ -14,5 +16,17 @@ export async function lifecycleError(error, store) {
  const {shared}=await import('./shared.mjs');
  const {approvedFailure}=await shared('failures.mjs');
  const approved=approvedFailure(error);
- return new RerError(['owner_conflict','machine_busy'].includes(approved?.code)?'safety_refusal':'command_failed', approved?.message ?? `${store?.state?.step ?? 'Local lifecycle'} failed. Inspect the private redacted capture log.`, approved?.exitCode ?? 1, {childExitCode:approved?.childExitCode,signal:approved?.signal,...(approved?.d1Import ? {d1Import:approved.d1Import} : {})});
+ const native=nativeFailure(error);
+ return new RerError(['owner_conflict','machine_busy'].includes(approved?.code)?'safety_refusal':'command_failed', approved?.message ?? `${store?.state?.step ?? 'Local lifecycle'} failed (${native.class}${native.code ? `, code ${native.code}` : ''}).`, approved?.exitCode ?? 1, {childExitCode:approved?.childExitCode,signal:approved?.signal,...(approved?.d1Import ? {d1Import:approved.d1Import} : {})});
+}
+
+// Only classified diagnostics reach this boundary: unexpected native messages
+// can contain SQL or row values. Name a log only after its failure entry writes.
+export function retainTransferFailure(error,store,root) {
+ if(!store?.logPath){error.message+=' No capture log was created.';return error;}
+ try {
+  store.report(`${error.code}: ${error.message}`,{logOnly:true});
+  error.message+=`\nFull output: ${store.redact(relative(root,store.logPath))}`;
+ } catch { error.message+=' The private capture log could not be written.'; }
+ return error;
 }

@@ -58,10 +58,23 @@ snapshots:
  assert.equal(directData.code, 2);
  assert.equal(directData.stdout, JSON.stringify({version:1,verb:'dev',event:'error',code:'invalid_invocation',message:'Port must be a decimal integer from 1 to 65535.',exitCode:2})+'\n'+JSON.stringify({version:1,verb:'dev',event:'result',ok:false,exitCode:2})+'\n');
  const args = ['import', '--input', '../old.rer', '--journal', '../latest.rer', '--yes'];
+ const refusal = 'Path must be a contained checkout path without traversal.';
+ const retainedRefusal = async message => {
+  const capture = /\nFull output: (\.seed\/installer\/(?:commands-\d+\/)?install\.log)\n?$/.exec(message)?.[1];
+  assert.ok(capture, message);
+  const log = await readFile(join(root, capture), 'utf8');
+  assert.deepEqual(log.split('\n').filter(line => line.startsWith('safety_refusal:')), [`safety_refusal: ${refusal}`]);
+  return capture;
+ };
  await human(args, 4, /--input "\.\.\/old\.rer" must stay inside this checkout[\s\S]*\.rer\/recovery\/<name>\.rer[\s\S]*rer import --input '\.rer\/recovery\/old\.rer' --journal '\.rer\/recovery\/latest\.rer' --yes/);
  const machine = await invoke([...args, '--json']);
  assert.equal(machine.code, 4);
- assert.equal(machine.stdout, JSON.stringify({ version: 1, verb: 'import', event: 'error', code: 'safety_refusal', message: 'Path must be a contained checkout path without traversal.', exitCode: 4 }) + '\n' + JSON.stringify({ version: 1, verb: 'import', event: 'result', ok: false, exitCode: 4 }) + '\n');
+ const events = machine.stdout.trimEnd().split('\n').map(JSON.parse);
+ const capture = await retainedRefusal(events[0].message);
+ assert.deepEqual(events, [
+  { version: 1, verb: 'import', event: 'error', code: 'safety_refusal', message: `${refusal}\nFull output: ${capture}`, exitCode: 4 },
+  { version: 1, verb: 'import', event: 'result', ok: false, exitCode: 4 },
+ ]);
  await mkdir(join(root, '.rer/recovery'), { recursive: true });
  await writeFile(join(root, '.rer/recovery/old.rer'), '', { mode: 0o600 });
  const journal = await human(['import', '--input', '.rer/recovery/old.rer', '--journal', '../latest.rer', '--yes'], 4, /--journal "\.\.\/latest\.rer" must stay inside this checkout/);

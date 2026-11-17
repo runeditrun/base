@@ -153,6 +153,10 @@ restore has no door plan, reviewed fingerprint, reconciliation or Undo. Keep own
 Local `export --output FILE` and `import --input FILE --yes` use the Base
 portability implementation through the shared command runner and real Wrangler
 bindings. Seed adapters declare their database, buckets and archive policy.
+The selected dispatcher supplies `@runeditrun/rer/portability` when it loads a
+package adapter, including an explicitly invoked package CLI outside the
+checkout. An older checkout package therefore cannot silently supply an older
+archive worker. The seed's declared bindings and executable policy still apply.
 Export writes a new 0600 archive and reports its verified content hash, resource
 counts, exclusions and configuration names. Import applies migrations, verifies
 the archive and restores atomically into an empty destination. Stop dev or
@@ -163,6 +167,9 @@ destination refuses rows erased since. Erasure-fence refusals (`erased_row`,
 available only when the adapter declares complete resource coverage. Unsupported
 hosted export exits 2 before effects; unsupported import or transfer capability
 can refuse with exit 4.
+Failed local transfers write their classified diagnostic into the private
+capture and name its path. If capture could not be created or written, the
+failure says so. Unexpected native messages, SQL and row values stay private.
 
 A first-party adapter may also declare `portability.hostedExport` as an argv
 array, for example `['node', 'scripts/export.mjs']`. With that declaration,
