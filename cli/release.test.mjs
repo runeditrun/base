@@ -2,12 +2,57 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cp, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { exportCLI } from './export.mjs';
 import { fixture } from '../modules/release/test-fixture.mjs';
 import { contractText } from '../modules/release/contract-fixture.mjs';
 import { isolatedQueue } from './fixtures/queue.mjs';
 const base=resolve(import.meta.dirname,'..');
+
+test('verification and release refuse stale project file hashes, even when the release checkout is already corrected', async t => {
+ const f = fixture(t);
+ const path = 'rer-setup.json';
+ const file = Buffer.from('{ "changed": true }\r\n');
+ const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
+ const declared = sha256('{}'), actual = sha256(file);
+ const manifest = sha => ({
+  projectId: f.options.project, sourceRepository: f.options.repository,
+  setup: { path, sha256: sha },
+  resources: [{ path, digest: `sha256:${sha}` }],
+ });
+ const save = (name, value) => writeFile(join(f.repo, name), JSON.stringify(value));
+ await save('edition.json', { id: f.options.project });
+ await save('OPERATIONS.json', { version: 2, project: f.options.project, requiredEnvironment: [], runtime: { requirements: [] }, commands: {
+  verify: { argv: ['node', '--test', 'check.test.mjs'], inputs: ['check.test.mjs'], effects: 'Run fixture verification.' },
+ } });
+ await writeFile(join(f.repo, path), file);
+ await save('rer-project.json', manifest(declared));
+ const stale = f.commit();
+ const env = await isolatedQueue(t);
+ const cli = (verb, ...args) => spawnSync(process.execPath, [join(base, 'bin/rer.mjs'), verb, ...args], { cwd: f.repo, env, encoding: 'utf8', timeout: 15000 });
+ const refuses = (result, exitCode) => {
+  assert.equal(result.status, exitCode, result.stdout + result.stderr);
+  const output = result.stdout + result.stderr;
+  for (const value of ['setup.sha256', 'resources[0].digest', path, declared, actual]) assert.ok(output.includes(value), output);
+ };
+ refuses(cli('verify'), 1);
+ refuses(cli('check'), 1);
+ const editionCheck = spawnSync(process.execPath, [join(base, 'edition-authoring/cli.mjs'), 'check'], { cwd: f.repo, env, encoding: 'utf8', timeout: 15000 });
+ refuses(editionCheck, 1);
+
+ const correctedFile = Buffer.from('{ "changed": true, "corrected": true }\r\n');
+ await writeFile(join(f.repo, path), correctedFile);
+ await save('rer-project.json', manifest(sha256(correctedFile)));
+ f.commit();
+ const check = cli('check');
+ assert.equal(check.status, 0, check.stdout + check.stderr);
+ const result = cli('release', '--repo', f.repo, '--ref', stale, '--project', f.options.project,
+  '--repository', f.options.repository, '--output', f.options.output, '--local-verify', '--tag');
+ refuses(result, 2);
+ assert.equal(execFileSync('git', ['-C', f.repo, 'tag', '--list'], { encoding: 'utf8' }), '');
+ await assert.rejects(readFile(join(f.options.output, 'release-receipt.json')), { code: 'ENOENT' });
+});
 
 test('exported release dispatcher preserves local producer receipts, flags and exits',async t=>{
  const env=await isolatedQueue(t);
@@ -28,7 +73,6 @@ test('exported release dispatcher preserves local producer receipts, flags and e
 
 test('release candidate commits only coherent prerelease metadata and leaves producer gates intact', async t => {
  const env=await isolatedQueue(t), f=fixture(t), portable=join(f.temporary,'candidate-tools');
- const {execFileSync}=await import('node:child_process');
  const git=(...args)=>execFileSync('git',['-C',f.repo,...args],{encoding:'utf8',stdio:'pipe'}).trim();
  await exportCLI(base,portable);await cp(join(base,'onboarding'),join(portable,'scripts/base-onboarding'),{recursive:true});
  const invoke=(...args)=>spawnSync(process.execPath,[join(portable,'scripts/rer.mjs'),'release','candidate','--cwd',f.repo,...args],{env,encoding:'utf8',timeout:30000});
