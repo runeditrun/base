@@ -25,6 +25,20 @@ export async function callerPolicy(env=process.env) {
  const ci=!value&&env.CI==='true';
  // As with identity: a prober that closed first reports that itself.
  const server=createServer(socket=>{socket.on('error',()=>{});socket.end(JSON.stringify({token,ci}));});
- await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(path,resolve);});await chmod(path,0o600);
- return {ci,environment:{RER_JOB_POLICY:JSON.stringify({path,token,owner:lifetime.info})},async close(){await new Promise(resolve=>server.close(resolve));await unlink(path).catch(error=>{if(error.code!=='ENOENT')throw error;});await lifetime.close();}};
+ const close=async()=>{
+  try {
+   if(server.listening){
+    await new Promise(resolve=>server.close(resolve));
+    await unlink(path).catch(error=>{if(error.code!=='ENOENT')throw error;});
+   }
+  }finally{await lifetime.close();}
+ };
+ try {
+  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(path,resolve);});
+  await chmod(path,0o600);
+  return {ci,environment:{RER_JOB_POLICY:JSON.stringify({path,token,owner:lifetime.info})},close};
+ }catch(error){
+  await close().catch(()=>{});
+  throw error;
+ }
 }

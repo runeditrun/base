@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.122-dev.g5400f594",
+  "cliVersion": "0.2.122-dev.geac13113",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -69,7 +69,7 @@
     },
     "commands.mjs": {
       "source": "onboarding/commands.mjs",
-      "sha256": "00e750b4ac6e7afde73fff4ad4ca91663096147fb049096d7882e9a4240e3275"
+      "sha256": "62e97ae0d8908cc753b51e8c84816e5fb38a78cc45ad395d9e011227058ced12"
     },
     "dependency-approval.mjs": {
       "source": "onboarding/dependency-approval.mjs",
@@ -499,7 +499,7 @@
     },
     "cli/bounded.mjs": {
       "source": "cli/bounded.mjs",
-      "sha256": "e09785ee4d635168f0405c661f9f2a97f93cb2f06eaae3faa90be24dd393794f"
+      "sha256": "2bdfe7cecb8c99ad1ad0cbbcf6729de6d01d3094d3eb69c449cc7129f2a5e1b4"
     },
     "cli/browser-runtime.mjs": {
       "source": "cli/browser-runtime.mjs",
@@ -1079,7 +1079,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "b194000d3cfe495781471112478f130b473d113e3130b80e5df2abe15795fcf0"
+      "sha256": "1545e9efdf9e99723ad5585ff88d8b1ff370c7f64819a72eb575675c11185346"
     },
     "cli/managed-data-schema.mjs": {
       "source": "cli/managed-data-schema.mjs",
@@ -4067,7 +4067,7 @@
     },
     "modules/job-queue/identity.mjs": {
       "source": "modules/job-queue/identity.mjs",
-      "sha256": "6846f930bb008594602e96bdb18e4b2ed043dc4cb6ccfd52225099b55c6ff605"
+      "sha256": "6f9d0e4391c07f8e14557d532ab0f81d9d46d73735944f559dbafe1ec883b22f"
     },
     "modules/job-queue/index.mjs": {
       "source": "modules/job-queue/index.mjs",
@@ -4087,7 +4087,7 @@
     },
     "modules/job-queue/policy.mjs": {
       "source": "modules/job-queue/policy.mjs",
-      "sha256": "cd1d6391fad62959a41fd0c6523d95af546dd775c674ad6a6da6bbdb429c63f6"
+      "sha256": "692f49fcbafd38ae432995fc7cd351f361b7c008bec6b7c58aa1a6cdf84474b0"
     },
     "modules/job-queue/processes.mjs": {
       "source": "modules/job-queue/processes.mjs",
