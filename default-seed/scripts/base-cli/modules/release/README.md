@@ -69,6 +69,13 @@ URLs; identity comparison ignores case and a terminal `.git` in URLs. Missing,
 malformed, partial or inconsistent identities fail closed. The selected
 committed tree supplies the declarations.
 
+Every object in `rer-project.json` that declares a `path` and a `sha256` or
+`digest` must name a regular file in the project tree. Release compares each
+declaration with the raw file bytes at the selected commit before staging
+output or tags. Use a hexadecimal SHA-256, with an optional `sha256:` prefix
+for `digest`. The same check uses checkout files in `rer verify`, `rer check`
+and the edition source check.
+
 Temporary release directories are removed recursively, including incidental
 Finder metadata. A cleanup failure keeps a completed release successful and
 records a `temporary-cleanup-failed` warning in stderr and the release receipt;

@@ -27,6 +27,7 @@ import { contractStatusClauses } from './contract-status.mjs';
 import { hostedExportCommand } from './hosted-export-command.mjs';
 import { agentSurfaceClauses } from './agent-surface.mjs';
 import { sizeCheckClauses } from './size/clauses.mjs';
+import { checkoutProjectHashProblems } from '../edition-authoring/project-hashes.mjs';
 
 // cliVersion: the rer version of the code answering (absent for a vendored copy
 // too old to record one). defaults: what a server start applies when the person
@@ -85,6 +86,7 @@ export async function check(project, explicitProfile) {
  const clauses = [], add = (id, ok, message) => clauses.push({ id, ok: Boolean(ok), ...(!ok ? { message } : {}) });
  // A warning, never a failing clause: live run sites redeploy while seeds keep Base's mark.
  let placeholderMarks = [];
+ for (const problem of checkoutProjectHashProblems(project.root)) add('delivery.project-hashes', false, problem);
  clauses.push(...await deliveryDeclarationClauses(project.root));
  clauses.push(await deployVariableClause(project.root, project.adapter));
  clauses.push(...await agentSurfaceClauses(project.root));
