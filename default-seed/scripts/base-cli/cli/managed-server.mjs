@@ -19,7 +19,7 @@ import { invalid,missing,refuse,RerError,lifecycleError } from './errors.mjs';
 import { processInfo } from '../modules/job-queue/processes.mjs';
 import { declaredCrons,runScheduled } from './scheduled.mjs';
 import { demoGuarded,demoPreflight } from './demo.mjs';
-import { readDevKey,requireDevKey,refuseManagedInstallation,resolvePersona,openUrl } from './dev-identity.mjs';
+import { readDevKey,requireDevKey,refuseManagedInstallation,resolvePersona,openUrl,personaOpenUrl } from './dev-identity.mjs';
 import { announceDoorRoute,claimSavedName,moveCheckout,routeRunning,verifyDoorFor } from './door-mode.mjs';
 
 // Dev opens through the local identity exchange. Preview serves production output.
@@ -189,7 +189,7 @@ function reportScheduled(out,options,run){
 // which reset removes with the rest of .rer/local, for a person or agent that
 // did not keep the terminal output.
 async function emitReady(out,options,root,url,dev,siteUrl,demo,ownerOpenUrl){
- if(options.verb==='dev'&&dev?.openUrl){
+ if(options.verb==='dev'&&options.as===undefined&&dev?.openUrl){
   const {privateDirectory,writePrivateFile}=await shared('private-files.mjs');
   await writePrivateFile(join(await privateDirectory(root,['.rer','local']),'open-url'),dev.openUrl+'\n');
  }
@@ -199,9 +199,10 @@ async function devReady(root,url,key,options,signal,store){
  const as=options.as??'owner',persona=await resolvePersona(url,key,as,signal);
  // The owner persona names the owner the session will actually have (the
  // remaining owner once the setup owner has left), or none when none is left.
- const link=openUrl(url,key,{path:'/__dev/key',as:persona.as});
+ const scoped=options.as!==undefined;
+ const link=scoped?await personaOpenUrl(url,key,persona):openUrl(url,key,{path:'/__dev/key',as:persona.as});
  await ownerEntryReady(root,link,signal,store);
- return {identity:true,signedInAs:persona.email??null,ownerLeft:as==='owner'&&!persona.email,openUrl:link};
+ return {identity:true,signedInAs:persona.email??null,ownerLeft:as==='owner'&&!persona.email,openUrl:scoped?await personaOpenUrl(url,key,persona):link};
 }
 async function checkedNativeEntry(root,issue,signal,store){
  const link=await issue();
