@@ -55,6 +55,11 @@ export async function main(argv) {
    }
   }
   if(options.noQueue){const {shared}=await import('./shared.mjs');const {commandPolicy}=await shared('queue.mjs');const policy=await commandPolicy();try{if(!policy.ci)throw invalid('--no-queue requires the original caller CI=true.');}finally{await policy.close();}}
+  if (options.verb === 'verify') {
+   const { checkoutProjectHashProblems } = await import('../edition-authoring/project-hashes.mjs');
+   const problems = checkoutProjectHashProblems(options.cwd);
+   if (problems.length) throw new RerError('invalid_project_hash', problems.join('\n'), 1);
+  }
   const runtime = await selectNodeRuntime(options, argv, out);
   if (runtime) return runtime.exitCode;
   if (!independent && Object.hasOwn(authoringVerbs, options.verb)) {

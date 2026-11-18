@@ -15,6 +15,7 @@ import { listingContent } from './listing.mjs';
 import { previousListing } from './previous-listing.mjs';
 import { cleanupTemporary } from './cleanup.mjs';
 import { parseTimeoutSeconds } from '../../scripts/publish-check/timeout.mjs';
+import { projectHashProblems, projectManifest } from '../../edition-authoring/project-hashes.mjs';
 
 // Failure output belongs to the private receipt, not the site preview.
 const withoutOutput = gates => JSON.parse(JSON.stringify(gates, (key, value) => key === 'output' ? undefined : value));
@@ -30,6 +31,8 @@ export async function release({ repo, ref = 'HEAD', output, project, repository,
   // metadata, placeholder inspection or release export reads their contents.
   validatePublicationDestination({ repo, commit: ref }, project, repository);
   const source = inspectSource(repo, ref);
+  const hashProblems = projectHashProblems(source.entries.has(projectManifest) ? source.bytes(projectManifest) : undefined, source.bytes);
+  if (hashProblems.length) throw Error(hashProblems.join('\n'));
   // A release refuses a seed still wearing Base's placeholder mark unless the
   // caller allows it explicitly; the receipt records that allowance.
   const files = [...source.entries].filter(([, entry]) => entry.type === 'blob' && ['100644', '100755'].includes(entry.mode)).map(([path]) => path);

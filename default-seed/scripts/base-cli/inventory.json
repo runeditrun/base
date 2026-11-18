@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.122-dev.gd0d41268",
+  "cliVersion": "0.2.122-dev.g8ab65ef7",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -971,7 +971,7 @@
     },
     "cli/export.mjs": {
       "source": "cli/export.mjs",
-      "sha256": "82a12777cd48cf9a251f7d25a7d4d528fd7c3eaf1919f70b425dbced948026ba"
+      "sha256": "d49e8a30f620158c0c0b6dfcff6f44377ddfcc5d931ad2eaf39facd3b72bc602"
     },
     "cli/font-cache.mjs": {
       "source": "cli/font-cache.mjs",
@@ -1047,7 +1047,7 @@
     },
     "cli/inspect.mjs": {
       "source": "cli/inspect.mjs",
-      "sha256": "258a5cda8918188a3f21535d1380d78cd6965de15cfeebf77628a76546542298"
+      "sha256": "acd453c1809c07f08ed93cda16bf92a951220493b0b8cffe825fb0536ae1ff8a"
     },
     "cli/jsonc.mjs": {
       "source": "cli/jsonc.mjs",
@@ -1079,7 +1079,7 @@
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
-      "sha256": "1545e9efdf9e99723ad5585ff88d8b1ff370c7f64819a72eb575675c11185346"
+      "sha256": "7955f884c97e97210ad3aa9e8ac27521a9489fb349812d311f6198aaacb8c36a"
     },
     "cli/managed-data-schema.mjs": {
       "source": "cli/managed-data-schema.mjs",
@@ -1575,7 +1575,7 @@
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
-      "sha256": "b60b229542574459e46f33f48412ab775d298b21ab8e6a8ecf5dad46efb5589f"
+      "sha256": "87bff33255838dbbcdb017c034380002b3cffe65b7fb098dc05f20544d1931fc"
     },
     "edition-authoring/copy-checkout.mjs": {
       "source": "edition-authoring/copy-checkout.mjs",
@@ -1632,6 +1632,10 @@
     "edition-authoring/parent-comparison.mjs": {
       "source": "edition-authoring/parent-comparison.mjs",
       "sha256": "fba6c894e2fe5a48c2f8706ab74b09d1935bd7fa38049a264d3d91ff6d336003"
+    },
+    "edition-authoring/project-hashes.mjs": {
+      "source": "edition-authoring/project-hashes.mjs",
+      "sha256": "43d0a7d7d576f76a0c3e8c525225a29fb202fc2e4ed1f29c964c500a23fb1c35"
     },
     "edition-authoring/projection-lock.mjs": {
       "source": "edition-authoring/projection-lock.mjs",
@@ -5107,7 +5111,7 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "c3e5add95c3dbd936912424b7cfd55db619ee0197c3e9ca3c6ef74ebb09fae60"
+      "sha256": "9b06f7c21219ca322eba870f6d6b0cc509be90c16ad228658fc78045628fad39"
     },
     "modules/release/archive-guard.mjs": {
       "source": "modules/release/archive-guard.mjs",
@@ -5155,7 +5159,7 @@
     },
     "modules/release/produce.mjs": {
       "source": "modules/release/produce.mjs",
-      "sha256": "579da4ef17f587d8524b0f3c432e247204e8e7c6f82623097e7aa6ec424c5869"
+      "sha256": "683349c480eea5953f2c3bc36b665e0796d9a079d1e75368112c84e64d5cdd17"
     },
     "modules/release/public-base.mjs": {
       "source": "modules/release/public-base.mjs",
