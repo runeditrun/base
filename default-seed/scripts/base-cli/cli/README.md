@@ -106,6 +106,14 @@ An available persona API or health endpoint alone cannot establish that the
 owner's page is ready. Inline recovery-script text is not mistaken for a visible
 busy page.
 
+Before that readiness check, `rer dev` asks the app for one document no route
+claims (`/rer-warmup`) and waits for any answer, so the app's router has rendered
+once and the on-demand server module graph is loaded. A fresh install's owner entry
+lands on first-run setup, which renders no route; without this step the whole
+graph loaded under the owner's first signed-in page after setup, and every
+signed-in request waited behind it. Five minutes without an answer exits 1 with
+`first_render_failed`.
+
 `rer dev` runs the local migration hook before starting the app and checking its
 owner prerequisites. The shared operator hook reads every SQL file in the seed's
 canonical `migrations/core` inventory, including changes pulled since the last
