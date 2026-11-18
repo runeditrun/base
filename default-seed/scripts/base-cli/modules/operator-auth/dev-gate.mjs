@@ -4,6 +4,8 @@ import { rejectedResponse } from './rejected-response.mjs';
 import { constantEqual } from './crypto.mjs';
 import { escapeHtml, isLoopbackHost, localCookieName } from './http.mjs';
 import { configureBranding } from './branding.mjs';
+import { EXCHANGE_SCRIPT } from './dev-gate-script.mjs';
+export { EXCHANGE_SCRIPT } from './dev-gate-script.mjs';
 
 // The local key gate. `rer setup` writes a random RER_DEV_KEY per checkout and
 // the local runtimes receive it as a binding; a deployed Worker never has one
@@ -31,12 +33,6 @@ async function cookieValue(key) {
   return Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Reads `#rer-dev=KEY` (with optional `as` or `next`), removes it from the
-// address bar first, then trades it through a same-origin POST. The fragment
-// never reaches a server; the key never appears in a query string. Listen for
-// fragment navigation too: an open gate page stays loaded when RER_OPEN points
-// to the same path with a fresh key fragment.
-export const EXCHANGE_SCRIPT = "(()=>{const exchange=()=>{const h=new URLSearchParams(location.hash.slice(1)),k=h.get('rer-dev');if(!k)return;history.replaceState(null,'',location.pathname+location.search);const a=h.get('as'),n=h.get('next')||(a?'/auth/dev/enter?as='+encodeURIComponent(a):location.pathname+location.search),to=n.startsWith('/')&&!n.startsWith('//')&&!n.includes('\\\\')?n:'/';fetch('" + DEV_KEY_PATH + "',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({key:k})}).then(r=>{if(r.ok)location.replace(to);else document.body.insertAdjacentHTML('beforeend','<p role=\"alert\">This link no longer opens the app. Run ~/.local/bin/rer dev again for a fresh one.</p>" + (`<p>${terminalHelpHtml}</p>`).replaceAll("'", "&#39;") + "')})};addEventListener('hashchange',exchange);exchange()})()";
 // The hand-off page wears the seed's own theme: the same rer-theme.css tokens and the
 // same --rer-logo mark the sign-in pages draw. The mark becomes a real <img> named by
 // the product and shown beside the wordmark text; a seed that declares no logo shows
@@ -58,7 +54,7 @@ export function devNotFound() {
     'content-security-policy': "default-src 'none'; script-src 'none'; style-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'" } });
 }
 
-function readGateCookie(request, name) {
+export function readGateCookie(request, name) {
   const entries = (request.headers.get('cookie') || '').split(';').map(part => part.trim()).filter(part => part.startsWith(`${name}=`));
   return entries.length === 1 ? entries[0].slice(name.length + 1) : null;
 }
@@ -96,7 +92,7 @@ export function devGate({ key, origin, local }) {
     setCookie,
     // GET serves the exchange page with the seed's productName, mark and theme; POST trades the key for the cookie.
     // `invited` says whether the app has a person beyond the owner and its personas for `rer dev --as <email>` to take.
-    async exchange(request, branding, { invited = false } = {}) {
+    async exchange(request, branding, { invited = false, redeemPersona } = {}) {
       if (new URL(request.url).pathname !== DEV_KEY_PATH) return null;
       if (request.method === 'GET' || request.method === 'HEAD') {
         const { script, logo, style } = await exchangeHashes();
@@ -111,8 +107,9 @@ export function devGate({ key, origin, local }) {
       }
       if (request.method !== 'POST' || request.headers.get('sec-fetch-site') === 'cross-site' || !request.headers.get('content-type')?.startsWith('application/json')) return rejectedResponse(request, devNotFound());
       const text = await request.text();
-      let presented; try { presented = text.length <= 1024 ? JSON.parse(text)?.key : undefined; } catch {}
-      if (typeof presented !== 'string' || !constantEqual(presented, key)) return devNotFound();
+      let presented; try { presented = text.length <= 1024 ? JSON.parse(text) : undefined; } catch {}
+      if (presented?.persona && redeemPersona) return redeemPersona(presented.persona);
+      if (typeof presented?.key !== 'string' || !constantEqual(presented.key, key)) return devNotFound();
       return new Response(null, { status: 204, headers: { ...privateHeaders, 'set-cookie': await setCookie() } });
     },
   });
