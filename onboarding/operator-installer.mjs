@@ -3,7 +3,7 @@ import { privateDirectory } from './private-files.mjs';
 import { localInstaller } from './adapter.mjs';
 import { selectLocalState, LocalStateSafetyError } from './local/state.mjs';
 import {operatorPrerequisites} from './operator-prerequisites.mjs';
-import { localOperatorSettings, prepareOperatorMail, repairOperatorMail } from './operator-settings.mjs';
+import { localOperatorMailProvider, localOperatorSettings, prepareOperatorMail, repairOperatorMail } from './operator-settings.mjs';
 import { migrateOperator } from './operator-migrations.mjs';
 import { installOperator } from './operator-install.mjs';
 import { join, delimiter } from 'node:path';
@@ -17,7 +17,7 @@ export function operatorInstaller({ database, features, prepare, prepareData }) 
   guard: async ({ root }) => { await selectLocalState(root); },
   secrets: {
    keepExisting: true, originKey: 'AUTH_ORIGIN', afterWrite: repairOperatorMail,
-   values: ({ origin }) => ({ AUTH_LOCAL: 'true', AUTH_ORIGIN: origin, MAIL_PROVIDER: 'development', MAIL_FROM: 'auth@localhost.test' }),
+   values: ({ origin }) => ({ AUTH_LOCAL: 'true', AUTH_ORIGIN: origin, MAIL_PROVIDER: localOperatorMailProvider, MAIL_FROM: 'auth@localhost.test' }),
   },
   build: ['pnpm', ['run', '--silent', 'build:app']],
   migrate: context => migrateOperator(context, database),

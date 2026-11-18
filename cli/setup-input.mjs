@@ -72,16 +72,28 @@ export async function setupInput(project, options, vars, signal, { origin } = {}
  const missingKeys=seed.model.setupModel(answers,known).missing;
  const keys=[...new Set([...missingKeys,...invalidKeys])];
  if(keys.length){
+  const mail=seed.model.fields.MAIL_PROVIDER;
+  let mailHelp='', omitMail=false;
+  if(invalidKeys.includes('MAIL_PROVIDER')&&mail?.options){
+   const {localOperatorMailProvider}=await shared('operator-settings.mjs');
+   if(answers.MAIL_PROVIDER===localOperatorMailProvider){
+    mailHelp=` The shared operator adapter requires MAIL_PROVIDER=${localOperatorMailProvider} for local startup. This checkout's setup manifest does not offer that value.`;
+    const implicitProvider=(installerAnswers??savedAnswers).MAIL_PROVIDER??adapterDefaults.MAIL_PROVIDER??defaults.MAIL_PROVIDER;
+    omitMail=!project.adapter.localPrerequisites&&mail.valid(implicitProvider);
+    if(omitMail)mailHelp+=" Omit MAIL_PROVIDER from the answers file to use this checkout's local setup settings.";
+   }
+  }
   // Only declared metadata and example choices are public, never supplied values.
   const shape={},details=keys.map(key=>{
    const field=Object.hasOwn(seed.model.fields,key)?seed.model.fields[key]:undefined;
    if(!field)return '(undeclared field)';
    const privateValue=field.type==='password',choices=privateValue?undefined:field.options?.map(([value])=>value);
    const type=privateValue?'secret':field.kind??(choices?'select':field.type??'text');
-   shape[key]=privateValue?'<private value>':choices?.[0]??'<value>';
+   if(key!=='MAIL_PROVIDER'||!omitMail)shape[key]=privateValue?'<private value>':choices?.[0]??'<value>';
    return `${key} (${type}${choices?`; choices: ${choices.map(value=>JSON.stringify(value)).join(' | ')}`:''})`;
   });
-  throw missing(`Missing or invalid active setup fields: ${details.join(', ')}. Create an owner-only JSON file (chmod 600 answers.json) shaped ${JSON.stringify(shape)}, then run ~/.local/bin/rer setup --answers answers.json --non-interactive. --owner-email EMAIL and --owner-name NAME are also accepted when declared; use manifest field names inside the JSON, never an environment-file wrapper.`);
+  const fileHelp=omitMail&&!Object.keys(shape).length?'Keep the other answers in the owner-only JSON file (chmod 600 answers.json)':`Create an owner-only JSON file (chmod 600 answers.json) shaped ${JSON.stringify(shape)}`;
+  throw missing(`Missing or invalid active setup fields: ${details.join(', ')}.${mailHelp} ${fileHelp}, then run ~/.local/bin/rer setup --answers answers.json --non-interactive. --owner-email EMAIL and --owner-name NAME are also accepted when declared; use manifest field names inside the JSON, never an environment-file wrapper.`);
  }
  if(!mailbox(answers[names.email]))throw invalid('Provide a valid plain owner mailbox.');
  answers[names.email]=answers[names.email].toLowerCase();
