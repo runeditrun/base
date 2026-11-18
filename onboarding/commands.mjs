@@ -15,9 +15,12 @@ import { isWranglerMigrationApply, wranglerMigrationView } from './migration-pro
 import { isWranglerQuery, wranglerQueryView, viteDiagnosticsView, archiveReceiptView } from './command-diagnostics-view.mjs';
 
 export async function createCommands(directory,state,{terminal=text=>writeSync(1,text),spawn=spawnChild,queue:queuePolicy,custodyToken,onWaiting,filterViteWarnings=false,filterArchiveReceipts=false}={}) {
- let policy=queuePolicy?await commandPolicy():{environment:{},close:async()=>{}};
  const custodyBaseline=['darwin','linux'].includes(process.platform)?await createProcessBaseline():undefined;
  const logPath=join(directory,'install.log'), log=await openPrivateLog(logPath);
+ let policy=queuePolicy?await commandPolicy().catch(async error=>{
+  await log.close().catch(()=>{});
+  throw error;
+ }):{environment:{},close:async()=>{}};
  const redaction=createRedaction();redaction.addSecrets(credentialValues(process.env));
  const registerCustody=environment=>{
   const secrets=[];

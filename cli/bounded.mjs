@@ -13,14 +13,14 @@ import {RerError} from './errors.mjs';
 export async function boundedCommand(project,options,argv,out){
  if(!['install','setup','build','verify','deploy','export','import','size'].includes(options.verb))return null;
  const {commandPolicy,queuedCommand,queueLabel,maxWaitSeconds}=await shared('queue.mjs');
- const policy=await commandPolicy();
  const childArgs=[...argv];const cwdIndex=childArgs.indexOf('--cwd');if(cwdIndex>=0&&(childArgs.indexOf('--')<0||cwdIndex<childArgs.indexOf('--')))childArgs[cwdIndex+1]=project.root;
  const directory=await mkdtemp(join(tmpdir(),'rer-bounded-'));
- let store,result,finalEvent,errorEvent,buffer='';const unclosed=[];
+ let policy,store,result,finalEvent,errorEvent,buffer='';const unclosed=[];
  const cancellation=new AbortController();
  const handlers=new Map(['SIGINT','SIGTERM'].map(name=>[name,()=>cancellation.abort(name)]));
  for(const [name,handler] of handlers)process.on(name,handler);
  try{
+  policy=await commandPolicy();
   const {createCommands}=await shared('commands.mjs');
   store=await createCommands(directory,{logs:[]},{terminal:()=>{}});
   result=await queuedCommand(process.execPath,[fileURLToPath(new URL('../bin/rer.mjs',import.meta.url)),...childArgs],{
@@ -55,7 +55,7 @@ export async function boundedCommand(project,options,argv,out){
   });
  }finally{
   // Every closer runs: a policy socket left listening keeps this process alive.
-  for(const close of [()=>store?.closeCommands(),()=>policy.close(),()=>rm(directory,{recursive:true,force:true})]){try{await close();}catch(error){unclosed.push(error);}}
+  for(const close of [()=>store?.closeCommands(),()=>policy?.close(),()=>rm(directory,{recursive:true,force:true})]){try{await close();}catch(error){unclosed.push(error);}}
   for(const [name,handler] of handlers)process.off(name,handler);
  }
  if(unclosed.length)out.progress(`Local cleanup could not confirm that every helper process stopped (${unclosed.map(error=>store?.redact?.(String(error?.message))??'unknown cause').join('; ')}). The ${options.verb} itself finished.\n`);

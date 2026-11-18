@@ -8,7 +8,11 @@ import { check, describe, doctorSummary } from './inspect.mjs';
 import { selectNodeRuntime } from './node-runtime.mjs';
 import { resolve } from 'node:path';
 
-export async function main(argv = process.argv.slice(2)) {
+export async function main(argv) {
+ // The executable entry points call main() without arguments. Callers supplying
+ // their own argv get a status without changing the lifetime of their process.
+ const executable = argv === undefined;
+ argv ??= process.argv.slice(2);
  if (argv[0] === 'rehearse') return (await import('./rehearse.mjs')).rehearseCommand(argv.slice(1));
  if (argv[0] === 'door' && argv[1] === 'clauses') return (await import('./door-clauses.mjs')).doorClausesCommand(argv.slice(2));
  if (argv[0] === 'business') return (await import('./business/command.mjs')).businessCommand(argv.slice(1));
@@ -98,8 +102,13 @@ export async function main(argv = process.argv.slice(2)) {
   else result = await (await import('./lifecycle.mjs')).runCommand(project, options, out);
   out.result(true, 0, result); return 0;
  } catch (error) {
-  const failure = error instanceof RerError ? error : unexpectedFailure(error);
-  out.error(failure); out.result(false, failure.exitCode, { ...failure.exportDetails, ...(failure.siteDeploy ? {siteDeploy:failure.siteDeploy} : {}), ...(failure.d1Import ? {d1Import:failure.d1Import} : {}), ...(failure.childExitCode === undefined ? {} : { childExitCode: failure.childExitCode, signal: failure.signal }) }); return failure.exitCode;
+  const expected = error instanceof RerError;
+  const failure = expected ? error : unexpectedFailure(error);
+  out.error(failure); out.result(false, failure.exitCode, { ...failure.exportDetails, ...(failure.siteDeploy ? {siteDeploy:failure.siteDeploy} : {}), ...(failure.d1Import ? {d1Import:failure.d1Import} : {}), ...(failure.childExitCode === undefined ? {} : { childExitCode: failure.childExitCode, signal: failure.signal }) });
+  // The command's finally blocks have run. Allow pending output and cleanup to
+  // drain, but give a lingering handle at most three seconds to keep rer alive.
+  if (executable && !expected) setTimeout(() => process.exit(failure.exitCode), 3000).unref();
+  return failure.exitCode;
  }
 }
 
