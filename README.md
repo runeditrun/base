@@ -164,7 +164,8 @@ there after signing in. Once setup is complete, `/setup` opens the app or settin
 
 In dev and demo, invited people choose **Sign in as <name>** in operator access
 or at `/signin` to open `/app` with their assigned role. A fresh local browser
-profile opens `RER_OPEN` first for the checkout's key cookie. Mail is silently
+profile opens the link printed by plain `rer dev` first for the checkout's key
+cookie. Mail is silently
 suppressed. `rer dev --as person@example.com` also opens an invited or active
 person's account through the same one-click path.
 

@@ -14,7 +14,7 @@ const CREDENTIAL_NAME = new RegExp(`(?:^|[_.-])(?:${CREDENTIAL_WORD})s?(?:$|[_.-
 // Base's maintained Node 22 runtime. These names require a real case boundary.
 const CAMEL_CREDENTIAL_NAME = /[A-Za-z0-9](?:Token|Secret|Credential|Key|Pat|Dsn|Auth|Pass|Passwd|Password|Pwd|Signature|Sig|Cookie)s?(?:$|[_.-]|[A-Z0-9])/;
 const FIELD_NAME = '(?:api[_-]?key|access[_-]?token|auth[_-]?token|token|password|secret|signature|sig|key|pat|dsn|auth|pass)';
-const DEV_FIELD = '(?<![A-Za-z0-9])rer-dev';
+const DEV_FIELD = '(?<![A-Za-z0-9])rer-(?:dev|persona)';
 // A field name may follow `_` or `-` (DB_PASSWORD, client_secret, x-api-key),
 // but not a letter or digit inside an ordinary word.
 const FIELD = '(?<![A-Za-z0-9])' + FIELD_NAME;

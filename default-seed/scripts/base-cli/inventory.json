@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.122-dev.g24aabc6b",
+  "cliVersion": "0.2.122-dev.g9bf3066a",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -289,7 +289,7 @@
     },
     "redaction.mjs": {
       "source": "onboarding/redaction.mjs",
-      "sha256": "2a828e150c41296eb75f28c0c5cb9f7dc39e8b4506b2e3d5104943c332647d54"
+      "sha256": "5feb2bd2223e1ccd9d706913c9ac7a8ac2d01dcab1af58ca69729ffe217091bb"
     },
     "schema/SETUP.schema.json": {
       "source": "onboarding/schema/SETUP.schema.json",
@@ -947,7 +947,7 @@
     },
     "cli/dev-identity.mjs": {
       "source": "cli/dev-identity.mjs",
-      "sha256": "8c5922caabaddd21929fa6e8ba6f59f184fa7ce3f43451d4db6dcc8e9c0d171a"
+      "sha256": "94f52932e1b5d7e4ca96572ce806d77b58891c9a98d9f07ae77e5c61596145bb"
     },
     "cli/door-clauses.mjs": {
       "source": "cli/door-clauses.mjs",
@@ -1095,7 +1095,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "26eecb2d2ea87bc9e96bfb437a1e492dfac123f9ed324b97878f85bb7e3de249"
+      "sha256": "cca1cbf195713037f79756c2bbe2e04e677c59da9c6582523b102dd7f4815317"
     },
     "cli/native-owner-entry.mjs": {
       "source": "cli/native-owner-entry.mjs",
@@ -4375,7 +4375,7 @@
     },
     "modules/operator-auth/README.md": {
       "source": "modules/operator-auth/README.md",
-      "sha256": "7e3262274dca406889751ccca6ca1aaee7e0d940f21bcc96e4e4e05a3682fe8c"
+      "sha256": "b8412340e65441dab25a4773ed188a3edcc2c1631a09d36736f71ed4917128d7"
     },
     "modules/operator-auth/SCHEDULED-POLICY.md": {
       "source": "modules/operator-auth/SCHEDULED-POLICY.md",
@@ -4439,7 +4439,7 @@
     },
     "modules/operator-auth/accounts/oa.mjs": {
       "source": "modules/operator-auth/accounts/oa.mjs",
-      "sha256": "84508f8c507d12d3df4cd0d683baa8bbd5a3b60522bd08d31cf49ebb92a72aa1"
+      "sha256": "8d7f6cbf75b15b9926696778219386bb8b5b89ce788a1571055eef1a08e2e721"
     },
     "modules/operator-auth/accounts/one-click.mjs": {
       "source": "modules/operator-auth/accounts/one-click.mjs",
@@ -4559,15 +4559,19 @@
     },
     "modules/operator-auth/dev-admission.d.mts": {
       "source": "modules/operator-auth/dev-admission.d.mts",
-      "sha256": "4fa20898bba75ecf5a09005fd4ea3ae520f8a43b4b2cca5ecb5069443cd72d1d"
+      "sha256": "a2ca09d933278f74ea89be9df8e901eb9e4f4d98039c4fe23a4ba294ae8f9377"
     },
     "modules/operator-auth/dev-admission.mjs": {
       "source": "modules/operator-auth/dev-admission.mjs",
-      "sha256": "d8c59cea293b24364961dc0a9a1f2bfb615ffee73cd48507147f37b577cc0ef8"
+      "sha256": "f150b6ba28bdd7fc6fa233b9807577fead5850fd40ea103554079ec93c4d2399"
+    },
+    "modules/operator-auth/dev-gate-script.mjs": {
+      "source": "modules/operator-auth/dev-gate-script.mjs",
+      "sha256": "939d1911b862638a7e358ca6f41a78af213f66aa319799a77c82b909a6fb16f6"
     },
     "modules/operator-auth/dev-gate.mjs": {
       "source": "modules/operator-auth/dev-gate.mjs",
-      "sha256": "914621e21c073c890dff7e4f89dd5363575bd1612f5b07e351b608a56a53eaaf"
+      "sha256": "60a049f19dd3febb7130faf674b85757663b2bbeec9d72fadf74463fa942110d"
     },
     "modules/operator-auth/dev/cli-session.mjs": {
       "source": "modules/operator-auth/dev/cli-session.mjs",
@@ -4579,11 +4583,19 @@
     },
     "modules/operator-auth/dev/index.mjs": {
       "source": "modules/operator-auth/dev/index.mjs",
-      "sha256": "8f99661dd2c82060443cfeaaf970e0e0a7c76e71ca3046c9ae7c8ec178626a5a"
+      "sha256": "4a7e47e3e649bb6ca91cf0edf3167151c478a341464f665a8fe5592734f45dfe"
     },
     "modules/operator-auth/dev/invited.mjs": {
       "source": "modules/operator-auth/dev/invited.mjs",
       "sha256": "54f5f042c592924937eb1e47ca6d751b6ddb59b76dc0b1e74962dfb2c2727d42"
+    },
+    "modules/operator-auth/dev/persona-entry.mjs": {
+      "source": "modules/operator-auth/dev/persona-entry.mjs",
+      "sha256": "af6a25a73e3447dc5efe5f892171f7f1c630780a553d494420434312f2f617e6"
+    },
+    "modules/operator-auth/dev/persona-grant.mjs": {
+      "source": "modules/operator-auth/dev/persona-grant.mjs",
+      "sha256": "a53d87bf414dd56dbe574b6f5b84223561d73f635020ff1a3f0a5fc4c32f1266"
     },
     "modules/operator-auth/dev/personas.mjs": {
       "source": "modules/operator-auth/dev/personas.mjs",

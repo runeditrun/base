@@ -158,8 +158,8 @@ to `/setup`; signed-out visitors sign in and return there. Once complete,
 Invite another person from the app's operator access screen, then choose
 **Sign in as <name>** beside that person. The same action appears at `/signin`;
 it accepts their current invitation and opens `/app` with their assigned role.
-After opening `RER_OPEN`, this browser can switch people without email. A fresh
-browser profile first opens `RER_OPEN` to receive this checkout's key cookie.
+In a fresh browser profile, open the link printed by plain `rer dev` to receive
+this checkout's key cookie and switch people without email.
 `rer dev --as person@example.com` also selects an invited or active person, including one invited at a built-in persona's address (the persona name selects them too);
 for an email that is no one in the local database, it lists the people it takes.
 An explicit `--as` link works in a fresh browser and opens only the selected account.
