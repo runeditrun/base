@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.2.123
+
+Signed: Run Edit Run fleet, 2026-11-18.
+
+### Declared project file hashes
+
+- `rer release` checks every object in `rer-project.json` that declares a `path` and a `sha256` or `digest` against the raw file bytes at the selected commit, before staging output or tags. Missing, unreadable or unsafe paths and malformed or mismatched hashes are refused with correction guidance. `rer verify`, `rer check` and the edition source check apply the same check to checkout files.
+- Release producers must update a declared setup hash to match the file, or restore the intended file. Lamp v1.11.22 and Oncall v0.5.18 are cases this check refuses because their declared setup hashes differ from the files.
+
+### Local startup and persona links
+
+- Before announcing ready, `rer dev` requests an unmatched document through the app's router and waits for the response body, loading the server module graph before the owner's first signed-in page. Any HTTP status completes this warmup; five minutes without an answer refuses startup with `first_render_failed`. The owner-entry readiness check still follows it.
+- Explicit `rer dev --as PERSONA` links carry a 15-minute grant signed with the checkout's key and bound to the origin and selected account. Exchange admits only the resulting dev session; persona switching and dev-minted credentials still require the checkout-wide gate. Reset invalidates local entry.
+- Native lifecycle and synchronous spawn causes survive command capture and adapter wrappers. Diagnostics name the executable basename and classified OS failure, retaining a written capture-log path without exposing native arguments or private application data. Captured dev-key checks compare the used key with the saved private key.
+- Failed command admission releases its policy sockets, process identity and log resources. After cleanup, an unexpected failure in the executable CLI allows pending output to drain but bounds lingering handles to three seconds; callers passing their own arguments receive a status without that process-lifetime change.
+- Local setup explains when the shared operator requires `MAIL_PROVIDER=development` but the checkout's manifest does not offer it. Where the checkout's own valid local settings permit it, guidance says to omit that field from the answers file; other required fields retain their declared choices.
+
+### Business refusals, removal and CI isolation
+
+- Business API, pairing, grant, agent and MCP refusals retain bounded, redacted server prose, including failed change/update reasons, while withholding secret-bearing envelope fields and reflected credential values.
+- Deployment removal reports resources as removed only after independent absence read-back. A surviving or unverified Worker retains its data; incomplete removal keeps the deployment record and names remaining or unverified resources for recovery.
+- Verify planner fixtures isolate their GitHub job environment, and site-search fixtures prepare real pnpm before intercepting provider traffic. Maintained CLI and onboarding copies and inventories are regenerated.
+
+ChargeDesk checkouts pin rer 0.2.118 and other seeds have older pins, and need a re-pin to receive these fixes.
+
+These changes require adoption through the seed's pinned package or refreshed source. This preparation establishes no seed adoption, provider delivery, deployment or production result. The source range changes no portability or import-kit module, product migration or archive format identity.
+
 ## 0.2.122
 
 Signed: Run Edit Run fleet, 2026-11-17.
