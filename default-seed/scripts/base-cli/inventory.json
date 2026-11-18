@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.122-dev.g9bf3066a",
+  "cliVersion": "0.2.122-dev.gd0d41268",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -395,7 +395,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "126c30e81161768b754d2f4e1e33d224c36da636c1ecd51bf6eebb0a9cc48fd5"
+      "sha256": "d3a95eea0b9a841b817e06137702d53333041046039830e950d6d95f355b7e91"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -1095,7 +1095,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "cca1cbf195713037f79756c2bbe2e04e677c59da9c6582523b102dd7f4815317"
+      "sha256": "63186e6d37c824d0ad7be53678347bbb46dced0102503894590ef6515c32fced"
     },
     "cli/native-owner-entry.mjs": {
       "source": "cli/native-owner-entry.mjs",
@@ -1256,6 +1256,10 @@
     "cli/release.mjs": {
       "source": "cli/release.mjs",
       "sha256": "c939b779bec873a7be8c9df0b7724ca457b3fdf648a7b4c03e36e011b76e16e5"
+    },
+    "cli/render-warmup.mjs": {
+      "source": "cli/render-warmup.mjs",
+      "sha256": "2e8789c5aac6c377593cd38efed87ed0b0ddd725e769407f122c8ced0b1a5de4"
     },
     "cli/run-transfers.mjs": {
       "source": "cli/run-transfers.mjs",
