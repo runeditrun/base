@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.122-dev.geac13113",
+  "cliVersion": "0.2.122-dev.g24aabc6b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -185,7 +185,7 @@
     },
     "operator-installer.mjs": {
       "source": "onboarding/operator-installer.mjs",
-      "sha256": "d54e84a6209b74880d7c1ba6d7b0e755df38c3c6cbc61a73fa2a7223cd08def1"
+      "sha256": "ef1ba5845710e9f85bfa771b16f2db388329e7e6803747fc075ff0ee91e84cd2"
     },
     "operator-migrations.mjs": {
       "source": "onboarding/operator-migrations.mjs",
@@ -197,7 +197,7 @@
     },
     "operator-settings.mjs": {
       "source": "onboarding/operator-settings.mjs",
-      "sha256": "47ee566c06620cc503262d25405397576ef03fcc7544d30e65567549d18fc9cc"
+      "sha256": "0e016053a7075328ffc636f687550a04dc67470f3408fe5f77ea6fec72218b5e"
     },
     "package.json": {
       "source": "onboarding/package.json",
@@ -1299,7 +1299,7 @@
     },
     "cli/setup-input.mjs": {
       "source": "cli/setup-input.mjs",
-      "sha256": "e109923e0fc932a756af7c7401e044b8cf4f0cea89eb39b3c43381f11bf642d8"
+      "sha256": "aea36dc1b4d11db3eabb1b6eda0a8d0e1c1d90acf7eb02afd09ac104fa85c63e"
     },
     "cli/shared.mjs": {
       "source": "cli/shared.mjs",
