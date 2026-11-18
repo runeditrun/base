@@ -9,9 +9,10 @@
 import { realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { processInfo } from '../../modules/job-queue/processes.mjs';
+import { setTimeout as delay } from 'node:timers/promises';
 import { liveServers } from '../registry.mjs';
 import { LaunchFailure, workerFailure } from './failure.mjs';
-import { prepare } from './prepare.mjs';
+import { flagValue, prepare } from './prepare.mjs';
 import { claimLaunch, eventLog, launchDirectory, liveWorker, releaseLaunch, serverRecord, stopRequest } from './state.mjs';
 import { startServer } from './steps.mjs';
 import { captureFile } from './capture.mjs';
@@ -23,10 +24,8 @@ const children = new Set(), stopping = new AbortController();
 const stop = () => { stopping.abort(); for (const child of children) child.kill('SIGTERM'); };
 for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, stop);
 process.on('SIGHUP', () => {});
-if (!await claimLaunch(directory, token)) {
- const holder = await liveWorker(directory);
- await events.write({ event: 'redirect', token: holder?.token });
-} else {
+const persona = flagValue(args, '--as');
+if (await claim()) {
  const logFile = await captureFile(root, join(directory, 'launch.log'));
  const log = text => logFile.write(text + '\n');
  let started;
@@ -62,4 +61,22 @@ if (!await claimLaunch(directory, token)) {
  // Release preparation custody at ready, but continue redacting output until
  // the registered server exits. Repeated launches can prepare independently.
  await started?.closed;
+}
+
+async function claim() {
+ for (;;) {
+  if (stopping.signal.aborted || await stopRequest.covers(directory, requestedAt)) {
+   await events.write({ event: 'failed', exitCode: 1, message: 'The launch stopped before the app was ready.' });
+   return false;
+  }
+  if (await claimLaunch(directory, token, persona)) return true;
+  const holder = await liveWorker(directory);
+  if (holder && holder.persona === persona) {
+   await events.write({ event: 'redirect', token: holder.token });
+   return false;
+  }
+  // A different persona can share the running server after it is ready. It
+  // needs its own handoff, so wait for the current preparation claim to end.
+  await delay(200);
+ }
 }
