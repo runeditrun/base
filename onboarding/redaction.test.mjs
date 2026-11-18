@@ -57,6 +57,7 @@ test('credential shapes redact in one buffer and across individual bytes with ne
   ['https://host.invalid/?signature=other-private-signature&safe=public','other-private-signature'],
   ['https://host.invalid/?key=private-query-key&safe=public','private-query-key'],
   ['https://host.invalid/#rer-dev=private-dev-fragment&as=owner','private-dev-fragment'],
+  ['https://host.invalid/#rer-persona=private-persona-signature&as=member','private-persona-signature'],
   ['https://host.invalid/?rer-dev=private-dev-query&safe=public','private-dev-query'],
   ['-----BEGIN RSA PRIVATE KEY-----\nTEST_PRIVATE_PEM_BODY_ONE\nPRIVATE_PEM_BODY_TWO\n-----END RSA PRIVATE KEY-----','PRIVATE_PEM_BODY_ONE'],
   [pkcs8,pkcs8.split('\n')[1]],

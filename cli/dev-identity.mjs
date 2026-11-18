@@ -5,6 +5,7 @@ import { shared } from './shared.mjs';
 import { contained } from './project.mjs';
 import { invalid, missing, refuse } from './errors.mjs';
 import { loopback } from './parse.mjs';
+import { PERSONA_LINK_SECONDS, signPersonaGrant } from '../modules/operator-auth/dev/persona-grant.mjs';
 
 // The per-checkout key gate. Setup writes RER_DEV_KEY (32 random bytes) to
 // owner-only .rer/local/ (directory 0700, file 0600); a repeat setup keeps it,
@@ -46,6 +47,12 @@ export async function requireDevKey(root) {
 export function openUrl(url, key, { path = '/', as, next } = {}) {
  const fragment = new URLSearchParams({ 'rer-dev': key, ...(as ? { as } : {}), ...(next ? { next } : {}) });
  return `${url}${path}#${fragment}`;
+}
+
+export async function personaOpenUrl(origin, key, { as, email }, expires = Math.floor(Date.now() / 1000) + PERSONA_LINK_SECONDS) {
+ const signature = await signPersonaGrant(key, origin, { as, email: email ?? null, expires });
+ const fragment = new URLSearchParams({ 'rer-persona': signature, as, ...(email ? { email } : {}), expires });
+ return `${origin}/__dev/key#${fragment}`;
 }
 
 export function refuseManagedInstallation(...sources) {
