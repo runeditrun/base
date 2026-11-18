@@ -6,6 +6,7 @@ import { readySummary } from '../../cli/ready-summary.mjs';
 import { launchSummary } from '../../cli/run-transfers.mjs';
 import { contained } from '../../cli/project.mjs';
 import { shared } from '../../cli/shared.mjs';
+import { personaOpenUrl, requireDevKey } from '../../cli/dev-identity.mjs';
 
 const elapsed = ms => { const s = Math.round(ms / 1000); return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`; };
 const quiet = 20000;
@@ -28,8 +29,18 @@ export function printer({ json, stopHint, keyless = false, root }) {
   heartbeat() { if (Date.now() - last >= quiet) progress('waiting', `still ${current} (${elapsed(Date.now() - phaseStarted)}). Allow up to 10 minutes; if this command is stopped, run ~/.local/bin/rer dev again to reattach.`); },
   // The dispatcher's ready event, as its own human ready lines.
   async ready(ready, { log, pid }) {
+   const link = ready.openUrl ? new URL(ready.openUrl) : null;
+   const fragment = new URLSearchParams(link?.hash.slice(1));
    if (keyless) { const { openUrl, ...rest } = ready; ready = rest; }
-   else if (root && ready.openUrl && new URLSearchParams(new URL(ready.openUrl).hash.slice(1)).get('rer-dev') === '[REDACTED]') {
+   else if (root && fragment.get('rer-persona') === '[REDACTED]') {
+    // The journal carries only the grant's public fields. Recreate the
+    // signature for this invocation without reading or replacing the owner link.
+    const openUrl = await personaOpenUrl(link.origin, await requireDevKey(root), {
+     as: fragment.get('as'), email: fragment.get('email'),
+    }, Number(fragment.get('expires')));
+    ready = { ...ready, openUrl };
+   }
+   else if (root && fragment.get('rer-dev') === '[REDACTED]') {
     // The journal never transports the credential. Only the caller's final
     // handoff reads the private link the dispatcher saved inside .rer/local.
     const { readPrivateFile } = await shared('private-files.mjs');

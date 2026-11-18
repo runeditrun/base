@@ -155,7 +155,9 @@ Help, check, describe, doctor and stop do not select or acquire Node.
 After `RER_READY`, `dev` prints `RER_SIGNED_IN EMAIL` and `RER_OPEN URL`.
 Open that URL on this computer: the app opens signed in as the owner and
 finishes first-run setup at `/setup`. Treat the line as a credential.
-`dev --as PERSONA` starts as a persona or signed out. Legacy `dev --login`
+`dev --as PERSONA` prints a link valid for 15 minutes on this checkout. It
+signs in only as the selected account, or opens signed out with `--as signed-out`.
+Legacy `dev --login`
 uses the same automatic sign-in. Until first-run completion is stored durably,
 app routes return the signed-in owner to `/setup`; a signed-out owner returns
 there after signing in. Once setup is complete, `/setup` opens the app or settings.
