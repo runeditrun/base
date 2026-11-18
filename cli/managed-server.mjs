@@ -21,6 +21,7 @@ import { declaredCrons,runScheduled } from './scheduled.mjs';
 import { demoGuarded,demoPreflight } from './demo.mjs';
 import { readDevKey,requireDevKey,refuseManagedInstallation,resolvePersona,openUrl,personaOpenUrl } from './dev-identity.mjs';
 import { announceDoorRoute,claimSavedName,moveCheckout,routeRunning,verifyDoorFor } from './door-mode.mjs';
+import { warmDocumentRender } from './render-warmup.mjs';
 
 // Dev opens through the local identity exchange. Preview serves production output.
 export async function ready(out,url,dev,json=false,siteUrl,demo,root,ownerOpenUrl){
@@ -150,6 +151,8 @@ export async function managedServer(project,options,out,{clock={}}={}){
   // The runtime can receive public requests now. Keep announcement/registry
   // readiness false until the browser has verified that same public door.
   forwarding=true;
+  // Dev loads modules on demand: render one document now, so the owner's first signed-in page after setup does not pay for the whole graph.
+  if(options.verb==='dev')await warmDocumentRender(selected.url,proxy.probe,controller.signal,store);
   // A key is sent (or printed) for a door origin only once the door proves it is ours.
   if(devKey)await verifyDoorFor(selected.url);
   if(demo)await demoGuarded(selected.url,demo.state,controller.signal);
