@@ -150,7 +150,7 @@ test('main duplicate lookup authorizes only the newest complete green push of th
  await writeFile(preload, `const runs = ${JSON.stringify(recorded)}, jobs = ${JSON.stringify(recordedJobs)}, current = ${JSON.stringify(currentRun)};
 globalThis.fetch = async url => new Response(JSON.stringify(url.includes('/workflows/') ? runs : url.includes('/jobs') ? jobs : current));\n`);
  const command = spawnSync(process.execPath, ['--import', preload, linked, '--main-skip'], {
-  cwd: directory, encoding: 'utf8', env: { ...process.env, ...env, GITHUB_OUTPUT: output },
+  cwd: directory, encoding: 'utf8', env: { ...env, GITHUB_OUTPUT: output },
  });
  assert.equal(command.status, 0, command.stderr);
  assert.equal(await readFile(output, 'utf8'), 'skip=true\n');
@@ -319,7 +319,10 @@ test('verification planning requires the newest push proof, identical trees and 
   assert.deepEqual(JSON.parse(command.stdout).include, expected.map(({ name, browser }) => ({ name, browser })));
  }
  const output = join(directory, 'planning-output');
- const command = spawnSync(process.execPath, [join(scripts, 'verify-ci.mjs'), '--plan'], { cwd: directory, encoding: 'utf8', env: { ...process.env, GITHUB_TOKEN: '', GITHUB_OUTPUT: output, TIER: 'push' } });
+ const command = spawnSync(process.execPath, [join(scripts, 'verify-ci.mjs'), '--plan'], {
+  cwd: directory, encoding: 'utf8',
+  env: { ...environment, GITHUB_TOKEN: '', GITHUB_OUTPUT: output, TIER: 'push' },
+ });
  assert.equal(command.status, 0, command.stderr);
  const outputs = Object.fromEntries((await readFile(output, 'utf8')).trim().split('\n').map(line => { const at = line.indexOf('='); return [line.slice(0, at), line.slice(at + 1)]; }));
  assert.equal(outputs.coverage, 'full'); assert.equal(outputs.has_shards, 'true');
