@@ -9,7 +9,7 @@
 //   server.json   that server's PID and start time, and the process rer spawned
 //   stop.json     when rer dev --stop last ran: a launch requested before it stops
 //   pin-install.json  the process installing the checkout's pinned rer package
-import { appendFile, link, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
+import { appendFile, link, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { processInfo } from '../../modules/job-queue/processes.mjs';
 import { serversDirectory } from '../registry.mjs';
@@ -97,12 +97,19 @@ export async function settledPinInstall(checkout, { env = process.env, signal, o
 
 // The worker claims the checkout's launch; a second worker started at the
 // same moment finds the first and leaves.
-export async function claimLaunch(directory, token) {
+export async function claimLaunch(directory, token, persona) {
  const path = join(directory, 'worker.json');
  for (let attempt = 0; attempt < 3; attempt++) {
   const { start, title: command } = await processInfo(process.pid), checkout = await realpath(process.cwd());
-  if (await linkClaim(path, { token, pid: process.pid, start, command, checkout, startedAt: Date.now(), events: `events-${token}.jsonl` })) {
-   for (const entry of await readdir(directory)) if (/^events-.*\.jsonl$/.test(entry) && entry !== `events-${token}.jsonl`) await rm(join(directory, entry), { force: true });
+  if (await linkClaim(path, { token, persona, pid: process.pid, start, command, checkout, startedAt: Date.now(), events: `events-${token}.jsonl` })) {
+   // A previous caller can still be reading its ready event when a different
+   // persona takes the launch claim. Keep recent journals for those callers.
+   const cutoff = Date.now() - 15 * 60_000;
+   for (const entry of await readdir(directory)) {
+    if (!/^events-.*\.jsonl$/.test(entry)) continue;
+    const journal = join(directory, entry);
+    if ((await stat(journal)).mtimeMs < cutoff) await rm(journal, { force: true });
+   }
    return true;
   }
   if (await liveWorker(directory)) return false;

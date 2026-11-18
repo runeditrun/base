@@ -16,7 +16,7 @@ import { delegate } from '../delegate.mjs';
 import { ownRoot } from '../package-info.mjs';
 import { LaunchFailure } from './failure.mjs';
 import { describeCheckout } from './facts.mjs';
-import { prepare } from './prepare.mjs';
+import { flagValue, prepare } from './prepare.mjs';
 import { printer } from './render.mjs';
 import { access } from 'node:fs/promises';
 import { layout } from '../cli/layout.mjs';
@@ -98,7 +98,7 @@ async function foreground(target, devArgs, directory, out, doorStart) {
 async function detached(target, devArgs, directory, out, doorStart) {
  let token, worker;
  const holder = await liveWorker(directory);
- if (holder) { token = holder.token; out.attaching(holder.startedAt); }
+ if (holder && holder.persona === flagValue(devArgs, '--as')) { token = holder.token; out.attaching(holder.startedAt); }
  else {
   token = randomUUID();
   // The worker ends itself for a stop that ran after this command started.
