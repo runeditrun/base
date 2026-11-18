@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { main as cli } from './main.mjs';
 import { checkout, account } from './fixtures/owner-deploy.mjs';
+import { isolatedQueue } from './fixtures/queue.mjs';
 
 const execute = promisify(execFile);
 
@@ -202,4 +203,22 @@ export const commandAdapter = {...lifecycle,deploy};`);
  const real = await execute(process.execPath, [fileURLToPath(new URL('../bin/rer.mjs', import.meta.url)), 'deploy', '--environment', 'production', '--env-file', 'empty.env', '--cwd', root], { env, cwd: root }).then(() => assert.fail('the same seed check stops a real deploy'), error => error);
  assert.equal(real.code, 1, real.stdout + real.stderr);
  assert.match(real.stdout + real.stderr, /run ~\/\.local\/bin\/rer deploy --environment production --env-file empty\.env --cwd \. again using the same environment credentials/);
+});
+
+test('deploy dry run exits with its reported failure when the temporary directory cannot be created', async t => {
+ const { root } = await checkout(t, {});
+ await writeFile(join(root, 'adapter.mjs'), "export const commandAdapter = {};");
+ await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'tests/fixture', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { deploy: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs', 'deploy.json'], effects: 'Preflight deployment offline.' } } }));
+ await writeFile(join(root, '.node-version'), process.versions.node + '\n');
+ await writeFile(join(root, 'package.json'), JSON.stringify({ engines: { node: process.versions.node }, packageManager: 'pnpm@10.12.4' }));
+ const blockedTemp = join(root, 'unusable-temp-directory-'.repeat(5));
+ await writeFile(blockedTemp, '');
+ const env = await isolatedQueue(t, { ...process.env, CI: 'false', TMPDIR: blockedTemp, TMP: blockedTemp, TEMP: blockedTemp });
+ const failed = await execute(process.execPath, [fileURLToPath(new URL('../bin/rer.mjs', import.meta.url)), 'deploy', '--dry-run', '--cwd', root, '--json'], { env, timeout: 12000 })
+  .then(() => assert.fail('deploy should fail before it can start'), error => error);
+ assert.equal(failed.code, 1, failed.stdout + failed.stderr);
+ const events = failed.stdout.trim().split('\n').map(JSON.parse);
+ assert.match(events.find(event => event.event === 'error').message, /mkdtemp/);
+ const result = events.at(-1);
+ assert.deepEqual([result.event, result.ok, result.exitCode], ['result', false, failed.code]);
 });

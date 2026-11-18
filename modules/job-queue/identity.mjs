@@ -14,14 +14,19 @@ export async function identity() {
   // A prober that timed out or exited may close before the answer is written;
   // the prober reports that itself, so the answer's EPIPE or ECONNRESET is dropped.
   const server = createServer(client => { client.on('error', () => {}); client.end(token); });
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(path, resolve); });
-  await chmod(path, 0o600);
-  const { title, ...processIdentity } = await processInfo(process.pid);
-  const info = { ...processIdentity, token, socket: path };
-  return { info, async close() {
+  const close = async () => {
     await new Promise(resolve => server.close(resolve));
     await unlink(path).catch(error => { if (error.code !== 'ENOENT') throw error; });
-  } };
+  };
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(path, resolve); });
+  try {
+    await chmod(path, 0o600);
+    const { title, ...processIdentity } = await processInfo(process.pid);
+    return { info: { ...processIdentity, token, socket: path }, close };
+  } catch (error) {
+    await close().catch(() => {});
+    throw error;
+  }
 }
 
 export async function alive(owner) {
