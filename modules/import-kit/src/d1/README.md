@@ -342,23 +342,26 @@ statements from `d1Schema` in a new product migration. Existing inline plans and
 version-1 inline and version-2 binary-chunk original sets remain readable.
 Plans larger than 128 KiB are stored as a digest/count/size manifest and ordered
 UTF-8 chunks. New original sets use version 3: metadata rows have NULL bytes,
-and canonical base64 TEXT is retained in ordered 128 KiB chunks in the existing
-`ik_d1_original_chunks.bytes` column. SQLite BLOB affinity preserves bound TEXT;
-no SQL binary decoder is required. Empty retained originals have one empty TEXT
-chunk. Unavailable originals have no chunks. Version 3 needs no new migration
-when both chunk tables already exist. It does require this reader version; do
-not roll back to a binary-only reader after creating version-3 jobs.
+and canonical base64 is retained as BLOBs in ordered 128 KiB chunks in the
+existing `ik_d1_original_chunks.bytes` column. Empty retained originals have
+one zero-byte BLOB. Unavailable originals have no chunks. The reader also
+accepts version-3 chunks written as TEXT by older import kits. Adopters with
+both chunk tables already installed can update the worker and its CLI copies
+together without a migration. Earlier version-3 workers expect TEXT chunks.
 
 Plan chunks are inserted with bounded `json_each` batches, each bound JSON
 string at most 1,900,000 UTF-8 bytes including escaping and array punctuation.
 For chunked plans, original chunks are copied from that exact base64 text using
 bounded positional descriptors and SQLite `substr`, inside the same transaction.
+The assembled ASCII is cast to BLOB after slicing so the offsets stay in text.
 Offsets account for Unicode code points and split boundaries. Original bytes
 remain independently stored; they are not reconstructed from parsed source data.
-Inline plans bind their small original chunks directly. Publication guards first
+Inline plans bind their small original chunks as base64 and cast to BLOB in the
+insert. Publication guards first
 compare all plan chunks to exact snapshots, then compare original chunks with
 those same guarded positions, plus complete metadata and cardinality checks.
-This avoids sending two complete copies of base64 in one D1 batch request. Reconstruction
+This avoids sending two complete copies of base64 in one D1 batch request. Version-3
+guards compare the exact base64 bytes across both SQLite storage classes. Reconstruction
 verifies complete bytes, ordinals, counts and digests. Publication also compares
 the exact manifest and every chunk, including original bytes; a stored digest is
 never the concurrency fence. Erasure integrations must delete both new chunk

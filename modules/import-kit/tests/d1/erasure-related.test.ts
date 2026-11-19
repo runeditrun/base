@@ -16,7 +16,7 @@ const related = { source: (record: any) => JSON.stringify(record.payload).includ
 function retainedText(r: any) {
   const tables = r.native().prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'ik_%'").all();
   const text = [JSON.stringify(tables.map((row: any) => r.native().prepare(`SELECT * FROM ${row.name}`).all()))];
-  const chunks = r.native().prepare('SELECT job_id,kind,original_key,bytes FROM ik_d1_original_chunks ORDER BY job_id,kind,original_key,ordinal').all(), groups = new Map<string, string>();
+  const chunks = r.native().prepare('SELECT job_id,kind,original_key,CAST(bytes AS TEXT) AS bytes FROM ik_d1_original_chunks ORDER BY job_id,kind,original_key,ordinal').all(), groups = new Map<string, string>();
   for (const row of chunks) { const key = canonicalJson([row.job_id, row.kind, row.original_key]); groups.set(key, (groups.get(key) ?? '') + row.bytes); }
   for (const body of groups.values()) text.push(Buffer.from(body, 'base64').toString());
   for (const row of r.native().prepare('SELECT bytes FROM ik_originals WHERE bytes IS NOT NULL').all()) text.push(Buffer.from(row.bytes).toString());

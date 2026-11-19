@@ -9,6 +9,7 @@ import type { D1ImportContext, D1Sql } from './types.ts';
 import { sql, guard, authorize, readAtomic } from './database.ts';
 import { stored, boundary } from './jobs.ts';
 import { originalCopies, retainCopies } from './original-copies.ts';
+import { originalChunkColumns } from './original-chunk-cells.ts';
 import type { StoredPlan } from './plans.ts';
 import { insertJsonRows } from './sets.ts';
 import { nativeStagingScope } from './native-staging-context.ts';
@@ -60,7 +61,7 @@ const ORIGINAL_READ_ROWS = 16;
 async function originalChunks(db: D1ImportContext['storage']['database'], id: string): Promise<any[]> {
   const rows: any[] = [];
   for (;;) {
-    const { results } = await db.prepare(`SELECT * FROM ik_d1_original_chunks WHERE job_id=? ORDER BY kind,original_key,ordinal LIMIT ${ORIGINAL_READ_ROWS} OFFSET ?`).bind(id, rows.length).all();
+    const { results } = await db.prepare(`SELECT ${originalChunkColumns} FROM ik_d1_original_chunks WHERE job_id=? ORDER BY kind,original_key,ordinal LIMIT ${ORIGINAL_READ_ROWS} OFFSET ?`).bind(id, rows.length).all();
     rows.push(...results);
     if (results.length < ORIGINAL_READ_ROWS) return rows;
   }

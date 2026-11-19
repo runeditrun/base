@@ -60,7 +60,7 @@ async function nextItems(context,row) {
       if(table.name==='oa_policy_approvals')await refusePolicyApprovals(db,copies);
       row.metadata.normalized??=[];row.metadata.normalized.push(table.name);await save(db,row).run();
     }
-    const records=await readCopy(db,table,copies[table.name],cursor.row,Math.min(1000,Math.ceil(partBytes/128)),true);
+    const records=await readCopy(db,table,copies[table.name],cursor.row,Math.min(1000,Math.ceil(partBytes/128)),'export');
     const items=[];let size=200;
     for(const {row:record,meta} of records) {
       const value=encodedRow(table,record,config.secretColumns[table.name]??[]);

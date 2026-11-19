@@ -1121,6 +1121,13 @@ destination writers and extra-payload recovery need product-level verification.
 
 ## Adopting
 
+Export writes retained `ik_d1_original_chunks.bytes` into the archive as BLOBs.
+If an older import kit stored the base64 as TEXT in this BLOB column, export
+casts the snapshot value to BLOB. Restore writes the same base64 bytes, and
+the source installation and its custody revisions are untouched. Update the
+import-kit reader and the portability runtime together when backing up these
+installations.
+
 Copy exactly these runtime, declaration and schema files byte for byte under the
 seed's `vendor/base/` directory. The fixture adoption test parses this list and
 executes the copied Worker and CLI. Tests and development fixtures are not copied.

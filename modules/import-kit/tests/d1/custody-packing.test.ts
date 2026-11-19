@@ -19,7 +19,7 @@ test('real D1: encoded custody preserves every byte including invalid UTF-8, emp
   const job = await m.request('create', () => createD1ImportJob(plan, { ...ctx, reviewedFingerprint: plan.fingerprint }));
   assert.equal(m.snapshots.at(-1).count, admission.totalExecutions);
   assert.equal((await r.db().prepare('SELECT version FROM ik_original_sets').first())?.version, 3);
-  assert.equal((await r.db().prepare("SELECT COUNT(*) AS n FROM ik_d1_original_chunks WHERE typeof(bytes)<>'text'").first())?.n, 0);
+  assert.deepEqual((await r.db().prepare('SELECT DISTINCT typeof(bytes) AS storage FROM ik_d1_original_chunks').all()).results, [{ storage: 'blob' }]);
   await m.request('resume', () => resumeD1Import(job.id, ctx));
   await m.request('undo', () => undoD1Import(job.id, ctx));
   const originals = await m.request('read-after-undo', () => readD1ImportOriginals(job.id, ctx));
@@ -36,7 +36,7 @@ for (const corruption of ['missing', 'extra', 'content', 'ordinal']) test(`real 
   const row = await r.db().prepare('SELECT * FROM ik_d1_original_chunks WHERE job_id=? AND ordinal=1 LIMIT 1').bind(job.id).first();
   const key = [job.id, row.kind, row.original_key, row.ordinal];
   if (corruption === 'missing') await r.db().prepare('DELETE FROM ik_d1_original_chunks WHERE job_id=? AND kind=? AND original_key=? AND ordinal=?').bind(...key).run();
-  if (corruption === 'extra') await r.db().prepare('INSERT INTO ik_d1_original_chunks VALUES(?,?,?,?,?)').bind(job.id, row.kind, row.original_key, 100, row.bytes).run();
+  if (corruption === 'extra') await r.db().prepare('INSERT INTO ik_d1_original_chunks VALUES(?,?,?,?,?)').bind(job.id, row.kind, row.original_key, 100, Uint8Array.from(row.bytes).buffer).run();
   if (corruption === 'content') await r.db().prepare("UPDATE ik_d1_original_chunks SET bytes='AAAA' WHERE job_id=? AND kind=? AND original_key=? AND ordinal=?").bind(...key).run();
   if (corruption === 'ordinal') await r.db().prepare('UPDATE ik_d1_original_chunks SET ordinal=100 WHERE job_id=? AND kind=? AND original_key=? AND ordinal=?').bind(...key).run();
   await assert.rejects(readD1ImportOriginals(job.id, ctx), /ORIGINAL_CUSTODY_MISMATCH/);

@@ -34,7 +34,7 @@ for (const version of [1, 2, 3]) test(`query-only custody version ${version} ret
 for (const table of ['ik_d1_plan_chunks', 'ik_d1_original_chunks']) for (const position of ['first', 'last']) test(`read rejects late ${position} ${table} byte edit without writes`, async t => {
   const r = await custody(t), native = r.native();
   const column = table === 'ik_d1_plan_chunks' ? 'body' : 'bytes';
-  const row = native.prepare(`SELECT rowid,${column} AS content FROM ${table} ORDER BY ordinal ${position === 'first' ? 'ASC' : 'DESC'} LIMIT 1`).get()!;
+  const row = native.prepare(`SELECT rowid,CAST(${column} AS TEXT) AS content FROM ${table} ORDER BY ordinal ${position === 'first' ? 'ASC' : 'DESC'} LIMIT 1`).get()!;
   assert.ok(native.prepare(`SELECT MAX(ordinal) AS n FROM ${table}`).get()!.n as number > 0);
   let batches = 0, count = -1, before: any;
   const observed = observeReads(r.db(), () => {

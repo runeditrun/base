@@ -2,6 +2,7 @@ import type { D1Sql } from './types.ts';
 import type { StoredPlan } from './plans.ts';
 import { guard, sql } from './database.ts';
 import { jsonChunks, PACKED_JSON_BYTES } from './sets.ts';
+import { originalChunkEquals } from './original-chunk-cells.ts';
 
 /** A copy descriptor contains positions, never a second copy of the bytes. */
 interface Copy {
@@ -41,7 +42,7 @@ export function originalCopies(encoded: StoredPlan, chunks: any[]): Copy[] {
 }
 const value = (key: string) => `json_extract(e.value,'$.${key}')`;
 const joins = `JOIN ik_d1_plan_chunks a ON a.job_id=${value('job_id')} AND a.ordinal=${value('first')} JOIN ik_d1_plan_chunks b ON b.job_id=${value('job_id')} AND b.ordinal=${value('second')}`;
-const bytes = `substr(a.body,${value('start')},${value('length')}) || substr(b.body,1,${value('tail')})`;
+const bytes = `CAST(substr(a.body,${value('start')},${value('length')}) || substr(b.body,1,${value('tail')}) AS BLOB)`;
 export function retainCopies(copies: Copy[]): D1Sql[] {
   return jsonChunks(copies, PACKED_JSON_BYTES).map(chunk => sql(`INSERT INTO ik_d1_original_chunks(job_id,kind,original_key,ordinal,bytes) SELECT ${['job_id','kind','original_key','ordinal'].map(value).join(',')},${bytes} FROM json_each(?) e ${joins}`, chunk));
 }
@@ -49,5 +50,5 @@ export function retainCopies(copies: Copy[]): D1Sql[] {
  * Equality with those immutable chunks proves original content without binding
  * another complete base64 copy into the D1 request. Cardinality is separate. */
 export function copyGuards(copies: Copy[]): D1Sql[] {
-  return jsonChunks(copies, PACKED_JSON_BYTES).map(chunk => guard(sql(`NOT EXISTS(SELECT 1 FROM json_each(?) e WHERE NOT EXISTS(SELECT 1 FROM ik_d1_original_chunks t ${joins} WHERE ${['job_id','kind','original_key','ordinal'].map(c => `t.${c} IS ${value(c)}`).join(' AND ')} AND t.bytes IS (${bytes})))`, chunk)));
+  return jsonChunks(copies, PACKED_JSON_BYTES).map(chunk => guard(sql(`NOT EXISTS(SELECT 1 FROM json_each(?) e WHERE NOT EXISTS(SELECT 1 FROM ik_d1_original_chunks t ${joins} WHERE ${['job_id','kind','original_key','ordinal'].map(c => `t.${c} IS ${value(c)}`).join(' AND ')} AND ${originalChunkEquals(bytes)}))`, chunk)));
 }

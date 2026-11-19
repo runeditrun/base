@@ -61,7 +61,7 @@ export async function normalizeStaged(context,row) {
         await db.batch(checkpoint(row,before,row.metadata,queries).map(q=>statement(db,q.sql,...(q.params??[]))));
         before=metadataJson(row.metadata);queries=[];
       };
-      for(const {row:raw,meta} of await readCopy(db,table,copy,offset,100,true)) {
+      for(const {row:raw,meta} of await readCopy(db,table,copy,offset,100,'encoded')) {
         const original=encodedRow(table,raw),after=mapImportRow(config,table,original);
         const columns=Object.keys(original).filter(key=>!same(original[key],after[key]));
         insist(Number.isSafeInteger(meta.rer_portability_copy_rowid),'copy_rowid');

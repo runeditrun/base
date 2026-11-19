@@ -21,8 +21,8 @@ export function createCopy(db,table,copy,snapshot=false) {
     db.prepare(`CREATE TABLE ${meta}(rer_portability_row_order INTEGER PRIMARY KEY,rer_portability_copy_rowid INTEGER NOT NULL UNIQUE,rer_portability_source_rowid INTEGER,rer_portability_tombstone TEXT)`),
     ...(snapshot?[db.prepare(`INSERT INTO ${meta} SELECT ROW_NUMBER() OVER(ORDER BY ${ordering})-1,ROW_NUMBER() OVER(ORDER BY ${ordering}),${table.rowidAlias?quote(table.rowidAlias):'NULL'},NULL FROM ${quote(table.name)}`)]:[])];
 }
-export async function readCopy(db,table,copy,offset,limit,encoded=false) {
-  const columns=projectedColumns(table,encoded);
+export async function readCopy(db,table,copy,offset,limit,mode='raw') {
+  const encoded=mode!=='raw',columns=projectedColumns(table,encoded,mode==='export');
   const selected=encoded?writableColumns(table):table.columns;
   const from=`FROM ${quote(copy)} s JOIN ${quote(sidecar(copy))} m ON s.${copyRowid(table)}=m.rer_portability_copy_rowid ORDER BY m.rer_portability_row_order LIMIT ? OFFSET ?`;
   // Read sizes first, never discover a large row by overflowing the RPC result.
@@ -55,7 +55,7 @@ async function normalize(context,table,copy) {
   if(table.columns.some(c=>c.generated)&&secrets.length)await db.prepare(`UPDATE ${quote(copy)} SET ${secrets.map(name=>quote(name)+'=NULL').join(',')}`).run();
   if(config.exportRow)for(let offset=0;offset<table.count;offset+=500) {
     const statements=[];
-    for(const {row,meta} of await readCopy(db,table,copy,offset,500,true)) {
+    for(const {row,meta} of await readCopy(db,table,copy,offset,500,'export')) {
       const before=encodedRow(table,row,secrets),after=mapRow(config,table,before);
       if(canonicalJson(before)===canonicalJson(after))continue;
       const columns=writableColumns(table).filter(c=>!secrets.includes(c.name));
