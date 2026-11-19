@@ -12,6 +12,7 @@ import { migrationRecorder } from '../modules/portability/migration-evidence.mjs
 
 const wasmPath = fileURLToPath(new URL('./vendor/wa-sqlite/wa-sqlite.wasm', import.meta.url));
 const sqlitePath = fileURLToPath(new URL('./portability-sqlite.mjs', import.meta.url));
+const ownerHistoryPath = fileURLToPath(new URL('../modules/portability/worker-owner-history.mjs', import.meta.url));
 
 // Only migration-owned schema and hashed seeded-row identities enter the bundle.
 // Never open a live database, settings file, archive, or archive-supplied path.
@@ -27,20 +28,23 @@ async function migrationEvidence(root,{binding='DB'}={}) {
   return {name,sha256:await sha256(bytes),statements:splitStatements(bytes.toString('utf8'))};
  }));
  const sources=await ownerMigrationSources(root,binding);
- if (sources.length) {
+ const ownerFiles = (await Promise.all(sources.filter(source => source.directory).map(async ({directory,prefix,table}) => {
+  const owners = await collectMigrations(root, [{binding,path:directory,prefix}], [{kind:'d1',binding}]);
+  return owners.map(({name,sha256,sql}) => ({name,sha256,statements:splitStatements(sql),table}));
+ }))).flat();
+ const ownerSources = sources.map(({prefix,table})=>({prefix,table}));
+ if (ownerFiles.length) {
   const declared = new Set(files.map(file => file.name));
-  const ownerFiles = await Promise.all(sources.filter(source => source.directory).map(async ({directory,prefix,table}) => {
-   const owners = await collectMigrations(root, [{binding,path:directory,prefix}], [{kind:'d1',binding}]);
-   return owners.map(({name,sha256,sql}) => ({name,sha256,statements:splitStatements(sql),table}));
-  }));
-  for (const file of ownerFiles.flat()) {
+  for (const file of ownerFiles) {
    insist(!declared.has(file.name),'migration_ledger:ambiguous',409);
    declared.add(file.name);
    files.push(file);
   }
-  return {version:2,files,ownerSources:sources.map(({prefix,table})=>({prefix,table}))};
+  return {version:2,files,ownerSources};
  }
- return bundledPrefixes(files);
+ const evidence = await bundledPrefixes(files);
+ if (ownerSources.length) evidence.ownerSources = ownerSources;
+ return evidence;
 }
 
 async function bundledPrefixes(files) {
@@ -67,8 +71,10 @@ async function bundledPrefixes(files) {
 export async function generateMigrationEvidence(root,options) {
  const evidence = await migrationEvidence(root,options);
  if (evidence.version === 1) return evidence;
- const {sqliteMemory} = await import('./portability-sqlite.mjs');
- return {...evidence,openDatabase:sqliteMemory(await WebAssembly.compile(await readFile(wasmPath)))};
+ const [{sqliteMemory}, {workerOwnerEvidence}] = await Promise.all([
+  import('./portability-sqlite.mjs'), import('../modules/portability/worker-owner-history.mjs'),
+ ]);
+ return workerOwnerEvidence(evidence, sqliteMemory(await WebAssembly.compile(await readFile(wasmPath))));
 }
 
 // Explicit seed opt-in. The module is consumed only by the server/Worker graph;
@@ -87,7 +93,8 @@ export function legacyMigrationEvidence({binding='DB'}={}) {
    if (evidence.version === 1) return 'export default '+canonicalJson(evidence)+';';
    return `import wasm from ${JSON.stringify(wasmPath)};
 import { sqliteMemory } from ${JSON.stringify(sqlitePath)};
-export default { ...${canonicalJson(evidence)}, openDatabase: sqliteMemory(wasm) };`;
+import { workerOwnerEvidence } from ${JSON.stringify(ownerHistoryPath)};
+export default workerOwnerEvidence(${canonicalJson(evidence)}, sqliteMemory(wasm));`;
   },
  };
 }

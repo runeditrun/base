@@ -613,8 +613,9 @@ declare module 'virtual:rer-legacy-migration-evidence' {
 
 The generated JavaScript contains checkout file hashes and statements. A checkout
 with only core migrations bundles its prefix inventories and bounded deterministic
-seed-row hashes at build time. A checkout with declared owner migration
-directories bundles a SQLite engine. Its Worker makes those inventories in a
+seed-row hashes at build time, including when declared owner migration directories
+are absent or empty. At least one owner SQL migration file enables the SQLite
+engine and replay module. The Worker makes those inventories in a
 fresh in-memory database using the combined order recorded by the live core and
 owner ledgers. Volatile seeded rows cannot be vouched for. Runtime policy
 projects each inventory through the same schema identity code as live SQLite.
@@ -1153,6 +1154,7 @@ modules/portability/bridge.mjs
 modules/portability/library-history.mjs
 modules/portability/checkout-history.mjs
 modules/portability/owner-history.mjs
+modules/portability/worker-owner-history.mjs
 modules/portability/migration-history.mjs
 modules/portability/ledgers.mjs
 modules/portability/migration-statements.mjs
