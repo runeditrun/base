@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.124-dev.g22313337",
+  "cliVersion": "0.2.124-dev.gfa2fb056",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -3187,7 +3187,7 @@
     },
     "modules/import-kit/src/d1/README.md": {
       "source": "modules/import-kit/src/d1/README.md",
-      "sha256": "9d396bb71fa6b122bdac2cbfe670216ce478d0b77f720c16a10861477738f54a"
+      "sha256": "1d0aac41ffd3bc08376c5deded39c601cd7373c79a58a7160a0c1ab946bb9708"
     },
     "modules/import-kit/src/d1/apply-effects.ts": {
       "source": "modules/import-kit/src/d1/apply-effects.ts",
@@ -3409,9 +3409,13 @@
       "source": "modules/import-kit/src/d1/native-staging.ts",
       "sha256": "5a91f76b297f059108622c18628fc5d23c0ca8dec01362cf5b5a8096e066573f"
     },
+    "modules/import-kit/src/d1/original-chunk-cells.ts": {
+      "source": "modules/import-kit/src/d1/original-chunk-cells.ts",
+      "sha256": "e16dad6b8c6f4a741f0527449671e95b0efa65dbf11fbced7ea430a7f8f105dd"
+    },
     "modules/import-kit/src/d1/original-copies.ts": {
       "source": "modules/import-kit/src/d1/original-copies.ts",
-      "sha256": "1c4d830a36c4a7300879dd842daff3b185b2d14caf6372141144e6c4c74adef6"
+      "sha256": "13abc0f049e475c4fefbeac37878e3c50bd1200eb95a63f14ce9fab28f5536a4"
     },
     "modules/import-kit/src/d1/original-storage.ts": {
       "source": "modules/import-kit/src/d1/original-storage.ts",
@@ -3419,7 +3423,7 @@
     },
     "modules/import-kit/src/d1/originals.ts": {
       "source": "modules/import-kit/src/d1/originals.ts",
-      "sha256": "2419e873aec0f9ff8556e91caeccc321b37456d28474ee1225a703d671772ef7"
+      "sha256": "4ee1e77af225107a67a28fc868e50c2913c1711c65c20a36c486231302a327d6"
     },
     "modules/import-kit/src/d1/plan-dictionary.ts": {
       "source": "modules/import-kit/src/d1/plan-dictionary.ts",
@@ -3587,7 +3591,7 @@
     },
     "modules/import-kit/src/d1/sets.ts": {
       "source": "modules/import-kit/src/d1/sets.ts",
-      "sha256": "684734c78e7704d1eac0ea006b2c4e10122f4f7bea2e24780ba4224f4ceb2dd1"
+      "sha256": "2bd98eaed5f36080bbad746369bc5e850b71c7b2157ddc3bf1681d5334ba55fa"
     },
     "modules/import-kit/src/d1/snapshot-text.ts": {
       "source": "modules/import-kit/src/d1/snapshot-text.ts",
@@ -4911,7 +4915,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "3a6e505bb8e878560cbfb2261f26d7214ed32320297ff8e21589882b218b59da"
+      "sha256": "0f83bb7e89da09013f7ea870e432a1dba0fcfd1ab15e7012c30ef147f6a28722"
     },
     "modules/portability/archive-step.mjs": {
       "source": "modules/portability/archive-step.mjs",
@@ -4931,7 +4935,7 @@
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
-      "sha256": "171304e9f409f9c43b74af69d635ba89c9ba489ad7560db2e822dd41a7069b9f"
+      "sha256": "2d510252959f16643326c5a0875c02b729e532471a203e1135a8253105330ae7"
     },
     "modules/portability/checkout-history.mjs": {
       "source": "modules/portability/checkout-history.mjs",
@@ -4947,7 +4951,7 @@
     },
     "modules/portability/copies.mjs": {
       "source": "modules/portability/copies.mjs",
-      "sha256": "1de06490a5eda233e74eee516671b5b2ef0b4f7069b9219a046623f85df479f0"
+      "sha256": "84b66d0a1b9488abf6f6cc836e83ff5e4f32b493192966f9ab722162162a33c9"
     },
     "modules/portability/derived.mjs": {
       "source": "modules/portability/derived.mjs",
@@ -4963,7 +4967,7 @@
     },
     "modules/portability/export.mjs": {
       "source": "modules/portability/export.mjs",
-      "sha256": "a00cdad3027bd22194f666cb2996b2cd1252b95ad8f48c4f0239286af1eb6e2e"
+      "sha256": "8b685d156eb0bec14999d66359abb33beef3d1bb56f8d14e115de6a8f2c5e940"
     },
     "modules/portability/files.mjs": {
       "source": "modules/portability/files.mjs",
@@ -4999,7 +5003,7 @@
     },
     "modules/portability/import-safety.mjs": {
       "source": "modules/portability/import-safety.mjs",
-      "sha256": "9e6353c789b5a41734027fa990251cb83d175fc5ce0752a08e9c531b26530494"
+      "sha256": "b3ac92e60cf3ec116fbbce97fc559865d31abe19a28bcf85fab1c0337f54f632"
     },
     "modules/portability/import-staging.mjs": {
       "source": "modules/portability/import-staging.mjs",

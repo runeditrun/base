@@ -27,7 +27,7 @@ function noPrivateValues(r:any) {
   for(const value of planted) assert.ok(!text.includes(value),value);
   // Decode every retained original, including chunk boundaries. Plan chunks
   // contain canonical JSON and are separately included in the table inventory.
-  const chunks=r.native().prepare('SELECT job_id,kind,original_key,bytes FROM ik_d1_original_chunks ORDER BY job_id,kind,original_key,ordinal').all();
+  const chunks=r.native().prepare('SELECT job_id,kind,original_key,CAST(bytes AS TEXT) AS bytes FROM ik_d1_original_chunks ORDER BY job_id,kind,original_key,ordinal').all();
   const groups=new Map<string,string>();
   for(const row of chunks){const key=canonicalJson([row.job_id,row.kind,row.original_key]);groups.set(key,(groups.get(key)??'')+row.bytes);}
   const bodies = rows.flatMap(([, records]:any)=>records.flatMap((row:any)=>Object.values(row).filter((value): value is string => typeof value === 'string')));

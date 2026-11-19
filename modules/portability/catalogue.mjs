@@ -140,8 +140,16 @@ export function affinity(type) {
   if(text==='' || text.includes('BLOB')) return 'BLOB';
   return 'NUMBER';
 }
-export function projectedColumns(table,encoded=false) {
-  return (encoded?writableColumns(table):table.columns).map(c=>encoded && affinity(c.type)==='INTEGER'?`CAST(s.${quote(c.name)} AS TEXT) AS ${quote(c.name)}`:`s.${quote(c.name)}`).join(',');
+export function projectedColumns(table,encoded=false,exporting=false) {
+  return (encoded?writableColumns(table):table.columns).map(column=>{
+    const name=quote(column.name),cell=`s.${name}`;
+    if(encoded && affinity(column.type)==='INTEGER')return `CAST(${cell} AS TEXT) AS ${name}`;
+    // Old Move in jobs stored canonical base64 as TEXT. Archive the exact
+    // same bytes as a BLOB, without writing to the source or its custody fence.
+    if(exporting && table.name==='ik_d1_original_chunks' && column.name==='bytes' && affinity(column.type)==='BLOB')
+      return `CASE WHEN typeof(${cell})='text' THEN CAST(${cell} AS BLOB) ELSE ${cell} END AS ${name}`;
+    return cell;
+  }).join(',');
 }
 export const writableColumns=table=>table.columns.filter(c=>!c.generated);
 export function validateRow(table,row,secrets=[]) {
