@@ -1149,6 +1149,7 @@ modules/portability/restore-safety.mjs
 modules/portability/bridge.mjs
 modules/portability/library-history.mjs
 modules/portability/checkout-history.mjs
+modules/portability/owner-history.mjs
 modules/portability/migration-history.mjs
 modules/portability/ledgers.mjs
 modules/portability/migration-statements.mjs
