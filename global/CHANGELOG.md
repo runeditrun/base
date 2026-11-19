@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.125
+
+Signed: Run Edit Run fleet, 2026-11-19.
+
+### Worker archive restore in applied order
+
+- Worker restore replays interleaved core and owner migrations in their recorded applied order. This resolves the 0.2.124 known limit where an owner ALTER followed by a later core upgrade could cause a matching archive to refuse with HTTP 409.
+- The Worker bundles the SQLite WASM and owner replay module only when at least one owner migration SQL file exists. A declared optional owner directory that is absent or empty keeps the core-only build path. Core-only Worker bundles add 330 bytes of shared evidence dispatch compared with 0.2.124 in the qualified fixture.
+- The portability adoption list documents the replay modules. Maintained CLI copies and inventory are regenerated.
+
+Archives with owner migrations written by rer 0.2.124 or later are not readable by rer 0.2.123 or older (`manifest_inventory`), unchanged from 0.2.124. The archive format remains `runeditrun-portability` version 2, unchanged from 0.2.124.
+
+An owner-enabled Worker bundle grows by about 1.18 MB for the SQLite WASM and replay support compared with 0.2.124; this applies only to an owner-enabled build.
+
+ChargeDesk checkouts pin rer 0.2.118 and other seeds have older pins, and need a re-pin to receive this fix.
+
+These changes require adoption through the seed's pinned package or refreshed source. This preparation establishes no seed adoption, live Spool deployment, provider delivery or production result. The source range changes portability and its maintained copies, with no import-kit or product migration change.
+
 ## 0.2.124
 
 Signed: Run Edit Run fleet, 2026-11-19.
