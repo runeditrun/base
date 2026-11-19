@@ -16,6 +16,7 @@ import { nativeFailure, stateBytes } from './portability-progress.mjs';
 import { parseJsonc } from './jsonc.mjs';
 import { loadPolicy } from './portability-policy.mjs';
 import { appliedMigrations, platformMigrationDeclaration, nativeMigrationPreflight } from './portability-migrations.mjs';
+import { nativeMigrationHistory, ownerMigrationPolicy, ownerMigrationSources } from './portability-owners.mjs';
 
 // Transfers read only the D1 database and R2 buckets. A configuration with just
 // those keeps the app's other bindings out of the proxy: a Durable Object class
@@ -51,11 +52,18 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
  let proxy;
  try {
   proxy = await getPlatformProxy({ configPath, persist: { path: join(root, '.wrangler/state/v3') }, remoteBindings: false });
-  if(direction==='migration-preflight')return await nativeMigrationPreflight({root,db:proxy.env[binding],binding,platformMigrations});
-  const migrations=async()=>migrationReplay(await appliedMigrations(root,proxy.env[binding],binding,declaration,unstable_splitSqlQuery),policy,declaration);
+  const db = proxy.env[binding], owners = await ownerMigrationSources(root, binding);
+  const migrationHistory = () => nativeMigrationHistory(db, owners);
+  if(direction==='migration-preflight') {
+   const result=await nativeMigrationPreflight({root,db,binding,platformMigrations,ownerSources:owners});
+   if(!owners.length)return result;
+   const history=await migrationHistory();
+   return {...result, nativeOwners: !history || history.table==='d1_migrations'};
+  }
+  const migrations=async()=>migrationReplay(await appliedMigrations(root,db,binding,declaration,unstable_splitSqlQuery,owners),policy,declaration);
   const boundBuckets = Object.fromEntries(Object.entries(buckets).map(([name, binding]) => [name, proxy.env[binding]]));
-  policy = await loadPolicy(root, inputPolicy, policyModule, { db: proxy.env[binding], buckets: boundBuckets });
-  const options={ db: proxy.env[binding], buckets: boundBuckets, policy, migrations };
+  policy = ownerMigrationPolicy(await loadPolicy(root, inputPolicy, policyModule, { db, buckets: boundBuckets }), owners);
+  const options={ db, buckets: boundBuckets, policy, migrations, migrationHistory };
   if(direction==='schema-recovery-preflight') { await requireProductEmpty(options);return {checkedEmpty:true}; }
   if(direction==='legacy-preflight') {
    await requireLegacyEmpty(options,await legacyTargetState(options.db,options.migrations));
@@ -83,7 +91,7 @@ catch (error) {
  // Report symbolic codes and identities verified against the checkout or the
  // known Platform ledger name; native database errors can contain private data.
  const ledgerIdentity = error instanceof PortabilityError && error.code.startsWith('migration_ledger:') ? error.migration ?? error.identity : undefined;
- const reason = error instanceof PortabilityError ? (error.code.startsWith('migration_ledger:') ? error.code + (ledgerIdentity ? ':' + ledgerIdentity : '') : error.code.split(':')[0]) : /^[A-Z_]+$/.test(error.code ?? '') ? error.code : error.message === 'archive_json' ? 'archive_json' : 'native_error';
+ const reason = error instanceof PortabilityError ? (error.code.startsWith('migration_ledger:') ? error.code + (ledgerIdentity ? ':' + ledgerIdentity : '') : error.code === 'schema_mismatch:owner_migration_history' ? error.code : error.code.split(':')[0]) : /^[A-Z_]+$/.test(error.code ?? '') ? error.code : error.message === 'archive_json' ? 'archive_json' : 'native_error';
  // A later migration that changes restorable data is named: it is a file of this installation.
  const migration = error instanceof PortabilityError && error.code.startsWith('schema_mismatch:migration_data:') ? error.code.slice('schema_mismatch:migration_data:'.length) : undefined;
  // An unapplied migration is a file of this checkout: it is named so it can be applied.

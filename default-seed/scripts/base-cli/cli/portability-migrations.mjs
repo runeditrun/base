@@ -5,6 +5,8 @@ import { migrationStatements } from '../modules/portability/migration-sql.mjs';
 import { destinationLedger, ledgerNames, matchMigrationLedger } from '../modules/portability/ledgers.mjs';
 import { all, insist, PortabilityError } from '../modules/portability/storage.mjs';
 import {migrationDirectory} from '../modules/deploy-kit/migration-directory.mjs';
+import { collectMigrations } from '../modules/delivery-producer/migrations.mjs';
+import { nativeMigrationHistory } from './portability-owners.mjs';
 export {migrationDirectory};
 
 // Seed-owned declarations, never archive metadata: the deploymentSpec prefix
@@ -19,18 +21,26 @@ export function platformMigrationDeclaration(input={}) {
 
 // Reproduce the runner's stored SQL text, then recover SQLite's statement
 // boundaries (migration-sql.mjs).
-export async function migrationInventory(root,binding,{prefix},split) {
+export async function migrationInventory(root,binding,{prefix},split,sources=[]) {
  const directory=await migrationDirectory(root,binding);
- return Promise.all((await readdir(directory)).filter(name=>name.endsWith('.sql')).sort().map(async name=>{
+ const files=await Promise.all((await readdir(directory)).filter(name=>name.endsWith('.sql')).sort().map(async name=>{
   const bytes=await readFile(join(directory,name));
   return {name,...(split?{statements:migrationStatements(bytes.toString('utf8'),split)}:{}),sha256:createHash('sha256').update(bytes).digest('hex'),...(prefix===undefined?{}:{aliases:[prefix+name]})};
  }));
+ if(sources.length) {
+  const owners=await collectMigrations(root,sources.filter(source=>source.directory).map(({directory,prefix})=>({binding,path:directory,prefix})),[{kind:'d1',binding}]);
+  for(const {name,sha256,sql} of owners) {
+   insist(!files.some(file=>file.name===name || file.aliases?.includes(name)),'migration_ledger:ambiguous',409);
+   files.push({name,sha256,...(split?{statements:migrationStatements(sql,split)}:{})});
+  }
+ }
+ return files;
 }
 
 // Preserve the runner's applied order, resolving file identities by hash.
-export async function appliedMigrations(root,db,binding,declaration,split) {
- const ledger=await destinationLedger(db) ?? [],files=await migrationInventory(root,binding,declaration,split);
- return matchMigrationLedger(ledger,files,declaration).map(name=>files.find(file=>file.name===name));
+export async function appliedMigrations(root,db,binding,declaration,split,sources=[]) {
+ const history=await nativeMigrationHistory(db,sources),files=await migrationInventory(root,binding,declaration,split,sources);
+ return matchMigrationLedger(history?.entries ?? [],files,declaration).map(name=>files.find(file=>file.name===name));
 }
 
 // Ledger contents can contain private values. Report constant categories,
@@ -87,17 +97,23 @@ async function legacyPairPreflight(db) {
 // Adapter entry point, before *any* native Wrangler apply. The caller supplies
 // the real target binding and keeps its writers stopped through apply/transfer.
 // This only reads: it never repairs history or creates a second ledger.
-export async function nativeMigrationPreflight({root,db,binding='DB',platformMigrations}) {
+export async function nativeMigrationPreflight({root,db,binding='DB',platformMigrations,ownerSources=[]}) {
  const declaration=platformMigrationDeclaration(platformMigrations);
  const tables=await all(db,`SELECT type,name FROM sqlite_master WHERE lower(name) IN (${ledgerNames.map(name=>`'${name}'`).join(',')})`);
  const legacyPair=tables.length===2 && ['_rer_deploy_migrations','d1_migrations'].every(name=>tables.some(row=>row.name===name));
  if(tables.length>1 && !legacyPair)throw Object.assign(new PortabilityError('migration_ledger:multiple',409),tables.some(row=>row.name==='rer_migrations')?{identity:'rer_migrations'}:{});
  insist(tables.every(row=>row.type==='table' && ledgerNames.includes(row.name)),'migration_ledger:incompatible',409);
  const table=legacyPair?'_rer_deploy_migrations':tables[0]?.name;
- if(!table)return {nativeApply:true};
+ if(!table) {
+  if(ownerSources.length) {
+   await nativeMigrationHistory(db,ownerSources);
+   await migrationInventory(root,binding,declaration,undefined,ownerSources);
+  }
+  return {nativeApply:true};
+ }
  // This runner's history cannot authorize Wrangler to apply the same files.
  insist(table!=='_rer_deploy_migrations' || legacyPair,'migration_ledger:runner',409);
- const files=await migrationInventory(root,binding,declaration);
+ const files=await migrationInventory(root,binding,declaration,undefined,table==='rer_migrations'?ownerSources:[]);
  let nativeApply=false;
  try {
   if(legacyPair)await legacyPairPreflight(db);
@@ -108,5 +124,11 @@ export async function nativeMigrationPreflight({root,db,binding='DB',platformMig
   // The checkout file is named: it is the seed's own, never a ledger value.
   if(table!=='d1_migrations')for(const file of files)if(!applied.includes(file.name))throw Object.assign(new PortabilityError('migration_ledger:unapplied',409),{migration:file.name});
  } catch(error) { throw constantRefusal(error,files); }
+ if(ownerSources.length && table!=='rer_migrations') {
+  const history=await nativeMigrationHistory(db,ownerSources);
+  const allFiles=await migrationInventory(root,binding,declaration,undefined,ownerSources);
+  try { matchMigrationLedger(history.entries,allFiles,declaration); }
+  catch(error) { throw constantRefusal(error,allFiles); }
+ }
  return {nativeApply};
 }
