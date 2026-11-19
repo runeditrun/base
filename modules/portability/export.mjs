@@ -7,13 +7,15 @@ import { createCopy,readCopy,normalizeCopy } from './copies.mjs';
 import { canonicalJson, utf8, base64, StreamHash } from './hash.mjs';
 import { FORMAT, makePart, checkPart, ContentVerifier, ArchiveVerifier } from './format.mjs';
 import { journal } from './journal.mjs';
-import { readLedger, platformOrigin } from './ledgers.mjs';
+import { platformOrigin, nativeOrigin } from './ledgers.mjs';
+import { transferHistory } from './owner-history.mjs';
 import { capturePayload, payloadRange } from './payloads.mjs';
 import { dropProviderData } from './provider-data.mjs';
 import { dropDevData } from './dev-data.mjs';
 import { revokePolicyApprovals, refusePolicyApprovals } from './policy-data.mjs';
 export async function createExport(context,actor='direct') {
-  const {db,config,buckets}=context,s=await state(db);insist(!s.applying,'import_applying',409);
+  const {db,buckets}=context,s=await state(db);insist(!s.applying,'import_applying',409);
+  const {config,ledger,migrations:replay}=await transferHistory(context);
   const cat=await catalogue(db,config),id=crypto.randomUUID(),objects=[];
   for(const [binding,spec] of Object.entries(config.buckets).sort()) {
     let cursor;
@@ -25,7 +27,8 @@ export async function createExport(context,actor='direct') {
   }
   objects.sort((a,b)=>a.bucket<b.bucket?-1:a.bucket>b.bucket?1:a.key<b.key?-1:a.key>b.key?1:0);
   const copies=Object.fromEntries(cat.tables.map((t,i)=>[t.name,'rer_portability_snap_'+id.replaceAll('-','')+'_'+i]));
-  const ledger=await readLedger(db),origin=await platformOrigin(ledger,context.migrations),migrations=origin?origin.entries.map(entry=>entry.name):ledger?.entries.map(entry=>entry.name);
+  const origin=await (ledger?.owners?nativeOrigin(ledger,replay,cat.identity):platformOrigin(ledger,replay));
+  const migrations=origin?origin.entries.map(entry=>entry.name):ledger?.entries.map(entry=>entry.name);
   const manifest={kind:'manifest',format:FORMAT,version:2,product:config.product,exportedAt:new Date().toISOString(),sourceIdentity:s.source_identity,schema:cat.identity,tables:cat.tables,schemaObjects:cat.schemaObjects,objects,payloads:[],excludedTables:cat.excludedTables,excludedColumns:config.secretColumns,requiredConfiguration:config.requiredConfiguration,partCount:0,epoch:s.epoch,journal:await journal(db,s.source_identity),...(migrations?{migrations}:{}),...(origin?{migrationLedger:origin}:{})};
   const row={id,kind:'export',actor,phase:'building',completed:0,metadata:{manifest,copies,cursor:{table:0,row:0,binary:0,offset:0},partBytes:config.partBytes}};
   const audit=context.onExport?context.onExport({id,actor:actor==='direct'?null:actor,scope:'installation'}):[];

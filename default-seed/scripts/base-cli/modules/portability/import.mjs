@@ -16,25 +16,27 @@ import { checkEpoch, fence, mergeJournal, tombstone } from './journal.mjs';
 import { writeObject } from './payloads.mjs';
 import { createCopy,sidecar,readCopy,restoreCopy } from './copies.mjs';
 import { excludedDependentGuards, migrationSeeded, seededCondition } from './restore-safety.mjs';
-import { additiveBridge, sameSchemaMigrations, appliedMigrations, verifiedLegacySchema } from './bridge.mjs';
+import { additiveBridge, sameSchemaMigrations, verifiedLegacySchema } from './bridge.mjs';
 import { replayStatements } from './backfills.mjs';
-import { checkArchivedLedgers, archivedHistory, archivedLedgerTables, ledgerReader, matchMigrationLedger } from './ledgers.mjs';
+import { checkArchivedLedgers, archivedHistory, archivedLedgerTables, ledgerReader, matchMigrationLedger, readLedger } from './ledgers.mjs';
+import { transferHistory } from './owner-history.mjs';
 import { legacyEmptyGuards, legacyAuditStatements, requireLegacyEmpty } from './legacy-safety.mjs';
 import { checkReferences } from './references.mjs';
 import { rebuildDerivedStatements } from './derived.mjs';
+const acceptedUpgrade=(config,manifest)=>manifest.migrationLedger?.origin==='d1_migrations'?undefined:config.acceptedSchemas[manifest.schema];
 // ledgers: the rows of each migration ledger table the archive carries, as the
 // caller read them from it ({table:rows}); uploadPart binds them to its parts.
 export async function createImport(context,manifest,actor='direct',legacyRecovery,ledgers,acknowledgeUnverifiedSchemaObjects=false,id=crypto.randomUUID()) {
-  const {db,config,buckets}=context;await checkManifest(manifest);checkArchivedLedgers(manifest,ledgers);
-  insist(manifest.product===config.product,'wrong_product');
+  const {db,buckets}=context;await checkManifest(manifest);checkArchivedLedgers(manifest,ledgers);
+  insist(manifest.product===context.config.product,'wrong_product');
   // An already-stale backup cannot become restorable. Refuse before schema
   // inventory, staging copies and part uploads; fence checks again at finalize.
   await checkEpoch(db,manifest);
   // Explicit schema upgrades can reconcile rows, but cannot attest an interrupted deployment.
-  await appliedMigrations(db);
+  const {config,ledger:historyLedger,migrations}=await transferHistory(context),ledger=historyLedger?.entries;
   const original=manifest;manifest=await restorableManifest(original,{canonical:true});
   const skippedTables=original.tables.filter(table=>platformTable(table.name)).map(table=>table.name);
-  const cat=await catalogue(db,config),upgrade=config.acceptedSchemas[original.schema];
+  const cat=await catalogue(db,config),upgrade=acceptedUpgrade(config,original);
   manifest=await withoutAbsentExcludedObjects(manifest,cat,config);
   const legacy=original.version===2 && manifest.schemaObjects===undefined;
   // An explicit acknowledgment keeps its existing recovery semantics. Without
@@ -43,7 +45,7 @@ export async function createImport(context,manifest,actor='direct',legacyRecover
   const unverified=legacy && acknowledgeUnverifiedSchemaObjects===true;
   const verifyingLegacy=legacy && !unverified && !legacyRecovery;
   const history=()=>archivedHistory(original,ledgers,{allowOlderShape:unverified || verifyingLegacy});
-  const verified=(verifyingLegacy || (!legacy && manifest.schema!==cat.identity)) && await verifiedLegacySchema(db,manifest,cat,context.migrations,history);
+  const verified=(verifyingLegacy || (!legacy && manifest.schema!==cat.identity)) && await verifiedLegacySchema(ledger??[],manifest,cat,migrations,history);
   insist(!legacy || legacyRecovery || unverified || verified,'schema_mismatch:legacy_schema',409);
   if(verified)manifest={...manifest,schema:verified};
   if(unverified)for(const table of manifest.tables) {
@@ -53,7 +55,7 @@ export async function createImport(context,manifest,actor='direct',legacyRecover
     insist(table.dependencies.every(d=>target.dependencies.includes(d)),'schema_mismatch:dependencies:'+table.name,409);
   }
   const same=manifest.schema===cat.identity;
-  const {replays,...bridge}=unverified?await additiveBridge(db,manifest,cat,context.migrations,history,legacyRecovery,true):upgrade?{}:same?(await sameSchemaMigrations(db,manifest,cat,context.migrations,history)??{}):await additiveBridge(db,manifest,cat,context.migrations,history,legacyRecovery);
+  const {replays,...bridge}=unverified?await additiveBridge(db,ledger,manifest,cat,migrations,history,legacyRecovery,true):upgrade?{}:same?(await sameSchemaMigrations(db,ledger,manifest,cat,migrations,history)??{}):await additiveBridge(db,ledger,manifest,cat,migrations,history,legacyRecovery);
   // Finalize checks object references on the staged rows; a later migration
   // replayed into a reference table would publish rows that check never saw.
   const referenced=replays?.find(r=>Object.values(config.buckets).some(spec=>spec.objectReferences?.table===r.table));
@@ -70,7 +72,7 @@ export async function createImport(context,manifest,actor='direct',legacyRecover
   insist(canonicalJson(manifest.requiredConfiguration)===canonicalJson(config.requiredConfiguration),'configuration_inventory');
   for(const o of manifest.objects) insist(buckets[o.bucket] && config.buckets[o.bucket] && o.key.startsWith(config.buckets[o.bucket].prefix??''),'bucket_inventory');
   insist(canonicalJson(manifest.payloads.map(x=>x.name))===canonicalJson(Object.keys(config.extraPayloads).sort()),'payload_inventory');
-  if(unverified)await destinationState(context,{metadata:{targets:cat.tables,manifest:original}});
+  if(unverified)await destinationState({...context,config,migrations},{metadata:{targets:cat.tables,manifest:original}});
   await ensureImportLeases(db);
   const previous=(await state(db)).import_job;
   if(previous) {
@@ -96,7 +98,7 @@ async function uploadLeasedPart(context,id,index,part) {
   const previous=await statement(db,'SELECT sha256 FROM rer_portability_parts WHERE job=? AND idx=?',id,index).first();
   if(previous){insist(previous.sha256===part.sha256,'part_conflict',409);return importStatus(context,id,{includeLease:false});}
   insist(row.phase==='staging','import_phase',409);insist(index===row.completed && index<row.metadata.manifest.partCount,'part_order',409);
-  const inserts=[],groups=new Map(),manifest=row.metadata.manifest,upgrade=config.acceptedSchemas[manifest.schema];
+  const inserts=[],groups=new Map(),manifest=row.metadata.manifest,upgrade=acceptedUpgrade(config,manifest);
   for(const item of part.items) {
     if(item.kind==='row') {
       const table=manifest.tables.find(x=>x.name===item.table);insist(table && Number.isSafeInteger(item.index) && item.index>=0 && item.index<table.count,'row_inventory');
@@ -303,7 +305,7 @@ export function libraryImports(context,direct,migrationRoot) {
       await checkManifest(manifest);
       if(!archivedLedgerTables(manifest).length)return direct.create(manifest,actor,options);
       insist(manifest.product===context.config.product,'wrong_product');
-      await appliedMigrations(context.db);
+      await (context.migrationHistory?.()??readLedger(context.db));
       insist(!(await statement(context.db,'SELECT import_job FROM rer_portability_state WHERE id=1').first())?.import_job && ![...pending.values()].some(row=>row.phase==='staging'),'import_running',409);
       context.migrations??=await libraryMigrations(context.db,context.inputPolicy,migrationRoot);
       const id=crypto.randomUUID();pending.set(id,{id,manifest:structuredClone(manifest),actor,parts:[],phase:'staging'});return id;
