@@ -4891,7 +4891,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "b5ce5b6f76c7a6ef21d35305ff9aea3475db0136803e0f6863255174881912e8"
+      "sha256": "1a714ef481f04236e8b1d42b4e8038fb9aff971651dad766538f64c6c5763198"
     },
     "modules/portability/archive-step.mjs": {
       "source": "modules/portability/archive-step.mjs",
