@@ -682,8 +682,12 @@ them into a scratch database to find the archive's place in that history:
   ledger's own names are kept beside their hashes. Import resolves each entry
   by hash exactly as it does an archived ledger table (next item), so a
   Platform prefix needs no declaration and a changed file refuses. Platform's
-  ledger is never imported as product tables. Native sources record no
-  `migrationLedger`; their archives are unchanged, and v1 and earlier v2
+  ledger is never imported as product tables. Native sources with applied
+  owner migrations carry `{origin:'d1_migrations',entries:[{name,sha256}]}`
+  in the same field. The entries combine core names and prefixed owner names
+  in recorded application order. Restore checks those names and hashes against
+  the destination's applied history and keeps both ledgers in place. Core-only
+  native archives use `manifest.migrations` as before, and v1 and earlier v2
   archives remain importable.
 - Older archives that still carry their source's migration ledger as a table
   (`rer_migrations` and the other ledgers above, from before they became
