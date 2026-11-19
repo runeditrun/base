@@ -11,6 +11,7 @@ import { splitStatements } from '../modules/portability/sql-text.mjs';
 import { requireEmptyTables } from '../modules/portability/restore-empty.mjs';
 import { insist } from '../modules/portability/storage.mjs';
 import { shared } from './shared.mjs';
+import { ownerMigrationPolicy, ownerMigrationSources } from './portability-owners.mjs';
 
 const status = path => lstat(path).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
 // Miniflare's named D1 identity: the declared binding determines its file.
@@ -58,8 +59,9 @@ export async function emptyNativePreflight({ root, binding, policy, policyModule
    async all() { return { results: query.all(...values) }; },
    async first() { return query.get(...values) ?? null; },
   }; } };
-  const rules = await loadPolicy(root, policy, policyModule), declaration = platformMigrationDeclaration(platformMigrations);
-  const migrations = async () => migrationReplay(await appliedMigrations(root, db, binding, declaration, splitStatements), rules, declaration);
+  const owners = await ownerMigrationSources(root, binding);
+  const rules = ownerMigrationPolicy(await loadPolicy(root, policy, policyModule), owners), declaration = platformMigrationDeclaration(platformMigrations);
+  const migrations = async () => migrationReplay(await appliedMigrations(root, db, binding, declaration, splitStatements, owners), rules, declaration);
   await requireEmptyTables({ db, policy: rules, migrations });
  } finally { try { snapshot?.close(); } finally { await rm(directory, { recursive: true, force: true }); } }
 }
