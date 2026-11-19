@@ -1,4 +1,4 @@
-import { policy, inventorySchemaIdentity } from './catalogue.mjs';
+import { inventorySchemaIdentity } from './catalogue.mjs';
 import { canonicalJson } from './hash.mjs';
 import { checkoutHistory } from './checkout-history.mjs';
 import { insist, PortabilityError } from './storage.mjs';
@@ -8,8 +8,8 @@ import { insist, PortabilityError } from './storage.mjs';
 export async function workerMigrations(db,input,evidence) {
  try {
   insist(evidence?.version===1 && evidence.prefixes.length===evidence.files.length+1,'schema_mismatch:legacy_evidence',409);
-  const config=policy(input),files=evidence.files;
-  return await checkoutHistory(db,input,files,names=>{
+  const {files,ownerSources}=evidence;
+  return await checkoutHistory(db,input,files,(names,config)=>{
    const prefix=selected=>{
     insist(selected.length<=names.length && canonicalJson(selected)===canonicalJson(files.slice(0,selected.length).map(f=>f.name)),'schema_mismatch:legacy_evidence',409);
     const found=evidence.prefixes[selected.length];
@@ -24,6 +24,6 @@ export async function workerMigrations(db,input,evidence) {
     async rowImages(requests){return new Map(requests.filter(r=>final.seeds.some(s=>s.name===r.name && !s.hashes.length)).map(r=>[r.name,[]]));},
     async rowHashes(requests,limit){return new Map(requests.flatMap(r=>{const found=final.seeds.find(s=>s.name===r.name && s.hashes.length<=limit && canonicalJson(s.columns)===canonicalJson(r.columns));return found?[[r.name,found.hashes]]:[];}));},
    };
-  },{nativeWrangler:true});
+  },{nativeWrangler:true,ownerSources});
  }catch(error){if(error instanceof PortabilityError)throw error;throw new PortabilityError('schema_mismatch:legacy_evidence',409);}
 }
