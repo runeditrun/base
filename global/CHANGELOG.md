@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.124
+
+Signed: Run Edit Run fleet, 2026-11-19.
+
+### Archive restore with owner migrations
+
+- Local `rer import` predicts the archived schema by replaying the recorded core and owner migrations, including an owner migration that alters a core table. Native exports record the combined applied history with file hashes and omit owner migration bookkeeping tables from product data. Worker migration evidence and the shared restore path also include declared owner migrations, covering the Spool restore adapter when core migrations precede owner migrations.
+- Changed, missing, reordered or archive-extra owner migrations refuse with `schema_mismatch:owner_migration_history` before importing product rows. Later additive migrations in the destination remain supported by the additive-restore contract.
+- The portability adoption list now includes `owner-history.mjs`. Maintained CLI copies and inventory are regenerated.
+
+Archives written by this version for a seed WITH owner migrations carry a combined migration ledger and are not readable by rer 0.2.123 or older: those readers refuse `manifest_inventory`. Core-only and legacy archives are unchanged both ways. The archive format remains `runeditrun-portability` version 2; the existing optional migration ledger now accepts the native `d1_migrations` origin.
+
+KNOWN LIMIT: a Worker restore replays core files before owner files. An owner who applied an ALTER and later installed a core upgrade can have a matching archive refused (HTTP 409, zero rows, nothing published). A follow-up fixes the applied-order replay.
+
+ChargeDesk checkouts pin rer 0.2.118 and other seeds have older pins, and need a re-pin to receive this fix.
+
+These changes require adoption through the seed's pinned package or refreshed source. This preparation establishes no seed adoption, live Spool deployment, provider delivery or production result. The source range changes portability and its maintained copies, with no import-kit or product migration change.
+
 ## 0.2.123
 
 Signed: Run Edit Run fleet, 2026-11-18.
