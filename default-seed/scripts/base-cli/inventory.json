@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.123-dev.g6e64a28f",
+  "cliVersion": "0.2.123-dev.ga1c31721",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1167,7 +1167,7 @@
     },
     "cli/portability-evidence.mjs": {
       "source": "cli/portability-evidence.mjs",
-      "sha256": "98cf166b31f15910b6054550d3c28a326dffcd6d2ac1b595dbc0c4c5c778ed39"
+      "sha256": "5a48a9462af65d0f83f612e20ea6a099d0a9a69c8ffd1b62bfa3d64df0b4ad5e"
     },
     "cli/portability-migrations.mjs": {
       "source": "cli/portability-migrations.mjs",
@@ -1188,6 +1188,10 @@
     "cli/portability-runtime.mjs": {
       "source": "cli/portability-runtime.mjs",
       "sha256": "ff2f4f6592d6ef7b52c16e6032f80fc8bebbaa644aba78af2dbcbc42bdb6a5fe"
+    },
+    "cli/portability-sqlite.mjs": {
+      "source": "cli/portability-sqlite.mjs",
+      "sha256": "722fef11af52ca9bd610ea7bb22613f6636518998da8f86059d414f407f09e68"
     },
     "cli/portability-worker.mjs": {
       "source": "cli/portability-worker.mjs",
@@ -1528,6 +1532,22 @@
     "cli/upstream-agent.mjs": {
       "source": "cli/upstream-agent.mjs",
       "sha256": "dc2b22e01c2969ebe11040cd274d454c5c6b37b2d0177641287e44c9e1809820"
+    },
+    "cli/vendor/wa-sqlite/LICENSE": {
+      "source": "cli/vendor/wa-sqlite/LICENSE",
+      "sha256": "547f9e97e461bd369cc64b6fc12d724e8b02764b8db7812691f29f0ec572be79"
+    },
+    "cli/vendor/wa-sqlite/README.md": {
+      "source": "cli/vendor/wa-sqlite/README.md",
+      "sha256": "ac125fd96d52e4ce098a82647aeac0e1f3586a67f9907b3b9a0cff9068946a66"
+    },
+    "cli/vendor/wa-sqlite/wa-sqlite.mjs": {
+      "source": "cli/vendor/wa-sqlite/wa-sqlite.mjs",
+      "sha256": "76ae19e45dacdd3f73d90fa88b955b73b1727edbf53d31bf042cf0816c3038f2"
+    },
+    "cli/vendor/wa-sqlite/wa-sqlite.wasm": {
+      "source": "cli/vendor/wa-sqlite/wa-sqlite.wasm",
+      "sha256": "d56db36a8dd12f898f452076da8161c178d4c579422af51dffb1ed80dec865e1"
     },
     "cli/version.mjs": {
       "source": "cli/version.mjs",
@@ -4891,7 +4911,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "1a714ef481f04236e8b1d42b4e8038fb9aff971651dad766538f64c6c5763198"
+      "sha256": "ac6006a87492d96955b3e77d4a457189e2ae6d81597adf467bc2bcf30e39dd9c"
     },
     "modules/portability/archive-step.mjs": {
       "source": "modules/portability/archive-step.mjs",
@@ -4915,7 +4935,7 @@
     },
     "modules/portability/checkout-history.mjs": {
       "source": "modules/portability/checkout-history.mjs",
-      "sha256": "b0ec1dcf4e283d1c8adab420ddc47152921e9e60054cd2bf7077d0088ff20748"
+      "sha256": "9feb4e380eb1cc74fc0f654509cd2a248e112458f44cf1a03b27b5ec30739455"
     },
     "modules/portability/cli-options.mjs": {
       "source": "modules/portability/cli-options.mjs",
@@ -5021,6 +5041,10 @@
       "source": "modules/portability/lines.mjs",
       "sha256": "63b23f3414962ba89abccb3d57a15d5c8dd0df953e7426b13c998242c35158b9"
     },
+    "modules/portability/migration-evidence.mjs": {
+      "source": "modules/portability/migration-evidence.mjs",
+      "sha256": "7f96e28a38b45ca12fd885e23f2301a1351322f4d8de1bb69d57abcaee19440b"
+    },
     "modules/portability/migration-history.mjs": {
       "source": "modules/portability/migration-history.mjs",
       "sha256": "d28c26f5cc63a0fff323818ad254824c93878638c8a717f2472e32a55f78d663"
@@ -5039,7 +5063,7 @@
     },
     "modules/portability/owner-history.mjs": {
       "source": "modules/portability/owner-history.mjs",
-      "sha256": "16a9e0adec2f9e35ff5264bbda9c0dbae6be1d2dd161577dd166293fb50cbebd"
+      "sha256": "ee16cbcf6908c31daedb2d0a3a9cfdb13591922c2da097077d6f97fa859d52d4"
     },
     "modules/portability/payloads.mjs": {
       "source": "modules/portability/payloads.mjs",
@@ -5111,11 +5135,11 @@
     },
     "modules/portability/worker-history.d.mts": {
       "source": "modules/portability/worker-history.d.mts",
-      "sha256": "852c76d2811469002152af951ab37cade09edb1e9590a43b3f634adc5983b877"
+      "sha256": "ee9204fe4bac3028ea319d4b1765a22d6296f7aeb20f7464f4592d0c58ebc7c6"
     },
     "modules/portability/worker-history.mjs": {
       "source": "modules/portability/worker-history.mjs",
-      "sha256": "70aed5fe1e7d651854203117bb0070565e5a3fa13af74378675d50346ca24baa"
+      "sha256": "33262e0e831b8457a214fc65f9e85b0a5fb3e29a3e089210ad58ef2a394620d4"
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",

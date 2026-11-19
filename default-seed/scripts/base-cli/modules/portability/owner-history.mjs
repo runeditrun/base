@@ -32,7 +32,7 @@ export async function nativeMigrationHistory(db, sources) {
  const rows = [...core, ...owners].sort((a, b) => a.applied_at.localeCompare(b.applied_at));
  // IDs order each ledger. Across ledgers equal timestamps carry no order.
  insist(rows.every((row, i) => !i || row.applied_at !== rows[i - 1].applied_at || row.table === rows[i - 1].table), 'migration_ledger:uncertain', 409);
- const entries = rows.map(({ name, sha256 }) => ({ name, ...(sha256 ? { sha256 } : {}) }));
+ const entries = rows.map(({ name, sha256, table }) => ({ name, table, ...(sha256 ? { sha256 } : {}) }));
  insist(new Set(entries.map(row => row.name)).size === entries.length, 'migration_ledger:ambiguous', 409);
  return { table: ledger.table, entries, owners: true };
 }
