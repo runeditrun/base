@@ -2,6 +2,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { realpath, readFile, readdir } from 'node:fs/promises';
 import { resolve, relative, isAbsolute, sep } from 'node:path';
 import { migrationDirectory } from './portability-migrations.mjs';
+import { ownerMigrationSources } from './portability-owners.mjs';
+import { collectMigrations } from '../modules/delivery-producer/migrations.mjs';
 import { splitStatements } from '../modules/portability/sql-text.mjs';
 import { canonicalJson, sha256 } from '../modules/portability/hash.mjs';
 import { quote, insist } from '../modules/portability/storage.mjs';
@@ -25,6 +27,12 @@ export async function generateMigrationEvidence(root,{binding='DB'}={}) {
   const bytes=await readFile(file);
   return {name,sha256:await sha256(bytes),statements:splitStatements(bytes.toString('utf8'))};
  }));
+ const sources=await ownerMigrationSources(root,binding);
+ const owners=await collectMigrations(root,sources.filter(source=>source.directory).map(({directory,prefix})=>({binding,path:directory,prefix})),[{kind:'d1',binding}]);
+ for(const {name,sha256,sql} of owners) {
+  insist(!files.some(file=>file.name===name),'migration_ledger:ambiguous',409);
+  files.push({name,sha256,statements:splitStatements(sql)});
+ }
  const objects=[],indices=new Map(),prefixes=[];
  const scratch=new DatabaseSync(':memory:');
  try {
@@ -64,7 +72,7 @@ export async function generateMigrationEvidence(root,{binding='DB'}={}) {
    await capture();
   }
  }finally{scratch.close();}
- return {version:1,files,objects,prefixes};
+ return {version:1,files,objects,prefixes,...(sources.length?{ownerSources:sources.map(({prefix,table})=>({prefix,table}))}:{})};
 }
 
 // Explicit seed opt-in. The module is consumed only by the server/Worker graph;
