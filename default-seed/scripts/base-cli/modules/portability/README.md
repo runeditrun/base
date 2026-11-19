@@ -611,18 +611,22 @@ declare module 'virtual:rer-legacy-migration-evidence' {
 }
 ```
 
-The generated JavaScript contains ordered checkout file hashes and statements,
-deduplicated complete schema inventories for every prefix, and hashed identities
-of bounded deterministic seeded rows. Volatile seeded rows cannot be vouched for;
-their values are never bundled. Runtime policy projects each inventory through
-the same schema identity code as live SQLite. The Worker adapter binds evidence
-to the live hashed ledger and complete schema, then supplies the existing legacy
-collector, archived-ledger validation, bridge and restore guards.
+The generated JavaScript contains checkout file hashes and statements. A checkout
+with only core migrations bundles its prefix inventories and bounded deterministic
+seed-row hashes at build time, including when declared owner migration directories
+are absent or empty. At least one owner SQL migration file enables the SQLite
+engine and replay module. The Worker makes those inventories in a
+fresh in-memory database using the combined order recorded by the live core and
+owner ledgers. Volatile seeded rows cannot be vouched for. Runtime policy
+projects each inventory through the same schema identity code as live SQLite.
+The Worker adapter binds evidence to the live ledger and complete schema, then
+supplies the legacy collector, archived-ledger validation, bridge and restore
+guards.
 
 The same explicit build-evidence adoption supports native Wrangler's plain
 `d1_migrations` ledger. Keep the reviewed, unchanged applied migration files in
-the binding's declared directory when building. Every live name must select the
-exact ordered prefix of those files, and replay of that prefix must reproduce
+the binding's declared directories when building. Each ledger's live names must
+select the exact ordered prefix of its files, and combined replay must reproduce
 the complete live schema, including indexes and triggers on excluded tables.
 Unknown names, gaps, reordered names, tracked but missing hashes, and schema
 drift refuse before restore writes. Existing hashes must still match; the
@@ -1150,9 +1154,11 @@ modules/portability/bridge.mjs
 modules/portability/library-history.mjs
 modules/portability/checkout-history.mjs
 modules/portability/owner-history.mjs
+modules/portability/worker-owner-history.mjs
 modules/portability/migration-history.mjs
 modules/portability/ledgers.mjs
 modules/portability/migration-statements.mjs
+modules/portability/migration-evidence.mjs
 modules/portability/sql-text.mjs
 modules/portability/backfills.mjs
 modules/portability/transient-tables.mjs
