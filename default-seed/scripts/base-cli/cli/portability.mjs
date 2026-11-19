@@ -10,6 +10,7 @@ import { shared } from './shared.mjs';
 import { emptyNativePreflight } from './portability-empty.mjs';
 import { withManagedDataImport } from './managed-data.mjs';
 import { ledgerRefusal } from './ledger-refusal.mjs';
+import { applyNativeOwnerMigrations, ownerMigrationSources } from './portability-owners.mjs';
 
 export { withManagedDataImport };
 
@@ -71,14 +72,14 @@ export function localPortability({ database, binding = 'DB', buckets = {}, polic
    }
   }
   if(unverifiedSchemaRecovery)await nativeWorker(store,'schema-recovery-preflight',input,signal);
-  const {nativeApply}=await nativeWorker(store,'migration-preflight',input,signal);
+  const {nativeApply,nativeOwners}=await nativeWorker(store,'migration-preflight',input,signal);
   // Local migrations need no provider account: wrangler runs without credentials.
   // The shared runner shows its progress (a count every ten migrations) and leaves out its
   // own info lines, which only confuse a local backup; warnings and errors print.
   const { dependencyEnvironment } = await shared('dependency-environment.mjs');
-  if(nativeApply)await store.run('Applying local data migrations', 'pnpm', ['exec', 'wrangler', 'd1', 'migrations', 'apply', database, '--local', '--persist-to', '.wrangler/state', '--config', 'wrangler.jsonc'], {
-   cwd: root, signal, env: { ...dependencyEnvironment(), RER_LOCAL_OPERATION: operationToken, WRANGLER_SEND_METRICS: 'false' },
-  });
+  const env = { ...dependencyEnvironment(), RER_LOCAL_OPERATION: operationToken, WRANGLER_SEND_METRICS: 'false' };
+  if(nativeApply)await store.run('Applying local data migrations', 'pnpm', ['exec', 'wrangler', 'd1', 'migrations', 'apply', database, '--local', '--persist-to', '.wrangler/state', '--config', 'wrangler.jsonc'], { cwd: root, signal, env });
+  if(direction==='import' && nativeOwners)await applyNativeOwnerMigrations({root,binding,sources:await ownerMigrationSources(root,binding),store,signal,env});
   const receipt=await nativeWorker(store,direction,input,signal);
   if(legacyRecovery)receipt.output=relative(root,legacyRecovery.output);
   return { target: 'local', [direction === 'export' ? 'output' : 'input']: relative(root, path), ...receipt };
@@ -107,6 +108,7 @@ async function nativeWorker(store,direction,input,signal) {
    : receipt.reExport ? `Restore refused (schema_mismatch): the schema definitions cannot be safely verified by this version. ${reExport}`
    : receipt.identityTable ? `Transfer refused (identity_table_undeclared:${receipt.identityTable}): declare this table in includeTables to transfer its rows or excludeTables to omit them.`
    : receipt.safety ? `Restore refused (${receipt.reason}): safety normalization for ${receipt.safety} violates the declared import policy.`
+   : receipt.reason === 'schema_mismatch:owner_migration_history' ? 'Restore refused (schema_mismatch:owner_migration_history): the recorded migration order or file contents differ from this checkout.'
    : receipt.reason?.startsWith('migration_ledger:') ? ledgerRefusal(receipt)
    : receipt.migration ? `Restore refused (schema_mismatch:migration_data): migration ${receipt.migration} changed data after this archive was made, so its rows would skip that change. Restore an archive made after it.`
    : receipt.occupied ? occupiedRefusal(input,receipt.reason)
