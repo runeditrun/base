@@ -434,6 +434,9 @@ Licence: MIT.
 
 First-party commands acquire the exact `packageManager` pnpm pin when PATH lacks
 it, verify its registry sha512 integrity and cache it under `$HOME/.rer/pnpm`.
+The verified tool's version check keeps three attempts. Their 10, 20 and
+30 second deadlines scale with one-minute load per CPU, up to four times.
+If the check fails, rer reports what pnpm did and the final attempt's deadline.
 No global package manager installation or sudo is needed. Independent projects
 continue to run their declared commands with their own tools. Server and job
 state default to `$HOME/.rer/servers` and `$HOME/.rer/jobs`; supplied
