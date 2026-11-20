@@ -6,7 +6,7 @@ import { destinationLedger, ledgerNames, matchMigrationLedger } from '../modules
 import { all, insist, PortabilityError } from '../modules/portability/storage.mjs';
 import {migrationDirectory} from '../modules/deploy-kit/migration-directory.mjs';
 import { collectMigrations } from '../modules/delivery-producer/migrations.mjs';
-import { nativeMigrationHistory } from './portability-owners.mjs';
+import { nativeMigrationHistory, requireAppliedOwnerFiles } from '../modules/portability/owner-history.mjs';
 export {migrationDirectory};
 
 // Seed-owned declarations, never archive metadata: the deploymentSpec prefix
@@ -40,6 +40,7 @@ export async function migrationInventory(root,binding,{prefix},split,sources=[])
 // Preserve the runner's applied order, resolving file identities by hash.
 export async function appliedMigrations(root,db,binding,declaration,split,sources=[]) {
  const history=await nativeMigrationHistory(db,sources),files=await migrationInventory(root,binding,declaration,split,sources);
+ requireAppliedOwnerFiles(history,files);
  return matchMigrationLedger(history?.entries ?? [],files,declaration).map(name=>files.find(file=>file.name===name));
 }
 
@@ -127,6 +128,7 @@ export async function nativeMigrationPreflight({root,db,binding='DB',platformMig
  if(ownerSources.length && table!=='rer_migrations') {
   const history=await nativeMigrationHistory(db,ownerSources);
   const allFiles=await migrationInventory(root,binding,declaration,undefined,ownerSources);
+  requireAppliedOwnerFiles(history,allFiles);
   try { matchMigrationLedger(history.entries,allFiles,declaration); }
   catch(error) { throw constantRefusal(error,allFiles); }
  }
