@@ -32,15 +32,16 @@ function recordedPlacement(manifest, recorded, applied) {
 
 async function verifyRecordedSchema(manifest, earlier, schemaAfter) {
   const owner=manifest.migrationLedger?.origin==='d1_migrations';
+  const platform=platformPlacement(manifest);
   let schema;
-  try { schema=await schemaAfter(earlier,platformPlacement(manifest)); }
+  try { schema=await schemaAfter(earlier,platform); }
   catch(error) {
     // The full destination replay succeeded. An incomplete native history can
     // now fail on a missing SQL dependency or the Worker's prefix requirement.
     if(!owner || !(error?.code==='ERR_SQLITE_ERROR' || error instanceof PortabilityError && error.code==='schema_mismatch:legacy_evidence'))throw error;
     throw new PortabilityError('schema_mismatch:owner_migration_history',409);
   }
-  insist(schema===manifest.schema,owner?'schema_mismatch:owner_migration_history':'schema_mismatch',owner?409:400);
+  insist(schema===manifest.schema,owner?'schema_mismatch:owner_migration_history':'schema_mismatch',owner || platform?409:400);
 }
 // Where an archive sits in the destination's applied migrations: those its
 // rows passed through (earlier) and those applied after it (unapplied).
