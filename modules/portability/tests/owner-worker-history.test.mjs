@@ -5,9 +5,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { D1 } from '../../container/adapters/d1.mjs';
 import { generateMigrationEvidence } from '../../../cli/portability-evidence.mjs';
-import { createPortability, createPortabilityHandler, readArchive } from '../index.mjs';
+import { createPortability, createPortabilityHandler, readArchive, sha256 } from '../index.mjs';
 import { ArchiveVerifier } from '../format.mjs';
 import { workerMigrations } from '../worker-history.mjs';
+
+async function exportArchive(options) {
+ const service = await createPortability(options);
+ const id = await service.exports.create();
+ while ((await service.exports.advance(id)).phase === 'building') {}
+ const records = [];
+ for await (const record of readArchive(await service.exports.download(id))) records.push(record);
+ return records;
+}
 
 test('Worker restore binds owner SQL and the interleaved native D1 migration history', async t => {
  const root = await mkdtemp(join(tmpdir(), 'owner-worker-'));
@@ -61,14 +70,6 @@ test('Worker restore binds owner SQL and the interleaved native D1 migration his
  };
  const policy = { product: 'synthetic/worker-restore' };
  const options = (db, built = evidence) => ({ db, policy, migrations: () => workerMigrations(db, policy, built) });
- const exportArchive = async db => {
-  const service = await createPortability(options(db));
-  const id = await service.exports.create();
-  while ((await service.exports.advance(id)).phase === 'building') {}
-  const records = [];
-  for await (const record of readArchive(await service.exports.download(id))) records.push(record);
-  return records;
- };
  const appOrigin = 'https://restore.invalid';
  const restore = async (db, [manifest, ...records], built) => {
   const handler = await createPortabilityHandler({ ...options(db, built), appOrigin, authorize: () => 'synthetic-owner' });
@@ -90,7 +91,7 @@ test('Worker restore binds owner SQL and the interleaved native D1 migration his
 
  const source = await database('source', history);
  await source.prepare("INSERT INTO records(id,note) VALUES('one','synthetic-owner-note')").run();
- const archive = await exportArchive(source);
+ const archive = await exportArchive(options(source));
  const [manifest] = archive;
  assert.deepEqual(manifest.migrationLedger.entries.map(row => row.name), [core.name, 'ext-' + owner.name, upgrade.name, 'ext-' + backfill.name]);
  assert.deepEqual(manifest.tables.map(table => table.name), ['records']);
@@ -136,10 +137,69 @@ test('Worker restore binds owner SQL and the interleaved native D1 migration his
   const older = await database(label + ' source', applied);
   await older.prepare(insert).run();
   const target = await database(label + ' destination', throughUpgrade);
-  const archive = await exportArchive(older);
+  const archive = await exportArchive(options(older));
   const response = await restore(target, archive);
   assert.equal(response.status, 200, await response.clone().text());
   assert.equal((await response.json()).phase, 'complete');
   assert.deepEqual(await rows(target), [{ id: 'older', note, state: 'retained' }]);
  }
+});
+
+test('Worker refuses a Platform archive when cross-ledger replay changes its schema', async t => {
+ const root = await mkdtemp(join(tmpdir(), 'platform-worker-'));
+ const source = new D1(join(root, 'source.sqlite'));
+ const target = new D1(join(root, 'target.sqlite'));
+ t.after(async () => {
+  await Promise.all([source.close(), target.close()]);
+  await rm(root, { recursive: true, force: true });
+ });
+ const create = { dir: 'core', name: '0001_records.sql', sql: 'CREATE TABLE restore_records(id TEXT PRIMARY KEY);' };
+ const status = { dir: 'core', name: '0002_status.sql', sql: "ALTER TABLE restore_records ADD COLUMN status TEXT NOT NULL DEFAULT 'open';" };
+ const prefs = { dir: 'owner', name: '0001_preferences.sql', sql: 'CREATE TABLE preferences(id TEXT PRIMARY KEY);' };
+ const note = { dir: 'owner', name: '0002_note.sql', sql: "ALTER TABLE restore_records ADD COLUMN note TEXT NOT NULL DEFAULT 'owner-default';" };
+ await Promise.all(['core', 'owner'].map(dir => mkdir(join(root, dir))));
+ await Promise.all([
+  writeFile(join(root, 'wrangler.jsonc'), JSON.stringify({ d1_databases: [{ binding: 'DB', migrations_dir: 'core' }] })),
+  writeFile(join(root, 'package.json'), JSON.stringify({ name: 'synthetic' })),
+  writeFile(join(root, 'rer-packaging.json'), JSON.stringify({
+   artifact: { specInputs: { extraMigrationDirectories: [{ binding: 'DB', path: 'owner', prefix: 'ext-' }] } },
+  })),
+  ...[create, status, prefs, note].map(file => writeFile(join(root, file.dir, file.name), file.sql)),
+ ]);
+ const [evidence, schema] = await Promise.all([
+  generateMigrationEvidence(root),
+  readFile(new URL('../schema/portability.sql', import.meta.url), 'utf8'),
+ ]);
+ await source.exec(`${schema}
+  CREATE TABLE rer_migrations(name TEXT PRIMARY KEY, sha256 TEXT NOT NULL, applied_at TEXT NOT NULL);`);
+ const appliedAt = index => `2026-01-01 00:00:0${index}`;
+ for (const [index, file] of [create, status, note].entries()) {
+  await source.exec(file.sql);
+  await source.prepare('INSERT INTO rer_migrations VALUES(?,?,?)')
+   .bind(file.dir === 'owner' ? 'ext-' + file.name : file.name, await sha256(file.sql), appliedAt(index)).run();
+ }
+ await source.prepare('INSERT INTO restore_records VALUES(?,?,?)').bind('one', 'closed', 'synthetic-owner-note').run();
+ const policy = { product: 'synthetic/worker-restore' };
+ const [manifest] = await exportArchive({ db: source, policy });
+ assert.equal(manifest.migrationLedger.origin, 'rer_migrations');
+
+ const columns = 'id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL';
+ await target.exec(`${schema}
+  CREATE TABLE d1_migrations(${columns});
+  CREATE TABLE synthetic_ext_migrations(${columns});`);
+ for (const [index, file] of [create, prefs, note, status].entries()) {
+  await target.exec(file.sql);
+  const ledger = file.dir === 'core' ? 'd1_migrations' : 'synthetic_ext_migrations';
+  await target.prepare(`INSERT INTO ${ledger}(name,applied_at) VALUES(?,?)`).bind(file.name, appliedAt(index)).run();
+ }
+ const appOrigin = 'https://restore.invalid';
+ const handler = await createPortabilityHandler({ db: target, policy, appOrigin, authorize: () => 'synthetic-owner',
+  migrations: () => workerMigrations(target, policy, evidence) });
+ const response = await handler(new Request(appOrigin + '/api/portability/imports', {
+  method: 'POST', headers: { Origin: appOrigin }, body: JSON.stringify({ confirmed: true, manifest }),
+ }));
+ assert.equal(response.status, 409, await response.clone().text());
+ assert.deepEqual(await response.json(), { error: 'schema_mismatch' });
+ assert.equal(await target.prepare('SELECT COUNT(*) AS n FROM restore_records').first('n'), 0);
+ assert.equal(await target.prepare('SELECT COUNT(*) AS n FROM rer_portability_jobs').first('n'), 0);
 });
