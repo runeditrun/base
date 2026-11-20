@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.125-dev.g1f0f9491",
+  "cliVersion": "0.2.125-dev.g61f2d027",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -107,6 +107,10 @@
       "source": "onboarding/input-limits.mjs",
       "sha256": "a6995a5ff62f052f48b6d3677759db235165d153644730c7489dbd4e7ce8de6a"
     },
+    "inspection-command.mjs": {
+      "source": "onboarding/inspection-command.mjs",
+      "sha256": "6a309a247c29c42ff9e3c85d60a63dd1b847a68d5695fb0f607da35d1ef8c454"
+    },
     "installer-inputs.mjs": {
       "source": "onboarding/installer-inputs.mjs",
       "sha256": "801e904d914fe65ea6a6da1d0bf91aa19014276e32e8f61632176bd2a2bc55fe"
@@ -205,7 +209,7 @@
     },
     "port-probe.mjs": {
       "source": "onboarding/port-probe.mjs",
-      "sha256": "2528167e285c18179a2d8d6c7715b3c0ba03693b23dfa13ed2f3707398dda7fa"
+      "sha256": "265362b633c6ad4bb1c1cdf41bf22f407b6e2ed9cc2669ba017b4100c5132731"
     },
     "prefill.mjs": {
       "source": "onboarding/prefill.mjs",
@@ -225,7 +229,7 @@
     },
     "process-diagnostics.mjs": {
       "source": "onboarding/process-diagnostics.mjs",
-      "sha256": "f4187efb1bb85ef446c57060671c51d90f64c430a85a45546fae329174534e47"
+      "sha256": "20574c7e2f00620fb37c6d1eb657d62ad912fa9a031c54bfe8ee60c2b3e1d1a4"
     },
     "process-scope.mjs": {
       "source": "onboarding/process-scope.mjs",
@@ -1215,7 +1219,7 @@
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
-      "sha256": "d3b9dfb181d6f4ad4ef057fdd15a6b9a9e33b08464f0b446eafb91a5d6353c40"
+      "sha256": "b235299681f9820cea147f8c0984f63a45e061681df8591d9b75d028bddd2b7b"
     },
     "cli/project.mjs": {
       "source": "cli/project.mjs",
