@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { D1 } from '../../container/adapters/d1.mjs';
 import { generateMigrationEvidence } from '../../../cli/portability-evidence.mjs';
 import { createPortability, createPortabilityHandler, readArchive } from '../index.mjs';
+import { ArchiveVerifier } from '../format.mjs';
 import { workerMigrations } from '../worker-history.mjs';
 
 test('Worker restore binds owner SQL and the interleaved native D1 migration history', async t => {
@@ -102,21 +103,30 @@ test('Worker restore binds owner SQL and the interleaved native D1 migration his
  assert.deepEqual(await rows(matching), [{ id: 'one', note: 'synthetic-owner-note', state: 'retained' }]);
 
  const historyError = 'schema_mismatch:owner_migration_history';
- for (const { name, applied, built, error, sameSchema = true } of [
-  { name: 'changed owner SQL bytes', applied: [core, changedOwner, upgrade, backfill], built: changedEvidence, error: historyError },
-  { name: 'missing applied owner file', applied: history, built: missingEvidence, error: 'schema_mismatch' },
-  { name: 'missing owner ALTER', applied: [core], sameSchema: false, error: historyError },
-  { name: 'different applied order', applied: [core, owner, backfill, upgrade], error: historyError },
-  { name: 'archive has an extra data-only owner migration', applied: throughUpgrade, error: historyError },
+ const omitted = structuredClone(archive);
+ const omittedManifest = omitted[0];
+ omittedManifest.migrationLedger.entries = omittedManifest.migrationLedger.entries.filter(entry => entry.name !== 'ext-' + owner.name);
+ omittedManifest.migrations = omittedManifest.migrationLedger.entries.map(entry => entry.name);
+ const verifier = new ArchiveVerifier(omittedManifest);
+ for (const part of omitted.slice(1, -1)) verifier.add(part);
+ omitted.at(-1).archiveHash = verifier.digest();
+
+ for (const { name, applied, built, archiveInput = archive, sameSchema = true } of [
+  { name: 'changed owner SQL bytes', applied: [core, changedOwner, upgrade, backfill], built: changedEvidence },
+  { name: 'missing applied owner file', applied: history, built: missingEvidence },
+  { name: 'archive omits the owner ALTER', applied: history, archiveInput: omitted },
+  { name: 'missing owner ALTER', applied: [core], sameSchema: false },
+  { name: 'different applied order', applied: [core, owner, backfill, upgrade] },
+  { name: 'archive has an extra data-only owner migration', applied: throughUpgrade },
  ]) {
   const target = await database(name, applied);
   if (sameSchema) assert.deepEqual(await definitions(target), sourceDefinitions, name);
-  const response = await restore(target, archive, built);
+  const response = await restore(target, archiveInput, built);
   assert.equal(response.status, 409, name);
-  assert.deepEqual(await response.json(), { error }, name);
+  assert.deepEqual(await response.json(), { error: historyError }, name);
   assert.deepEqual(await rows(target), [], name);
   assert.equal((await target.prepare('SELECT COUNT(*) AS n FROM rer_portability_jobs').first()).n, 0, name);
-  t.diagnostic(`${name}: 409 ${error}, zero rows`);
+  t.diagnostic(`${name}: 409 ${historyError}, zero rows`);
  }
 
  for (const { label, applied, insert, note } of [
