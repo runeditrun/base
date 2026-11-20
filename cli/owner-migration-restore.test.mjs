@@ -69,10 +69,11 @@ test('the installed CLI restores Platform data into an upgraded native checkout 
  const importFrom = (file, code = 0) => seed.text(['import', '--input', `exports/${file}.rer`, '--yes'], code);
  await importFrom('platform');
  assert.deepEqual(await records(), rows);
+ await seed.data("INSERT OR REPLACE INTO restore_records VALUES('synthetic-owner-record', 'owner data');");
  await seed.text(['export', '--output', 'exports/owner.rer']);
  await clear();
  await importFrom('owner');
- assert.deepEqual(await records(), rows);
+ assert.deepEqual(await records(), [{ id: 'synthetic-owner-record', owner_note: 'owner data' }]);
  await clear();
 
  async function variant(name, transform) {
