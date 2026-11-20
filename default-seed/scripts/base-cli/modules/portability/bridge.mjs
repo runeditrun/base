@@ -16,11 +16,15 @@ function recordedMigrations(manifest, archived, files, replay) {
   return entries.map(entry=>entry.name);
 }
 
+function platformPlacement(manifest) {
+  return manifest.migrationLedger?.origin==='rer_migrations' && manifest.schemaObjects!==undefined;
+}
+
 function recordedPlacement(manifest, recorded, applied) {
   const selected=applied.filter(name=>recorded.includes(name));
   // Platform and Wrangler may order the same files differently. The hashes
   // already matched; replay their destination order and check the archive schema.
-  if(manifest.migrationLedger?.origin==='rer_migrations' && manifest.schemaObjects!==undefined)return selected;
+  if(platformPlacement(manifest))return selected;
   const mismatch=manifest.migrationLedger?.origin==='d1_migrations'?'schema_mismatch:owner_migration_history':'schema_mismatch:migration_history';
   insist(canonicalJson(selected)===canonicalJson(recorded),mismatch,409);
   return recorded;
@@ -29,7 +33,7 @@ function recordedPlacement(manifest, recorded, applied) {
 async function verifyRecordedSchema(manifest, earlier, schemaAfter) {
   const owner=manifest.migrationLedger?.origin==='d1_migrations';
   let schema;
-  try { schema=await schemaAfter(earlier); }
+  try { schema=await schemaAfter(earlier,platformPlacement(manifest)); }
   catch(error) {
     // The full destination replay succeeded. An incomplete native history can
     // now fail on a missing SQL dependency or the Worker's prefix requirement.
@@ -60,7 +64,7 @@ async function placement(db,manifest,cat,replay,ledger,history,legacyRecovery,un
   // archive placement. The live destination check above remains complete, and
   // current v2 imports use their authenticated object inventory. Verified legacy
   // v2 uses the replayed complete identity; acknowledged recovery places by tables only.
-  const schemaAfter=names=>replay.schemaAfter(names,legacyRecovery && manifest.schemaObjects===undefined?{legacyExcludedObjects:true}:unverified?{tablesOnly:true}:undefined);
+  const schemaAfter=(names,allowSubsequence)=>replay.schemaAfter(names,legacyRecovery && manifest.schemaObjects===undefined?{legacyExcludedObjects:true}:unverified?{tablesOnly:true}:undefined,allowSubsequence);
   if(unverified && archived && manifest.migrations)insist(canonicalJson(matchMigrationLedger(archived,files,replay))===canonicalJson(recorded),'schema_mismatch:migration_history',409);
   let earlier,unapplied;
   if(recorded) {
