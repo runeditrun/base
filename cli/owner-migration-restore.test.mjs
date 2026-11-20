@@ -84,7 +84,7 @@ test('the installed CLI restores Platform data into an upgraded native checkout 
   const verifier = new ArchiveVerifier(manifest);
   for (const part of lines.slice(1, -1)) verifier.add(JSON.parse(part));
   const closing = { ...JSON.parse(lines.at(-1)), archiveHash: verifier.digest() };
-  await writeFile(join(seed.root, `exports/${name}.rer`), [JSON.stringify(manifest), ...lines.slice(1, -1), JSON.stringify(closing), ''].join('\n'));
+  await writeFile(join(seed.root, `exports/${name}.rer`), [JSON.stringify(manifest), ...lines.slice(1, -1), JSON.stringify(closing), ''].join('\n'), { mode: 0o600 });
  }
  async function refuses(file) {
   const result = await importFrom(file, 4);
