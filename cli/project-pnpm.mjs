@@ -2,7 +2,7 @@
 // The verified cache is private to rer; the resulting PATH travels to children.
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { delimiter, dirname, join } from 'node:path';
-import { homedir, tmpdir } from 'node:os';
+import { availableParallelism, homedir, loadavg, tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { cachedPnpm, downloadPnpm } from './pnpm-runtime.mjs';
 import { missing, RerError } from './errors.mjs';
@@ -63,14 +63,16 @@ async function ensure(root, { env = process.env, signal, report = () => {}, stor
  const supplied = { ...env, RER_PNPM_ENTRY: join(directory, '..', 'bin', 'pnpm.cjs'), PATH: [env.PATH, directory, dirname(process.execPath)].filter(value => value !== undefined).join(delimiter) };
  // A fresh pnpm's first run can stall or fail once (a cold start on a busy
  // machine): the check settles with a bounded retry, then names what failed.
+ const loadFactor = Math.min(4, Math.max(1, loadavg()[0] / availableParallelism()));
+ const timeouts = [10000, 20000, 30000].map(ms => Math.round(ms * loadFactor));
  let result;
- for (const [attempt, timeoutMs] of [10000, 20000, 30000].entries()) {
+ for (const [attempt, timeoutMs] of timeouts.entries()) {
   if (attempt) await delay(1000, undefined, { signal });
   result = await probe(root, supplied, signal, store, timeoutMs);
   if (result.version === pin) { Object.assign(env, supplied); return env; }
  }
  const failed = result.version === undefined ? result.reason : `it reported ${JSON.stringify(result.version.slice(0, 64))}`;
- const message = `The verified pnpm ${pin} did not report the project version after 3 tries (${failed}).${result.diagnostic ? `\n${result.diagnostic}\n` : ' '}Run ${shellQuote(join(directory, 'pnpm'))} --version to inspect it, then rerun rer.`;
+ const message = `The verified pnpm ${pin} did not report the project version after 3 tries (${failed}). The final attempt allowed ${timeouts.at(-1) / 1000} s.${result.diagnostic ? `\n${result.diagnostic}\n` : ' '}Run ${shellQuote(join(directory, 'pnpm'))} --version to inspect it, then rerun rer.`;
  store.report(message);
  throw missing(message);
 }
