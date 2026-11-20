@@ -16,7 +16,16 @@ async function seed(t){
  const root=await mkdtemp(join(tmpdir(),'rer-public-preflight-'));t.after(()=>rm(root,{recursive:true,force:true}));
  await cp(join(base,'default-seed'),root,{recursive:true,filter:path=>!path.split('/').some(part=>['node_modules','.wrangler','.seed','.rer','dist','.cache'].includes(part))});
  await exportCLI(base,root);await cp(join(base,'onboarding'),join(root,'scripts/base-onboarding'),{recursive:true,filter:path=>!path.endsWith('.test.mjs')});
- const run=async (args,{slow=false,failed=false}={})=>{const child=spawn(process.execPath,[...(slow||failed?['--import',join(base,'cli/fixtures/slow-state-inspection.mjs')]:[]),'scripts/rer.mjs',...args,'--json','--non-interactive'],{cwd:root,env:{...process.env,CI:'true',RER_TEST_INSPECTION_FAILURE:failed?'1':'0',RER_SERVERS_DIR:join(root,'.test-servers')},stdio:['ignore','pipe','pipe']});let stdout='',stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',resolve);});return {code,stdout,stderr,events:stdout.trim().split('\n').filter(Boolean).map(JSON.parse)};};
+ const run=async (args,{slow=false,failed=false,held,timeout}={})=>{
+  const preload=held?'held-inspection.mjs':slow||failed?'slow-state-inspection.mjs':undefined;
+  const child=spawn(process.execPath,[...(preload?['--import',join(base,'cli/fixtures',preload)]:[]),'scripts/rer.mjs',...args,'--json','--non-interactive'],{
+   cwd:root,env:{...process.env,CI:'true',RER_TEST_INSPECTION_FAILURE:failed?'1':'0',RER_SERVERS_DIR:join(root,'.test-servers'),...(held?{RER_TEST_HELD_INSPECTION:held}:{})},
+   timeout,killSignal:'SIGKILL',stdio:['ignore','pipe','pipe']
+  });
+  let stdout='',stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);
+  const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',resolve);});
+  return {code,stdout,stderr,events:stdout.trim().split('\n').filter(Boolean).map(JSON.parse)};
+ };
  return {root,run};
 }
 test('public setup enumerates active missing fields and private answer shape without prompting or echoing answers',async t=>{
@@ -40,6 +49,32 @@ test('public setup enumerates active missing fields and private answer shape wit
  manifest.fields.push({name:'FINAL_FIELD',label:'Last required answer',kind:'text',required:true});await writeFile(path,JSON.stringify(manifest));
  const terminal=JSON.parse((await promisify(execFile)('python3',[join(base,'cli/fixtures/terminal-setup.py'),root,process.execPath],{timeout:90000})).stdout);
  assert.deepEqual(terminal.prompted,['OWNER_EMAIL','WORKSPACE','ACCESS','FINAL_FIELD']);assert.equal(terminal.secretWasEchoed,false);assert.equal(terminal.managedSecretPrompted,false);assert.equal(terminal.termination,143);
+});
+test('installed setup leaves a held process inspection at its deadline and continues with the checkout lock',async t=>{
+ const {root,run}=await seed(t),held=join(root,'held-inspection.log');
+ const starts=lines=>lines.flatMap(line=>{
+  const match=/^(\d+) started (\d+)$/.exec(line);
+  return match?[{pid:Number(match[1]),at:Number(match[2])}]:[];
+ });
+ let lines;
+ try {
+  const result=await run(['setup','--port','48930'],{held,timeout:60000});
+  const finished=Date.now();
+  assert.equal(result.code,3,result.stderr+result.stdout);
+  lines=(await readFile(held,'utf8')).trim().split('\n');
+  const children=starts(lines);
+  assert.ok(children.length,'the stand-in inspection started');
+  for(const {pid,at} of children){
+   assert.ok(lines.includes(`${pid} SIGKILL`),'rer sent SIGKILL at the deadline');
+   process.kill(pid,0);
+   assert.ok(finished-at<20000,'setup exited while the inspection child was still held');
+  }
+  assert.match(result.stderr,/Local process inspection did not answer/);
+  assert.equal(result.events.find(event=>event.event==='error').code,'missing_input');
+ } finally {
+  lines??=(await readFile(held,'utf8').catch(()=>'')).split('\n');
+  for(const {pid} of starts(lines))try{process.kill(pid,'SIGKILL');}catch(error){if(error.code!=='ESRCH')throw error;}
+ }
 });
 test('public setup refuses retained database owner mismatch before changing private settings or data',async t=>{
  const {root,run}=await seed(t);const directory=join(root,'.wrangler/state/v3/d1/miniflare-D1DatabaseObject');await mkdir(directory,{recursive:true});

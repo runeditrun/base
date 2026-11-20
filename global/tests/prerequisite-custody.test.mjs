@@ -103,6 +103,13 @@ test('the pinned pnpm check settles a transient failure and names a lasting one'
  const pin = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).packageManager.replace(/^pnpm@/, '');
  const edge = join(temporary, 'edge.mjs');
  await writeFile(edge, `import {readFileSync} from 'node:fs';
+import os from 'node:os';
+import {syncBuiltinESMExports} from 'node:module';
+if(process.env.RER_TEST_PROBE_LOAD!==undefined){
+ os.loadavg=()=>[Number(process.env.RER_TEST_PROBE_LOAD),0,0];
+ os.availableParallelism=()=>4;
+ syncBuiltinESMExports();
+}
 globalThis.fetch=async url=>new Response(url.endsWith('.tgz')?readFileSync(process.env.PROBE_ARCHIVE):JSON.stringify({version:process.env.PROBE_PIN,dist:{integrity:process.env.PROBE_INTEGRITY}}));\n`);
  const start = (argv, env) => {
   const child = spawn(process.execPath, argv, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -117,11 +124,19 @@ globalThis.fetch=async url=>new Response(url.endsWith('.tgz')?readFileSync(proce
  assert.equal(settled.code, 0, settled.stderr);
  assert.equal((await readFile(join(transient.home, 'runs'), 'utf8')).trim(), '2', 'one failed check, then one that settled');
  const lasting = await acquisition(temporary, pin, edge, failing(99), 'lasting');
- await writeFile(join(lasting.home, 'runs'), '0');
- const refused = await lasting.run(start);
- assert.equal(refused.code, 3, refused.stderr);
- assert.match(refused.stderr, /exited 1: fixture pnpm cold start failed/, 'the refusal names what pnpm did');
- assert.match(refused.stderr, /Command: pnpm --version\nExit code: 1; signal: none\nStderr \(redacted\):\nfixture pnpm cold start failed/);
- assert.doesNotMatch(refused.stderr, /test-only-probe-credential/);
- assert.equal((await readFile(join(lasting.home, 'runs'), 'utf8')).trim(), '3', 'the retry is bounded');
+ const rer = join(base, 'global/rer.mjs');
+ const bounds = [];
+ for (const load of [0, 120]) {
+  await writeFile(join(lasting.home, 'runs'), '0');
+  const refused = await lasting.run((_, env) => start([rer, 'setup', '--json'], { ...env, RER_TEST_PROBE_LOAD: String(load), RER_NO_UPDATE_CHECK: '1' }));
+  assert.equal(refused.code, 3, refused.stderr);
+  assert.match(refused.stderr, /exited 1: fixture pnpm cold start failed/, 'the refusal names what pnpm did');
+  assert.match(refused.stderr, /Command: pnpm --version\nExit code: 1; signal: none\nStderr \(redacted\):\nfixture pnpm cold start failed/);
+  assert.doesNotMatch(refused.stderr, /test-only-probe-credential/);
+  assert.equal((await readFile(join(lasting.home, 'runs'), 'utf8')).trim(), '3', 'the retry is bounded');
+  const bound = /final attempt allowed ([\d.]+) s/.exec(refused.stderr);
+  assert.ok(bound, refused.stderr);
+  bounds.push(Number(bound[1]));
+ }
+ assert.ok(bounds[1] >= 4 * bounds[0] && bounds[1] > 80, `idle and loaded final probe bounds: ${bounds.join(', ')} s`);
 });
