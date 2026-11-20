@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.126
+
+Signed: Run Edit Run fleet, 2026-11-20.
+
+### Platform archives into native destinations
+
+- A Platform-origin archive can restore into a native destination with applied owner migrations even when Platform recorded the core and owner files in a different order. Restore matches the recorded hashes to the destination's own files, replays them in the destination's applied order, and requires the result to reproduce the archive schema before bridging later migrations. This covers the qualified Platform-to-native path that rer 0.2.124 and 0.2.125 refused with `schema_mismatch`.
+- Changed migration bytes, a missing recorded entry, an archive-extra owner migration, an absent applied owner file, or a reorder that changes the archived schema still refuse before importing product rows or creating import jobs. The Worker returns HTTP 409 and the CLI exits 4; invalid native owner history reports `schema_mismatch:owner_migration_history`.
+- Core-only Worker bundles grow by about 0.7 KB compared with 0.2.125 in the qualified fixture. SQLite WASM and owner replay remain excluded when there are no owner migration files.
+
+### Bounded local inspection
+
+- Port inspection stops waiting when its inspection deadline expires, even if an `lsof` child remains hung, and reports the port unchecked. A host-scoped probe skips process inspection only after a successful bind and explicit TCP refusal on the applicable loopback addresses; ambiguous and any-address probes still inspect.
+- The verified pnpm version probe keeps three cached-tool attempts at 10, 20 and 30 seconds at idle. Deadlines scale with one-minute load per CPU, capped at 40, 80 and 120 seconds. A failed probe reports the final attempt's deadline.
+- Maintained CLI and onboarding copies and inventory are regenerated.
+
+Archives written by rer 0.2.124 or 0.2.125 import into 0.2.126, and 0.2.126 archives import into those versions for the same compatible fixtures: the archive format identity remains `runeditrun-portability` version 2, unchanged from 0.2.125. This does not give older readers the new Platform-to-native restore behavior.
+
+HappyToHelp and any seed with Platform-origin history on rer 0.2.124 or 0.2.125 need a re-pin to 0.2.126. ChargeDesk pins rer 0.2.118 and other seeds have older pins; re-pin to receive these fixes.
+
+These changes require adoption through the seed's pinned package or refreshed source. This preparation establishes no seed adoption, live deployment, provider delivery or production result. The source range changes portability, onboarding inspection and their maintained copies, with no import-kit or product migration change.
+
 ## 0.2.125
 
 Signed: Run Edit Run fleet, 2026-11-19.
