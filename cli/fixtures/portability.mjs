@@ -27,7 +27,7 @@ CREATE INDEX computed_entries_total ON computed_entries(total);`;
 
 // A runnable exported reference, using the checkout's installed dependencies.
 // Migrations and transfer use the public runner without building the application.
-export async function portabilityFixture(t,{generated=true,receiptWorker=false}={}) {
+export async function portabilityFixture(t,{generated=true,receiptWorker=false,entry='scripts/rer.mjs'}={}) {
  const directory=await mkdtemp(join(tmpdir(),'rer-data-journey-')),root=join(directory,'installation');
  const children=new Set();
  let closing;
@@ -90,10 +90,10 @@ commandAdapter.portability.export=async context=>{
   assert.equal(code,expected,`Fixture command ${args[0]} exited ${code}: ${stdout}\n${stderr}`);
   return {stdout,stderr};
  }
- const run=async(args,expected=0,{slow=false}={})=>(await command([...(slow?['--import',join(base,'cli/fixtures/slow-state-inspection.mjs')]:[]),'scripts/rer.mjs',...args,'--json'],expected)).stdout.trim().split('\n').map(JSON.parse);
+ const run=async(args,expected=0,{slow=false}={})=>(await command([...(slow?['--import',join(base,'cli/fixtures/slow-state-inspection.mjs')]:[]),entry,...args,'--json'],expected)).stdout.trim().split('\n').map(JSON.parse);
  // A command as a person runs it, without --json: its terminal output.
  // `fault` names a transfer-fault.mjs failure for the transfer worker.
- const text=(args,expected=0,{fault}={})=>command(['scripts/rer.mjs',...args],expected,fault?{NODE_OPTIONS:`--import=${join(base,'cli/fixtures/transfer-fault.mjs')}`,RER_TEST_TRANSFER_FAULT:fault}:{});
+ const text=(args,expected=0,{fault}={})=>command([entry,...args],expected,fault?{NODE_OPTIONS:`--import=${join(base,'cli/fixtures/transfer-fault.mjs')}`,RER_TEST_TRANSFER_FAULT:fault}:{});
  const data=async sql=>JSON.parse((await command(['node_modules/wrangler/bin/wrangler.js','d1','execute','default-seed-reference','--local','--persist-to','.wrangler/state','--config','wrangler.jsonc','--command',sql,'--json'])).stdout);
  return {root,run,text,data};
 }
