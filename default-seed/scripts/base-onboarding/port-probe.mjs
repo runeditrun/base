@@ -1,4 +1,4 @@
-import { createServer } from 'node:net';
+import { createServer, Socket } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import { inspectionContext, portListener, searchContext, uncheckedInspection } from './process-diagnostics.mjs';
 
@@ -13,6 +13,25 @@ async function bind(host, port) {
  } finally { if (socket.listening) await new Promise(resolve => socket.close(resolve)); }
 }
 
+async function loopbackRefuses(host, port, context) {
+ // An IPv6 wildcard may appear in an IPv4 ownership check even when it is
+ // v6-only. For IPv4 and localhost, require both loopbacks to refuse.
+ if (!['127.0.0.1', 'localhost', '::1'].includes(host)) return false;
+ const addresses = host === '::1' ? ['::1'] : ['127.0.0.1', '::1'];
+ const timeout = Math.min(250, Math.floor(context.deadline - performance.now()));
+ if (timeout <= 0) return false;
+ const refused = await Promise.all(addresses.map(address => new Promise(resolve => {
+  const socket = new Socket({ signal: context.signal });
+  const finish = refused => { clearTimeout(timer); socket.destroy(); resolve(refused); };
+  const timer = setTimeout(() => finish(false), timeout);
+  socket.once('connect', () => finish(false));
+  socket.once('error', error => finish(error.code === 'ECONNREFUSED'));
+  socket.connect({ host: address, port });
+ })));
+ context.signal?.throwIfAborted();
+ return refused.every(Boolean);
+}
+
 // A failed diagnostic is unknown, never evidence of a foreign owner. A real
 // bind can still prove availability. If a bind loses a race but inspection
 // finds no listener, retry the bind within the same inspection deadline.
@@ -25,6 +44,12 @@ export async function probePort(host, port, { context = inspectionContext({ port
  };
  let bound = await bindings(), listener, unchecked;
  if (!bound.available && (bound.code !== 'EADDRINUSE' || searching)) return bound;
+ // An any-address search must still see listeners bound only to non-loopback
+ // addresses. A failed bind is also ambiguous, even with a refused connect.
+ if (bound.available && !anyAddress && await loopbackRefuses(host, port, context)) {
+  bound = await bindings();
+  if (bound.available || bound.code !== 'EADDRINUSE') return bound;
+ }
  try { listener = await portListener(port, anyAddress ? undefined : host, context); }
  catch (error) { if (!uncheckedInspection(error)) throw error; unchecked = error; }
  if (listener) return { available: false, listener };

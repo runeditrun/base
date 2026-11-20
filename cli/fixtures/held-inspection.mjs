@@ -12,7 +12,7 @@ cp.execFile = (command, args, options, callback) => {
   : command.endsWith('/lsof') && args.includes('-iTCP');
  if (!inspection) return exec(command, args, options, callback);
  const child = exec(process.execPath, ['-e', "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"], options, callback);
- appendFileSync(journal, `${child.pid}\n`);
+ appendFileSync(journal, `${child.pid} started ${Date.now()}\n`);
  const kill = child.kill.bind(child);
  child.kill = signal => {
   if (signal !== 'SIGKILL') return kill(signal);

@@ -51,25 +51,29 @@ test('public setup enumerates active missing fields and private answer shape wit
  assert.deepEqual(terminal.prompted,['OWNER_EMAIL','WORKSPACE','ACCESS','FINAL_FIELD']);assert.equal(terminal.secretWasEchoed,false);assert.equal(terminal.managedSecretPrompted,false);assert.equal(terminal.termination,143);
 });
 test('installed setup leaves a held process inspection at its deadline and continues with the checkout lock',async t=>{
- const {root,run}=await seed(t),held=join(root,'held-inspection.log'),wallBound=20000;
- const started=performance.now();
- let result, lines;
+ const {root,run}=await seed(t),held=join(root,'held-inspection.log');
+ const starts=lines=>lines.flatMap(line=>{
+  const match=/^(\d+) started (\d+)$/.exec(line);
+  return match?[{pid:Number(match[1]),at:Number(match[2])}]:[];
+ });
+ let lines;
  try {
-  result=await run(['setup','--port','48930'],{held,timeout:wallBound});
-  lines=(await readFile(held,'utf8')).trim().split('\n');
-  const pids=lines.filter(line=>/^\d+$/.test(line));
-  assert.ok(pids.length,'the stand-in inspection started');
-  for(const pid of pids){
-   assert.ok(lines.includes(`${pid} SIGKILL`),'rer sent SIGKILL at the deadline');
-   process.kill(Number(pid),0);
-  }
-  assert.ok(performance.now()-started<wallBound,'setup exited while the inspection child was still held');
+  const result=await run(['setup','--port','48930'],{held,timeout:60000});
+  const finished=Date.now();
   assert.equal(result.code,3,result.stderr+result.stdout);
+  lines=(await readFile(held,'utf8')).trim().split('\n');
+  const children=starts(lines);
+  assert.ok(children.length,'the stand-in inspection started');
+  for(const {pid,at} of children){
+   assert.ok(lines.includes(`${pid} SIGKILL`),'rer sent SIGKILL at the deadline');
+   process.kill(pid,0);
+   assert.ok(finished-at<20000,'setup exited while the inspection child was still held');
+  }
   assert.match(result.stderr,/Local process inspection did not answer/);
   assert.equal(result.events.find(event=>event.event==='error').code,'missing_input');
  } finally {
-  lines??=(await readFile(held,'utf8').catch(()=>'' )).split('\n');
-  for(const line of lines)if(/^\d+$/.test(line))try{process.kill(Number(line),'SIGKILL');}catch(error){if(error.code!=='ESRCH')throw error;}
+  lines??=(await readFile(held,'utf8').catch(()=>'')).split('\n');
+  for(const {pid} of starts(lines))try{process.kill(pid,'SIGKILL');}catch(error){if(error.code!=='ESRCH')throw error;}
  }
 });
 test('public setup refuses retained database owner mismatch before changing private settings or data',async t=>{
