@@ -23,6 +23,31 @@ const run = (program, args, env, cwd) => new Promise((resolveRun, reject) => {
 });
 const count = (text, pattern) => text.match(pattern)?.length ?? 0;
 
+test('packed rer cli install with an XDG data home preserves the HOME launcher', async t => {
+ const directory = await mkdtemp(join(tmpdir(), 'rer-xdg-install-'));
+ t.after(() => rm(directory, { recursive: true, force: true }));
+ const archive = await buildPackage(base, directory);
+ const unpacked = await run('tar', ['-xzf', archive], { PATH: '/usr/bin:/bin' }, directory);
+ assert.equal(unpacked.code, 0, unpacked.stderr);
+
+ const env = { HOME: join(directory, 'home'), PATH: `${dirname(process.execPath)}:/usr/bin:/bin`, RER_NO_UPDATE_CHECK: '1' };
+ const install = env => run(process.execPath, [join(directory, 'package/global/rer.mjs'), 'cli', 'install'], env, directory);
+ const standard = await install(env);
+ assert.equal(standard.code, 0, standard.stderr);
+ const homeLauncher = join(env.HOME, '.local/bin/rer'), original = await readFile(homeLauncher);
+
+ const isolated = join(directory, 'isolated'), xdgEnv = { ...env, XDG_DATA_HOME: join(isolated, 'share') };
+ const installed = await install(xdgEnv);
+ assert.equal(installed.code, 0, installed.stderr);
+ assert.deepEqual(await readFile(homeLauncher), original);
+ const launcher = join(isolated, 'bin/rer');
+ const status = await run(launcher, ['cli', 'status', '--json'], xdgEnv, directory);
+ assert.equal(status.code, 0, status.stderr);
+ const current = JSON.parse(status.stdout);
+ assert.equal(current.launcher, launcher);
+ assert.equal(current.root, await realpath(join(xdgEnv.XDG_DATA_HOME, 'rer')));
+});
+
 test('install.sh with a supplied command ends with one PATH step when ~/.local/bin is not on PATH, and stays silent when it is', { timeout: 5 * 60_000 }, async t => {
  const directory = await mkdtemp(join(tmpdir(), 'rer-installer-path-')), registry = await localRegistry();
  t.after(async () => { await registry.close(); await rm(directory, { recursive: true, force: true }); });

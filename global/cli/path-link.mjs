@@ -1,7 +1,8 @@
-// Installation writes only the canonical launcher in ~/.local/bin.
+// Installation writes only the launcher in the resolved bin directory.
 // Other PATH commands are reported, never replaced or linked alongside.
 import { access, constants, lstat, readFile, readlink, stat } from 'node:fs/promises';
 import { basename, delimiter, join, resolve } from 'node:path';
+import { shellQuote } from '../../cli/node-runtime-cache.mjs';
 
 // Older installs recorded extra PATH links; uninstall can still remove those.
 export async function ownedPathLink(path, launcher) {
@@ -11,19 +12,26 @@ export async function ownedPathLink(path, launcher) {
 
 // Only the person executing the printed command edits their shell file.
 // Match the complete PATH line before appending so repeated execution is safe.
-export async function shellStartup(home, env = process.env) {
- const shell = basename(env.SHELL ?? ''), add = 'export PATH="$HOME/.local/bin:$PATH"';
- if (shell === 'fish') return { files: ['.config/fish/config.fish', '.config/fish/fish_variables'].map(file => join(home, file)), target: '~/.config/fish', line: 'fish_add_path ~/.local/bin' };
- if (!['zsh', 'bash'].includes(shell)) return { files: [], line: add };
+export function shellStartup(paths, env = process.env) {
+ const { home, bin, defaultBin } = paths, shell = basename(env.SHELL ?? '');
+ const directory = bin === defaultBin ? '~/.local/bin' : bin;
+ if (shell === 'fish') {
+  const argument = bin === defaultBin ? directory : `'${bin.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`;
+  const marker = bin === defaultBin ? '.local/bin' : bin;
+  return { files: ['.config/fish/config.fish', '.config/fish/fish_variables'].map(file => join(home, file)), directory, marker, line: `fish_add_path ${argument}` };
+ }
+ const add = bin === defaultBin ? 'export PATH="$HOME/.local/bin:$PATH"' : `export PATH=${shellQuote(bin)}:"$PATH"`;
+ if (!['zsh', 'bash'].includes(shell)) return { files: [], directory, line: add };
  const file = shell === 'zsh' ? '.zshrc' : '.bashrc';
  const target = `~/${file}`;
- return { files: [join(home, file)], target, line: `(grep -Fqx '${add}' ${target} 2>/dev/null || printf '\\n%s\\n' '${add}' >> ${target}) && ${add}` };
+ const quoted = shellQuote(add), marker = bin === defaultBin ? '.local/bin' : add;
+ return { files: [join(home, file)], directory, marker, target, line: `(grep -Fqx ${quoted} ${target} 2>/dev/null || printf '\\n%s\\n' ${quoted} >> ${target}) && ${add}` };
 }
 
-// Whether a startup file already puts ~/.local/bin on PATH for new terminals.
-async function persistent(files) {
+// Whether a startup file already names the bin directory for new terminals.
+async function persistent({ files, marker }) {
  for (const file of files) {
-  try { if ((await readFile(file, 'utf8')).includes('.local/bin')) return true; }
+  try { if ((await readFile(file, 'utf8')).includes(marker)) return true; }
   catch (error) { if (!['ENOENT', 'EISDIR', 'EACCES'].includes(error.code)) throw error; }
  }
  return false;
@@ -46,11 +54,11 @@ export async function pathAdvice(paths, env = process.env, { includeShellStep = 
   } catch (error) { if (!['ENOENT', 'EACCES', 'ENOTDIR'].includes(error.code)) throw error; }
  }
  if (!includeShellStep) return lines.join('\n');
- const startup = await shellStartup(paths.home, env);
+ const startup = shellStartup(paths, env);
  const first = entries.includes(bin) && firstCommand === paths.launcher;
- if (first && await persistent(startup.files)) return lines.join('\n');
+ if (first && await persistent(startup)) return lines.join('\n');
  const why = first ? 'New terminals will not find rer yet.' : firstCommand ? `Another rer (${firstCommand}) comes first on your PATH.` : 'rer is not on your PATH yet.';
- const effect = basename(env.SHELL ?? '') === 'fish' ? 'fish saves ~/.local/bin in its user path configuration' : startup.target ? `you add ~/.local/bin to PATH in ${startup.target} and this terminal` : 'you add ~/.local/bin to PATH for this terminal only';
+ const effect = basename(env.SHELL ?? '') === 'fish' ? `fish saves ${startup.directory} in its user path configuration` : startup.target ? `you add ${startup.directory} to PATH in ${startup.target} and this terminal` : `you add ${startup.directory} to PATH for this terminal only`;
  lines.push(`Next step: ${why} Run this line; ${effect}. The installer changes no shell file:`, `  ${startup.line}`);
  if (['zsh', 'bash'].includes(basename(env.SHELL ?? ''))) lines.push('Open a new Terminal window, then `rer` works by name.');
  return lines.join('\n');

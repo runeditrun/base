@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { chmod, cp, mkdir, readdir, readlink, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { ownManifest, ownRoot, packageDigest, packageFileList } from '../package-info.mjs';
-import { installRecord, launcherOwner, launcherScript, layout } from './layout.mjs';
+import { installRecord, launcherCommand, launcherOwner, launcherScript, layout } from './layout.mjs';
 import { pathAdvice } from './path-link.mjs';
 import { commandNotFoundHelp } from '../../cli/command-guidance.mjs';
 import { runningDoor } from '../../cli/door.mjs';
@@ -47,7 +47,8 @@ async function closing(paths) {
  if (process.env.RER_INSTALL_NO_NEXT) return notices ? notices + '\n' : '';
  const advice = await pathAdvice(paths);
  const terminal = !advice && ['zsh', 'bash'].includes(basename(process.env.SHELL ?? '')) ? 'Open a new Terminal window, then `rer` works by name.\n' : '';
- return `Run a downloaded JavaScript tool with the installed runtime: ~/.local/bin/rer run --script ./tool.mjs [ARGS...]\nNext, start an app: ~/.local/bin/rer dev <owner>/<repo>\n${commandNotFoundHelp}\n${advice ? advice + '\n' : terminal}`;
+ const launcher = launcherCommand(paths), recovery = commandNotFoundHelp.replace('~/.local/bin/rer', () => launcher);
+ return `Run a downloaded JavaScript tool with the installed runtime: ${launcher} run --script ./tool.mjs [ARGS...]\nNext, start an app: ${launcher} dev <owner>/<repo>\n${recovery}\n${advice ? advice + '\n' : terminal}`;
 }
 
 export async function install({ quiet = false } = {}) {
@@ -56,7 +57,8 @@ export async function install({ quiet = false } = {}) {
  const channel = (process.env.RER_INSTALL_CHANNEL ?? (await channelOf(paths)).channel) === 'script' ? 'script' : 'npx';
  const launcher = await launcherOwner(paths.launcher);
  if (launcher.state === 'foreign') {
-  process.stderr.write(`~/.local/bin/rer cli install: ${paths.launcher} already exists and was not written by ~/.local/bin/rer cli install (it may be the unrelated npm package "rer"). Nothing was changed. Remove or rename it, then run the install again.\n`);
+  const command = `${launcherCommand(paths)} cli install`;
+  process.stderr.write(`${command}: ${paths.launcher} already exists and was not written by ${command} (it may be the unrelated npm package "rer"). Nothing was changed. Remove or rename it, then run the install again.\n`);
   return 4;
  }
  const record = await installRecord(paths), current = await readLink(paths.current);
@@ -64,7 +66,8 @@ export async function install({ quiet = false } = {}) {
  let present = false;
  try { present = await packageDigest(join(paths.versions, name)) === digest; } catch (error) { if (error.code !== 'ENOENT') throw error; }
  if (present && current === join('versions', name) && launcher.text === script && record?.channel === channel) {
-  if (!quiet) process.stdout.write(`rer ${manifest.version} is already current (${join(paths.versions, name)}). Nothing changed.\n${await closing(paths)}`);
+  const launcherNotice = paths.bin === paths.defaultBin ? '' : `${paths.launcher} runs it.\n`;
+  if (!quiet) process.stdout.write(`rer ${manifest.version} is already current (${join(paths.versions, name)}). Nothing changed.\n${launcherNotice}${await closing(paths)}`);
   return 0;
  }
  if (!present) { await rm(join(paths.versions, name), { recursive: true, force: true }); await copyVersion(paths, name); }
