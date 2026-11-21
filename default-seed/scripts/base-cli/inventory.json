@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.127-dev.gd18a3057",
+  "cliVersion": "0.2.127-dev.gcdbe664d",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1599,11 +1599,11 @@
     },
     "edition-authoring/base-copies.mjs": {
       "source": "edition-authoring/base-copies.mjs",
-      "sha256": "bd1ad7bb65bc31c25f0e3b402d940e3a04fb09d1587e0fc16014a32343366438"
+      "sha256": "8568c95f6adf07d8d6d1b136fa140223ffe0a544ba292ce05b5532d5efb807cf"
     },
     "edition-authoring/cli.mjs": {
       "source": "edition-authoring/cli.mjs",
-      "sha256": "87bff33255838dbbcdb017c034380002b3cffe65b7fb098dc05f20544d1931fc"
+      "sha256": "2812198aa88c81ee4c0ba2f178947a328b2ccfcfab9d183fb948e4961c821d61"
     },
     "edition-authoring/copy-checkout.mjs": {
       "source": "edition-authoring/copy-checkout.mjs",
