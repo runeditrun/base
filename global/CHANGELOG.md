@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.128
+
+Signed: Run Edit Run fleet, 2026-11-21.
+
+### Optional computer choices
+
+- `rer business connect`, `run` and `next` describe undecided computer choices as optional: “Optional choices for this computer (nothing waits on them):”. The first check-in no longer says “After choosing ... run next to apply them”; it says to run `business next` to see the next task. Choices still apply at the next check-in. Other output, exit codes and JSON are unchanged.
+
+### Local sign-in and migration guidance
+
+- The local `rer dev` sign-in gate places the expired-link alert inside the page's main content. Its text and alert role, sign-in links, expiry and refusals are unchanged.
+- `refresh-base`'s applied-migration refusal, `verify-base`'s finding and the agent-door adoption guide point maintainers to the existing exact-path ignore rule for applied migrations that match a Base file but are not recorded copies. Preserve those migrations' filenames and bytes. Behavior, exit codes and JSON are unchanged.
+
+### Verification under load
+
+- `rer verify` hydration deadlines scale with one-minute CPU load per available core, up to four times their idle limits. Idle limits are unchanged. The three hydration failure messages include the deadline in use. Maintained CLI copies and inventory are regenerated.
+- This does not establish that standalone `rer verify` passes on HappyToHelp under load. Its test profiler's fixed 30-second inspector timer and a homepage tooltip mounted outside React remain HappyToHelp-owned limits, reported to hh.
+
+Nothing in this release changes archives: `modules/portability`, `modules/import-kit`, every product migration and the archive format identity (`runeditrun-portability` version 2) are unchanged from 0.2.127. Core-only and owner-migration archives remain interchangeable with 0.2.127 for the same fixtures.
+
+HappyToHelp, Lamp, Uptime, Oncall, Spool and other seeds on 0.2.126 or 0.2.127: re-pinning to 0.2.128 is optional; it only changes the four items above. Seeds on older pins: re-pin.
+
+These changes require adoption through the seed's pinned package or refreshed source. This preparation establishes no seed adoption, live deployment, provider delivery or production result.
+
 ## 0.2.127
 
 Signed: Run Edit Run fleet, 2026-11-21.
