@@ -1,6 +1,7 @@
 // Chromium from the seed's own Playwright, the two ways of serving pages to it
 // (the production build as rer deploy hosts it, or a running origin), and one
 // load: scripts held until the probe releases them, every external request aborted.
+import { availableParallelism, loadavg } from 'node:os';
 import { checkoutPlaywright } from '../browser-runtime.mjs';
 import { RerError } from '../errors.mjs';
 import { serveHosted } from '../hosted-output.mjs';
@@ -38,14 +39,18 @@ export function originServer(origin) {
  * same-origin script requests (scripts), those answered before the probe released
  * the hold (unheld: none unless the hold failed) and the aborted cross-origin script
  * requests sent in CORS mode, as module fetches are (crossScripts). */
-export async function runLoad(browser, server, path, item, { timeout = 30000 } = {}) {
+export async function runLoad(browser, server, path, item, { timeout } = {}) {
+ const loadFactor = Math.min(4, Math.max(1, loadavg()[0] / availableParallelism()));
+ const scale = ms => Math.round(ms * loadFactor);
+ const browserLimitMs = timeout ?? scale(30000);
+ const probeLimits = { noHydrationMs: scale(8000), settleMs: scale(20000) };
  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: item.reduced ? 'reduce' : 'no-preference', serviceWorkers: 'block' });
  const errors = [], warnings = [], aborted = new Set(), scripts = new Set(), unheld = new Set(), crossScripts = new Set();
  let release, isReleased = false; const released = new Promise(resolve => { release = () => { isReleased = true; resolve(); }; });
  try {
   const page = await context.newPage();
   await page.exposeBinding('__rerRelease', () => { release(); });
-  await page.addInitScript({ content: `(${probe})(${JSON.stringify({ kind: item.kind, section: item.section, release: item.release })})` });
+  await page.addInitScript({ content: `(${probe})(${JSON.stringify({ kind: item.kind, section: item.section, release: item.release, ...probeLimits })})` });
   page.on('pageerror', error => errors.push(`page error: ${String(error.message).split('\n')[0]}`));
   page.on('console', message => {
    const text = message.text(), type = message.type();
@@ -70,10 +75,10 @@ export async function runLoad(browser, server, path, item, { timeout = 30000 } =
    } catch (error) { if (!page.isClosed()) await route.abort().catch(() => {}); if (!/closed|disposed/i.test(String(error))) errors.push(`check could not serve ${url.pathname}: ${error.message}`); }
   });
   const started = Date.now();
-  await page.goto(server.origin + path, { waitUntil: 'commit', timeout });
-  const settled = await page.waitForFunction(() => window.__rerProbe?.settledAt !== null && window.__rerProbe?.settledAt !== undefined, null, { timeout, polling: 50 }).then(() => true, () => false);
+  await page.goto(server.origin + path, { waitUntil: 'commit', timeout: browserLimitMs });
+  const settled = await page.waitForFunction(() => window.__rerProbe?.settledAt !== null && window.__rerProbe?.settledAt !== undefined, null, { timeout: browserLimitMs, polling: 50 }).then(() => true, () => false);
   const record = await page.evaluate(() => window.__rerProbe ?? null).catch(() => null);
-  return { record: settled ? record : { ...(record ?? {}), settled: 'timeout' }, errors, warnings, aborted: [...aborted], scripts: [...scripts], unheld: [...unheld], crossScripts: [...crossScripts], ms: Date.now() - started };
+  return { record: settled ? record : { ...(record ?? {}), settled: 'timeout', settledLimitMs: browserLimitMs }, errors, warnings, aborted: [...aborted], scripts: [...scripts], unheld: [...unheld], crossScripts: [...crossScripts], ms: Date.now() - started };
  } finally { release(); await context.close(); }
 }
 
