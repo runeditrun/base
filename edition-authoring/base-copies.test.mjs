@@ -661,6 +661,7 @@ test('refresh-base refuses to rewrite an applied migration and leaves every file
     const refused = run(seed, 'refresh-base', next, '--base', base);
     assert.equal(refused.status, 1);
     assert.match(refused.error, /migrations\/core\/0004_sample\.sql.*new migration/);
+    assert.match(refused.error, /exact path.*ignore.*base-copies\.json.*ADOPTING\.md#fresh-schema-and-populated-cutover/);
     assert.equal(fs.readFileSync(path.join(seed, 'migrations/core/0004_sample.sql'), 'utf8'), 'create table a (id text);\n');
     assert.equal(fs.readFileSync(path.join(seed, 'vendor/sample/index.mjs'), 'utf8'), 'export const sample = 1;\n');
     assert.deepEqual(fs.readFileSync(path.join(seed, 'base-copies.json')), record);
