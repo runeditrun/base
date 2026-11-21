@@ -95,10 +95,20 @@ async function nativeWorker(store,direction,input,signal) {
   const child = store.spawn(`${direction === 'migration-preflight' ? 'Checking migration history for' : direction === 'policy-preflight' ? 'Checking archive policy' : ['legacy-preflight','schema-recovery-preflight'].includes(direction) ? 'Checking empty recovery destination' : direction === 'export' ? 'Exporting' : 'Restoring'} local installation data`, process.execPath,
    ['--import', notice, worker, direction, JSON.stringify(input)], { cwd: input.root, signal, env: { ...process.env, WRANGLER_SEND_METRICS: 'false' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
   let receipt;
-  // Progress lines come first, as {progress}; the last message is the receipt.
-  child.on('message', message => { if (typeof message?.progress === 'string') store.report(message.progress); else receipt = message; });
+  // A failed startup can leave Wrangler's restart process running after the
+  // worker reports the error. Start normal cleanup as soon as it reports failure.
+  const failed = new Promise(resolve => {
+   child.on('message', message => {
+    if (typeof message?.progress === 'string') store.report(message.progress);
+    else {
+     receipt = message;
+     if (receipt?.ok === false) resolve();
+    }
+   });
+  });
   const closed = new Promise(resolve => child.once('close', (code, signal) => resolve({ code, signal })));
-  await new Promise(resolve => { child.once('exit', resolve); child.once('error', resolve); });
+  const exited = new Promise(resolve => { child.once('exit', resolve); child.once('error', resolve); });
+  await Promise.race([exited, failed]);
   await store.stop(child);
   const status = await closed;
   if (!receipt || typeof receipt !== 'object') throw new RerError('transfer_failed', `Local portability ended before it finished (${status.signal ? `signal ${status.signal}` : `exit code ${status.code}`}). Run the same command again; it starts over${direction === 'import' ? ' and first cleans up anything this attempt staged' : ''}.`, 1);

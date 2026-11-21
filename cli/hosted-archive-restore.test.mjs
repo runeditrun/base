@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { buildPackage } from '../scripts/rer-package.mjs';
+import { D1 } from '../modules/container/adapters/d1.mjs';
 import { portabilityFixture } from './fixtures/portability.mjs';
 
 const base = resolve(import.meta.dirname, '..');
@@ -39,6 +40,37 @@ const retainedRow = { id: 'synthetic-retained-record' };
 const insert = `INSERT INTO restore_records VALUES ('${retainedRow.id}');`;
 const records = async seed => (await seed.data('SELECT id FROM restore_records'))[0].results;
 const restore = ['import', '--input', 'exports/backup.rer', '--yes', '--non-interactive'];
+const policy = { product: 'synthetic/restore' };
+
+function nativeHistory(files) {
+ return `CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+  ${files.map(([name, sql]) => `${sql}\nINSERT INTO d1_migrations(name) VALUES('${name}');`).join('\n')}`;
+}
+
+async function restoreOverHTTP(seed, bytes, files) {
+ const load = path => import(pathToFileURL(join(pkg, path)).href);
+ const [{ createPortabilityHandler }, { generateMigrationEvidence }, { workerMigrations }] = await Promise.all([
+  load('modules/portability/index.mjs'), load('cli/portability-evidence.mjs'), load('modules/portability/worker-history.mjs'),
+ ]);
+ const db = new D1(join(seed.root, 'worker-restore.sqlite'));
+ try {
+  await db.exec(await readFile(join(pkg, 'modules/portability/schema/portability.sql'), 'utf8'));
+  await db.exec(nativeHistory(files));
+  const evidence = await generateMigrationEvidence(seed.root), origin = 'https://restore.test';
+  const handler = await createPortabilityHandler({ db, policy, appOrigin: origin, authorize: () => 'owner',
+   migrations: () => workerMigrations(db, policy, evidence) });
+  const send = (path, method, data) => handler(new Request(origin + '/api/portability/' + path, {
+   method, headers: { Origin: origin }, body: JSON.stringify(data),
+  }));
+  const [manifest, ...parts] = bytes.trimEnd().split('\n').map(JSON.parse);
+  const created = await send('imports', 'POST', { confirmed: true, manifest });
+  assert.equal(created.status, 201);
+  const path = 'imports/' + (await created.json()).id;
+  for (const part of parts.slice(0, -1)) assert.equal((await send(path + '/parts/' + part.index, 'PUT', part)).status, 200);
+  assert.equal((await send(path + '/finalize', 'POST', parts.at(-1))).status, 200);
+  assert.deepEqual((await db.prepare('SELECT id FROM restore_records').all()).results, [retainedRow]);
+ } finally { await db.close(); }
+}
 
 test('the installed CLI restores a hosted deployment history into a newer Wrangler checkout', { timeout: 240_000 }, async t => {
  const core = [['0040_auxiliary.sql', 'CREATE TABLE auxiliary (id TEXT PRIMARY KEY);'], recordsFile];
@@ -48,23 +80,31 @@ test('the installed CLI restores a hosted deployment history into a newer Wrangl
  // that legacy ledger, without a migrationLedger origin or owner entries.
  const ordered = core.toReversed();
  await seed.data(`CREATE TABLE _rer_deploy_migrations(name TEXT PRIMARY KEY, sha256 TEXT NOT NULL, state TEXT NOT NULL);
-  CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
-  ${ordered.map(([name, sql]) => `${sql}
-   INSERT INTO d1_migrations(name) VALUES('${name}');
-   INSERT INTO _rer_deploy_migrations VALUES('${name}','${createHash('sha256').update(sql).digest('hex')}','applied');`).join('\n')}
+  ${nativeHistory(ordered)}
+  ${ordered.map(([name, sql]) => `INSERT INTO _rer_deploy_migrations VALUES('${name}','${createHash('sha256').update(sql).digest('hex')}','applied');`).join('\n')}
   ${insert}`);
  await seed.text(['export', '--output', 'exports/backup.rer']);
- const manifest = JSON.parse((await readFile(join(seed.root, 'exports/backup.rer'), 'utf8')).split('\n', 1)[0]);
+ const bytes = await readFile(join(seed.root, 'exports/backup.rer'), 'utf8');
+ const manifest = JSON.parse(bytes.split('\n', 1)[0]);
  assert.equal(manifest.migrationLedger, undefined);
  assert.deepEqual(manifest.migrations, core.map(([name]) => name));
  await rename(seed.state, seed.state + '-source');
- const additive = '9999_additive.sql';
- await writeFile(join(seed.migrations, additive), 'CREATE TABLE later (id TEXT PRIMARY KEY);');
+ const additive = ['9999_additive.sql', 'CREATE TABLE later (id TEXT PRIMARY KEY);'];
+ await writeFile(join(seed.migrations, additive[0]), additive[1]);
  await seed.text(restore);
  assert.deepEqual(await records(seed), [retainedRow]);
  assert.deepEqual((await seed.data('SELECT name FROM d1_migrations ORDER BY id'))[0].results.map(row => row.name),
-  [...ordered.map(([name]) => name), additive]);
+  [...ordered, additive].map(([name]) => name));
  assert.equal((await seed.data('SELECT count(*) AS n FROM later'))[0].results[0].n, 0);
+ await restoreOverHTTP(seed, bytes, [...ordered, additive]);
+
+ await rename(seed.state, seed.state + '-restored');
+ const backfill = ['030_backfill.sql', "INSERT INTO restore_records SELECT 'copied' FROM restore_records WHERE id='synthetic-retained-record';"];
+ await writeFile(join(seed.migrations, backfill[0]), backfill[1]);
+ await seed.data(nativeHistory([ordered[0], backfill, ordered[1], additive]));
+ assert.match((await seed.text(restore, 4)).stderr, /schema_mismatch/);
+ assert.deepEqual(await records(seed), []);
+ assert.equal((await seed.data("SELECT count(*) AS n FROM rer_portability_jobs WHERE kind='import'"))[0].results[0].n, 0);
 });
 
 test('the installed CLI completes import with an unchecked process inspection', { timeout: 240_000 }, async t => {
