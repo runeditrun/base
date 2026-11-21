@@ -142,15 +142,16 @@ export function probe(config) {
     if (S.hydratedAt === null && fiber(document.body) && pending() === 0) S.hydratedAt = t;
     const quiet = t - lastMutation > 300 && !oneShot().some(a => a.playState === 'running');
     if (S.hydratedAt !== null && t - S.hydratedAt > 300 && quiet) return settle('hydrated');
-    if (S.hydratedAt === null && t - S.releasedAt > 8000 && !anyFiber()) return settle('not hydrated');
-    if (t - S.releasedAt > 20000) return settle('timeout');
+    if (S.hydratedAt === null && t - S.releasedAt > config.noHydrationMs && !anyFiber()) return settle('not hydrated', config.noHydrationMs);
+    if (t - S.releasedAt > config.settleMs) return settle('timeout', config.settleMs);
    }
   } catch (error) { S.error = String(error && error.stack || error); return settle('error'); }
   requestAnimationFrame(frame);
  }
 
- function settle(state) {
+ function settle(state, limitMs) {
   S.settled = state; S.settledAt = now();
+  if (limitMs !== undefined) S.settledLimitMs = limitMs;
   S.replaced = snapshot.filter(([el]) => !el.isConnected).map(([, key]) => key);
   S.rer = window.__rerHydration ? JSON.parse(JSON.stringify(window.__rerHydration)) : null;
  }
