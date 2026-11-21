@@ -204,7 +204,7 @@ async function devReady(root,url,key,options,signal,store){
  // remaining owner once the setup owner has left), or none when none is left.
  const scoped=options.as!==undefined;
  const link=scoped?await personaOpenUrl(url,key,persona):openUrl(url,key,{path:'/__dev/key',as:persona.as});
- await ownerEntryReady(root,link,signal,store);
+ await ownerEntryReady(root,link,signal,store,{persona:scoped});
  return {identity:true,signedInAs:persona.email??null,ownerLeft:as==='owner'&&!persona.email,openUrl:scoped?await personaOpenUrl(url,key,persona):link};
 }
 async function checkedNativeEntry(root,issue,signal,store){

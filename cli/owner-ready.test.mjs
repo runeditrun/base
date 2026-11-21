@@ -69,4 +69,11 @@ test('rer dev announces the owner entry only after its redirected Setup answers,
   assert.ok(!child.output.includes(f.key), 'readiness diagnostics never print the credential');
   assert.doesNotMatch(child.output, /"event":"ready"|RER_READY|RER_OPEN/);
  }
+ // The fixture's local key exchange has no persona redeemer.
+ await f.configure({});
+ const persona = f.start(false, 3000, 'owner');
+ assert.equal(await persona.done, 1, persona.output + persona.errors);
+ assert.match(persona.errors, /entry exchange not observed; destination document not observed after entry/);
+ assert.match(persona.errors, /persona redeemer.*modules\/operator-auth\/README\.md#local-dev-identity-and-the-key-gate/);
+ assert.doesNotMatch(persona.output, /RER_READY|RER_OPEN/);
 });
