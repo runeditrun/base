@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.127-dev.gf7cd1529",
+  "cliVersion": "0.2.127-dev.gd18a3057",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -547,7 +547,7 @@
     },
     "cli/business/choices.mjs": {
       "source": "cli/business/choices.mjs",
-      "sha256": "6cfd742aeee05084bb54f933bc0d5f898dd433a8bfe516031ce936eee7dd4c1e"
+      "sha256": "214924eef88e055d0e9eb6f18e3a6af81356a6cbd8d6c40663285f91d95909ca"
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
