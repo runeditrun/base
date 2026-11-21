@@ -27,6 +27,11 @@ async function migrationEvidence(root,{binding='DB'}={}) {
   const bytes=await readFile(file);
   return {name,sha256:await sha256(bytes),statements:splitStatements(bytes.toString('utf8'))};
  }));
+ // Wrangler sorts the leading migration number before breaking ties by name.
+ const numbers=files.map(({name})=>Number.parseInt(name,10));
+ const nativeOrder=files.map((_,i)=>i).sort((a,b)=>(Number.isFinite(numbers[a])?numbers[a]:Infinity)
+  -(Number.isFinite(numbers[b])?numbers[b]:Infinity) || a-b);
+ const reordered=nativeOrder.some((index,i)=>index!==i);
  const sources=await ownerMigrationSources(root,binding);
  const ownerFiles = (await Promise.all(sources.filter(source => source.directory).map(async ({directory,prefix,table}) => {
   const owners = await collectMigrations(root, [{binding,path:directory,prefix}], [{kind:'d1',binding}]);
@@ -40,15 +45,32 @@ async function migrationEvidence(root,{binding='DB'}={}) {
    declared.add(file.name);
    files.push(file);
   }
-  return {version:2,files,ownerSources};
+  return {version:2,files,ownerSources,...(reordered?{nativeOrder:[...nativeOrder,...ownerFiles.map((_,i)=>nativeOrder.length+i)]}:{})};
  }
- const evidence = await bundledPrefixes(files);
+ const evidence = await bundledPrefixes(files,reordered?nativeOrder:undefined);
  if (ownerSources.length) evidence.ownerSources = ownerSources;
  return evidence;
 }
 
-async function bundledPrefixes(files) {
- const objects=[],indices=new Map(),prefixes=[];
+async function bundledPrefixes(files,nativeOrder) {
+ const objects=[],indices=new Map();
+ const prefixes=await capturePrefixes(files,objects,indices);
+ if(nativeOrder) {
+  const lexicalObjects=objects.length;
+  let nativePrefixes;
+  try { nativePrefixes=await capturePrefixes(nativeOrder.map(i=>files[i]),objects,indices); }
+  catch(error) {
+   // A lexical checkout can contain dependencies that make numeric order impossible.
+   if(error.code!=='ERR_SQLITE_ERROR')throw error;
+  }
+  if(nativePrefixes)return {version:1,files,objects,prefixes,nativeOrder,nativePrefixes};
+  objects.length=lexicalObjects;
+ }
+ return {version:1,files,objects,prefixes};
+}
+
+async function capturePrefixes(files,objects,indices) {
+ const prefixes=[];
  const scratch=new DatabaseSync(':memory:');
  try {
   const recorder=migrationRecorder({exec:sql=>scratch.exec(sql),all:sql=>scratch.prepare(sql).all()});
@@ -65,7 +87,7 @@ async function bundledPrefixes(files) {
    await capture();
   }
  }finally{scratch.close();}
- return {version:1,files,objects,prefixes};
+ return prefixes;
 }
 
 export async function generateMigrationEvidence(root,options) {

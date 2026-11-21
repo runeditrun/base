@@ -94,5 +94,10 @@ export async function importArchive(service, path, transient, journal, progress,
   complete = true;
   if(status.schemaUnverified)progress?.({phase:'schema-unverified',receipt:status.schemaUnverified});
   return { ...receipt(manifest, closing, transient), ...(status.schemaUnverified?{schemaUnverified:status.schemaUnverified}:{}), ...(status.bridged ? { bridged: status.bridged } : {}), ...(status.skippedTables ? { skippedTables: status.skippedTables } : {}), ...(status.safetyChanges ? { safetyChanges: status.safetyChanges } : {}) };
- } finally { if (id && !complete) await service.imports.abort(id); }
+ } catch (error) {
+  // A dead storage connection may also prevent cleanup. Preserve the original
+  // failure and stage; the next local import can clean up the abandoned job.
+  if (id && !complete) await service.imports.abort(id).catch(() => {});
+  throw error;
+ }
 }
