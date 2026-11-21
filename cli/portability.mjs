@@ -112,6 +112,8 @@ async function nativeWorker(store,direction,input,signal) {
    : receipt.reason?.startsWith('migration_ledger:') ? ledgerRefusal(receipt)
    : receipt.migration ? `Restore refused (schema_mismatch:migration_data): migration ${receipt.migration} changed data after this archive was made, so its rows would skip that change. Restore an archive made after it.`
    : receipt.occupied ? occupiedRefusal(input,receipt.reason)
+   : receipt.storageTransport ? `The connection to the local Wrangler storage runtime failed (${receipt.storageTransport}) while ${receipt.step}. Keep the archive and retry the import once local Wrangler can start and respond.`
+   : direction === 'import' && receipt.native?.class === 'TypeError' ? `Local restore stopped while ${receipt.step} (TypeError). Keep the archive. Report this stage and the rer version if the same command fails again.`
    : `The portability module refused or failed the archive operation (${receipt.reason ?? 'incomplete'}${receipt.native ? `: ${receipt.native.class}${receipt.native.code && receipt.native.code !== receipt.reason ? `, code ${receipt.native.code}` : ''}` : ''})${receipt.step ? ` during ${receipt.step}` : ''}.${receipt.native && receipt.exitCode === 1 ? ' Run the same command again; it starts over.' : ''}`, receipt.exitCode ?? 1);
   delete receipt.ok;
   return receipt;

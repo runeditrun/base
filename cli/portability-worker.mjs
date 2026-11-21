@@ -12,7 +12,7 @@ import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { createPortability, PortabilityError, readArchive } from '../modules/portability/index.mjs';
 import { transferProgress } from '../modules/portability/progress.mjs';
-import { nativeFailure, stateBytes } from './portability-progress.mjs';
+import { localStorageTransport, nativeFailure, stateBytes } from './portability-progress.mjs';
 import { parseJsonc } from './jsonc.mjs';
 import { loadPolicy } from './portability-policy.mjs';
 import { appliedMigrations, platformMigrationDeclaration, nativeMigrationPreflight } from './portability-migrations.mjs';
@@ -29,6 +29,7 @@ async function dataConfiguration(root) {
  return path;
 }
 
+let importStep = 'verifying the archive';
 async function run(direction, { root, path, journal, binding, buckets, policy, policyModule, transient, legacyRecovery, acknowledgeUnverifiedSchemaObjects, platformMigrations }) {
  // Lines for the person go to the CLI over IPC, which prints them as the command's progress.
  const progress = transferProgress(line => process.send({ progress: line }));
@@ -43,6 +44,7 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
  policy = await loadPolicy(root, inputPolicy, policyModule);
  const declaration=platformMigrationDeclaration(platformMigrations);
  if (direction === 'policy-preflight') return { checkedPolicy: true };
+ importStep = 'opening local D1 and R2';
  const require = createRequire(join(root, 'package.json'));
  const { getPlatformProxy, unstable_splitSqlQuery } = require('wrangler');
  installD1Preflight(createRequire(require.resolve('wrangler/package.json'))('miniflare').D1_PLUGIN);
@@ -69,6 +71,7 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
    await requireLegacyEmpty(options,await legacyTargetState(options.db,options.migrations));
    return {checkedEmpty:true};
   }
+  importStep = 'checking local restore storage';
   await ensurePortabilitySchema(proxy.env[binding], await portabilityPlan(unstable_splitSqlQuery));
   if(legacyRecovery)return await recoverLegacyArchive(options,path,legacyRecovery.output,transient,legacyRecovery.acknowledged);
   if (direction === 'import') await requireEmptyTables(options);
@@ -77,6 +80,7 @@ async function run(direction, { root, path, journal, binding, buckets, policy, p
   // the recorded abandoned job, dropping only its exact staging copies and
   // sidecars before the replacement import creates its own scratch tables.
   if (direction === 'import' && await service.imports.abortAbandoned()) process.send({ progress: 'Cleaned up an unfinished earlier import: a restore that stopped part-way left its staged data here. Its staging is removed and this import starts from the beginning.' });
+  importStep = 'preparing the restore';
   return await (direction === 'export' ? exportArchive(service,path,transient,progress) : importArchive(service,path,transient,journal,progress,{acknowledgeUnverifiedSchemaObjects}));
  } finally { await proxy?.dispose(); await rm(configPath, { force: true }); }
 }
@@ -103,8 +107,10 @@ catch (error) {
  const identityTable = error instanceof PortabilityError && error.code.startsWith('identity_table_undeclared:') ? error.code.slice('identity_table_undeclared:'.length) : undefined;
  const safety = error instanceof PortabilityError && error.code.startsWith('import_row_') ? error.code.slice(error.code.indexOf(':')+1) : undefined;
  // Anything that is not a portability refusal names its class and code, never its message: that can hold row data.
- const step=failureStep(error) ?? (process.argv[2] === 'import' ? undefined : process.argv[2]);
  const native = error instanceof PortabilityError || error.message === 'archive_json' ? undefined : nativeFailure(error);
+ const importing = process.argv[2] === 'import';
+ const step = importing ? (native?.class === 'TypeError' ? failureStep(error) ?? importStep : undefined) : failureStep(error) ?? process.argv[2];
+ const storageTransport = importing && importStep !== 'verifying the archive' ? localStorageTransport(error) : undefined;
  process.exitCode = exitCode;
- await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, step, ...(reExport ? { reExport: true } : {}), ...(migration ? { migration } : {}), ...(unapplied ? { unapplied } : {}), ...(occupied ? { occupied } : {}), ...(identityTable ? { identityTable } : {}), ...(safety ? { safety } : {}), ...(native ? { native } : {}), exitCode });
+ await reply({ ok: false, code: exitCode === 2 ? 'invalid_archive' : exitCode === 4 ? 'restore_refused' : 'transfer_failed', reason, step, ...(reExport ? { reExport: true } : {}), ...(migration ? { migration } : {}), ...(unapplied ? { unapplied } : {}), ...(occupied ? { occupied } : {}), ...(identityTable ? { identityTable } : {}), ...(safety ? { safety } : {}), ...(storageTransport ? { storageTransport } : {}), ...(native ? { native } : {}), exitCode });
 }
