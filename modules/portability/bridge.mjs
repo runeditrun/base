@@ -20,17 +20,17 @@ function platformPlacement(manifest) {
   return manifest.migrationLedger?.origin==='rer_migrations' && manifest.schemaObjects!==undefined;
 }
 
-function recordedPlacement(manifest, recorded, applied) {
+function recordedPlacement(manifest, recorded, applied, legacyNameOrder=false) {
   const selected=applied.filter(name=>recorded.includes(name));
   // Platform and Wrangler may order the same files differently. The hashes
   // already matched; replay their destination order and check the archive schema.
-  if(platformPlacement(manifest))return selected;
+  if(platformPlacement(manifest) || legacyNameOrder)return selected;
   const mismatch=manifest.migrationLedger?.origin==='d1_migrations'?'schema_mismatch:owner_migration_history':'schema_mismatch:migration_history';
   insist(canonicalJson(selected)===canonicalJson(recorded),mismatch,409);
   return recorded;
 }
 
-async function verifyRecordedSchema(manifest, earlier, schemaAfter) {
+async function verifyRecordedSchema(manifest, earlier, schemaAfter, legacyNameOrder) {
   const owner=manifest.migrationLedger?.origin==='d1_migrations';
   const platform=platformPlacement(manifest);
   let schema;
@@ -41,7 +41,7 @@ async function verifyRecordedSchema(manifest, earlier, schemaAfter) {
     if(!owner || !(error?.code==='ERR_SQLITE_ERROR' || error instanceof PortabilityError && error.code==='schema_mismatch:legacy_evidence'))throw error;
     throw new PortabilityError('schema_mismatch:owner_migration_history',409);
   }
-  insist(schema===manifest.schema,owner?'schema_mismatch:owner_migration_history':'schema_mismatch',owner || platform?409:400);
+  insist(schema===manifest.schema,owner?'schema_mismatch:owner_migration_history':'schema_mismatch',owner || platform || legacyNameOrder?409:400);
 }
 // Where an archive sits in the destination's applied migrations: those its
 // rows passed through (earlier) and those applied after it (unapplied).
@@ -56,8 +56,9 @@ async function placement(db,manifest,cat,replay,ledger,history,legacyRecovery,un
   const files=replay.names.map(name=>({name,sha256:replay.sha256?.(name),aliases:replay.aliases?.(name)}));
   // An aligned replayer keeps its existing contract: hashes are optional.
   // Resolve destination aliases only when its ledger uses different names.
-  let applied=ledger.map(m=>m.name);
-  if(canonicalJson(replay.names)!==canonicalJson(applied))applied=matchMigrationLedger(ledger,files,replay);
+  const entries=ledger?.entries??[];
+  let applied=entries.map(m=>m.name);
+  if(canonicalJson(replay.names)!==canonicalJson(applied))applied=matchMigrationLedger(entries,files,replay);
   insist(canonicalJson(replay.names)===canonicalJson(applied) && await replay.schemaAfter(applied)===cat.identity,'schema_mismatch');
   const archived=history?.();
   const recorded=recordedMigrations(manifest,archived,files,replay);
@@ -69,8 +70,17 @@ async function placement(db,manifest,cat,replay,ledger,history,legacyRecovery,un
   if(unverified && archived && manifest.migrations)insist(canonicalJson(matchMigrationLedger(archived,files,replay))===canonicalJson(recorded),'schema_mismatch:migration_history',409);
   let earlier,unapplied;
   if(recorded) {
-    earlier=recordedPlacement(manifest,recorded,applied);
-    await verifyRecordedSchema(manifest,earlier,schemaAfter);
+    // The legacy deployment ledger exports filenames in lexical order. A
+    // core-only Wrangler destination can apply the same files in a different
+    // order. This requires exact applied filenames and a complete schema
+    // match, including objects. Hash-bearing and archived ledgers keep their
+    // own placement rules.
+    const legacyNameOrder=archived===undefined && manifest.version===2 && manifest.schemaObjects!==undefined
+      && ledger?.table==='d1_migrations' && !ledger.owners
+      && recorded.length===manifest.migrations?.length
+      && recorded.every((name,i)=>name===manifest.migrations[i] && (!i || recorded[i-1]<name));
+    earlier=recordedPlacement(manifest,recorded,applied,legacyNameOrder);
+    await verifyRecordedSchema(manifest,earlier,schemaAfter,legacyNameOrder && earlier.some((name,i)=>name!==recorded[i]));
     unapplied=applied.filter(name=>!earlier.includes(name));
   }else{
     // Unrecorded: the latest matching prefix. Migrations that change no archived
@@ -127,11 +137,11 @@ export async function verifiedLegacySchema(ledger,manifest,cat,migrations,histor
 // records a migration the destination never applied is newer than it, even
 // when that migration left the schema as it was (an index, a data change).
 export async function sameSchemaMigrations(db,ledger,manifest,cat,migrations,history) {
-  const applied=ledger?.map(m=>m.name);
+  const applied=ledger?.entries.map(m=>m.name);
   if(manifest.migrationLedger?.origin==='d1_migrations')insist(migrations && applied,'schema_mismatch:owner_migration_history',409);
   if(!applied)return;
   if(!migrations){
-    if(manifest.migrations)matchMigrationLedger(manifest.migrations.map(name=>({name})),ledger);
+    if(manifest.migrations)matchMigrationLedger(manifest.migrations.map(name=>({name})),ledger.entries);
     insist(!manifest.migrations || applied.every(name=>manifest.migrations.includes(name)),'schema_mismatch:migrations');return;
   }
   // A data-only migration leaves the schema unchanged but still needs its
@@ -146,7 +156,7 @@ export async function sameSchemaMigrations(db,ledger,manifest,cat,migrations,his
 export async function additiveBridge(db,ledger,manifest,cat,migrations,history,legacyRecovery,unverified=false) {
   insist(migrations,'schema_mismatch');
   const replay=await migrations();
-  const {applied,earlier,replays,rebuilt}=await placement(db,manifest,cat,replay,ledger??[],history,legacyRecovery,unverified);
+  const {applied,earlier,replays,rebuilt}=await placement(db,manifest,cat,replay,ledger,history,legacyRecovery,unverified);
   const columns={};
   for(const table of manifest.tables) {
     const target=cat.tables.find(t=>t.name===table.name),label=':'+table.name;
