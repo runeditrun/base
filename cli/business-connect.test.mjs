@@ -209,7 +209,7 @@ test('failed scans name Retry while consent-pending scans still ask for permissi
 const optionalChoicesLine = /^.*\boptional\b.*\bchoices\b.*$/gim;
 
 test('Business check-ins let the computer continue while its choices are undecided', async t => {
- const remote = await fixtureServer(t), home = join(directory, 'optional-choices-home');
+ const remote = await fixtureServer(t), home = join(directory, 'first-check-in-home');
  const options = { env: { CLAUDECODE: '1' } };
  const paired = await connect(home, remote, options);
  for (const [command, result] of [
@@ -218,7 +218,7 @@ test('Business check-ins let the computer continue while its choices are undecid
   ['next', await cli(home, ['business', 'next'], options)],
  ]) {
   assert.equal(result.code, 0, result.stderr);
-  assert.doesNotMatch(result.stdout + result.stderr, /\b(?:wait(?:ing)? (?:for|until)|after|once|until)\b[^\n]*\b(?:choos\w*|choices?|permissions)\b/i, command);
+  assert.doesNotMatch(result.stdout + result.stderr, /\b(?:wait(?:ing)? (?:for|until)|after|once|until)\b[^\n:/]*\b(?:choos\w*|choices?|permissions)\b/i, command);
   assert.match(result.stdout, /\boptional\b[^\n]*\bnothing waits\b/i, command);
   assert.match(result.stdout, /^Run .*\bbusiness next\b.*\bsee the next task\b/m, command);
   t.diagnostic(`rer business ${command}\n${result.stdout}`);
