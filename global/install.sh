@@ -11,7 +11,7 @@
 # differently from this script's own check), and installs through the
 # package's own `rer cli install`: the same layout as
 # `npx -y @runeditrun/rer cli install`. A failure leaves any previous install
-# selected and working. It never edits shell profiles: when ~/.local/bin is not
+# selected and working. It never edits shell profiles: when the launcher is not
 # on PATH, the absolute launcher works now, and a run that supplied a command ends
 # with the one PATH line to run and keep.
 #
@@ -151,36 +151,48 @@ NODE
  export RER_TRANSFER_RER_BYTES
  mkdir "$work/stage"
  tar -xzf "$work/rer.tgz" -C "$work/stage" || fail "could not unpack rer $version; nothing was installed."
- # A supplied command replaces the app next step. When ~/.local/bin is not on
+ "$node_binary" --input-type=module - "$work/stage/package" >"$work/launcher" <<'NODE' || fail 'could not resolve the launcher path.'
+import { pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+const root = pathToFileURL(process.argv[2] + '/');
+const { layout } = await import(new URL('global/cli/layout.mjs', root));
+const { shellQuote } = await import(new URL('cli/node-runtime-cache.mjs', root));
+const { home, bin, launcher } = layout();
+const standard = bin === join(home, '.local/bin');
+console.log([launcher, standard ? '~/.local/bin/rer' : shellQuote(launcher), standard ? '~/.local/bin' : bin].join('\n'));
+NODE
+ { IFS= read -r launcher; IFS= read -r launcher_command; IFS= read -r launcher_bin_label; } <"$work/launcher"
+ launcher_bin=${launcher%/*}
+ # A supplied command replaces the app next step. When the launcher is not on
  # the caller's PATH, the closing lines below give the shell step.
  no_next=
  if [ "$#" -gt 0 ]; then no_next=1; fi
  RER_INSTALL_CHANNEL=script RER_INSTALL_NO_NEXT=$no_next "$node_binary" "$work/stage/package/global/rer.mjs" cli install </dev/null \
-  || fail "~/.local/bin/rer cli install failed; any previous install is still selected."
+  || fail "$launcher_command cli install failed; any previous install is still selected."
  if [ "$#" -eq 0 ]; then
-  printf 'For Business setup: ~/.local/bin/rer business setup --help\n'
+  printf 'For Business setup: %s business setup --help\n' "$launcher_command"
   return
  fi
  # The command can tell the person how to run rer again from their own shell,
- # where ~/.local/bin may not be on PATH yet.
- RER_INVOKED_AS="$HOME/.local/bin/rer"
+ # where the launcher may not be on PATH yet.
+ RER_INVOKED_AS="$launcher"
  if [ "$(command -v rer 2>/dev/null || true)" = "$RER_INVOKED_AS" ]; then RER_INVOKED_AS=rer; fi
  # The caller's own PATH decides whether a later bare `rer` works. Read it before
  # it is extended for the command below. Business connect stays free of shell advice.
  path_step=
  case ":$PATH:" in
-  *":$HOME/.local/bin:"* | *":$HOME/.local/bin/:"*) ;;
+  *":$launcher_bin:"* | *":$launcher_bin/:"*) ;;
   *) if [ "$1" != business ]; then path_step=1; fi ;;
  esac
- PATH="$PATH:$HOME/.local/bin"
+ PATH="$PATH:$launcher_bin"
  export PATH RER_INVOKED_AS
  # The closing lines replace the app's own optional PATH sentence, never repeat it.
  if [ -n "$path_step" ]; then RER_INSTALLER_PATH_STEP=1; export RER_INSTALLER_PATH_STEP; fi
  status=0
- "$HOME/.local/bin/rer" "$@" || status=$?
+ "$launcher" "$@" || status=$?
  if [ "$1" != business ]; then
-  printf 'Run a downloaded JavaScript tool with the installed runtime: ~/.local/bin/rer run --script ./tool.mjs [ARGS...]\n'
-  printf "%s\n" "If you see 'command not found', run \`~/.local/bin/rer cli path\` and paste the line it prints."
+  printf 'Run a downloaded JavaScript tool with the installed runtime: %s run --script ./tool.mjs [ARGS...]\n' "$launcher_command"
+  printf "If you see 'command not found', run \`%s cli path\` and paste the line it prints.\n" "$launcher_command"
  fi
  if [ -n "$path_step" ]; then
   shell_name=${SHELL:-}
@@ -190,8 +202,8 @@ NODE
    fish) shell_file='fish user path configuration' ;;
    *) shell_file='this terminal only' ;;
   esac
-  printf '\nRequired next step: run the line below; you add ~/.local/bin to PATH in %s. The installer changes no shell file.\n' "$shell_file"
-  "$HOME/.local/bin/rer" cli path
+  printf '\nRequired next step: run the line below; you add %s to PATH in %s. The installer changes no shell file.\n' "$launcher_bin_label" "$shell_file"
+  "$launcher" cli path
  fi
  if [ "$1" != business ]; then
   shell_name=${SHELL:-}

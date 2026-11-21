@@ -1,26 +1,30 @@
 // Where a user install lives. Data: ${XDG_DATA_HOME:-$HOME/.local/share}/rer,
 // as immutable versions/<version>-<digest8> directories and a `current` link.
-// Launcher: $HOME/.local/bin/rer, using the installer's private Node when present.
+// The launcher uses the bin directory alongside the data home, or XDG_BIN_HOME
+// when both XDG homes are set.
 import { readFile, lstat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { shellQuote } from '../../cli/node-runtime-cache.mjs';
 
 export function layout(env = process.env) {
  const home = env.HOME || homedir();
- const data = join(env.XDG_DATA_HOME || join(home, '.local/share'), 'rer');
- const bin = join(home, '.local/bin');
- return { home, data, versions: join(data, 'versions'), current: join(data, 'current'), record: join(data, 'install.json'), bin, launcher: join(bin, 'rer') };
+ const dataHome = env.XDG_DATA_HOME ? resolve(env.XDG_DATA_HOME) : join(home, '.local/share');
+ const data = join(dataHome, 'rer'), defaultBin = join(home, '.local/bin');
+ const bin = env.XDG_DATA_HOME ? resolve(env.XDG_BIN_HOME || join(dirname(dataHome), 'bin')) : defaultBin;
+ return { home, data, versions: join(data, 'versions'), current: join(data, 'current'), record: join(data, 'install.json'), bin, defaultBin, launcher: join(bin, 'rer') };
 }
 
 const marker = '# rer launcher, written by `rer cli install` (@runeditrun/rer). Do not edit.';
-const quote = value => `'${value.replaceAll("'", `'\\''`)}'`;
+
+export const launcherCommand = paths => paths.bin === paths.defaultBin ? '~/.local/bin/rer' : shellQuote(paths.launcher);
 
 // The managed runtime stays inside the install root; npx installs use PATH.
 export function launcherScript(data) {
  return `#!/bin/sh
 ${marker}
 # It uses the installer's private Node when present, otherwise Node on PATH.
-root=${quote(data)}
+root=${shellQuote(data)}
 if [ -x "$root/node/bin/node" ]; then
  node="$root/node/bin/node"
  PATH="$PATH:$root/node/bin"
