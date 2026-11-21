@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.127-dev.gf7cd1529",
+  "cliVersion": "0.2.127-dev.g01a62036",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4603,7 +4603,7 @@
     },
     "modules/operator-auth/dev-gate-script.mjs": {
       "source": "modules/operator-auth/dev-gate-script.mjs",
-      "sha256": "939d1911b862638a7e358ca6f41a78af213f66aa319799a77c82b909a6fb16f6"
+      "sha256": "2cefa49df99a8cce920ce1b585c6c6ff50c3ebd83019d4def131aea888a79e7a"
     },
     "modules/operator-auth/dev-gate.mjs": {
       "source": "modules/operator-auth/dev-gate.mjs",
