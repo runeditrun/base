@@ -19,6 +19,9 @@ test('RER_OPEN enters as owner on initial load and same-path fragment navigation
           assert.equal(page.url(), `${r.origin}/__dev/key`);
           assert.deepEqual(await context.cookies(), []);
           assert.equal((await context.request.get(`${r.origin}/auth/session`)).status(), 401);
+          await page.goto(`${r.origin}/__dev/key#rer-dev=synthetic-base-invalid-link`);
+          assert.equal(await page.getByRole('alert').evaluate(alert => Boolean(alert.closest('main'))), true,
+            'the invalid link alert is inside the main landmark');
         }
         const exchanged = page.waitForResponse(response =>
           response.request().method() === 'POST' && new URL(response.url()).pathname === '/__dev/key');
