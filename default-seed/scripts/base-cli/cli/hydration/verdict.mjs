@@ -5,6 +5,7 @@ import { describeCase } from './cases.mjs';
 const LATE_MS = 34; // two frames
 const within = (key, scope) => key === scope || key.startsWith(scope + '>');
 const list = (keys, limit = 6) => keys.slice(0, limit).join(', ') + (keys.length > limit ? ` and ${keys.length - limit} more` : '');
+const settleBound = record => record?.settledLimitMs === undefined ? '' : ` within ${record.settledLimitMs} ms`;
 
 /** Replays in one load: a one-shot animation on a rebuilt element starting more
  * than two frames after the original did, or an animated element whose opacity
@@ -43,7 +44,8 @@ export const plainHtml = (load, scripts) => load.record?.settled === 'not hydrat
 /** The failure for a page whose plain load never hydrated and is not plain HTML. */
 export function judgeUnhydrated({ path, scripts, baseline: { record, errors } }) {
  const state = record?.settled ?? 'no probe record';
- const why = state === 'not hydrated' ? `React never hydrated the page${scripts.length ? ` although it loads application scripts (${list(scripts, 3)})` : ''}` : `the page did not settle (${state}${record?.error ? ': ' + record.error : ''})`;
+ const bound = settleBound(record);
+ const why = state === 'not hydrated' ? `React never hydrated the page${bound}${scripts.length ? ` although it loads application scripts (${list(scripts, 3)})` : ''}` : `the page did not settle${bound} (${state}${record?.error ? ': ' + record.error : ''})`;
  return `${path} plain load: ${why}${errors.length ? `; ${list([...new Set(errors)], 3)}` : ''}`;
 }
 
@@ -59,7 +61,7 @@ export function judgePage(page) {
  let exercised = false;
  for (const { item, load } of loads) {
   const what = describeCase(item, survey), record = load.record;
-  if (!record || record.settled !== 'hydrated') { fail(what, record?.settled === 'error' ? `the probe failed: ${record.error}` : `the page did not settle after hydration within the time limit (${record?.settled ?? 'no record'})`); continue; }
+  if (!record || record.settled !== 'hydrated') { fail(what, record?.settled === 'error' ? `the probe failed: ${record.error}` : `the page did not settle after hydration${settleBound(record)} (${record?.settled ?? 'no record'})`); continue; }
   if (unheld(what, load)) continue;
   noisy(what, load);
   if (item.kind === 'plain') {

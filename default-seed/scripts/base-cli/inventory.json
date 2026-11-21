@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.127-dev.gcdbe664d",
+  "cliVersion": "0.2.127-dev.ga3012472",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1015,7 +1015,7 @@
     },
     "cli/hydration/browser.mjs": {
       "source": "cli/hydration/browser.mjs",
-      "sha256": "30705c8fac8c62728109221863b4e730c9bb27393ea8396e43c7b83c65c40d6d"
+      "sha256": "a2ac67fe8853a00c68191a4e5a72c3dca6d87d17adad75579d90f82be0971073"
     },
     "cli/hydration/cases.mjs": {
       "source": "cli/hydration/cases.mjs",
@@ -1027,7 +1027,7 @@
     },
     "cli/hydration/probe.mjs": {
       "source": "cli/hydration/probe.mjs",
-      "sha256": "be497252f3248420541f9b6e7711249d79246e938475f9b8e8b0cd9a46f0ca9f"
+      "sha256": "1039fcef265a453d4ca7323be92445e0a4998d6f69402edeb6acc6d21cdaa8e0"
     },
     "cli/hydration/scripts.mjs": {
       "source": "cli/hydration/scripts.mjs",
@@ -1035,7 +1035,7 @@
     },
     "cli/hydration/verdict.mjs": {
       "source": "cli/hydration/verdict.mjs",
-      "sha256": "89dfc6539935a29f30ec5b2f722d6fe46e06478f88be051daa11e1ea0b4f16bb"
+      "sha256": "033307404c3679286bfc2a1e1ca73b88e24ff05eff18b8c74d81ab83f1ca145e"
     },
     "cli/import-origin.mjs": {
       "source": "cli/import-origin.mjs",
