@@ -4,12 +4,13 @@ import { invalid, missing, RerError } from './errors.mjs';
 
 // Use the browser protocol itself: fragment exchange, cookies, server and
 // client redirects, and rendered content. No application destination is fixed.
-export async function ownerEntryReady(root, link, signal, store) {
+export async function ownerEntryReady(root, link, signal, store, { persona = false } = {}) {
  const timeout = Number(process.env.RER_OWNER_READY_TIMEOUT_MS ?? 60000);
  if (!Number.isSafeInteger(timeout) || timeout <= 0 || timeout > 2147483647) throw invalid('RER_OWNER_READY_TIMEOUT_MS must be positive integer milliseconds, at most 2147483647.');
  const entry = new URL(link), deadline = performance.now() + timeout;
  const bounded = AbortSignal.any([signal, AbortSignal.timeout(timeout)].filter(Boolean));
  let browser, page, lastState, destination = entry, last = 'browser did not open the entry', documents = 0, status, exchanged = !entry.hash, lastReload = 0;
+ let personaExchangeMissing = false;
  const remaining = () => Math.max(1, Math.ceil(deadline - performance.now()));
  const name = url => url.origin + url.pathname; // Fragments and query values may be credentials.
  const close = () => { void browser?.close().catch(() => {}); };
@@ -69,6 +70,7 @@ export async function ownerEntryReady(root, link, signal, store) {
     destination.hash && 'destination still has a fragment',
     destination.origin !== entry.origin && 'destination is cross-origin',
    ].filter(Boolean);
+   personaExchangeMissing = persona && !exchanged;
    last = `HTTP ${status ?? 'unknown'} (${failed.join('; ')}). Readiness: exchanged=${exchanged}, documents=${documents}, usable=${observed?.usable ?? 'unknown'}, busy=${observed?.busy ?? 'unknown'}, refresh=${observed?.refresh ?? 'unknown'}, fragment=${!!destination.hash}, sameOrigin=${destination.origin === entry.origin}`;
    if (observed) last += `. Last seen: HTTP ${observed.status ?? 'unknown'} (${conditions.join('; ') || 'rendered owner content'})`;
    if (!failed.length) return;
@@ -88,5 +90,7 @@ export async function ownerEntryReady(root, link, signal, store) {
   await browser?.close();
  }
  signal?.throwIfAborted();
- throw new RerError('owner_entry_not_ready', `Owner entry ${name(entry)} did not become ready within ${timeout} ms. Destination ${name(destination)}: ${last}. No ready link was announced. Check the application startup log, then run the command again.`, 1);
+ const message = `Owner entry ${name(entry)} did not become ready within ${timeout} ms. Destination ${name(destination)}: ${last}. No ready link was announced. Check the application startup log, then run the command again.`;
+ const hint = "The seed's dev owner-entry route may lack the persona redeemer. See “Local dev identity and the key gate” in Base's operator-auth adoption guide (https://github.com/runeditrun/base/blob/main/modules/operator-auth/README.md#local-dev-identity-and-the-key-gate).";
+ throw new RerError('owner_entry_not_ready', message, 1, personaExchangeMissing ? { humanMessage: `${message} ${hint}` } : {});
 }
