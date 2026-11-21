@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.126-dev.g70bd9d32",
+  "cliVersion": "0.2.126-dev.ge89a3ce2",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -1171,7 +1171,7 @@
     },
     "cli/portability-evidence.mjs": {
       "source": "cli/portability-evidence.mjs",
-      "sha256": "bd10a86706f3fe497bdda6ea557f62eb8cfe8a760d12ed309608340b571278b0"
+      "sha256": "9de140b6d79114602257285f2d38afa612f0f7735a809c38132093349686234c"
     },
     "cli/portability-migrations.mjs": {
       "source": "cli/portability-migrations.mjs",
@@ -1203,7 +1203,7 @@
     },
     "cli/portability.mjs": {
       "source": "cli/portability.mjs",
-      "sha256": "20ddd3f81b3e92a7afbb868a7bbc559e1931945bee3970e8609987d3ef8cacab"
+      "sha256": "034397bdcb39175593c84a8c0d07400eecec140d0088d3f32098fa245d76c3a2"
     },
     "cli/preview-cache.mjs": {
       "source": "cli/preview-cache.mjs",
@@ -4915,7 +4915,7 @@
     },
     "modules/portability/README.md": {
       "source": "modules/portability/README.md",
-      "sha256": "1dabbff31e249a3906f1524412f308381a09509bd31a1bb64a60ab7466f7eef9"
+      "sha256": "cfaf7784943ce5384c0487b03a5bfdf404b9fa7cb339151db5e62a5df0237811"
     },
     "modules/portability/archive-step.mjs": {
       "source": "modules/portability/archive-step.mjs",
@@ -4931,7 +4931,7 @@
     },
     "modules/portability/bridge.mjs": {
       "source": "modules/portability/bridge.mjs",
-      "sha256": "88c49c2ece88557498a79a674d13ff6c7a0136b21470f6799a83a43691892cd7"
+      "sha256": "e7afe49dc30ce4b40d6e729af4092395f491ba68b17e235c7ba453557209d037"
     },
     "modules/portability/catalogue.mjs": {
       "source": "modules/portability/catalogue.mjs",
@@ -4939,7 +4939,7 @@
     },
     "modules/portability/checkout-history.mjs": {
       "source": "modules/portability/checkout-history.mjs",
-      "sha256": "d7634528dccc5553bbff4c35b49663c683a7d9d6a599a307ee219b35b8cea06a"
+      "sha256": "cc4934ab84ef64d468edee6c0fef643bf29275a78d6406779291c821cc0767ee"
     },
     "modules/portability/cli-options.mjs": {
       "source": "modules/portability/cli-options.mjs",
@@ -4971,7 +4971,7 @@
     },
     "modules/portability/files.mjs": {
       "source": "modules/portability/files.mjs",
-      "sha256": "0d5108ae2ad21d2dff894c7ce3687d44fc27c1ef16626eb39653bfb619d75385"
+      "sha256": "135be6b9a3e45cd904397c2ebfc26c2eb730855660337908655241f08546c05d"
     },
     "modules/portability/format.mjs": {
       "source": "modules/portability/format.mjs",
@@ -5139,11 +5139,11 @@
     },
     "modules/portability/worker-history.d.mts": {
       "source": "modules/portability/worker-history.d.mts",
-      "sha256": "f8ce6647e4be07a4353f0798e00289935f7fcf31f15ef124e3c39af43e6ba03e"
+      "sha256": "8b02af4fddb2b2a2cb9fb4418b63775d2f8ecb5b194f616bcdb3054036bfcec2"
     },
     "modules/portability/worker-history.mjs": {
       "source": "modules/portability/worker-history.mjs",
-      "sha256": "d0880cc0a3c1cdefd6f51dc151f8b0ef36fed39955f25875e4d5b18baf31db1d"
+      "sha256": "15bb0e9675b43dd1821a78048bd72e27496dee07d555e025af61ed7b9fccb6a3"
     },
     "modules/portability/worker-owner-history.mjs": {
       "source": "modules/portability/worker-owner-history.mjs",

@@ -20,11 +20,11 @@ function platformPlacement(manifest) {
   return manifest.migrationLedger?.origin==='rer_migrations' && manifest.schemaObjects!==undefined;
 }
 
-function recordedPlacement(manifest, recorded, applied, legacyNameOrder=false) {
+function recordedPlacement(manifest, recorded, applied) {
   const selected=applied.filter(name=>recorded.includes(name));
   // Platform and Wrangler may order the same files differently. The hashes
   // already matched; replay their destination order and check the archive schema.
-  if(platformPlacement(manifest) || legacyNameOrder)return selected;
+  if(platformPlacement(manifest))return selected;
   const mismatch=manifest.migrationLedger?.origin==='d1_migrations'?'schema_mismatch:owner_migration_history':'schema_mismatch:migration_history';
   insist(canonicalJson(selected)===canonicalJson(recorded),mismatch,409);
   return recorded;
@@ -68,20 +68,25 @@ async function placement(db,manifest,cat,replay,ledger,history,legacyRecovery,un
   // v2 uses the replayed complete identity; acknowledged recovery places by tables only.
   const schemaAfter=(names,allowSubsequence)=>replay.schemaAfter(names,legacyRecovery && manifest.schemaObjects===undefined?{legacyExcludedObjects:true}:unverified?{tablesOnly:true}:undefined,allowSubsequence);
   if(unverified && archived && manifest.migrations)insist(canonicalJson(matchMigrationLedger(archived,files,replay))===canonicalJson(recorded),'schema_mismatch:migration_history',409);
+  // Name-only v2 archives can list the same files in a different order from
+  // Wrangler. Every recorded file must belong to the applied prefix, so a
+  // migration omitted from its interior cannot be treated as a later change.
+  const hosted=archived===undefined && manifest.version===2 && manifest.schemaObjects!==undefined
+    && ledger?.table==='d1_migrations' && recorded!==undefined
+    && (!ledger.owners || !entries.some(row=>row.table!==ledger.table && recorded.includes(row.name)));
+  insist(!replay.hostedOrderOnly || hosted,'schema_mismatch:legacy_evidence',409);
   let earlier,unapplied;
   if(recorded) {
-    // The legacy deployment ledger exports filenames in lexical order. A
-    // core-only Wrangler destination can apply the same files in a different
-    // order. This requires exact applied filenames and a complete schema
-    // match, including objects. Hash-bearing and archived ledgers keep their
-    // own placement rules.
-    const legacyNameOrder=archived===undefined && manifest.version===2 && manifest.schemaObjects!==undefined
-      && ledger?.table==='d1_migrations' && !ledger.owners
-      && recorded.length===manifest.migrations?.length
-      && recorded.every((name,i)=>name===manifest.migrations[i] && (!i || recorded[i-1]<name));
-    earlier=recordedPlacement(manifest,recorded,applied,legacyNameOrder);
-    await verifyRecordedSchema(manifest,earlier,schemaAfter,legacyNameOrder && earlier.some((name,i)=>name!==recorded[i]));
-    unapplied=applied.filter(name=>!earlier.includes(name));
+    if(hosted) {
+      earlier=applied.slice(0,recorded.length);
+      insist(earlier.length===manifest.migrations.length && earlier.every(name=>manifest.migrations.includes(name)),
+        'schema_mismatch:migration_history',409);
+      unapplied=applied.slice(earlier.length);
+    }else{
+      earlier=recordedPlacement(manifest,recorded,applied);
+      unapplied=applied.filter(name=>!earlier.includes(name));
+    }
+    await verifyRecordedSchema(manifest,earlier,schemaAfter,hosted && earlier.some((name,i)=>name!==recorded[i]));
   }else{
     // Unrecorded: the latest matching prefix. Migrations that change no archived
     // definition (excluded tables or data-only changes) cannot be told apart
@@ -117,6 +122,7 @@ async function placement(db,manifest,cat,replay,ledger,history,legacyRecovery,un
 export async function verifiedLegacySchema(ledger,manifest,cat,migrations,history) {
   if(!migrations)return false;
   const replay=await migrations();
+  if(replay.hostedOrderOnly)return false;
   try {
     const files=replay.names.map(name=>({name,sha256:replay.sha256?.(name),aliases:replay.aliases?.(name)}));
     const archived=history(),recorded=recordedMigrations(manifest,archived,files,replay);
