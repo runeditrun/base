@@ -677,6 +677,12 @@ them into a scratch database to find the archive's place in that history:
 - Archives record the applied migration names in `manifest.migrations` (since
   additive restore). Every recorded migration must be applied here, and
   replaying exactly those must give the archive's schema identity.
+  A hosted export from the legacy deployment ledger can list filenames in
+  lexical order, which differs from Wrangler's application order for
+  mixed-width migration numbers. For an archive with a complete schema object
+  inventory and exact applied filenames in lexical order, a core-only
+  Wrangler destination replays those files in its own applied order. The
+  replay must reproduce the archive schema before later migrations are bridged.
 - Archives exported from an installation RER Platform migrated (a Managed
   installation leaving for native) also carry `manifest.migrationLedger`:
   `{origin:'rer_migrations',entries:[{name,sha256}]}` in application order,
