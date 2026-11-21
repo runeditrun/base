@@ -18,6 +18,7 @@ export async function launchChromium(root) {
 
 const strip = new Set(['content-encoding', 'content-length', 'transfer-encoding', 'connection']);
 const plainHeaders = headers => { const out = {}; headers.forEach((value, key) => { if (!strip.has(key)) out[key] = value; }); return out; };
+const idleLimits = { browser: 30000, noHydration: 8000, settle: 20000 };
 
 /** The production build served the way rer deploy hosts it, at its https origin. */
 export async function hostedServer(root, options) {
@@ -42,8 +43,8 @@ export function originServer(origin) {
 export async function runLoad(browser, server, path, item, { timeout } = {}) {
  const loadFactor = Math.min(4, Math.max(1, loadavg()[0] / availableParallelism()));
  const scale = ms => Math.round(ms * loadFactor);
- const browserLimitMs = timeout ?? scale(30000);
- const probeLimits = { noHydrationMs: scale(8000), settleMs: scale(20000) };
+ const browserLimitMs = timeout ?? scale(idleLimits.browser);
+ const probeLimits = { noHydrationMs: scale(idleLimits.noHydration), settleMs: scale(idleLimits.settle) };
  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: item.reduced ? 'reduce' : 'no-preference', serviceWorkers: 'block' });
  const errors = [], warnings = [], aborted = new Set(), scripts = new Set(), unheld = new Set(), crossScripts = new Set();
  let release, isReleased = false; const released = new Promise(resolve => { release = () => { isReleased = true; resolve(); }; });
@@ -78,7 +79,8 @@ export async function runLoad(browser, server, path, item, { timeout } = {}) {
   await page.goto(server.origin + path, { waitUntil: 'commit', timeout: browserLimitMs });
   const settled = await page.waitForFunction(() => window.__rerProbe?.settledAt !== null && window.__rerProbe?.settledAt !== undefined, null, { timeout: browserLimitMs, polling: 50 }).then(() => true, () => false);
   const record = await page.evaluate(() => window.__rerProbe ?? null).catch(() => null);
-  return { record: settled ? record : { ...(record ?? {}), settled: 'timeout', settledLimitMs: browserLimitMs }, errors, warnings, aborted: [...aborted], scripts: [...scripts], unheld: [...unheld], crossScripts: [...crossScripts], ms: Date.now() - started };
+  const idleLimitMs = !settled ? idleLimits.browser : record?.settled === 'not hydrated' ? idleLimits.noHydration : idleLimits.settle;
+  return { record: settled ? record : { ...(record ?? {}), settled: 'timeout', settledLimitMs: browserLimitMs }, idleLimitMs, errors, warnings, aborted: [...aborted], scripts: [...scripts], unheld: [...unheld], crossScripts: [...crossScripts], ms: Date.now() - started };
  } finally { release(); await context.close(); }
 }
 

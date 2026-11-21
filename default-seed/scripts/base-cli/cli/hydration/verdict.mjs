@@ -5,7 +5,14 @@ import { describeCase } from './cases.mjs';
 const LATE_MS = 34; // two frames
 const within = (key, scope) => key === scope || key.startsWith(scope + '>');
 const list = (keys, limit = 6) => keys.slice(0, limit).join(', ') + (keys.length > limit ? ` and ${keys.length - limit} more` : '');
-const settleBound = record => record?.settledLimitMs === undefined ? '' : ` within ${record.settledLimitMs} ms`;
+const settleBound = ({ record, idleLimitMs }, json) => {
+ const limit = record?.settledLimitMs;
+ return limit === undefined || (!json && limit === idleLimitMs) ? '' : ` within ${limit} ms`;
+};
+const contentBound = ({ record, idleLimitMs }, json) => {
+ const limit = record.config?.settleMs;
+ return json || limit === undefined || limit === idleLimitMs ? '' : ` (post-hydration wait limit: ${limit} ms)`;
+};
 
 /** Replays in one load: a one-shot animation on a rebuilt element starting more
  * than two frames after the original did, or an animated element whose opacity
@@ -42,31 +49,36 @@ export function measure(item, record, { survey, baseline }) {
 export const plainHtml = (load, scripts) => load.record?.settled === 'not hydrated' && !scripts.length && !load.errors.length;
 
 /** The failure for a page whose plain load never hydrated and is not plain HTML. */
-export function judgeUnhydrated({ path, scripts, baseline: { record, errors } }) {
+export function judgeUnhydrated({ path, scripts, baseline }, json) {
+ const { record, errors } = baseline;
  const state = record?.settled ?? 'no probe record';
- const bound = settleBound(record);
+ const bound = settleBound(baseline, json);
  const why = state === 'not hydrated' ? `React never hydrated the page${bound}${scripts.length ? ` although it loads application scripts (${list(scripts, 3)})` : ''}` : `the page did not settle${bound} (${state}${record?.error ? ': ' + record.error : ''})`;
  return `${path} plain load: ${why}${errors.length ? `; ${list([...new Set(errors)], 3)}` : ''}`;
 }
 
 /** Failures for one page: its plain load, its case loads and its canaries. */
-export function judgePage(page) {
+export function judgePage(page, json) {
  const failures = [], { path, baseline, loads, survey } = page, base = baseline.record;
  const fail = (what, evidence) => failures.push(`${path} ${what}: ${evidence}`);
  const noisy = (what, load) => { if (load.errors.length) fail(what, `recovery was not quiet (${list([...new Set(load.errors)], 3)})`); };
  const unheld = (what, load) => { if (load.unheld?.length) fail(what, `not exercised: the check's script hold let ${list(load.unheld, 3)} reach the page before the probe released the scripts`); return load.unheld?.length > 0; };
  unheld('plain load', baseline);
  noisy('plain load', baseline);
- if (base.rer?.count) fail('plain load', `window.__rerHydration.count is ${base.rer.count} with no edit (${list(base.rer.stacks ?? [], 2)})`);
+ if (base.rer?.count) fail('plain load', `window.__rerHydration.count is ${base.rer.count} with no edit (${list(base.rer.stacks ?? [], 2)})${contentBound(baseline, json)}`);
  let exercised = false;
  for (const { item, load } of loads) {
   const what = describeCase(item, survey), record = load.record;
-  if (!record || record.settled !== 'hydrated') { fail(what, record?.settled === 'error' ? `the probe failed: ${record.error}` : `the page did not settle after hydration${settleBound(record)} (${record?.settled ?? 'no record'})`); continue; }
+  if (!record || record.settled !== 'hydrated') {
+   const bound = settleBound(load, json) || (json ? '' : ' within the time limit');
+   fail(what, record?.settled === 'error' ? `the probe failed: ${record.error}` : `the page did not settle after hydration${bound} (${record?.settled ?? 'no record'})`);
+   continue;
+  }
   if (unheld(what, load)) continue;
   noisy(what, load);
   if (item.kind === 'plain') {
    if (item.reduced && record.oneShot.length) fail(what, `one-shot animations ran: ${list(record.oneShot)}`);
-   if (record.rer?.count) fail(what, `window.__rerHydration.count is ${record.rer.count} with no edit`);
+   if (record.rer?.count) fail(what, `window.__rerHydration.count is ${record.rer.count} with no edit${contentBound(load, json)}`);
    continue;
   }
   if (!record.editBeforeHydration) { fail(what, 'not exercised: the edit landed after React had started hydrating'); continue; }
