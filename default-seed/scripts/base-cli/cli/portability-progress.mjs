@@ -17,3 +17,17 @@ export function nativeFailure(error) {
  const code = typeof error?.code === 'string' && /^[A-Za-z0-9_.-]{1,64}$/.test(error.code) ? error.code : Number.isSafeInteger(error?.code) ? String(error.code) : undefined;
  return { class: name, ...(code ? { code } : {}) };
 }
+
+const transportCodes = new Set([
+ 'ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT',
+ 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT', 'UND_ERR_SOCKET',
+]);
+
+// The local Wrangler bindings use Undici over loopback. Carry only known
+// transport codes, never socket addresses or driver messages.
+export function localStorageTransport(error) {
+ if (!(error instanceof TypeError) || !['fetch failed', 'terminated'].includes(error.message)
+  || !/(?:node:internal\/deps\/undici|[/\\]undici[/\\])/.test(error.stack ?? '')) return;
+ const code = error.cause?.code;
+ return transportCodes.has(code) ? code : 'unreachable';
+}
