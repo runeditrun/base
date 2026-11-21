@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.127
+
+Signed: Run Edit Run fleet, 2026-11-21.
+
+### Hosted archives into native destinations
+
+- A hosted export with a legacy name-only migration ledger can restore into a native checkout whose Wrangler applied the core filenames in a different order. The recorded filenames, as a set, must be a contiguous prefix of the destination's applied history. Restore replays that prefix in the destination's order, checks the complete archived schema, and bridges later additive core or owner migrations only after the whole prefix. This covers the hosted-to-native path that rer 0.2.126 refused with `schema_mismatch:migration_history`.
+- An interior migration missing from the archive, changed, extra or unavailable filenames, or a reorder that changes the archived schema still refuse before importing product rows or creating import jobs (CLI exit 4; zero product rows and zero import jobs). The CLI and Worker use the same placement decision. Core-only Worker bundles grow by about 0.7 KB in the qualified fixture; SQLite WASM remains excluded without owner migration files.
+
+### Local restore storage failures
+
+- A dropped connection to the local Wrangler storage runtime now names the restore stage, including staging or preparing the restore, and the storage connection failure. Diagnostics retain only bounded transport codes and fixed stage names, with no native driver message or payload. Failed restores publish no product rows; the same archive can be fully restored on a re-run once local storage responds.
+- Maintained CLI copies and inventory are regenerated.
+
+Archives written by rer 0.2.124, 0.2.125 or 0.2.126 import into 0.2.127, and 0.2.127 archives import into those versions for the same compatible core-only and owner-migration fixtures: the archive format identity remains `runeditrun-portability` version 2, unchanged from 0.2.126. This does not give older readers the new hosted-to-native restore behavior.
+
+HappyToHelp and any seed restoring a hosted export need a re-pin to 0.2.127. This also applies to Dial, Nook and Penny if they import hosted archive bytes. Seeds on older pins need a re-pin to receive these fixes.
+
+These changes require adoption through the seed's pinned package or refreshed source. This preparation establishes no seed adoption, live deployment, provider delivery or production result. The source range changes portability and import error naming and their maintained copies, with no import-kit or product migration change.
+
 ## 0.2.126
 
 Signed: Run Edit Run fleet, 2026-11-20.
