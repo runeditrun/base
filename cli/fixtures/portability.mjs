@@ -93,7 +93,10 @@ commandAdapter.portability.export=async context=>{
  const run=async(args,expected=0,{slow=false}={})=>(await command([...(slow?['--import',join(base,'cli/fixtures/slow-state-inspection.mjs')]:[]),entry,...args,'--json'],expected)).stdout.trim().split('\n').map(JSON.parse);
  // A command as a person runs it, without --json: its terminal output.
  // `fault` names a transfer-fault.mjs failure for the transfer worker.
- const text=(args,expected=0,{fault}={})=>command([entry,...args],expected,fault?{NODE_OPTIONS:`--import=${join(base,'cli/fixtures/transfer-fault.mjs')}`,RER_TEST_TRANSFER_FAULT:fault}:{});
+ const text=(args,expected=0,{env={},fault,preload}={})=>command(
+  [...(preload?['--import',join(base,'cli/fixtures',preload)]:[]),entry,...args],expected,
+  fault?{...env,NODE_OPTIONS:`--import=${join(base,'cli/fixtures/transfer-fault.mjs')}`,RER_TEST_TRANSFER_FAULT:fault}:env,
+ );
  const data=async sql=>JSON.parse((await command(['node_modules/wrangler/bin/wrangler.js','d1','execute','default-seed-reference','--local','--persist-to','.wrangler/state','--config','wrangler.jsonc','--command',sql,'--json'])).stdout);
  return {root,run,text,data};
 }
