@@ -44,8 +44,8 @@ export const commandAdapter = declare({
 `);
  await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'synthetic-base-1', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: { dev: { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs'], effects: 'Serve owner readiness fixture.' } } }));
  const env = await isolatedQueue(t, { ...process.env, HOME: process.env.HOME, CI: 'true' });
- function start(json = true, timeout = 8000) {
-  const child = spawn(process.execPath, [join(base, 'bin/rer.mjs'), 'dev', '--cwd', root, ...(json ? ['--json'] : [])], { env: { ...env, RER_OWNER_READY_TIMEOUT_MS: String(timeout) }, stdio: ['ignore', 'pipe', 'pipe'] });
+ function start(json = true, timeout = 8000, persona) {
+  const child = spawn(process.execPath, [join(base, 'bin/rer.mjs'), 'dev', '--cwd', root, ...(json ? ['--json'] : []), ...(persona ? ['--as', persona] : [])], { env: { ...env, RER_OWNER_READY_TIMEOUT_MS: String(timeout) }, stdio: ['ignore', 'pipe', 'pipe'] });
   child.output = ''; child.errors = '';
   child.stdout.on('data', bytes => { child.output += bytes; }); child.stderr.on('data', bytes => { child.errors += bytes; });
   child.done = new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });

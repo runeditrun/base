@@ -19,7 +19,7 @@ const CONTEXTS = 3;
 /** Checks the pages and returns the result; `report(lines)` receives its human
  * summary (pages, skips, redirects followed, what was not checked) before it
  * returns or fails on a page. With no page to load it fails naming why. */
-export async function checkHydration(root, { origin, pages: declared, declaration, report } = {}) {
+export async function checkHydration(root, { origin, pages: declared, declaration, report, json = false } = {}) {
  const started = Date.now();
  const server = origin ? originServer(origin) : await hostedServer(root, { declaration });
  let browser;
@@ -44,11 +44,11 @@ export async function checkHydration(root, { origin, pages: declared, declaratio
   // Only a document React hydrates needs no-transform: a redirect or a page that
   // never hydrates has no HTML whose rewrite could cause a mismatch.
   for (const page of pages.filter(page => page.hydrated)) if (!/(^|[\s,])no-transform($|[\s,])/i.test(page.cacheControl ?? '')) failures.push(`${page.path} document: Cache-Control is "${page.cacheControl ?? 'absent'}" and lacks no-transform, so a proxy (Cloudflare's email address obfuscation) may rewrite the HTML React hydrates`);
-  for (const page of pages) if (!page.hydrated && !page.skipped) failures.push(judgeUnhydrated(page));
+  for (const page of pages) if (!page.hydrated && !page.skipped) failures.push(judgeUnhydrated(page, json));
   const work = pages.filter(page => page.hydrated).flatMap(page => planCases(page).map(item => ({ page, item })));
   const loads = await pool(work.map(({ page, item }) => () => runLoad(browser, server, page.path, item)), CONTEXTS);
   work.forEach(({ page, item }, index) => { (page.loads ??= []).push({ item, load: loads[index] }); });
-  for (const page of pages.filter(page => page.hydrated)) failures.push(...judgePage({ ...page, loads: page.loads ?? [] }));
+  for (const page of pages.filter(page => page.hydrated)) failures.push(...judgePage({ ...page, loads: page.loads ?? [] }, json));
   const result = {
    served: server.mode === 'hosted' ? 'production build as ~/.local/bin/rer deploy hosts it' : server.origin,
    pages: pages.map(page => page.skipped ? { path: page.path, skipped: 'plain HTML: React does not hydrate this page and it loads no application script' } : {
