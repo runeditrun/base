@@ -206,6 +206,25 @@ test('failed scans name Retry while consent-pending scans still ask for permissi
  }
 });
 
+const optionalChoicesLine = /^.*\boptional\b.*\bchoices\b.*$/gim;
+
+test('Business check-ins let the computer continue while its choices are undecided', async t => {
+ const remote = await fixtureServer(t), home = join(directory, 'optional-choices-home');
+ const options = { env: { CLAUDECODE: '1' } };
+ const paired = await connect(home, remote, options);
+ for (const [command, result] of [
+  ['connect', paired],
+  ['run --once', await cli(home, ['business', 'run', '--once'], options)],
+  ['next', await cli(home, ['business', 'next'], options)],
+ ]) {
+  assert.equal(result.code, 0, result.stderr);
+  assert.doesNotMatch(result.stdout + result.stderr, /\b(?:wait(?:ing)? (?:for|until)|after|once|until)\b[^\n]*\b(?:choos\w*|choices?|permissions)\b/i, command);
+  assert.match(result.stdout, /\boptional\b[^\n]*\bnothing waits\b/i, command);
+  assert.match(result.stdout, /^Run .*\bbusiness next\b.*\bsee the next task\b/m, command);
+  t.diagnostic(`rer business ${command}\n${result.stdout}`);
+ }
+});
+
 test('Business next echoes the installed launcher or npx invocation and open choices appear once per run', async t => {
  const remote = await fixtureServer(t), home = join(directory, 'echo-home');
  await connect(home, remote);
@@ -214,15 +233,15 @@ test('Business next echoes the installed launcher or npx invocation and open cho
  const bin = join(home, '.local/bin');
  const result = await cli(home, ['business', 'next'], { installed: true, path: `${bin}:${process.env.PATH}` });
  assert.equal(result.code, 0, result.stderr);
- assert.match(result.stdout, /run ~\/\.local\/bin\/rer business next/);
+ assert.match(result.stdout, /run ~\/\.local\/bin\/rer business next/i);
  assert.doesNotMatch(result.stdout, /npx -y/);
  const registry = await localRegistry(); t.after(registry.close);
  registry.publish(packed.version, packed.bytes);
  const npx = await cli(home, ['business', 'next'], { npx: true, path: `${bin}:${process.env.PATH}`, env: { 'npm_config_@runeditrun:registry': `${registry.url}/`, npm_config_cache: join(home, 'npm-cache'), npm_config_audit: 'false', npm_config_fund: 'false' } });
  assert.equal(npx.code, 0, npx.stderr);
- assert.match(npx.stdout, /run npx -y @runeditrun\/rer business next/);
- assert.equal(result.stdout.match(/The owner has not chosen yet:/g)?.length, 1);
- assert.equal(npx.stdout.match(/The owner has not chosen yet:/g)?.length, 1);
+ assert.match(npx.stdout, /run npx -y @runeditrun\/rer business next/i);
+ assert.equal(result.stdout.match(optionalChoicesLine)?.length, 1);
+ assert.equal(npx.stdout.match(optionalChoicesLine)?.length, 1);
  // The undecided set changes between check-ins in the same long-running command.
  let checks = 0, runner;
  remote.state.onSelf = async () => {
@@ -231,7 +250,7 @@ test('Business next echoes the installed launcher or npx invocation and open cho
  };
  const running = await cli(home, ['business', 'run'], { onSpawn: child => { runner = child; } });
  assert.equal(running.code, 0, running.stderr);
- assert.equal(running.stdout.match(/The owner has not chosen yet:/g)?.length, 1);
+ assert.equal(running.stdout.match(optionalChoicesLine)?.length, 1);
  assert.equal(checks, 2);
  assert.equal(running.stdout.match(/No local app carry files changed/g)?.length, 1);
  assert.equal(running.stdout.match(/No local apps were found/g)?.length, 1);
@@ -878,7 +897,7 @@ test('connect keeps its state where RER_BUSINESS_STATE_DIR says, checks it befor
  assert.ok(!(await readdir(home)).includes('.rer'), 'nothing is written to ~/.rer when RER_BUSINESS_STATE_DIR is set');
  assert.equal((await stat(join(stateDir, 'state.json'))).mode & 0o777, 0o600);
  for (const choice of ['Add rules so Claude Code never reads your secret files', 'Install the background service']) assert.ok(paired.stdout.includes(choice), paired.stdout);
- const [applied, undecided] = paired.stdout.split('The owner has not chosen yet:');
+ const [applied, undecided] = paired.stdout.split(optionalChoicesLine);
  assert.ok(applied.includes('Keep this computer awake while it works: not allowed') && !undecided.includes('Keep this computer awake while it works'), 'a decided choice is applied and named, not asked again');
  assert.ok(!paired.stdout.includes('connect again to apply'), 'connect never has to run again: run and next apply later choices');
  assert.ok(!/installPermissions|awakeConsent|installService/.test(paired.stdout + paired.stderr), 'internal names never reach a person');
@@ -996,7 +1015,7 @@ test('inside an agent sandbox run and next apply the owner\'s choices for its ag
  const folder = await realpath(home), lock = join(stateDir, 'run.lock');
  remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
  const paired = await connect(home, remote, { env });
- assert.ok(paired.stdout.includes('the run and next commands apply the choices at their next check-in, so connect does not need to run again') && !paired.stdout.includes('connect again to apply'), paired.stdout);
+ assert.ok(paired.stdout.includes('The run and next commands apply the choices at their next check-in, so connect does not need to run again') && !paired.stdout.includes('connect again to apply'), paired.stdout);
 
  // Before the owner allows its folder, run says exactly what it waits for.
  const waitingRun = await cli(home, ['business','run','--once'], { env });
@@ -1107,7 +1126,7 @@ test('inside an agent sandbox run and next apply the owner\'s choices for its ag
  remote.state.optIns = { installPermissions: null, awakeConsent: null, installService: null };
  const codex = await connect(codexHome, remote, { env: codexEnv });
  const notApplicable = 'Secret-file rules do not apply on Codex: Business has no way yet to stop Codex from reading your secret files';
- assert.ok(codex.stdout.includes(notApplicable) && codex.stdout.includes('The owner has not chosen yet:') && !codex.stdout.includes('never reads your secret files'), codex.stdout);
+ assert.ok(codex.stdout.includes(notApplicable) && codex.stdout.match(optionalChoicesLine) && !codex.stdout.includes('never reads your secret files'), codex.stdout);
  remote.state.optIns = { installPermissions: true, awakeConsent: false, installService: false };
  const codexNext = await cli(codexHome, ['business','next'], { env: codexEnv });
  assert.equal(codexNext.code, 0, codexNext.stderr);

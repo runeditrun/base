@@ -93,9 +93,9 @@ export async function applyChoices(api, state, { reconnecting = false } = {}) {
  }
  const undecided = names.filter(name => decided[name] === null && !inapplicable[name]);
  if (undecided.length) {
-  once('undecided', `The owner has not chosen yet:\n${undecided.map(name => `  - ${choices[name]}\n`).join('')}They choose on this computer's row in ${state.origin}/business/${encodeURIComponent(state.businessId)}/settings; the run and next commands apply the choices at their next check-in, ${reconnecting ? 'without pairing again' : 'so connect does not need to run again'}.\n`);
+  once('undecided', `Optional choices for this computer (nothing waits on them):\n${undecided.map(name => `  - ${choices[name]}\n`).join('')}The owner can make these choices whenever they like on this computer's row in ${state.origin}/business/${encodeURIComponent(state.businessId)}/settings. The run and next commands apply the choices at their next check-in, ${reconnecting ? 'without pairing again' : 'so connect does not need to run again'}.\n`);
  }
- once('choices-next-step', `After choosing this computer's permissions in Business, run ${businessCommand('next')} to apply them and see the next task.\n`);
+ once('choices-next-step', `Run ${businessCommand('next')} to see the next task.\n`);
  if (carried?.summaryChanged) {
   const count = carried.checkouts.length;
   process.stdout.write(count
