@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.130
+
+Signed: Run Edit Run fleet, 2026-11-22.
+
+### Local owner entry and hosted deploy
+
+- On macOS, `rer dev` opens the owner page from an isolated installer home without a browser-home override. If Chromium exits early, rer reports the exit and the last page state.
+- Hosted `rer deploy --dry-run` reports when `--owner-name` is required and when rer can derive it from the owner email, including when the app manages its own owner setup.
+- Hosted `rer deploy` shows elapsed progress during resource provisioning and names the database and current D1 migration during long imports.
+
 ## 0.2.129
 
 Signed: Run Edit Run fleet, 2026-11-22.
