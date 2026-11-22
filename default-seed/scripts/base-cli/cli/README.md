@@ -97,15 +97,17 @@ still wait for the browser to verify the destination through that door.
 
 This uses the checkout's locked Playwright and provisions its headless browser
 on first use, as verification does. Browser provisioning has its own five-minute
-deadline. To run Chromium under a separate home from an isolated CLI installation,
-set `RER_OWNER_BROWSER_HOME` to the absolute path of that home. Use
-`PLAYWRIGHT_BROWSERS_PATH` to select a separate browser cache directory.
+deadline and uses the installer's browser cache. Set `PLAYWRIGHT_BROWSERS_PATH`
+to select a different cache. On macOS, Chromium uses the system account's home
+for keychain services and Playwright creates a fresh temporary browser profile.
+The installer and app keep their own environment. Set `RER_OWNER_BROWSER_HOME`
+to an absolute directory to override the home of this Chromium process.
 Once the browser is installed, owner readiness allows three minutes on startup
 for cold client builds and one minute when reattaching. Set
 `RER_OWNER_READY_TIMEOUT_MS` to positive integer milliseconds to change it.
-Expiry exits 1 with `owner_entry_not_ready`, naming the startup log,
-entry and last destination without entry credentials. No ready event or open link
-is emitted.
+Failure exits 1 with `owner_entry_not_ready` and gives the startup log, last
+destination, exchange status, client render progress, and any observed Chromium
+exit status. The diagnostics omit entry credentials.
 An available persona API or health endpoint alone cannot establish that the
 owner's page is ready. Inline recovery-script text is not mistaken for a visible
 busy page.

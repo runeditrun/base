@@ -45,8 +45,16 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,p
   }
   const migrations = [];
   // A migration failure names its database, so the owner knows which one to inspect.
-  if (plan.d1.length) onProgress?.('Checking and applying D1 migrations');
-  for (const item of plan.d1) migrations.push({binding:item.binding,...await migrate(api,resources.d1.find(x => x.binding === item.binding).id,item.migrations,{apply:!unchanged,upgrade:true,locked}).catch(error => { error.resource ??= `d1:${item.name}`; throw error; })});
+  for (const item of plan.d1) {
+    let detail = `${item.name}: checking migration history`;
+    onProgress?.('Checking and applying D1 migrations', true, () => detail);
+    const result = await migrate(api,resources.d1.find(x => x.binding === item.binding).id,item.migrations,{
+      apply:!unchanged,upgrade:true,locked,
+      onApplying: (name, index, total) => { detail = `${item.name}: migration ${index} of ${total} (${name})`; },
+      onReadback: () => { detail = `${item.name}: verifying migration history`; },
+    }).catch(error => { error.resource ??= `d1:${item.name}`; throw error; });
+    migrations.push({binding:item.binding,...result});
+  }
   const window = readiness.window ?? readinessWindow({...(healthOptions.now ? {clock:healthOptions.now} : {}), ...(healthOptions.sleep ? {sleep:healthOptions.sleep} : {}), ...readiness});
   // Owner mode already authenticated this pending version against its saved
   // intent. Finish its routing/triggers/receipt instead of publishing it twice.

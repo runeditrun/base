@@ -20,6 +20,7 @@ export async function deployOwnerInput({ root, adapter, setupSeed, options, sign
  const given = env[key]?.trim() ? env[key] : undefined;
  let displayName = options.ownerName ?? given ?? input[key];
  let remember = options.ownerName !== undefined || given === undefined;
+ let ownerNameSource;
  if (!displayName?.trim() && adapter.hooks?.secrets) {
   const { readSettings } = await shared('adapter-settings.mjs');
   displayName = (await readSettings(root, adapter.hooks.secrets)).values[key];
@@ -32,8 +33,13 @@ export async function deployOwnerInput({ root, adapter, setupSeed, options, sign
   displayName = [defaults?.[key], field.default].find(value => typeof value === 'string' && value.trim());
   if (displayName !== undefined || field.optional) {
    remember = false;
-   displayName ??= emailName(setupSeed.manifest, declaration, env);
-   if (displayName === undefined) return { input };
+   if (displayName === undefined) {
+    const emailField = setupSeed.manifest?.steps.find(step => step.type === 'owner-claim')?.emailField;
+    if (!emailField) return { input };
+    ownerNameSource = 'email';
+    displayName = emailName(emailField, declaration, env);
+    if (displayName === undefined) return { input, ownerNameSource };
+   }
   } else {
    if (options.dryRun) return { input, neededForRealDeploy: ['owner name (--owner-name or ~/.local/bin/rer setup)'] };
    displayName = await promptForName(options, signal);
@@ -42,12 +48,10 @@ export async function deployOwnerInput({ root, adapter, setupSeed, options, sign
  if (!validOwnerName(displayName)) throw invalid('Provide a valid owner name.');
  input[key] = displayName;
  if (!options.dryRun && remember) await rememberSetupAnswers(project, input);
- return { input, displayName: displayName.trim() };
+ return { input, displayName: displayName.trim(), ownerNameSource };
 }
 
-function emailName(manifest, declaration, env) {
- const emailField = manifest?.steps.find(step => step.type === 'owner-claim')?.emailField;
- if (!emailField) return;
+function emailName(emailField, declaration, env) {
  const key = declaration?.secrets?.find(item => item.binding === emailField)?.environment ?? emailField;
  try {
   const name = normalizeEmail(env[key]).split('@')[0];

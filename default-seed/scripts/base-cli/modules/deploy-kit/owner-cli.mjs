@@ -216,23 +216,26 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
 export async function withDeployProgress(notice, deploy, initialPhase) {
   const outer = progressScope.getStore();
   if (outer) {
-    const prior = outer.phase;
+    const { phase: prior, detail } = outer;
     if (initialPhase) outer.progress(initialPhase, false);
     try { return await deploy(outer.progress); }
-    finally { outer.progress(prior, false); }
+    finally { outer.progress(prior, false, detail); }
   }
   let timer;
   const state = {
     phase: undefined,
-    progress(phase, announce = true) {
+    detail: undefined,
+    progress(phase, announce = true, detail) {
       clearInterval(timer);
       state.phase = phase;
+      state.detail = detail;
       if (!phase) return;
       const started = performance.now();
-      if (announce) notice(`Cloudflare deploy: ${phase}.`);
+      const label = () => detail ? `${phase} — ${detail()}` : phase;
+      if (announce) notice(`Cloudflare deploy: ${label()}.`);
       timer = setInterval(() => {
         const seconds = Math.round((performance.now() - started) / 1000);
-        notice(`Cloudflare deploy: ${phase} (${seconds}s elapsed).`);
+        notice(`Cloudflare deploy: ${label()} (${seconds}s elapsed).`);
       }, 30_000).unref();
     },
   };

@@ -91,21 +91,22 @@ async function deployScoped(context) {
  const settings = adapter.hooks?.secrets ?? adapter.settings;
  await enforceDeployPolicy({ ...context, declaration, declarationPath: path, settings });
  // Required secrets have been checked; retain the production sign-in guidance.
- const dryRun = async (result, { planned = true, ownerNeeded } = {}) => {
+ const dryRun = async (result, ownerInput, { planned = true } = {}) => {
   const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
   const plan = result?.plan ?? (!planned ? undefined : (await owner(['local-plan', '--declaration', path, '--environment', options.environment ?? 'production', ...await deployProductArguments(root, deployProductDirectory(declaration))], production.env, { cwd: root, localOnlyKeys })).plan);
   result = { ...result, dryRun: true, deployed: false, providerChecked: false, plan };
   const { signIn, mailOff } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
-  const nameInputs = ownerNeeded ?? (await deployOwnerInput({ ...context, declaration, env: production.env })).neededForRealDeploy;
-  const needed = [...new Set([...neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false }), ...(result.neededForRealDeploy ?? []), ...(nameInputs ?? [])])];
+  const { neededForRealDeploy: ownerNeeded = [], ownerNameSource } = ownerInput;
+  const needed = [...new Set([...neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false }), ...(result.neededForRealDeploy ?? []), ...ownerNeeded])];
   if (!context[deferDryRunSummary]) {
    if (mailOff) store.report(mailOffNotice(mailOff, options.environment ?? 'production'), { names: mailOff.credentialNames });
    // The one completion line: rer's own plan step (or its deliberate skip) succeeded. A hook's own line says only that the hook finished.
    store.report('deploy: local dry run complete; no credentials were needed, no Cloudflare requests were made and nothing was changed remotely. Target secrets and remote readiness were not checked.');
    reportNeeded(store, needed);
+   if (ownerNameSource === 'email') store.report('Rer derives the owner name from the owner email. Supply --owner-name to choose a different name.');
    if (declaration.secrets?.some(item => item.binding === 'INSTALLATION_KEY')) store.report('deploy: INSTALLATION_KEY is a private generated binding; INSTALLATION_KEY_PREVIOUS is optional and managed only during rotation or an explicit retired-key reopen. Values are withheld.');
   }
-  return needed.length && result && typeof result === 'object' ? { ...result, neededForRealDeploy: needed } : result;
+  return { ...result, ...(needed.length ? { neededForRealDeploy: needed } : {}), ...(ownerNameSource ? { ownerNameSource } : {}) };
  };
  const runHook = hookContext => options.dryRun ? withLocalDeployPlan(async () => {
   try { return await adapter.deploy({ ...hookContext, [deferDryRunSummary]: true }); }
@@ -123,7 +124,13 @@ async function deployScoped(context) {
  if (options.rotateSecret?.split(',').includes('INSTALLATION_KEY')) return ownerDeploy(path, adapter)(context);
  // A hook that deployed through the kit keeps what its Worker holds: rotate there as a secret change.
  if (options.rotateSecret && !adapter.deploy.managesHostedOwner && await hookState(root, options.environment ?? 'production')) return ownerDeploy(path, adapter)(context);
- if (adapter.deploy.managesHostedOwner) { const result = await runHook(context); return options.dryRun ? dryRun(result) : result; }
+ if (adapter.deploy.managesHostedOwner) {
+  if (!options.dryRun) return runHook(context);
+  const { env } = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
+  const ownerInput = await deployOwnerInput({ ...context, declaration, env });
+  const result = await runHook({ ...context, input: ownerInput.input });
+  return dryRun(result, ownerInput);
+ }
  const productDirectory = deployProductDirectory(declaration);
  const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
  const { mailOff } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
@@ -175,7 +182,7 @@ async function deployScoped(context) {
     step = 'plan the deploy locally';
     // A hook that returned no kit state validated its own plan, and the declaration it names may be a stand-in a real deploy never plans against.
     const plan = deployed?.state ? (await command('local-plan')).plan : deployed?.plan;
-    return dryRun({ ...deployed, plan }, { planned: false, ownerNeeded: ownerInput.neededForRealDeploy ?? [] });
+    return dryRun({ ...deployed, plan }, ownerInput, { planned: false });
    }
    await rememberHookState(root, environment, deployed?.state);
    hookRecord = await hookState(root, environment);
