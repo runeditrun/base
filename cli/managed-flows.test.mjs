@@ -363,7 +363,7 @@ test('managed startup reports a real misbound application port and stops its des
     if(listener&&!proxyFailed&&tree.some(item=>item.pid===listener.pid&&item.start===listener.start)){
      healthyWrongPort=(await healthStatus(`http://127.0.0.1:${ports.wrong}`)).healthy;
      if(healthyWrongPort)observedAt??=Date.now();
-     if(healthyWrongPort)proxyFailed=(await healthStatus(url)).status===404;
+     if(healthyWrongPort)proxyFailed=(await healthStatus(url)).status===503;
      if(healthyWrongPort&&proxyFailed)await writeFile(observedFile,'synthetic-base-1',{mode:0o600});
     }
     await pause(250);
