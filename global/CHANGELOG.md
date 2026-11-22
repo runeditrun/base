@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.131
+
+Signed: Run Edit Run fleet, 2026-11-22.
+
+### First local start
+
+- While `rer dev` waits, its progress lines say that a start usually takes about a minute. On a busy computer they give the load, the slowdown and a longer limit to allow.
+- Until the app answers for the first time, its local address returns HTTP 503 with `Retry-After` and a page that says it is starting and reloads by itself. It no longer returns a plain `404 Not found`. A seed gets this when it pins rer 0.2.131.
+- If the owner-entry browser stops early, the error gives the time it stopped, not the full readiness budget.
+
 ## 0.2.130
 
 Signed: Run Edit Run fleet, 2026-11-22.
