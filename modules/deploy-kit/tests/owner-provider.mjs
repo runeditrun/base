@@ -11,6 +11,7 @@ export function ownerProvider({creationDates = true} = {}) {
   const stamp = () => new Date(Date.UTC(2026,9,8,0,0,created++)).toISOString();
   const {state} = fixture;
   state.kv = [];
+  state.r2Jobs = new Map();
   const failures = [];
   let settingsBarrier, uploaded = false;
   let lag = null;
@@ -69,6 +70,35 @@ export function ownerProvider({creationDates = true} = {}) {
       lag.reads--; state.calls.push({method,path,search:url.search,lagged:true});
       const rows = state.databases.map(({db,...x}) => x), shown = lag.shape === 'omit' ? rows.slice(0,lag.known) : rows;
       return ok(shown,{page:1,total_count:lag.shape === 'omit' ? shown.length : rows.length - 1,total_pages:1});
+    }
+    const jobs = path && /^\/r2\/buckets\/([^/]+)\/jobs(?:\/([^/]+))?$/.exec(path);
+    if (url.origin === 'https://api.cloudflare.com' && jobs) {
+      if (init.headers?.Authorization !== `Bearer ${fixture.token}`) throw new Error('wrong test credential');
+      state.calls.push({method,path,search:url.search});
+      const [,bucket,id] = jobs;
+      if (!state.buckets.some(row => row.name === bucket)) return Response.json({success:false,errors:[]},{status:404});
+      const jobsForBucket = state.r2Jobs.get(bucket) ?? new Map();
+      if (method === 'POST' && !id) {
+        const body = JSON.parse(init.body);
+        if (body.jobType !== 'prefixDelete' || body.prefix !== '') throw new Error('unexpected R2 purge request');
+        const job = {id:randomUUID(),jobType:body.jobType,prefixDelete:{prefix:body.prefix,deletedObjects:0,isBucketClear:true},status:'ENQUEUED'};
+        jobsForBucket.set(job.id,job);
+        state.r2Jobs.set(bucket,jobsForBucket);
+        state.writes.push({method,path,body});
+        return ok(job);
+      }
+      if (method === 'GET' && !id) {
+        const status = url.searchParams.get('status');
+        return ok({jobs:[...jobsForBucket.values()].filter(job => !status || job.status === status)});
+      }
+      const job = jobsForBucket.get(id);
+      if (method !== 'GET' || !job) throw new Error('unexpected R2 job operation');
+      if (job.status === 'ENQUEUED' || job.status === 'RUNNING') {
+        job.status = 'COMPLETED';
+        job.prefixDelete.deletedObjects = state.objects.get(bucket)?.size ?? 0;
+        state.objects.get(bucket)?.clear();
+      }
+      return ok(job);
     }
     const objects = path && /^\/r2\/buckets\/([^/]+)\/objects(?:\/(.+))?$/.exec(path);
     if (url.origin === 'https://api.cloudflare.com' && objects) {

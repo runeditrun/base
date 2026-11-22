@@ -1,7 +1,5 @@
 import test from 'node:test';
 import https from 'node:https';
-import { createServer } from 'node:http';
-import { connect } from 'node:net';
 import assert from 'node:assert/strict';
 import { writeFile, readFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -9,23 +7,8 @@ import { deployProviderFixture as removalFixture } from './fixtures/deploy-provi
 
 // Public CLI dispatcher, flag parser and deploy kit; only Cloudflare's network edge is fake.
 test('rer deploy --remove --yes empties its created bucket and refuses unproved ownership', async t => {
- const {root, provider, run} = await removalFixture(t);
- // The production HTTPS transport uses its real HTTP client against a local
- // provider edge. req.url proves dot segments and encoded keys survive the wire.
- const endpoint = createServer(async (request, response) => {
-  const result = await provider.objectDelete(request.url, {headers:{Authorization:request.headers.authorization}});
-  response.writeHead(result.status, Object.fromEntries(result.headers));
-  response.end(Buffer.from(await result.arrayBuffer()));
- });
- await new Promise(resolve => endpoint.listen(0, '127.0.0.1', resolve));
- t.after(async () => { endpoint.closeAllConnections(); await new Promise(resolve => endpoint.close(resolve)); });
- const nativeRequest = https.request;
- t.mock.method(https, 'request', (options, respond) => {
-  assert.equal(options.hostname, 'api.cloudflare.com');
-  assert.equal(options.method, 'DELETE');
-  assert.ok(options.path.startsWith(`/client/v4/accounts/${provider.accountId}/r2/buckets/fixture-production-files/objects/`));
-  return nativeRequest({...options, createConnection:() => connect(endpoint.address().port, '127.0.0.1')}, respond);
- });
+ const {root, provider, run} = await removalFixture(t, {queues:[{binding:'JOBS'}]});
+ const objectDeletes = t.mock.method(https, 'request', () => { throw new Error('unexpected-object-delete'); });
  assert.equal(await run(), 0);
  const path = join(root, '.rer/deploy/production.json'), name = 'fixture-production-files';
  const original = JSON.parse(await readFile(path, 'utf8'));
@@ -37,11 +20,14 @@ test('rer deploy --remove --yes empties its created bucket and refuses unproved 
  provider.state.objects.set('unrelated-bucket', new Map([['keep', Buffer.from('untouched')]]));
  assert.equal(await run('--remove', '--yes'), 0);
  assert.deepEqual(provider.state.buckets.map(row => row.name), ['unrelated-bucket']);
+ assert.equal(provider.state.queues.length,0);
  assert.equal(provider.state.objects.get(name)?.size ?? 0, 0);
  assert.equal(provider.state.objects.get('unrelated-bucket').get('keep').toString(), 'untouched');
  await assert.rejects(access(path), {code:'ENOENT'});
- assert.ok(provider.state.calls.some(call => call.path.endsWith('/objects') && call.search.includes('cursor=')), 'followed provider object pagination');
- assert.equal(provider.state.writes.filter(call => call.method === 'DELETE' && call.path.includes('/objects/')).length, keys.length);
+ assert.equal(objectDeletes.mock.callCount(),0, 'no per-object network calls for a bucket spanning multiple list pages');
+ const jobs = provider.state.r2Jobs.get(name);
+ assert.equal(jobs.size,1);
+ assert.equal([...jobs.values()][0].prefixDelete.deletedObjects,keys.length);
  assert.equal(await run(), 0);
  Object.assign(original, JSON.parse(await readFile(path, 'utf8')));
  provider.state.objects.set(name, new Map(keys.map(key => [key, Buffer.from(`data:${key}`)])));
@@ -62,6 +48,34 @@ test('rer deploy --remove --yes empties its created bucket and refuses unproved 
  }
  await writeFile(path, JSON.stringify(original));
 
+});
+
+test('rer deploy --remove resumes an R2 job whose creation response was lost', async t => {
+ const {root, provider, run} = await removalFixture(t, {queues:[{binding:'JOBS'}]});
+ const objectDeletes = t.mock.method(https, 'request', () => { throw new Error('unexpected-object-delete'); });
+ assert.equal(await run(),0);
+ const name = 'fixture-production-files', path = join(root,'.rer/deploy/production.json');
+ const saved = JSON.parse(await readFile(path,'utf8'));
+ const objects = new Map(Array.from({length:645}, (_, i) => [`files/${i}`, Buffer.from('stored data')]));
+ provider.state.objects.set(name,objects);
+ provider.fail('POST', /\/r2\/buckets\/[^/]+\/jobs$/, {afterApply:true});
+
+ assert.equal(await run('--remove','--yes'),1);
+ const jobs = provider.state.r2Jobs.get(name);
+ assert.equal(jobs.size,1, 'the lost POST response did not replay the write');
+ assert.equal(objects.size,645);
+ assert.equal(provider.state.buckets.some(row => row.name === name),true);
+ assert.equal(provider.state.queues.length,0);
+ const retained = JSON.parse(await readFile(path,'utf8'));
+ assert.deepEqual(retained.owned.r2,saved.owned.r2);
+ assert.equal(retained.owned.worker,null);
+
+ assert.equal(await run('--remove','--yes'),0);
+ assert.equal(jobs.size,1, 'the second removal waited for the active job');
+ assert.equal(objects.size,0);
+ assert.equal(objectDeletes.mock.callCount(),0);
+ assert.equal(provider.state.buckets.length,0);
+ await assert.rejects(access(path),{code:'ENOENT'});
 });
 
 test('rer deploy --remove refuses ambiguous full pages and malformed R2 pagination, accepting terminal empty pages', async t => {
@@ -109,9 +123,10 @@ test('rer deploy --remove refuses ambiguous full pages and malformed R2 paginati
    await refuse();
    assert.deepEqual([...objects], retained, 'a full ambiguous page preserves its objects');
    objects.clear();
-   const writes = provider.state.writes.length;
+   const writes = provider.state.writes.length, calls = provider.state.calls.length;
    assert.equal(await run('--remove', '--yes'), 0, `${metadata} metadata completes empty removal`);
    assert.deepEqual(provider.state.writes.slice(writes).map(({method, path}) => ({method, path})), [{method:'DELETE',path:`/r2/buckets/${name}`}]);
+   assert.equal(provider.state.calls.slice(calls).some(call => call.path.includes('/jobs')), false, 'empty removal needs no bucket job');
    assert.equal(objectDeletes.mock.callCount(), 0);
    assert.equal(provider.state.buckets.some(row => row.name === name), false);
    assert.equal(objects.size, 0);

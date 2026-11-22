@@ -16,6 +16,47 @@ import { manifest, checkout, account, lifecycle, store } from './fixtures/owner-
 
 const secretNames = provider => provider.state.secrets.map(item => item.name).sort();
 
+test('rer deploy reports slow adapter work and switches to detailed D1 progress inside the kit', async t => {
+ const { root } = await checkout(t, { secrets: [] });
+ account(t);
+ const fetch = globalThis.fetch;
+ const preflight = { entered: Promise.withResolvers(), release: Promise.withResolvers() };
+ const migration = { entered: Promise.withResolvers(), release: Promise.withResolvers() };
+ t.mock.method(globalThis, 'fetch', async (input, options) => {
+  const path = new URL(input).pathname;
+  const pending = path.endsWith('/subdomain') ? preflight : path.endsWith('/import') ? migration : undefined;
+  if (pending) {
+   pending.entered.resolve();
+   await pending.release.promise;
+  }
+  return fetch(input, options);
+ });
+ t.mock.timers.enable({ apis: ['setInterval'] });
+ const out = store();
+ const adapter = { ...lifecycle, deploy: ownerDeploy('deploy.json', lifecycle) };
+ const deploy = deployCommand({ root, adapter, options: {}, store: out });
+ const elapsed = message => out.lines.filter(line => message.test(line)).length;
+ const adapterProgress = /application deployment.*elapsed/i, migrationProgress = /migrations.*elapsed/i;
+ try {
+  const completed = deploy.then(() => assert.fail('deployment finished without waiting on the provider'));
+  await Promise.race([preflight.entered.promise, completed]);
+  t.mock.timers.tick(60_000);
+  const generic = elapsed(adapterProgress);
+  assert.ok(generic > 0, 'the adapter reports ongoing work before the kit starts provisioning');
+  preflight.release.resolve();
+  await Promise.race([migration.entered.promise, completed]);
+  t.mock.timers.tick(60_000);
+  const first = elapsed(migrationProgress);
+  assert.ok(first > 0, 'a slow migration reports while the provider request is pending');
+  t.mock.timers.tick(60_000);
+  assert.ok(elapsed(migrationProgress) > first, 'progress repeats while the same request is pending');
+  assert.equal(elapsed(adapterProgress), generic, 'the detailed phase replaces the outer heartbeat');
+ } finally { preflight.release.resolve(); migration.release.resolve(); await deploy; }
+ const count = out.lines.length;
+ t.mock.timers.tick(60_000);
+ assert.equal(out.lines.length, count, 'the progress timer stops once the deployment finishes');
+});
+
 test('direct owner callers retire once, skip legacy retirement, and select live tokens after modern inspection', async t => {
  const { root } = await checkout(t, { secrets: [{ binding: 'SETUP_TOKEN', environment: 'SETUP_TOKEN' }] });
  const { provider, claims } = account(t);

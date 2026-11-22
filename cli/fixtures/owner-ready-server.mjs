@@ -28,7 +28,7 @@ const server = createServer(async (req, res) => {
   const setup = '<main><h1>Setup</h1><form><label>Workspace name <input value="Synthetic workspace"></label><button>Continue</button></form></main>';
   // Foundation's signed-in /app is a rendered, read-only heading and paragraph.
   const owner = config.readOnly ? '<main><h1>Synthetic workspace</h1><p>Signed in as Synthetic owner</p></main>' : setup;
-  const content = config.empty ? '<main></main>' : config.clientMs ? `<main aria-busy="true">Loading…</main><script>setTimeout(async()=>{document.body.innerHTML=${JSON.stringify(owner)};await fetch('/mounted')},${config.clientMs})</script>` : owner;
+  const content = config.empty ? '<main></main>' : config.clientMs ? `<main><h1>Owner setup</h1><p role="status">Loading your name…</p></main><script>setTimeout(async()=>{document.body.innerHTML=${JSON.stringify(owner)};await fetch('/mounted')},${config.clientMs})</script>` : owner;
   response = new Response(busy ? '<!doctype html><html><body><h1>The workspace is busy. Trying again in a few seconds</h1></body></html>' : '<!doctype html><html><head>' + (config.refresh ? '<meta http-equiv="refresh" content="3600">' : '') + '</head><body>' + content + '<script>const recoveryText="The workspace is busy. Trying again in a few seconds";</script></body></html>', { status: busy ? config.status ?? 503 : config.destinationStatus ?? 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
  } else if (path === '/rer-warmup') {
   // The app's first document render: slow once, as an on-demand module graph is.

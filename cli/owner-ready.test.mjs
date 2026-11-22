@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { setTimeout as pause } from 'node:timers/promises';
 import { ownerReadyFixture } from './fixtures/owner-ready.mjs';
 
@@ -35,6 +36,9 @@ test('rer dev announces the owner entry only after its redirected Setup answers,
   assert.equal(error.code, 'owner_entry_not_ready');
   assert.ok(error.message.includes(f.origin + '/workspace/start-here'), error.message);
   assert.match(error.message, /HTTP 503/);
+  const logPath = /Startup log: (.+)\. Check startup output/.exec(error.message)?.[1];
+  assert.ok(logPath, 'the refusal tells the user where the server logs are');
+  assert.match(await readFile(logPath, 'utf8'), /Starting fixture application/);
   assert.doesNotMatch(reused.output, /"event":"ready"/);
   assert.ok(!reused.output.includes(f.key), 'timeout never prints the entry credential');
   child.kill('SIGTERM'); await child.done;

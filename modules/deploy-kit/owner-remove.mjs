@@ -1,5 +1,5 @@
 import { pause } from './cancellation.mjs';
-import { r2ObjectPages, r2ObjectPath } from './r2-objects.mjs';
+import { checkBucket, requireBucketIdentity, removeOwnedBucket } from './r2-remove.mjs';
 import { rm } from 'node:fs/promises';
 import { assert, hexId } from './validation.mjs';
 import { resourceKinds, findResource } from './resources.mjs';
@@ -39,7 +39,8 @@ async function confirmEmpty(api, worker, kind, name, id) {
  * drop the state file. Nothing else in the account is touched. Ownership is checked for
  * everything before the first delete; a replaced or uncertain resource refuses it all,
  * except an uncertain one confirmed empty (see confirmEmpty). R2 object purges
- * additionally require the saved creation timestamp and recheck it before each delete. */
+ * additionally require the saved creation timestamp and recheck it before the purge
+ * and bucket delete. */
 export async function ownerRemove({api: provider, target, statePath, clock, sleep, signal}) {
   const api = withSettledLists(withScopeHints(provider),{signal});
   return withStateLock(statePath, async () => {
@@ -95,7 +96,7 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
       }
       for (const item of workerGone ? doomed : []) {
         try {
-          if (item.kind === 'r2') await removeBucket(api, item);
+          if (item.kind === 'r2') await removeOwnedBucket(api, item, {signal});
           else {
             await remove[item.kind](api, item.id, item.name);
             if (item.kind === 'queues') await waitForQueueRemoval(api,item,{clock,sleep,signal});
@@ -156,30 +157,6 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
       throw error;
     }
   });
-}
-
-async function checkBucket(api, name, entry) {
-  const row = await api.request(`/r2/buckets/${name}`);
-  if (row?.name !== name) throw refuse('owned-resource-replaced', 'r2', name);
-  checkResourceIdentity('r2', name, row, entry);
-}
-function requireBucketIdentity(name, entry) {
-  if (entry.status !== 'created' || typeof entry.id !== 'string' || !entry.id) throw refuse('uncertain-resource-create', 'r2', name);
-}
-async function removeBucket(api, {name, entry}) {
-  requireBucketIdentity(name, entry);
-  await checkBucket(api, name, entry);
-  for await (const rows of r2ObjectPages(api, name)) {
-    for (const {key} of rows) {
-      // Preflight may precede Worker teardown. Re-read before each destructive
-      // request too. The provider has no conditional bucket-identity delete;
-      // out-of-band delete/recreate operations must be serialized by the owner.
-      await checkBucket(api, name, entry);
-      await api.request(r2ObjectPath(name, key), {method:'DELETE'});
-    }
-  }
-  await checkBucket(api, name, entry);
-  await api.request(`/r2/buckets/${name}`, {method:'DELETE'});
 }
 
 // Queue deletion and its account listing can settle separately. Finish the

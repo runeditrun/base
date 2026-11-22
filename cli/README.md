@@ -96,12 +96,16 @@ once its runtime can serve requests; registry readiness and ready announcements
 still wait for the browser to verify the destination through that door.
 
 This uses the checkout's locked Playwright and provisions its headless browser
-on first use, as verification does. Owner readiness has a 60-second elapsed
-deadline, including provisioning, browser launch and navigation. Set
+on first use, as verification does. Browser provisioning has its own five-minute
+deadline. To run Chromium under a separate home from an isolated CLI installation,
+set `RER_OWNER_BROWSER_HOME` to the absolute path of that home. Use
+`PLAYWRIGHT_BROWSERS_PATH` to select a separate browser cache directory.
+Once the browser is installed, owner readiness allows three minutes on startup
+for cold client builds and one minute when reattaching. Set
 `RER_OWNER_READY_TIMEOUT_MS` to positive integer milliseconds to change it.
-Expiry exits 1 with `owner_entry_not_ready`, naming the entry and last destination
-without credentials, for example: `Destination http://127.0.0.1:8787/workspace/start-here:
-HTTP 503 (busy/retry interstitial)`. No ready event or open link is emitted.
+Expiry exits 1 with `owner_entry_not_ready`, naming the startup log,
+entry and last destination without entry credentials. No ready event or open link
+is emitted.
 An available persona API or health endpoint alone cannot establish that the
 owner's page is ready. Inline recovery-script text is not mistaken for a visible
 busy page.
@@ -553,25 +557,18 @@ upload.
 
 The owner deployment declaration may set top-level `"productDirectory": ".rer/deploy/product"` for a product staged by the build or deploy hook. It must name a normalized checkout-relative subdirectory: no absolute path, backslash, empty, `.` or `..` segment. The directory must exist after the build or hook, with no symlink on its path. rer reads this field and passes `--product` only to the kit's packaging commands (`local-plan`, `deploy` and `health`). A public dry run passes `options.dryRun` to the seed deploy hook for offline preflight; without a custom hook, the owner deployer runs the build lifecycle. Both paths return `dryRun: true`, `deployed: false` and `providerChecked: false` while listing missing real-deploy inputs. Hooks must keep this preflight offline; the wrapper validates the artifacts of a legacy hook that returned a kit `state` with the local plan without contacting Cloudflare. A hook that returns no `state` has validated its own plan, and the declaration it names may be a stand-in a real deploy never plans against, so the wrapper skips that plan. Either way rer prints one `deploy: local dry run complete` line after its own plan step (or its skip) succeeds; a failure in that step names it. A hook that invokes the kit itself still supplies `--product` on its own invocation; the wrapper reads the declaration for its own steps. Omitting the field keeps packaging at the checkout root. State, root ownership, secret changes and removal keep their existing locations and behavior; dry run needs no credentials and never reads target secrets.
 
-For a hosted owner claim, deploy reuses the name saved by `rer setup` in the
-checkout's `.seed/installer/setup-answers.json`, under the adapter's
-`input.names.name` field (default `displayName`). If no name is known,
-interactive deploy asks once and saves it there. For unattended deployment,
-`rer deploy --non-interactive --owner-name 'Maya Chen'` supplies the name;
-without a saved or supplied name, it refuses before upload. Names use the same
-validation as `setup --owner-name`: nonblank, at most 200 characters and no
-Unicode Cc or Cf control characters. Nameless installers retain their existing
-deployment behavior. A dry run never prompts for or requires a missing owner
-name, never saves a name, and never claims a hosted owner, but its needed-for-a-real-deploy
-list names the owner name unless a saved answer or a held claim exists. An explicitly supplied
-name still must be valid and supported by the installer.
+For a hosted owner claim, deploy looks for `--owner-name`, the adapter's declared
+owner-name field in the environment or `--env-file`, the name saved by `rer setup`,
+and then a declared default. If the name is optional and still unset, deploy
+derives it from the owner email. If a required name is still missing, dry run
+lists it among the live inputs. A real deploy prompts interactively or asks for
+`--owner-name` before building or uploading in unattended mode. Names use the
+same validation as setup. A dry run leaves owner settings and the hosted
+installation untouched.
 
-For real deployments, an adapter that validates the hosted owner email in its
-managed deploy preflight does so before rer asks for the owner name. A placeholder
-email therefore receives the adapter's email refusal first; once the email is
-accepted, a missing name prompts interactively or refuses unattended deployment.
-Dry runs bypass custom deploy hooks and their owner-email preflight: they validate
-the local plan, while a real deployment validates the hosted identity before upload.
+An adapter's live owner-email preflight runs before a missing name is prompted
+for. During hosted provisioning, rer reports the current step and periodically
+prints elapsed time while it waits for Cloudflare.
 
 `--env-file` values are available in the command's preflight, custom hook and
 child build environment and are redacted; the caller environment is restored

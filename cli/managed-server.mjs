@@ -87,12 +87,12 @@ export async function managedServer(project,options,out,{clock={}}={}){
    if(devIdentity)devKey=await requireDevKey(project.root);
    // A key is sent (or printed) for a door origin only once the door proves it is ours.
    if(devIdentity)await verifyDoorFor(running.url);
-   const ownerOpenUrl=await checkedNativeEntry(project.root,()=>registry.ownerEntry(running).then(value=>value.ownerOpenUrl),controller.signal);
-   const dev=devIdentity&&options.verb==='dev'&&await devReady(project.root,running.url,devKey,options,controller.signal);
+   const ownerOpenUrl=await checkedNativeEntry(project.root,()=>registry.ownerEntry(running).then(value=>value.ownerOpenUrl),controller.signal,undefined,running.startupLog);
+   const dev=devIdentity&&options.verb==='dev'&&await devReady(project.root,running.url,devKey,options,controller.signal,undefined,running.startupLog);
    await emitReady(out,options,project.root,running.url,dev,running.siteUrl,running.demo,ownerOpenUrl);return {reused:true};
   }
   await registry.serve(async action=>{
-   if(action==='status')return {...activity?.snapshot(),forwarding,url:selected?.url,probe:proxy?.probe,siteUrl:site?.url,demo};
+   if(action==='status')return {...activity?.snapshot(),forwarding,url:selected?.url,probe:proxy?.probe,siteUrl:site?.url,demo,startupLog:store?.logPath};
    if(action==='owner-entry')return ownerEntry?{ownerOpenUrl:ownerEntry.issue()}:{};
    if(action==='stop')return stop('explicit stop');
    throw Error('Unknown management operation');
@@ -198,19 +198,19 @@ async function emitReady(out,options,root,url,dev,siteUrl,demo,ownerOpenUrl){
  }
  await ready(out,url,dev||(ownerOpenUrl?{openUrl:ownerOpenUrl,native:true}:undefined),options.json,siteUrl,demo,options.verb === 'dev' && !options.demo ? root : undefined,ownerOpenUrl);
 }
-async function devReady(root,url,key,options,signal,store){
+async function devReady(root,url,key,options,signal,store,startupLog){
  const as=options.as??'owner',persona=await resolvePersona(url,key,as,signal);
  // The owner persona names the owner the session will actually have (the
  // remaining owner once the setup owner has left), or none when none is left.
  const scoped=options.as!==undefined;
  const link=scoped?await personaOpenUrl(url,key,persona):openUrl(url,key,{path:'/__dev/key',as:persona.as});
- await ownerEntryReady(root,link,signal,store,{persona:scoped});
+ await ownerEntryReady(root,link,signal,store,{persona:scoped,startupLog});
  return {identity:true,signedInAs:persona.email??null,ownerLeft:as==='owner'&&!persona.email,openUrl:scoped?await personaOpenUrl(url,key,persona):link};
 }
-async function checkedNativeEntry(root,issue,signal,store){
+async function checkedNativeEntry(root,issue,signal,store,startupLog){
  const link=await issue();
  if(!link)return;
- await ownerEntryReady(root,link,signal,store);
+ await ownerEntryReady(root,link,signal,store,{startupLog});
  // The probe redeemed its single-use grant. Announce a fresh grant through
  // that same checked public entry, leaving its redemption to the owner.
  return issue();

@@ -407,15 +407,16 @@ export async function withStateLock(path, run) {
 
 /** Find or create every declared resource under the owner's account, migrate, upload and check health.
  * Ownership preflight precedes provider writes. A re-run of the same build writes nothing. */
-export async function ownerDeploy({api: provider, target, plan, artifact, statePath, env = {}, fetch = globalThis.fetch, healthOptions = {}, readiness = {}, settle = {}, declaredSecrets = plan.secrets}) {
+export async function ownerDeploy({api: provider, target, plan, artifact, statePath, env = {}, fetch = globalThis.fetch, healthOptions = {}, readiness = {}, settle = {}, declaredSecrets = plan.secrets, onProgress}) {
   assert(typeof statePath === 'string' && statePath.length, 'missing-owner-state-path');
   const api = withSettledLists(withScopeHints(provider),settle);
   assert(target?.accountId === api.accountId, 'owner-account-mismatch');
   validatePlan(plan); assertOwnerNames(target, plan);
   for (const item of plan.d1) validateMigrations(item.migrations);
-  return withStateLock(statePath, () => deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets}));
+  return withStateLock(statePath, () => deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets, onProgress}));
 }
-async function deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets}) {
+async function deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets, onProgress}) {
+  onProgress?.('Checking resources and deployment requirements');
   const state = await readOwnerState(statePath, target);
   const save = () => writeOwnerState(statePath, state);
   if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await save();
@@ -429,6 +430,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
   const {missing:sentSecrets,unset:unsetSecrets} = await secretBindings(api, plan.worker, plan, env, exists);
   // Record intent before each create. A failed or lost response leaves it pending:
   // absent on resume means create again; present means an uncertain outcome to inspect.
+  if (create.length) onProgress?.('Provisioning Cloudflare resources');
   for (const {kind,item} of create) {
     state.owned[kind][item.name] = {status:'pending'}; await save();
     let row;
@@ -466,7 +468,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
   }};
   const receipt = await deploy({api:observed, plan, artifact, artifactSha256:hash(artifact), previousReceipt:state.receipt ?? undefined, pendingUpload:state.pendingUpload,
     // Migrations run inside this run's state lock: no other deploy of this install is running.
-    createResources:false, uploadWithoutReceipt:true, locked:true, env, fetch, healthOptions, readiness, declaredSecrets,
+    createResources:false, uploadWithoutReceipt:true, locked:true, env, fetch, healthOptions, readiness, declaredSecrets, onProgress,
     onReceipt: async candidate => { if (candidate.changed || !state.receipt) { state.receipt = candidate; delete state.pendingUpload; delete state.pendingSecret; await save(); } },
     // Keep each first-health attempt beside the identity it belongs to.
     onHealth: async candidate => { if (candidate.changed) { state.receipt = candidate; await save(); } }});

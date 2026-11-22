@@ -73,7 +73,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     // Preserve complete text for the CLI's remaining redaction before truncation.
     const redactCredentials = text => redactValues(text,[accountId,token,assetToken]);
     // D1 import text keeps Cloudflare's reason, never its signed upload destinations.
-    const redactAuth = text => /\/r2\/buckets\/[^/]+\/objects(?:[/?]|$)/.test(path) ? '[R2 object details omitted]' : /\/d1\/database\/[^/]+\/import$/.test(path) ? redactCredentials(text).replace(/\bhttps?:\/\/\S+/gi,'[URL omitted]') : redactCredentials(text);
+    const redactAuth = text => /\/r2\/buckets\/[^/]+\/(?:objects|jobs)(?:[/?]|$)/.test(path) ? '[R2 object details omitted]' : /\/d1\/database\/[^/]+\/import$/.test(path) ? redactCredentials(text).replace(/\bhttps?:\/\/\S+/gi,'[URL omitted]') : redactCredentials(text);
     const operation = `${method} ${path.split('?')[0].replace(/(\/r2\/buckets\/[^/]+\/objects)\/.*/, '$1/[object]')}`;
     const endpoint = redactCredentials(`https://api.cloudflare.com/client/v4${zone ? '' : '/accounts/[REDACTED]'}${operation.slice(method.length + 1)}`);
     const started = performance.now(), limitMs = Math.max(1,Math.ceil(Math.min(timeoutMs,deadlineMs ?? timeoutMs)));
@@ -86,6 +86,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
       error.providerTransport = {operation:redactCredentials(operation),endpoint,attempts,status,reason:transportReason(cause)};
       return recordDeployFailure(error,{step:failureStep,providerRequest:detail(status,transportClass(cause)),output:providerText(transportOutput(cause),redactAuth,Infinity)});
     };
+    const r2Purge = method === 'POST' && /^\/r2\/buckets\/[^/]+\/jobs$/.test(path) && body?.jobType === 'prefixDelete' && body.prefix === '';
     const {response,output = ''} = await providerResponse({method,timeoutMs:limitMs,callerSignal:deadlineSignal(callerSignal),removal,
       replayableAsset:method === 'POST' && (/^\/workers\/scripts\/[^/]+\/assets-upload-session$/.test(path) || path === '/workers/assets/upload?base64=true'),
       reserveRetry:() => requests < maxRequests && (++requests, true),failure:transportFailure,
@@ -95,7 +96,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
         return onResponse && !response.ok ? importResponseText(response,failedRead,signal) : response.body ? boundedText(response,response.ok ? undefined : 64 * 1024,failedRead,!response.ok,signal) : '';
       },
       send:signal => isR2ObjectDelete(path, method) ? objectDelete(`/client/v4/accounts/${accountId}${path}`, {headers:{Authorization:`Bearer ${token}`},signal}) : request(zone ? `https://api.cloudflare.com/client/v4${path}` : `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`, {
-      method, redirect: 'error', signal, headers: { Authorization: `Bearer ${assetToken ?? token}`, ...(body && !(body instanceof FormData) ? { 'Content-Type':'application/json' } : {}) },
+      method, redirect: 'error', signal, headers: { Authorization: `Bearer ${assetToken ?? token}`, ...(body && !(body instanceof FormData) ? { 'Content-Type':'application/json' } : {}), ...(r2Purge ? {'cf-r2-data-catalog-check':'true'} : {}) },
       ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }),
     })});
     onResponse?.({status:response.status, body:output});

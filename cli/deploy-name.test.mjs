@@ -12,7 +12,8 @@ import { terminalDeploy } from './fixtures/deploy-terminal.mjs';
 // Real setup/dispatcher/deploy lifecycle; only the local and hosted HTTP edge
 // and Cloudflare are faked, using the existing owner-account fixture.
 test('setup and deploy carry the declared owner name, and unattended deploy refuses an unknown name before upload', async t => {
- for (const custom of [false, true, 'preflight']) for (const nameField of ['displayName', 'FIRST_OWNER_NAME', undefined]) {
+ for (const custom of [false, true, 'preflight']) for (const nameField of ['displayName', 'FIRST_OWNER_NAME', undefined, ...(
+  custom === 'preflight' ? ['OWNER_NAME'] : custom ? ['OWNER_DISPLAY_NAME'] : [])]) {
   await t.test(`${custom === 'preflight' ? 'owner preflight' : custom ? 'custom' : 'standard'} deploy / ${nameField ?? 'nameless'}`, async t => {
    const { root, git } = await checkout(t, { secrets: ['OWNER_EMAIL', 'SESSION_SECRET', 'SETUP_TOKEN'].map(name => ({ binding: name, environment: name })) });
    const { provider, claimBodies } = account(t), localClaims = [];
@@ -28,11 +29,15 @@ test('setup and deploy carry the declared owner name, and unattended deploy refu
     return inner(input, init);
    });
    const name = nameField ?? 'displayName';
+   const derivesName = nameField === 'OWNER_NAME', nativeName = nameField === 'OWNER_DISPLAY_NAME';
    const fields = [{ name: 'OWNER_EMAIL', kind: 'email', label: 'Owner email', required: true, prefill: 'account-email' },
     ...['SESSION_SECRET', 'SETUP_TOKEN'].map(name => ({ name, label: name, kind: 'secret', generate: 'hex', required: true, ownerVisible: false }))];
-   if (nameField === 'FIRST_OWNER_NAME') fields.push({ name, kind: 'text', label: 'Your name', required: true });
+   if (nameField && nameField !== 'displayName') fields.push({ name, kind: 'text', label: 'Your name', required: !derivesName, ...(derivesName ? { default: '' } : {}) });
    await writeFile(join(root, 'rer-setup.json'), JSON.stringify({ schema: 1, title: 'Owner installation', groups: [], fields, steps: [{ type: 'owner-claim', mode: 'signed', emailField: 'OWNER_EMAIL', tokenField: 'SETUP_TOKEN', path: '/auth/bootstrap' }] }));
    const source = path => JSON.stringify(new URL(path, import.meta.url).href);
+   const nativeUpload = nativeName ? `
+ const claimed = await fetch(new URL('/auth/bootstrap',deployed.origin), {method:'POST',headers:{Origin:deployed.origin},body:JSON.stringify({token:process.env.SETUP_TOKEN,displayName:process.env.OWNER_DISPLAY_NAME})});
+ await claimed.body?.cancel();` : '';
    await writeFile(join(root, 'adapter.mjs'), `import { localInstaller } from ${source('../onboarding/adapter.mjs')};
 import { commandAdapter as declareAdapter } from ${source('./adapter.mjs')};
 import { ownerDeploy } from ${source('./deploy.mjs')};
@@ -40,16 +45,21 @@ import { missing } from ${source('./errors.mjs')};
 import { deployEnvironment } from ${source('./deploy-inputs.mjs')};
 import { main as owner } from ${source('../modules/deploy-kit/owner-cli.mjs')};
 const lifecycle = localInstaller({secrets:{file:'.dev.vars',keepExisting:true},owner:{displayName:input=>input[${JSON.stringify(name)}]?.trim()||'Owner'}});
-export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer-setup.json'},ownerBootstrap:${nameField === 'displayName'},input:{names:{name:${JSON.stringify(name)}}},deployDeclaration:'deploy.json',deploy:${custom === 'preflight' ? `Object.assign(async context => {
+export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer-setup.json'},ownerBootstrap:${nameField === 'displayName'},input:{names:{name:${JSON.stringify(name)}}${nativeName ? ',defaults:async()=>({OWNER_DISPLAY_NAME:"Owner"})' : ''}},deployDeclaration:'deploy.json',deploy:${custom === 'preflight' ? `Object.assign(async context => {
  const declaration = JSON.parse(await (await import('node:fs/promises')).readFile(context.root + '/deploy.json', 'utf8'));
  const {env} = await deployEnvironment({...context, declaration, settings:lifecycle.settings});
  if (!context.options.remove && /@(?:[^@]+\\.)?(?:test|invalid|localhost|example)$/i.test(env.OWNER_EMAIL ?? '')) throw missing('Deploy needs a real OWNER_EMAIL that can receive sign-in mail. Nothing was deployed.');
+ ${derivesName ? 'if (context.options.dryRun) return {dryRun:true,deployed:false};' : ''}
  return ownerDeploy('deploy.json',lifecycle)(context);
-},{managesHostedOwner:true,declaration:'deploy.json'})` : custom ? "async ({root,options})=>({...await owner([options.dryRun?'dry-run':'deploy','--declaration','deploy.json','--environment',options.environment??'production'],process.env,{cwd:root}),deployed:!options.dryRun})" : "ownerDeploy('deploy.json',lifecycle)"}});`);
+},{managesHostedOwner:true,declaration:'deploy.json'})` : custom ? `async ({root,options})=>{
+ const deployed=await owner([options.dryRun?'dry-run':'deploy','--declaration','deploy.json','--environment',options.environment??'production'],process.env,{cwd:root});
+ if (!options.dryRun) {${nativeUpload}}
+ return {...deployed,deployed:!options.dryRun};
+}` : "ownerDeploy('deploy.json',lifecycle)"}});`);
    await writeFile(join(root, 'OPERATIONS.json'), JSON.stringify({ version: 2, project: 'tests/fixture', runtime: { requirements: [] }, requiredEnvironment: [], seedContract: { version: 1, profile: 'first-party', adapter: 'adapter.mjs' }, commands: Object.fromEntries(['setup', 'deploy'].map(verb => [verb, { argv: ['node', 'adapter.mjs'], inputs: ['adapter.mjs', 'deploy.json'], effects: `${verb} the installation.` }])) }));
    await writeFile(join(root, '.node-version'), process.versions.node + '\n');
    await writeFile(join(root, 'package.json'), JSON.stringify({ engines: { node: process.versions.node }, packageManager: 'pnpm@10.12.4' }));
-   await writeFile(join(root, '.gitignore'), 'dist/\n.rer/\n.seed/\n.dev.vars\n');
+   await writeFile(join(root, '.gitignore'), 'dist/\n.rer/\n.seed/\n.dev.vars\ndeploy.env\n');
    await writeFile(join(root, '.dev.vars'), `OWNER_EMAIL=${custom === 'preflight' ? productionSender : 'owner@example.test'}\nSESSION_SECRET=local-only-session\nSETUP_TOKEN=test-only-local-token\n`, { mode: 0o600 });
    git('add', '.'); git('commit', '-qm', 'owner name installation');
    const run = async (verb, ...flags) => {
@@ -60,6 +70,33 @@ export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer
     return { code, error: events.find(event => event.event === 'error')?.message, result: events.at(-1) };
    };
    const answersPath = join(root, '.seed/installer/setup-answers.json');
+   if (derivesName || nativeName) {
+    const envFile = ['--env-file', 'deploy.env'];
+    const envInput = derivesName ? 'OWNER_EMAIL=alex.rivera@support.example.net' : 'OWNER_DISPLAY_NAME=Alex Morgan';
+    await writeFile(join(root, 'deploy.env'), `${envInput}\n`, { mode: 0o600 });
+    const calls = provider.state.calls.length;
+    const dry = await run('deploy', '--dry-run', ...envFile);
+    assert.equal(dry.code, 0, dry.error);
+    assert.ok(dry.result.plan);
+    assert.doesNotMatch((dry.result.neededForRealDeploy ?? []).join('\n'), /owner name/i);
+    assert.equal(provider.state.calls.length, calls, 'the plan resolves the name offline');
+    await assert.rejects(access(answersPath), { code: 'ENOENT' });
+    const live = await run('deploy', ...envFile);
+    assert.equal(live.code, 0, live.error);
+    assert.equal(claimBodies.at(-1).displayName, derivesName ? 'alex.rivera' : 'Alex Morgan');
+    await assert.rejects(access(answersPath), { code: 'ENOENT' });
+    if (nativeName) {
+     assert.equal((await run('deploy', '--remove', '--yes')).code, 0);
+     const fallback = await run('deploy');
+     assert.equal(fallback.code, 0, fallback.error);
+     assert.equal(claimBodies.at(-1).displayName, 'Owner');
+     assert.equal((await run('deploy', '--remove', '--yes')).code, 0);
+     const override = await run('deploy', ...envFile, '--owner-name', 'Maya Chen');
+     assert.equal(override.code, 0, override.error);
+     assert.equal(claimBodies.at(-1).displayName, 'Maya Chen');
+    }
+    return;
+   }
    if (nameField) {
     const writes = provider.state.writes.length, calls = provider.state.calls.length;
     if (custom === 'preflight') {
@@ -78,6 +115,7 @@ export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer
     assert.equal(real.code, 3, real.error);
     assert.equal(dry.code, 0, dry.error);
     assert.ok(dry.result.plan);
+    assert.ok(dry.result.neededForRealDeploy.some(value => value.includes('--owner-name')));
     assert.match(real.error, /--owner-name/);
     t.diagnostic(`Missing owner name: dry run exit ${dry.code}; real deploy exit ${real.code}; ${real.error}`);
     assert.equal(provider.state.calls.length, calls, 'owner input resolves before the network edge');

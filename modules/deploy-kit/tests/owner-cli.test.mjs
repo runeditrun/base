@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, mkdir, writeFile, readFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { main, report } from '../owner-cli.mjs';
+import { cronNotice, main, report } from '../owner-cli.mjs';
 import { ownerProvider } from './owner-provider.mjs';
 import { deadlineClock } from './deadline-clock.mjs';
 
@@ -42,7 +42,7 @@ test('owner CLI deploys, checks health without writes, names removal survivors a
   const writes = provider.state.writes.length, bytes = await readFile(first.state);
   const second = await main(argv,inputs(provider),options);
   assert.equal(second.changed,false); assert.deepEqual(second.created,[]);
-  assert.equal(notices.length,2,'each deploy of a Cron Worker says once that the first scheduled run can take hours');
+  assert.equal(notices.filter(line => line === cronNotice).length,2,'each deploy of a Cron Worker says once that the first scheduled run can take hours');
   assert.deepEqual(await main(['health','--declaration','deploy.json','--environment','production'],inputs(provider),options),{ok:true,worker:'vector-production',origin:first.origin});
   // An edge still answering from the previous version (as after a secret change) settles within the bound.
   let answers = 0;

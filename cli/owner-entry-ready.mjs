@@ -1,12 +1,37 @@
 import { setTimeout as pause } from 'node:timers/promises';
+import { stat } from 'node:fs/promises';
+import { isAbsolute } from 'node:path';
 import { checkoutPlaywright, ensureChromium, browsersPresent } from './browser-runtime.mjs';
 import { invalid, missing, RerError } from './errors.mjs';
 
+const browserSetupTimeout = 300000;
+
 // Use the browser protocol itself: fragment exchange, cookies, server and
 // client redirects, and rendered content. No application destination is fixed.
-export async function ownerEntryReady(root, link, signal, store, { persona = false } = {}) {
- const timeout = Number(process.env.RER_OWNER_READY_TIMEOUT_MS ?? 60000);
+export async function ownerEntryReady(root, link, signal, store, { persona = false, startupLog = store?.logPath } = {}) {
+ // A freshly started dev server can still be compiling its first client
+ // module graph. A reattach only checks an already running application.
+ const timeout = Number(process.env.RER_OWNER_READY_TIMEOUT_MS ?? (store ? 180000 : 60000));
  if (!Number.isSafeInteger(timeout) || timeout <= 0 || timeout > 2147483647) throw invalid('RER_OWNER_READY_TIMEOUT_MS must be positive integer milliseconds, at most 2147483647.');
+ const browserHome = process.env.RER_OWNER_BROWSER_HOME;
+ if (browserHome !== undefined && (!isAbsolute(browserHome) || !(await stat(browserHome).catch(() => null))?.isDirectory())) {
+  throw invalid('RER_OWNER_BROWSER_HOME must be an absolute path to an existing directory.');
+ }
+ const log = startupLog ? `Startup log: ${store?.redact(startupLog) ?? startupLog}. ` : '';
+ // A cold download (or its queue wait) must not spend the page's render budget.
+ if (store) {
+  const setupTimeout = AbortSignal.timeout(browserSetupTimeout);
+  try {
+   await ensureChromium(root, store, AbortSignal.any([signal, setupTimeout].filter(Boolean)));
+  } catch (error) {
+   signal?.throwIfAborted();
+   if (!setupTimeout.aborted) throw error;
+   throw new RerError('owner_entry_not_ready', `Headless Chromium setup did not finish within ${browserSetupTimeout / 1000} seconds. No ready link was announced. ${log}Run the command again to resume browser setup.`, 1);
+  }
+ } else if (!await browsersPresent(root)) {
+  throw missing(`Owner entry verification needs the checkout’s headless browser. ${log}Run ~/.local/bin/rer verify to provision it, then run the command again.`);
+ }
+ const { playwright } = checkoutPlaywright(root);
  const entry = new URL(link), deadline = performance.now() + timeout;
  const bounded = AbortSignal.any([signal, AbortSignal.timeout(timeout)].filter(Boolean));
  let browser, page, lastState, destination = entry, last = 'browser did not open the entry', documents = 0, status, exchanged = !entry.hash, lastReload = 0;
@@ -16,13 +41,12 @@ export async function ownerEntryReady(root, link, signal, store, { persona = fal
  const close = () => { void browser?.close().catch(() => {}); };
  bounded.addEventListener('abort', close, { once: true });
  try {
-  last = 'headless browser prerequisites did not become ready';
-  if (store) await ensureChromium(root, store, bounded);
-  else if (!await browsersPresent(root)) throw missing('Owner entry verification needs the checkout’s headless browser. Run ~/.local/bin/rer verify to provision it, then run the command again.');
-  const { playwright } = checkoutPlaywright(root);
   bounded.throwIfAborted();
-  last = 'browser did not open the entry';
-  browser = await playwright.chromium.launch({ headless: true, timeout: remaining(), args: ['--use-mock-keychain', '--password-store=basic'] });
+  browser = await playwright.chromium.launch({
+   headless: true, timeout: remaining(),
+   ...(browserHome === undefined ? {} : { env: { ...process.env, HOME: browserHome } }),
+   args: ['--use-mock-keychain', '--password-store=basic'],
+  });
   bounded.throwIfAborted();
   const context = await browser.newContext();
   page = await context.newPage();
@@ -39,13 +63,14 @@ export async function ownerEntryReady(root, link, signal, store, { persona = fal
    }
   });
   try { await page.goto(link, { waitUntil: 'domcontentloaded', timeout: Math.min(5000, remaining()) }); } catch { last = 'entry document did not finish loading'; }
-  while (!bounded.aborted) {
+  while (!bounded.aborted && browser.isConnected()) {
    destination = new URL(page.url() === 'about:blank' ? entry.href : page.url());
    const state = await page.evaluate(() => {
     const visible = element => !!(element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden');
     const area = document.querySelector('main') ?? document.body, text = area?.innerText.trim() ?? '';
     const retry = /the workspace is busy|trying again in a few seconds/i.test(text);
-    const busy = retry || [...document.querySelectorAll('[aria-busy="true"], [role="progressbar"]')].some(visible) || /^loading[.\s…]*$/i.test(text);
+    const loading = [...area?.querySelectorAll('[role="status"]') ?? []].some(element => visible(element) && /^loading\b/i.test(element.innerText.trim()));
+    const busy = retry || loading || [...document.querySelectorAll('[aria-busy="true"], [role="progressbar"]')].some(visible) || /^loading[.\s…]*$/i.test(text);
     // An owner destination may be a read-only status page. Its controls may
     // also live outside the light DOM; visible rendered content is enough,
     // provided all exchange, navigation and interstitial checks below pass.
@@ -86,11 +111,14 @@ export async function ownerEntryReady(root, link, signal, store, { persona = fal
   signal?.throwIfAborted();
   if (error instanceof RerError && !bounded.aborted) throw error;
  } finally {
+  if (!bounded.aborted && !browser?.isConnected()) {
+   last += '. Headless Chromium could not stay open. If Chromium must run outside the installer HOME, set RER_OWNER_BROWSER_HOME to its permitted home directory';
+  }
   bounded.removeEventListener('abort', close);
-  await browser?.close();
+  await browser?.close().catch(() => {});
  }
  signal?.throwIfAborted();
- const message = `Owner entry ${name(entry)} did not become ready within ${timeout} ms. Destination ${name(destination)}: ${last}. No ready link was announced. Check the application startup log, then run the command again.`;
+ const message = `Owner entry ${name(entry)} did not become ready within ${timeout} ms. Destination ${name(destination)}: ${last}. No ready link was announced. ${log}Check startup output, then run the command again.`;
  const hint = "The seed's dev owner-entry route may lack the persona redeemer. See “Local dev identity and the key gate” in Base's operator-auth adoption guide (https://github.com/runeditrun/base/blob/main/modules/operator-auth/README.md#local-dev-identity-and-the-key-gate).";
  throw new RerError('owner_entry_not_ready', message, 1, personaExchangeMissing ? { humanMessage: `${message} ${hint}` } : {});
 }

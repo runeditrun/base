@@ -122,7 +122,8 @@ export function help(verb) {
  if (!verb) return `Usage: ~/.local/bin/rer VERB [FLAGS]\nCommands: ${Object.keys({...verbs, ...authoringVerbs}).join(', ')}, signin, size, release, listing, rehearse\nRun ~/.local/bin/rer VERB --help for flags.\n${appSignInHelp}\n`;
  const known = verbs[verb] ?? authoringVerbs[verb] ?? (verb === 'signin' ? signinVerb : verb === 'size' ? sizeVerb : undefined);
  const door = ['export', 'import'].includes(verb) ? 'To move records, start the app and open its signed-in owner import door:\n\n  ~/.local/bin/rer dev\n\nOpen its Move in page (/app/import in the Base reference; the project\'s own docs name its path), then export or upload and review supported records there.\n\nTo back up or restore this installation:\n' : '';
- return `${door}Usage: ~/.local/bin/rer ${verb}${verb === 'refresh-base' ? ' --ref FULL_COMMIT' : ''} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n`;
+ const browser = ['dev', 'preview'].includes(verb) ? '\nSet RER_OWNER_BROWSER_HOME to run the headless owner-entry probe with a separate HOME. Set PLAYWRIGHT_BROWSERS_PATH to choose its browser cache.\n' : '';
+ return `${door}Usage: ~/.local/bin/rer ${verb}${verb === 'refresh-base' ? ' --ref FULL_COMMIT' : ''} [FLAGS]\nFlags: ${(known?.flags ?? commonFlags).join(', ')}\n${known?.effects ?? 'Execute the declared OPERATIONS v2 argv with explicit arguments after --.'}\n${browser}`;
 }
 
 function distance(a,b){let row=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){const next=[i];for(let j=1;j<=b.length;j++)next[j]=Math.min(next[j-1]+1,row[j]+1,row[j-1]+(a[i-1]===b[j-1]?0:1));row=next;}return row[b.length];}
