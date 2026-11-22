@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.128-dev.g1497f8cb",
+  "cliVersion": "0.2.128-dev.g69442bbf",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -551,7 +551,7 @@
     },
     "cli/business/command.mjs": {
       "source": "cli/business/command.mjs",
-      "sha256": "53523cf72fc16b9284f5f27ec3327eff55bec106f3d919c083f72868c11aaaba"
+      "sha256": "503985edee6296c144cb52fbfa8dbee201c6e8a47d72cea038d473ebea27258a"
     },
     "cli/business/config-policy.mjs": {
       "source": "cli/business/config-policy.mjs",
@@ -663,11 +663,11 @@
     },
     "cli/business/run-child.mjs": {
       "source": "cli/business/run-child.mjs",
-      "sha256": "8972f26b38400a081ed5b79886ebef33e56f728ac5c5dc1b19231c9cb3b6ebdf"
+      "sha256": "5458ed46ae1d3a3efad113f9b804904756a0e6b6a0f6b32cb5b12bb5ddd90905"
     },
     "cli/business/run-grant.mjs": {
       "source": "cli/business/run-grant.mjs",
-      "sha256": "7ea433321302b5247edf828ea8844cc80af209f2025492b72309c3925c626faa"
+      "sha256": "a9e28d575783643b2ad8a0425ce3c042a107c1459fe97b3ea09041a06c32c371"
     },
     "cli/business/run-mask.mjs": {
       "source": "cli/business/run-mask.mjs",

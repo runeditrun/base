@@ -25,7 +25,8 @@ Advanced commands (Usage: ~/.local/bin/rer business VERB)
                                  Connect carries the Business name into local apps
   run --grant G -- <command> [args...]
                                  Run a command with an approved scoped cloud credential; revoked after
-  cleanup LEASE [--status]        Retry cleanup or read its safe status
+  cleanup LEASE [--github] [--status]
+                                 Retry cleanup or read its safe status (--github: a GitHub grant's lease)
   run [--once]                   Work this computer's tasks: the folder scan the owner allows. Says what
                                  it is doing and what it waits for; applies the owner's choices at each
                                  check-in
@@ -77,8 +78,11 @@ ${appSignInHelp}
 `,
  run: `Usage: ~/.local/bin/rer business run --grant G -- <command> [args...]
 Run any software command under this paired agent’s explicit deploy action and grant.
-The scoped Cloudflare token and account reach only the child environment. Output
-is masked and cleanup is reported separately; the child’s exit status is kept.
+The scoped Cloudflare token and account reach only the child environment. A GitHub
+grant (its id starts with github-) gives the child GH_TOKEN and GITHUB_TOKEN instead:
+push to the approved repositories only, for at most an hour. Ambient Cloudflare and
+GitHub credential variables never reach the child. Output is masked and cleanup
+is reported separately; the child’s exit status is kept.
 Before starting, stderr shows the credential's UTC expiry and minutes remaining
 (rounded up). At expiry the command is interrupted and says: run it again to resume.
 The reported caller exit status keeps the child's code or terminating signal

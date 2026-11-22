@@ -3,9 +3,14 @@ import { constants } from 'node:os';
 import { commandMask, deviceCredentialValues } from './run-mask.mjs';
 
 export const signalCode = signal => 128 + (constants.signals[signal] ?? 1);
-export function childEnvironment(source, credential, account) {
- const env = Object.fromEntries(Object.entries(source).filter(([key]) => !/^(?:CLOUDFLARE_|CF_|MANAGED_CLOUDFLARE_)/i.test(key)));
- return { ...env, CLOUDFLARE_API_TOKEN: credential, CLOUDFLARE_ACCOUNT_ID: account };
+/** The command sees only its grant's credential: every ambient Cloudflare or GitHub credential variable is removed, then a
+ * Cloudflare lease sets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, and a GitHub lease (`kind: 'github'`) GH_TOKEN and
+ * GITHUB_TOKEN, which gh and GitHub's own tools read. */
+export function childEnvironment(source, lease) {
+ const env = Object.fromEntries(Object.entries(source).filter(([key]) =>
+  !/^(?:CLOUDFLARE_|CF_|MANAGED_CLOUDFLARE_|GH_|GITHUB_TOKEN$|GITHUB_PAT|GH_ENTERPRISE_TOKEN$|GITHUB_ENTERPRISE_TOKEN$)/i.test(key)));
+ return lease.kind === 'github' ? { ...env, GH_TOKEN: lease.credential, GITHUB_TOKEN: lease.credential }
+  : { ...env, CLOUDFLARE_API_TOKEN: lease.credential, CLOUDFLARE_ACCOUNT_ID: lease.account_id };
 }
 /** Own one process group, forward interruption, and bound its lifetime to the credential's server expiry. */
 export async function runChild(command, lease, { signal, source = process.env, output = process.stdout, errors = process.stderr } = {}) {
@@ -21,7 +26,7 @@ export async function runChild(command, lease, { signal, source = process.env, o
  const interrupt = () => stop(signal.reason?.signal ?? 'SIGTERM');
  try {
   if (signal?.aborted) return { code: signalCode(signal.reason?.signal ?? 'SIGTERM'), signal: signal.reason?.signal };
-  child = spawn(command[0], command.slice(1), { env: childEnvironment(source, lease.credential, lease.account_id),
+  child = spawn(command[0], command.slice(1), { env: childEnvironment(source, lease),
    stdio: ['inherit', 'pipe', 'pipe'], shell: false, detached: process.platform !== 'win32' });
   child.stdout.on('data', stdout.write); child.stderr.on('data', stderr.write);
   signal?.addEventListener('abort', interrupt, { once: true });
