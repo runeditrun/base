@@ -64,7 +64,7 @@ async function ledgerAppliesMigration(api, id, migration) {
   } catch { return false; }
 }
 /** `locked`: the caller holds the install's deploy lock (owner.mjs withStateLock). */
-export async function migrate(api, id, migrations, { apply = true, upgrade = apply, locked = false } = {}) {
+export async function migrate(api, id, migrations, { apply = true, upgrade = apply, locked = false, onApplying, onReadback } = {}) {
   validateMigrations(migrations);
   const { applied, pending, transition, exists, claimed, claimedFrom } = await readLedger(api, id, migrations, query, { rewritten:locked });
   assert(apply || pending.length === 0,'pending-migrations');
@@ -76,6 +76,7 @@ export async function migrate(api, id, migrations, { apply = true, upgrade = app
   }
   if (pending.length && !exists) await query(api,id,createLedger);
   for (const [index, migration] of pending.entries()) {
+    onApplying?.(migration.name,index + 1,pending.length);
     // Claim before execution. A claim left by an import that did not complete runs
     // again only when its effects are provably absent; otherwise it stays refused.
     if (claimed && index === 0) await assertRetryable(async sql => (await query(api,id,sql))[0].results, migration);
@@ -96,6 +97,7 @@ export async function migrate(api, id, migrations, { apply = true, upgrade = app
       });
   }
   if (pending.length) {
+    onReadback?.();
     // By name and bytes: rows applied after ones that sort above them keep their ids.
     const rows = (await query(api,id,`SELECT name, sha256, state FROM ${ledger}`))[0].results, final = new Map(rows.map(x => [x.name, x]));
     assert(rows.length === migrations.length && final.size === rows.length && migrations.every(x => final.get(x.name)?.state === 'applied' && recorded(final.get(x.name), x)), 'migration-readback-mismatch');

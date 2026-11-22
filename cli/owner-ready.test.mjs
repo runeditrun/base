@@ -36,6 +36,8 @@ test('rer dev announces the owner entry only after its redirected Setup answers,
   assert.equal(error.code, 'owner_entry_not_ready');
   assert.ok(error.message.includes(f.origin + '/workspace/start-here'), error.message);
   assert.match(error.message, /HTTP 503/);
+  assert.match(error.message, /Exchange HTTP 204/);
+  assert.match(error.message, /Client: .*scripts=\d+.*last DOM read at \d+ ms/);
   const logPath = /Startup log: (.+)\. Check startup output/.exec(error.message)?.[1];
   assert.ok(logPath, 'the refusal tells the user where the server logs are');
   assert.match(await readFile(logPath, 'utf8'), /Starting fixture application/);

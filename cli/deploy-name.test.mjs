@@ -79,6 +79,12 @@ export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer
     assert.equal(dry.code, 0, dry.error);
     assert.ok(dry.result.plan);
     assert.doesNotMatch((dry.result.neededForRealDeploy ?? []).join('\n'), /owner name/i);
+    if (derivesName) {
+     assert.equal(dry.result.ownerNameSource, 'email');
+     const explicit = await run('deploy', '--dry-run', ...envFile, '--owner-name', 'Maya Chen');
+     assert.equal(explicit.code, 0, explicit.error);
+     assert.equal(explicit.result.ownerNameSource, undefined);
+    }
     assert.equal(provider.state.calls.length, calls, 'the plan resolves the name offline');
     await assert.rejects(access(answersPath), { code: 'ENOENT' });
     const live = await run('deploy', ...envFile);
@@ -126,8 +132,10 @@ export const commandAdapter = declareAdapter(lifecycle,{setup:{manifestFile:'rer
      const unnamed = await run('deploy', '--dry-run');
      assert.equal(unnamed.code, 0, unnamed.error);
      assert.ok(unnamed.result.plan);
+     assert.ok(unnamed.result.neededForRealDeploy.some(value => value.includes('--owner-name')));
      const credentialFree = await run('deploy', '--dry-run', '--owner-name', 'Alex Morgan');
      assert.equal(credentialFree.code, 0, credentialFree.error);
+     assert.doesNotMatch((credentialFree.result.neededForRealDeploy ?? []).join('\n'), /--owner-name/);
      assert.equal(provider.state.calls.length, calls, 'credential-free plans never reach the provider');
     } finally { process.env.CLOUDFLARE_API_TOKEN = token; }
     const named = await run('deploy', '--dry-run', '--owner-name', 'Alex Morgan');

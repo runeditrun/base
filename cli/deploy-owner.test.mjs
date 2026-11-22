@@ -36,7 +36,7 @@ test('rer deploy reports slow adapter work and switches to detailed D1 progress 
  const adapter = { ...lifecycle, deploy: ownerDeploy('deploy.json', lifecycle) };
  const deploy = deployCommand({ root, adapter, options: {}, store: out });
  const elapsed = message => out.lines.filter(line => message.test(line)).length;
- const adapterProgress = /application deployment.*elapsed/i, migrationProgress = /migrations.*elapsed/i;
+ const adapterProgress = /application deployment.*elapsed/i, migrationProgress = /D1 migrations.*migration \d+ of \d+ \([^)]*\.sql\).*elapsed/i;
  try {
   const completed = deploy.then(() => assert.fail('deployment finished without waiting on the provider'));
   await Promise.race([preflight.entered.promise, completed]);
