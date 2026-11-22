@@ -36,6 +36,21 @@ test('business run preserves arguments and exits, injects only the scoped child 
  assert.equal(f.state.issued,3);assert.equal(f.state.revocations,3);
 });
 
+test('business run with a GitHub grant gives the child only GH_TOKEN and GITHUB_TOKEN, masks it and ends it through the GitHub exchange',async t=>{
+ const f=await fixture(t);f.state.expiryMs=3600000;
+ const script=`const token=process.env.GH_TOKEN;if(token!==${JSON.stringify(secret)}||process.env.GITHUB_TOKEN!==token||process.env.CLOUDFLARE_API_TOKEN||process.env.CF_API_TOKEN||process.env.CLOUDFLARE_ACCOUNT_ID)process.exit(92);console.log('TOKEN='+token)`;
+ const result=await f.run([process.execPath,'-e',script],{grant:'github-'+'1'.repeat(8)});
+ assert.equal(result.code,0,result.stderr);assert.match(result.stdout,/TOKEN=\[credential\]/);assert.match(result.stderr,/cleanup: revoked/);
+ for(const value of [secret,device,'ambient-github-token','ambient-broad-token'])assert.ok(!(result.stdout+result.stderr).includes(value),value);
+ assert.deepEqual(f.state.routes.map(route=>route.split('/')[4]),['github-token','github-token'],'issued and ended through the GitHub exchange');
+ const lease=[...f.state.leases.keys()][0];
+ assert.equal((await f.start(['cleanup',lease,'--github','--status']).result).code,0);
+ // A Cloudflare grant's command never sees an ambient GitHub token either.
+ f.state.expiryMs=900000;
+ const cloudflare=await f.run([process.execPath,'-e','process.exit(process.env.GH_TOKEN||process.env.GITHUB_TOKEN?93:0)']);
+ assert.equal(cloudflare.code,0,cloudflare.stderr);assert.equal(f.state.routes.at(-1).split('/')[4],'cloudflare-token');
+});
+
 test('business run refuses unavailable authority without spawning or retrying and reports unconfirmed cleanup separately from the child exit',async t=>{
  const f=await fixture(t);f.state.refuse=true;
  let result=await f.run([process.execPath,'-e','console.log("SHOULD-NOT-RUN")']);
