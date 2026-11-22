@@ -37,7 +37,7 @@ export async function ownerEntryReady(root, link, signal, store, { persona = fal
  // Playwright still creates a temporary profile for every launch. Cache and
  // project lookup take place in the worker with the installer's original HOME.
  const browserHome = homeOverride ?? (process.platform === 'darwin' ? userInfo().homedir : undefined);
- const entry = new URL(link);
+ const entry = new URL(link), began = performance.now();
  const { result, browserExit } = await runProbe({ root, link, timeout, browserHome }, signal);
  signal?.throwIfAborted();
  if (result?.ready) return;
@@ -46,8 +46,10 @@ export async function ownerEntryReady(root, link, signal, store, { persona = fal
  const diagnostics = result?.stopped || !result
   ? ` ${result?.stopped ?? 'Owner-entry browser probe stopped'}${browserExit ? ` (${browserExit})` : ''}.`
   : '';
- const when = result?.stopped && result.observedAt < timeout
-  ? `after ${result.observedAt} ms (readiness budget ${timeout} ms)`
+ // A browser that stopped early is reported at the time it stopped, never as the whole budget.
+ const stoppedAt = result ? (result.stopped ? result.observedAt : timeout) : Math.round(performance.now() - began);
+ const when = stoppedAt < timeout
+  ? `after ${stoppedAt} ms (readiness budget ${timeout} ms)`
   : `within ${timeout} ms`;
  const message = `Owner entry ${entryName} did not become ready ${when}. Destination ${last}${diagnostics} No ready link was announced. ${log}Check startup output, then run the command again.`;
  const hint = "The seed's dev owner-entry route may lack the persona redeemer. See “Local dev identity and the key gate” in Base's operator-auth adoption guide (https://github.com/runeditrun/base/blob/main/modules/operator-auth/README.md#local-dev-identity-and-the-key-gate).";

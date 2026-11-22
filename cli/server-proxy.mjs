@@ -25,7 +25,10 @@ import { UpstreamAgent } from './upstream-agent.mjs';
 // anyway, and an auth check that throws on it must not answer with a crash page.
 export async function trafficProxy({host,port,target,activity,door,devKey,origin,ownerEntry}) {
  const probe=randomUUID(),sockets=new Set(),keyed=keyHolder(devKey),configured=origin?new URL(origin).host:null;
- const agent=new UpstreamAgent();let closing=false;
+ // Until the runtime behind this listener first answers (again, after a new
+ // target), a refused connection means it is still starting: say so with 503 and
+ // Retry-After instead of a 404 that reads like a wrong address.
+ const agent=new UpstreamAgent();let closing=false,answered=false;
  const server=http.createServer(async (req,res)=>{
   if(door&&!doorAdmits(req,door)){req.resume();res.writeHead(403,{'content-type':'text/plain; charset=utf-8'});res.end('This checkout answers only through its front door.');return;}
   if(!hostAdmits(req,configured)){req.resume();res.writeHead(421,{'content-type':'text/plain; charset=utf-8'});res.end('This local server answers only its own host.');return;}
@@ -44,7 +47,7 @@ export async function trafficProxy({host,port,target,activity,door,devKey,origin
   function send(retried=false){
    let responseStarted=false,readAtStart;
    const attempt=http.request({host:'127.0.0.1',port:target,path:req.url,method:req.method,headers:req.headers,agent:retried?false:agent},reply=>{
-   responseStarted=true;
+   responseStarted=true;answered=true;
    // Vite answers a path outside its serving allow list with a 403 page that lists the
    // allow list (checkout and home paths); a request without the dev key gets 404 instead.
    // Any other 403 is the application's own and passes through.
@@ -69,7 +72,7 @@ export async function trafficProxy({host,port,target,activity,door,devKey,origin
     if(!retried&&dropped&&attempt.reusedSocket&&!responseStarted&&attempt.socket?.bytesRead===readAtStart&&bodyless&&!bodyStarted&&req.readableEnded){
      req.unpipe(attempt);send(true);return;
     }
-    if(!res.headersSent)notFound(res);else res.destroy();
+    if(res.headersSent)res.destroy();else if(!answered&&error.code==='ECONNREFUSED')starting(req,res);else notFound(res);
    });
    if(retried)attempt.end();else req.pipe(attempt);
   }
@@ -103,7 +106,7 @@ export async function trafficProxy({host,port,target,activity,door,devKey,origin
   upstream.on('error',()=>socket.destroy());socket.on('error',()=>upstream.destroy());socket.on('close',()=>upstream.destroy());upstream.on('close',()=>socket.destroy());
  });
  try{await listen(server,host,port);}catch(error){agent.destroy();throw error;}
- return {probe,port:server.address().port,setTarget(port){target=port;},async close(){closing=true;agent.destroy();for(const socket of sockets)socket.destroy();await new Promise(resolve=>server.close(resolve));}};
+ return {probe,port:server.address().port,setTarget(port){target=port;answered=false;},async close(){closing=true;agent.destroy();for(const socket of sockets)socket.destroy();await new Promise(resolve=>server.close(resolve));}};
 }
 function doorAdmits(req,door){
  const host=String(req.headers.host??'').toLowerCase(),given=Buffer.from(String(req.headers[door.header]??'')),secret=Buffer.from(door.secret);
@@ -133,6 +136,12 @@ function keyHolder(key){
 }
 const restrictedPage=Buffer.from('<h1>403 Restricted</h1>');
 function notFound(res){res.writeHead(404,{'content-type':'text/plain; charset=utf-8'});res.end('Not found');}
+const startingText='This app is still starting on this computer. A first start usually takes about a minute, longer on a busy computer; the rer dev terminal shows its progress.';
+function starting(req,res){
+ const html=String(req.headers.accept??'').includes('text/html');
+ res.writeHead(503,{'content-type':html?'text/html; charset=utf-8':'text/plain; charset=utf-8','retry-after':'3','cache-control':'no-store'});
+ res.end(html?`<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="3"><title>Starting</title><p>${startingText} This page reloads by itself.</p>`:startingText);
+}
 // The runtime's built-in routes (/cdn-cgi/*: Local Explorer, trigger handlers,
 // R2 and platform proxies), the checkout's private files and export archives
 // (*.rer and their in-progress .partial files) never answer on the public

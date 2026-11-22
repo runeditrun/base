@@ -1,15 +1,25 @@
 import { withCommandHelp } from '../../cli/command-guidance.mjs';
 import { humanError } from '../../cli/human-error.mjs';
-// What `rer dev` prints while it launches: a progress line at least every 30
+// What `rer dev` prints while it launches: a progress line at least every 20
 // seconds (a `progress` event with --json), then the dispatcher's ready lines.
 import { readySummary } from '../../cli/ready-summary.mjs';
 import { launchSummary } from '../../cli/run-transfers.mjs';
 import { contained } from '../../cli/project.mjs';
 import { shared } from '../../cli/shared.mjs';
 import { personaOpenUrl, requireDevKey } from '../../cli/dev-identity.mjs';
+import { availableParallelism, loadavg } from 'node:os';
 
 const elapsed = ms => { const s = Math.round(ms / 1000); return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`; };
 const quiet = 20000;
+
+// On an idle computer a first start takes about a minute; a shared or busy one
+// stretches every step by about its load per core. Say so while the person waits,
+// with a ceiling that grows with that load rather than a fixed one it can outlive.
+export function waitAdvice(load = loadavg()[0], cores = availableParallelism()) {
+ const perCore = load / cores;
+ if (!(perCore >= 1.5)) return 'This usually takes about a minute. Allow up to 10 minutes';
+ return `This computer is busy (load ${Math.round(load)} on ${cores} cores), so each step runs about ${Math.round(perCore)} times slower than usual. Allow up to ${Math.max(10, Math.ceil(perCore * 1.5))} minutes`;
+}
 
 // `keyless` (a start by the front door, whose log this is): the ready lines
 // leave out the dev-key link, so the door's files never hold a key.
@@ -26,7 +36,7 @@ export function printer({ json, stopHint, keyless = false, root }) {
  return {
   phase({ phase, message }) { if (phase !== 'note') { if (phase !== currentPhase) phaseStarted = Date.now(); currentPhase = phase; current = message; } progress(phase, message); },
   attaching(startedAt) { progress('attach', `attaching to the launch already preparing this checkout (started ${elapsed(Date.now() - startedAt)} ago)`); },
-  heartbeat() { if (Date.now() - last >= quiet) progress('waiting', `still ${current} (${elapsed(Date.now() - phaseStarted)}). Allow up to 10 minutes; if this command is stopped, run ~/.local/bin/rer dev again to reattach.`); },
+  heartbeat() { if (Date.now() - last >= quiet) progress('waiting', `still ${current} (${elapsed(Date.now() - phaseStarted)}). ${waitAdvice()}; if this command is stopped, run ~/.local/bin/rer dev again to reattach.`); },
   // The dispatcher's ready event, as its own human ready lines.
   async ready(ready, { log, pid }) {
    const link = ready.openUrl ? new URL(ready.openUrl) : null;

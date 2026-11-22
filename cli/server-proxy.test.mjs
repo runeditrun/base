@@ -84,3 +84,19 @@ test('public proxy reuses connections, recovers a stale read once, and never rep
  assert.equal(sockets.size,0);
  t.diagnostic(`accepts=${accepts}; stale GET attempts=${stale.length}; POST attempts=1; activity=${begins}/${finishes}; upstream sockets after close=${sockets.size}`);
 });
+
+// The first-start door: the public port listens before the runtime does, so a
+// browser opened early must learn the app is starting, then reach it once up.
+test('public proxy answers 503 with Retry-After while the runtime is still starting', {timeout:15000}, async t=>{
+ const runtime=http.createServer((req,res)=>res.end('up'));
+ await new Promise(resolve=>runtime.listen(0,'127.0.0.1',resolve));
+ const port=runtime.address().port;
+ await new Promise(resolve=>runtime.close(resolve));
+ const proxy=await trafficProxy({host:'127.0.0.1',port:0,target:port,activity:{begin(){return()=>{};}}});
+ t.after(()=>proxy.close());
+ const early=await request(proxy.port,'/',{headers:{accept:'text/html'}});
+ assert.equal(early.status,503);assert.ok(Number(early.headers['retry-after'])>0);
+ await new Promise(resolve=>runtime.listen(port,'127.0.0.1',resolve));
+ t.after(()=>new Promise(resolve=>{runtime.closeAllConnections();runtime.close(resolve);}));
+ assert.equal((await request(proxy.port,'/')).body,'up');
+});

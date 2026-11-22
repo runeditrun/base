@@ -1131,7 +1131,7 @@
     },
     "cli/owner-entry-ready.mjs": {
       "source": "cli/owner-entry-ready.mjs",
-      "sha256": "cfc1ef6244b9b2ed0288c43edb7166950276dfafedf6fdca96152e15b8ffade9"
+      "sha256": "1b260791c92ef38ae00bdef5bb5abe8c46959943c3d8d133b631b09af94273de"
     },
     "cli/package-calls.mjs": {
       "source": "cli/package-calls.mjs",
@@ -1299,7 +1299,7 @@
     },
     "cli/server-proxy.mjs": {
       "source": "cli/server-proxy.mjs",
-      "sha256": "9ec909ab37519237641a15fb3a73d47f581185c74217d7c4b69162ffe3215482"
+      "sha256": "06697db7f31ad53d0f5cb261cf2cd3b7afcd94474783319df38d68fbae3518aa"
     },
     "cli/server-registry.mjs": {
       "source": "cli/server-registry.mjs",
