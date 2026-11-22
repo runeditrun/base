@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.129
+
+Signed: Run Edit Run fleet, 2026-11-22.
+
+### Owner entry, deploy and removal
+
+- `rer dev` waits for the owner page to render after Chromium is ready. `RER_OWNER_BROWSER_HOME` lets Chromium use a separate home when rer runs under an isolated `HOME`.
+- `rer deploy` shows progress during long provider operations. Dry runs list any owner name still required, and deploy can derive an optional owner name from the owner email.
+- `rer remove` uses Cloudflare’s empty-bucket job for non-empty R2 buckets. Run the same command again to resume an active job after an interruption.
+
+### GitHub grants
+
+- `rer business run --grant` accepts a GitHub grant and gives one command a short-lived `GH_TOKEN` scoped to the approved repositories.
+
 ## 0.2.128
 
 Signed: Run Edit Run fleet, 2026-11-21.
