@@ -17,8 +17,8 @@ export function isR2ObjectDelete(path, method) {
 
 // The API returns result: Object[] and result_info.is_truncated/cursor, not the
 // bucket-list shape. Yield bounded pages so removal never collects the bucket.
-export async function* r2ObjectPages(api, bucket) {
-  try { for await (const {rows} of providerPages(api.envelope, `/r2/buckets/${bucket}/objects`, {pagination:'cursor'})) {
+export async function* r2ObjectPages(api, bucket, {signal} = {}) {
+  try { for await (const {rows} of providerPages(api.envelope, `/r2/buckets/${bucket}/objects`, {pagination:'cursor',signal})) {
     assert(rows.length <= 1000 && rows.every(row => typeof row?.key === 'string' && row.key.length), 'invalid-r2-object-list');
     assert(new Set(rows.map(row => row.key)).size === rows.length, 'invalid-r2-object-list');
     yield rows;

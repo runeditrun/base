@@ -18,7 +18,7 @@ import { verifyHealth } from './health.mjs';
  * passes the declaration's, so retiring the spent setup token leaves the build unchanged.
  * `locked`: the caller holds the install's deploy lock (owner mode), so migrate may retry a
  * claim on bytes a reviewed rewrite replaced. */
-export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,pendingUpload,repeatOnly=false,createResources=!previousReceipt,uploadWithoutReceipt=false,onReceipt,onHealth,readiness={},env={},fetch=globalThis.fetch,healthOptions={},declaredSecrets=plan.secrets,locked=false}) {
+export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,pendingUpload,repeatOnly=false,createResources=!previousReceipt,uploadWithoutReceipt=false,onReceipt,onHealth,readiness={},env={},fetch=globalThis.fetch,healthOptions={},declaredSecrets=plan.secrets,locked=false,onProgress}) {
   validatePlan(plan); validateArtifact(artifact);
   await verifyServiceGrants(api, plan);
   for (const item of plan.d1) validateMigrations(item.migrations);
@@ -45,6 +45,7 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,p
   }
   const migrations = [];
   // A migration failure names its database, so the owner knows which one to inspect.
+  if (plan.d1.length) onProgress?.('Checking and applying D1 migrations');
   for (const item of plan.d1) migrations.push({binding:item.binding,...await migrate(api,resources.d1.find(x => x.binding === item.binding).id,item.migrations,{apply:!unchanged,upgrade:true,locked}).catch(error => { error.resource ??= `d1:${item.name}`; throw error; })});
   const window = readiness.window ?? readinessWindow({...(healthOptions.now ? {clock:healthOptions.now} : {}), ...(healthOptions.sleep ? {sleep:healthOptions.sleep} : {}), ...readiness});
   // Owner mode already authenticated this pending version against its saved
@@ -53,6 +54,7 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,p
     && pendingUpload.provider?.versionId === existing.versionId && pendingUpload.provider?.deploymentId === existing.deploymentId
     && pendingUpload.provider?.etag === existing.etag && existing.version?.annotations?.['workers/message'] === `rer-deploy:${fingerprint}`;
   let upload;
+  onProgress?.(unchanged || resumedUpload ? 'Verifying the deployed Worker' : 'Publishing the Worker and reconciling routes and triggers');
   if (!unchanged) { window.start(); if (!resumedUpload) upload = await uploadWorker(api,{plan,artifact,bindings,secrets,migration,fingerprint}); }
   if (!unchanged) api = readinessAPI(api, window);
   const published = unchanged || resumedUpload ? existing : await uploadedWorker({api,worker:plan.worker,upload,previous:existing,fingerprint,window}); assert(published,'missing-deployed-worker');
@@ -71,6 +73,7 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,p
   if (onReceipt) await onReceipt(receipt);
   // One built file proves the Worker hands static assets to the browser (assets run behind it).
   const asset = publicAssetPaths(artifact.assets.map(x => x.path))[0];
+  onProgress?.('Checking deployment health');
   try {
     if (unchanged) await verifyHealth({...healthOptions,api,plan,receipt,fetch,asset});
     else await firstHealth({api,plan,receipt,fetch,healthOptions,readiness:{...readiness,window,freshUpload:!existing},onHealth,asset});

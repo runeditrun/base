@@ -29,6 +29,7 @@ const usage = 'usage: owner-cli.mjs deploy|dry-run|local-plan|health|remove|insp
 // Keep their plan local without changing direct kit callers or real deploys.
 const localPlans = new AsyncLocalStorage();
 const ownerSignals = new AsyncLocalStorage();
+const progressScope = new AsyncLocalStorage();
 export const withOwnerDeploySignal = (signal, run) => ownerSignals.run(signal, run);
 const execute = promisify(execFile);
 export const withLocalDeployPlan = run => localPlans.run(true, run);
@@ -102,8 +103,8 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
       vars:Object.keys(plan.vars),crons:plan.crons,
     }};
   }
-  // Removal reads identity before each object DELETE and may span many pages.
-  // Bound each response, not the owner's bucket size; failures retain ownership.
+  // Removal has its own bounded R2 purge wait. The transport bounds response
+  // reads without tying the delete request count to the object's count.
   let requestWindow = propagation?.uploaded ? propagation.window : undefined;
   const request = fetch;
   const guardedRequest = (input, init = {}) => {
@@ -195,7 +196,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   const declaredSecrets = current === declaration ? plan.secrets : ownerPlan(target,declaration,artifact,{localOnlyKeys,env,publicDefaults}).secrets;
   const window = readinessWindow({...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}), ...healthOptions?.readiness,signal});
   requestWindow = window;
-  const {receipt,created,sentSecrets,unsetSecrets,freshUpload} = await ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,readiness:{...healthOptions?.readiness,window,signal},settle,declaredSecrets}).catch(error => {
+  const {receipt,created,sentSecrets,unsetSecrets,freshUpload} = await withDeployProgress(notice, onProgress => ownerDeploy({api,target,plan,artifact,statePath,env,fetch,healthOptions,readiness:{...healthOptions?.readiness,window,signal},settle,declaredSecrets,onProgress})).catch(error => {
     api.annotateFailure(error,error.message.startsWith('missing-secret-') ? 'secrets' : undefined);
     throw error;
   });
@@ -208,6 +209,36 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     matchesToken:(binding,token) => sentTokens.has(binding) && sentTokens.get(binding) === token}});
   rememberReadiness(result);
   return result;
+}
+
+// A native hook may call the kit in-process. Use one heartbeat and surface
+// the kit's phase while it runs inside that hook.
+export async function withDeployProgress(notice, deploy, initialPhase) {
+  const outer = progressScope.getStore();
+  if (outer) {
+    const prior = outer.phase;
+    if (initialPhase) outer.progress(initialPhase, false);
+    try { return await deploy(outer.progress); }
+    finally { outer.progress(prior, false); }
+  }
+  let timer;
+  const state = {
+    phase: undefined,
+    progress(phase, announce = true) {
+      clearInterval(timer);
+      state.phase = phase;
+      if (!phase) return;
+      const started = performance.now();
+      if (announce) notice(`Cloudflare deploy: ${phase}.`);
+      timer = setInterval(() => {
+        const seconds = Math.round((performance.now() - started) / 1000);
+        notice(`Cloudflare deploy: ${phase} (${seconds}s elapsed).`);
+      }, 30_000).unref();
+    },
+  };
+  state.progress(initialPhase, false);
+  try { return await progressScope.run(state, () => deploy(state.progress)); }
+  finally { clearInterval(timer); }
 }
 
 /** Prints refusal codes and resource names only; never inputs, tokens or provider bodies. */

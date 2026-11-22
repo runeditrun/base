@@ -26,6 +26,7 @@ export async function warmDocumentRender(url, probe, signal, store, budgetMs = B
   await response.arrayBuffer();
  } catch (error) {
   signal?.throwIfAborted();
-  throw new RerError('first_render_failed', `The application did not render its first page ${timeout.aborted ? `within ${Math.round(budgetMs / 1000)} s` : 'before the server was announced ready'}. Check the application startup log, then run ~/.local/bin/rer dev again.`, 1, { cause: error });
+  const log = store.logPath ? ` Check the startup log at ${store.redact(store.logPath)}.` : '';
+  throw new RerError('first_render_failed', `The application did not render its first page ${timeout.aborted ? `within ${Math.round(budgetMs / 1000)} s` : 'before the server was announced ready'}.${log} Run ~/.local/bin/rer dev again.`, 1, { cause: error });
  }
 }

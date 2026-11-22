@@ -49,7 +49,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
    production = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
    ({signIn, mailOff} = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed, adapter: lifecycle, declarationPath, options, mailOffSignIn: mailOffSignInCommand(adapter) ?? mailOffSignInCommand(lifecycle) }) ?? {});
    if (!options.dryRun) committedSource(root, options);
-   ownerInput = await deployOwnerInput({ root, adapter, setupSeed, options, signal });
+   ownerInput = await deployOwnerInput({ root, adapter, setupSeed, options, signal, declaration, env: production.env });
    await withoutLocalSettings(root, { settings: lifecycle.settings, operationToken }, () => lifecycle.run(root, {}, store, () => {}, signal, { verb: 'build', operationToken }));
    await checkBuild();
    await refuseLocalEnvOutput(root);
@@ -74,7 +74,8 @@ export function ownerDeploy(declarationPath, lifecycle) {
     store.report(`Deploy plan: ${JSON.stringify(plan)}`, { logOnly: true });
     for (const line of deployPlanLines(plan, declaration)) store.report(line);
     store.report(`Full plan: repeat this command with --json.${store.logPath ? ` Redacted capture log: ${relative(root, store.logPath)}` : ''}`);
-    return { dryRun: true, deployed: false, providerChecked: false, plan };
+    const { neededForRealDeploy } = ownerInput;
+    return { dryRun: true, deployed: false, providerChecked: false, plan, ...(neededForRealDeploy ? { neededForRealDeploy } : {}) };
    }
    // A custom hook's own state file, when its deploy named one.
    const state = change.length ? recordedState : await hookState(root, environment);

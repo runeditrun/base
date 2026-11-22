@@ -15,7 +15,7 @@ import { observeOwner, ownerExchangeFailure } from './deploy-observation.mjs';
 import { committedSource } from './deploy-source.mjs';
 import { hookOrigin, waitForSource } from './deploy-hook.mjs';
 import { rememberHookState, hookState } from './deploy-hook-record.mjs';
-import { main as owner, withLocalDeployPlan, withOwnerDeploySignal } from '../modules/deploy-kit/owner-cli.mjs';
+import { main as owner, withDeployProgress, withLocalDeployPlan, withOwnerDeploySignal } from '../modules/deploy-kit/owner-cli.mjs';
 import { localOnlyBinding, ownerWorkerName } from '../modules/deploy-kit/owner.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { deployDiagnostic, migrationFailure, providerFailure, assetFailure, ownerTargetFailure } from '../modules/deploy-kit/diagnostics.mjs';
@@ -91,12 +91,13 @@ async function deployScoped(context) {
  const settings = adapter.hooks?.secrets ?? adapter.settings;
  await enforceDeployPolicy({ ...context, declaration, declarationPath: path, settings });
  // Required secrets have been checked; retain the production sign-in guidance.
- const dryRun = async (result, { planned = true, extraNeeded } = {}) => {
+ const dryRun = async (result, { planned = true, ownerNeeded } = {}) => {
   const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
   const plan = result?.plan ?? (!planned ? undefined : (await owner(['local-plan', '--declaration', path, '--environment', options.environment ?? 'production', ...await deployProductArguments(root, deployProductDirectory(declaration))], production.env, { cwd: root, localOnlyKeys })).plan);
   result = { ...result, dryRun: true, deployed: false, providerChecked: false, plan };
   const { signIn, mailOff } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
-  const needed = [...new Set([...neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false }), ...(result.neededForRealDeploy ?? []), ...(extraNeeded ?? [])])];
+  const nameInputs = ownerNeeded ?? (await deployOwnerInput({ ...context, declaration, env: production.env })).neededForRealDeploy;
+  const needed = [...new Set([...neededForRealDeploy({ declaration, env: production.env, signIn, secretsChecked: false }), ...(result.neededForRealDeploy ?? []), ...(nameInputs ?? [])])];
   if (!context[deferDryRunSummary]) {
    if (mailOff) store.report(mailOffNotice(mailOff, options.environment ?? 'production'), { names: mailOff.credentialNames });
    // The one completion line: rer's own plan step (or its deliberate skip) succeeded. A hook's own line says only that the hook finished.
@@ -113,9 +114,9 @@ async function deployScoped(context) {
    // An offline plan defers those inputs, retaining the refusal as guidance.
    if (!(error instanceof RerError) || error.code !== 'missing_input') throw error;
    const result = await ownerDeploy(path, adapter)(hookContext);
-   return { ...result, neededForRealDeploy: [error.message] };
+   return { ...result, neededForRealDeploy: [error.message, ...(result.neededForRealDeploy ?? [])] };
   }
- }) : adapter.deploy(hookContext);
+ }) : withDeployProgress(line => store.report(line), () => adapter.deploy(hookContext), 'Running the application deployment');
  // Custom hooks historically ignored these flags. Only the ownership controller
  // may perform them; neither a build nor a custom upload runs here.
  if (options.remove || options.setSecret || options.unsetSecret || options.reopenInstallationKey) return ownerDeploy(path, adapter)(context);
@@ -127,8 +128,9 @@ async function deployScoped(context) {
  const production = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
  const { mailOff } = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed: context.setupSeed, adapter, declarationPath: path, options }) ?? {};
  const sourceSha = options.dryRun ? undefined : committedSource(root, options);
- const ownerInput = await deployOwnerInput(context);
+ const ownerInput = await deployOwnerInput({ ...context, declaration, env: production.env });
  const { env, supplied, generated, reused, rotated } = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys });
+ if (ownerInput.displayName !== undefined) env[adapter.input?.names?.name ?? 'displayName'] = ownerInput.displayName;
  const { createRedaction } = await shared('redaction.mjs');
  const redaction = createRedaction();
  const kinds = await settingKinds({ declaration, setupManifest });
@@ -173,7 +175,7 @@ async function deployScoped(context) {
     step = 'plan the deploy locally';
     // A hook that returned no kit state validated its own plan, and the declaration it names may be a stand-in a real deploy never plans against.
     const plan = deployed?.state ? (await command('local-plan')).plan : deployed?.plan;
-    return dryRun({ ...deployed, plan }, { planned: false, extraNeeded: ownerInput.neededForRealDeploy });
+    return dryRun({ ...deployed, plan }, { planned: false, ownerNeeded: ownerInput.neededForRealDeploy ?? [] });
    }
    await rememberHookState(root, environment, deployed?.state);
    hookRecord = await hookState(root, environment);
