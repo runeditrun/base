@@ -85,6 +85,8 @@
     "./modules/deploy-kit/migration-ledger": "./modules/deploy-kit/migration-ledger.mjs",
     "./modules/deploy-kit/owner": "./modules/deploy-kit/owner.mjs",
     "./modules/deploy-kit/owner-cli": "./modules/deploy-kit/owner-cli.mjs",
+    "./modules/deploy-kit/owner-remove": "./modules/deploy-kit/owner-remove.mjs",
+    "./modules/deploy-kit/native-upload": "./modules/deploy-kit/native-upload.mjs",
     "./modules/deploy-kit/prepare": "./modules/deploy-kit/prepare.mjs",
     "./modules/deploy-kit/provider": "./modules/deploy-kit/provider.mjs",
     "./modules/release/export": "./modules/release/export.mjs",

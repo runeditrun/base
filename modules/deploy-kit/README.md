@@ -185,6 +185,15 @@ A seed carries a copy of `modules/deploy-kit/` from a Base pin. Refresh the copy
 
 A seed whose setup provisions nothing declares the same bindings and deploys through its own `deploy` verb. Resource names change from `rer-seedproof-*` or a chosen prefix to `<project>-<environment>-*`. The kit refuses rather than adopts an earlier installation's resources.
 
+### Native uploaders
+
+A seed that uploads its Worker with its own tool (Lamp's Wrangler run) keeps the same ownership record and gets the same pending-upload reconciliation through `native-upload.mjs` (package export `@runeditrun/rer/modules/deploy-kit/native-upload`):
+
+- `nativeWorkerCheck({api, target, statePath, commands})` checks the recorded Worker before setup provisions anything. A Worker whose upload answer was lost is adopted when its live version carries the recorded fingerprint binding `RER_DEPLOY_FINGERPRINT` and the version message `rer-deploy:<fingerprint>`.
+- `nativeUpload({api, target, statePath, fingerprint, receipt, upload, commands})` records the fingerprint, runs `upload` (which must set both marks, for example `wrangler deploy --var RER_DEPLOY_FINGERPRINT:<fp> --message rer-deploy:<fp>`), reads the live version back and writes the receipt. When the tool fails after the Worker upload landed (a queue or trigger step), the upload stays recorded as this deployment's own, and the error says so. Running the same deploy again adopts that exact upload and repeats the remaining steps.
+- `ownerRemove` (package export `@runeditrun/rer/modules/deploy-kit/owner-remove`) proves and removes the same pending upload. Its R2 purge is the provider's resumable bulk job. `expectedResources` names the adapter's own resource names: a present resource missing from the record refuses (`unrecorded-resource`). `onProgress` receives a line per step. Call it once per Worker target, in the adapter's order (a public Worker that refers to the app Worker first). Skip a target whose record owns nothing once its Worker reads absent.
+- `ownershipMessage(error, {deploy, remove})` turns an ownership refusal into operator text that names the next command. A Worker without both marks, or one deployed by someone else, is still refused.
+
 ### Run site (`rer deploy --site`)
 
 A seed's run site (`run-<seed>.com`: its marketing homepage, `/run` and docs, written by `rer build --site`) deploys to the owner's account as a **Base-generated site Worker** (`site.mjs`). The seed declares only the apex domain, beside `deploy.json`, in the file its `commandAdapter` `site.declaration` names (Base's seeds: `deploy-site.json`):

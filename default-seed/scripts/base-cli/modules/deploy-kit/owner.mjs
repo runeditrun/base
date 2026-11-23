@@ -368,32 +368,44 @@ export async function settleOwnerState({api: provider, target, statePath, settle
 }
 export const sameDeployment = (a, b) => a?.versionId === b?.versionId && a?.deploymentId === b?.deploymentId && a?.etag === b?.etag;
 
-/** Both marks rer's upload puts on a version: the build binding and the version annotation. */
-const carriesUpload = (live, fingerprint) => deployedFingerprint(live?.settings) === fingerprint && live.version?.annotations?.['workers/message'] === `rer-deploy:${fingerprint}`;
+/** Both marks rer's upload puts on a version: the build binding and the version annotation.
+ * A native uploader (Wrangler) sets the same two: the fingerprint var and `--message rer-deploy:<fp>` (native-upload.mjs). */
+export const uploadMessage = fingerprint => `rer-deploy:${fingerprint}`;
+export const carriesUpload = (live, fingerprint) => typeof fingerprint === 'string' && deployedFingerprint(live?.settings) === fingerprint && live.version?.annotations?.['workers/message'] === uploadMessage(fingerprint);
+export const deploymentIdentity = live => ({versionId:live.versionId,deploymentId:live.deploymentId,etag:live.etag});
+/** Record an upload's intent just before it is sent: its fingerprint, and the live identity this
+ * record verified as its own right before it (if any), so a retry still recognizes that Worker
+ * when the upload never landed. */
+export function beginUpload(state, fingerprint, current) {
+  state.pendingUpload = {fingerprint,...(current ? {previous:deploymentIdentity(current)} : {})};
+}
 /** A completed receipt or the exact identity of an interrupted successful upload proves ownership.
  * An upload whose response or readback was lost is this deploy's own when the live version carries
  * the fingerprint saved just before its PUT: rer records its ids, as a completed readback would. */
-async function checkWorkerIdentity(api, plan, state, save) {
-  const live = await activeWorker(api, plan.worker);
+export async function checkWorkerIdentity(api, worker, state, save) {
+  const live = await activeWorker(api, worker);
   const pending = state.pendingUpload;
   if (pending && !pending.provider && carriesUpload(live, pending.fingerprint)) {
-    pending.provider = {versionId:live.versionId,deploymentId:live.deploymentId,etag:live.etag};
+    pending.provider = deploymentIdentity(live);
     state.owned.worker = {status:'created'}; await save();
     return live;
   }
-  const expected = pending?.provider ?? state.receipt?.provider;
-  if (!expected) throw refuse('uncertain-resource-create','worker',plan.worker);
-  if (!sameDeployment(live, expected)) throw refuse('owned-resource-replaced','worker',plan.worker);
+  const expected = pending?.provider ?? pending?.previous ?? state.receipt?.provider;
+  // What was seen, for operator text (native-upload.mjs ownershipMessage): ids and fingerprints only.
+  const observed = {versionId:live?.versionId, expected:expected?.versionId, pending:pending?.fingerprint, fingerprint:deployedFingerprint(live?.settings)};
+  if (!expected) throw Object.assign(refuse('uncertain-resource-create','worker',worker), {observed});
+  if (!sameDeployment(live, expected)) throw Object.assign(refuse('owned-resource-replaced','worker',worker), {observed});
   return live;
 }
-async function checkOwnedWorker(api, plan, state, save) {
-  const settings = await workerSettings(api, plan.worker);
+/** The live Worker this record owns, or null when it is absent and was never confirmed created. */
+export async function checkOwnedWorker(api, worker, state, save) {
+  const settings = await workerSettings(api, worker);
   if (settings === null) {
-    if (state.owned.worker?.status === 'created') throw refuse('owned-resource-missing','worker',plan.worker);
+    if (state.owned.worker?.status === 'created') throw refuse('owned-resource-missing','worker',worker);
     return null;
   }
-  if (!state.owned.worker) throw refuse('resource-name-collision','worker',plan.worker);
-  return checkWorkerIdentity(api, plan, state, save);
+  if (!state.owned.worker) throw refuse('resource-name-collision','worker',worker);
+  return checkWorkerIdentity(api, worker, state, save);
 }
 
 /** One deploy per state file. A killed writer's lock is reclaimed only after
@@ -421,7 +433,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
   const save = () => writeOwnerState(statePath, state);
   if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await save();
   await checkServiceWorkers(api, plan);
-  const priorWorker = await checkOwnedWorker(api, plan, state, save);
+  const priorWorker = await checkOwnedWorker(api, plan.worker, state, save);
   assert(!state.pendingSecret, 'secret-change-unsettled');
   const exists = priorWorker !== null;
   const create = await ownedResourcesToCreate(api, plan, state);
@@ -451,9 +463,9 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
     const sending = path === upload && options?.method === 'PUT';
     if (sending) {
       await checkSavedResourceIdentities(api, state);
-      const current = await checkOwnedWorker(api, plan, state, save);
+      const current = await checkOwnedWorker(api, plan.worker, state, save);
       if (!sameDeployment(priorWorker,current)) throw refuse('owned-resource-replaced','worker',plan.worker);
-      state.pendingUpload = {fingerprint:await uploadFingerprint(options.body)}; await save();
+      beginUpload(state, await uploadFingerprint(options.body), current); await save();
     }
     const result = await api.request(path, options);
     if (sending) {
@@ -461,7 +473,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
       // it absent. Record it before readback, which can fail after creation.
       if (!exists) api.recordCreated?.(`Worker:${plan.worker}`);
       const active = await uploadedWorker({api,worker:plan.worker,upload:result,previous:priorWorker,fingerprint:state.pendingUpload.fingerprint,window});
-      state.pendingUpload.provider = {versionId:active.versionId,deploymentId:active.deploymentId,etag:active.etag};
+      state.pendingUpload.provider = deploymentIdentity(active);
       state.owned.worker = {status:'created'}; await save();
     }
     return result;

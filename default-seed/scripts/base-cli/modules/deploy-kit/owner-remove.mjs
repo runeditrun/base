@@ -3,11 +3,10 @@ import { checkBucket, requireBucketIdentity, removeOwnedBucket } from './r2-remo
 import { rm } from 'node:fs/promises';
 import { assert, hexId } from './validation.mjs';
 import { resourceKinds, findResource } from './resources.mjs';
-import { activeWorker } from './worker.mjs';
 import { deleteWorker } from './teardown.mjs';
 import { recordDeployFailure } from './diagnostics.mjs';
 import { query } from './migrations.mjs';
-import { KINDS, readOwnerState, writeOwnerState, withStateLock, withScopeHints, withSettledLists, workerSettings, sameDeployment, resourceId, checkResourceIdentity, refuse, settlePendingSecret } from './owner.mjs';
+import { KINDS, readOwnerState, writeOwnerState, withStateLock, withScopeHints, withSettledLists, workerSettings, checkWorkerIdentity, resourceId, checkResourceIdentity, refuse, settlePendingSecret } from './owner.mjs';
 
 const remove = {
   d1: (api, id) => api.request(`/d1/database/${id}`, {method:'DELETE'}),
@@ -38,10 +37,14 @@ async function confirmEmpty(api, worker, kind, name, id) {
  * each only while it is still the one rer created. Read back that each is gone, then
  * drop the state file. Nothing else in the account is touched. Ownership is checked for
  * everything before the first delete; a replaced or uncertain resource refuses it all,
- * except an uncertain one confirmed empty (see confirmEmpty). R2 object purges
- * additionally require the saved creation timestamp and recheck it before the purge
- * and bucket delete. */
-export async function ownerRemove({api: provider, target, statePath, clock, sleep, signal}) {
+ * except an uncertain one confirmed empty (see confirmEmpty). A Worker whose upload
+ * answer was lost is this record's own only when its live version carries the recorded
+ * pending fingerprint and annotation (checkWorkerIdentity), as a deploy retry would adopt it.
+ * R2 object purges additionally require the saved creation timestamp and recheck it before
+ * the purge and bucket delete. `expectedResources` ({kind: [name]}) names resources a native
+ * adapter's own record expects: one present but absent from this state file refuses
+ * (`unrecorded-resource`); a name grants no deletion authority. */
+export async function ownerRemove({api: provider, target, statePath, clock, sleep, signal, expectedResources = {}, onProgress = () => {}}) {
   const api = withSettledLists(withScopeHints(provider),{signal});
   return withStateLock(statePath, async () => {
     const state = await readOwnerState(statePath, target);
@@ -50,22 +53,31 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
     try {
       if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await writeOwnerState(statePath, state);
       const owned = KINDS.flatMap(kind => Object.entries(state.owned[kind]).map(([name, entry]) => ({kind, name, entry})));
-      assert(state.owned.worker || owned.length, 'nothing-to-remove');
-      // Preflight, read-only.
+      if (!state.owned.worker && !owned.length) {
+        // An empty record (or one an earlier pass finished) never proves the names are free.
+        if (await workerSettings(api, target.worker) !== null) throw refuse('resource-name-collision', 'worker', target.worker);
+        for (const kind of KINDS) {
+          const expected = expectedResources[kind] ?? [];
+          const rows = expected.length ? await resourceKinds[kind].list(api) : [];
+          for (const name of expected) if (findResource(rows, kind, name)) throw refuse('unrecorded-resource', kind, name);
+        }
+        throw new Error('nothing-to-remove');
+      }
+      // Preflight: provider reads only. Adopting a verified pending upload writes its ids to the record.
       let worker = null;
       if (await workerSettings(api, target.worker) !== null) {
         if (!state.owned.worker) throw refuse('resource-name-collision', 'worker', target.worker);
-        const expected = state.pendingUpload?.provider ?? state.receipt?.provider;
-        if (!expected) throw refuse('uncertain-resource-create', 'worker', target.worker);
-        const live = await activeWorker(api, target.worker);
-        if (!sameDeployment(live, expected)) throw refuse('owned-resource-replaced', 'worker', target.worker);
+        await checkWorkerIdentity(api, target.worker, state, () => writeOwnerState(statePath, state));
         worker = target.worker;
       } else remaining.delete(`worker:${target.worker}`);
       assert(!state.pendingSecret, 'secret-change-unsettled');
       const listed = {}, doomed = [];
       for (const kind of KINDS) {
-        if (!owned.some(item => item.kind === kind)) continue;
+        const expected = expectedResources[kind] ?? [];
+        if (!owned.some(item => item.kind === kind) && !expected.length) continue;
         listed[kind] = await resourceKinds[kind].list(api);
+        // A missing creation record never proves the resource is absent or ours.
+        for (const name of expected) if (!state.owned[kind][name] && findResource(listed[kind], kind, name)) throw refuse('unrecorded-resource', kind, name);
         for (const {name, entry} of owned.filter(item => item.kind === kind)) {
           const row = findResource(listed[kind], kind, name);
           if (!row) { remaining.delete(`${kind}:${name}`); continue; }
@@ -85,6 +97,7 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
       }
       let workerGone = true;
       if (worker) {
+        onProgress(`Removing Worker ${worker}`);
         try { await deleteWorker({api, worker, signal, ...(clock ? {clock} : {}), ...(sleep ? {sleep} : {})}); }
         catch (error) {
           failed.push({resource:`worker:${worker}`, code:error.message, error});
@@ -95,6 +108,7 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
         }
       }
       for (const item of workerGone ? doomed : []) {
+        onProgress(item.kind === 'r2' ? `Purging and removing ${item.kind}:${item.name}` : `Removing ${item.kind}:${item.name}`);
         try {
           if (item.kind === 'r2') await removeOwnedBucket(api, item, {signal});
           else {

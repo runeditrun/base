@@ -939,7 +939,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "e731052f603a6e150bc5d0a86376f68aa25a97bec279fb2f44ec0aa604f90a36"
+      "sha256": "9059ca5317f885c6838f48f4e702ed68c1d6b511341fa0933a77d1f475a8df4b"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
@@ -2887,7 +2887,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "2afcc95520473b52549384f30948bff3324f74b61c0a0b65ed736b50bbb59e85"
+      "sha256": "6adbafa8110e8c40fff8517e2a908cf09fd600204c44327bd2fd666f19fcea1a"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -2977,6 +2977,10 @@
       "source": "modules/deploy-kit/migrations.mjs",
       "sha256": "a3d34023e6d86d71a9ba5ce81758f9d9ba2f6398d98a2110b48372a66dabd3f3"
     },
+    "modules/deploy-kit/native-upload.mjs": {
+      "source": "modules/deploy-kit/native-upload.mjs",
+      "sha256": "8202624440ea5b0c731fa9154e5f1370f504440b27399a21011f23d2e2a89e5f"
+    },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
       "sha256": "7f079e956bfceaca8486efbfbf1aa8526e08496956f9eb605c7642c9026dce49"
@@ -2987,7 +2991,7 @@
     },
     "modules/deploy-kit/owner-remove.mjs": {
       "source": "modules/deploy-kit/owner-remove.mjs",
-      "sha256": "dd1f4cff945387ec36fd799c8330a2c08c5d1ebc7ac55bb21f82d526d1453e8d"
+      "sha256": "14b548b9e4b7ade2b08047ad78a3015ccb2cf079d0f7bab6650ca694711eca94"
     },
     "modules/deploy-kit/owner-secret-copy.mjs": {
       "source": "modules/deploy-kit/owner-secret-copy.mjs",
@@ -3007,7 +3011,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "58596c1d82372f157250784f0a7fd22a68935abc763ba07c75d3145a9c2840aa"
+      "sha256": "76c859f6bb4f613ad1ab118c795bd2d21d9be2d16889d76ccc50455aba884c70"
     },
     "modules/deploy-kit/pagination.mjs": {
       "source": "modules/deploy-kit/pagination.mjs",
