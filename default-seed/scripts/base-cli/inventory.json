@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.131-dev.g9399e16b",
+  "cliVersion": "0.2.131-dev.g3ccdc558",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -527,7 +527,7 @@
     },
     "cli/business/agent-verbs.mjs": {
       "source": "cli/business/agent-verbs.mjs",
-      "sha256": "89126f0ce105f8c5d81cc3748b3b6c8577d3c2718780950774e657f4ff42fbc0"
+      "sha256": "3bb2499950a00f45b2d62df2298210963ac4ee8242de630e80c3909550be00a1"
     },
     "cli/business/agent-wait.mjs": {
       "source": "cli/business/agent-wait.mjs",
@@ -603,7 +603,11 @@
     },
     "cli/business/mcp-bridge.mjs": {
       "source": "cli/business/mcp-bridge.mjs",
-      "sha256": "c1b7004c4bef3ddccf4c1b82d5e7063848c281915dfde3da8678fe8b8fe8e59a"
+      "sha256": "25501efbc12b6adc202bd83807604c6cb5d739c6d9817b07da48d329fe615ea3"
+    },
+    "cli/business/mcp-token-cache.mjs": {
+      "source": "cli/business/mcp-token-cache.mjs",
+      "sha256": "9bc3fc1ac467538d8b7fd8a85a96f121c2967d50bc4554a895d6779ffe6b5848"
     },
     "cli/business/outbound.mjs": {
       "source": "cli/business/outbound.mjs",
@@ -651,7 +655,7 @@
     },
     "cli/business/questions.mjs": {
       "source": "cli/business/questions.mjs",
-      "sha256": "8249b60ac0794928fba6a5a818a0ead5aeffcc1953cc9ba22555f3a521069a4b"
+      "sha256": "07e704ceb7f00f9c0cac9b155573bd7d30b054f7fe5bbdf34586846db626daaa"
     },
     "cli/business/refusal.mjs": {
       "source": "cli/business/refusal.mjs",
@@ -695,11 +699,11 @@
     },
     "cli/business/state.mjs": {
       "source": "cli/business/state.mjs",
-      "sha256": "12dc2a69834f7983ee9503a2a3bdf1e99315d9a467fa08be834d51b6c1c88377"
+      "sha256": "cad5ed9e66ca0c70b403289538ce85627354a150cf9299cfc878d7387ead4dd7"
     },
     "cli/business/supervisor.mjs": {
       "source": "cli/business/supervisor.mjs",
-      "sha256": "a9cfc4b09ab9158300d15ceb8776bbf23ec9c93e8b7f7feb20e12542cffb1d9b"
+      "sha256": "1f65da0b09cc728a598887d89cc8313c235a1dde90c692729e3a56ecf9c5094e"
     },
     "cli/cache-doctor.mjs": {
       "source": "cli/cache-doctor.mjs",

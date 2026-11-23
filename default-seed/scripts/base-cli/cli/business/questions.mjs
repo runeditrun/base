@@ -5,6 +5,7 @@ import { paired, revokedByServer, revokedText } from './local-commands.mjs';
 import { applyChoices } from './choices.mjs';
 import { businessCommand } from './invocation.mjs';
 import { refusalView, toolRefusal, serverSaid } from './refusal.mjs';
+import { mcpTokenCache } from './mcp-token-cache.mjs';
 
 const protocolVersion = '2025-11-25';
 const headers = { Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': protocolVersion };
@@ -12,19 +13,21 @@ export const classifications = ['uses', 'sells', 'both', 'product-dependency'];
 
 /** One MCP session on the Business server. The returned function calls a tool and returns its structuredContent (it throws when
  * the tool refuses); `.call` returns the raw tool result, `.exchange` the raw JSON-RPC response for any method, `.initialized` the
- * server's initialize result. The short-lived bearer is minted again within 30 seconds of expiry, and once on a 401. */
-export async function mcpClient(api, { taskId, signal } = {}) {
- let minted = await api.mintToken('mcp', { taskId, signal });
- const remint = async () => { minted = await api.mintToken('mcp', { taskId, signal }); };
+ * server's initialize result. The pairing's cached bearer is refreshed 60 seconds before expiry, and once on a 401. */
+export async function mcpClient(api, state, { taskId, signal } = {}) {
+ const cache = mcpTokenCache(api, state, taskId);
  let sequence = 0;
  async function post(body) {
-  if (Date.parse(minted.expires_at) - Date.now() < 30_000) await remint();
-  const send = () => api.post('/api/business/mcp', body, { token: minted.access_token, signal, headers });
-  try { return await send(); } catch (error) {
-   if (error.status !== 401) throw error;
-   await remint();
-   return send();
-  }
+  const send = async token => {
+   try { return await api.post('/api/business/mcp', body, { token, signal, headers }); }
+   catch (error) {
+    if (error.status === 401) await cache.drop(token);
+    throw error;
+   }
+  };
+  const token = await cache.get(signal);
+  try { return await send(token); } catch (error) { if (error.status !== 401) throw error; }
+  return send(await cache.get(signal));
  }
  async function exchange(method, params, notification = false) {
   const id = ++sequence;
@@ -53,8 +56,8 @@ export async function mcpClient(api, { taskId, signal } = {}) {
  }, { call, exchange, initialized });
 }
 
-export async function nextQuestions(api, signal) {
- const tool = await mcpClient(api, { signal });
+export async function nextQuestions(api, state, signal) {
+ const tool = await mcpClient(api, state, { signal });
  const result = await tool('next_question');
  if (!Array.isArray(result.tasks)) throw Error('Business server returned invalid task summaries.');
  return result.tasks;
@@ -162,7 +165,7 @@ export async function next() {
  try {
   // Each check-in applies the owner's latest choices for this computer.
   await applyChoices(api, state);
-  tasks = await nextQuestions(api, signal);
+  tasks = await nextQuestions(api, state, signal);
  } catch (error) {
   if (error.status !== 401) throw error;
   throw Error(`Business pairing expired or was revoked. This computer was ${revokedText(await revokedByServer(state))}${serverSaid(error.reason)}`);
@@ -197,12 +200,12 @@ export async function answer(id, vendorId, choice, rawConfidence = '1') {
  if (!/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(rawConfidence)) throw Error('Choose a numeric confidence between 0 and 1.');
  const confidence = Number(rawConfidence);
  const { state, credential } = await paired(), api = new Api(state.origin, credential), signal = AbortSignal.timeout(55_000);
- const summary = await (await mcpClient(api, { signal }))('explain_task', { task_id: id });
+ const summary = await (await mcpClient(api, state, { signal }))('explain_task', { task_id: id });
  if (summary.runner === 'owner' || ownerKinds.has(summary.kind)) throw Error(`This item requires the owner in the browser: ${ownerLink(state)}`);
  if (summary.kind !== 'classify.row' || summary.runner !== 'executor') throw Error('This item does not accept a CLI classification answer.');
  const { vendors } = classification(summary);
  if (!vendors.includes(vendorId)) throw Error('Choose a catalog vendor id from this question, or none.');
- const tool = await mcpClient(api, { taskId: id, signal });
+ const tool = await mcpClient(api, state, { taskId: id, signal });
  let lease = summary;
  if (summary.state === 'ready') lease = await tool('answer', { task_id: id, action: 'claim', client_event_id: randomUUID(), fence: summary.fence });
  if (typeof lease.grant_id !== 'string') throw Error('Business did not return a grant for this question.');
@@ -221,9 +224,9 @@ export async function done(id, flag, note) {
  if (flag !== '--note' || typeof note !== 'string' || !note.trim() || note.length > 500) throw Error('Finish a Move in step with: done ID --note "what moved" (up to 500 characters).');
  if (sensitive(note)) throw Error('The note looks like it holds a secret, so it was not sent. Say what moved, without keys or tokens.');
  const { state, credential } = await paired(), api = new Api(state.origin, credential), signal = AbortSignal.timeout(55_000);
- const summary = await (await mcpClient(api, { signal }))('explain_task', { task_id: id });
+ const summary = await (await mcpClient(api, state, { signal }))('explain_task', { task_id: id });
  if (summary.kind !== 'move.in' || summary.runner !== 'executor') throw Error('This item is not a Move in step for this computer.');
- const tool = await mcpClient(api, { taskId: id, signal });
+ const tool = await mcpClient(api, state, { taskId: id, signal });
  let lease = summary;
  if (summary.state === 'ready') lease = await tool('answer', { task_id: id, action: 'claim', client_event_id: randomUUID(), fence: summary.fence });
  if (typeof lease.grant_id !== 'string') throw Error('Business did not return a grant for this step.');
@@ -238,8 +241,7 @@ export async function done(id, flag, note) {
 
 export async function token() {
  const { state, credential } = await paired();
+ // An external headersHelper gets its own bearer. Keep the shared cache private.
  const result = await new Api(state.origin, credential).mintToken('mcp');
- // Claude headersHelper consumes this directly; never run this in an agent
- // transcript. Vendor credentials cannot be retrieved through this command.
  process.stdout.write(JSON.stringify({ Authorization: `Bearer ${result.access_token}` }) + '\n');
 }

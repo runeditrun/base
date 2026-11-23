@@ -53,7 +53,7 @@ export async function run({ once = false } = {}) {
     return;
    }
    if (!progress.pendingClaim) {
-    summaries = await nextQuestions(api, stop.signal);
+    summaries = await nextQuestions(api, state, stop.signal);
     const selected = summaries.find(task => kinds.has(task.kind) && ['ready','leased'].includes(task.state));
     if (!selected) {
      const waiting = waits();

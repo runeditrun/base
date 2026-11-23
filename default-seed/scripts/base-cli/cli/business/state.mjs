@@ -44,9 +44,8 @@ export async function saveState(state) {
  return saveJson('state.json', state);
 }
 
-// A short-lived pairing poll token must survive agent turns. It is not a
-// device credential; keep it private, expiring, and separate from paired state.
-async function saveJson(name, value) {
+// Keep paired state and short-lived bearer files private, and replace each file atomically.
+export async function saveJson(name, value) {
  const directory = stateDirectory();
  await mkdir(directory, { recursive: true, mode: 0o700 });
  await chmod(directory, 0o700);
@@ -86,7 +85,7 @@ export async function checkStateWritable() {
 
 // Files this CLI writes in its state folder. A folder named by RER_BUSINESS_STATE_DIR
 // may hold other things, so only these are removed from it.
-const owned = /^(?:(?:state|pairing|progress|permissions|service|carried)\.json|(?:run|pairing)\.lock|disconnect|service(?:-error)?\.log|discovery-[A-Za-z0-9_.:-]+\.(?:json|tmp)|export-[0-9a-f]{32}\.bundle|.*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.tmp(?:\.check)?)$/;
+const owned = /^(?:(?:state|pairing|progress|permissions|service|carried)\.json|mcp-token-[0-9a-f]{64}\.json|(?:run|pairing)\.lock|disconnect|service(?:-error)?\.log|discovery-[A-Za-z0-9_.:-]+\.(?:json|tmp)|export-[0-9a-f]{32}\.bundle|.*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.tmp(?:\.check)?)$/;
 /** After a revocation whose local cleanup was refused, keep only what a later
  * disconnect needs to finish: the state and the receipts of what remains. */
 export async function removeWorkFiles(keep = ['state.json', 'permissions.json', 'service.json']) {
