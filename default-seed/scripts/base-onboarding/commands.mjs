@@ -14,7 +14,7 @@ import { toolCommand } from './tool-command.mjs';
 import { isWranglerMigrationApply, wranglerMigrationView } from './migration-progress.mjs';
 import { isWranglerQuery, wranglerQueryView, viteDiagnosticsView, archiveReceiptView } from './command-diagnostics-view.mjs';
 
-export async function createCommands(directory,state,{terminal=text=>writeSync(1,text),spawn=spawnChild,queue:queuePolicy,custodyToken,onWaiting,filterViteWarnings=false,filterArchiveReceipts=false}={}) {
+export async function createCommands(directory,state,{terminal=text=>writeSync(1,text),spawn=spawnChild,queue:queuePolicy,custodyToken,onWaiting,retryLocalMigrations=false,onMigrationRetry,filterViteWarnings=false,filterArchiveReceipts=false}={}) {
  const custodyBaseline=['darwin','linux'].includes(process.platform)?await createProcessBaseline():undefined;
  const logPath=join(directory,'install.log'), log=await openPrivateLog(logPath);
  let policy=queuePolicy?await commandPolicy().catch(async error=>{
@@ -171,19 +171,7 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
   if(!capture.custody)void capture.closed.then(capture.removeCancellation);
   return child;
  };
- return {
-  async configureQueue(value){if(!queuePolicy){queuePolicy=value;policy=await commandPolicy();registerCustody(policy.environment);}},
-  ownership:child=>ownershipRecords.get(child),
-  addSecrets:redaction.addSecrets, redact:redaction.redact, redactionStream:redaction.stream, report, logPath, track, stopCommands,
-  ownCleanup(scope,action){const actions=cleanups.get(scope)??[];actions.push(action);cleanups.set(scope,actions);},
-  setCommandSignal(value){signal=value;},
-  spawn:spawnCommand,
-  async stop(child){await stopCommand(child);await captures.get(child)?.closed;const scope=captures.get(child)?.scope;if(![...managed].some(other=>captures.get(other).scope===scope)){const actions=cleanups.get(scope)??[];cleanups.delete(scope);for(const action of actions)await action();}},
-  async run(label,command,args=[],options={}) {
-   // Any caller's `wrangler d1 migrations apply` (the setup hooks, a seed's own export and import) shows
-   // a count instead of wrangler's table redrawn per migration; the log keeps every byte and is named in the summary.
-   if(!options.view&&isWranglerMigrationApply(command,args))options={...options,view:()=>wranglerMigrationView({log:redaction.redact(checkoutPath(options.cwd??process.cwd(),logPath))})};
-   if(!options.view&&isWranglerQuery(command,args))options={...options,view:()=>wranglerQueryView({log:redaction.redact(checkoutPath(options.cwd??process.cwd(),logPath))})};
+ const runOnce=async(label,command,args,options)=>{
    if(queuePolicy && options.heavy !== false) {
     let queuedChild;
     const commandSignal=signal&&options.signal?AbortSignal.any([signal,options.signal]):options.signal||signal;
@@ -202,6 +190,37 @@ export async function createCommands(directory,state,{terminal=text=>writeSync(1
    const cancelled=options.signal?.aborted||capture.scope?.aborted;
    if(result.code!==0||result.signal||result.error||cancelled)throw failure(label,{...result,...(cancelled?{reason:'cancel'}:{})},capture);
    return child;
+ };
+ return {
+  async configureQueue(value){if(!queuePolicy){queuePolicy=value;policy=await commandPolicy();registerCustody(policy.environment);}},
+  ownership:child=>ownershipRecords.get(child),
+  addSecrets:redaction.addSecrets, redact:redaction.redact, redactionStream:redaction.stream, report, logPath, track, stopCommands,
+  ownCleanup(scope,action){const actions=cleanups.get(scope)??[];actions.push(action);cleanups.set(scope,actions);},
+  setCommandSignal(value){signal=value;},
+  spawn:spawnCommand,
+  async stop(child){await stopCommand(child);await captures.get(child)?.closed;const scope=captures.get(child)?.scope;if(![...managed].some(other=>captures.get(other).scope===scope)){const actions=cleanups.get(scope)??[];cleanups.delete(scope);for(const action of actions)await action();}},
+  async run(label,command,args=[],options={}) {
+   if(options.view)return runOnce(label,command,args,options);
+   const log=redaction.redact(checkoutPath(options.cwd??process.cwd(),logPath));
+   if(isWranglerQuery(command,args))return runOnce(label,command,args,{...options,view:()=>wranglerQueryView({log})});
+   if(!isWranglerMigrationApply(command,args))return runOnce(label,command,args,options);
+
+   let migration;
+   const apply=()=>runOnce(label,command,args,{...options,view:()=>{migration=wranglerMigrationView({log});return migration;}});
+   try { return await apply(); }
+   catch(error) {
+    if(!retryLocalMigrations||!isWranglerMigrationApply(command,args,{localOnly:true})||
+     error.childExitCode!==1||error.signal||signal?.aborted||options.signal?.aborted||!migration?.retryable())throw error;
+   }
+   // Local Wrangler batches each migration with its d1_migrations INSERT in
+   // one Miniflare transaction. The new process rereads that ledger before applying.
+   const first=migration.facts().migrationsApplied;
+   const message='Wrangler reported an internal error. Retrying local database migrations once.';
+   report(message,{logOnly:Boolean(onMigrationRetry)});
+   onMigrationRetry?.(message);
+   const result=await apply();
+   state.migrationsApplied+=first;
+   return result;
   },
   async waitForReady(label,child,health,options={}) {
    state.step=redaction.redact(String(label));track(label,child);const capture=captures.get(child);

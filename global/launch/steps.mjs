@@ -9,6 +9,7 @@ function events(line) { try { const value = JSON.parse(line); return value && ty
 
 // What a child's JSON event means for the person waiting.
 export function waitingNote(event) {
+ if (event.event === 'migration-retry') return event.message;
  if (event.event === 'waiting') return `waiting in the job queue${event.reason ? `: ${event.reason}` : ''}`;
  if (event.event === 'node-selection') return event.message;
  if (event.event === 'port') return `using port ${event.port}`;
@@ -58,6 +59,8 @@ export async function startServer(entry, args, { root, env, logPath, children, s
   if (event?.event === 'ready') { ready = event; resolveReady(); }
   if (event?.event === 'error') error = event;
   if (event?.event === 'moved') note(`moved this checkout from ${event.from} to ${event.to}; its data is kept`);
+  if (event?.event === 'waiting' && event.phase === 'server-load') note(event.message);
+  if (event?.event === 'migration-retry') note(waitingNote(event));
   if (!event) output = (output + line + '\n').slice(-8192);
  });
  child.stderr.on('data', data => { output = (output + data).slice(-8192); capture.write(data); });

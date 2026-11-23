@@ -16,18 +16,23 @@ const PER_MIGRATION = /^🚣 \d+ commands? executed successfully\.?$/;
 // a remote one, the confirmation it answers itself in CI.
 const BOILERPLATE = /^(\u26C5\uFE0F?\s*wrangler\b|Resource location:|Use --remote if you want|Migrations to be applied:|\? About to apply \d+ migration|Your database may not be available|🤖 Using fallback value|🌀 (Executing on|To execute on)|✅ No migrations to apply)/u;
 
-export function isWranglerMigrationApply(command, args = []) {
+export function isWranglerMigrationApply(command, args = [], { localOnly = false } = {}) {
  const words = [command, ...args].map(String);
  const tool = words.findIndex(word => /(^|[\\/])wrangler(\.js)?$/.test(word));
  if (tool < 0) return false;
  const rest = words.slice(tool + 1);
- return rest.some((word, index) => word === 'd1' && rest[index + 1] === 'migrations' && rest[index + 2] === 'apply');
+ const apply = rest.findIndex((word, index) => word === 'd1' && rest[index + 1] === 'migrations' && rest[index + 2] === 'apply');
+ if (apply < 0) return false;
+ if (!localOnly) return true;
+ return rest.includes('--local') && !rest.some((word, index) =>
+  /^--(?:remote|preview|no-local)(?:$|=)/.test(word) ||
+  word.startsWith('--local=') || (word === '--local' && rest[index + 1] === 'false'));
 }
 
 // One view per command: write(text) returns the text to show, end() the rest.
 // The summary names the log that keeps wrangler's full output: { log }.
 export function wranglerMigrationView({ log } = {}) {
- let pending = '', total = 0, announced = 0, failed = false, errored = false;
+ let pending = '', total = 0, announced = 0, failed = false, errored = false, transient = false, otherError = false;
  const applied = new Set(), seen = new Set(), names = [];
  const shown = [];
  const progress = () => `Applying migrations ${applied.size}/${Math.max(total, applied.size)}`;
@@ -45,7 +50,11 @@ export function wranglerMigrationView({ log } = {}) {
    return;
   }
   const trimmed = text.trim();
-  if (/\[ERROR\]/.test(trimmed)) errored = true;
+  if (/\[ERROR\]/.test(trimmed)) {
+   errored = true;
+   if (/^(?:✘\s+)?\[ERROR\] internal error; reference = [a-z\d]+$/i.test(trimmed)) transient = true;
+   else if (!/^✘ \[ERROR\] Migration .+ failed with the following errors:$/.test(trimmed)) otherError = true;
+  }
   if (!trimmed || PER_MIGRATION.test(trimmed) || BOILERPLATE.test(trimmed) || seen.has(trimmed)) return;
   seen.add(trimmed);
   shown.push(text);
@@ -65,5 +74,6 @@ export function wranglerMigrationView({ log } = {}) {
    return drain();
   },
   facts: () => ({ migrationsApplied: applied.size }),
+  retryable: () => transient && !otherError,
  };
 }

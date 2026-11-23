@@ -26,7 +26,7 @@ export async function signinCommand(project, options, out, { fetch } = {}) {
  try { result = await owner(['signin', '--declaration', path, '--environment', environment, ...(state ? ['--state', state] : [])], env, { cwd: root, localOnlyKeys: project.adapter.localOnlyKeys ?? [], ...(fetch ? { fetch } : {}) }); }
  catch (error) { throw failure(error, { environment, again, adapter: project.adapter, redact: redaction.redact }); }
  const minutes = Math.round((result.expiresAt - Date.now()) / 60000);
- if (!options.json) out.human(`One-time sign-in link for the owner ${result.email}. It works once, only for that owner, and expires in ${minutes} minutes. rer does not save it; open it now:\n${result.link}`);
+ if (!options.json) out.human(`One-time sign-in link for the owner ${result.email}. It works once, only for that owner, and expires in ${minutes} minutes. rer does not save it; open it now:\nRER_OPEN ${result.link}`);
  return { owner: result.email, expiresAt: result.expiresAt, ...(options.json ? { link: result.link } : {}) };
 }
 

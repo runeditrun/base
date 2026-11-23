@@ -222,7 +222,10 @@ environment. An unreadable or non-integer file refuses the start, naming the fil
 or does not report its own (`rer describe` reports `defaults`), so a current
 checkout never records a limit you did not set.
 A start is never refused for machine load alone unless `RER_SERVERS_LOAD_THRESHOLD`
-or `RER_JOBS_LOAD_THRESHOLD` is set; memory and disk guards stay. The disk guard
+or `RER_JOBS_LOAD_THRESHOLD` is set. When the server load threshold holds a
+checkout's first `rer dev` start, rer checks the load for up to 10 minutes and
+reports it every 20 seconds. If the load stays above the threshold, rer names
+the per-command override. The disk guard
 measures installed `node_modules` and `.wrangler` (including local D1 state). It
 requires twice those bytes plus 256 MiB, with a 1 GiB minimum, on the checkout,
 the selected temporary directory (`TMPDIR`, then `TMP`/`TEMP`, then the OS

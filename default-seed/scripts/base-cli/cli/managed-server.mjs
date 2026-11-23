@@ -22,6 +22,10 @@ import { demoGuarded,demoPreflight } from './demo.mjs';
 import { readDevKey,requireDevKey,refuseManagedInstallation,resolvePersona,openUrl,personaOpenUrl } from './dev-identity.mjs';
 import { announceDoorRoute,claimSavedName,moveCheckout,routeRunning,verifyDoorFor } from './door-mode.mjs';
 import { warmDocumentRender } from './render-warmup.mjs';
+import { contained } from './project.mjs';
+
+const devStartReceipt = '.rer/local/dev-started';
+const ownerOpenReceipt = '.rer/local/open-url';
 
 // Dev opens through the local identity exchange. Preview serves production output.
 export async function ready(out,url,dev,json=false,siteUrl,demo,root,ownerOpenUrl){
@@ -126,7 +130,9 @@ export async function managedServer(project,options,out,{clock={}}={}){
   if(!demo)await privateDirectory(project.root,['.wrangler','state']);
   const directory=await privateDirectory(project.root,['.seed','installer',...(process.env.RER_ONBOARDING_PROCESS_OWNER?[`commands-${process.pid}`]:[])]);
   const {createCommands}=await shared('commands.mjs');const state={logs:[]};
-  store=await createCommands(directory,state,{terminal:text=>out.progress(text),onWaiting:options.json?details=>out.event('waiting',details):undefined,custodyToken:registry.custodyToken(),queue:{verb:options.verb,originalCI:process.env.CI==='true'}});
+  store=await createCommands(directory,state,{terminal:text=>out.progress(text),onWaiting:options.json?details=>out.event('waiting',details):undefined,custodyToken:registry.custodyToken(),
+   retryLocalMigrations:options.verb==='dev',onMigrationRetry:options.json?message=>out.event('migration-retry',{message}):undefined,
+   queue:{verb:options.verb,originalCI:process.env.CI==='true'}});
   store.state=state;store.step=async label=>store.report(label);store.phase=async phase=>{state.phase=phase;};store.setCommandSignal(controller.signal);
   store.setupManifest=seed?.manifest;if(devKey)store.addSecrets([devKey]);
   await tools(project.root,store,controller.signal);
@@ -140,7 +146,14 @@ export async function managedServer(project,options,out,{clock={}}={}){
   const adapterOptions={modelsLive,demo,selectedOrigin:selected.url,operationToken:operation.token,privateSettings:project.adapter.settings,runtimePort:internal,setRuntimePort:port=>proxy.setRuntimePort(port),devKey:devKey??undefined,devLogin:false,scheduled:crons.length>0,beforeStart:options.verb==='dev'?prerequisites:undefined};
   const input={[keys.email]:selected.vars[keys.email]};
   if(options.verb==='preview')await productionBuild(project,()=>store.run('Building fixed production output',process.execPath,[fileURLToPath(new URL('../bin/rer.mjs',import.meta.url)),'build','--cwd',project.root,'--json'],{cwd:project.root,phase:'build',signal:controller.signal,env:{...process.env,RER_LOCAL_OPERATION:operation.token},afterCommand:()=>recoverInterrupted(project.root,operation)}),text=>store.report(text));
-  await serverResources(project.root);
+  // A saved owner link also proves a successful dev start by an older CLI.
+  const firstDevStart=mode==='dev'&&!await hasDevStartReceipt(project.root,devIdentity);
+  const onLoadWaiting=firstDevStart?details=>{
+   if(options.json)out.event('waiting',details);
+   else out.progress(details.message+'\n');
+  }:undefined;
+  await serverResources(project.root,{signal:controller.signal,onLoadWaiting});
+  controller.signal.throwIfAborted();
   await project.adapter.run(project.root,input,store,async child=>{
    app=child;
    child.once('exit',code=>{if(!reason){reason='unexpected application exit';void cleanup().then(()=>finished({code:code||1}));}});
@@ -171,6 +184,12 @@ export async function managedServer(project,options,out,{clock={}}={}){
     if(options.json)out.event('warning',{code:error.code,message});else out.progress(`Warning: ${message}\n`);
    }
   }
+  controller.signal.throwIfAborted();
+  if(firstDevStart&&!(dev?.openUrl&&options.as===undefined)){
+   // Persona starts and seeds without devIdentity do not save an owner link.
+   const {writePrivateFile}=await shared('private-files.mjs');
+   await writePrivateFile(join(await privateDirectory(project.root,['.rer','local']),'dev-started'),'ready\n');
+  }
   activity.ready();await emitReady(out,options,project.root,selected.url,dev,site?.url,demo,ownerOpenUrl);
   if(crons.length){
    out.progress(`Running ${crons.length===1?'the scheduled trigger':'the scheduled triggers'} locally: ${crons.join(' | ')}\n`);
@@ -187,6 +206,14 @@ function reportScheduled(out,options,run){
  const error=options.verb==='preview'&&run.status===404 ? 'The preview target does not expose /cdn-cgi/local/scheduled. Forward the adapter context scheduled flag to previewTarget, or set RER_RUNTIME_TRIGGERS=1 in a custom target using the shared production runtime. For another runtime, expose that internal trigger endpoint or declare scheduled:false.' : run.error;
  const at=new Date().toISOString().replace(/\.\d+Z$/,'Z'),outcome=run.skipped?`skipped (${error})`:run.ok?`ok ${run.ms}ms`:`failed (${run.status?`HTTP ${run.status}`:error}) ${run.ms}ms`;
  if(options.json)out.event('scheduled',{at,cron:run.cron,ok:run.ok,skipped:Boolean(run.skipped),status:run.status,ms:run.ms,...(error?{error}:{})});else out.human(`RER_SCHEDULED ${at} "${run.cron}" ${outcome}${error&&run.status?` — ${error}`:''}`);
+}
+async function hasDevStartReceipt(root,devIdentity){
+ const paths=devIdentity?[devStartReceipt,ownerOpenReceipt]:[devStartReceipt];
+ for(const path of paths){
+  try{await contained(root,path,{privateFile:true});return true;}
+  catch(error){if(error.code!=='missing_input')throw error;}
+ }
+ return false;
 }
 // dev also keeps its RER_OPEN link in owner-only .rer/local/open-url (0600),
 // which reset removes with the rest of .rer/local, for a person or agent that

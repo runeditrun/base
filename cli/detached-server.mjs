@@ -38,7 +38,8 @@ export async function detachedServer(options, argv, out) {
      ready(out,event.url,dev,options.json,event.siteUrl,event.demo);
      return 0;
     }
-    if (event.event==='waiting' || event.event==='warning') out.event(event.event,event);
+    if (!options.json && (event.event==='migration-retry'||event.event==='waiting'&&event.phase==='server-load')) out.progress(event.message+'\n');
+    else if (event.event==='waiting' || event.event==='warning' || event.event==='migration-retry') out.event(event.event,event);
    }
    if (exit!==undefined) throw new RerError(failure?.code ?? 'command_failed',failure?.message ?? `The ${options.verb} server stopped before readiness (${spawnError?.code ?? exit}); inspect ${log}.`,failure?.exitCode ?? (exit || 1));
    await delay(200);

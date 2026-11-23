@@ -177,22 +177,29 @@ test('rer signin selects only the held app identity and refuses mismatched or re
   const network = t.mock.method(globalThis, 'fetch', h.fetch);
   const stdout = t.mock.method(process.stdout, 'write', text => { lines.push(String(text)); return true; });
   let exit;
-  try { exit = await main(['signin', '--cwd', h.root, '--json', ...args]); }
+  try { exit = await main(['signin', '--cwd', h.root, ...args]); }
   finally {
    stdout.mock.restore(); network.mock.restore();
    for (const key of Object.keys(process.env)) if (!Object.hasOwn(saved, key)) delete process.env[key];
    Object.assign(process.env, saved);
   }
-  const events = lines.join('').trim().split('\n').map(line => JSON.parse(line));
+  return { exit, text: lines.join('') };
+ };
+ const runJson = async (args = [], credentials) => {
+  const { exit, text } = await run(['--json', ...args], credentials);
+  const events = text.trim().split('\n').map(line => JSON.parse(line));
   return { exit, result: events.at(-1), error: events.find(event => event.event === 'error') };
  };
- const succeeds = async origin => {
-  const { exit, result, error } = await run();
-  assert.equal(exit, 0, error?.message);
-  const link = new URL(result.link);
+ const verifyLink = async (value, origin) => {
+  const link = new URL(value);
   assert.equal(link.origin, origin);
   assert.equal(link.pathname, '/auth/owner-signin');
   assert.equal((await h.use(link.searchParams.get('token'))).status, 303);
+ };
+ const succeeds = async origin => {
+  const { exit, result, error } = await runJson();
+  assert.equal(exit, 0, error?.message);
+  await verifyLink(result.link, origin);
  };
  await succeeds('https://fixture-production.fixture-account.workers.dev');
  const statePath = join(h.root, '.rer/deploy/production.json');
@@ -210,6 +217,13 @@ test('rer signin selects only the held app identity and refuses mismatched or re
  await writeFile(join(h.root, '.rer/deploy/production.page.json'), JSON.stringify(page));
  h.requests.length = 0;
  await succeeds(saved.receipt.origin);
+ const human = await run();
+ assert.equal(human.exit, 0);
+ const markers = [...human.text.matchAll(/^RER_OPEN (\S+)$/gm)];
+ assert.equal(markers.length, 1, 'one marker gives the owner link to the terminal');
+ const [, link] = markers[0];
+ assert.equal(human.text.split(link).length, 2, 'the link appears only in the marker');
+ await verifyLink(link, saved.receipt.origin);
  assert.ok(h.requests.some(({ path }) => path.includes(`/workers/scripts/${saved.worker}/`)));
  assert.ok(h.requests.every(({ path }) => !path.includes(page.worker)), 'the page record never supplies the signin target');
  assert.ok(h.requests.every(({ path }) => !path.endsWith('/workers/subdomain')), 'a recorded app origin does not require workers.dev');
@@ -217,7 +231,7 @@ test('rer signin selects only the held app identity and refuses mismatched or re
  let grants = (await h.db.prepare('SELECT count(*) AS n FROM oa_owner_signins').first()).n;
  const refuses = async (args, credentials, pattern) => {
   h.calls.length = 0;
-  const result = await run(args, credentials);
+  const result = await runJson(args, credentials);
   assert.notEqual(result.exit, 0);
   assert.equal(result.result.link, undefined);
   assert.match(result.error.message, pattern);

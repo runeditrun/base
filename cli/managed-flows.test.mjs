@@ -116,13 +116,28 @@ test('rer dev shares one canonical checkout, returns its URL, and stops after id
   assert.equal(occupied.listening,true,'an occupied port leaves its existing owner alone');
  } finally {await new Promise(resolve=>occupied.close(resolve));}
 
- // This admission case owns its limit; the ordinary fixture's serving limit
- // leaves the other lifecycle assertions independent of shared host load.
- const overloaded=f.launch(['scripts/rer.mjs','dev','--json'],process.execPath,{RER_SERVERS_LOAD_THRESHOLD:'0'});
+ // Simulate the host staying busy through the first start's load-wait ceiling.
+ const preload=['--import',join(import.meta.dirname,'fixtures/serving-load.mjs')];
+ const underLoad=(mode,devArgs=[],nodeArgs=[])=>f.launch([...preload,...nodeArgs,'scripts/rer.mjs','dev',...devArgs,'--json'],process.execPath,{RER_SERVERS_LOAD_THRESHOLD:'1',RER_TEST_SERVING_LOAD:mode});
+ const waiting=child=>events(child).filter(row=>row.event==='waiting'&&row.phase==='server-load');
+ const overloaded=underLoad('overloaded');
  assert.equal(await overloaded.done,4);
- assert.equal(events(overloaded).find(row=>row.event==='error').code,'safety_refusal');
+ const loadRefusal=events(overloaded).find(row=>row.event==='error');
+ assert.equal(loadRefusal.code,'safety_refusal');
+ assert.match(loadRefusal.message,/RER_SERVERS_LOAD_THRESHOLD=\d+ .*rer dev/);
+ assert.ok(waiting(overloaded).length>1,'a continuing hold reports progress again before refusing');
+ assert.ok(waiting(overloaded).every(row=>row.resources.load>row.limits.loadThreshold));
  assert.ok(!events(overloaded).some(row=>row.event==='ready'));
  assert.deepEqual(JSON.parse(await readFile(join(f.registry,'state.json'),'utf8')).running,[],'load refusal releases the starting reservation');
+
+ const cancelled=underLoad('cancel');
+ const cancelBy=Date.now()+30_000;
+ while(!cancelled.stdoutText.includes('"phase":"server-load"')&&cancelled.exitCode===null&&Date.now()<cancelBy)await pause(25);
+ assert.ok(waiting(cancelled).length,'SIGTERM is sent while the load gate holds startup');
+ cancelled.kill('SIGTERM');
+ assert.equal(await cancelled.done,143);
+ assert.equal(events(cancelled).find(row=>row.event==='error').code,'cancelled');
+ assert.deepEqual(JSON.parse(await readFile(join(f.registry,'state.json'),'utf8')).running,[],'cancelling the wait releases the reservation');
 
  // Available memory below the floor refuses at once, naming the floor and its override.
  const starved=f.launch(['scripts/rer.mjs','dev','--json'],process.execPath,{RER_SERVERS_MIN_MEMORY_BYTES:String(2**50)});
@@ -171,12 +186,15 @@ test('rer dev shares one canonical checkout, returns its URL, and stops after id
  await writeFile(join(f.root, 'src/synthetic-base-3.rer'), 'synthetic-base-3');
  await writeFile(route, "import { doors } from '../synthetic-base-1/exports/doors';\n" + routeBytes.replace('<h1>Reference snapshot</h1>', '<h1>Reference snapshot</h1><p>{doors}</p>'));
 
- const dev = await ready(f.launch(['--import', join(import.meta.dirname,'fixtures/slow-state-inspection.mjs'), 'scripts/rer.mjs', 'dev', '--port', String(port), '--json']));
+ const dev = await ready(underLoad('clears',['--port',String(port)],['--import',join(import.meta.dirname,'fixtures/slow-state-inspection.mjs')]));
+ assert.ok(waiting(dev).length,'an unsuccessful start does not use up the first-start wait');
  const original = await processTree(dev.pid);
  const alias = f.root + '-alias'; await symlink(f.root, alias);
  try {
-  const duplicate = await f.run(['dev', '--cwd', alias, '--json']);
+  const duplicate = underLoad('overloaded',['--cwd',alias]);
+  assert.equal(await duplicate.done,0);
   assert.equal(events(duplicate).find(row => row.event === 'ready').url, url);
+  assert.deepEqual(waiting(duplicate),[],'a live server is reused during overload');
  } finally {await rm(alias);}
  const legacy=events(await f.run(['dev','--login','--json'])).find(row=>row.event==='ready');
  assert.equal(legacy.signedInAs,'managed-owner@example.test');
@@ -204,6 +222,11 @@ test('rer dev shares one canonical checkout, returns its URL, and stops after id
  await rm(join(f.root, 'src/synthetic-base-3.rer'));
  await f.run(['dev', '--stop', '--json']);
  await stopped(dev, original);
+
+ const restart=underLoad('overloaded');
+ assert.equal(await restart.done,4);
+ assert.equal(events(restart).find(row=>row.event==='error').code,'safety_refusal');
+ assert.deepEqual(waiting(restart),[],'a stopped checkout that served before keeps the immediate load refusal');
 
  // Reuse/HMR gets the ordinary lifetime. A separate instance proves eventual
  // idle teardown without racing those assertions against a short timeout.

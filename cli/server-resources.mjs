@@ -1,6 +1,7 @@
 import {loadavg,tmpdir} from 'node:os';
 import {statfs,lstat,readdir} from 'node:fs/promises';
 import {dirname,join,resolve} from 'node:path';
+import {setTimeout as delay} from 'node:timers/promises';
 import {refuse} from './errors.mjs';
 import {serversDirectory} from './server-registry.mjs';
 // Persistent serving is not a bounded queue job. Check its launch separately,
@@ -46,12 +47,44 @@ async function diskAt(path,disk){
  try{return await disk(path,{bigint:true});}
  catch(error){if(error.code!=='ENOENT'||dirname(path)===path)throw error;return diskAt(dirname(path),disk);}
 }
-export async function serverResources(root,{load=()=>loadavg()[0],disk=statfs,env=process.env}={}){
+const loadWaitMinutes=10,loadWaitMs=loadWaitMinutes*60_000;
+const loadProgressMs=20_000,loadPollMs=2000;
+async function admitLoad(threshold,load,{signal,onLoadWaiting}){
+ if(threshold===Infinity)return;
+ const started=performance.now();
+ let reportAt=started;
+ for(;;){
+  signal?.throwIfAborted();
+  const measured=await load();
+  signal?.throwIfAborted();
+  if(Number.isFinite(measured)&&measured<=threshold)return;
+  const current=performance.now(),elapsed=current-started,remaining=loadWaitMs-elapsed;
+  const known=Number.isFinite(measured),sample=known?measured.toFixed(1):'unknown';
+  if(!onLoadWaiting||remaining<=0){
+   const waited=onLoadWaiting?` It waited ${loadWaitMinutes} minutes for the load to drop.`:'';
+   const override=Math.ceil(Math.max(threshold,known?measured:0)*2);
+   throw refuse(`Not started: this computer is busy. Its 1-minute load is ${sample} and a server starts only at ${threshold} or below.${waited}\nTry again in a few minutes, or start it anyway with a higher threshold, for example RER_SERVERS_LOAD_THRESHOLD=${override} ~/.local/bin/rer dev.`);
+  }
+  if(current>=reportAt){
+   const elapsedSeconds=Math.floor(elapsed/1000);
+   onLoadWaiting({
+    phase:'server-load',
+    message:`Waiting for the computer to calm down (${elapsedSeconds}s elapsed, up to ${loadWaitMinutes} minutes). Load ${sample} vs limit ${threshold}.`,
+    elapsedSeconds,
+    reasonCodes:[known?'load':'resources_unavailable'],
+    resources:{load:known?measured:null},
+    limits:{loadThreshold:threshold},
+   });
+   reportAt=current+loadProgressMs;
+  }
+  await delay(Math.min(loadPollMs,reportAt-current,remaining),undefined,{signal});
+ }
+}
+export async function serverResources(root,{load=()=>loadavg()[0],disk=statfs,env=process.env,signal,onLoadWaiting}={}){
  const threshold=servingLoadThreshold(env);
  // Validate explicit values before doing any measurements.
  let floor=serversDiskFloor(env);
- const measured=threshold===Infinity?0:await load();
- if(!Number.isFinite(measured)||measured>threshold)throw refuse(`Not started: this computer is busy. Its 1-minute load is ${Number.isFinite(measured)?measured.toFixed(1):'unknown'} and a server starts only at ${threshold} or below.\nTry again in a few minutes, or start it anyway with a higher threshold, for example RER_SERVERS_LOAD_THRESHOLD=${Math.ceil(Math.max(threshold,Number.isFinite(measured)?measured:0)*2)} ~/.local/bin/rer dev.`);
+ await admitLoad(threshold,load,{signal,onLoadWaiting});
  if(env.RER_SERVERS_DISK_FLOOR_GIB===undefined)floor=serversDiskFloor(env,await seedDiskBytes(root));
  const temporary=resolve(env.TMPDIR||env.TMP||env.TEMP||tmpdir());
  for(const path of new Set([resolve(root),temporary,serversDirectory(env)])){
