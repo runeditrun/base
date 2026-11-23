@@ -5,19 +5,24 @@ import { createRequire } from 'node:module';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { freePort, run } from '../global/tests/harness.mjs';
+import { buildPackage } from '../scripts/rer-package.mjs';
 import { isolatedQueue } from './fixtures/queue.mjs';
 
 const base = resolve(import.meta.dirname, '..');
 const require = createRequire(join(base, 'default-seed/package.json'));
 const wrangler = resolve(require.resolve('wrangler/package.json'), '../bin/wrangler.js');
 const { getPlatformProxy } = require('wrangler');
-const entry = join(base, 'global/rer.mjs');
-const source = path => JSON.stringify(new URL('../' + path, import.meta.url).href);
 
 test('rer dev recovers a local migration with a lost Wrangler response and surfaces SQL errors without retrying', { timeout: 120_000 }, async t => {
  const home = await mkdtemp(join(tmpdir(), 'rer-migration-retry-'));
  t.after(() => rm(home, { recursive: true, force: true }));
+ const packed = await buildPackage(base, join(home, 'build'));
+ const extracted = await run('tar', ['-xzf', packed, '-C', home]);
+ assert.equal(extracted.code, 0, extracted.stderr);
+ const pkg = join(home, 'package'), entry = join(pkg, 'global/rer.mjs');
+ const source = path => JSON.stringify(pathToFileURL(join(pkg, path)).href);
  const env = await isolatedQueue(t, { PATH: process.env.PATH, NODE_OPTIONS: process.env.NODE_OPTIONS, HOME: home, CI: 'true', RER_NO_UPDATE_CHECK: '1', WRANGLER_SEND_METRICS: 'false' });
  const mig = ['d1', 'migrations', 'apply', 'DB', '--local', '--persist-to', '.wrangler/state', '--config', 'wrangler.jsonc'];
  async function launch(name, sql) {
