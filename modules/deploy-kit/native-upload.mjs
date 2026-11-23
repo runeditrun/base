@@ -26,9 +26,9 @@ export function ownershipMessage(error, commands = {}) {
       if (seen.pending && seen.fingerprint === seen.pending) return `Worker ${name} runs the build this deployment record started uploading (RER_DEPLOY_FINGERPRINT ${seen.pending}), but its version lacks the message ${uploadMessage(seen.pending)}, so rer cannot prove this checkout uploaded it: the uploader did not set that message. rer changed nothing. If Cloudflare shows this Worker created at the failed attempt with a single version, delete that one Worker in Cloudflare (Workers & Pages, or DELETE /accounts/<account>/workers/scripts/${name} without force), keep this deployment record and its data resources, then run ${deploy} again.`;
       return `Worker ${name} exists, but its live version carries neither this record's confirmed identity nor the marks of the upload the record started (RER_DEPLOY_FINGERPRINT ${seen.pending ?? 'not recorded'} with version message ${seen.pending ? uploadMessage(seen.pending) : 'rer-deploy:<fingerprint>'}), so rer cannot prove it is this deployment's Worker and changed nothing. If another checkout deployed this environment, run its deploy from that checkout. Otherwise inspect the Worker in Cloudflare; if nobody uses it, delete it there and run ${deploy} again.`;
     case 'owned-resource-replaced':
-      return `Worker ${name} was deployed by someone else after this record last confirmed it (live version ${seen.versionId ?? 'unknown'}, recorded ${seen.expected ?? 'unknown'}), so rer changed nothing and will not adopt or remove it. If another checkout deployed this environment, deploy or remove it from that checkout; otherwise use another environment name.`;
+      return `Worker ${name} was deployed by someone else after this record last confirmed it (live version ${seen.versionId ?? 'unknown'}, recorded ${seen.expected ?? 'unknown'}), so rer refused to adopt or remove it. If another checkout deployed this environment, deploy or remove it from that checkout; otherwise use another environment name.`;
     case 'owned-resource-missing':
-      return `Worker ${name} is recorded as created, but Cloudflare no longer has it. To finish removing this environment, run ${remove}: it removes the remaining recorded resources. rer does not redeploy over a recorded Worker that disappeared.`;
+      return `Worker ${name} is recorded as created, but Cloudflare no longer has it. To finish removing this environment, run ${remove}: it permanently deletes the remaining recorded resources and their data, including any database and files. rer does not redeploy over a recorded Worker that disappeared.`;
   }
   if (error?.message === 'unrecorded-resource') return `${error.resource} exists under this environment's name but is not in this deployment record, so rer did not remove anything. Run ${remove} from the checkout whose record created it, or delete it in Cloudflare yourself if it is not in use.`;
   if (error?.message === 'owned-resource-replaced') return `${error.resource} is no longer the resource this record created (its identity changed), so rer changed nothing. Inspect it in Cloudflare; keep any data you need, and use another environment name if someone else uses it.`;
@@ -45,6 +45,7 @@ function explained(error, commands) {
  * interrupted upload that carries the recorded marks. Run it before provisioning anything. */
 export async function nativeWorkerCheck({api: provider, target, statePath, commands, signal}) {
   const api = withSettledLists(withScopeHints(provider), {signal});
+  assert(target?.accountId === api.accountId, 'owner-account-mismatch');
   return withStateLock(statePath, async () => {
     const state = await readOwnerState(statePath, target);
     try { return await checkOwnedWorker(api, target.worker, state, () => writeOwnerState(statePath, state)); }
@@ -83,6 +84,7 @@ export async function nativeUpload({api: provider, target, statePath, fingerprin
   assert(typeof upload === 'function', 'missing-native-upload');
   const {deploy, remove} = {...defaults, ...commands};
   const api = withSettledLists(withScopeHints(provider), {signal});
+  assert(target?.accountId === api.accountId, 'owner-account-mismatch');
   return withStateLock(statePath, async () => {
     const state = await readOwnerState(statePath, target);
     const save = () => writeOwnerState(statePath, state);
@@ -107,8 +109,9 @@ export async function nativeUpload({api: provider, target, statePath, fingerprin
     }
     if (live) { state.pendingUpload.provider = deploymentIdentity(live); state.owned.worker = {status:'created'}; await save(); }
     if (failure) {
+      const removal = state.receipt ? '' : ` To remove this deployment and permanently delete its recorded data, including any database and files, run ${remove}.`;
       const next = live
-        ? `The upload of Worker ${target.worker} is recorded as this deployment's own (version ${live.versionId}); a later step did not finish. Run ${deploy} again: it adopts this upload and repeats the steps that did not finish. To remove the deployment instead, run ${remove}.`
+        ? `The upload of Worker ${target.worker} is recorded as this deployment's own (version ${live.versionId}); a later step did not finish. Run ${deploy} again: it adopts this upload and repeats the steps that did not finish.${removal}`
         : `Cloudflare did not show this attempt's upload of Worker ${target.worker}, so nothing new was recorded. Run ${deploy} again: if the upload landed, it is adopted once its version carries ${uploadMessage(fingerprint)}; otherwise it uploads again.`;
       throw Object.assign(new Error(`${failure.message}\n${next}`, {cause:failure}), {code:'native-upload-incomplete', uploadRecorded:Boolean(live)});
     }

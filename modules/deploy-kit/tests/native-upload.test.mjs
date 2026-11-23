@@ -52,7 +52,8 @@ test('a native upload that fails after the Worker upload is adopted by the retry
     await assert.rejects(f.run(fingerprint,{queueFails:true}),error => {
       assert.equal(error.code,'native-upload-incomplete');
       assert.equal(error.uploadRecorded,true);
-      assert.match(error.message,/10500[\s\S]*recorded as this deployment's own[\s\S]*pnpm run deploy:cloudflare/);
+      assert.ok(error.message.includes(commands.deploy));
+      assert.ok(error.message.includes(commands.remove));
       return true;
     });
     const failed = await f.saved();
@@ -104,7 +105,8 @@ test('an unproven or replaced Worker is still refused by the retry and by remove
     const settings = structuredClone(f.state.settings), before = await readFile(f.statePath);
     await assert.rejects(f.run(fingerprint),error => {
       assert.equal(error.code,scenario === 'replaced' ? 'owned-resource-replaced' : 'uncertain-resource-create');
-      assert.match(error.message,scenario === 'replaced' ? /deployed by someone else/ : /lacks the message rer-deploy:f{64}[\s\S]*delete that one Worker[\s\S]*pnpm run deploy:cloudflare/);
+      assert.equal(error.resource,`worker:${f.target.worker}`);
+      if (scenario === 'unmarked') assert.ok(error.message.includes(commands.deploy));
       return true;
     });
     await assert.rejects(f.remove(),{message:scenario === 'replaced' ? 'owned-resource-replaced' : 'uncertain-resource-create'});

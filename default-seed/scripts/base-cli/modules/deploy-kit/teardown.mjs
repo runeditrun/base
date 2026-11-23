@@ -79,23 +79,33 @@ export async function verifyTeardown({api,plan,receipt,prefix=plan?.worker,maxAt
  * Delete a Worker the caller has already proven it owns. The provider keeps dispatching a
  * deleted Worker's Cron (as failing invocations) until its next scheduler refresh, so clear the
  * schedule set first, wait until the provider reports none, and only then delete. A set that does
- * not settle within `maxWaitMs` leaves the Worker in place.
+ * not settle within `maxWaitMs` leaves the Worker in place. The owner remover supplies
+ * a fresh identity check for each write and releases queue consumers after schedules settle.
  */
-export async function deleteWorker({api,worker,maxWaitMs=60000,clock=()=>performance.now(),sleep,signal}) {
+export async function deleteWorker({api,worker,maxWaitMs=60000,clock=()=>performance.now(),sleep,signal,checkIdentity,releaseConsumers}) {
   assert(name(worker),'teardown-invalid-worker-name');
   const schedules = `/workers/scripts/${worker}/schedules`;
-  await api.request(schedules,{method:'PUT',body:[]});
-  const start = clock();
-  for (let delay=250;; delay=Math.min(delay*2,4000)) {
+  const readSchedules = async () => {
     const result = await api.request(schedules);
     assert(result && !Array.isArray(result) && Array.isArray(result.schedules),'invalid-cron-list');
-    if (!result.schedules.length) break;
-    if (clock()-start+delay > maxWaitMs) {
-      const error = new Error(`The provider still lists ${result.schedules.length} Cron schedule(s) on ${worker} ${Math.round(maxWaitMs/1000)} seconds after they were cleared, so the Worker was not deleted. Run the teardown again once the provider reports none.`);
-      error.code = 'teardown-schedules-not-cleared';
-      throw error;
+    return result.schedules;
+  };
+  if (!checkIdentity || (await readSchedules()).length) {
+    await checkIdentity?.();
+    await api.request(schedules,{method:'PUT',body:[],beforeRetry:checkIdentity && (signal => checkIdentity({signal}))});
+    const start = clock();
+    for (let delay=250;; delay=Math.min(delay*2,4000)) {
+      const remaining = await readSchedules();
+      if (!remaining.length) break;
+      if (clock()-start+delay > maxWaitMs) {
+        const error = new Error(`The provider still lists ${remaining.length} Cron schedule(s) on ${worker} ${Math.round(maxWaitMs/1000)} seconds after they were cleared, so the Worker was not deleted. Run the teardown again once the provider reports none.`);
+        error.code = 'teardown-schedules-not-cleared';
+        throw error;
+      }
+      await pause(delay,signal,sleep);
     }
-    await pause(delay,signal,sleep);
   }
-  await api.request(`/workers/scripts/${worker}?force=true`,{method:'DELETE'});
+  await releaseConsumers?.();
+  await checkIdentity?.();
+  await api.request(`/workers/scripts/${worker}?force=true`,{method:'DELETE',beforeRetry:checkIdentity && (signal => checkIdentity({signal, retryingDelete:true}))});
 }

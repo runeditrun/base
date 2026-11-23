@@ -12,13 +12,16 @@ function unsent(error, seen = new Set()) {
 }
 
 /** Scoped safe replays share the original deadline and request budget. */
-export async function providerResponse({send, method, timeoutMs, callerSignal, reserveRetry, failure, removal = false, replayableAsset = false, consume}) {
+export async function providerResponse({send, method, timeoutMs, callerSignal, reserveRetry, failure, removal = false, replayableAsset = false, consume, beforeRetry}) {
   const timeout = AbortSignal.timeout(timeoutMs);
   const signal = callerSignal ? AbortSignal.any([callerSignal, timeout]) : timeout;
   const read = method === 'GET' || method === 'HEAD';
   const removalReplay = removal && ['GET','DELETE'].includes(method);
   const maxAttempts = removalReplay ? 3 : 2;
   for (let attempt = 1; ; attempt++) {
+    // Revalidate a resource addressed by name before replaying a write. A refusal
+    // from the check must escape as-is, without being treated as a transport error.
+    if (attempt > 1) await beforeRetry?.(signal);
     // Leave time for a second read when the first one times out. Caller deadlines
     // remain authoritative and are never reset by a retry.
     const firstRead = read && attempt === 1 ? new AbortController() : undefined;

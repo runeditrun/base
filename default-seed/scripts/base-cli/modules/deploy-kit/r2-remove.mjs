@@ -72,6 +72,7 @@ export async function removeOwnedBucket(api, {name, entry}, {signal, purgeMs = 6
   const deadline = AbortSignal.timeout(purgeMs);
   const bounded = combinedSignal(signal, deadline);
   const bucket = `/r2/buckets/${name}`, jobs = `${bucket}/jobs`;
+  const beforeRetry = retrySignal => checkBucket(api, name, entry, retrySignal);
   try {
     await checkBucket(api, name, entry, bounded);
     if (await hasObjects(api, name, bounded)) {
@@ -80,12 +81,12 @@ export async function removeOwnedBucket(api, {name, entry}, {signal, purgeMs = 6
         // Cloudflare does not offer a conditional write based on creation date.
         // Outside deletion/recreation of this bucket must be serialized.
         await checkBucket(api, name, entry, bounded);
-        job = clearJob(await api.request(jobs, {method:'POST',body:{jobType:'prefixDelete',prefix:''},signal:bounded}));
+        job = clearJob(await api.request(jobs, {method:'POST',body:{jobType:'prefixDelete',prefix:''},signal:bounded,beforeRetry}));
       }
       await waitForClearJob(api, jobs, job, bounded);
     }
     await checkBucket(api, name, entry, bounded);
-    await api.request(bucket, {method:'DELETE',signal:bounded});
+    await api.request(bucket, {method:'DELETE',signal:bounded,beforeRetry});
   } catch (error) {
     if (!signal?.aborted && deadline.aborted) throw Object.assign(new Error('r2-purge-timeout'), {cause:error});
     throw error;

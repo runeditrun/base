@@ -64,7 +64,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     maxRequests = limit;
   }
   // `zone` scope: the zone-level API (/zones/...), for a run site's zone lookup and redirect rule.
-  async function rawEnvelope(path, { method = 'GET', body, assetToken, zone = false, signal: callerSignal, step, deadlineMs, onResponse } = {}) {
+  async function rawEnvelope(path, { method = 'GET', body, assetToken, zone = false, signal: callerSignal, step, deadlineMs, onResponse, beforeRetry } = {}) {
     assert(typeof path === 'string' && (isR2ObjectDelete(path, method) || /^\/[a-z0-9/_?=&.,%-]+$/i.test(path) && !path.includes('..') && !path.split('?')[0].includes('%')), 'invalid-provider-path');
     assert(!zone || /^\/zones(?:[/?]|$)/.test(path), 'invalid-provider-path');
     assert(++requests <= maxRequests, 'provider-request-budget');
@@ -87,7 +87,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
       return recordDeployFailure(error,{step:failureStep,providerRequest:detail(status,transportClass(cause)),output:providerText(transportOutput(cause),redactAuth,Infinity)});
     };
     const r2Purge = method === 'POST' && /^\/r2\/buckets\/[^/]+\/jobs$/.test(path) && body?.jobType === 'prefixDelete' && body.prefix === '';
-    const {response,output = ''} = await providerResponse({method,timeoutMs:limitMs,callerSignal:deadlineSignal(callerSignal),removal,
+    const {response,output = ''} = await providerResponse({method,timeoutMs:limitMs,callerSignal:deadlineSignal(callerSignal),removal,beforeRetry,
       replayableAsset:method === 'POST' && (/^\/workers\/scripts\/[^/]+\/assets-upload-session$/.test(path) || path === '/workers/assets/upload?base64=true'),
       reserveRetry:() => requests < maxRequests && (++requests, true),failure:transportFailure,
       consume:(response,attempts,signal) => {

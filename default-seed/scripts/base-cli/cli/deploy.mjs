@@ -169,6 +169,10 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
   const remaining = error.remaining;
   if (error.message === 'nothing-to-remove') return `There are no recorded resources to remove; nothing was removed.`;
   const cause = deployDiagnostic(error, redact)?.code ?? error.message;
+  if (error.resource?.startsWith('worker:') && ['resource-name-collision', 'owned-resource-replaced'].includes(cause)) {
+   const reason = cause === 'resource-name-collision' ? 'the deployment record never started creating that Worker' : 'its active deployment no longer matches this record';
+   return redact(`Removal stopped (${cause}): rer could not prove it owns ${error.resource} because ${reason}. The Worker and remaining data were left in place. Inspect the Worker in Cloudflare and keep this deployment record.`);
+  }
   const count = Array.isArray(remaining) ? `${remaining.length} resources remain (${remaining.join(', ') || 'none'})` : 'the remaining resource count could not be read';
   const detail = providerFailure(error, redact);
   const failed = error.failed?.map(item => `${item.resource}: ${providerFailure(item.error, redact) ?? item.code}`).join('; ');

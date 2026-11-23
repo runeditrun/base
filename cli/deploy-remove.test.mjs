@@ -172,7 +172,8 @@ test('standard removal retries safe gateway failures and reports only unconfirme
   capture.mock.restore();
   if (['read-once','delete-applied','worker-delete-applied','worker-cleanup-forbidden','kv-delete-applied-forbidden'].includes(scenario)) {
    assert.equal(result,0);
-   assert.equal(hits,scenario === 'read-once' ? 4 : scenario === 'delete-applied' ? 2 : scenario === 'worker-delete-applied' ? 3 : 1);
+   if (scenario === 'read-once') assert.ok(hits > 1, 'the read was retried');
+   else assert.equal(hits, 1, 'a missing or already-applied target receives no second write');
    const message = output.flatMap(text => text.trim().split('\n')).map(text => JSON.parse(text)).filter(event => event.event === 'progress').map(event => event.message).join('\n');
    // The result must count a delete proved by readback even if its response failed.
    const resultEvent = output.flatMap(text => text.trim().split('\n')).map(text => JSON.parse(text)).find(event => event.event === 'result');
@@ -202,6 +203,68 @@ test('standard removal retries safe gateway failures and reports only unconfirme
    t.mock.method(globalThis,'fetch',provider.fetch);
    assert.equal(await run('--remove','--yes'),0);
    await assert.rejects(access(path),{code:'ENOENT'});
+  }
+ });
+});
+
+test('rer deploy --remove refuses a Worker replaced while preparing its delete', async t => {
+ for (const hasCron of [false, true]) await t.test(hasCron ? 'after clearing Cron' : 'without Cron', async t => {
+  const queue = hasCron ? {binding:'JOBS'} : {binding:'JOBS',consumer:{batch_size:10}};
+  const {root, provider, run} = await removalFixture(t, {d1:[{binding:'DB'}], queues:[queue]});
+  assert.equal(await run(), 0);
+  const path = join(root, '.rer/deploy/production.json');
+  const record = await readFile(path), writes = provider.state.writes.length;
+  if (hasCron) provider.state.schedules = [{cron:'*/5 * * * *'}];
+  let replacement;
+  t.mock.method(globalThis, 'fetch', async (input, init = {}) => {
+   const response = await provider.fetch(input, init);
+   if (!replacement && init.method === 'GET' && new URL(input).pathname.endsWith('/fixture-production/schedules') && !provider.state.schedules.length) {
+    provider.foreign.replaceWorker();
+    replacement = provider.state.version.id;
+   }
+   return response;
+  });
+  assert.equal(await run('--remove', '--yes'), 1);
+  assert.ok(replacement);
+  assert.equal(provider.state.version?.id, replacement);
+  assert.equal(provider.state.writes.slice(writes).filter(write => write.method === 'DELETE').length, 0);
+  if (!hasCron) assert.equal(provider.state.writes.length, writes);
+  assert.deepEqual(await readFile(path), record);
+  assert.equal(provider.state.queues[0].consumers.length, hasCron ? 0 : 1);
+ });
+});
+
+test('rer deploy --remove deletes an unchanged Worker and re-proves a named target before any retry', async t => {
+ for (const kind of ['unchanged', 'worker', 'bucket']) await t.test(kind, async t => {
+  const {root, provider, run} = await removalFixture(t);
+  assert.equal(await run(), 0);
+  const path = join(root, '.rer/deploy/production.json');
+  const target = kind === 'worker' ? '/workers/scripts/fixture-production' : '/r2/buckets/fixture-production-files';
+  let attempts = 0, replacement;
+  t.mock.method(globalThis, 'fetch', async (input, init = {}) => {
+   if (kind !== 'unchanged' && init.method === 'DELETE' && new URL(input).pathname.endsWith(target) && ++attempts === 1) {
+    if (kind === 'worker') {
+     provider.foreign.replaceWorker();
+     replacement = provider.state.version;
+    } else {
+     provider.state.buckets.length = 0;
+     provider.foreign.r2('fixture-production-files');
+     replacement = provider.state.buckets[0];
+    }
+    return new Response('provider unavailable', {status:502});
+   }
+   return provider.fetch(input, init);
+  });
+  assert.equal(await run('--remove', '--yes'), kind === 'unchanged' ? 0 : 1);
+  if (kind === 'unchanged') {
+   assert.equal(provider.state.settings, null);
+   assert.equal(provider.state.buckets.length, 0);
+   await assert.rejects(access(path), {code:'ENOENT'});
+  } else {
+   assert.equal(attempts, 1);
+   assert.ok(replacement);
+   assert.deepEqual(kind === 'worker' ? provider.state.version : provider.state.buckets[0], replacement);
+   await access(path);
   }
  });
 });

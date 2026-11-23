@@ -6,7 +6,7 @@ import { resourceKinds, findResource } from './resources.mjs';
 import { deleteWorker } from './teardown.mjs';
 import { recordDeployFailure } from './diagnostics.mjs';
 import { query } from './migrations.mjs';
-import { KINDS, readOwnerState, writeOwnerState, withStateLock, withScopeHints, withSettledLists, workerSettings, checkWorkerIdentity, resourceId, checkResourceIdentity, refuse, settlePendingSecret } from './owner.mjs';
+import { KINDS, readOwnerState, writeOwnerState, withStateLock, withScopeHints, withSettledLists, workerSettings, checkWorkerIdentity, deploymentIdentity, resourceId, checkResourceIdentity, refuse, settlePendingSecret } from './owner.mjs';
 
 const remove = {
   d1: (api, id) => api.request(`/d1/database/${id}`, {method:'DELETE'}),
@@ -32,6 +32,16 @@ async function confirmEmpty(api, worker, kind, name, id) {
   }
 }
 
+// The preflight already verified the version and its etag. Send one fresh read of
+// the active deployment just before a named write, without paging through its history.
+async function recheckWorker(api, worker, expected, signal) {
+  const {result} = await api.envelope(`/workers/scripts/${worker}/deployments?page=1&per_page=1`, {signal});
+  if (Array.isArray(result?.deployments) && !result.deployments.length) throw refuse('owned-resource-missing', 'worker', worker);
+  const deployment = result?.deployments?.[0], version = deployment?.versions?.[0];
+  if (deployment?.id === expected.deploymentId && deployment.versions?.length === 1 && version?.percentage === 100 && version.version_id === expected.versionId) return;
+  throw Object.assign(refuse('owned-resource-replaced', 'worker', worker), {observed:{versionId:version?.version_id, expected:expected.versionId}});
+}
+
 /** Delete exactly what this environment's state file says rer created: the Worker (its
  * schedules first; its Durable Objects go with it), then each D1, R2, KV and queue,
  * each only while it is still the one rer created. Read back that each is gone, then
@@ -46,6 +56,7 @@ async function confirmEmpty(api, worker, kind, name, id) {
  * (`unrecorded-resource`); a name grants no deletion authority. */
 export async function ownerRemove({api: provider, target, statePath, clock, sleep, signal, expectedResources = {}, onProgress = () => {}}) {
   const api = withSettledLists(withScopeHints(provider),{signal});
+  assert(target?.accountId === api.accountId, 'owner-account-mismatch');
   return withStateLock(statePath, async () => {
     const state = await readOwnerState(statePath, target);
     const remaining = new Set([...(state.owned.worker ? [`worker:${target.worker}`] : []), ...KINDS.flatMap(kind => Object.keys(state.owned[kind]).map(name => `${kind}:${name}`))]);
@@ -64,11 +75,11 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
         throw new Error('nothing-to-remove');
       }
       // Preflight: provider reads only. Adopting a verified pending upload writes its ids to the record.
-      let worker = null;
+      let workerIdentity = null;
       if (await workerSettings(api, target.worker) !== null) {
         if (!state.owned.worker) throw refuse('resource-name-collision', 'worker', target.worker);
-        await checkWorkerIdentity(api, target.worker, state, () => writeOwnerState(statePath, state));
-        worker = target.worker;
+        const live = await checkWorkerIdentity(api, target.worker, state, () => writeOwnerState(statePath, state));
+        workerIdentity = deploymentIdentity(live);
       } else remaining.delete(`worker:${target.worker}`);
       assert(!state.pendingSecret, 'secret-change-unsettled');
       const listed = {}, doomed = [];
@@ -88,25 +99,44 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
           doomed.push({kind, name, entry, id:resourceId(kind, row)});
         }
       }
-      // A Worker that consumes one of these queues is released first.
-      for (const queue of doomed.filter(item => item.kind === 'queues')) {
-        for (const consumer of await api.list(`/queues/${queue.id}/consumers`, {pagination:'single'})) {
-          assert(hexId(consumer.consumer_id), 'invalid-consumer-id');
-          await api.request(`/queues/${queue.id}/consumers/${consumer.consumer_id}`, {method:'DELETE'});
+      const worker = workerIdentity ? target.worker : null;
+      let preparationFailed = false;
+      const checkIdentity = async ({signal: checkSignal = signal, retryingDelete = false} = {}) => {
+        try { await recheckWorker(api, worker, workerIdentity, checkSignal); }
+        catch (error) {
+          // An earlier DELETE can have succeeded despite a lost acknowledgement.
+          // Let independent readback prove absence before removing any data.
+          const missing = error.status === 404 || error.message === 'owned-resource-missing';
+          if (missing && retryingDelete) throw error;
+          preparationFailed = true;
+          if (missing) throw refuse('owned-resource-replaced', 'worker', worker);
+          throw error;
         }
-      }
+      };
+      const releaseConsumers = async () => {
+        preparationFailed = true;
+        for (const queue of doomed.filter(item => item.kind === 'queues')) {
+          for (const consumer of await api.list(`/queues/${queue.id}/consumers`, {pagination:'single'})) {
+            assert(hexId(consumer.consumer_id), 'invalid-consumer-id');
+            if (worker) await checkIdentity();
+            await api.request(`/queues/${queue.id}/consumers/${consumer.consumer_id}`, {method:'DELETE'});
+          }
+        }
+        preparationFailed = false;
+      };
       let workerGone = true;
       if (worker) {
         onProgress(`Removing Worker ${worker}`);
-        try { await deleteWorker({api, worker, signal, ...(clock ? {clock} : {}), ...(sleep ? {sleep} : {})}); }
+        try { await deleteWorker({api, worker, signal, clock, sleep, checkIdentity, releaseConsumers}); }
         catch (error) {
+          if (preparationFailed) throw error;
           failed.push({resource:`worker:${worker}`, code:error.message, error});
           // Keep a surviving Worker's data. An applied delete with a failed
           // acknowledgement may proceed only after a successful absence read.
           workerGone = false;
-          try { workerGone = await workerSettings(api, target.worker) === null; } catch { /* Final readback below retains unverified resources. */ }
+          try { workerGone = await workerSettings(api, worker) === null; } catch { /* Final readback below retains unverified resources. */ }
         }
-      }
+      } else await releaseConsumers();
       for (const item of workerGone ? doomed : []) {
         onProgress(item.kind === 'r2' ? `Purging and removing ${item.kind}:${item.name}` : `Removing ${item.kind}:${item.name}`);
         try {
