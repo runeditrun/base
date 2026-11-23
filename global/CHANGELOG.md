@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.132
+
+Signed: Run Edit Run fleet, 2026-11-23.
+
+### Native Cloudflare deploy and removal
+
+- Native deploy adapters can recover a verified Worker upload when a later deploy step fails. A retry can adopt the upload, and removal can remove it after verifying its identity. Native removal can also resume Cloudflare’s bulk purge for non-empty R2 buckets.
+
+### Business MCP calls
+
+- Business commands and the MCP bridge reuse a bearer from private local state until it is within 60 seconds of expiry. If the server refuses it with HTTP 401, rer discards it and retries once.
+
 ## 0.2.131
 
 Signed: Run Edit Run fleet, 2026-11-22.
