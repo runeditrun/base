@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.133
+
+Signed: Run Edit Run fleet, 2026-11-23.
+
+### Hosted sign-in and first local start
+
+- Hosted `rer signin` prints the one-time owner link on a single `RER_OPEN` line.
+- `rer setup` and `rer dev` retry local D1 migrations once after Wrangler reports an internal error with a reference ID. SQL errors stop immediately.
+- If the computer is above the configured load threshold, a checkout's first `rer dev` waits up to 10 minutes and reports progress every 20 seconds.
+
+### Native Cloudflare removal
+
+- Before deleting a Worker by name, rer checks that the recorded deployment is still serving. If the Worker has been replaced, removal stops and preserves the remaining data. Retried Worker and R2 deletions also recheck the resource identity.
+
 ## 0.2.132
 
 Signed: Run Edit Run fleet, 2026-11-23.
