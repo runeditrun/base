@@ -2,8 +2,7 @@ import { createInterface } from 'node:readline';
 import { Api } from './api.mjs';
 import { mcpClient } from './questions.mjs';
 import { paired } from './local-commands.mjs';
-import { describe } from './errors.mjs';
-import { maskDeviceText } from './run-mask.mjs';
+import { describe, redact } from './errors.mjs';
 import { refusalView, toolRefusal, serverSaid } from './refusal.mjs';
 
 const protocolVersion = '2025-11-25';
@@ -16,9 +15,9 @@ export async function bridge({ input = process.stdin, output = process.stdout, e
  let session;
  const connection = () => session ??= (async () => {
   const { state, credential } = await paired();
-  return mcpClient(new Api(state.origin, credential));
+  return mcpClient(new Api(state.origin, credential), state);
  })().catch(error => { session = undefined; throw error; });
- const send = message => output.write(maskDeviceText(JSON.stringify({ jsonrpc: '2.0', ...message })) + '\n');
+ const send = message => output.write(redact(JSON.stringify({ jsonrpc: '2.0', ...message })) + '\n');
  const fail = (id, code, text) => send({ id, error: { code, message: text } });
 
  async function handle(message) {

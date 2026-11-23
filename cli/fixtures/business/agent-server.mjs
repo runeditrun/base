@@ -36,7 +36,9 @@ export async function agentServer(t, device) {
   if (request.url === '/api/business/executors/token') {
    if (token !== device) return json(401, { error: 'unknown device' });
    const bearer = `bz_task_fixture-${++state.mints}`; state.bearers.add(bearer);
-   return json(200, { access_token: bearer, token_type: 'Bearer', expires_in: 300, expires_at: new Date(Date.now() + 300_000).toISOString(), audience: `${state.origin}/api/business/mcp`, task_id: null });
+   const expiresIn = state.tokenLifetime ?? 300;
+   state.lastExpiry = Date.now() + expiresIn * 1_000;
+   return json(200, { access_token: bearer, token_type: 'Bearer', expires_in: expiresIn, expires_at: new Date(state.lastExpiry).toISOString(), audience: `${state.origin}/api/business/mcp`, task_id: null });
   }
   if (request.url !== '/api/business/mcp') return json(404, { error: 'no route' });
   if (!state.bearers.has(token) || state.stale.has(token)) return json(401, { error: 'bearer expired' });

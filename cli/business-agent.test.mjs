@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import { setTimeout as delay } from 'node:timers/promises';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,10 +19,13 @@ async function paired(t) {
  const remote = await agentServer(t, device);
  const home = join(root, 'home');
  await mkdir(join(home, '.rer/business'), { recursive: true });
- await writeFile(join(home, '.rer/business/state.json'), JSON.stringify({ origin: remote.origin, businessId: 'biz', executorId: 'executor1', credentialVersion: 2 }));
  const credentials = join(home, 'credentials'), calls = join(home, 'keychain-calls');
  await mkdir(credentials, { mode: 0o700 });
- await writeFile(join(credentials, `${credentialHandle(remote.origin, 'biz').slice(7)}.credential`), device, { mode: 0o600 });
+ async function selectBusiness(businessId) {
+  await writeFile(join(home, '.rer/business/state.json'), JSON.stringify({ origin: remote.origin, businessId, executorId: 'executor1', credentialVersion: 2 }));
+  await writeFile(join(credentials, credentialHandle(remote.origin, businessId).slice(7) + '.credential'), device, { mode: 0o600 });
+ }
+ await selectBusiness('biz');
  await writeFile(calls, '');
  const env = { PATH: process.env.PATH, HOME: home, RER_NO_UPDATE_CHECK: '1', RER_BUSINESS_CREDENTIAL_DIR: credentials, RER_TEST_KEYCHAIN_CALLS: calls, NODE_OPTIONS: `--import=${fileURLToPath(new URL('./fixtures/business/register.mjs', import.meta.url))}` };
  const start = args => spawn(process.execPath, [join(base, 'bin/rer.mjs'), 'business', ...args], { cwd: home, env, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -30,8 +34,43 @@ async function paired(t) {
   child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; });
   child.on('close', code => done({ code, stdout, stderr })); child.stdin.end();
  });
- return { remote, rer, start, calls, home };
+ return { remote, rer, start, calls, home, selectBusiness };
 }
+
+test('Business call reuses the paired MCP bearer across processes and replaces it when needed', async t => {
+ const { remote, rer, selectBusiness } = await paired(t);
+ remote.tokenLifetime = 70;
+ const call = () => rer(['call', 'installations.list', '--json']);
+ const first = await call();
+ assert.equal(first.code, 0, first.stderr);
+ const expiry = remote.lastExpiry;
+ assert.equal(remote.mints, 1);
+ assert.deepEqual(await call(), first);
+ assert.equal(remote.mints, 1, 'a second CLI process reused the same bearer');
+
+ remote.tokenLifetime = 300;
+ await delay(Math.max(0, expiry - Date.now() - 60_000));
+ assert.deepEqual(await call(), first);
+ assert.equal(remote.mints, 2, 'the still-live bearer entered its renewal window');
+
+ await selectBusiness('another-business');
+ assert.deepEqual(await call(), first);
+ assert.equal(remote.mints, 3, 'the same origin and executor paired to a different business did not reuse its bearer');
+
+ remote.httpRefusal = { route: '/api/business/mcp', status: 401, body: { error: 'bearer expired' } };
+ const refused = await call();
+ assert.equal(refused.code, 1);
+ assert.equal(remote.mints, 4, 'a refusal retried just once');
+ delete remote.httpRefusal;
+ assert.deepEqual(await call(), first);
+ assert.equal(remote.mints, 5, 'the second refused bearer was discarded too');
+
+ remote.appName = [...remote.bearers].at(-1);
+ const redacted = await call();
+ assert.equal(redacted.code, 0, redacted.stderr);
+ assert.ok(!redacted.stdout.includes(remote.appName));
+ assert.equal(remote.mints, 5);
+});
 
 test('Business HTTP and MCP refusals retain server reasons in commands, JSON and the stdio bridge without forwarding secret fields', async t => {
  const { remote, rer, start, home } = await paired(t);
