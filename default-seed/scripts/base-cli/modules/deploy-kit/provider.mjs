@@ -7,6 +7,7 @@ import { recordDeployFailure, providerText } from './diagnostics.mjs';
 import { D1_IMPORT_POLL_LIMIT, importD1, importUploadURL } from './d1-import.mjs';
 import { importDiagnostic, importResponseText } from './d1-import-diagnostics.mjs';
 import { assert, hexId, uuid } from './validation.mjs';
+import { SLOWEST_UPLINK_KBPS, bodyBytes, sendLimitMs } from './upload-timeout.mjs';
 import { providerResponse, transportOutput, transportReason, transportClass } from './provider-transport.mjs';
 
 // A gateway/server error can arrive after a write. An explicit API refusal cannot.
@@ -42,8 +43,9 @@ const redactValues = (text, values) => values.filter(Boolean).flatMap(value=>[va
   return at >= 0 && secret.startsWith(value.slice(at)) ? value.slice(0,at)+'[REDACTED]' : value;
 },text);
 /** Only this fixed origin and the explicitly selected account ever receive the token. */
-export function cloudflare({ accountId, token, fetch: request = globalThis.fetch, objectDelete = deleteR2Object, timeoutMs = 30000, maxRequests = 500, removal = false, budgetMigrations = false, requestSignal = () => undefined, settleLists = false }) {
+export function cloudflare({ accountId, token, fetch: request = globalThis.fetch, objectDelete = deleteR2Object, timeoutMs = 30000, minUploadKBps = SLOWEST_UPLINK_KBPS, maxRequests = 500, removal = false, budgetMigrations = false, requestSignal = () => undefined, settleLists = false }) {
   assert(hexId(accountId), 'invalid-cloudflare-account-id');
+  assert(Number.isFinite(minUploadKBps) && minUploadKBps > 0, 'invalid-upload-min-kbps');
   assert(typeof token === 'string' && token.trim() && !/[\r\n]/.test(token), 'invalid-cloudflare-api-token');
   // Capture an outer deadline once per operation, before transport retries.
   const deadlineSignal = caller => {
@@ -76,8 +78,10 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     const redactAuth = text => /\/r2\/buckets\/[^/]+\/(?:objects|jobs)(?:[/?]|$)/.test(path) ? '[R2 object details omitted]' : /\/d1\/database\/[^/]+\/import$/.test(path) ? redactCredentials(text).replace(/\bhttps?:\/\/\S+/gi,'[URL omitted]') : redactCredentials(text);
     const operation = `${method} ${path.split('?')[0].replace(/(\/r2\/buckets\/[^/]+\/objects)\/.*/, '$1/[object]')}`;
     const endpoint = redactCredentials(`https://api.cloudflare.com/client/v4${zone ? '' : '/accounts/[REDACTED]'}${operation.slice(method.length + 1)}`);
-    const started = performance.now(), limitMs = Math.max(1,Math.ceil(Math.min(timeoutMs,deadlineMs ?? timeoutMs)));
-    const detail = (status, cause) => ({method,endpoint:endpoint.replace('https://api.cloudflare.com',''),status,elapsedMs:Math.round(performance.now()-started),timeoutMs:limitMs,cause});
+    // A send gets the base limit plus the time its bytes need at the slowest uplink tolerated.
+    const sent = bodyBytes(body), sendMs = sendLimitMs(timeoutMs,sent,minUploadKBps);
+    const started = performance.now(), limitMs = Math.max(1,Math.ceil(Math.min(sendMs,deadlineMs ?? sendMs)));
+    const detail = (status, cause) => ({method,endpoint:endpoint.replace('https://api.cloudflare.com',''),status,elapsedMs:Math.round(performance.now()-started),timeoutMs:limitMs,cause,...(sent ? {bytes:sent,minUploadKBps} : {})});
     const failureStep = step ?? `${method} ${operation.slice(method.length + 1)}`;
     // Historical version content contains base64 for every Worker module.
     const responseLimit = method === 'GET' && /^\/workers\/workers\/[^/]+\/versions\/[^/?]+\?include=modules$/.test(path)
@@ -206,7 +210,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     const failure = (cause, attempts, status = null) => recordDeployFailure(importDiagnostic(Object.assign(new Error('d1-import-upload-transport-failed'),
       {providerTransport:{operation:'PUT D1 import upload',endpoint:'https://[REDACTED].r2.cloudflarestorage.com/[D1 import upload]',attempts,status,reason:transportReason(cause)}}),
       {step:'upload',status,redact,cause}), {});
-    const {response,output = ''} = await providerResponse({method:'PUT',timeoutMs,callerSignal:deadlineSignal(),
+    const {response,output = ''} = await providerResponse({method:'PUT',timeoutMs:sendLimitMs(timeoutMs,bytes.length,minUploadKBps),callerSignal:deadlineSignal(),
       reserveRetry:() => requests < maxRequests && (++requests, true),
       send:signal => request(destination, { method:'PUT', redirect:'error', signal, headers:{'Content-Length':String(bytes.length)}, body:bytes }),
       failure,

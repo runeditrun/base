@@ -64,7 +64,8 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,p
     && pendingUpload.provider?.etag === existing.etag && existing.version?.annotations?.['workers/message'] === `rer-deploy:${fingerprint}`;
   let upload;
   onProgress?.(unchanged || resumedUpload ? 'Verifying the deployed Worker' : 'Publishing the Worker and reconciling routes and triggers');
-  if (!unchanged) { window.start(); if (!resumedUpload) upload = await uploadWorker(api,{plan,artifact,bindings,secrets,migration,fingerprint}); }
+  // The 90 s readiness window times the wait after the upload, so it starts once the upload has finished, not before a slow one.
+  if (!unchanged) { if (!resumedUpload) upload = await uploadWorker(api,{plan,artifact,bindings,secrets,migration,fingerprint}); window.start(); }
   if (!unchanged) api = readinessAPI(api, window);
   const published = unchanged || resumedUpload ? existing : await uploadedWorker({api,worker:plan.worker,upload,previous:existing,fingerprint,window}); assert(published,'missing-deployed-worker');
   if (plan.limits?.cpu_ms !== undefined) assert(published.settings.limits?.cpu_ms === plan.limits.cpu_ms, 'worker-cpu-limit-readback-mismatch');

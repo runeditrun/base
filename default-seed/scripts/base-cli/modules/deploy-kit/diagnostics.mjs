@@ -140,7 +140,7 @@ export function providerFailure(error, redact = String) {
   const retained = failures.get(error)?.providerRequest;
   if (retained) {
     const step = providerText(failures.get(error).step,redact,200);
-    const cause = retained.cause === 'timeout' ? `timeout after ${retained.timeoutMs / 1000} s (limit ${retained.timeoutMs} ms)` : retained.cause === 'connection timeout' ? `connection timeout (per-call limit ${retained.timeoutMs} ms)` : retained.cause;
+    const cause = retained.cause === 'timeout' ? `timeout after ${Math.round(retained.timeoutMs / 1000)} s (limit ${retained.timeoutMs} ms${retained.bytes ? `, sized for ${retained.bytes} bytes at ${retained.minUploadKBps} kB/s; on a slower link set RER_UPLOAD_MIN_KBPS lower, for example RER_UPLOAD_MIN_KBPS=${Math.max(1,Math.floor(retained.minUploadKBps / 4))}, then run the command again` : ''})` : retained.cause === 'connection timeout' ? `connection timeout (per-call limit ${retained.timeoutMs} ms)` : retained.cause;
     const body = providerText(failures.get(error).output ?? '',redact,300);
     const outcome = retained.status === null ? cause : `HTTP ${retained.status}${retained.cause === 'HTTP refusal' ? '' : `; ${cause}`}`;
     const specific = providerRefusal(error,redact) ?? providerTransport(error,redact);

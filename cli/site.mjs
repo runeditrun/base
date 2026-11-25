@@ -147,9 +147,10 @@ export async function siteCommand(project, options, store, signal, out) {
  if (!options.json) for (const line of human) out.human(line);
  const { cloudflare } = await import('../modules/deploy-kit/provider.mjs');
  const { siteDeploy, siteReadbackSummary } = await import('../modules/deploy-kit/site.mjs');
+ const { uploadMinKBps } = await import('../modules/deploy-kit/upload-timeout.mjs');
  const environment = options.environment ?? 'production';
  try {
-  const api = cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN, settleLists: true, requestSignal: () => signal });
+  const api = cloudflare({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN, settleLists: true, minUploadKBps: uploadMinKBps(process.env), requestSignal: () => signal });
   // The receipt is for the person; ownership is read from the provider, so a fresh checkout deploys too.
   const result = await siteDeploy({ api, plan, files, receiptPath: join(project.root, '.rer', 'deploy', `site-${environment}.json`) });
   return { dryRun: false, deployed: true, origin: result.origin, site: summary };

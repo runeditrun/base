@@ -22,6 +22,7 @@ import { refuseLocalModels } from './local-only.mjs';
 import { validateMigrations } from './migrations.mjs';
 import { publicOrigin } from './public-origin.mjs';
 import { switchableDefaults } from '../../cli/deploy-settings.mjs';
+import { uploadMinKBps } from './upload-timeout.mjs';
 
 export const cronNotice = 'This Worker has a Cron Trigger. Cloudflare may take up to about two hours to start its first scheduled run on some accounts.';
 const usage = 'usage: owner-cli.mjs deploy|dry-run|local-plan|health|remove|inspect|record-owner|signin|rekey|settle --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
@@ -129,7 +130,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     return request(input, {...init,signal:requestAbort});
   };
   // Transport must see the same outer signal when deciding whether to retry.
-  const api = deploymentDiagnostics(cloudflare({accountId:env.CLOUDFLARE_ACCOUNT_ID,token:env.CLOUDFLARE_API_TOKEN,fetch:guardedRequest,requestSignal,budgetMigrations:command === 'deploy',...(command === 'remove' ? {maxRequests:Infinity,removal:true} : {})}),{onCreated});
+  const api = deploymentDiagnostics(cloudflare({accountId:env.CLOUDFLARE_ACCOUNT_ID,token:env.CLOUDFLARE_API_TOKEN,fetch:guardedRequest,requestSignal,minUploadKBps:uploadMinKBps(env),budgetMigrations:command === 'deploy',...(command === 'remove' ? {maxRequests:Infinity,removal:true} : {})}),{onCreated});
   const statePath = values.state ? resolve(root,values.state) : join(root,'.rer','deploy',`${values.environment}.json`);
   // Every follow-up uses the app record's resolved name, including native
   // uploaders' prefixes. Removal needs no routable origin or completed receipt.
