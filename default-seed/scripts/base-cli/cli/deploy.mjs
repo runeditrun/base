@@ -9,7 +9,7 @@ import { missing, invalid, refuse, RerError } from './errors.mjs';
 import { localOnlyBinding } from '../modules/deploy-kit/owner.mjs';
 import { workerReplacementRecovery } from '../modules/deploy-kit/owner-settings.mjs';
 import { workerLimitsMessage } from '../modules/deploy-kit/worker-limits.mjs';
-import { secretFailureMessage } from './deploy-secret-error.mjs';
+import { secretFailureMessage, secretChangeMessage } from './deploy-secret-error.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
 import { claimHostedOwner } from './deploy-owner.mjs';
@@ -112,7 +112,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
     step = 'secrets';
     const bindings = (options.setSecret ?? options.unsetSecret).split(','), flag = options.setSecret ? '--set' : '--unset';
     await owner('secret', [...bindings.flatMap(binding => [flag, binding]), ...(state ? ['--state', state] : [])]);
-    store.report(`${options.setSecret ? 'Set' : 'Removed'} ${bindings.join(', ')} on this environment's Worker as one new version, recorded it and verified hosted readiness.`, { names: bindings });
+    store.report(`${options.setSecret ? 'Set' : 'Removed'} ${bindings.join(', ')} on this environment's Worker as one new version that keeps every other setting of the live version, recorded it and verified hosted readiness. Nothing else to run: ${again} and ~/.local/bin/rer signin recognise this version.`, { names: bindings });
     return { bindings, present: Boolean(options.setSecret), deployed: false };
    }
    store.report(`Deploying the ${environment} environment to your Cloudflare account.`);
@@ -191,7 +191,7 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
  const limitsMessage = workerLimitsMessage(code);
  if (limitsMessage) return limitsMessage;
  const at = step === 'deploy' ? diagnostic?.step ?? 'prepare deploy' : step;
- const secrets = secretFailureMessage(error);
+ const secrets = secretFailureMessage(error) ?? secretChangeMessage(error, again, retry);
  if (secrets) return secrets;
  if (code === 'nothing-to-remove') return `The deployment record selected by ${again} has no resources that rer owns, so --remove deletes nothing.`;
  if (code === 'owner-token-retirement-failed') return `The application is deployed at ${deployed?.origin}; owner ${error.owner}; setup token retirement failed (${redact(String(error.cause))}${providerFailure(error,redact) ? `; ${providerFailure(error,redact)}` : ''}). Run ${again} --unset-secret ${error.tokenKey ?? 'SETUP_TOKEN'} using the same environment credentials, or run ${again} again to finish.`;

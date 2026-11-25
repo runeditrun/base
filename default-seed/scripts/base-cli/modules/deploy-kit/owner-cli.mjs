@@ -12,7 +12,7 @@ import { regularBytes } from './artifact.mjs';
 import { packageBuild } from './prepare.mjs';
 import { cloudflare } from './provider.mjs';
 import { limitsForAccount, workerLimitsMessage } from './worker-limits.mjs';
-import { ownerTarget, ownerStateTarget, recordedOwnerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState, workerSettings, withScopeHints } from './owner.mjs';
+import { ownerTarget, ownerStateTarget, recordedOwnerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState, workerSettings, withScopeHints, unsettledSecret, assertSettledReceipt } from './owner.mjs';
 import { activeWorker, secretBindings } from './worker.mjs';
 import { ownerSecret } from './owner-secret.mjs';
 import { ownerRemove } from './owner-remove.mjs';
@@ -146,18 +146,18 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     const undeclared = named.filter(binding => !declared.some(entry => entry?.binding === binding));
     if (undeclared.length) { const error = new Error('undeclared-secret'); error.resource = undeclared.map(binding => `secret:${binding}`).join(', '); throw error; }
     const changes = named.map(binding => ({binding, value:values.set === undefined ? undefined : env[declared.find(entry => entry?.binding === binding).environment], ...(values.unset !== undefined && Object.hasOwn(publicDefaults,binding) ? {publicDefault:publicDefaults[binding]} : {})}));
-    return {ok:true,...await ownerSecret({api,target,statePath,changes,fetch,healthOptions,settle,signal}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
+    return {ok:true,...await ownerSecret({api,target,statePath,changes,fetch,healthOptions,settle,signal,notice}).catch(error => { throw api.annotateFailure(error,'secrets'); })};
   }
   // A secret rer retired (the spent setup token) is no longer part of the plan.
   // A dry run only reads state: settling an interrupted change may write it.
-  const state = command === 'dry-run' ? await readOwnerState(statePath,target) : await settleOwnerState({api,target,statePath,settle});
-  if (command === 'dry-run') assert(!state.pendingSecret, 'secret-change-unsettled');
+  const state = command === 'dry-run' ? await readOwnerState(statePath,target) : await settleOwnerState({api,target,statePath,settle,notice});
+  if (command === 'dry-run' && state.pendingSecret) throw unsettledSecret(state);
   // Settled or refused: a caller about to run foreign code never proceeds on an unsettled record.
-  if (command === 'settle') { assert(!state.pendingSecret, 'secret-change-unsettled'); return {ok:true}; }
+  if (command === 'settle') { if (state.pendingSecret) throw unsettledSecret(state); return {ok:true}; }
   const {retiredSecrets = []} = state;
   if (command === 'record-owner') return withStateLock(statePath, async () => {
     const current = await readOwnerState(statePath, target);
-    assert(current.receipt && !current.pendingUpload && !current.pendingSecret, 'missing-owner-receipt');
+    assertSettledReceipt(current);
     const live = await activeWorker(api, target.worker);
     assert(live && sameDeployment(live, current.receipt.provider), 'owned-resource-replaced');
     current.ownerClaim = { outcome: values.outcome };
@@ -168,7 +168,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   if (command === 'signin') return {ok:true,...await ownerSignin({api,target,statePath,settle,notice}).catch(error => { throw api.annotateFailure(error,'signin'); })};
   if (command === 'inspect') {
     assert(!localOnlyBinding(declaration, localOnlyKeys), 'local-only-binding');
-    assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');
+    assertSettledReceipt(state);
     const live = await activeWorker(api, target.worker);
     assert(live && sameDeployment(live, state.receipt.provider), 'owned-resource-replaced');
     const rows = await api.request(`/workers/scripts/${target.worker}/secrets`);

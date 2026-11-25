@@ -5,7 +5,7 @@ import { activeWorker } from './worker.mjs';
 import { secretNames, validSecretNames } from './owner-secret-names.mjs';
 import { waitHealth } from './health-request.mjs';
 import { definiteProviderRefusal } from './provider.mjs';
-import { readOwnerState, writeOwnerState, withStateLock, withScopeHints, withSettledLists, sameDeployment, refuse, recordSecretChange, settlePendingSecret } from './owner.mjs';
+import { readOwnerState, writeOwnerState, withStateLock, withScopeHints, withSettledLists, sameDeployment, refuse, recordSecretChange, settlePendingSecret, unsettledSecret } from './owner.mjs';
 import { uploadSecretCopy, deploySecretCopy } from './owner-secret-copy.mjs';
 
 /** Set (each `value` given) or remove Worker secrets of the owner's last deployment as one
@@ -21,7 +21,7 @@ import { uploadSecretCopy, deploySecretCopy } from './owner-secret-copy.mjs';
  * deployment is still live. An ambiguous one-secret rotation
  * re-PUTs the value before accepting its successor as proof of the rotation.
  * A removed declared secret is retired: later plans omit it until it is set again. */
-export async function ownerSecret({api: provider, target, statePath, changes, fetch = globalThis.fetch, healthOptions = {}, settle = {}, windowMs = 30000, clock = () => performance.now(), sleep, signal}) {
+export async function ownerSecret({api: provider, target, statePath, changes, fetch = globalThis.fetch, healthOptions = {}, settle = {}, windowMs = 30000, clock = () => performance.now(), sleep, signal, notice}) {
   const api = withSettledLists(withScopeHints(provider),{...settle,signal});
   const bindings = changes.map(change => change.binding), present = changes[0]?.value !== undefined;
   assert(bindings.length && bindings.every(identifier) && validSecretNames(bindings), 'invalid-secret-name');
@@ -32,11 +32,11 @@ export async function ownerSecret({api: provider, target, statePath, changes, fe
     assert(state.receipt && !state.pendingUpload, 'missing-owner-receipt');
     // A copy uploaded but never deployed is that earlier change: finish it first.
     const deployCopy = version => deploySecretCopy(api, target.worker, version);
-    if (await settlePendingSecret(api, target.worker, state, {preflight:true, deployCopy})) await writeOwnerState(statePath, state);
+    if (await settlePendingSecret(api, target.worker, state, {preflight:true, deployCopy, notice})) await writeOwnerState(statePath, state);
     const live = await activeWorker(api, target.worker);
     if (!live) throw refuse('owned-resource-missing', 'worker', target.worker);
     if (!sameDeployment(live, state.receipt.provider)) throw refuse('owned-resource-replaced', 'worker', target.worker);
-    assert(!state.pendingSecret, 'secret-change-unsettled');
+    if (state.pendingSecret) throw unsettledSecret(state);
     const path = `/workers/scripts/${target.worker}/secrets`;
     const names = secretNames(await api.request(path));
     assert(names, 'invalid-secret-list');
@@ -56,9 +56,10 @@ export async function ownerSecret({api: provider, target, statePath, changes, fe
       else if (present) await put();
       else if (changed) await api.request(`${path}/${writes[0].binding}`, {method:'DELETE'});
     } catch (error) {
-      // A refused upload changed nothing. A copy uploaded but refused deployment stays
+      // A refused upload changed nothing, and neither did a copy that does not run what the
+      // live version runs: it is never deployed. A copy uploaded but refused deployment stays
       // pending: the same command deploys it next time, as this change and no other.
-      if (definiteProviderRefusal(error) && !uploaded) { delete state.pendingSecret; await writeOwnerState(statePath, state); throw error; }
+      if (!uploaded && (definiteProviderRefusal(error) || error.message === 'secret-copy-settings-changed')) { delete state.pendingSecret; await writeOwnerState(statePath, state); throw error; }
       if (definiteProviderRefusal(error)) { await writeOwnerState(statePath, state); throw error; }
       signal?.throwIfAborted();
       failure = error;
@@ -68,6 +69,7 @@ export async function ownerSecret({api: provider, target, statePath, changes, fe
       else for (const start = clock(); ; await pause(2000,signal,sleep)) {
         try {
           if (await settlePendingSecret(api, target.worker, state, {
+            notice,
             observe: current => { unchanged = sameDeployment(current, state.receipt.provider); },
             // A copy whose upload or deployment answer was lost is deployed here once it is found.
             ...(copy ? {deployCopy} : {}),
@@ -88,7 +90,7 @@ export async function ownerSecret({api: provider, target, statePath, changes, fe
           if (confirming) throw error;
           if (error.message !== 'provider-transport-failed' && !(error.status >= 500 && error.status < 600)) throw error;
         }
-        if (clock() - start + 2000 > windowMs) throw failure ?? new Error('secret-change-unsettled');
+        if (clock() - start + 2000 > windowMs) throw failure ?? unsettledSecret(state);
       }
     } catch (error) {
       if (unchanged && failure) delete state.pendingSecret;

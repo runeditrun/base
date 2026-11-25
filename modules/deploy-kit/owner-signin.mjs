@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { assert } from './validation.mjs';
 import { query } from './migrations.mjs';
 import { literal } from './migration-ledger.mjs';
-import { checkWorkerIdentity, readOwnerState, withScopeHints, withSettledLists, withStateLock, writeOwnerState } from './owner.mjs';
+import { assertSettledReceipt, checkWorkerIdentity, readOwnerState, withScopeHints, withSettledLists, withStateLock, writeOwnerState } from './owner.mjs';
 import { OWNER_SIGNIN_PATH, OWNER_SIGNIN_SECONDS, ownerSigninDigest } from '../operator-auth/owner-signin-grant.mjs';
 
 /** `rer signin`: with the same Cloudflare credentials that deployed this Worker, write a
@@ -17,7 +17,7 @@ export async function ownerSignin({ api: provider, target, statePath, clock = Da
 
 async function signinLocked({api,target,statePath,clock,notice}) {
   const state = await readOwnerState(statePath, target);
-  assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');
+  assertSettledReceipt(state);
   await checkWorkerIdentity(api, target.worker, state, () => writeOwnerState(statePath,state), {adoptSettings:true,notice});
   const ids = Object.values(state.owned.d1).filter(entry => entry.status === 'created' && entry.id).map(entry => entry.id);
   const holding = [];
