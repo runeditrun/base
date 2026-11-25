@@ -5,11 +5,11 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { signinCommand } from '../../../cli/signin.mjs';
-import { main } from '../owner-cli.mjs';
+import { main, report } from '../owner-cli.mjs';
 import { cloudflare } from '../provider.mjs';
 import { ownerProvider } from './owner-provider.mjs';
 
-async function setup(t) {
+async function setup(t, workersSettings = {free_tier:false}) {
   const root = await realpath(await mkdtemp(join(tmpdir(),'rer-worker-settings-')));
   t.after(() => rm(root,{recursive:true,force:true}));
   for (const path of ['dist/server','dist/client','migrations/core']) await mkdir(join(root,path),{recursive:true});
@@ -31,12 +31,14 @@ async function setup(t) {
   await writeFile(join(root,'.gitignore'),'dist/\n.rer/\n');
   const git = (...args) => execFileSync('git',['-c','user.name=Fixture','-c','user.email=fixture@example.test','-c','commit.gpgsign=false',...args],{cwd:root,stdio:'pipe'});
   git('init','-q'); git('add','.'); git('commit','-qm','Seed fixture');
-  const provider = ownerProvider(); t.after(() => provider.close());
+  const provider = ownerProvider({workersSettings}); t.after(() => provider.close());
   const {state,fetch,token,accountId} = provider, api = cloudflare(provider), worker = 'settings-production';
   const creds = {CLOUDFLARE_ACCOUNT_ID:accountId,CLOUDFLARE_API_TOKEN:token};
   const notices = [];
-  const run = () => main(['deploy','--declaration',declaration,'--environment','production'],{...creds,MAIL_KEY:'test-only-mail-key'},
+  const args = ['--declaration',declaration,'--environment','production'];
+  const run = (command = 'deploy') => main([command,...args],{...creds,MAIL_KEY:'test-only-mail-key'},
     {cwd:root,fetch,notice:line => notices.push(line)});
+  const offline = () => main(['local-plan',...args],{},{cwd:root,fetch:() => assert.fail('offline plan contacted Cloudflare')});
   const statePath = join(root,'.rer/deploy/production.json');
   const record = async () => JSON.parse(await readFile(statePath,'utf8'));
   await run();
@@ -49,10 +51,11 @@ async function setup(t) {
     finally { for (const [key,value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } }
   };
   const patch = body => api.request(`/workers/scripts/${worker}/settings`,{method:'PATCH',body});
-  return {state,api,worker,build,run,record,statePath,notices,patch,signin};
+  const settings = () => api.request(`/workers/scripts/${worker}/settings`);
+  return {state,api,worker,build,run,record,statePath,notices,patch,settings,signin,offline,fail:provider.fail};
 }
 
-test('signin and deploy record an authenticated settings change and deploy sends the built Wrangler limits',async t => {
+test('Workers Paid deploys and redeploys Wrangler limits and keeps them when it adopts a settings-only version',async t => {
   const f = await setup(t);
   const initial = (await f.record()).receipt.provider;
   const limits = {cpu_ms:30000,subrequests:150};
@@ -79,13 +82,61 @@ test('signin and deploy record an authenticated settings change and deploy sends
   await f.build(limits);
   const upgraded = await f.run();
   assert.equal(upgraded.changed,true);
-  assert.deepEqual(f.state.version.resources.script_runtime.limits,limits);
+  const checkSettings = async () => {
+    const {usage_model, limits:reportedLimits} = await f.settings();
+    assert.deepEqual({usage_model,limits:reportedLimits},{usage_model:'standard',limits});
+  };
+  await checkSettings();
   assert.deepEqual((await f.record()).receipt.config.limits,limits);
   assert.equal((await f.record()).settingsAdoption.provider.versionId,adjusted);
 
+  await f.patch({compatibility_flags:['nodejs_compat']});
+  const matchingVersion = f.state.version.id;
+  const adopted = await f.run();
+  assert.equal(adopted.changed,false);
+  assert.equal(adopted.versionId,matchingVersion);
+  assert.deepEqual((await f.record()).receipt.config.limits,limits);
+  await checkSettings();
+
   await f.patch({limits:{...limits,cpu_ms:45000}});
-  assert.equal((await f.run()).changed,true);
-  assert.deepEqual(f.state.version.resources.script_runtime.limits,limits);
+  f.fail('PUT',/^\/workers\/scripts\/settings-production$/,{afterApply:true});
+  await assert.rejects(f.run());
+  const uploaded = f.state.version.id;
+  await checkSettings();
+  assert.equal((await f.run()).versionId,uploaded,'the retry adopts the completed upload');
+  await checkSettings();
+  assert.equal((await f.run()).changed,false);
+});
+
+test('Workers Free omits the CPU override and an unreadable or ambiguous plan stops deployment',async t => {
+  const workersSettings = {free_tier:null};
+  const f = await setup(t,workersSettings);
+  const limits = {cpu_ms:12_345};
+  await f.build(limits);
+  assert.deepEqual((await f.offline()).plan.workersPaidLimits,limits);
+
+  const writes = f.state.writes.length;
+  f.fail('GET',/^\/workers\/settings$/,{status:403});
+  for (const message of [/Workers settings could not be read.*account and API token/,/Workers settings did not identify the account plan/]) {
+    await assert.rejects(f.run(),error => {
+      assert.match(report(error).message,message);
+      return true;
+    });
+    assert.equal(f.state.writes.length,writes,'limits lookup stopped all provider writes');
+  }
+  workersSettings.free_tier = true;
+  const preview = await f.run('dry-run');
+  assert.equal(preview.deployed,false);
+  assert.equal(Object.hasOwn(preview,'limits'),false);
+  assert.equal(f.state.writes.length,writes);
+  await f.run();
+  assert.equal(Object.hasOwn(await f.settings(),'limits'),false);
+
+  workersSettings.free_tier = false;
+  assert.equal((await f.run()).changed,true,'an account upgrade applies the limit with the same source');
+  const paid = await f.settings();
+  assert.deepEqual(paid.limits,limits);
+  assert.equal(paid.usage_model,'standard');
   assert.equal((await f.run()).changed,false);
 });
 

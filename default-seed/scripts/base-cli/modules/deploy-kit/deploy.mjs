@@ -59,7 +59,7 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,p
   const window = readiness.window ?? readinessWindow({...(healthOptions.now ? {clock:healthOptions.now} : {}), ...(healthOptions.sleep ? {sleep:healthOptions.sleep} : {}), ...readiness});
   // Owner mode already authenticated this pending version against its saved
   // intent. Finish its routing/triggers/receipt instead of publishing it twice.
-  const resumedUpload = pendingUpload?.fingerprint === fingerprint && existing
+  const resumedUpload = pendingUpload?.fingerprint === fingerprint && existing && limitsMatch
     && pendingUpload.provider?.versionId === existing.versionId && pendingUpload.provider?.deploymentId === existing.deploymentId
     && pendingUpload.provider?.etag === existing.etag && existing.version?.annotations?.['workers/message'] === `rer-deploy:${fingerprint}`;
   let upload;
@@ -67,6 +67,7 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,p
   if (!unchanged) { window.start(); if (!resumedUpload) upload = await uploadWorker(api,{plan,artifact,bindings,secrets,migration,fingerprint}); }
   if (!unchanged) api = readinessAPI(api, window);
   const published = unchanged || resumedUpload ? existing : await uploadedWorker({api,worker:plan.worker,upload,previous:existing,fingerprint,window}); assert(published,'missing-deployed-worker');
+  if (plan.limits?.cpu_ms !== undefined) assert(published.settings.limits?.cpu_ms === plan.limits.cpu_ms, 'worker-cpu-limit-readback-mismatch');
   verifyBindings(published.settings.bindings,bindings);
   verifyScheduledHandler(published,plan);
   // Finish routing activation before applying schedules to this deployment.

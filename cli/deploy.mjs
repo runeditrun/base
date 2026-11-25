@@ -8,6 +8,7 @@ import { contained } from './project.mjs';
 import { missing, invalid, refuse, RerError } from './errors.mjs';
 import { localOnlyBinding } from '../modules/deploy-kit/owner.mjs';
 import { workerReplacementRecovery } from '../modules/deploy-kit/owner-settings.mjs';
+import { workerLimitsMessage } from '../modules/deploy-kit/worker-limits.mjs';
 import { secretFailureMessage } from './deploy-secret-error.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
@@ -187,6 +188,8 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
  if (readiness) return readiness;
  const diagnostic = deployDiagnostic(error, redact);
  const code = diagnostic?.code ?? (/^[a-zA-Z0-9_-]{1,120}$/.test(error.message) ? redact(error.message) : 'deploy-failed');
+ const limitsMessage = workerLimitsMessage(code);
+ if (limitsMessage) return limitsMessage;
  const at = step === 'deploy' ? diagnostic?.step ?? 'prepare deploy' : step;
  const secrets = secretFailureMessage(error);
  if (secrets) return secrets;

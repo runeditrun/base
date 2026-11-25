@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.133-dev.gea4e5998",
+  "cliVersion": "0.2.133-dev.g92192906",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -903,7 +903,7 @@
     },
     "cli/deploy-plan.mjs": {
       "source": "cli/deploy-plan.mjs",
-      "sha256": "1b63b4006d489c8dbd5c988305663de18f31962909d12fef56593407781117d6"
+      "sha256": "ce82ca8f2e0f19abed826758884fd8bb93fcaa5bdb669b5da66205f325265aff"
     },
     "cli/deploy-policy.mjs": {
       "source": "cli/deploy-policy.mjs",
@@ -943,7 +943,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "84c059fe47e4e435efe8fd1430d8658f905395fe438e60d3e873f8fe942f3c0c"
+      "sha256": "039b2697402299f5368604d7249d8e56442bc1a0929672135af77672fa6381f4"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
@@ -2891,7 +2891,7 @@
     },
     "modules/deploy-kit/README.md": {
       "source": "modules/deploy-kit/README.md",
-      "sha256": "e25d114c6e1337b5ad2ac37997577ba12238e1cd52184a505bde6c1d698a323a"
+      "sha256": "e5b910d3a31436fb3109ca904c7d3a76b792b4c7dede87190f22a6d5e9c1503d"
     },
     "modules/deploy-kit/artifact.mjs": {
       "source": "modules/deploy-kit/artifact.mjs",
@@ -2935,7 +2935,7 @@
     },
     "modules/deploy-kit/deploy.mjs": {
       "source": "modules/deploy-kit/deploy.mjs",
-      "sha256": "835790b9ef3079246f596d5c8ea7a3da2af3dba53cb444e356eb0b20bd530b2a"
+      "sha256": "b1937fb1e14f32d614ba088e2cae0f1b995170b70351ac9724b9ffbb68bb2dc8"
     },
     "modules/deploy-kit/diagnostics.mjs": {
       "source": "modules/deploy-kit/diagnostics.mjs",
@@ -2987,7 +2987,7 @@
     },
     "modules/deploy-kit/owner-cli.mjs": {
       "source": "modules/deploy-kit/owner-cli.mjs",
-      "sha256": "d4fc69c17f9e670443f13d9b36c5e41f71fc6162b3b3a99f0f4aaf1a3fafa80d"
+      "sha256": "c068e2d9f2f926e92800e6f86dce9afc7458caef9eb8eb2923a44d09037e5c6c"
     },
     "modules/deploy-kit/owner-rekey.mjs": {
       "source": "modules/deploy-kit/owner-rekey.mjs",
@@ -3019,7 +3019,7 @@
     },
     "modules/deploy-kit/owner.mjs": {
       "source": "modules/deploy-kit/owner.mjs",
-      "sha256": "3725479e59ef5a618b5e8075693e33b299069775750309cb6109bc69222fa7e2"
+      "sha256": "516063f6c1fb6dd11ea00add8af6a5fb6557232ba2ac650cd7b30039b849d2cc"
     },
     "modules/deploy-kit/pagination.mjs": {
       "source": "modules/deploy-kit/pagination.mjs",
@@ -3112,6 +3112,10 @@
     "modules/deploy-kit/validation.mjs": {
       "source": "modules/deploy-kit/validation.mjs",
       "sha256": "930902dc22039596936ad7757b4cb64ef78be03310ce4b08af62ee6ee7ba681c"
+    },
+    "modules/deploy-kit/worker-limits.mjs": {
+      "source": "modules/deploy-kit/worker-limits.mjs",
+      "sha256": "25544ccdaa222bf57a32358592490ebb9fa5260f6da9970ccddaa8cae385109d"
     },
     "modules/deploy-kit/worker.mjs": {
       "source": "modules/deploy-kit/worker.mjs",

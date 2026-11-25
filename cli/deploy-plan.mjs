@@ -4,6 +4,7 @@ import { deployPermissions } from './deploy-needs.mjs';
 // databases have applied. Keep that distinction in the human summary.
 export function deployPlanLines(plan, declaration) {
  const lines = ['Would deploy:', `  Worker: ${plan.worker}`];
+ if (plan.workersPaidLimits) lines.push(`  CPU limit: ${plan.workersPaidLimits.cpu_ms} ms on Workers Paid (account plan checked on deploy).`);
  for (const database of plan.d1) lines.push(`  D1 database: ${database.name} (${database.migrations.length} declared migration${database.migrations.length === 1 ? '' : 's'})`);
  if (!plan.d1.length) lines.push('  D1 databases: none');
  for (const [kind, label] of [['r2', 'R2 storage'], ['kv', 'KV storage'], ['queues', 'Queue'], ['services', 'Worker service']]) {

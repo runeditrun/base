@@ -1,7 +1,7 @@
 import { DatabaseSync } from '../../container/adapters/d1-sqlite.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { hash } from '../validation.mjs';
-export function providerFixture({handlers = ['fetch','scheduled']} = {}) {
+export function providerFixture({handlers = ['fetch','scheduled'], workersSettings} = {}) {
   const accountId = 'a'.repeat(32); const token = 'test-only-provider-token';
   const state = {calls:[],writes:[],databases:[],buckets:[],queues:[],namespaces:[],settings:null,version:null,deployments:[],secrets:[],content:new Map(),subdomain:false,schedules:[],objects:new Map(),failSql:null,healthOverride:null};
   // Model the provider's detected-handler response at the network edge. Tests
@@ -44,6 +44,7 @@ export function providerFixture({handlers = ['fetch','scheduled']} = {}) {
     if (url.origin !== 'https://api.cloudflare.com' || !url.pathname.startsWith(`/client/v4/accounts/${accountId}/`)) throw Error('wrong provider destination');
     if (init.headers?.Authorization !== `Bearer ${path === '/workers/assets/upload' ? 'fixture-upload-jwt':token}`) throw Error('wrong token');
     state.calls.push({method,path,search:url.search});
+    if (path === '/workers/settings' && method === 'GET') return workersSettings ? ok(workersSettings) : missing();
     // A body-less request (DELETE) can arrive as an empty string through a network edge.
     const body = typeof init.body === 'string' ? (init.body ? JSON.parse(init.body) : undefined) : init.body;
     const list = rows => ok(rows,{page:Number(url.searchParams.get('page') ?? 1),total_count:rows.length,total_pages:1});
@@ -205,9 +206,13 @@ export function providerFixture({handlers = ['fetch','scheduled']} = {}) {
     }
     if (suffix === '' && method === 'PUT') {
       const meta = JSON.parse(await body.get('metadata').text());
+      if (workersSettings?.free_tier === true && meta.limits?.cpu_ms !== undefined) {
+        return Response.json({success:false,errors:[{code:10021,message:'Custom CPU limits require Workers Paid'}]},{status:400});
+      }
       for (const item of meta.bindings.filter(x => x.type === 'secret_text')) state.secrets.push({name:item.name,value:item.text});
       const bindings = [...meta.bindings.filter(x => !['inherit','secret_text'].includes(x.type)), ...state.secrets.map(({name}) => ({name,type:'secret_text'}))];
       state.settings = {...meta,bindings,migration_tag:meta.migrations?.new_tag ?? state.settings?.migration_tag};
+      if (workersSettings?.free_tier === false) state.settings.usage_model ??= 'standard';
       for (const klass of meta.migrations?.new_sqlite_classes ?? []) state.namespaces.push({id:randomUUID().replaceAll('-',''),class:klass,script:name,use_sqlite:true});
       const files = await Promise.all([...body].filter(([path]) => path !== 'metadata').map(async ([path,file]) => ({path,type:file.type,bytes:Buffer.from(await file.arrayBuffer())})));
       const modules = files.map(({path,bytes}) => ({path,sha256:hash(bytes)}));

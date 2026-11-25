@@ -11,6 +11,7 @@ import { assert, hexId } from './validation.mjs';
 import { regularBytes } from './artifact.mjs';
 import { packageBuild } from './prepare.mjs';
 import { cloudflare } from './provider.mjs';
+import { limitsForAccount, workerLimitsMessage } from './worker-limits.mjs';
 import { ownerTarget, ownerStateTarget, recordedOwnerTarget, ownerWorkerName, ownerPlan, ownerDeploy, ownerHealth, settleOwnerState, sameDeployment, localOnlyBinding, withStateLock, readOwnerState, writeOwnerState, workerSettings, withScopeHints } from './owner.mjs';
 import { activeWorker, secretBindings } from './worker.mjs';
 import { ownerSecret } from './owner-secret.mjs';
@@ -101,6 +102,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
       r2:plan.r2,kv:plan.kv ?? [],queues:plan.queues,durableObjects:plan.durableObjects,services:plan.services ?? [],
       secrets:plan.secrets.map(({binding,optional}) => ({binding,optional:optional ?? false})),
       vars:Object.keys(plan.vars),crons:plan.crons,
+      ...(plan.limits?.cpu_ms !== undefined ? {workersPaidLimits:{cpu_ms:plan.limits.cpu_ms}} : {}),
     }};
   }
   // Removal has its own bounded R2 purge wait. The transport bounds response
@@ -179,9 +181,10 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   const plan = ownerPlan(target,current,artifact,{localOnlyKeys,env,publicDefaults});
   if (command === 'dry-run') {
     const checked = withScopeHints(api);
+    const limits = await limitsForAccount(checked, plan.limits, signal);
     const exists = await workerSettings(checked,target.worker) !== null;
     const {unset} = await secretBindings(checked,target.worker,plan,env,exists);
-    return {ok:true,dryRun:true,deployed:false,optionalUnset:unset};
+    return {ok:true,dryRun:true,deployed:false,optionalUnset:unset,...(limits ? {limits} : {})};
   }
   if (command === 'health') {
     const readiness = {...(healthOptions?.now ? {clock:healthOptions.now} : {}), ...(healthOptions?.sleep ? {sleep:healthOptions.sleep} : {}),
@@ -247,6 +250,8 @@ export async function withDeployProgress(notice, deploy, initialPhase) {
 /** Prints refusal codes and resource names only; never inputs, tokens or provider bodies. */
 export function report(error) {
   const diagnostic = deployDiagnostic(error);
+  const limitsMessage = workerLimitsMessage(error.message);
+  if (limitsMessage) return {ok:false,...(diagnostic ?? {code:error.message}),message:limitsMessage};
   const names = values => Array.isArray(values) ? values.filter(value => typeof value === 'string' && /^(?:worker|d1|r2|kv|queues|durable-object):[a-zA-Z0-9_.-]{1,128}$/.test(value)) : [];
   const remaining = names(error.remaining), removed = names(error.removed);
   const removal = Array.isArray(error.remaining) ? {removed,remaining,message:`Removed ${removed.join(', ') || 'nothing'}; ${remaining.length} resources remain or could not be verified absent (${remaining.join(', ') || 'none named'}). Keep the deployment record and run the removal again after correcting the cause.`} : {};

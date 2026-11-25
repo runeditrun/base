@@ -5,8 +5,8 @@ import { providerFixture } from './provider-fixture.mjs';
 /** Fake Cloudflare account for owner-account mode tests. It reuses the existing
  * SQLite-backed fixture unchanged and adds Workers KV namespaces, resources that
  * someone else created, and injected failures (an HTTP status or a lost response). */
-export function ownerProvider({creationDates = true} = {}) {
-  const fixture = providerFixture();
+export function ownerProvider({creationDates = true, workersSettings} = {}) {
+  const fixture = providerFixture({workersSettings});
   let created = 0;
   const stamp = () => new Date(Date.UTC(2026,9,8,0,0,created++)).toISOString();
   const {state} = fixture;

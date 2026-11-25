@@ -18,6 +18,7 @@ import { validSecretNames, secretNames, pendingSecretNames } from './owner-secre
 import { copyMessage, undeployedCopy } from './owner-secret-copy.mjs';
 import { publicOrigin } from './public-origin.mjs';
 import { settingsAdoptionNote, settingsSuccessor } from './owner-settings.mjs';
+import { limitsForAccount } from './worker-limits.mjs';
 
 /* Owner-account mode: the owner's own Cloudflare account, token and account id.
  * Names are derived from the project id and the owner's environment. A local
@@ -438,7 +439,12 @@ export async function ownerDeploy({api: provider, target, plan, artifact, stateP
   assert(target?.accountId === api.accountId, 'owner-account-mismatch');
   validatePlan(plan); assertOwnerNames(target, plan);
   for (const item of plan.d1) validateMigrations(item.migrations);
-  return withStateLock(statePath, () => deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets, onProgress}));
+  return withStateLock(statePath, async () => {
+    const {limits, ...basePlan} = plan;
+    const effectiveLimits = await limitsForAccount(api, limits, settle.signal);
+    const effectivePlan = effectiveLimits === undefined ? basePlan : {...basePlan,limits:effectiveLimits};
+    return deployLocked({api, target, plan:effectivePlan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets, onProgress});
+  });
 }
 async function deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets, onProgress}) {
   onProgress?.('Checking resources and deployment requirements');
