@@ -17,9 +17,26 @@ from public_hygiene import reference_rules
 from content_identities import ContentIdentities, candidate as identity_candidate
 from copy_origins import CopyOrigins
 from checksum_maps import ChecksumMaps
-from credential_assignments import text_rules, Findings
+from credential_assignments import text_rules, Findings, AssignmentFinding
 from assignment import is_assignment
 from third_party_notices import RULE as NOTICE, blob_id
+from public_history import blob_hits, incompleteness
+
+
+def public_lines(rules, public_oid, history):
+    """The public base's lines at this path, read only when a SEC-3 finding needs them."""
+    if public_oid is None or not any(isinstance(rule, AssignmentFinding) for rule in rules):
+        return None
+    return set(history.blob(public_oid).split(b'\n'))
+
+
+def inherited(rule, data, lines):
+    """A SEC-3 line whose exact bytes the public base already holds at this path is already published.
+    The detector reports the line of the value itself (credential_assignments.mjs), so a new value never matches."""
+    if not isinstance(rule, AssignmentFinding) or lines is None:
+        return False
+    held = data.split(b'\n')
+    return rule.line <= len(held) and held[rule.line - 1] in lines
 
 
 def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, repository=None, *, cache_dir=None, timeout=300, annotation_file=None):
@@ -47,7 +64,8 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             add(INVALID, 'edition.json', history.commit)
             config['pendingDestination'] = None
         recorded = registry() + exceptions(history.selected(EXCEPTIONS))
-        public_blobs = {e['oid'] for c in history.public_commits for e in history.entries(c)}
+        # Object ids reachable from the public base, in one native walk instead of one ls-tree per public commit.
+        public_blobs = history.public_objects()
         # A file byte-identical to the same path on the public base is already public.
         public_paths = {e['path']: e['oid'] for e in history.entries(history.public_commit)
                         if e['kind'] == 'blob'} if history.public_commit else {}
@@ -58,7 +76,14 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
         # Repository references wait here so that the whole scan resolves them in bulk.
         deferred = []
         release_license_good = not license_rules(history.selected('LICENSE'), recorded)
+        skipped = set()
         for commit in history.commits:
+            # A commit the public base already reaches is published: a finding in it can only be a pre-existing
+            # note, which never blocks (report.Findings.add), apart from the scan.* outcomes public_history still
+            # reports. secret.env-match does block there, so --env-file walks every commit.
+            if commit != history.commit and commit in history.public_commits and not hashes:
+                skipped.add(commit)
+                continue
             entries = history.entries(commit)
             entries_by_commit[commit] = {e['path']: e for e in entries}
             tree = history.commit_tree(commit).decode()
@@ -89,12 +114,19 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                     inspected[key] = timings.call('history.text', text_rules, history.blob(oid), path, config_tree, hashes)
                 rules, provenance, references = inspected[key]
                 entry_scope = 'pre-existing' if (scope != 'release-tree' and oid in public_blobs) or public_paths.get(path) == oid else scope
+                lines = public_lines(rules, public_paths.get(path), history) if entry_scope != 'pre-existing' else None
                 for rule in rules:
-                    add(rule, path, commit, blob_id(history.blob(oid)) if rule == NOTICE else oid, entry_scope)
+                    rule_scope = 'pre-existing' if inherited(rule, history.blob(oid), lines) else entry_scope
+                    add(rule, path, commit, blob_id(history.blob(oid)) if rule == NOTICE else oid, rule_scope)
                 if references:
                     deferred.append((references, path, commit, oid, entry_scope))
                 if provenance:
                     add('provenance.declared-source', path, commit, oid, entry_scope)
+        if skipped:
+            def identity_rule(path):
+                return INVALID if (project is not None or repository is not None) and path == 'edition.json' else 'scan.identity-invalid'
+            for rule, path, commit, oid in timings.call('history.public', lambda: list(incompleteness(history, skipped, identity_rule))):
+                add(rule, path, commit, oid, 'pre-existing')
         report['history'].update(commits=len(history.commits), trees=len(seen_trees), blobs=len(seen_blobs))
         selected_context, _ = timings.call('working-tree.context', context, history, history.commit, config)
         working_paths = []
@@ -111,9 +143,10 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             rules, _, references = timings.call('working-tree.text', text_rules, data, path, selected_context, hashes)
             public_oid = public_paths.get(path)
             scope = 'pre-existing' if public_oid and (public_oid == oid or history.blob(public_oid) == data) else 'working-tree'
+            lines = public_lines(rules, public_oid, history) if scope != 'pre-existing' else None
             for rule in rules:
                 # A notice names the exact bytes it matched, tracked or not.
-                add(rule, path, history.commit, blob_id(data) if rule == NOTICE else oid, scope)
+                add(rule, path, history.commit, blob_id(data) if rule == NOTICE else oid, 'pre-existing' if inherited(rule, data, lines) else scope)
             if references:
                 deferred.append((references, path, history.commit, oid, scope))
             if path == 'LICENSE':
@@ -125,7 +158,11 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
             lambda path: working_regular(Path(history.repo), path), copy_origins.read)}
         checksums = {}
         for mode in ('git', 'dir'):
-            for hit in timings.call('gitleaks.' + mode, secrets, binary, mode, history.repo, history.revisions, timeout=timeout, redact=False):
+            hits = timings.call('gitleaks.' + mode, secrets, binary, mode, history.repo, history.revisions, timeout=timeout, redact=False)
+            # A hit on a skipped public commit at a path holding a blob there could only be a pre-existing note.
+            published = blob_hits(history, {(hit.get('Commit'), hit.get('File', '.')) for hit in hits
+                                            if mode == 'git' and hit.get('Commit') in skipped})
+            for hit in hits:
                 path, commit = hit.get('File', '.'), hit.get('Commit') or history.commit
                 if mode == 'dir' and Path(path).is_absolute():
                     path = Path(path).resolve().relative_to(Path(history.repo).resolve()).as_posix()
@@ -136,6 +173,8 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                     held = working_regular(Path(history.repo), path) if public_oid else None
                     scope = 'pre-existing' if held and history.blob(public_oid) == held[0] else 'working-tree'
                 else:
+                    if (commit, path) in published:
+                        continue
                     scope = 'pre-existing' if (oid and public_paths.get(path) == oid) or (commit != history.commit and oid in public_blobs) else 'release-tree' if commit == history.commit else 'newly-public'
                 if hit['RuleID'] in ('generic-api-key', 'hex-api-key'):
                     identity_scope = 'working-tree' if mode == 'dir' else commit

@@ -5459,7 +5459,7 @@
     },
     "scripts/publish-check/git_history.py": {
       "source": "scripts/publish-check/git_history.py",
-      "sha256": "8a9cacce7ed7fe65befc823ea622573cd9d2ba9c09014f0b2f0e5ece89cb71a1"
+      "sha256": "156cab0b2e297adb6f8995695d3d1a4bde8da6e05f31f017a8d8a5e7c1d7d523"
     },
     "scripts/publish-check/github_refs.py": {
       "source": "scripts/publish-check/github_refs.py",
@@ -5479,7 +5479,7 @@
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",
-      "sha256": "6b639529959687b014a45a79427b93011abe5bf9744ff2c0605ba1bd13ad6141"
+      "sha256": "0e452e35eee7c1d7ed12277c4dbe8d0b0e791e4deae916c9b748191c5e97e2d9"
     },
     "scripts/publish-check/hit_location.py": {
       "source": "scripts/publish-check/hit_location.py",
@@ -5544,6 +5544,10 @@
     "scripts/publish-check/public_base.py": {
       "source": "scripts/publish-check/public_base.py",
       "sha256": "534c76c74393677c095afc201e431831d8344cc322534ee4327b3fec50847c94"
+    },
+    "scripts/publish-check/public_history.py": {
+      "source": "scripts/publish-check/public_history.py",
+      "sha256": "7dc1f47221a83c28e6fdba0c8c6e787bc81ec8c24b835c7da3b21d907d8fee7d"
     },
     "scripts/publish-check/public_hygiene.py": {
       "source": "scripts/publish-check/public_hygiene.py",

@@ -37,7 +37,7 @@ class History:
                                                'refs/publish-check/public/tags').decode().splitlines())
             except InspectionError:
                 raise PublicBaseError('public-base.fetch-failed') from None
-        public_revisions = [self.public_commit, *sorted(self.public_tags)] if public_base else []
+        self.public_revisions = public_revisions = [self.public_commit, *sorted(self.public_tags)] if public_base else []
         self.revisions = [self.commit, *public_revisions] if public_base else ['--all', self.commit]
         from history_hydration import prepare
         self.hydration = prepare(self)
@@ -57,6 +57,12 @@ class History:
             return result.stdout
         except (OSError, subprocess.TimeoutExpired):
             raise InspectionError('history.git-unavailable') from None
+
+    def public_objects(self):
+        if self.public_commit is None:
+            return set()
+        listing = self.run('rev-list', '--objects', *self.public_revisions)
+        return {line.split(b' ', 1)[0].decode() for line in listing.splitlines()}
 
     def commit_tree(self, commit):
         known = getattr(self, 'tree_ids', {}).get(commit)
