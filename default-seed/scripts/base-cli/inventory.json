@@ -919,7 +919,7 @@
     },
     "cli/deploy-secret-error.mjs": {
       "source": "cli/deploy-secret-error.mjs",
-      "sha256": "eb504b9e0311ebff058c13df7678f8463f083c85d866b1e3d9be3a498e9a6c29"
+      "sha256": "9db9853752da1c905e495cfbcd4499edae1f78d5479a8f3b106306f949458ca9"
     },
     "cli/deploy-secrets.mjs": {
       "source": "cli/deploy-secrets.mjs",
@@ -943,7 +943,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "051cb37347edebd85540ab9c9752b3e710396b182b3496582c272845f5901188"
+      "sha256": "2f3dac38afcbaf490cd2cb05b481afaf331f3d7b9eecb2297b889458ea8ea2f8"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
@@ -2999,7 +2999,7 @@
     },
     "modules/deploy-kit/owner-secret-copy.mjs": {
       "source": "modules/deploy-kit/owner-secret-copy.mjs",
-      "sha256": "9cf88c0d479aa90c4ae1db081acab2cec3a36b810a4b2420fb13246fe4fb9935"
+      "sha256": "1bd2459e440f0602e704c05a0e0e2033132d5f281565984e68d6bd9b0699d418"
     },
     "modules/deploy-kit/owner-secret-names.mjs": {
       "source": "modules/deploy-kit/owner-secret-names.mjs",

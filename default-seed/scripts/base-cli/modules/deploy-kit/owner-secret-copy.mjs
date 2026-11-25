@@ -6,10 +6,11 @@ import { scriptContent } from './owner-settings.mjs';
 // call adds secrets but never removes one (both measured on 17 October 2026). A copy
 // of the live version does both: its own modules and assets, every version setting
 // the live version runs with (compatibility date and flags, CPU and subrequest limits,
-// usage model, placement), every binding inherited except the named secrets, which it
+// placement), every binding inherited except the named secrets, which it
 // sets or leaves out. Script-level settings (Cron Triggers, observability, logpush,
 // tail consumers) belong to the script, not the version, and a version upload leaves
-// them as they are. Version upload metadata that omits a setting gets Cloudflare's
+// them as they are. The usage model is not sent: every real copy read it back as the
+// live "standard" without it. Version upload metadata that omits a setting gets Cloudflare's
 // default, not the live value: a copy without `limits` dropped an explicit
 // limits.cpu_ms (ChargeDesk Uptime, 25 November 2026). So the copy is read back before
 // it is deployed and is deployed only when it runs exactly what the live version runs.
@@ -24,10 +25,10 @@ const placementReport = new Set(['status','last_analyzed_at']);
 function liveSettings(live) {
   const runtime = live.version?.resources?.script_runtime;
   assert(typeof runtime?.compatibility_date === 'string', 'invalid-active-version');
-  const {compatibility_date, compatibility_flags = [], limits, usage_model} = runtime;
+  const {compatibility_date, compatibility_flags = [], limits} = runtime;
   const placement = Object.fromEntries(Object.entries(live.settings?.placement ?? {}).filter(([key]) => !placementReport.has(key)));
   return {compatibility_date, compatibility_flags,
-    ...(limits === undefined ? {} : {limits}), ...(usage_model === undefined ? {} : {usage_model}),
+    ...(limits === undefined ? {} : {limits}),
     ...(Object.keys(placement).length ? {placement} : {})};
 }
 

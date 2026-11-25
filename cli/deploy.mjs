@@ -112,7 +112,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
     step = 'secrets';
     const bindings = (options.setSecret ?? options.unsetSecret).split(','), flag = options.setSecret ? '--set' : '--unset';
     await owner('secret', [...bindings.flatMap(binding => [flag, binding]), ...(state ? ['--state', state] : [])]);
-    store.report(`${options.setSecret ? 'Set' : 'Removed'} ${bindings.join(', ')} on this environment's Worker as one new version that keeps every other setting of the live version, recorded it and verified hosted readiness. Nothing else to run: ${again} and ~/.local/bin/rer signin recognise this version.`, { names: bindings });
+    store.report(`${options.setSecret ? 'Set' : 'Removed'} ${bindings.join(', ')} on this environment's Worker as one new version that keeps every other setting of the live version, recorded it and verified hosted readiness. Nothing else to run: ${again} and ${again.replace('~/.local/bin/rer deploy', '~/.local/bin/rer signin')} recognise this version.`, { names: bindings });
     return { bindings, present: Boolean(options.setSecret), deployed: false };
    }
    store.report(`Deploying the ${environment} environment to your Cloudflare account.`);
