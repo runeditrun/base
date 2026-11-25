@@ -17,6 +17,7 @@ import { verifyHealth } from './health.mjs';
 import { validSecretNames, secretNames, pendingSecretNames } from './owner-secret-names.mjs';
 import { copyMessage, undeployedCopy } from './owner-secret-copy.mjs';
 import { publicOrigin } from './public-origin.mjs';
+import { settingsAdoptionNote, settingsSuccessor } from './owner-settings.mjs';
 
 /* Owner-account mode: the owner's own Cloudflare account, token and account id.
  * Names are derived from the project id and the owner's environment. A local
@@ -196,6 +197,7 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
     ...(grant === undefined ? {} : {grant}),...(entrypoint === undefined ? {} : {entrypoint}),...(allowedHosts === undefined ? {} : {props:{allowedHosts}})}));
   assert(declaration.workersDev === undefined || declaration.workersDev === false, 'invalid-owner-declaration');
   return validatePlan({version:1,worker:target.worker,compatibilityDate:declaration.compatibilityDate,compatibilityFlags:declaration.compatibilityFlags ?? [],
+    ...(artifact.limits === undefined ? {} : {limits:artifact.limits}),
     d1:d1.map(({binding}) => ({binding,name:name(binding),migrations:artifact.migrations.filter(x => x.binding === binding).map(({binding:_,...rest}) => rest)})),
     r2:entries(declaration,'r2').map(item => ({...item,name:name(item.binding)})),
     ...(kv.length ? {kv} : {}),
@@ -382,7 +384,7 @@ export function beginUpload(state, fingerprint, current) {
 /** A completed receipt or the exact identity of an interrupted successful upload proves ownership.
  * An upload whose response or readback was lost is this deploy's own when the live version carries
  * the fingerprint saved just before its PUT: rer records its ids, as a completed readback would. */
-export async function checkWorkerIdentity(api, worker, state, save) {
+export async function checkWorkerIdentity(api, worker, state, save, {adoptSettings = false, notice} = {}) {
   const live = await activeWorker(api, worker);
   const pending = state.pendingUpload;
   if (pending && !pending.provider && carriesUpload(live, pending.fingerprint)) {
@@ -394,18 +396,29 @@ export async function checkWorkerIdentity(api, worker, state, save) {
   // What was seen, for operator text (native-upload.mjs ownershipMessage): ids and fingerprints only.
   const observed = {versionId:live?.versionId, expected:expected?.versionId, pending:pending?.fingerprint, fingerprint:deployedFingerprint(live?.settings)};
   if (!expected) throw Object.assign(refuse('uncertain-resource-create','worker',worker), {observed});
-  if (!sameDeployment(live, expected)) throw Object.assign(refuse('owned-resource-replaced','worker',worker), {observed});
-  return live;
+  if (live && sameDeployment(live, expected)) return live;
+  if (adoptSettings && !pending && !state.pendingSecret && state.owned.worker?.status === 'created' && state.receipt) {
+    const successor = await settingsSuccessor(api, worker, state, live);
+    if (successor) {
+      const provider = deploymentIdentity(successor);
+      state.settingsAdoption = {note:settingsAdoptionNote,previous:expected,provider};
+      state.receipt.provider = provider;
+      await save();
+      notice?.(`Worker ${worker}: ${settingsAdoptionNote}`);
+      return successor;
+    }
+  }
+  throw Object.assign(refuse('owned-resource-replaced','worker',worker), {observed});
 }
 /** The live Worker this record owns, or null when it is absent and was never confirmed created. */
-export async function checkOwnedWorker(api, worker, state, save) {
+export async function checkOwnedWorker(api, worker, state, save, options) {
   const settings = await workerSettings(api, worker);
   if (settings === null) {
     if (state.owned.worker?.status === 'created') throw refuse('owned-resource-missing','worker',worker);
     return null;
   }
   if (!state.owned.worker) throw refuse('resource-name-collision','worker',worker);
-  return checkWorkerIdentity(api, worker, state, save);
+  return checkWorkerIdentity(api, worker, state, save, options);
 }
 
 /** One deploy per state file. A killed writer's lock is reclaimed only after
@@ -433,7 +446,7 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
   const save = () => writeOwnerState(statePath, state);
   if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await save();
   await checkServiceWorkers(api, plan);
-  const priorWorker = await checkOwnedWorker(api, plan.worker, state, save);
+  const priorWorker = await checkOwnedWorker(api, plan.worker, state, save, {adoptSettings:true,notice:onProgress});
   assert(!state.pendingSecret, 'secret-change-unsettled');
   const exists = priorWorker !== null;
   const create = await ownedResourcesToCreate(api, plan, state);

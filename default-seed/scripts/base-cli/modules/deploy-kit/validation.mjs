@@ -13,8 +13,13 @@ export const hexId = value => typeof value === 'string' && /^[a-f0-9]{32}$/i.tes
 export function localPath(value) { assert(typeof value === 'string' && value.length && !value.startsWith('/') && !value.includes('\\') && value.split('/').every(x => x && x !== '.' && x !== '..') && !/[\x00-\x1f]/.test(value), 'invalid-local-path'); return value; }
 /** Declared KV namespaces; absent means none. */
 export const kvOf = plan => plan.kv ?? [];
+export function validateLimits(limits) {
+  assert(limits === undefined || limits && typeof limits === 'object' && !Array.isArray(limits)
+    && Object.entries(limits).every(([key,value]) => ['cpu_ms','subrequests'].includes(key) && Number.isSafeInteger(value) && value > 0), 'invalid-worker-limits');
+}
 export function validatePlan(plan) {
   assert(plan?.version === 1 && resourceName(plan.worker) && /^\d{4}-\d{2}-\d{2}$/.test(plan.compatibilityDate), 'invalid-plan');
+  validateLimits(plan.limits);
   for (const key of ['d1','r2','queues','durableObjects','secrets','crons']) assert(Array.isArray(plan[key]), 'invalid-plan-resources');
   // KV is optional so plans written before KV support keep their exact shape.
   assert(plan.kv === undefined || Array.isArray(plan.kv), 'invalid-plan-resources');

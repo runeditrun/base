@@ -79,6 +79,9 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
     const started = performance.now(), limitMs = Math.max(1,Math.ceil(Math.min(timeoutMs,deadlineMs ?? timeoutMs)));
     const detail = (status, cause) => ({method,endpoint:endpoint.replace('https://api.cloudflare.com',''),status,elapsedMs:Math.round(performance.now()-started),timeoutMs:limitMs,cause});
     const failureStep = step ?? `${method} ${operation.slice(method.length + 1)}`;
+    // Historical version content contains base64 for every Worker module.
+    const responseLimit = method === 'GET' && /^\/workers\/workers\/[^/]+\/versions\/[^/?]+\?include=modules$/.test(path)
+      ? 64 * 1024 * 1024 : undefined;
     const transportFailure = (cause, attempts, status = null) => {
       const error = new Error('provider-transport-failed');
       // Portable across vendored kit copies used by custom deploy hooks. Raw
@@ -93,7 +96,7 @@ export function cloudflare({ accountId, token, fetch: request = globalThis.fetch
       consume:(response,attempts,signal) => {
         onResponse?.({status:response.status,body:''});
         const failedRead = cause => transportFailure(signal.aborted ? signal.reason : cause,attempts,response.status);
-        return onResponse && !response.ok ? importResponseText(response,failedRead,signal) : response.body ? boundedText(response,response.ok ? undefined : 64 * 1024,failedRead,!response.ok,signal) : '';
+        return onResponse && !response.ok ? importResponseText(response,failedRead,signal) : response.body ? boundedText(response,response.ok ? responseLimit : 64 * 1024,failedRead,!response.ok,signal) : '';
       },
       send:signal => isR2ObjectDelete(path, method) ? objectDelete(`/client/v4/accounts/${accountId}${path}`, {headers:{Authorization:`Bearer ${token}`},signal}) : request(zone ? `https://api.cloudflare.com/client/v4${path}` : `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`, {
       method, redirect: 'error', signal, headers: { Authorization: `Bearer ${assetToken ?? token}`, ...(body && !(body instanceof FormData) ? { 'Content-Type':'application/json' } : {}), ...(r2Purge ? {'cf-r2-data-catalog-check':'true'} : {}) },

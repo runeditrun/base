@@ -7,6 +7,7 @@ import { settingKinds, switchableDeclarationHelp } from './deploy-settings.mjs';
 import { contained } from './project.mjs';
 import { missing, invalid, refuse, RerError } from './errors.mjs';
 import { localOnlyBinding } from '../modules/deploy-kit/owner.mjs';
+import { workerReplacementRecovery } from '../modules/deploy-kit/owner-settings.mjs';
 import { secretFailureMessage } from './deploy-secret-error.mjs';
 import { refuseLocalModels } from '../modules/deploy-kit/local-only.mjs';
 import { deployEnvironment, deployAgain } from './deploy-inputs.mjs';
@@ -171,7 +172,8 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
   const cause = deployDiagnostic(error, redact)?.code ?? error.message;
   if (error.resource?.startsWith('worker:') && ['resource-name-collision', 'owned-resource-replaced'].includes(cause)) {
    const reason = cause === 'resource-name-collision' ? 'the deployment record never started creating that Worker' : 'its active deployment no longer matches this record';
-   return redact(`Removal stopped (${cause}): rer could not prove it owns ${error.resource} because ${reason}. The Worker and remaining data were left in place. Inspect the Worker in Cloudflare and keep this deployment record.`);
+   const recovery = cause === 'owned-resource-replaced' ? ` ${workerReplacementRecovery(again)}` : '';
+   return redact(`Removal stopped (${cause}): rer could not prove it owns ${error.resource} because ${reason}. The Worker and remaining data were left in place. Inspect the Worker in Cloudflare and keep this deployment record.${recovery}`);
   }
   const count = Array.isArray(remaining) ? `${remaining.length} resources remain (${remaining.join(', ') || 'none'})` : 'the remaining resource count could not be read';
   const detail = providerFailure(error, redact);
@@ -209,6 +211,7 @@ function failureText({ error, step, created, again, retry, secretChange, deploye
 function recovery({ code, at, resource, again, retry, secretChange }) {
  const remove = `${again} --remove --yes`, removing = retry === remove;
  if (code === 'provider-incomplete-pagination') return `Cloudflare did not supply a complete list. Inspect the named GET call in Cloudflare, resolve its missing continuation, then run ${retry} again with the same account and environment. Keep the deployment record so rer can reuse its resources.`;
+ if (code === 'owned-resource-replaced' && resource?.startsWith('worker:')) return workerReplacementRecovery(again);
  if (code === 'owned-resource-replaced' || code === 'resource-name-collision') return `rer refuses to change a resource it did not create or that was replaced after it did; nothing was changed. Choose another --environment name, or remove the other resource yourself.`;
  // A lost create answer: the resource may exist, and rer cannot prove it made it.
  if (code === 'uncertain-resource-create' && resource && !resource.startsWith('worker:')) return `Found ${resource} at a pending create name, but its creation response and provider identity were not recorded. rer preserved the resource and deployment record without deleting, adopting or recreating it. This create cannot be safely repeated from its name alone. Inspect its ownership in Cloudflare before proceeding; keep any data. ${resource.startsWith('d1:') || resource.startsWith('kv:') ? `If it is the empty resource from this interrupted run and you want to discard this deployment, ${remove} verifies emptiness before removing it and the other recorded resources.` : 'This resource cannot be automatically removed without confirmed ownership.'}`;

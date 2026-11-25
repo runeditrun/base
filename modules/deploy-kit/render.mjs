@@ -5,6 +5,7 @@ import { assert, stable } from './validation.mjs';
 export const RUN_WORKER_FIRST = true;
 export function renderConfig(plan, resources, accountId, sourceSha, fingerprint, main, hasAssets = false) {
   return { name:plan.worker, account_id:accountId, main, compatibility_date:plan.compatibilityDate, compatibility_flags:plan.compatibilityFlags ?? [], workers_dev:plan.workersDev !== false,
+    ...(plan.limits === undefined ? {} : {limits:plan.limits}),
     ...(hasAssets ? {assets:{directory:'__static',binding:'ASSETS',run_worker_first:RUN_WORKER_FIRST}} : {}),
     vars:{...plan.vars,RER_DEPLOY_SOURCE:sourceSha,RER_DEPLOY_FINGERPRINT:fingerprint}, version_metadata:{binding:'RER_VERSION'},
     d1_databases:resources.d1.map(x => ({binding:x.binding,database_name:x.name,database_id:x.id})), r2_buckets:resources.r2.map(x => ({binding:x.binding,bucket_name:x.name})),

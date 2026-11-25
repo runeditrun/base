@@ -37,7 +37,8 @@ export async function packageBuild({root,source,runIdentity,productDirectory = '
     const sql = (await regularBytes(join(directory,name),512000)).toString('utf8'); migrations.push({binding:'DB',name,sql,sha256:hash(sql)});
   }
   migrations = withRewrites(migrations, await readMigrationRewrites(product));
-  const artifact = {version:1,source,run:runIdentity,main,modules,assets,migrations}; validateArtifact(artifact);
+  const artifact = {version:1,source,run:runIdentity,main,modules,assets,migrations,
+    ...(config.limits === undefined ? {} : {limits:config.limits})}; validateArtifact(artifact);
   return artifact;
 }
 export async function prepare(env = process.env) {

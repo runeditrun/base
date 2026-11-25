@@ -6,6 +6,7 @@ import { shared } from './shared.mjs';
 import { settingKinds } from './deploy-settings.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { deployDiagnostic, providerRefusal, ownerTargetFailure } from '../modules/deploy-kit/diagnostics.mjs';
+import { workerReplacementRecovery } from '../modules/deploy-kit/owner-settings.mjs';
 
 // rer signin: the owner's way into a hosted install without mail. With the same
 // Cloudflare credentials that deployed it, rer writes a one-time grant (only its
@@ -14,7 +15,8 @@ import { deployDiagnostic, providerRefusal, ownerTargetFailure } from '../module
 // for the recorded owner, once, within 15 minutes, and logs its use.
 export async function signinCommand(project, options, out, { fetch } = {}) {
  if (project.profile !== 'first-party' || typeof project.adapter?.deploy !== 'function') throw refuse('~/.local/bin/rer signin needs a seed with an owner-account deploy declaration.');
- const root = project.root, environment = options.environment ?? 'production', again = deployAgain(options).replace('~/.local/bin/rer deploy', '~/.local/bin/rer signin');
+ const root = project.root, environment = options.environment ?? 'production', deploy = deployAgain(options);
+ const again = deploy.replace('~/.local/bin/rer deploy', '~/.local/bin/rer signin');
  const { path, value: declaration } = await declarationFor(root, project.adapter);
  const state = await deploymentRecord(root, { ...options, verb: 'signin' });
  const { env } = await deployEnvironment({ root, options, declaration, localOnlyKeys: project.adapter.localOnlyKeys ?? [] });
@@ -23,18 +25,18 @@ export async function signinCommand(project, options, out, { fetch } = {}) {
  const redaction = createRedaction();
  redaction.addSecrets([...(await settingKinds({ declaration, setupManifest: project.setupManifest })).privateValues(env), env.CLOUDFLARE_ACCOUNT_ID]);
  let result;
- try { result = await owner(['signin', '--declaration', path, '--environment', environment, ...(state ? ['--state', state] : [])], env, { cwd: root, localOnlyKeys: project.adapter.localOnlyKeys ?? [], ...(fetch ? { fetch } : {}) }); }
- catch (error) { throw failure(error, { environment, again, adapter: project.adapter, redact: redaction.redact }); }
+ try { result = await owner(['signin', '--declaration', path, '--environment', environment, ...(state ? ['--state', state] : [])], env, { cwd: root, localOnlyKeys: project.adapter.localOnlyKeys ?? [], ...(fetch ? { fetch } : {}), ...(options.json ? {} : {notice:line => out.human(line)}) }); }
+ catch (error) { throw failure(error, { environment, deploy, again, adapter: project.adapter, redact: redaction.redact }); }
  const minutes = Math.round((result.expiresAt - Date.now()) / 60000);
  if (!options.json) out.human(`One-time sign-in link for the owner ${result.email}. It works once, only for that owner, and expires in ${minutes} minutes. rer does not save it; open it now:\nRER_OPEN ${result.link}`);
  return { owner: result.email, expiresAt: result.expiresAt, ...(options.json ? { link: result.link } : {}) };
 }
 
-function failure(error, { environment, again, adapter, redact }) {
+function failure(error, { environment, deploy, again, adapter, redact }) {
  if (ownerTargetFailure(error)) return refuse(redact(ownerTargetFailure(error)));
  const code = deployDiagnostic(error, redact)?.code ?? error.message;
  if (code === 'missing-owner-receipt') return refuse(`This checkout has no completed rer deployment of the ${environment} environment. Run ~/.local/bin/rer signin from the checkout that deployed it (~/.local/bin/rer deploy --environment ${environment}).`);
- if (code === 'owned-resource-replaced') return refuse(`The ${environment} Worker is no longer the one this checkout deployed, so rer will not sign anyone in to it. Run ~/.local/bin/rer deploy --environment ${environment} first.`);
+ if (code === 'owned-resource-replaced') return refuse(`rer could not verify ownership of the ${environment} Worker (owned-resource-replaced). ${workerReplacementRecovery(deploy)}`);
  if (code === 'owner-signin-unsupported') {
   const path = adapter.signInPath;
   if (path !== undefined && (typeof path !== 'string' || path.length > 2048 || !path.startsWith('/') || path.startsWith('//') || /[\\\s\u0000-\u001f\u007f-\u009f]/u.test(path))) return invalid('The adapter signInPath must be a same-origin browser path such as /login. Correct the seed declaration, then run ~/.local/bin/rer signin again.');

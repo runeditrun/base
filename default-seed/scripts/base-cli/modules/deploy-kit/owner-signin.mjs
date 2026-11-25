@@ -2,20 +2,23 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { assert } from './validation.mjs';
 import { query } from './migrations.mjs';
 import { literal } from './migration-ledger.mjs';
-import { readOwnerState, sameDeployment, withScopeHints, withSettledLists } from './owner.mjs';
-import { activeWorker } from './worker.mjs';
+import { checkWorkerIdentity, readOwnerState, withScopeHints, withSettledLists, withStateLock, writeOwnerState } from './owner.mjs';
 import { OWNER_SIGNIN_PATH, OWNER_SIGNIN_SECONDS, ownerSigninDigest } from '../operator-auth/owner-signin-grant.mjs';
 
 /** `rer signin`: with the same Cloudflare credentials that deployed this Worker, write a
  * one-time grant for the claimed owner into the deployment's own auth D1 and return the
  * link. Only the token's SHA-256 reaches the database; the token itself exists only in
  * the returned link. Refuses unless the live Worker is the one this record deployed. */
-export async function ownerSignin({ api: provider, target, statePath, clock = Date.now, settle = {} }) {
+export async function ownerSignin({ api: provider, target, statePath, clock = Date.now, settle = {}, notice }) {
   const api = withSettledLists(withScopeHints(provider), settle);
+  assert(target?.accountId === api.accountId, 'owner-account-mismatch');
+  return withStateLock(statePath, () => signinLocked({api,target,statePath,clock,notice}));
+}
+
+async function signinLocked({api,target,statePath,clock,notice}) {
   const state = await readOwnerState(statePath, target);
   assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');
-  const live = await activeWorker(api, target.worker);
-  assert(live && sameDeployment(live, state.receipt.provider), 'owned-resource-replaced');
+  await checkWorkerIdentity(api, target.worker, state, () => writeOwnerState(statePath,state), {adoptSettings:true,notice});
   const ids = Object.values(state.owned.d1).filter(entry => entry.status === 'created' && entry.id).map(entry => entry.id);
   const holding = [];
   for (const id of ids) if ((await query(api, id, "SELECT name FROM sqlite_master WHERE type='table' AND name='oa_owner_signins'"))[0].results.length) holding.push(id);

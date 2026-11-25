@@ -17,6 +17,7 @@ export function providerFixture({handlers = ['fetch','scheduled']} = {}) {
     const bindings = [...state.version.resources.bindings.filter(row => row.type !== 'secret_text'), ...state.secrets.map(({name}) => ({name,type:'secret_text'}))];
     state.content.set(id,state.content.get(state.version.id));
     state.version = {...structuredClone(state.version),id};
+    state.version.annotations = {'workers/triggered_by':'secret'};
     state.version.resources.bindings = structuredClone(bindings);
     state.settings.bindings = structuredClone(bindings);
     state.versions = [state.version,...(state.versions ?? [])];
@@ -128,9 +129,33 @@ export function providerFixture({handlers = ['fetch','scheduled']} = {}) {
     if (path === '/workers/durable_objects/namespaces') return list(state.namespaces);
     if (path === '/workers/subdomain') return ok({subdomain:'fixture-account'});
     if (path === '/workers/assets/upload') {write(method,path);return ok({jwt:'fixture-complete-jwt'});}
+    const versionContent = /^\/workers\/workers\/[^/]+\/versions\/([^/]+)$/.exec(path);
+    if (versionContent && method === 'GET' && url.searchParams.get('include') === 'modules') {
+      const id = versionContent[1], content = state.content.get(id);
+      if (!content) return missing();
+      return ok({id,main_module:content.entry,modules:content.files.map(file => ({
+        name:file.path,content_type:file.type,content_base64:file.bytes.toString('base64'),
+      }))});
+    }
     const worker = /^\/workers\/scripts\/([^/]+)(.*)$/.exec(path); if (!worker) throw Error(`unexpected fixture path ${path}`);
     const name = worker[1], suffix = worker[2];
     if (suffix === '/assets-upload-session') {write(method,path,body);return ok({jwt:'fixture-upload-jwt',buckets:[Object.values(body.manifest).map(x => x.hash)]});}
+    if (suffix === '/settings' && method === 'PATCH') {
+      if (!state.version) return missing();
+      const id = randomUUID(), {annotations,bindings = state.settings.bindings,...runtime} = body;
+      const version = structuredClone(state.version);
+      version.id = id;
+      delete version.annotations;
+      if (annotations) version.annotations = annotations;
+      version.resources.bindings = structuredClone(bindings);
+      Object.assign(version.resources.script_runtime,runtime);
+      state.content.set(id,state.content.get(state.version.id));
+      state.version = version; state.versions.unshift(version);
+      state.deployments.unshift({id:randomUUID(),versions:[{version_id:id,percentage:100}]});
+      delete state.settings.annotations;
+      Object.assign(state.settings,body,{bindings:structuredClone(bindings)});
+      write(method,path,body); return ok(state.settings);
+    }
     if (suffix === '/settings') return state.settings ? ok(state.settings) : missing();
     // A version's own modules, as uploaded, with its entry module named in a header.
     if (suffix === '/content/v2' && method === 'GET') {
@@ -187,7 +212,7 @@ export function providerFixture({handlers = ['fetch','scheduled']} = {}) {
       const files = await Promise.all([...body].filter(([path]) => path !== 'metadata').map(async ([path,file]) => ({path,type:file.type,bytes:Buffer.from(await file.arrayBuffer())})));
       const modules = files.map(({path,bytes}) => ({path,sha256:hash(bytes)}));
       const id = randomUUID();state.content.set(id,{entry:meta.main_module,files});
-      state.version={id,...(meta.annotations ? {annotations:meta.annotations} : {}),resources:{bindings,script:{etag:hash(modules),handlers:structuredClone(state.uploadHandlers)},script_runtime:{compatibility_date:meta.compatibility_date,compatibility_flags:meta.compatibility_flags ?? []}}};state.versions=[state.version,...(state.versions ?? [])];state.deployments=[{id:randomUUID(),versions:[{version_id:id,percentage:100}]},...state.deployments];
+      state.version={id,...(meta.annotations ? {annotations:meta.annotations} : {}),resources:{bindings,script:{etag:hash(modules),handlers:structuredClone(state.uploadHandlers)},script_runtime:{compatibility_date:meta.compatibility_date,compatibility_flags:meta.compatibility_flags ?? [],...(meta.limits === undefined ? {} : {limits:meta.limits})}}};state.versions=[state.version,...(state.versions ?? [])];state.deployments=[{id:randomUUID(),versions:[{version_id:id,percentage:100}]},...state.deployments];
       write(method,path,{bindings:bindings.map(x => ({name:x.name,type:x.type}))});return ok({id:name,deployment_id:id});
     }
     throw Error(`unexpected fixture ${method} ${path}`);

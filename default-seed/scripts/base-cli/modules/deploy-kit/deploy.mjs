@@ -37,7 +37,8 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,p
   const migration = durableMigration(namespaces,existing);
   const priorFingerprint = existing?.settings.bindings.find(x => x.type === 'plain_text' && x.name === 'RER_DEPLOY_FINGERPRINT')?.text;
   const authenticated = previousReceipt?.fingerprint === fingerprint && previousReceipt.accountId === api.accountId && previousReceipt.worker === plan.worker && previousReceipt.provider?.versionId === existing?.versionId && previousReceipt.provider?.etag === existing?.etag && previousReceipt.provider?.deploymentId === existing?.deploymentId;
-  const unchanged = priorFingerprint === fingerprint && secrets.missing.length === 0 && !migration && !(uploadWithoutReceipt && !authenticated);
+  const limitsMatch = Object.entries(plan.limits ?? {}).every(([key,value]) => existing?.settings.limits?.[key] === value);
+  const unchanged = priorFingerprint === fingerprint && limitsMatch && secrets.missing.length === 0 && !migration && !(uploadWithoutReceipt && !authenticated);
   if (repeatOnly) assert(unchanged && previousReceipt?.fingerprint === fingerprint && previousReceipt?.provider?.versionId === existing?.versionId && previousReceipt?.provider?.etag === existing?.etag, 'repeat-deployment-drift');
   if (unchanged) {
     assert(previousReceipt?.fingerprint === fingerprint && previousReceipt.accountId === api.accountId && previousReceipt.worker === plan.worker && previousReceipt.provider?.versionId === existing.versionId && previousReceipt.provider?.etag === existing.etag && previousReceipt.provider?.deploymentId === existing.deploymentId, 'no-op-requires-authenticated-prior-receipt');

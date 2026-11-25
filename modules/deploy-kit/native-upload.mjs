@@ -2,6 +2,7 @@ import { pause } from './cancellation.mjs';
 import { assert } from './validation.mjs';
 import { activeWorker } from './worker.mjs';
 import { beginUpload, carriesUpload, checkOwnedWorker, deploymentIdentity, readOwnerState, sameDeployment, uploadMessage, withScopeHints, withSettledLists, withStateLock, writeOwnerState } from './owner.mjs';
+import { workerReplacementRecovery } from './owner-settings.mjs';
 
 /* Native deploy adapters upload the Worker with their own tool (a seed's Wrangler run) and keep
  * rer's ownership record (owner.mjs). They get the same pending-upload reconciliation as rer's own
@@ -26,7 +27,7 @@ export function ownershipMessage(error, commands = {}) {
       if (seen.pending && seen.fingerprint === seen.pending) return `Worker ${name} runs the build this deployment record started uploading (RER_DEPLOY_FINGERPRINT ${seen.pending}), but its version lacks the message ${uploadMessage(seen.pending)}, so rer cannot prove this checkout uploaded it: the uploader did not set that message. rer changed nothing. If Cloudflare shows this Worker created at the failed attempt with a single version, delete that one Worker in Cloudflare (Workers & Pages, or DELETE /accounts/<account>/workers/scripts/${name} without force), keep this deployment record and its data resources, then run ${deploy} again.`;
       return `Worker ${name} exists, but its live version carries neither this record's confirmed identity nor the marks of the upload the record started (RER_DEPLOY_FINGERPRINT ${seen.pending ?? 'not recorded'} with version message ${seen.pending ? uploadMessage(seen.pending) : 'rer-deploy:<fingerprint>'}), so rer cannot prove it is this deployment's Worker and changed nothing. If another checkout deployed this environment, run its deploy from that checkout. Otherwise inspect the Worker in Cloudflare; if nobody uses it, delete it there and run ${deploy} again.`;
     case 'owned-resource-replaced':
-      return `Worker ${name} was deployed by someone else after this record last confirmed it (live version ${seen.versionId ?? 'unknown'}, recorded ${seen.expected ?? 'unknown'}), so rer refused to adopt or remove it. If another checkout deployed this environment, deploy or remove it from that checkout; otherwise use another environment name.`;
+      return `rer could not verify ownership of Worker ${name} (live version ${seen.versionId ?? 'unknown'}, recorded ${seen.expected ?? 'unknown'}). ${workerReplacementRecovery(deploy)}`;
     case 'owned-resource-missing':
       return `Worker ${name} is recorded as created, but Cloudflare no longer has it. To finish removing this environment, run ${remove}: it permanently deletes the remaining recorded resources and their data, including any database and files. rer does not redeploy over a recorded Worker that disappeared.`;
   }
@@ -42,13 +43,13 @@ function explained(error, commands) {
 }
 
 /** Read-only for the provider: the live Worker this record owns (null when absent), adopting an
- * interrupted upload that carries the recorded marks. Run it before provisioning anything. */
-export async function nativeWorkerCheck({api: provider, target, statePath, commands, signal}) {
+ * interrupted upload or a verified settings-only change. Run it before provisioning anything. */
+export async function nativeWorkerCheck({api: provider, target, statePath, commands, signal, notice = console.error}) {
   const api = withSettledLists(withScopeHints(provider), {signal});
   assert(target?.accountId === api.accountId, 'owner-account-mismatch');
   return withStateLock(statePath, async () => {
     const state = await readOwnerState(statePath, target);
-    try { return await checkOwnedWorker(api, target.worker, state, () => writeOwnerState(statePath, state)); }
+    try { return await checkOwnedWorker(api, target.worker, state, () => writeOwnerState(statePath, state), {adoptSettings:true,notice}); }
     catch (error) { throw explained(error, commands); }
   });
 }
@@ -79,7 +80,7 @@ async function uploadedVersion(api, worker, pending, {waitMs, clock, sleep, sign
  * receipt fields (origin, source). A failure after the upload landed leaves it recorded as this
  * deployment's own, so running the same deploy again adopts it and repeats only what the record
  * does not show as done; `ownerRemove` removes it. Returns the completed receipt. */
-export async function nativeUpload({api: provider, target, statePath, fingerprint, receipt = {}, upload, commands, readbackMs = 60000, clock = () => performance.now(), sleep, signal}) {
+export async function nativeUpload({api: provider, target, statePath, fingerprint, receipt = {}, upload, commands, readbackMs = 60000, clock = () => performance.now(), sleep, signal, notice = console.error}) {
   assert(typeof fingerprint === 'string' && /^[A-Za-z0-9._:-]{8,128}$/.test(fingerprint), 'invalid-upload-fingerprint');
   assert(typeof upload === 'function', 'missing-native-upload');
   const {deploy, remove} = {...defaults, ...commands};
@@ -89,7 +90,7 @@ export async function nativeUpload({api: provider, target, statePath, fingerprin
     const state = await readOwnerState(statePath, target);
     const save = () => writeOwnerState(statePath, state);
     let prior;
-    try { prior = await checkOwnedWorker(api, target.worker, state, save); }
+    try { prior = await checkOwnedWorker(api, target.worker, state, save, {adoptSettings:true,notice}); }
     catch (error) { throw explained(error, commands); }
     state.owned.worker ??= {status:'pending'};
     beginUpload(state, fingerprint, prior); await save();

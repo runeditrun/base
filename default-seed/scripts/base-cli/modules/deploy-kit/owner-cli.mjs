@@ -163,7 +163,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
     return {ok:true, owner:values.outcome};
   });
   // The link is a credential: returned to the caller once, never written to the state file.
-  if (command === 'signin') return {ok:true,...await ownerSignin({api,target,statePath,settle}).catch(error => { throw api.annotateFailure(error,'signin'); })};
+  if (command === 'signin') return {ok:true,...await ownerSignin({api,target,statePath,settle,notice}).catch(error => { throw api.annotateFailure(error,'signin'); })};
   if (command === 'inspect') {
     assert(!localOnlyBinding(declaration, localOnlyKeys), 'local-only-binding');
     assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');
