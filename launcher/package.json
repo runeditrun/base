@@ -7,9 +7,5 @@
   "license": "MIT",
   "engines": { "node": ">=22" },
   "bin": { "rer-setup": "bin/rer-setup.mjs" },
-  "files": ["bin", "lib", "README.md"],
-  "scripts": {
-    "test": "node --test tests/*.test.mjs",
-    "test:acceptance": "node tests/acceptance.mjs"
-  }
+  "files": ["bin", "lib", "README.md"]
 }

@@ -1,0 +1,4 @@
+{
+  "cap": 200,
+  "excluded": ["live-proofs/"]
+}

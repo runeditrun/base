@@ -104,17 +104,9 @@ pnpm store, workerd from the lockfile, and Chromium in the default shared
 Playwright cache plus its system libraries.
 `verify` includes the existing foundation and default-seed runtime/browser checks.
 Their typechecks use package-local, gitignored `.cache/typecheck.tsbuildinfo`; deleting it forces a full check, while `build` still builds the real Worker and assets.
-The Verify workflow runs for pull requests and main pushes; its manual
-`clean_bootstrap` option verifies without restoring caches. It also runs
-packed-launcher acquisition, browser onboarding and offline resume for pinned
-public HappyToHelp source through `scripts/ci/launcher-acceptance.mjs` and
-`launcher/tests/release-acceptance.mjs`. CI fetches commit
-`60e9a84688ea41575d56a8f692bbb8173366c7c5` without credentials and selects Node
-26.8.1 after Base's Node 22 stages finish. The helper writes its manifest and
-evidence under `$RUNNER_TEMP`; CI removes those temporary outputs after the suite.
-This browser suite does not install the app. The separately available
-`pnpm verify:launcher-acceptance` runs the full packed-launcher installation
-journey; the current Verify workflow does not invoke it.
+The Verify workflow runs once per pushed commit (a branch push; the main push of the same SHA reuses it, and a
+release tag runs it again). Its manual `clean_bootstrap` option verifies without restoring caches. CI counts the tests
+against the cap in `test-budget.json` (default 200) and fails over it: replace or delete a test before adding one.
 The reference prerender preview uses explicit IPv4 loopback so its listener and
 fetch URL agree in Linux containers.
 

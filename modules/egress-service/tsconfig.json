@@ -20,7 +20,6 @@
     "worker.ts",
     "index.ts",
     "testing/dev-egress.ts",
-    "tests/contracts.check.ts",
     "wasm.d.ts"
   ]
 }

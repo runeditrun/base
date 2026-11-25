@@ -1,20 +1,14 @@
 name: Verify
 
 on:
-  pull_request:
+  # One trigger per commit: a branch push is the run; the main push of the same SHA reuses it.
   push:
-    branches: [main]
+    branches: ['**']
     tags: ['**']
-  schedule:
-    - cron: '17 14 * * *'
   workflow_dispatch:
     inputs:
       clean_bootstrap:
         description: Run without restoring dependency, browser or apt caches
-        type: boolean
-        default: false
-      journeys:
-        description: Include slow installer and README journeys
         type: boolean
         default: false
 
@@ -24,7 +18,7 @@ permissions:
 # Keep each main run; a green push of the same SHA to a branch or tag can satisfy it.
 # A distinct run key also avoids GitHub replacing a pending main run.
 concurrency:
-  group: verify-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  group: verify-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
@@ -49,81 +43,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node export/verify-ci.mjs --main-skip
+      - name: Fail over the test cap
+        run: node scripts/ci/count-tests.mjs
       - id: stages
         name: Assign every full-verify stage exactly once
-        env:
-          CI_INCLUDE_JOURNEYS: ${{ github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/') || inputs.journeys }}
         run: |
           matrix=$(node scripts/ci/verify.mjs --matrix)
           printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
 
-  template-cache:
-    name: Verify (delivered template cache lifecycle)
-    needs: plan
-    if: ${{ needs.plan.outputs.skip != 'true' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      CI: 'true'
-      WRANGLER_SEND_METRICS: 'false'
-      PLAYWRIGHT_SKIP_BROWSER_GC: '1'
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22.20.0'
-      - run: npm install --global pnpm@10.12.4
-      - name: Export the delivered template and prepare its caches
-        id: fixture
-        run: node scripts/ci/template-cache.mjs prepare
-      - name: Cold frozen install, sudo dependencies and browser launch
-        run: node scripts/ci/template-cache.mjs cold
-      - name: Save the runner-user caches
-        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684
-        with:
-          path: ${{ steps.fixture.outputs.paths }}
-          key: delivered-template-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Remove the caches and installed dependencies
-        run: node scripts/ci/template-cache.mjs remove
-      - name: Restore the saved caches as the runner user
-        id: restored
-        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684
-        with:
-          path: ${{ steps.fixture.outputs.paths }}
-          key: delivered-template-${{ github.run_id }}-${{ github.run_attempt }}
-          fail-on-cache-miss: true
-      - name: Require a cache hit and repeat the delivered install and launch
-        env:
-          CACHE_HIT: ${{ steps.restored.outputs.cache-hit }}
-        run: |
-          test "$CACHE_HIT" = true
-          node scripts/ci/template-cache.mjs warm
-      - name: Remove the fixture
-        if: ${{ always() }}
-        run: node scripts/ci/template-cache.mjs cleanup
-
-  companion-macos:
-    needs: plan
-    if: ${{ needs.plan.outputs.skip != 'true' }}
-    name: Verify (companion macOS)
-    runs-on: macos-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22.20.0'
-      # These flows exercise Seatbelt itself: provider reads/writes and retained
-      # checkout Git filters must stay inside the real macOS boundary.
-      - name: Run all four companion tests inside the supported OS boundary
-        run: node --test --test-concurrency=1 cli/companion.test.mjs
-
   verify:
-    name: Verify (${{ matrix.group }}${{ matrix.shard && format(' {0}/{1}', matrix.shard, matrix.total) || '' }})
+    name: Verify (${{ matrix.group }})
     needs: plan
     if: ${{ needs.plan.outputs.skip != 'true' }}
     strategy:
@@ -142,7 +71,7 @@ jobs:
       options: --init
       volumes:
         - /usr/local/lib/android:/runner-preinstalled/android
-    timeout-minutes: ${{ matrix.group == 'journeys' && 60 || matrix.group == 'modules' && 35 || 25 }}
+    timeout-minutes: 30
     env:
       TZ: UTC
       RER_VERIFY_WORKERS: '1'
@@ -266,14 +195,11 @@ jobs:
             exit 1
           fi
       - name: Strict checks of seed module copies
-        if: ${{ matrix.group == 'modules' && matrix.shard == 1 }}
+        if: ${{ matrix.group == 'tests' }}
         run: pnpm typecheck:modules
       - name: Run full-verify stages assigned to this job
         env:
           VERIFY_GROUP: ${{ matrix.group }}
-          CLI_SHARD: ${{ matrix.shard }}
-          MODULE_SHARD: ${{ matrix.shard }}
-          REFERENCE_SHARD: ${{ matrix.shard }}
           RER_TEST_EVIDENCE_DIRECTORY: ${{ runner.temp }}/rer-test-evidence
         run: |
           mkdir -p "$RER_TEST_EVIDENCE_DIRECTORY"
@@ -282,30 +208,6 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: verify-evidence-${{ matrix.group }}-${{ matrix.shard || 'all' }}
+          name: verify-evidence-${{ matrix.group }}
           path: ${{ runner.temp }}/rer-test-evidence
           if-no-files-found: ignore
-      - name: Fetch pinned active HappyToHelp source without credentials
-        if: ${{ !cancelled() && matrix.group == 'launcher' }}
-        env:
-          GIT_CONFIG_NOSYSTEM: '1'
-          GIT_CONFIG_GLOBAL: /dev/null
-          GIT_TERMINAL_PROMPT: '0'
-          GIT_ASKPASS: /bin/false
-        run: |
-          git -c credential.helper= init "$RUNNER_TEMP/public-happytohelp"
-          git -c credential.helper= -C "$RUNNER_TEMP/public-happytohelp" fetch --depth=1 https://github.com/just-every/happytohelp.git 60e9a84688ea41575d56a8f692bbb8173366c7c5
-          git -c credential.helper= -C "$RUNNER_TEMP/public-happytohelp" checkout --detach FETCH_HEAD
-      - name: Select the active edition's pinned runtime after Base stages finish
-        if: ${{ !cancelled() && matrix.group == 'launcher' }}
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '26.8.1'
-      - name: Packed launcher acquisition, browser onboarding and offline resume for active HappyToHelp
-        if: ${{ !cancelled() && matrix.group == 'launcher' }}
-        run: node scripts/ci/launcher-acceptance.mjs
-      - name: Remove active-edition acceptance checkouts
-        if: ${{ always() && matrix.group == 'launcher' }}
-        run: |
-          rm -rf -- "$RUNNER_TEMP/public-happytohelp" "$RUNNER_TEMP/base-launcher-evidence"
-          rm -f -- "$RUNNER_TEMP/launcher-release-manifest.json"

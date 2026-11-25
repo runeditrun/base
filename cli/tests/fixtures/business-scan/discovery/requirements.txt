@@ -1,2 +1,0 @@
-# Synthetic fixture dependencies
-sendgrid>=6
