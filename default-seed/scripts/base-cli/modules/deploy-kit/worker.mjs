@@ -94,6 +94,7 @@ export async function uploadAssets(api, worker, files, {label = 'assets'} = {}) 
 export async function uploadWorker(api, {plan,artifact,bindings,secrets,migration,fingerprint}) {
   const data = new FormData();
   const metadata = {main_module:artifact.main,compatibility_date:plan.compatibilityDate,compatibility_flags:plan.compatibilityFlags ?? [],bindings:[...bindings,...secrets.bindings],keep_bindings:['secret_text'],annotations:{'workers/message':`rer-deploy:${fingerprint}`}};
+  if (plan.limits) metadata.limits = plan.limits;
   if (migration) metadata.migrations = migration;
   if (artifact.assets.length) { metadata.assets = {jwt:await uploadAssets(api,plan.worker,artifact.assets),config:{run_worker_first:RUN_WORKER_FIRST}}; }
   data.set('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));

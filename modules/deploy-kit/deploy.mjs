@@ -66,6 +66,7 @@ export async function deploy({api,plan,artifact,artifactSha256,previousReceipt,p
   if (!unchanged) { window.start(); if (!resumedUpload) upload = await uploadWorker(api,{plan,artifact,bindings,secrets,migration,fingerprint}); }
   if (!unchanged) api = readinessAPI(api, window);
   const published = unchanged || resumedUpload ? existing : await uploadedWorker({api,worker:plan.worker,upload,previous:existing,fingerprint,window}); assert(published,'missing-deployed-worker');
+  if (plan.limits) assert(published.settings.limits?.cpu_ms === plan.limits.cpu_ms, 'worker-cpu-limit-readback-mismatch');
   verifyBindings(published.settings.bindings,bindings);
   verifyScheduledHandler(published,plan);
   // Finish routing activation before applying schedules to this deployment.

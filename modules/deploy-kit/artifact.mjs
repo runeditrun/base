@@ -2,6 +2,7 @@ import { constants } from 'node:fs';
 import { open, lstat, readdir } from 'node:fs/promises';
 import { resolve, parse, join, extname } from 'node:path';
 import { assert, hash, localPath } from './validation.mjs';
+import { validateWorkerLimits } from './worker-limits.mjs';
 export const MAX_ARTIFACT = 48 * 1024 * 1024;
 export async function regularBytes(path, limit = MAX_ARTIFACT) {
   const absolute = resolve(path); let prefix = parse(absolute).root;
@@ -22,6 +23,7 @@ export async function readArtifact(path, expected) {
 export function validateArtifact(value) {
   assert(value?.version === 1 && /^[a-f0-9]{40}$/.test(value.source?.sha ?? '') && /^[a-f0-9]{40}$/.test(value.source?.tree ?? '') && /^\d+$/.test(value.run?.id ?? '') && /^\d+$/.test(value.run?.attempt ?? ''),'invalid-artifact-identity');
   assert(Array.isArray(value.modules) && value.modules.length > 0 && Array.isArray(value.assets) && Array.isArray(value.migrations), 'invalid-artifact-inventory');
+  validateWorkerLimits(value.limits);
   localPath(value.main);
   for (const list of [value.modules,value.assets]) {
     assert(list.length <= 10000 && new Set(list.map(x => x.path)).size === list.length,'invalid-artifact-file-count');

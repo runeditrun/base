@@ -6,6 +6,7 @@ import { mkdtemp, mkdir, writeFile, readFile, realpath, rm } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cronNotice, main, report } from '../owner-cli.mjs';
+import { cloudflare } from '../provider.mjs';
 import { ownerProvider } from './owner-provider.mjs';
 import { deadlineClock } from './deadline-clock.mjs';
 
@@ -14,10 +15,10 @@ const declaration = {version:1,project:'runeditrun/vector',compatibilityDate:'20
   vars:{SEED_SAMPLE_DATA:'false'},originVar:'APP_ORIGIN'};
 
 /** A committed root-product seed with an existing local Vite-shaped build. */
-async function seed(t) {
+async function seed(t, limits) {
   const root = await realpath(await mkdtemp(join(tmpdir(),'deploy-kit-owner-cli-'))); t.after(() => rm(root,{recursive:true,force:true}));
   for (const dir of ['dist/server','dist/client','migrations/core']) await mkdir(join(root,dir),{recursive:true});
-  await writeFile(join(root,'dist/server/wrangler.json'),JSON.stringify({main:'index.js',no_bundle:true,rules:[{type:'ESModule',globs:['**/*.js','**/*.mjs']}]}));
+  await writeFile(join(root,'dist/server/wrangler.json'),JSON.stringify({main:'index.js',no_bundle:true,limits,rules:[{type:'ESModule',globs:['**/*.js','**/*.mjs']}]}));
   await writeFile(join(root,'dist/server/index.js'),'export default {scheduled() {},fetch(){return new Response("vector")}};');
   await writeFile(join(root,'dist/client/index.html'),'<h1>Vector</h1>');
   await writeFile(join(root,'migrations/core/0001_projects.sql'),'CREATE TABLE projects(id TEXT PRIMARY KEY);');
@@ -28,6 +29,67 @@ async function seed(t) {
   return root;
 }
 function inputs(provider, extra = {}) { return {CLOUDFLARE_ACCOUNT_ID:provider.accountId,CLOUDFLARE_API_TOKEN:provider.token,SESSION_SECRET:'test-only-session-value',...extra}; }
+
+test('Workers Paid retains the built CPU limit through upload, upgrade and adoption after a lost upload response', async t => {
+  const limits = {cpu_ms:30_000};
+  const provider = ownerProvider({workersSettings:{free_tier:false}}); t.after(() => provider.close());
+  const root = await seed(t, limits);
+  const options = {fetch:provider.fetch,cwd:root,notice:() => {}};
+  const args = ['--declaration','deploy.json','--environment','production'];
+  const deploy = () => main(['deploy',...args],inputs(provider),options);
+  const api = cloudflare(provider);
+  const workerPath = '/workers/scripts/vector-production';
+  const checkSettings = async () => {
+    const {usage_model, limits:reportedLimits} = await api.request(`${workerPath}/settings`);
+    assert.deepEqual({usage_model,limits:reportedLimits},{usage_model:'standard',limits});
+  };
+  const first = await deploy();
+  await checkSettings();
+  assert.equal((await deploy()).changed,false);
+  await writeFile(join(root,'dist/server/index.js'),'export default {scheduled() {},fetch(){return new Response("next")}};');
+  provider.fail('PUT',/^\/workers\/scripts\/vector-production$/,{afterApply:true});
+  await assert.rejects(deploy());
+  await checkSettings();
+  assert.notEqual(provider.state.version.id,first.versionId);
+  const uploaded = provider.state.version.id;
+  const resumed = await deploy();
+  assert.equal(resumed.versionId,uploaded,'the retry adopts the existing upload');
+  const {receipt} = JSON.parse(await readFile(resumed.state));
+  assert.deepEqual(receipt.config.limits,limits);
+  await checkSettings();
+});
+
+test('Workers Free omits the configured CPU override and deploy stops if the account plan cannot be confirmed', async t => {
+  const limits = {cpu_ms:12_345};
+  const root = await seed(t, limits);
+  const args = ['--declaration','deploy.json','--environment','production'];
+  const offline = await main(['local-plan',...args],{}, {cwd:root,fetch:() => assert.fail('offline plan contacted Cloudflare')});
+  assert.deepEqual(offline.plan.workersPaidLimits,limits);
+  for (const [workersSettings, refusal] of [
+    [undefined,/Workers settings could not be read.*account and API token/],
+    [{free_tier:'false'},/Workers settings did not identify the account plan/],
+    [{free_tier:true},undefined],
+  ]) {
+    const provider = ownerProvider({workersSettings}); t.after(() => provider.close());
+    const options = {fetch:provider.fetch,cwd:root,notice:() => {}};
+    const run = command => main([command,...args],inputs(provider),options);
+    if (refusal) {
+      await assert.rejects(run('deploy'),error => {
+        assert.match(report(error).message,refusal);
+        return true;
+      });
+      assert.ok(provider.state.calls.every(({method}) => method === 'GET'),'plan lookup stopped all provider writes');
+    } else {
+      const preview = await run('dry-run');
+      assert.equal(preview.deployed,false);
+      assert.equal(Object.hasOwn(preview,'limits'),false);
+      assert.equal(provider.state.writes.length,0);
+      const {worker} = await run('deploy');
+      const settings = await cloudflare(provider).request(`/workers/scripts/${worker}/settings`);
+      assert.equal(Object.hasOwn(settings,'limits'),false);
+    }
+  }
+});
 
 test('owner CLI deploys, checks health without writes, names removal survivors and completes on the next run', async t => {
   const provider = ownerProvider({creationDates:true}); t.after(() => provider.close());

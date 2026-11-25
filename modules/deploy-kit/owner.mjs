@@ -2,6 +2,7 @@ import { pause } from './cancellation.mjs';
 import { shared } from '../../cli/shared.mjs';
 import { readinessWindow } from './readiness-window.mjs';
 import { uploadedWorker } from './uploaded-worker.mjs';
+import { limitsForAccount, validateWorkerLimits } from './worker-limits.mjs';
 import { ingressBindings } from './container-config.mjs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -195,6 +196,7 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
   const services = entries(declaration,'services').map(({binding,project,entrypoint,allowedHosts,grant}) => ({binding,service:ownerWorkerName(project,target.environment),
     ...(grant === undefined ? {} : {grant}),...(entrypoint === undefined ? {} : {entrypoint}),...(allowedHosts === undefined ? {} : {props:{allowedHosts}})}));
   assert(declaration.workersDev === undefined || declaration.workersDev === false, 'invalid-owner-declaration');
+  validateWorkerLimits(artifact.limits);
   return validatePlan({version:1,worker:target.worker,compatibilityDate:declaration.compatibilityDate,compatibilityFlags:declaration.compatibilityFlags ?? [],
     d1:d1.map(({binding}) => ({binding,name:name(binding),migrations:artifact.migrations.filter(x => x.binding === binding).map(({binding:_,...rest}) => rest)})),
     r2:entries(declaration,'r2').map(item => ({...item,name:name(item.binding)})),
@@ -205,6 +207,7 @@ export function ownerPlan(target, declaration, artifact, { localOnlyKeys = [], e
     // An optional secret (`"optional": true`, an integration's credential) may stay unset: it is bound only once supplied.
     secrets:entries(declaration,'secrets').map(({verifyStandIn,...item}) => { assert(verifyStandIn === undefined || typeof verifyStandIn === 'string' && verifyStandIn.length > 0 && verifyStandIn.length <= 1024, 'invalid-verify-stand-in'); return Object.hasOwn(publicDefaults,item.binding) ? {...item,publicDefault:publicDefaults[item.binding]} : item; }),
     crons:[...(declaration.crons ?? [])],vars,
+    ...(artifact.limits ? {limits:{cpu_ms:artifact.limits.cpu_ms}} : {}),
     // Only declarations using these add the keys, so earlier plans and fingerprints are unchanged.
     ...(services.length ? {services} : {}),...(declaration.workersDev === false ? {workersDev:false} : {})});
 }
@@ -425,7 +428,13 @@ export async function ownerDeploy({api: provider, target, plan, artifact, stateP
   assert(target?.accountId === api.accountId, 'owner-account-mismatch');
   validatePlan(plan); assertOwnerNames(target, plan);
   for (const item of plan.d1) validateMigrations(item.migrations);
-  return withStateLock(statePath, () => deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets, onProgress}));
+  return withStateLock(statePath, async () => {
+    const {limits, ...basePlan} = plan;
+    validateWorkerLimits(limits);
+    const effectiveLimits = await limitsForAccount(api, limits, settle.signal);
+    const effectivePlan = effectiveLimits ? {...basePlan,limits:effectiveLimits} : basePlan;
+    return deployLocked({api, target, plan:effectivePlan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets, onProgress});
+  });
 }
 async function deployLocked({api, target, plan, artifact, statePath, env, fetch, healthOptions, readiness, settle, declaredSecrets, onProgress}) {
   onProgress?.('Checking resources and deployment requirements');
