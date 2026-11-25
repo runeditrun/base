@@ -30,7 +30,7 @@ async function versionEvidence(read) {
 
 // The legacy version endpoint exposes the script ETag. If it changed, compare
 // the entry point and every module using Cloudflare's version-addressed API.
-async function scriptContent(api, worker, versionId) {
+export async function scriptContent(api, worker, versionId) {
   const version = await versionEvidence(() => api.request(`/workers/workers/${worker}/versions/${versionId}?include=modules`));
   if (version?.id !== versionId || typeof version.main_module !== 'string' || !Array.isArray(version.modules)
     || !version.modules.every(row => typeof row?.name === 'string' && typeof row.content_type === 'string' && typeof row.content_base64 === 'string')

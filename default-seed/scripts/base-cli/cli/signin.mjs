@@ -7,6 +7,7 @@ import { settingKinds } from './deploy-settings.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { deployDiagnostic, providerRefusal, ownerTargetFailure } from '../modules/deploy-kit/diagnostics.mjs';
 import { workerReplacementRecovery } from '../modules/deploy-kit/owner-settings.mjs';
+import { secretChangeMessage } from './deploy-secret-error.mjs';
 
 // rer signin: the owner's way into a hosted install without mail. With the same
 // Cloudflare credentials that deployed it, rer writes a one-time grant (only its
@@ -35,6 +36,8 @@ export async function signinCommand(project, options, out, { fetch } = {}) {
 function failure(error, { environment, deploy, again, adapter, redact }) {
  if (ownerTargetFailure(error)) return refuse(redact(ownerTargetFailure(error)));
  const code = deployDiagnostic(error, redact)?.code ?? error.message;
+ const unsettled = code === 'secret-change-unsettled' && secretChangeMessage(error, deploy, again);
+ if (unsettled) return refuse(unsettled);
  if (code === 'missing-owner-receipt') return refuse(`This checkout has no completed rer deployment of the ${environment} environment. Run ~/.local/bin/rer signin from the checkout that deployed it (~/.local/bin/rer deploy --environment ${environment}).`);
  if (code === 'owned-resource-replaced') return refuse(`rer could not verify ownership of the ${environment} Worker (owned-resource-replaced). ${workerReplacementRecovery(deploy)}`);
  if (code === 'owner-signin-unsupported') {

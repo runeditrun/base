@@ -1,6 +1,6 @@
 import { assert, uuid } from './validation.mjs';
 import { activeWorker } from './worker.mjs';
-import { checkResourceIdentity, readOwnerState, sameDeployment, withStateLock, ownerResourceName } from './owner.mjs';
+import { assertSettledReceipt, checkResourceIdentity, readOwnerState, sameDeployment, withStateLock, ownerResourceName } from './owner.mjs';
 import { retiredInstallationKeys } from '../dependencies/custody.mjs';
 
 /** The D1 REST batch is one transaction, matching the Worker's db.batch contract.
@@ -28,7 +28,7 @@ function database(api, id) {
 export async function ownerRekey({ api, target, statePath, declaration, env, notice = line => console.error(line) }) {
  return withStateLock(statePath, async () => {
   const state = await readOwnerState(statePath, target);
-  assert(state.receipt && !state.pendingUpload && !state.pendingSecret, 'missing-owner-receipt');
+  assertSettledReceipt(state);
   const owned = async () => {
    const live = await activeWorker(api, target.worker);
    assert(live && sameDeployment(live, state.receipt.provider), 'owned-resource-replaced');

@@ -6,7 +6,7 @@ import { resourceKinds, findResource } from './resources.mjs';
 import { deleteWorker } from './teardown.mjs';
 import { recordDeployFailure } from './diagnostics.mjs';
 import { query } from './migrations.mjs';
-import { KINDS, readOwnerState, writeOwnerState, withStateLock, withScopeHints, withSettledLists, workerSettings, checkWorkerIdentity, deploymentIdentity, resourceId, checkResourceIdentity, refuse, settlePendingSecret } from './owner.mjs';
+import { KINDS, readOwnerState, writeOwnerState, withStateLock, withScopeHints, withSettledLists, workerSettings, checkWorkerIdentity, deploymentIdentity, resourceId, checkResourceIdentity, refuse, settlePendingSecret, unsettledSecret } from './owner.mjs';
 
 const remove = {
   d1: (api, id) => api.request(`/d1/database/${id}`, {method:'DELETE'}),
@@ -81,7 +81,7 @@ export async function ownerRemove({api: provider, target, statePath, clock, slee
         const live = await checkWorkerIdentity(api, target.worker, state, () => writeOwnerState(statePath, state));
         workerIdentity = deploymentIdentity(live);
       } else remaining.delete(`worker:${target.worker}`);
-      assert(!state.pendingSecret, 'secret-change-unsettled');
+      if (state.pendingSecret) throw unsettledSecret(state);
       const listed = {}, doomed = [];
       for (const kind of KINDS) {
         const expected = expectedResources[kind] ?? [];

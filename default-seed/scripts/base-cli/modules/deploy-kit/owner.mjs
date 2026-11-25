@@ -15,7 +15,7 @@ import { validateMigrations } from './migrations.mjs';
 import { deploy } from './deploy.mjs';
 import { verifyHealth } from './health.mjs';
 import { validSecretNames, secretNames, pendingSecretNames } from './owner-secret-names.mjs';
-import { copyMessage, undeployedCopy } from './owner-secret-copy.mjs';
+import { copyMessage, undeployedCopy, sameScript, settingsDrift } from './owner-secret-copy.mjs';
 import { publicOrigin } from './public-origin.mjs';
 import { settingsAdoptionNote, settingsSuccessor } from './owner-settings.mjs';
 import { limitsForAccount } from './worker-limits.mjs';
@@ -313,14 +313,30 @@ export function recordSecretChange(state, current, {bindings, present}) {
   if (retired.size) state.retiredSecrets = [...retired].sort(); else delete state.retiredSecrets;
   delete state.pendingSecret;
 }
+/** A secret change still pending in the record: what it named, so the refusal can name the command that finishes it. */
+export function unsettledSecret({pendingSecret}) {
+  return Object.assign(new Error('secret-change-unsettled'), {pendingChange:{bindings:pendingSecret.bindings, present:pendingSecret.present}});
+}
+/** The record holds a completed deployment and no change in flight. */
+export function assertSettledReceipt(state) {
+  if (state.pendingSecret) throw unsettledSecret(state);
+  assert(state.receipt && !state.pendingUpload, 'missing-owner-receipt');
+}
 /** A secret change rer recorded as pending but never confirmed (a lost response, or a run that
  * ended before the change settled). It is that change only when the Worker's versions list shows
- * exactly one version after the recorded starting version and it is the live one, still running the receipt's
- * exact script and build fingerprint, with the other secret names unchanged: adopt its version. A confirming PUT also records its
+ * exactly one version after the recorded starting version and it is the live one, with the build
+ * fingerprint of the receipt and the other secret names unchanged: adopt its version. A one-secret
+ * change must also keep the receipt's exact script etag. A confirming PUT also records its
  * own starting version before it writes; its immediate successor can be recovered by the
- * same checks. A several-secret copy must also carry its marker; one uploaded but never deployed
- * is deployed by `deployCopy` when given. Anything later is left to the identity check, which refuses it. */
-export async function settlePendingSecret(api, worker, state, {preflight = false, observe, confirm, deployCopy} = {}) {
+ * same checks. A several-secret copy must carry its marker and run the starting version's own
+ * code (the same etag, or the same entry point and modules when Cloudflare gave it a new etag).
+ * A copy whose version settings differ from the starting version's (one an older rer uploaded
+ * without the live limits) is still this change and is adopted; `notice` names the settings so
+ * the next full deploy puts them back. A copy uploaded but never deployed is deployed by
+ * `deployCopy` when given and when it runs what the live version runs; one that does not is
+ * never deployed and leaves the live Worker unchanged. Anything later is left to the identity
+ * check, which refuses it. */
+export async function settlePendingSecret(api, worker, state, {preflight = false, observe, confirm, deployCopy, notice} = {}) {
   if (!state.pendingSecret || !state.receipt) return false;
   const live = await activeWorker(api, worker);
   if (sameDeployment(live, state.receipt.provider)) {
@@ -328,28 +344,29 @@ export async function settlePendingSecret(api, worker, state, {preflight = false
     // A stale deployment alone must not erase an accepted but unsettled intent.
     const versions = (await api.request(`/workers/scripts/${worker}/versions`))?.items;
     const listed = Array.isArray(versions) && versions.every(item => uuid(item?.id)) && new Set(versions.map(item => item.id)).size === versions.length;
-    const unchanged = listed && versions[0]?.id === live.versionId;
-    const copy = listed && !unchanged && deployCopy ? await undeployedCopy(api, worker, state, versions) : null;
-    if (copy) { await deployCopy(copy); return settlePendingSecret(api, worker, state, {preflight, observe, confirm}); }
+    const copy = listed && versions[0]?.id !== live.versionId ? await undeployedCopy(api, worker, state, versions, live) : null;
+    if (copy?.keeps && deployCopy) { await deployCopy(copy.id); return settlePendingSecret(api, worker, state, {preflight, observe, confirm, notice}); }
+    // The newest version is the live one, or a copy rer will never deploy: nothing was applied.
+    const unchanged = listed && (versions[0]?.id === live.versionId || copy?.keeps === false);
     observe?.(unchanged ? live : null);
     if (!preflight || !unchanged) return false;
     delete state.pendingSecret;
     return true;
   }
   observe?.(live);
-  if (state.pendingSecret.versionId !== state.receipt.provider.versionId || !live || live.etag !== state.receipt.provider.etag || deployedFingerprint(live.settings) !== state.receipt.fingerprint) return false;
+  const {versionId, repeatVersionId, copy} = state.pendingSecret;
+  if (versionId !== state.receipt.provider.versionId || !live || !copy && live.etag !== state.receipt.provider.etag || deployedFingerprint(live.settings) !== state.receipt.fingerprint) return false;
   // Newest first, as the provider lists them.
   const versions = (await api.request(`/workers/scripts/${worker}/versions`))?.items;
   const ids = Array.isArray(versions) ? versions.map(item => item?.id) : [];
   if (!ids.every(uuid) || new Set(ids).size !== ids.length) return false;
-  const {versionId, repeatVersionId} = state.pendingSecret;
   const immediate = ids.indexOf(versionId) === 1;
   const repeated = repeatVersionId && ids[1] === repeatVersionId && ids.indexOf(versionId) === 2;
   // A rotation's ambiguous first answer requires a second PUT before success.
   // Its starting version is saved before that PUT, so interruption can recover
   // either the original immediate successor or the second write's successor.
   if (ids[0] !== live.versionId || !(repeatVersionId ? repeated || preflight && immediate && live.versionId === repeatVersionId : immediate)) return false;
-  if (state.pendingSecret.copy && live.version?.annotations?.['workers/message'] !== copyMessage(state.pendingSecret.copy)) return false;
+  if (copy && (live.version?.annotations?.['workers/message'] !== copyMessage(copy) || !await sameScript(api, worker, state.receipt.provider, live))) return false;
   const rows = await api.request(`/workers/scripts/${worker}/secrets`);
   const names = secretNames(rows), {bindings, present} = state.pendingSecret;
   if (!names || bindings.some(binding => names.includes(binding) !== present)) return false;
@@ -357,15 +374,19 @@ export async function settlePendingSecret(api, worker, state, {preflight = false
   const otherNames = names.filter(name => !bindings.includes(name));
   if (!priorNames || priorNames.length !== otherNames.length || !priorNames.every(name => otherNames.includes(name))) return false;
   if (confirm && !repeatVersionId) { await confirm(live); return false; }
+  const start = copy ? await api.request(`/workers/scripts/${worker}/versions/${versionId}`).catch(error => { if (error.status === 404) return null; throw error; }) : null;
+  const drift = start?.id === versionId ? settingsDrift(live.version, start) : [];
   recordSecretChange(state, live, state.pendingSecret);
+  const other = drift.filter(key => key !== 'limits');
+  if (drift.length) notice?.(`Worker ${worker}: recorded the secret copy rer made for ${bindings.join(', ')}; it does not carry the starting version's ${drift.join(', ')}.${drift.includes('limits') ? ' The next full rer deploy of this environment uploads the declared limits again.' : ''}${other.length ? ` Set ${other.join(', ')} again in Cloudflare if the Worker needs them.` : ''}`);
   return true;
 }
 /** Settle a pending secret change under the state lock, before a plan reads the retired list. */
-export async function settleOwnerState({api: provider, target, statePath, settle = {}}) {
+export async function settleOwnerState({api: provider, target, statePath, settle = {}, notice}) {
   const api = withSettledLists(withScopeHints(provider),settle);
   return withStateLock(statePath, async () => {
     const state = await readOwnerState(statePath, target);
-    if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await writeOwnerState(statePath, state);
+    if (await settlePendingSecret(api, target.worker, state, {preflight:true, notice})) await writeOwnerState(statePath, state);
     return state;
   });
 }
@@ -450,10 +471,10 @@ async function deployLocked({api, target, plan, artifact, statePath, env, fetch,
   onProgress?.('Checking resources and deployment requirements');
   const state = await readOwnerState(statePath, target);
   const save = () => writeOwnerState(statePath, state);
-  if (await settlePendingSecret(api, target.worker, state, {preflight:true})) await save();
+  if (await settlePendingSecret(api, target.worker, state, {preflight:true, notice:onProgress})) await save();
   await checkServiceWorkers(api, plan);
   const priorWorker = await checkOwnedWorker(api, plan.worker, state, save, {adoptSettings:true,notice:onProgress});
-  assert(!state.pendingSecret, 'secret-change-unsettled');
+  if (state.pendingSecret) throw unsettledSecret(state);
   const exists = priorWorker !== null;
   const create = await ownedResourcesToCreate(api, plan, state);
   if (exists) await checkCronOwnership(api, plan);
