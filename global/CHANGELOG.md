@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.134
+
+Signed: Run Edit Run fleet, 2026-11-25.
+
+### Cloudflare Worker deploy and sign-in
+
+- `rer deploy` and `rer signin` can adopt a single verified settings-only Worker change and update the deployment record automatically, without a hand-edit of `.rer/deploy`.
+- Standard Worker deploys apply the CPU limit from the built Wrangler config on Workers Paid and omit the CPU override on Workers Free. If rer cannot determine the account plan, it stops before provisioning or uploading.
+
 ## 0.2.133
 
 Signed: Run Edit Run fleet, 2026-11-23.
