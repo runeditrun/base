@@ -5359,7 +5359,7 @@
     },
     "scripts/publish-check/README.md": {
       "source": "scripts/publish-check/README.md",
-      "sha256": "ec23d1e619234f570facf69304ca40b6c6578a6de10ae8c56b2b27dfe1ef1165"
+      "sha256": "fb7e6702507415a424c12211ab35cf01471876704694f8dd8bed4c53ea0928f8"
     },
     "scripts/publish-check/assignment.py": {
       "source": "scripts/publish-check/assignment.py",
@@ -5391,15 +5391,23 @@
     },
     "scripts/publish-check/content_identities.py": {
       "source": "scripts/publish-check/content_identities.py",
-      "sha256": "208e548f63ebcca742c8dcb0f8cc2acf65706d1722eb4840cc1cbdd41b899b44"
+      "sha256": "3e9c9efbcfff13f099884509bd37f908e7c9e245fd5b946e45c8df188c9d7948"
     },
     "scripts/publish-check/controller_metadata.py": {
       "source": "scripts/publish-check/controller_metadata.py",
       "sha256": "357421c4c991f9d4a1ea2c955550c1a5ddcf96a623f6f3ae955715f2a83e1e7e"
     },
+    "scripts/publish-check/copy_adaptations.py": {
+      "source": "scripts/publish-check/copy_adaptations.py",
+      "sha256": "5ebf060ab312cad7261728fe507c616b41aafaa95324a1783c70c98cd63e8e46"
+    },
     "scripts/publish-check/copy_identities.py": {
       "source": "scripts/publish-check/copy_identities.py",
       "sha256": "bfdb64c44b0db14d7fb1f549b27154e67790037f8212fd16c712b5219995b14a"
+    },
+    "scripts/publish-check/copy_origins.py": {
+      "source": "scripts/publish-check/copy_origins.py",
+      "sha256": "7397b47aae7d70031ff460bce11679b6160cb618a93c79782724237a2a6f069b"
     },
     "scripts/publish-check/credential_assignments.mjs": {
       "source": "scripts/publish-check/credential_assignments.mjs",
@@ -5459,7 +5467,7 @@
     },
     "scripts/publish-check/history_scan.py": {
       "source": "scripts/publish-check/history_scan.py",
-      "sha256": "f7375219eb58458843797753a9922b875090cf8ffd57f986d92d8f8f9c5a7762"
+      "sha256": "6b639529959687b014a45a79427b93011abe5bf9744ff2c0605ba1bd13ad6141"
     },
     "scripts/publish-check/hit_location.py": {
       "source": "scripts/publish-check/hit_location.py",

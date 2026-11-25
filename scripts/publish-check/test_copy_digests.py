@@ -9,6 +9,57 @@ from test_source_metadata import public_scan
 
 
 class CopyDigestTests(RepositoryFixture, unittest.TestCase):
+    def test_root_copy_adaptations_require_valid_inventory_and_proved_values(self):
+        origin = RepositoryFixture()
+        origin.setUp()
+        self.addCleanup(origin.tearDown)
+        name = 'src/credential-names.ts'
+        upstream = b'export const enabled = false;\n'
+        edition = b'export const enabled = true;\n'
+        origin.write(name, upstream)
+        revision = origin.commit()
+        self.write(name, edition)
+        digest = hashlib.sha256(upstream).hexdigest()
+        copy = dict(path=name, originPath=name, revision=revision, files={name: digest},
+                    modes={name: '100644'}, adapted={name: revision},
+                    acknowledged={name: dict(sha256=hashlib.sha256(edition).hexdigest(), mode='100644')})
+        inventory = dict(schemaVersion=1, copies=[copy])
+        root = 'base-copies.json'
+
+        def scan():
+            return public_scan(self, base_origin=origin.repo)
+
+        def assert_assignment(path):
+            report = scan()
+            self.assertEqual(report['status'], 'FAIL')
+            self.assertTrue(any(f['path'] == path and f['rule'] == 'secret.assignment'
+                                for f in report['findings']))
+
+        valid = json.dumps(inventory, indent=2)
+        self.write(root, valid)
+        self.commit()
+        self.assertEqual(scan()['status'], 'PASS')
+
+        for other in ('metadata.json', 'nested/base-copies.json'):
+            with self.subTest(path=other):
+                self.write(other, valid)
+                assert_assignment(other)
+                (self.repo / other).unlink()
+
+        for case, adapted in (('extra key', {name: revision, 'notes': revision}),
+                              ('unproved revision', {name: secrets.token_hex(20)})):
+            with self.subTest(case=case):
+                invalid = dict(schemaVersion=1, copies=[{**copy, 'adapted': adapted}])
+                self.write(root, json.dumps(invalid, indent=2))
+                assert_assignment(root)
+
+        provider_key = 'AK' + 'IA' + ''.join(secrets.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZ234567') for _ in range(16))
+        invalid = dict(schemaVersion=1, copies=[{**copy, 'adapted': {name: provider_key}}])
+        self.write(root, json.dumps(invalid, indent=2))
+        report = scan()
+        self.assertEqual(report['status'], 'FAIL')
+        self.assertTrue(any(f['path'] == root and f['rule'] == 'secret.provider-token' for f in report['findings']))
+
     def test_fragment_relative_columns_require_a_proved_copy_digest(self):
         name = 'vendor/base/synthetic-base-1/api-key.mjs'
         data = b'export const name = "synthetic-base-1";\n'

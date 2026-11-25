@@ -133,10 +133,16 @@ against every declared file's bytes and regular-file mode in the same scanned
 tree. Historical matches use only that commit's blobs; present files cannot
 rescue a historical mismatch. Working-tree preimages reject linked paths.
 Copy records use the same proof at custom JSON paths.
+At the repository root, `base-copies.json` can also describe adaptations. The
+whole inventory must satisfy the version 1 shape. An acknowledgement's digest
+and mode must match the local file in the scanned tree. To classify an adapted
+revision or its baseline file digest, the original bytes and mode must also
+match the file at that exact pinned commit in public Base. The scanner reads
+those commits from the fixed public Base repository and retains findings if the
+pin or its bytes cannot be verified.
 The captured secret must occur unambiguously inside the exact proved JSON value;
 a native fragment ending partway through a digest qualifies too. The same value
-in another field remains a finding. There is no filename, hash-value or
-comma-delimited credential exemption.
+in another field remains a finding. Comma-delimited credentials remain scanned.
 
 `checksum_maps.py` classifies a file-name to digest map (`'0005_operator_auth.sql':
 '<sha256>'`, in JSON, JavaScript, YAML or similar) in any file outside the

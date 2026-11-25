@@ -15,6 +15,7 @@ from report import new_report, Findings, finish
 from tree_scan import context, text_rules, working_files, working_regular
 from public_hygiene import reference_rules
 from content_identities import ContentIdentities, candidate as identity_candidate
+from copy_origins import CopyOrigins
 from checksum_maps import ChecksumMaps
 from credential_assignments import text_rules, Findings
 from assignment import is_assignment
@@ -25,6 +26,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
     report = new_report(public_base is not None)
     timings = Timings(report)
     history = staged = None
+    copy_origins = CopyOrigins()
     add = Findings(report, {}, frozenset()).add
     try:
         hashes = load_hashes(env_file)
@@ -120,7 +122,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
         if not (Path(history.repo) / 'LICENSE').is_file():
             add('license.missing', 'LICENSE', scope='working-tree')
         identities = {'working-tree': timings.call('identities.prepare', ContentIdentities, working_identities,
-            lambda path: working_regular(Path(history.repo), path))}
+            lambda path: working_regular(Path(history.repo), path), copy_origins.read)}
         checksums = {}
         for mode in ('git', 'dir'):
             for hit in timings.call('gitleaks.' + mode, secrets, binary, mode, history.repo, history.revisions, timeout=timeout, redact=False):
@@ -152,7 +154,8 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
                         if identity_scope not in identities:
                             identities[identity_scope] = timings.call('identities.prepare', ContentIdentities, {
                                 p: history.blob(e['oid']) for p, e in scoped_entries.items()
-                                if identity_candidate(p) and e['kind'] == 'blob' and e['mode'] in ('100644', '100755')}, read_regular)
+                                if identity_candidate(p) and e['kind'] == 'blob' and e['mode'] in ('100644', '100755')},
+                                read_regular, copy_origins.read)
                         if identities[identity_scope].matches(path, hit):
                             continue
                     else:
@@ -210,6 +213,7 @@ def scan(repo, ref='HEAD', public_base=None, env_file=None, project=None, reposi
     except (OSError, ValueError, TypeError, KeyError, UnicodeError):
         add('scan.configuration-incomplete', '.')
     finally:
+        copy_origins.close()
         if history:
             history.close()
         timings.finish()
