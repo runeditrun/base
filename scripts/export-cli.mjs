@@ -3,7 +3,6 @@ import { resolve, relative } from 'node:path';
 import { exportCLI } from '../cli/export.mjs';
 import { exportRunData } from './export-run-data.mjs';
 import { testSource } from '../composition/git-source.mjs';
-import { existsSync } from 'node:fs';
 // node scripts/export-cli.mjs SEED_ROOT refreshes a seed's vendored copy;
 // node scripts/export-cli.mjs --to-package SEED_ROOT [--version X] converts it
 // to pin the @runeditrun/rer package instead (see export-cli/to-package.mjs).
@@ -22,13 +21,6 @@ await exportRunData(base);
 await exportCLI(base, target);
 await rm(resolve(target, 'scripts/base-onboarding'), { recursive: true, force: true });
 await cp(resolve(base, 'onboarding'), resolve(target, 'scripts/base-onboarding'), { recursive: true, filter: path => !testSource(relative(resolve(base, 'onboarding'), path)) });
-// Historical runner fixtures exercise custody/recovery only. Keep them under
-// tests so portable operating commands cannot use the superseded executor.
-if(existsSync(resolve(target,'tests/local-setup/fixtures'))){
- const fixtures=resolve(target,'tests/local-setup/fixtures/base-onboarding/local/fixtures');
- await rm(fixtures,{recursive:true,force:true});
- await cp(resolve(base,'onboarding/local/fixtures'),fixtures,{recursive:true});
-}
 
 for (const name of ['EDITION-AUTHORING.md', 'RUN-LOCALLY.md', 'SEED-COMMAND-CONTRACT.md', 'HOMEPAGE-VARIANTS.md', 'DEMO.md']) await cp(resolve(base, 'export', name), resolve(target, name));
 
