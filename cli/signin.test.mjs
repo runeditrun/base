@@ -261,8 +261,8 @@ test('rer signin selects only the held app identity and refuses mismatched or re
  grants = (await h.db.prepare('SELECT count(*) AS n FROM oa_owner_signins').first()).n;
  const settings = h.provider.state.settings;
  h.provider.state.settings = null;
- await refuses([], undefined, /no longer the one this checkout deployed/);
+ await refuses([], undefined, /owned-resource-replaced/);
  h.provider.state.settings = settings;
  h.provider.foreign.replaceWorker();
- await refuses([], undefined, /no longer the one this checkout deployed/);
+ await refuses([], undefined, /owned-resource-replaced/);
 });
