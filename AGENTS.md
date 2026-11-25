@@ -104,8 +104,8 @@ pnpm store, workerd from the lockfile, and Chromium in the default shared
 Playwright cache plus its system libraries.
 `verify` includes the existing foundation and default-seed runtime/browser checks.
 Their typechecks use package-local, gitignored `.cache/typecheck.tsbuildinfo`; deleting it forces a full check, while `build` still builds the real Worker and assets.
-The Verify workflow runs once per pushed commit (a branch push; the main push of the same SHA reuses it, and a
-release tag runs it again). Its manual `clean_bootstrap` option verifies without restoring caches. CI counts the tests
+The Verify workflow runs once per pushed commit (a branch push; the main push and a release tag of the same SHA
+reuse it). Its manual `clean_bootstrap` option verifies without restoring caches. CI counts the tests
 against the cap in `test-budget.json` (default 200) and fails over it: replace or delete a test before adding one.
 The reference prerender preview uses explicit IPv4 loopback so its listener and
 fetch URL agree in Linux containers.

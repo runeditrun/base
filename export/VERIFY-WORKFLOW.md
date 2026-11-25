@@ -73,9 +73,9 @@ Every API listing must be complete and stable, with distinct valid entries;
 partial pages, changing totals, authentication errors, redirects, rate limits,
 invalid JSON and request timeouts select verification.
 
-Base's existing `--main-skip` command and output remain available for its legacy
-workflow while its CI packing is adopted separately. That compatibility path
-retains its existing complete-job policy. The seed templates use `--plan` and
+Base's own workflow uses `--reuse`: its main push and release tag of a SHA skip
+when a branch push of that SHA passed every job (Base has no nightly tier). That
+path retains its existing complete-job policy. The seed templates use `--plan` and
 the explicit branch-only proof described here.
 
 ## Light coverage

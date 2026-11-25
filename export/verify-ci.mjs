@@ -15,13 +15,16 @@ const jobShape = value => value && Number.isSafeInteger(value.id) && value.id > 
  && (typeof value.conclusion === 'string' || value.conclusion === null);
 const succeeded = item => item.status === 'completed' && item.conclusion === 'success';
 
-// A push of this SHA to another branch or tag runs the jobs a main push runs.
-// A pull request tests its merge ref and a dispatch may run a subset, so
-// neither is evidence. The newest such push must have succeeded, and so must
-// every newer run of this workflow for the SHA.
-function mainEvidence(runs, { sha, repository, workflow, runId, currentRun }) {
+// The main push and a tag push of a SHA rerun nothing a branch push of that
+// SHA already ran. A push of this SHA to another branch or tag runs the same
+// jobs; the main push (which itself reused) is not evidence. A pull request
+// tests its merge ref and a dispatch may run a subset, so neither is evidence.
+// The newest such push must have succeeded, and so must every newer run of
+// this workflow for the SHA.
+const reusingRef = ref => ref === 'refs/heads/main' ? 'main' : ref?.startsWith('refs/tags/') ? ref.slice('refs/tags/'.length) : undefined;
+function reuseEvidence(runs, { sha, repository, workflow, runId, ref, currentRun }) {
  if (String(currentRun.id) !== runId || currentRun.head_sha !== sha || currentRun.repository.full_name !== repository
-  || currentRun.name !== workflow || currentRun.event !== 'push' || currentRun.head_branch !== 'main') return;
+  || currentRun.name !== workflow || currentRun.event !== 'push' || !ref || currentRun.head_branch !== ref) return;
  const related = runs.filter(run => run.id !== currentRun.id
   && run.workflow_id === currentRun.workflow_id && run.name === workflow
   && run.repository.id === currentRun.repository.id && run.repository.full_name === repository
@@ -32,9 +35,10 @@ function mainEvidence(runs, { sha, repository, workflow, runId, currentRun }) {
  if (evidence && succeeded(evidence) && related.every(run => run.id <= evidence.id || succeeded(run))) return evidence;
 }
 
-// Only complete API evidence can authorize skipping the main duplicate.
-export async function lookupMainVerification({ env = process.env, fetch = globalThis.fetch } = {}) {
- if (env.GITHUB_EVENT_NAME !== 'push' || env.GITHUB_REF !== 'refs/heads/main') return false;
+// Only complete API evidence can authorize skipping the main or tag duplicate.
+export async function lookupReusedVerification({ env = process.env, fetch = globalThis.fetch } = {}) {
+ const ref = reusingRef(env.GITHUB_REF);
+ if (env.GITHUB_EVENT_NAME !== 'push' || !ref) return false;
  try {
   if (!/^[^/]+\/[^/]+$/.test(env.GITHUB_REPOSITORY ?? '') || !/^\d+$/.test(env.GITHUB_RUN_ID ?? '')
    || !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA ?? '') || !env.GITHUB_TOKEN) return false;
@@ -66,20 +70,20 @@ export async function lookupMainVerification({ env = process.env, fetch = global
   const currentRun = await get(`${base}/runs/${env.GITHUB_RUN_ID}`);
   if (!runShape(currentRun)) return false;
   const runs = await list(`workflows/${currentRun.workflow_id}/runs?head_sha=${env.GITHUB_SHA}`, 'workflow_runs', runShape);
-  const evidence = runs && mainEvidence(runs, { sha: env.GITHUB_SHA, repository: env.GITHUB_REPOSITORY,
-   workflow: env.GITHUB_WORKFLOW, runId: env.GITHUB_RUN_ID, currentRun });
+  const evidence = runs && reuseEvidence(runs, { sha: env.GITHUB_SHA, repository: env.GITHUB_REPOSITORY,
+   workflow: env.GITHUB_WORKFLOW, runId: env.GITHUB_RUN_ID, ref, currentRun });
   if (!evidence) return false;
-  // Every job of the evidence succeeded, except this main-only gate job and
-  // jobs this main run has already skipped by their own conditions.
+  // Every job of the evidence succeeded, except this gate job and jobs this
+  // main or tag run has already skipped by their own conditions.
   const jobs = await list(`runs/${evidence.id}/jobs?filter=latest`, 'jobs', jobShape);
   if (!jobs?.some(succeeded) || !jobs.every(job => job.run_id === evidence.id
    && (succeeded(job) || (job.status === 'completed' && job.conclusion === 'skipped')))) return false;
   const skipped = jobs.filter(job => !succeeded(job) && job.name !== env.GITHUB_JOB);
   if (!skipped.length) return true;
-  const mainJobs = await list(`runs/${currentRun.id}/jobs?filter=latest`, 'jobs', jobShape);
-  const skippedOnMain = new Set(mainJobs?.filter(job => job.run_id === currentRun.id
+  const currentJobs = await list(`runs/${currentRun.id}/jobs?filter=latest`, 'jobs', jobShape);
+  const skippedHere = new Set(currentJobs?.filter(job => job.run_id === currentRun.id
    && job.status === 'completed' && job.conclusion === 'skipped').map(job => job.name));
-  return skipped.every(job => skippedOnMain.has(job.name));
+  return skipped.every(job => skippedHere.has(job.name));
  } catch {
   // Authentication, rate limits, network/JSON failures and timeouts all run CI.
  }
@@ -199,8 +203,8 @@ async function workflowPermissionErrors(directory = '.github/workflows') {
 const invokedDirectly = () => { try { return realpathSync(process.argv[1]) === realpathSync(import.meta.filename); } catch { return false; } };
 if (invokedDirectly()) {
  const [mode, tier] = process.argv.slice(2);
- if (mode === '--main-skip' && !tier) {
-  const output = `skip=${await lookupMainVerification()}\n`;
+ if (mode === '--reuse' && !tier) {
+  const output = `skip=${await lookupReusedVerification()}\n`;
   if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, output);
   process.stdout.write(output);
  } else if (mode === '--plan' && !tier) {

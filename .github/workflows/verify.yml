@@ -1,7 +1,7 @@
 name: Verify
 
 on:
-  # One trigger per commit: a branch push is the run; the main push of the same SHA reuses it.
+  # One trigger per commit: a branch push is the run; the main push and a tag push of the same SHA reuse it.
   push:
     branches: ['**']
     tags: ['**']
@@ -37,12 +37,12 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22.20.0'
-      - name: Reuse successful branch verification on main
+      - name: Reuse successful branch verification on main or a tag
         id: duplicate
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        if: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node export/verify-ci.mjs --main-skip
+        run: node export/verify-ci.mjs --reuse
       - name: Fail over the test cap
         run: node scripts/ci/count-tests.mjs
       - id: stages

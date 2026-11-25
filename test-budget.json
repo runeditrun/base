@@ -1,4 +1,9 @@
 {
   "cap": 200,
-  "excluded": ["live-proofs/"]
+  "excluded": [
+    "live-proofs/"
+  ],
+  "reasons": {
+    "live-proofs/": "Not Verify tests: live-proof.yml and deploy-stage.yml run them only by manual workflow_dispatch against a throwaway Cloudflare account, never on a push or tag (t016-linux-qualification.yml runs only on a pull request in a private repository, and Base is public). The cap counts what Verify runs."
+  }
 }
