@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.135
+
+Signed: Run Edit Run fleet, 2026-11-26.
+
+### Cloudflare Worker deploy and sign-in
+
+- `rer deploy --set-secret A,B` keeps the live Worker version's settings, including its CPU limit, when it changes several secrets at once. A copy that would drop a setting is never deployed: rer refuses, leaves the live Worker unchanged and says it is a rer fault to report. A copy an older rer left without its limits is adopted with a notice, and the next full deploy uploads the declared limits again.
+- An unsettled secret change no longer reports "no completed rer deployment": deploy, signin, remove, rekey and inspect name the command that finishes it.
+- A Worker upload gets 30 seconds plus its bytes at 40 kB/s, so a large Worker finishes its first deploy on a slow link. `RER_UPLOAD_MIN_KBPS` lowers the rate for a slower link, the timeout failure names the limit and the bytes, and the 90-second readiness window starts after the upload returns.
+
+### Jobs
+
+- A job waiting on machine load says no start time can be given and how to raise `RER_JOBS_LOAD_THRESHOLD`.
+
 ## 0.2.134
 
 Signed: Run Edit Run fleet, 2026-11-25.
