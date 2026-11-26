@@ -1,38 +1,52 @@
 import {readFile} from 'node:fs/promises';
 import {deliveryDeclarationSources} from '../../cli/delivery-declarations.mjs';
+import {switchableDefaults} from '../../cli/deploy-settings.mjs';
 import {sourcePath} from '../delivery-producer/migrations.mjs';
-import {usesManagedMail,validateMailSpec} from '../delivery-producer/mail.mjs';
+import {publicMailSender} from '../delivery-producer/mail.mjs';
 
 /** Shared binding comparison for source checks and emitted image validation. */
 export function imageVariableSecrets(vars, secrets) {
  return secrets.filter(secret => Object.hasOwn(vars, secret.binding));
 }
 
-/** Drop empty runtime-secret placeholders; admit only managed-mail public legacy values. */
-export async function checkImageVariables(root,vars,secrets) {
- const declared=imageVariableSecrets(vars,secrets);
- const placeholders=declared.filter(secret=>vars[secret.binding] === '');
- const overlaps=declared.filter(secret=>vars[secret.binding] !== '');
- if (!overlaps.length) {
-  for (const {binding} of placeholders) delete vars[binding];
-  return;
- }
- const publicMail=new Set(),privateNames=new Set();
- for (const [candidate,select] of deliveryDeclarationSources) {
-  const path=await sourcePath(root,candidate,{optional:true});
+/**
+ * The one rule for a name that is both a Wrangler var and a deploy secret, used by
+ * the source check and the image build. It is public only as a switchable public
+ * setting (deploy-settings) whose var keeps the declared default, or as a managed
+ * mail spec's public MAIL_FROM sender. A managed artifact's secret or optional
+ * secret name is always private. Returns binding, value -> 'public' | 'mismatch' | 'private'.
+ */
+export async function overlapRule(root, declaration) {
+ const defaults = await switchableDefaults(declaration);
+ const privateNames = new Set();
+ let publicSender = false;
+ for (const [candidate, select] of deliveryDeclarationSources) {
+  const path = await sourcePath(root, candidate, {optional: true});
   if (!path) continue;
-  const spec=select(JSON.parse(await readFile(path,'utf8')));
+  const spec = select(JSON.parse(await readFile(path, 'utf8')));
   if (!spec) continue;
-  for (const name of [...(spec.secretNames ?? []),...(spec.optionalSecretNames ?? [])]) privateNames.add(name);
-  if (!usesManagedMail(spec.mail)) continue;
-  const names=spec.publicVariableNames ?? Object.keys(spec.publicVariables ?? {});
-  const publicVariables=Object.fromEntries(Object.entries(vars).filter(([name])=>names.includes(name)));
-  validateMailSpec({...spec,publicVariables,secretNames:spec.secretNames ?? []});
-  for (const name of ['MAIL_PROVIDER','MAIL_FROM','MAIL_RELAY_URL']) if (typeof publicVariables[name] === 'string') publicMail.add(name);
+  for (const name of [...(spec.secretNames ?? []), ...(spec.optionalSecretNames ?? [])]) privateNames.add(name);
+  publicSender ||= publicMailSender(spec);
  }
- for (const {binding} of overlaps) if (!publicMail.has(binding) || privateNames.has(binding)) {
-  throw new Error('Secret declared as an image variable: '+binding);
+ return (binding, value) => {
+  if (privateNames.has(binding)) return 'private';
+  if (Object.hasOwn(defaults, binding)) return value === defaults[binding] ? 'public' : 'mismatch';
+  return binding === 'MAIL_FROM' && publicSender ? 'public' : 'private';
+ };
+}
+
+/** Drop empty runtime-secret placeholders; keep only public overlaps as image defaults. */
+export async function checkImageVariables(root, vars, declaration) {
+ const declared = imageVariableSecrets(vars, declaration.secrets ?? []);
+ const placeholders = declared.filter(secret => vars[secret.binding] === '');
+ const overlaps = declared.filter(secret => vars[secret.binding] !== '');
+ if (overlaps.length) {
+  const rule = await overlapRule(root, declaration);
+  for (const {binding} of overlaps) {
+   const kind = rule(binding, vars[binding]);
+   if (kind === 'mismatch') throw new Error(`${binding}: the image variable must match the public default in the deploy declaration's vars.${binding}`);
+   if (kind !== 'public') throw new Error('Secret declared as an image variable: ' + binding);
+  }
  }
  for (const {binding} of placeholders) delete vars[binding];
- console.warn(overlaps.map(secret=>secret.binding).join(', ')+' are public mail configuration, not secrets. Remove these bindings from deploy.json secrets; keep them in the mail spec public variables and Wrangler vars. Accepting the legacy declaration; runtime demo settings override the image defaults.');
 }

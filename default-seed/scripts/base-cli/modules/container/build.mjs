@@ -80,7 +80,7 @@ async function buildImage(root, { output = join(root,'.rer/container/image'), en
  const entry = engine === 'workerd' ? 'dist/server/'+workerConfig.main : 'dist/server/index.mjs';
  await readFile(join(root,entry));
  if (engine === 'node' && workerConfig.kv_namespaces?.length) throw new Error('Node container does not support KV');
- await checkImageVariables(root,workerConfig.vars ?? {},declaration.secrets ?? []);
+ await checkImageVariables(root,workerConfig.vars ?? {},declaration);
  if (engine === 'workerd') await writeFile(join(root,'dist/server/wrangler.json'),JSON.stringify(workerConfig)+'\n');
  const manifest = { version:1,engine,entry,cacheContract,runner,config:workerConfig,migrations,portabilityMigrations:await portabilityPlan(split),maxRequestBytes:25*1024*1024 };
  await rm(output,{recursive:true,force:true}); await mkdir(join(output,'app'),{recursive:true});

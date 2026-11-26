@@ -939,7 +939,7 @@
     },
     "cli/deploy-variables.mjs": {
       "source": "cli/deploy-variables.mjs",
-      "sha256": "c30f203255738ecec010d0703198111990c70e0f9b7c8723c07aecd679112db6"
+      "sha256": "d8ac0e8ad10e0aa8a3a42b99c8f87d5a3af1b5a0dc36e3162064c469cda3aef1"
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
@@ -2487,7 +2487,7 @@
     },
     "modules/container/build.mjs": {
       "source": "modules/container/build.mjs",
-      "sha256": "40a24c1e3cf2b7383e7c3a83b907e57810587235fd8c5d465b45e44d8eb67f11"
+      "sha256": "e435dd80be9a9acbc3ff05e7f40ed545feb588dcb484da733016beced27a8679"
     },
     "modules/container/demo-egress.mjs": {
       "source": "modules/container/demo-egress.mjs",
@@ -2511,7 +2511,7 @@
     },
     "modules/container/image-variables.mjs": {
       "source": "modules/container/image-variables.mjs",
-      "sha256": "ad2374544550fcd6c1b3e02e801dffcda6f471b8cd76e4300059ce151612e2b4"
+      "sha256": "036a7fbecd51b4ab365073b17f651f802c6d111f3ca6da0dd22f07f101198aea"
     },
     "modules/container/import-graph.mjs": {
       "source": "modules/container/import-graph.mjs",
@@ -2615,7 +2615,7 @@
     },
     "modules/demo-host/build.mjs": {
       "source": "modules/demo-host/build.mjs",
-      "sha256": "cb426769fbd0597296fe4040d83cfd750aff0f0b3c22036d56cbd054a796768c"
+      "sha256": "1fbf5ac2e099733467e0308c5f53b9a0fde978e25b59e769ff3ef1a017ed98c0"
     },
     "modules/demo-host/capacity.mjs": {
       "source": "modules/demo-host/capacity.mjs",
