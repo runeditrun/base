@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.136
+
+Signed: Run Edit Run fleet, 2026-11-26.
+
+### Local installs
+
+- `rer setup --host` moves a local install among 127.0.0.1, localhost and ::1 the way a port move does: only the saved origin and the settings derived from it change, `.wrangler/state` and every other setting keep their bytes, and setup says in one line what moved. A plain `rer dev` then serves on the new origin. Non-loopback hosts still refuse before any write.
+- Private settings writes rewrite changed keys in place and append new ones instead of regenerating the whole `.dev.vars` file, so comments and other lines are kept.
+- The browser installer follows the seed's declared host for a fresh install and keeps a saved plain localhost or [::1] origin.
+- A localhost origin is served on 127.0.0.1, and the proxy also holds the port on ::1 where IPv6 exists, so `rer setup --host localhost` becomes healthy on Linux and WSL2.
+
+### Publication scan
+
+- The publication scan no longer walks commits public main already holds, and a SEC-3 line already on public main is a note rather than a block.
+
 ## 0.2.135
 
 Signed: Run Edit Run fleet, 2026-11-26.
