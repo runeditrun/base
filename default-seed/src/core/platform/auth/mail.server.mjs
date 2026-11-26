@@ -17,6 +17,21 @@ function businessSender(env, sender) {
   } }
 }
 
+// The Business relay delivers to the Business owner only. The development and
+// demo senders take precedence in operatorMail, so they are never owner-only.
+export function ownerOnlyMail(env) {
+  return env.MAIL_PROVIDER === 'rer' && env.RER_DEMO !== '1' && !localDevelopmentEnabled(env)
+}
+
+// On the relay a non-owner address is answered like an unknown one: no link, no
+// send, so the public response does not reveal who is a teammate.
+export function operatorMailHooks(env) {
+  if (!ownerOnlyMail(env)) return {}
+  // The same comparison the relay sender makes; an unreadable owner admits no one.
+  const owner = () => { try { return parseAddress(env.OWNER_EMAIL).email.toLowerCase() } catch { return null } }
+  return { beforeMagicLink: ({ email }) => email === owner() }
+}
+
 // Construct only on a send: first-owner setup never depends on mail credentials.
 export function operatorMail(env) {
   if (env.RER_DEMO === '1' || localDevelopmentEnabled(env)) {
