@@ -2435,7 +2435,7 @@
     },
     "modules/container/adapters/d1-limits.mjs": {
       "source": "modules/container/adapters/d1-limits.mjs",
-      "sha256": "2f202022a8345c420e40dbf551cdcdc94eb1b4c3c3f49d5e801be75ce98c5aba"
+      "sha256": "f6fbef8fe8d8246117dab30d6fd0f4f228c9f05c851dbfb62c9b5170c7c2faa5"
     },
     "modules/container/adapters/d1-sqlite.mjs": {
       "source": "modules/container/adapters/d1-sqlite.mjs",

@@ -38,7 +38,7 @@ export function d1Preflight(sql, values = [], tableColumns) {
     tokens.push(token);
   }
   limit('bound parameters', d1NativeLimits.variableNumber, bindIndex);
-  const structural = new Set(['IN', 'VALUES', 'AS', 'SELECT', 'FROM', 'WHERE', 'ON', 'USING', 'OVER', 'FILTER', 'EXISTS', 'TABLE', 'CHECK', 'KEY', 'UNIQUE', 'REFERENCES', 'CONSTRAINT', 'BY', 'WHEN', 'THEN', 'ELSE', 'END', 'AND', 'OR', 'NOT', 'IS', 'SET', 'RETURNING']);
+  const structural = new Set(['MATERIALIZED', 'IN', 'VALUES', 'AS', 'SELECT', 'FROM', 'WHERE', 'ON', 'USING', 'OVER', 'FILTER', 'EXISTS', 'TABLE', 'CHECK', 'KEY', 'UNIQUE', 'REFERENCES', 'CONSTRAINT', 'BY', 'WHEN', 'THEN', 'ELSE', 'END', 'AND', 'OR', 'NOT', 'IS', 'SET', 'RETURNING']);
   const pairs = new Map(), stack = [];
   for (let i = 0; i < tokens.length; i++) {
     if (tokens[i].text === '(') stack.push(i);
