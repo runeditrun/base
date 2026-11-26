@@ -31,12 +31,15 @@ export function refusalView(body, limit = 500, secrets = []) {
 export const serverSaid = reason => reason ? ` The server said: ${reason}${/[.!?…]$/.test(reason) ? '' : '.'}` : '';
 
 // Refusal JSON has the same useful status/action/code and reason as the human
-// line, without forwarding arbitrary error data or credential-bearing fields.
+// line, plus the refusal's other top-level scalar fields (a reconnect_url the agent
+// must hand to the owner), without arbitrary nested data or credential-bearing fields.
+const handled = new Set(['status', 'code', 'action', 'message', 'error', 'detail', 'gap', 'isError']);
 export function refusalData(body) {
  const view = refusalView(body);
  return Object.fromEntries([
   ...['status', 'code', 'action'].filter(key => typeof body?.[key] === 'string').map(key => [key, view.line(body[key]).slice(0, 80)]),
   ...(view.sentence ? [['message', view.sentence]] : []),
+  ...Object.entries(body ?? {}).filter(([key, value]) => !handled.has(key) && !secretField.test(key) && value !== null && ['string', 'number', 'boolean'].includes(typeof value) && !(typeof value === 'string' && !view.line(value))).map(([key, value]) => [key, typeof value === 'string' ? view.line(value) : value]),
  ]);
 }
 

@@ -1,6 +1,7 @@
 import { redact } from './errors.mjs';
 import { refusalData, serverSaid } from './refusal.mjs';
 
+const refusalHandled = new Set(['status', 'code', 'action', 'message']);
 const scalar = value => value === null || ['string', 'number', 'boolean'].includes(typeof value);
 export const clean = (value, limit = 300) => redact(typeof value === 'string' ? value : JSON.stringify(value)).replace(/\s+/g, ' ').trim().slice(0, limit);
 
@@ -36,5 +37,6 @@ export function refusalText(data, ownerPage) {
   return `The owner has not let this computer do "${action}". The owner grants it in Business, under Computers: ${ownerPage}${serverSaid(message)}`;
  }
  const code = typeof data?.code === 'string' ? ` (${clean(data.code, 80)})` : '';
- return `Business refused: ${message ?? data?.status ?? 'no reason given'}${code}`;
+ const extra = Object.entries(data).filter(([key]) => !refusalHandled.has(key)).map(([key, value]) => `\n${key}: ${clean(value, 500)}`).join('');
+ return `Business refused: ${message ?? data?.status ?? 'no reason given'}${code}${extra}`;
 }
