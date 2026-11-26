@@ -19,7 +19,7 @@ function OperatorApp() {
       <p><a href="/app/people">People and recent activity</a></p>
       <p><a href="/app/import">Move your people in</a></p>
       <p><a href="/app/policies">Scheduled policy approvals</a></p>
-      <OperatorAccess timezone={business.timezone} />
+      <OperatorAccess timezone={business.timezone} ownerOnlyMail={dashboard.ownerOnlyMail} />
     </section>
   )
 }

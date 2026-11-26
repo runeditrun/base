@@ -2,7 +2,7 @@ import { policyDefinitions } from '../../features/policies/definitions.server'
 import { createOperatorAuth } from '../../../../../modules/operator-auth/index.mjs'
 import type { Bindings } from '../bindings.server'
 import { authConfig } from './config.server'
-import { operatorMail } from './mail.server.mjs'
+import { operatorMail, operatorMailHooks } from './mail.server.mjs'
 import { businessSettings } from '../business.server'
 
 export function operatorAuth(bindings: Bindings, waitUntil?: (promise: Promise<unknown>) => void) {
@@ -11,6 +11,7 @@ export function operatorAuth(bindings: Bindings, waitUntil?: (promise: Promise<u
     scheduledPolicies: policyDefinitions,
     config: authConfig(bindings),
     mailSender: operatorMail(bindings),
+    hooks: operatorMailHooks(bindings),
     businessSettings: businessSettings(bindings),
     // Cloudflare overwrites this at the public Worker boundary. Local review
     // listeners must bind loopback; forwarded headers are never trusted.
