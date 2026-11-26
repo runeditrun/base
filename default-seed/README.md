@@ -181,8 +181,11 @@ Cloudflare additionally needs `MAIL_ACCOUNT_ID`. Sends use the actual
 provider silently suppresses mail in development and demo. Production never
 selects it after a remote-provider failure.
 
-For a tool on a Business, supply the settings from `mail.sender` in the deploy
-environment or owned `--env-file`: `MAIL_PROVIDER=rer`, the assigned
+For a tool on a Business, `rer deploy` from a computer connected to it
+(`rer business connect`) asks the Business for the relay sender itself on the
+first deploy when no mail setting is supplied, and writes the key only to the
+Worker's `MAIL_API_KEY` secret. Or supply the settings from `mail.sender` in the
+deploy environment or owned `--env-file`: `MAIL_PROVIDER=rer`, the assigned
 `MAIL_FROM` and `MAIL_RELAY_URL`, and the private `MAIL_API_KEY`. Set
 `OWNER_EMAIL` to the verified Business owner. Only that mailbox can receive
 mail through this sender.

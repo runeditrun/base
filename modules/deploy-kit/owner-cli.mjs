@@ -25,7 +25,7 @@ import { switchableDefaults } from '../../cli/deploy-settings.mjs';
 import { uploadMinKBps } from './upload-timeout.mjs';
 
 export const cronNotice = 'This Worker has a Cron Trigger. Cloudflare may take up to about two hours to start its first scheduled run on some accounts.';
-const usage = 'usage: owner-cli.mjs deploy|dry-run|local-plan|health|remove|inspect|record-owner|signin|rekey|settle --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
+const usage = 'usage: owner-cli.mjs deploy|dry-run|local-plan|health|remove|inspect|address|record-owner|signin|rekey|settle --declaration <file> --environment <name> [--product <dir>] [--state <file>] [--outcome claimed|kept] | secret ... --set NAME [--set NAME]|--unset NAME [--unset NAME]';
 
 // The public offline command also contains legacy hooks that call kit dry-run.
 // Keep their plan local without changing direct kit callers or real deploys.
@@ -71,7 +71,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   catch { throw new Error('usage'); }
   const {positionals:[requestedCommand,...rest],values} = parsed;
   const command = localPlans.getStore() && requestedCommand === 'dry-run' ? 'local-plan' : requestedCommand;
-  if (!['deploy','dry-run','local-plan','health','secret','remove','inspect','record-owner','signin','rekey','settle'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
+  if (!['deploy','dry-run','local-plan','health','secret','remove','inspect','address','record-owner','signin','rekey','settle'].includes(command) || rest.length || !values.declaration || !values.environment) throw new Error('usage');
   if (localPlans.getStore() && command !== 'local-plan') throw new Error('offline-deploy-refuses-provider-operation');
   if ((command === 'secret') !== (values.set !== undefined || values.unset !== undefined) || values.set !== undefined && values.unset !== undefined) throw new Error('usage');
   if (values.outcome !== undefined && command !== 'record-owner' || command === 'record-owner' && !['claimed','kept'].includes(values.outcome)) throw new Error('usage');
@@ -132,6 +132,21 @@ export async function main(argv = process.argv.slice(2), env = process.env, {fet
   // Transport must see the same outer signal when deciding whether to retry.
   const api = deploymentDiagnostics(cloudflare({accountId:env.CLOUDFLARE_ACCOUNT_ID,token:env.CLOUDFLARE_API_TOKEN,fetch:guardedRequest,requestSignal,minUploadKBps:uploadMinKBps(env),budgetMigrations:command === 'deploy',...(command === 'remove' ? {maxRequests:Infinity,removal:true} : {})}),{onCreated});
   const statePath = values.state ? resolve(root,values.state) : join(root,'.rer','deploy',`${values.environment}.json`);
+  if (command === 'address') {
+    // Before any write: where this deploy will answer (its recorded origin, else the account's workers.dev name for the
+    // Worker) and the secret names its Worker holds (none before the first upload). Reads only.
+    const target = await ownerStateTarget(api,{project:declaration.project,environment:values.environment,statePath});
+    const exists = await workerSettings(api,target.worker) !== null;
+    const rows = exists ? await api.request(`/workers/scripts/${target.worker}/secrets`) : [];
+    assert(Array.isArray(rows), 'invalid-secret-list');
+    let origin = target.origin ?? null;
+    if (!origin && declaration.workersDev !== false) {
+      const {subdomain} = await api.request('/workers/subdomain');
+      assert(typeof subdomain === 'string' && /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(subdomain),'invalid-account-subdomain');
+      origin = `https://${target.worker}.${subdomain}.workers.dev`;
+    }
+    return {ok:true,origin,liveSecrets:rows.map(row => row.name)};
+  }
   // Every follow-up uses the app record's resolved name, including native
   // uploaders' prefixes. Removal needs no routable origin or completed receipt.
   const target = command === 'signin'

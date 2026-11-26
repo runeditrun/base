@@ -364,7 +364,8 @@ declares a sign-in that works without mail: the `commandAdapter` option
 `mailOffSignIn`, one line naming the command a person runs from the checkout. Both
 `rer deploy` and `rer deploy --dry-run` then pass the production sign-in check
 without any mail input, bind nothing that can send, and report that outbound email
-is off together with that command. `none` is never inferred: a missing
+is off together with that command. `none` is inferred only by the relay sender
+below, when it finds no sender; otherwise a missing
 `MAIL_PROVIDER`, `later` or `direct` keeps today's refusal, a seed without the
 declaration keeps today's refusal for `none` too, and `none` together with a
 mail credential (`MAIL_API_KEY`, `SENDGRID_API_KEY`, `RESEND_API_KEY`,
@@ -372,6 +373,23 @@ mail credential (`MAIL_API_KEY`, `SENDGRID_API_KEY`, `RESEND_API_KEY`,
 anything is built or uploaded. The seed owns what an installation does with mail
 off, and turning mail on later is a `rer deploy --set-secret` of the provider
 inputs the seed documents.
+
+**Mail from the Business this computer is connected to.** A seed that declares
+`MAIL_PROVIDER`, `MAIL_FROM`, `MAIL_RELAY_URL` and `MAIL_API_KEY` as deploy
+secrets, deployed with none of its mail inputs supplied, gets Run Edit Run's
+owner-only relay sender on its first deploy: `rer deploy` asks the connected
+Business's door for `mail.sender` (the tool's name is the product's, with the
+environment in brackets outside production; its address is the public origin or
+the Worker's workers.dev address) and deploys with `MAIL_PROVIDER=rer`, the
+assigned `MAIL_FROM` and `MAIL_RELAY_URL`, and the key, which goes only into the
+Worker's `MAIL_API_KEY` secret. The relay mails only the Business owner's
+verified address, so the deploy's owner email must be that address. A redeploy
+keeps the sender the Worker holds; to replace its key, `--unset-secret
+MAIL_API_KEY` and deploy again, and `rer business call mail.sender.revoke --tool
+NAME` stops it. With no sender (no Business connected, or the Business refused),
+the deploy says why in one line: a seed with `mailOffSignIn` then deploys with
+`MAIL_PROVIDER=none`, and any other seed keeps the refusal above. A later deploy
+from a connected computer switches a held `MAIL_PROVIDER=none` to the relay.
 
 A seed can opt into a switchable public selector with one `deploy.json` edit:
 

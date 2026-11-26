@@ -1,5 +1,6 @@
 import { requireProductionAuth, mailOffNotice } from './production-auth.mjs';
 import { mailOffSignInCommand } from './production-mail.mjs';
+import { deployMailSender } from './deploy-mail-sender.mjs';
 import { readFile } from 'node:fs/promises';
 import { deployDiagnostic, migrationFailure, providerFailure, assetFailure, ownerTargetFailure } from '../modules/deploy-kit/diagnostics.mjs';
 import { shared } from './shared.mjs';
@@ -46,10 +47,24 @@ export function ownerDeploy(declarationPath, lifecycle) {
   const recordedState = change.length ? await deploymentRecord(root, options) : undefined;
   // A dry run reads the settings file too, so a refused key fails here and not only on the real deploy.
   if (options.dryRun && options.envFile) await deployEnvironment({ root, options, declaration, localOnlyKeys });
-  let production, ownerInput, signIn, mailOff;
+  let production, ownerInput, signIn, mailOff, sender, relayMail = {};
   if (!change.length) {
    production = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
-   ({signIn, mailOff} = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed, adapter: lifecycle, declarationPath, options, mailOffSignIn: mailOffSignInCommand(adapter) ?? mailOffSignInCommand(lifecycle) }) ?? {});
+   const mailOffSignIn = mailOffSignInCommand(adapter) ?? mailOffSignInCommand(lifecycle);
+   // Day-one mail from the Business this computer is connected to (deploy-mail-sender.mjs). With no sender, a seed that
+   // signs its owner in without mail deploys with MAIL_PROVIDER=none; any other is refused below, as before.
+   const ownerField = declaration.secrets?.find?.(item => item?.binding === setupManifest?.steps?.find(step => step.type === 'owner-claim')?.emailField);
+   sender = await deployMailSender({ root, declaration, declarationPath, env: production.env, options, localOnlyKeys,
+    name: adapter?.product ?? lifecycle.product ?? declaration.project.split('/').at(-1), ownerEmail: ownerField && production.env[ownerField.environment],
+    report: line => store.report(line), addSecret: value => store.addSecrets?.([value]) });
+   if (sender?.off) {
+    store.report(`${mailOffSignIn ? 'Mail is off' : 'No mail sender from Run Edit Run'}: ${sender.off.replace(/[.\s]+$/, '')}.`);
+    if (mailOffSignIn) relayMail = { [declaration.secrets.find(item => item?.binding === 'MAIL_PROVIDER').environment]: 'none' };
+   }
+   Object.assign(relayMail, sender?.values);
+   Object.assign(production.env, relayMail);
+   // Relay settings this Worker already holds are its mail: they were checked when rer set them.
+   if (!sender?.held) ({signIn, mailOff} = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed, adapter: lifecycle, declarationPath, options, mailOffSignIn }) ?? {});
    if (!options.dryRun) committedSource(root, options);
    ownerInput = await deployOwnerInput({ root, adapter, setupSeed, options, signal, declaration, env: production.env });
    await withoutLocalSettings(root, { settings: lifecycle.settings, operationToken }, () => lifecycle.run(root, {}, store, () => {}, signal, { verb: 'build', operationToken }));
@@ -57,6 +72,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
    await refuseLocalEnvOutput(root);
   }
   const { env, supplied, generated, reused, rotated } = await deployEnvironment({ root, options, declaration, setupManifest, settings: lifecycle.settings, localOnlyKeys });
+  Object.assign(env, relayMail);
   if (options.setSecret || options.unsetSecret) secretChangeInputs(declaration, options, env, again);
   const kept = keptSecrets(declaration, setupManifest);
   if (!options.dryRun && cloudflareCredentials.some(name => !env[name]?.trim())) throw missing(missingCredentialsMessage(declaration, env, {dryRun:options.dryRun,signIn}));
@@ -135,6 +151,12 @@ export function ownerDeploy(declarationPath, lifecycle) {
    if (claimed === undefined) await linked(env[declared(claim?.tokenField ?? 'SETUP_TOKEN')?.environment]);
    step = 'verify hosted setup';
    await checkHostedSetup({ origin: deployed.origin, claimed: claimed ?? ownerClaim?.outcome, signal });
+   if (sender?.replace?.length) {
+    // The upload kept what the Worker held (the kit never replaces a held secret): switch those to the sender's now.
+    step = 'secrets';
+    await owner('secret', [...sender.replace.flatMap(binding => ['--set', binding]), ...(state ? ['--state', state] : [])]);
+    store.report(`Mail is on: set ${sender.replace.join(', ')} on this environment's Worker to the relay sender's settings as one new version.`, { names: sender.replace });
+   }
    store.report(`Your application is live on your Cloudflare account at ${deployed.origin}.`);
    // The app claims the OWNER_EMAIL the Worker holds: the local one only when this run uploaded it.
    const email = declared(claim?.emailField);
