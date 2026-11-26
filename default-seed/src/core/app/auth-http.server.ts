@@ -1,6 +1,7 @@
 import { AuthError, createAuthHandler, createSignInHandler, securityHeaders } from '../../../../modules/operator-auth/index.mjs'
 import type { Bindings } from '../platform/bindings.server'
 import { operatorAuth } from '../platform/auth/session.server'
+import { ownerOnlyMail } from '../platform/auth/mail.server.mjs'
 import { signinPresentation } from '../platform/auth/signin-options.server.mjs'
 import { fontDocumentResponse } from '../../../../foundation/runtime/font-response'
 
@@ -20,6 +21,7 @@ export async function signInResponse(request: Request, bindings: Bindings, waitU
   const presentation = signinPresentation(bindings)
   return fontDocumentResponse(await createSignInHandler(operatorAuth(bindings, waitUntil), {
     defaultReturnTo: '/setup',
+    ...(ownerOnlyMail(bindings) ? { note: 'Email sign-in links on this tool reach only the Business owner. Teammates cannot receive them yet.' } : {}),
     async setup() {
       if (!bindings.SETUP_TOKEN || await bindings.DB.prepare('SELECT singleton FROM oa_bootstrap LIMIT 1').first()) return null
       return { instructions: presentation.setupInstructions }

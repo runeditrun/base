@@ -46,5 +46,6 @@ export const loadPrivateDashboard = createServerFn({ method: 'GET' }).handler(as
   if (!session) throw redirect({ href: '/signin?returnTo=%2Fapp', reloadDocument: true })
   const { needsFirstRun } = await import('../../../../foundation/runtime/setup')
   if (await needsFirstRun(bindings, session)) throw redirect({ href: '/setup', reloadDocument: true })
-  return readDashboard(bindings)
+  const { ownerOnlyMail } = await import('../platform/auth/mail.server.mjs')
+  return { ...await readDashboard(bindings), ownerOnlyMail: ownerOnlyMail(bindings) }
 })
