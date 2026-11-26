@@ -43,6 +43,7 @@ export async function setupInput(project, options, vars, signal, { origin, moved
  const savedAnswers = Object.fromEntries(seed.manifest.fields.filter(field => field.kind !== 'secret' && typeof vars[field.name] === 'string' &&
   !(field.kind === 'select' && Object.hasOwn(adapterDefaults, field.name) && !seed.model.fields[field.name].valid(vars[field.name]))).map(field => [field.name, vars[field.name]]));
  const installerAnswers = await savedSetupAnswers(project, seed.model);
+ const supplied = answers;
  answers = { ...defaults, ...adapterDefaults, ...(installerAnswers ?? savedAnswers), ...answers };
  const savedEmail = vars[names.email];
  if (!answers[names.email] && savedEmail) answers[names.email] = savedEmail;
@@ -54,6 +55,8 @@ export async function setupInput(project, options, vars, signal, { origin, moved
  // A checkout moving to another origin takes along each setting that was its
  // origin (localDefault from: origin); one the owner set elsewhere stays.
  if(movedFrom)for(const field of seed.manifest.fields)if(field.localDefault?.from==='origin'&&answers[field.name]===movedFrom)answers[field.name]=origin;
+ // A move interrupted after the settings were written leaves the saved answers on the old origin while the settings already hold the current one; the settings win unless the answers file names the field.
+ if(origin)for(const field of seed.manifest.fields)if(field.localDefault?.from==='origin'&&vars[field.name]===origin&&answers[field.name]!==origin&&!Object.hasOwn(supplied,field.name))answers[field.name]=origin;
  const entered=seed.manifest.fields.filter(field=>field.kind==='secret'&&field.input==='entered');
  for(const field of entered)if(!answers[field.name]&&!vars[field.name]&&process.env[field.name])answers[field.name]=process.env[field.name];
  const known={secretReadiness:Object.fromEntries(seed.manifest.fields.filter(field=>field.kind==='secret').map(field=>[field.name,Boolean(vars[field.name])]))};

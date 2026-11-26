@@ -9,16 +9,21 @@ import { localVariables } from './local/environment.mjs';
 import { assertRegular, inspect } from './local/files.mjs';
 import { localOperation } from './local/operation.mjs';
 import { recoverInterrupted } from './local/recovery.mjs';
+import { probePort } from './port-probe.mjs';
 // The shared loopback predicate, beside this copy in Base or in a seed's scripts/.
 const portable = basename(dirname(fileURLToPath(import.meta.url))) === 'base-onboarding';
 const { isLoopbackHost } = await import(new URL(portable ? '../base-cli/modules/operator-auth/loopback.mjs' : '../modules/operator-auth/loopback.mjs', import.meta.url));
 
+// A fresh port must be free on every loopback address rer holds: localhost is
+// served on 127.0.0.1 and held on ::1, so probePort checks both.
 async function freePort(host = '127.0.0.1') {
- const socket = createServer();
- await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(0, host === 'localhost' ? '127.0.0.1' : host, resolve); });
- const { port } = socket.address();
- await new Promise(resolve => socket.close(resolve));
- return port;
+ for (;;) {
+  const socket = createServer();
+  await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(0, host === 'localhost' ? '127.0.0.1' : host, resolve); });
+  const { port } = socket.address();
+  await new Promise(resolve => socket.close(resolve));
+  if (host !== 'localhost' || (await probePort(host, port, { searching: true })).available) return port;
+ }
 }
 
 // A rerun keeps the loopback origin already saved in the seed's settings (a
@@ -60,7 +65,9 @@ async function readSettings(root, { file = '.dev.vars', format = 'dotenv' }) {
 const dotenvValue = value => /^[A-Za-z0-9._@:/+=,-]*$/.test(value) ? value : JSON.stringify(value);
 
 // Each changed setting is rewritten on its own line and each new one appended,
-// so every other line of the private settings keeps its bytes.
+// so every other line of the private settings keeps its bytes. Every setting
+// not being changed must still parse to the same value and no setting beyond
+// the updates may appear (a hand-written multiline value would leave junk).
 function dotenvText(text = '', updates, file = '.dev.vars') {
  const saved = localVariables(text), added = [];
  let result = text;
@@ -71,6 +78,8 @@ function dotenvText(text = '', updates, file = '.dev.vars') {
  if (added.length) result = result.replace(/\n*$/, '\n').replace(/^\n$/, '') + added.join('\n') + '\n';
  const parsed = localVariables(result);
  for (const [key, value] of Object.entries(updates)) if (parsed[key] !== value) throw new Error(`Could not change ${key} in ${file}; put ${key}=VALUE on its own line, then retry.`);
+ const others = Object.keys(saved).filter(key => !Object.hasOwn(updates, key));
+ if (Object.keys(parsed).some(key => !Object.hasOwn(updates, key) && !Object.hasOwn(saved, key)) || others.some(key => parsed[key] !== saved[key])) throw new Error(`Could not change ${Object.keys(updates).join(', ')} in ${file} without altering another setting; put each setting on one line, then retry.`);
  return result;
 }
 

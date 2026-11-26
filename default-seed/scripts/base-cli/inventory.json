@@ -25,7 +25,7 @@
     },
     "adapter-settings.mjs": {
       "source": "onboarding/adapter-settings.mjs",
-      "sha256": "9da65f0ab57f9226b7d08186641b54d370f437c0a349af21957ac5dd7d50d313"
+      "sha256": "11e3c19876d33d8f3da1b2ece23ddd0b7baa7f99f10e8bed1bcef4cf7eaedde1"
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
@@ -137,7 +137,7 @@
     },
     "local/environment.mjs": {
       "source": "onboarding/local/environment.mjs",
-      "sha256": "453f74fe3f081918aad4337fb1f67864ad8f668428017440ffa592507eca6ae2"
+      "sha256": "eece7568ca5ee37155981edde4b88a6e2102df789d2d1c4863ff8ae458f596d9"
     },
     "local/files.mjs": {
       "source": "onboarding/local/files.mjs",
@@ -1323,7 +1323,7 @@
     },
     "cli/setup-input.mjs": {
       "source": "cli/setup-input.mjs",
-      "sha256": "3cb7bd1a772533bb4a1a229ae0b149cf43609b2518e2cb3b27002dde37fa6df3"
+      "sha256": "be2f56ce87f9d816d12e4ab1781ad40372cac9466a8d9cd31a2a45f9f1558987"
     },
     "cli/shared.mjs": {
       "source": "cli/shared.mjs",
