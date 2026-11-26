@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.138
+
+Signed: Run Edit Run fleet, 2026-11-26.
+
+### Cloudflare Worker deploy and sign-in mail
+
+- `rer deploy` gets owner-only relay mail from the connected Business. For a seed that declares MAIL_PROVIDER, MAIL_FROM, MAIL_RELAY_URL and MAIL_API_KEY as deploy secrets, deployed with none of its mail inputs supplied, the first deploy asks the Business for `mail.sender` and deploys with MAIL_PROVIDER=rer, the assigned MAIL_FROM and MAIL_RELAY_URL, and the key, which goes only into the Worker's MAIL_API_KEY secret. The relay refuses any recipient but the Business owner's verified address, and the deploy's owner email must be that address.
+- A redeploy keeps the relay sender the Worker holds; a held relay key the Business no longer lists is re-issued. A deploy never replaces a sender that belongs to another Worker: when the tool's sender is at another address, mail is off and rer names the revoke command.
+- No sender (no Business connected, or the Business refused): one line says why; a seed with mailOffSignIn deploys with MAIL_PROVIDER=none, any other keeps today's refusal. An unreachable Business is named and stops the deploy before anything is built. A failed replace step prints the command that finishes it.
+- The sign-in preflight counts a declared MAIL_FROM (and MAIL_RELAY_URL) secret already bound on the Worker, so a redeploy with the same Cloudflare credentials and no --env-file keeps its mail. It no longer reports ready for a deploy whose Worker would have no MAIL_PROVIDER, and a held native mail credential counts as the person's own mail.
+- `rer deploy --set-secret MAIL_FROM` refuses an invalid or placeholder sender with the preflight's own message.
+- Setup's closing lines name MAIL_PROVIDER=none or the mail inputs for a mail-off seed, list no mail need for a seed that accepts MAIL_PROVIDER=none, and print 'command not found' once.
+
+### Mail module and reference seed
+
+- The mail module has an owner-only relay sender: it sends only to OWNER_EMAIL and refuses any other recipient before the network. The reference seed sends Business sign-in mail through it and keeps its default mail provider when the relay settings are optional.
+
+### Demo host
+
+- A native demo copy logs one `demo_ready` event, joined to `demo_admitted` by correlation, with the bundle digest prefix and start timing, and no visitor data.
+
 ## 0.2.137
 
 Signed: Run Edit Run fleet, 2026-11-26.
