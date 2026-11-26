@@ -4,7 +4,7 @@ import { isLocalRun } from './local-run'
 
 type SessionRow = { id: string; kind: string; createdAt: number; expiresAt: number; active: boolean }
 type OperatorRow = Operator & { signInUrl?: string }
-export function OperatorAccess({ timezone = 'UTC' }: { timezone?: string }) {
+export function OperatorAccess({ timezone = 'UTC', ownerOnlyMail = false }: { timezone?: string; ownerOnlyMail?: boolean }) {
   const [session, setSession] = useState<Session>()
   const [operators, setOperators] = useState<OperatorRow[]>([])
   const [sessions, setSessions] = useState<SessionRow[]>([])
@@ -92,12 +92,12 @@ export function OperatorAccess({ timezone = 'UTC' }: { timezone?: string }) {
     {session && session.operator.role !== 'member' ? <>
       {session.operator.role === 'owner' ? <p><a href="/auth/settings/identity">Business and sign-in settings</a></p> : null}
       <h3>Invite an operator</h3>
-      <form onSubmit={invite}>
+      {ownerOnlyMail ? <p>Invitations are off: this tool sends email through the Business relay, which reaches only the Business owner. Teammates get no invitation, sign-in or confirmation email.</p> : <form onSubmit={invite}>
         <label>Name <input name="displayName" required maxLength={200} /></label>
         <label>Email <input name="email" type="email" required /></label>
         <label>Role <select name="role"><option value="member">Member</option>{session.operator.role === 'owner' ? <><option value="admin">Admin</option><option value="owner">Owner</option></> : null}</select></label>
         <button type="submit">Send invitation</button>
-      </form>
+      </form>}
       <h3>Operators</h3>
       <ul>{operators.map((operator) => <li key={operator.id}>
         <p>{operator.email} · {operator.role} · {operator.status}</p>
