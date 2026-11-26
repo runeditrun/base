@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.142
+
+Signed: Run Edit Run fleet, 2026-11-26.
+
+### Demo host
+
+- A native demo copy owns its failed start. The front Worker answers a slow start after two seconds and no longer keeps the start alive with `waitUntil`, which Workers cancel 30 s after the response. A start that fails at any point, including after those 30 s, is recorded by the copy itself as `demo_failed` (correlation, error category and step timing) beside `native-demo-start-failed`, and the copy then writes the operator diagnostic, ends, and frees its capacity place. Before, a start that failed after 30 s left no `demo_failed` record and logged a "waitUntil() tasks did not complete" warning on `POST /__demo/start`.
+
 ## 0.2.141
 
 Signed: Run Edit Run fleet, 2026-11-26.
