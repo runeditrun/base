@@ -1,5 +1,5 @@
 import { requireProductionAuth, mailOffNotice } from './production-auth.mjs';
-import { mailOffSignInCommand } from './production-mail.mjs';
+import { mailOffSignInCommand, realSender, senderProblem } from './production-mail.mjs';
 import { deployMailSender } from './deploy-mail-sender.mjs';
 import { readFile } from 'node:fs/promises';
 import { deployDiagnostic, migrationFailure, providerFailure, assetFailure, ownerTargetFailure } from '../modules/deploy-kit/diagnostics.mjs';
@@ -183,6 +183,9 @@ function secretChangeInputs(declaration, options, env, again) {
  if (!options.setSecret) return;
  const absent = named.map(name => declared.find(item => item.binding === name).environment).filter(name => !env[name]?.trim());
  if (absent.length) throw missing(`${flag} ${options.setSecret} needs a value for each secret; ${absent.join(', ')} ${absent.length > 1 ? 'are' : 'is'} not set. Set ${absent.length > 1 ? 'them' : 'it'} in the environment or in an --env-file file (owned, mode 0600, one line per secret), then run ${again} ${flag} ${options.setSecret} again. Nothing was changed.`);
+ // A sender that would fail the deploy check is not bound by a secret change either: a later redeploy trusts what the Worker holds.
+ const from = declared.find(item => item.binding === 'MAIL_FROM' && named.includes('MAIL_FROM'));
+ if (from && !realSender(env[from.environment])) throw refuse(`${senderProblem} Set ${from.environment} to one, then run ${again} ${flag} ${options.setSecret} again. Nothing was changed.`);
 }
 
 // The failing step, its redacted cause, what this run created and the command that continues.

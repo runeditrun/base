@@ -1,5 +1,6 @@
 import { requireProductionAuth, mailOffNotice } from './production-auth.mjs';
 import { mailOffSignInCommand } from './production-mail.mjs';
+import { relayDeclarations } from './deploy-mail-sender.mjs';
 import { enforceDeployPolicy } from './deploy-policy.mjs';
 import { observedReadiness } from '../modules/deploy-kit/readiness-window.mjs';
 import { readFile, readdir } from 'node:fs/promises';
@@ -61,10 +62,14 @@ export async function hostedDeployNeeds(project) {
  const { path, value: declaration } = await declarationFor(root, adapter);
  const options = { dryRun: true }, settings = adapter.hooks?.secrets ?? adapter.settings;
  const { env } = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys: adapter.localOnlyKeys ?? [] });
- // A seed that signs its owner in without mail accepts MAIL_PROVIDER=none, so mail is not a need unless the person chose some.
+ // A seed that signs its owner in without mail accepts MAIL_PROVIDER=none. A seed that declares the relay's four
+ // settings gets that from the deploy itself, so mail is no need there; any other seed's deploy refuses without it.
  const auth = values => requireProductionAuth({ root, declaration, env: values, setupManifest, setupSeed, adapter, declarationPath: path, options });
  const providerName = (declaration.secrets ?? []).find?.(item => item?.binding === 'MAIL_PROVIDER')?.environment ?? 'MAIL_PROVIDER';
- const { signIn } = (mailOffSignInCommand(adapter) && !env.MAIL_PROVIDER?.trim() && !env[providerName]?.trim() ? await auth({ ...env, MAIL_PROVIDER: 'none', [providerName]: 'none' }).catch(() => undefined) : undefined) ?? await auth(env) ?? {};
+ const signInCommand = mailOffSignInCommand(adapter), none = signInCommand && !env.MAIL_PROVIDER?.trim() && !env[providerName]?.trim();
+ const selfOff = none && relayDeclarations(declaration).every(Boolean);
+ let { signIn } = (selfOff ? await auth({ ...env, MAIL_PROVIDER: 'none', [providerName]: 'none' }).catch(() => undefined) : undefined) ?? await auth(env) ?? {};
+ if (none && !selfOff && signIn) signIn = `${providerName}=none to deploy with mail off (sign in with ${signInCommand}), or ${signIn}`;
  return neededForRealDeploy({ declaration, env, signIn });
 }
 

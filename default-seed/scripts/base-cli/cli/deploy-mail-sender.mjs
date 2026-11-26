@@ -18,13 +18,17 @@ const RELAY = ['MAIL_PROVIDER', 'MAIL_FROM', 'MAIL_RELAY_URL', 'MAIL_API_KEY'];
 const CHOSEN = [...RELAY, 'SENDGRID_API_KEY', 'RESEND_API_KEY', 'MAIL_PROVIDER_API_KEY', 'MAIL_ACCOUNT_ID'];
 const present = value => typeof value === 'string' && Boolean(value.trim());
 
+// The relay's four settings as the declaration lists them; a missing one is undefined. Only a declaration with all
+// four gets the deploy's own MAIL_PROVIDER=none when no sender could be had.
+export const relayDeclarations = declaration => RELAY.map(binding => (Array.isArray(declaration.secrets) ? declaration.secrets : []).find(item => item?.binding === binding));
+
 /** Returns undefined when this is not rer's to decide (including a Worker that already holds mail: the sign-in preflight
  * counts it through the same live secret names), `{values, replace}` for a fresh sender (values by environment name;
  * `replace` names the relay settings the Worker already holds, such as MAIL_PROVIDER=none from a deploy with mail off,
  * which the upload would keep), or `{off: reason}` when no sender could be had. */
 export async function deployMailSender({ root, declaration, declarationPath, env, options, name, ownerEmail, localOnlyKeys, report, addSecret }) {
  const secrets = Array.isArray(declaration.secrets) ? declaration.secrets : [];
- const relay = RELAY.map(binding => secrets.find(item => item?.binding === binding));
+ const relay = relayDeclarations(declaration);
  if (options.dryRun || relay.some(item => !item)) return;
  if (secrets.some(item => CHOSEN.includes(item?.binding) && present(env[item.environment])) || CHOSEN.some(key => present(env[key]))) return;
  // Without Cloudflare access nothing is deployed: the deploy's own checks name what is missing.

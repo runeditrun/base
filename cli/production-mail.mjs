@@ -30,6 +30,9 @@ const placeholderSender = value => {
   || /^(?:fake|placeholder|change-?me|replace-?me|your-?email|your-?name|you)(?:[+._-]|$)/.test(local);
 };
 
+export const realSender = value => sender(value) && !placeholderSender(value);
+export const senderProblem = `MAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>).`;
+
 // A seed that signs its owner in without mail declares the command on its adapter
 // (`mailOffSignIn`: one line naming a command the person runs from the checkout).
 export function mailOffSignInCommand(adapter) {
@@ -100,17 +103,13 @@ export async function productionMail(root, declaration, env, declarationPath = '
  try { validateMailSenders(senders); }
  catch (error) { throw refuse(`${error.message} Nothing was built or uploaded.`); }
  let senderIssue;
- if (present(bindings.MAIL_FROM) && (!sender(bindings.MAIL_FROM) || placeholderSender(bindings.MAIL_FROM))) {
-  senderIssue = `MAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>). ${senderFix}, then run ~/.local/bin/rer deploy --dry-run again.`;
- }
+ if (present(bindings.MAIL_FROM) && !realSender(bindings.MAIL_FROM)) senderIssue = `${senderProblem} ${senderFix}, then run ~/.local/bin/rer deploy --dry-run again.`;
  // A declared MAIL_FROM secret the person did not supply may already be bound on the Worker: a redeploy needs no private file for it.
  const senderBoundLive = secrets.has('MAIL_FROM') && !present(bindings.MAIL_FROM);
  const provider = bindings.MAIL_PROVIDER;
  const deferred = !provider || provider === 'later';
  const choices = new Set(declaredProviders);
  if (deferred) for (const [name, key] of Object.entries(nativeCredential)) if (secrets.has(key)) choices.add(name);
- // A deployment that declares the relay's URL as a secret can send through the relay.
- if (deferred && secrets.has('MAIL_RELAY_URL')) choices.add('rer');
  const selected = deferred ? [...choices] : providers.includes(provider) ? [provider] : [];
  const routes = selected.map(provider => {
   const credentialKeys = deferred && nativeCredential[provider] && !declaredProviders.has(provider) ? [nativeCredential[provider]]

@@ -61,6 +61,10 @@ test('credentials-only deploy update uses declared live mail secrets with a vali
  assert.equal(f.provider.state.writes.length,writes,'a held sender makes no provider writes');
  await writeFile(join(f.root,'deploy.env'),'PRODUCT_MAIL_FROM=invalid-sender\n');
  assert.equal((await run()).code,4,'a supplied invalid sender still refuses over a held one');
+ // A secret change cannot bind a placeholder sender either: a later redeploy trusts what the Worker holds.
+ await writeFile(join(f.root,'deploy.env'),'PRODUCT_MAIL_FROM=you@example.com\n');
+ assert.equal(await f.run('--env-file','deploy.env','--set-secret','MAIL_FROM'),4,'--set-secret refuses a placeholder sender');
+ assert.equal(f.provider.state.writes.length,writes);
  await writeFile(join(f.root,'deploy.env'),'');
  const bound=f.provider.state.secrets.slice();
  f.provider.state.secrets=bound.filter(secret=>secret.name!=='MAIL_FROM');
