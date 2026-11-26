@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.140
+
+Signed: Run Edit Run fleet, 2026-11-26.
+
+### Demo host
+
+- A visitor copy's fetch, scheduled and queue handlers get a Workers ExecutionContext: waitUntil, passThroughOnException, props and exports. `ctx.exports.Name({ props })` for a WorkerEntrypoint the seed exports returns a stub whose methods run on a new instance with those props and env; a Durable Object class is the namespace the host binds. A name the seed does not export is absent, as on Workers. A seed whose scheduled() hands its work to its own entry point (Uptime's minute checks) now runs it in the demo instead of throwing "getWork is not a function" every minute. A scheduled handler's waitUntil work finishes before the alarm does.
+
+### Seed releases
+
+- A published tag whose RELEASE.json screenshots fail today's rule is a warning (`Warning: tag <tag>: RELEASE.json screenshots[i].<field> ...`) and counts as having no pictures of its own; only the release candidate's screenshots refuse, and each refusal names the failing field.
+
+### Business harness
+
+- `rer business call`: a refusal prints its other scalar fields (such as reconnect_url) in human and JSON output.
+
 ## 0.2.139
 
 Signed: Run Edit Run fleet, 2026-11-26.
