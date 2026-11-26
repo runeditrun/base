@@ -105,13 +105,14 @@ test('rer deploy refuses missing production sign-in before building and accepts 
  await writeFile(declarationPath,JSON.stringify(sendgrid));
  assert.match(error(await seed.run(['deploy','--env-file','production.env'],4)).message,/MAIL_API_KEY/,'another provider cannot borrow SendGrid credentials');
  await writeFile(join(seed.root,'production.env'),'MAIL_API_KEY=test-only-mail-credential\n',{mode:0o600});
- // Managed RER mail counts as outbound only with its assigned relay URL.
- const managed=JSON.parse(originalDeclaration);managed.vars.MAIL_PROVIDER='rer';
- await writeFile(declarationPath,JSON.stringify(managed));
+ // The owner can select the RER relay at deploy time with its assigned URL.
+ await writeFile(declarationPath,originalDeclaration);
+ const relayInputs='MAIL_PROVIDER=rer\nMAIL_API_KEY=test-only-mail-credential\n';
+ await writeFile(join(seed.root,'production.env'),relayInputs,{mode:0o600});
  assert.match(error(await seed.run(['deploy','--env-file','production.env'],4)).message,/MAIL_RELAY_URL/);
- managed.vars.MAIL_RELAY_URL='https://mail.example.test/install/relay';
- await writeFile(declarationPath,JSON.stringify(managed));
+ await writeFile(join(seed.root,'production.env'),relayInputs+'MAIL_RELAY_URL=https://mail.example.test/api/managed-mail/send\n');
  assert.match(error(await seed.run(['deploy','--env-file','production.env'],4)).message,/not committed/);
+ await writeFile(join(seed.root,'production.env'),'MAIL_API_KEY=test-only-mail-credential\n');
  // Auth SSO remains an independent way to satisfy the preflight; the existing
  // dependency-link flow owns approval before any real deployment can proceed.
  const sso=JSON.parse(originalDeclaration);sso.vars={AUTH_LOCAL:'false',IDENTITY_PROVIDER:'https://auth.example.test'};

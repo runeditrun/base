@@ -48,6 +48,7 @@ export async function portabilityFixture(t,{generated=true,receiptWorker=false,e
  await exportReference(base,root);
  const declaration = JSON.parse(await readFile(join(root, 'deploy.json'), 'utf8'));
  declaration.vars.MAIL_FROM = productionSender;
+ declaration.secrets = declaration.secrets.filter(item => item.binding !== 'MAIL_FROM');
  await writeFile(join(root, 'deploy.json'), JSON.stringify(declaration));
  if(receiptWorker) {
   // A seed-owned worker, like Spool's adapter, reports its real export receipt
