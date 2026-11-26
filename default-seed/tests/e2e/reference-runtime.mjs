@@ -15,6 +15,7 @@ import { advertisedOrigin, listenerConfig } from '../worker-listener.mjs'
 import { readableActivity, refreshSafeCreate } from './people-page.mjs'
 import { agentDoorPages } from './agent-pages.mjs'
 import { freshSeedImportDoor } from './import-door.mjs'
+import { ownerRelaySignIn } from './owner-relay.mjs'
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const email = 'operator@example.test'
@@ -275,6 +276,7 @@ async function main() {
     const activity = await readableActivity({ baseUrl, cookie, persistPath, execute })
     const browser = await browserNavigationCheck(baseUrl, cookie)
     const agentPages = await agentDoorPages(root)
+    const ownerRelay = await ownerRelaySignIn()
     console.log(JSON.stringify({
       status: 'passed',
       staticReference: true,
@@ -287,6 +289,7 @@ async function main() {
       activity,
       browser,
       agentPages,
+      ownerRelay,
     }))
   } finally {
     await stopOwnedProcess(worker)

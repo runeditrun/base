@@ -41,8 +41,9 @@ export interface Bindings {
   AUTH_REVIEW_ENABLED?: string
   AUTH_REVIEW_EMAIL?: string
   MAIL_FROM?: string
-  MAIL_PROVIDER?: 'resend' | 'sendgrid' | 'cloudflare' | 'development'
+  MAIL_PROVIDER?: 'resend' | 'sendgrid' | 'cloudflare' | 'development' | 'rer'
   MAIL_API_KEY?: string
+  MAIL_RELAY_URL?: string
   MAIL_ACCOUNT_ID?: string
   /** The linked Auth install's exact HTTPS issuer (the IDENTITY_PROVIDER answer). Empty: email links only. */
   IDENTITY_PROVIDER?: string
