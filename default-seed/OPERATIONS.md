@@ -47,7 +47,9 @@ rer describe
 `rer deploy --dry-run` validates and builds locally without
 provider requests. Real deployment requires privately supplied
 `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`, declared owner/session/setup
-secrets, and a verified production mail sender in `deploy.json`. Follow the
+secrets, and the production mail settings declared in `deploy.json`.
+Supply the mail settings through the deploy environment or an owned
+`--env-file`. Follow the
 owner-account deploy-kit instructions under `scripts/base-cli/modules/deploy-kit`.
 Local checks do not establish provider acceptance, inbox delivery or hosted
 health.

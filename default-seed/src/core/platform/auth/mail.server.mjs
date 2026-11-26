@@ -1,4 +1,4 @@
-import { createMailSender } from '../../../../../modules/mail/index.mjs'
+import { createMailSender, createOwnerRelaySender } from '../../../../../modules/mail/index.mjs'
 import { localDevelopmentEnabled } from './local.server.mjs'
 import { createBusinessSettings } from '../../../../../modules/business-settings/index.ts'
 import { parseAddress } from '../../../../../modules/mail/src/core/validation.mjs'
@@ -23,6 +23,9 @@ export function operatorMail(env) {
     return createMailSender({ provider: 'development', mode: 'development' })
   }
   if (!env.MAIL_PROVIDER || env.MAIL_PROVIDER === 'development') return undefined
+  if (env.MAIL_PROVIDER === 'rer') {
+    return createOwnerRelaySender({ ownerEmail: env.OWNER_EMAIL, relayUrl: env.MAIL_RELAY_URL, apiKey: env.MAIL_API_KEY })
+  }
 
   return businessSender(env, {
     async send(message) {

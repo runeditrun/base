@@ -180,6 +180,12 @@ Cloudflare additionally needs `MAIL_ACCOUNT_ID`. Sends use the actual
 `modules/mail/index.mjs` facade in production mode. The explicit `development`
 provider silently suppresses mail in development and demo. Production never
 selects it after a remote-provider failure.
+
+For a tool on a Business, supply the settings from `mail.sender` in the deploy
+environment or owned `--env-file`: `MAIL_PROVIDER=rer`, the assigned
+`MAIL_FROM` and `MAIL_RELAY_URL`, and the private `MAIL_API_KEY`. Set
+`OWNER_EMAIL` to the verified Business owner. Only that mailbox can receive
+mail through this sender.
 Missing or failing mail denies link issuance; bootstrap and existing-session
 access remain independent of mail. Provider API acceptance does not establish
 inbox delivery.
