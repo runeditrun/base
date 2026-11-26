@@ -8,22 +8,37 @@ import { enqueue, deliverQueues, nextQueue, queueMetrics } from './queues.mjs';
 import { seedAlarm, nextSeedAlarm, deliverSeedAlarms } from './alarms.mjs';
 import { cronMatches } from './cron.mjs';
 import { endedPage, clearCookie } from '../pages.mjs';
-import { report } from '../diagnostics.mjs';
+import { category, report } from '../diagnostics.mjs';
 
 const IDLE = 15 * 60_000, START_LIMIT = 5 * 60_000;
 const random = () => [...crypto.getRandomValues(new Uint8Array(32))].map(byte => byte.toString(16).padStart(2, '0')).join('');
 export class NativeDemo extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
-    ctx.blockConcurrencyWhile(async () => { this.state = await ctx.storage.get('visitor'); });
+    ctx.blockConcurrencyWhile(async () => {
+      this.state = await ctx.storage.get('visitor');
+      // A start runs only in the instance that began it, so one found starting
+      // here was cut off by a reset: it failed, and ends now, not at its alarm.
+      if (this.state?.phase === 'starting') {
+        report(this.state.correlation, this.state.seen, 'failed', { error: 'start-interrupted' });
+        await this.end();
+      }
+    });
   }
   async save() { await this.ctx.storage.put('visitor', this.state); }
+  // The object owns its failed start: the front Worker answered within seconds
+  // and cannot outlive a slow begin, so the failure record, the diagnostic and
+  // the end that frees the place all happen here.
   async begin(options) {
+    const started = Date.now();
     try { return await this.start(options); }
     catch (error) {
-      await this.diagnostic(options.correlation, error);
-      await this.end();
-      return { phase: 'failed', correlation: options.correlation };
+      const { correlation } = options, timing = error.timing;
+      report(correlation, started, 'failed', { error: category(error), ...(timing ? { timing } : {}) });
+      console.error(JSON.stringify({ event: 'native-demo-start-failed', correlation, message: error.message, timing }));
+      try { await this.diagnostic(correlation, error, timing); }
+      finally { await this.end(); }
+      return { phase: 'failed', correlation };
     }
   }
   async diagnostic(correlation, error, timing) {
@@ -83,10 +98,8 @@ export class NativeDemo extends DurableObject {
       return this.status();
     } catch (error) {
       timing.totalMs = Date.now() - started;
-      console.error(JSON.stringify({ event: 'native-demo-start-failed', correlation, message: error.message, timing }));
-      await this.diagnostic(correlation, error, timing);
-      await this.end();
-      return { phase: 'failed', correlation };
+      error.timing = timing;
+      throw error;
     } finally { clearInterval(hold); }
   }
   capacity() { return this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')); }

@@ -110,17 +110,11 @@ async function start(request, env, ctx) {
     demo = env.DEMO.get(id);
     const begun = demo.begin({ correlation, clientIp: ip, origin: env.DEMO_ORIGIN, originVar: env.DEMO_ORIGIN_VAR, ends, endsLocal: localTime(ends, request.cf?.timezone), settings: JSON.parse(env.DEMO_SETTINGS) });
     // A new object can take seconds to answer. That is a slow start, not a
-    // failed one: the page polls this copy, and a begin that later fails ends
-    // it and releases its place.
+    // failed one: the page polls this copy, and a begin that later fails is
+    // recorded and ended by the object itself, which outlives this response.
     let slow;
     const state = await Promise.race([begun, new Promise(resolve => { slow = setTimeout(resolve, 2000, null); })]).finally(() => clearTimeout(slow));
-    if (!state) {
-      report(correlation, started, 'begin-pending');
-      ctx.waitUntil(begun.catch(error => {
-        report(correlation, started, 'failed', { error: category(error) });
-        return bounded(demo.end(), 6000);
-      }).catch(cleanup => report(correlation, started, 'cleanup', { error: category(cleanup) })));
-    }
+    if (!state) report(correlation, started, 'begin-pending');
     return progress(request, env, id, { ...(state ?? { phase: 'starting' }), correlation });
   } catch (error) {
     report(correlation, started, 'failed', { error: category(error) });
