@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.137-dev.g6b480933",
+  "cliVersion": "0.2.137-dev.g9248e431",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4895,11 +4895,11 @@
     },
     "modules/operator-auth/signin/index.d.mts": {
       "source": "modules/operator-auth/signin/index.d.mts",
-      "sha256": "9acad80108b974454b1473c761222ba7daaeceb13b7c9842107cbf1b15745c10"
+      "sha256": "01890deff550fa14e98626a5b48bf908ab1081d5d67f89540f8f3bc768d610ff"
     },
     "modules/operator-auth/signin/index.mjs": {
       "source": "modules/operator-auth/signin/index.mjs",
-      "sha256": "edb64847c2c6a15fd78893eb1cd2e5990bf43e7e89510d925a1f21dd7a66af13"
+      "sha256": "7f0a70441adeb386ca7f847515d27fb6099d08f0cd64afda182b955072e008a5"
     },
     "modules/operator-auth/signin/one-click.mjs": {
       "source": "modules/operator-auth/signin/one-click.mjs",

@@ -23,11 +23,12 @@ export async function ownerRelaySignIn() {
     const bootstrap = await post('/auth/bootstrap', { token: setupToken, displayName: 'Morgan Ortiz' })
     assert.equal(bootstrap.status, 303)
     await bootstrap.body?.cancel()
-    // An active teammate would get a link through a direct provider.
+    // An active teammate would get a link through a direct provider; the relay answers
+    // them like an unknown address, so the public response does not reveal teammates.
     await runtime.db.prepare(`INSERT INTO oa_operators (id,email,display_name,role,status,created_at)
       VALUES (?,?,?,'member','active',?)`).bind(crypto.randomUUID(), member, 'Jamie Price', Date.now()).run()
     const refused = await signIn(member)
-    assert.equal(refused.status, 503)
+    assert.equal(refused.status, 202)
     assert.deepEqual(runtime.networkRequests, [])
 
     assert.equal((await signIn(owner.toUpperCase())).status, 202)
