@@ -28,17 +28,17 @@ function businessDoor(origin, keyFor) {
 }
 
 test('rer deploy gets owner-only relay mail from the connected Business, keeps it on redeploy, replaces a dead key, never replaces a sender of another Worker, and says mail is off without one', async t => {
- const f = await deployProviderFixture(t, { vars: { MAIL_PROVIDER: 'resend' }, r2: [], publicSettings: ['MAIL_PROVIDER', 'MAIL_FROM', 'MAIL_RELAY_URL'], secrets: ['MAIL_PROVIDER', 'MAIL_FROM', 'MAIL_RELAY_URL', 'MAIL_API_KEY'].map(name => ({ binding: name, environment: name, optional: true })) });
+ const f = await deployProviderFixture(t, { originVar: 'AUTH_ORIGIN', publicOriginSetting: 'PUBLIC_ORIGIN', vars: { MAIL_PROVIDER: 'resend' }, r2: [], publicSettings: ['MAIL_PROVIDER', 'MAIL_FROM', 'MAIL_RELAY_URL'], secrets: ['MAIL_PROVIDER', 'MAIL_FROM', 'MAIL_RELAY_URL', 'MAIL_API_KEY'].map(name => ({ binding: name, environment: name, optional: true })) });
  // A seed that signs its owner in without mail (`mailOffSignIn`) can deploy with mail off.
  await writeFile(join(f.root, 'adapter.mjs'), (await readFile(join(f.root, 'adapter.mjs'), 'utf8')).replace('const lifecycle = {', "const lifecycle = {mailOffSignIn:'rer signin',"));
  execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', '-c', 'commit.gpgsign=false', 'commit', '-qam', 'mail-less sign-in'], { cwd: f.root });
  const home = await mkdtemp(join(tmpdir(), 'rer-business-'));
  t.after(() => rm(home, { recursive: true, force: true }));
  await mkdir(join(home, 'credentials'), { mode: 0o700 });
- const names = ['RER_BUSINESS_STATE_DIR', 'RER_BUSINESS_CREDENTIAL_DIR', 'MAIL_PROVIDER', 'MAIL_FROM', 'MAIL_RELAY_URL', 'MAIL_API_KEY'], before = names.map(name => [name, process.env[name]]);
+ const names = ['RER_BUSINESS_STATE_DIR', 'RER_BUSINESS_CREDENTIAL_DIR', 'MAIL_PROVIDER', 'MAIL_FROM', 'MAIL_RELAY_URL', 'MAIL_API_KEY', 'PUBLIC_ORIGIN'], before = names.map(name => [name, process.env[name]]);
  t.after(() => { for (const [name, value] of before) value === undefined ? delete process.env[name] : process.env[name] = value; });
  Object.assign(process.env, { RER_BUSINESS_STATE_DIR: join(home, 'state'), RER_BUSINESS_CREDENTIAL_DIR: join(home, 'credentials') });
- for (const name of ['MAIL_PROVIDER', 'MAIL_FROM', 'MAIL_RELAY_URL', 'MAIL_API_KEY']) delete process.env[name];
+ for (const name of ['MAIL_PROVIDER', 'MAIL_FROM', 'MAIL_RELAY_URL', 'MAIL_API_KEY', 'PUBLIC_ORIGIN']) delete process.env[name];
  const origin = 'https://business.example.test', keyFor = count => String(count).padStart(43, 'k'), key = keyFor(1), door = businessDoor(origin, keyFor);
  globalThis.fetch.mock.mockImplementation((input, init = {}) => {
   const url = new URL(input instanceof Request ? input.url : input);
@@ -90,9 +90,32 @@ test('rer deploy gets owner-only relay mail from the connected Business, keeps i
  assert.equal(held().MAIL_API_KEY, keyFor(2));
  assert.ok(!replaced.text.includes(keyFor(2)));
 
- // Another Worker holds the live sender for this tool: a new one would stop its mail, so no sender is asked for, held key or not.
- door.senders.push({ tool: 'fixture', address: 'https://other.example' });
+ // A Business other than the one that issued the held key is connected now and lists no sender: the key is not dead, so it is kept.
+ await saveState({ version: 1, credentialVersion: 2, origin, businessId: 'biz_2', executorId: 'exe_2', vendorHandles: [], awakeConsent: false });
+ await createCredentialStore().set(credentialHandle(origin, 'biz_2'), 'bz_device_' + 'e'.repeat(43));
  assert.equal((await deploy()).code, 0);
+ assert.equal(issued(), 2);
+ assert.equal(held().MAIL_API_KEY, keyFor(2));
+ await saveState({ version: 1, credentialVersion: 2, origin, businessId: 'biz_1', executorId: 'exe_1', vendorHandles: [], awakeConsent: false });
+
+ // The Worker moved to its own public origin: its sender, listed at the workers.dev address, is still its own and its key stays.
+ door.senders.push({ tool: 'fixture', address });
+ process.env.PUBLIC_ORIGIN = 'https://clinic.example.test';
+ const moved = await deploy();
+ assert.equal(moved.code, 0, moved.text);
+ assert.equal(issued(), 2);
+ assert.equal(held().MAIL_API_KEY, keyFor(2));
+ assert.ok(!moved.text.includes('no longer live'), moved.text);
+ delete process.env.PUBLIC_ORIGIN;
+ door.senders.length = 0;
+
+ // Another Worker holds the live sender for this tool: a new one would stop its mail, so no sender is asked for, held key or not.
+ // A held key then closes with "Mail is off", not the sign-in line that promises email.
+ door.senders.push({ tool: 'fixture', address: 'https://other.example' });
+ const blocked = await deploy();
+ assert.equal(blocked.code, 0, blocked.text);
+ assert.match(blocked.text, /Mail is off: this Worker's relay key is no longer live and fixture has a live sender for https:\/\/other\.example/);
+ assert.doesNotMatch(blocked.text, /Sign in by email at/);
  f.provider.state.secrets = f.provider.state.secrets.filter(({ name }) => name !== 'MAIL_API_KEY');
  assert.equal((await deploy()).code, 0);
  assert.equal(issued(), 2);

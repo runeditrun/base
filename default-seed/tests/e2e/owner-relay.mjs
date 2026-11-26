@@ -22,6 +22,7 @@ export async function ownerRelaySignIn() {
   try {
     const bootstrap = await post('/auth/bootstrap', { token: setupToken, displayName: 'Morgan Ortiz' })
     assert.equal(bootstrap.status, 303)
+    const cookie = bootstrap.headers.get('set-cookie').split(';')[0]
     await bootstrap.body?.cancel()
     // An active teammate would get a link through a direct provider; the relay answers
     // them like an unknown address, so the public response does not reveal teammates.
@@ -43,6 +44,21 @@ export async function ownerRelaySignIn() {
     assert.equal(confirmed.status, 303)
     assert.ok(confirmed.headers.get('set-cookie'))
 
+    // The invitation and a teammate's step-up link would be rejected by the relay: both are refused here with a code.
+    const invited = await runtime.call('/auth/invite', { method: 'POST', cookie, input: { email: 'new@example.test', displayName: 'New Person', role: 'member' } })
+    assert.equal(invited.status, 403)
+    assert.equal((await invited.json()).error, 'teammate_mail_off')
+    assert.equal(submissions.length, 1)
+    const ownerStepUp = await runtime.call('/auth/step-up', { method: 'POST', cookie, input: { action: 'export' } })
+    assert.equal(ownerStepUp.status, 202)
+    assert.equal(submissions.length, 2)
+    await runtime.db.prepare('UPDATE oa_operators SET email=? WHERE role=?').bind('renamed@example.test', 'owner').run()
+    const teammateStepUp = await runtime.call('/auth/step-up', { method: 'POST', cookie, input: { action: 'export' } })
+    assert.equal(teammateStepUp.status, 403)
+    assert.equal((await teammateStepUp.json()).error, 'teammate_mail_off')
+    assert.equal(submissions.length, 2)
+    await runtime.db.prepare('UPDATE oa_operators SET email=? WHERE role=?').bind(owner, 'owner').run()
+
     for (const response of [
       () => Response.redirect('https://elsewhere.example.test/collect', 307),
       () => Response.json({ error: key }),
@@ -52,8 +68,8 @@ export async function ownerRelaySignIn() {
       assert.equal(failed.status, 503)
       assert.ok(!(await failed.text()).includes(key))
     }
-    assert.equal(submissions.length, 3)
-    assert.deepEqual(runtime.networkRequests.map(({ origin, path }) => origin + path), Array(3).fill(relayUrl))
+    assert.equal(submissions.length, 4)
+    assert.deepEqual(runtime.networkRequests.map(({ origin, path }) => origin + path), Array(4).fill(relayUrl))
     return true
   } finally {
     await runtime.close()

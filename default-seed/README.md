@@ -189,9 +189,10 @@ deploy environment or owned `--env-file`: `MAIL_PROVIDER=rer`, the assigned
 `MAIL_FROM` and `MAIL_RELAY_URL`, and the private `MAIL_API_KEY`. Set
 `OWNER_EMAIL` to the verified Business owner. Only that mailbox can receive
 mail through this sender.
-On this sender only the owner receives sign-in links (a teammate's address is
-answered like an unknown one), and teammate mail (invitations, "You were added",
-teammate step-up) is off and not offered.
+On this sender only the owner receives sign-in links, so the owner signs in
+with `OWNER_EMAIL` (any other address is answered like an unknown one, with no
+signal), and teammate mail (invitations, "You were added", teammate step-up) is
+off, not offered, and refused by the API with `teammate_mail_off`.
 Missing or failing mail denies link issuance; bootstrap and existing-session
 access remain independent of mail. Provider API acceptance does not establish
 inbox delivery.

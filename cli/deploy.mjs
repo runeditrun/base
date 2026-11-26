@@ -19,6 +19,7 @@ import { checkHostedSetup, hostedSetupFailure } from './deploy-setup.mjs';
 import { mutationReadinessFailure } from './deploy-readiness.mjs';
 import { committedSource } from './deploy-source.mjs';
 import { hookState, forgetHookState } from './deploy-hook-record.mjs';
+import { forgetMailBusiness } from './deploy-mail-record.mjs';
 import { deploymentRecord } from './deployment-record.mjs';
 import { cloudflareCredentials, missingCredentialsMessage } from './deploy-needs.mjs';
 import { keptSecrets, keepSecrets, forgetSecrets } from './deploy-secrets.mjs';
@@ -101,6 +102,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
     step = 'remove';
     const result = await owner('remove', state ? ['--state', state] : []);
     await forgetHookState(root, environment);
+    await forgetMailBusiness(root, environment);
     await forgetSecrets(root, environment);
     store.report(`Removed ${result.removed.join(', ') || 'nothing (already gone)'}; read back: none of them remains.`);
     return { removed: result.removed, deployed: false };
