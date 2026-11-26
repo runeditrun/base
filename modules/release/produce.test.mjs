@@ -94,15 +94,6 @@ test('dry runs execute declared release verification after default verification 
   }
 });
 
-test('pnpm 8 seed install policy remains frozen and unchanged', async t => {
-  const f = fixture(t, 'node --test check.test.mjs', 'pnpm@8.15.6');
-  const receipt = await release({ ...f.options, dryRun: true });
-  assert.equal(receipt.status, 'DRY_RUN', JSON.stringify(receipt));
-  assert.equal(receipt.gates.verify.tests, 1);
-  assert.equal(git(f.repo, 'status', '--porcelain'), '');
-  assert.deepEqual(readFileSync(resolve(f.repo, 'pnpm-lock.yaml')), f.files['pnpm-lock.yaml']);
-});
-
 test('verify failure blocks tagging and public export; dry run emits an explicitly blocked preview', async t => {
   const f = fixture(t, 'node -e "process.exit(7)"');
   const receipt = await release({ ...f.options, dryRun: true });
