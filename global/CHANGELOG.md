@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.137
+
+Signed: Run Edit Run fleet, 2026-11-26.
+
+### Demo and container builds
+
+- `rer deploy --demo` and the container image build accept a switchable public setting, such as MAIL_RECIPIENTS, by the same rule as deploy: its name in publicSettings, its default in vars, and an optional secrets entry. The image keeps the declared default and runtime settings override it. A secret that is not declared public, a required secret, or a name the managed artifact lists as a secret is still refused, and an image value that differs from the declared default names the mismatch. The fixed legacy mail list and its warning are gone; the deploy source check and the image build now share one rule.
+
+### Local installs
+
+- An interrupted `rer setup --host` move keeps a setting such as WIDGET_ORIGIN that already follows the new origin, and a private settings rewrite refuses before any write if it would change any other key.
+- A fresh localhost port is checked on both 127.0.0.1 and ::1, and a refusal other than "in use" stops with the reason and `rer setup --port PORT` instead of trying port after port.
+
 ## 0.2.136
 
 Signed: Run Edit Run fleet, 2026-11-26.
