@@ -192,7 +192,7 @@ test('invitation retries invalidate older links; role changes and competing owne
 });
 
 test('mail failures revoke outstanding credentials; unavailable mail is never silently replaced', async () => {
-  for (const options of [{ noMail: true }, { mailStatus: 'uncertain' }, { mailThrows: true }, { mailStatus: 'development' }]) {
+  for (const options of [{ noMail: true }, { mailStatus: 'rejected' }, { mailThrows: true }, { mailStatus: 'development' }]) {
     const r = await runtime({}, options);
     try {
       await r.bootstrap();
