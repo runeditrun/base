@@ -22,7 +22,11 @@ async function freePort(host = '127.0.0.1') {
   await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(0, host === 'localhost' ? '127.0.0.1' : host, resolve); });
   const { port } = socket.address();
   await new Promise(resolve => socket.close(resolve));
-  if (host !== 'localhost' || (await probePort(host, port, { searching: true })).available) return port;
+  if (host !== 'localhost') return port;
+  const probe = await probePort(host, port, { searching: true });
+  if (probe.available) return port;
+  // Only a port in use is skipped; any other refusal (EPERM, EACCES under a sandbox) would repeat on every pick.
+  if (probe.code !== 'EADDRINUSE' && !probe.listener) throw new Error(`Cannot check a free port on ${host}: ${probe.code ?? 'unknown error'}. Check the address or choose a port with rer setup --port PORT.`);
  }
 }
 

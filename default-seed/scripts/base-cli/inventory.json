@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.136-dev.g7170f34d",
+  "cliVersion": "0.2.136-dev.ge4392246",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -25,7 +25,7 @@
     },
     "adapter-settings.mjs": {
       "source": "onboarding/adapter-settings.mjs",
-      "sha256": "11e3c19876d33d8f3da1b2ece23ddd0b7baa7f99f10e8bed1bcef4cf7eaedde1"
+      "sha256": "de75f0c40904de260cf2222b779c8875bf60888560c30fa7c8840a9bba0142f3"
     },
     "adapter.mjs": {
       "source": "onboarding/adapter.mjs",
