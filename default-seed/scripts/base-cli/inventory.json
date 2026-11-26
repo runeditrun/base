@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.139-dev.g46b50486",
+  "cliVersion": "0.2.139-dev.g93e59a1b",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -2675,7 +2675,7 @@
     },
     "modules/demo-host/native/isolate.mjs": {
       "source": "modules/demo-host/native/isolate.mjs",
-      "sha256": "36a0b806ad58b5ad73e68f91506d8de960486d2f107640459c7347d4ecfa298e"
+      "sha256": "32f14e2388975c72c37a96b61b4a8f353e5d5892981c07b1900a73abf6bb73d6"
     },
     "modules/demo-host/native/loader.mjs": {
       "source": "modules/demo-host/native/loader.mjs",
