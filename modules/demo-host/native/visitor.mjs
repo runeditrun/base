@@ -8,6 +8,7 @@ import { enqueue, deliverQueues, nextQueue, queueMetrics } from './queues.mjs';
 import { seedAlarm, nextSeedAlarm, deliverSeedAlarms } from './alarms.mjs';
 import { cronMatches } from './cron.mjs';
 import { endedPage, clearCookie } from '../pages.mjs';
+import { report } from '../diagnostics.mjs';
 
 const IDLE = 15 * 60_000;
 const random = () => [...crypto.getRandomValues(new Uint8Array(32))].map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -62,6 +63,9 @@ export class NativeDemo extends DurableObject {
       if (this.state?.phase !== 'starting') throw new Error('demo-ended-during-start');
       this.state = { ...this.state, phase: 'ready', cookies, location: claimed.headers.get('location'), timing: { migrationsMs: migrated - at, claimAndSeedMs: Date.now() - migrated, totalMs: Date.now() - started } };
       await this.save();
+      // The one record that a copy started: same logger and shape as demo_admitted
+      // and demo_failed, joined by correlation. Counts and timings only.
+      report(correlation, started, 'ready', { bundle: bundle.digest.slice(0, 12), timing: this.state.timing });
       await this.schedule(await nextQueue(this));
       return this.status();
     } catch (error) {

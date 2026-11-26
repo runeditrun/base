@@ -2715,7 +2715,7 @@
     },
     "modules/demo-host/native/visitor.mjs": {
       "source": "modules/demo-host/native/visitor.mjs",
-      "sha256": "055e375e281679c486099888c15f2fd39afcbda290f0f6a07444827801c4e548"
+      "sha256": "66a611086604a86798441dac0a030447d9f67a8553a36f317cd99fb9be1504db"
     },
     "modules/demo-host/native/warm.mjs": {
       "source": "modules/demo-host/native/warm.mjs",
