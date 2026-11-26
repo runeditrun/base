@@ -33,11 +33,13 @@ export async function selectedOrigin(project, options, { setup = false } = {}) {
  if (port === undefined && setup) { port = await firstFreePort(host); taken = port !== defaultPort; }
  port ??= defaultPort;
  const url = origin(host, port);
- // Setup on a saved checkout moves it to another port; the host stays.
+ // Setup on a saved checkout moves it to another port or loopback host; its
+ // data stays. A front-door or other saved host cannot be moved this way.
  let moved;
  if (setup && previous && previous.origin !== url) {
-  if (previous.hostname.replace(/^\[|\]$/g, '') !== host) throw refuse('Setup origin conflicts with the saved installation. Reuse its origin or back up data and run ~/.local/bin/rer reset --yes.');
-  moved = { from: savedPort, to: port };
+  const savedHost = previous.hostname.replace(/^\[|\]$/g, '');
+  if (savedHost !== host && !listenHost(savedHost)) throw refuse('Setup origin conflicts with the saved installation. Reuse its origin or back up data and run ~/.local/bin/rer reset --yes.');
+  moved = { from: previous.origin, to: url, fromPort: savedPort, hostMoved: savedHost !== host };
  }
  return { url, host, port, vars, savedOrigin: previous?.origin, moved, explicitPort: options.port !== undefined, ...(taken ? { skipped: defaultPort } : {}) };
 }

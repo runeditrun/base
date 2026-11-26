@@ -15,7 +15,7 @@ const { isLoopbackHost } = await import(new URL(portable ? '../base-cli/modules/
 
 async function freePort(host = '127.0.0.1') {
  const socket = createServer();
- await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(0, host, resolve); });
+ await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(0, host === 'localhost' ? '127.0.0.1' : host, resolve); });
  const { port } = socket.address();
  await new Promise(resolve => socket.close(resolve));
  return port;

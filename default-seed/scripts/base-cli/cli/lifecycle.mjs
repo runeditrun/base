@@ -66,7 +66,7 @@ async function runLifecycle(project, options, out, deployRedaction) {
    }
    if (options.verb === 'setup') {
     selected = await selectedOrigin(project, options, { setup: options.verb === 'setup' });
-    if (options.verb === 'setup') {input = await setupInput(project, options, selected.vars, signal, { origin: selected.url });await dependencyInputs({project,input,origin:selected.url});}
+    if (options.verb === 'setup') {input = await setupInput(project, options, selected.vars, signal, { origin: selected.url, movedFrom: selected.moved?.from });await dependencyInputs({project,input,origin:selected.url});}
     if (!selected.door) await availablePort(selected.host, selected.port, { root: project.root, saved: !selected.explicitPort && selected.savedOrigin !== undefined, verb:options.verb });
     if (options.verb === 'setup') announcePort(out, options, selected);
    }
@@ -245,9 +245,9 @@ async function replaceOwner(project, options, out) {
 function announcePort(out, options, selected) {
  if (selected.door) { if (options.json) out.event('origin', { url: selected.url, door: true }); else out.human(`Using ${selected.url} for this checkout, served through the front door.`); return; }
  const { moved, skipped } = selected;
- const line = moved ? `Moving this checkout from port ${moved.from} to port ${moved.to}. Its data is kept.`
+ const line = moved ? (moved.hostMoved ? `Moving this checkout from ${moved.from} to ${moved.to}. Its data is kept.` : `Moving this checkout from port ${moved.fromPort} to port ${selected.port}. Its data is kept.`)
   : !selected.savedOrigin ? `Using port ${selected.port} for this checkout${skipped ? ` (${skipped} is in use)` : ''}.` : undefined;
  if (!line) return;
- if (options.json) out.event('port', { port: selected.port, ...(moved ? { movedFrom: moved.from } : {}) });
+ if (options.json) out.event('port', { port: selected.port, ...(moved ? { movedFrom: moved.fromPort, origin: moved.to, movedFromOrigin: moved.from } : {}) });
  else out.human(line);
 }

@@ -14,7 +14,7 @@ import {savedSetupAnswers} from './setup-answers.mjs';
 // localDefault. Explicit setup and deploy never read it.
 export const localDefaultsVariable = 'RER_SETUP_LOCAL_DEFAULTS';
 
-export async function setupInput(project, options, vars, signal, { origin } = {}) {
+export async function setupInput(project, options, vars, signal, { origin, movedFrom } = {}) {
  let answers = {};
  const { loadInstallerSeed } = await shared('setup-manifest.mjs');
  let seed;
@@ -51,6 +51,9 @@ export async function setupInput(project, options, vars, signal, { origin } = {}
  // when setup resumes. Keep them in private input, never the saved safe answers.
  for(const field of seed.manifest.fields)if(field.kind==='secret'&&!answers[field.name]&&typeof vars[field.name]==='string')answers[field.name]=vars[field.name];
  if(process.env[localDefaultsVariable]==='1')applyLocalDefaults(seed,answers,vars,origin);
+ // A checkout moving to another origin takes along each setting that was its
+ // origin (localDefault from: origin); one the owner set elsewhere stays.
+ if(movedFrom)for(const field of seed.manifest.fields)if(field.localDefault?.from==='origin'&&answers[field.name]===movedFrom)answers[field.name]=origin;
  const entered=seed.manifest.fields.filter(field=>field.kind==='secret'&&field.input==='entered');
  for(const field of entered)if(!answers[field.name]&&!vars[field.name]&&process.env[field.name])answers[field.name]=process.env[field.name];
  const known={secretReadiness:Object.fromEntries(seed.manifest.fields.filter(field=>field.kind==='secret').map(field=>[field.name,Boolean(vars[field.name])]))};

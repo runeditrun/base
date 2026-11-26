@@ -11,28 +11,32 @@ import { localOperation } from './local/operation.mjs';
 import { recoverInterrupted } from './local/recovery.mjs';
 // The shared loopback predicate, beside this copy in Base or in a seed's scripts/.
 const portable = basename(dirname(fileURLToPath(import.meta.url))) === 'base-onboarding';
-const { isLocalhostName } = await import(new URL(portable ? '../base-cli/modules/operator-auth/loopback.mjs' : '../modules/operator-auth/loopback.mjs', import.meta.url));
+const { isLoopbackHost } = await import(new URL(portable ? '../base-cli/modules/operator-auth/loopback.mjs' : '../modules/operator-auth/loopback.mjs', import.meta.url));
 
-async function freePort() {
+async function freePort(host = '127.0.0.1') {
  const socket = createServer();
- await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(0, '127.0.0.1', resolve); });
+ await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(0, host === 'localhost' ? '127.0.0.1' : host, resolve); });
  const { port } = socket.address();
  await new Promise(resolve => socket.close(resolve));
  return port;
 }
 
 // A rerun keeps the loopback origin already saved in the seed's settings (a
-// 127.0.0.1 port or a front-door `NAME.localhost` origin), so sessions, links
-// and the owner's bookmarks stay valid.
+// 127.0.0.1, localhost or [::1] port, or a front-door `NAME.localhost` origin),
+// so sessions, links and the owner's bookmarks stay valid. A fresh install
+// binds the host the seed declares (commandAdapter({ host }); the installer
+// server puts it on the store beside the setup manifest).
 async function chooseOrigin(context, hooks) {
  if (context.selectedOrigin) return context.selectedOrigin;
  if (typeof hooks.origin === 'function') return hooks.origin(context);
  const key = hooks.secrets?.originKey;
  if (key) {
   const saved = (await readSettings(context.root, hooks.secrets)).values[key];
-  try { const url = new URL(saved); if (url.protocol === 'http:' && (url.hostname === '127.0.0.1' || isLocalhostName(url.hostname)) && url.port && url.origin === saved) return saved; } catch {}
+  try { const url = new URL(saved); if (url.protocol === 'http:' && isLoopbackHost(url.hostname) && url.port && url.origin === saved) return saved; } catch {}
  }
- return `http://127.0.0.1:${await freePort()}`;
+ const host = context.store?.host ?? '127.0.0.1';
+ if (!['127.0.0.1', 'localhost', '::1'].includes(host)) throw new Error(`The seed adapter declares host ${JSON.stringify(String(host)).slice(0, 80)}; it must be exactly 127.0.0.1, localhost or ::1.`);
+ return `http://${host === '::1' ? '[::1]' : host}:${await freePort(host)}`;
 }
 
 async function readSettings(root, { file = '.dev.vars', format = 'dotenv' }) {
@@ -55,6 +59,21 @@ async function readSettings(root, { file = '.dev.vars', format = 'dotenv' }) {
 
 const dotenvValue = value => /^[A-Za-z0-9._@:/+=,-]*$/.test(value) ? value : JSON.stringify(value);
 
+// Each changed setting is rewritten on its own line and each new one appended,
+// so every other line of the private settings keeps its bytes.
+function dotenvText(text = '', updates, file = '.dev.vars') {
+ const saved = localVariables(text), added = [];
+ let result = text;
+ for (const [key, value] of Object.entries(updates)) {
+  const line = `${key}=${dotenvValue(value)}`;
+  if (Object.hasOwn(saved, key)) result = result.replace(new RegExp(`^${key}=.*$`, 'm'), () => line); else added.push(line);
+ }
+ if (added.length) result = result.replace(/\n*$/, '\n').replace(/^\n$/, '') + added.join('\n') + '\n';
+ const parsed = localVariables(result);
+ for (const [key, value] of Object.entries(updates)) if (parsed[key] !== value) throw new Error(`Could not change ${key} in ${file}; put ${key}=VALUE on its own line, then retry.`);
+ return result;
+}
+
 // A kept settings file gains only the managed generated secrets a newer
 // manifest declares and the file lacks (an install from before them). Saved
 // values and bytes are untouched, and an owner-visible token the owner removed
@@ -67,8 +86,7 @@ async function keepSettings(current, { manifest, store }, { format = 'dotenv' })
  if (!Object.keys(added).length) return current.values;
  store.addSecrets?.(Object.values(added));
  const merged = { ...current.values, ...added };
- await writePrivateFile(current.path, format === 'json' ? JSON.stringify(merged, null, 1) + '\n'
-  : current.text.replace(/\n*$/, '\n').replace(/^\n$/, '') + Object.entries(added).map(([key, value]) => `${key}=${dotenvValue(value)}`).join('\n') + '\n');
+ await writePrivateFile(current.path, format === 'json' ? JSON.stringify(merged, null, 1) + '\n' : dotenvText(current.text, added));
  return merged;
 }
 
@@ -99,18 +117,13 @@ async function writeSecrets(context, options) {
   store.addSecrets?.((manifest?.fields??[]).filter(field=>field.kind==='secret').flatMap(field=>[current.values[field.name],wanted[field.name]]).filter(Boolean));
   const merged = { ...current.values, ...updates };
   store.addSecrets?.([...generated.map(field => merged[field.name]).filter(Boolean), ...(manifest?.fields??[]).filter(field=>field.kind==='secret').map(field=>merged[field.name]).filter(Boolean), ...credentialValues(merged)]);
-  if (Object.keys(updates).length) {
-   const replacing = Object.keys(updates).some(key => Object.hasOwn(current.values, key));
-   const text = format === 'json'
-    ? JSON.stringify(merged, null, 1) + '\n'
-    : (replacing ? '' : (current.text === undefined ? '' : current.text.replace(/\n*$/, '\n').replace(/^\n$/, ''))) + Object.entries(replacing ? merged : updates).map(([key, value]) => `${key}=${dotenvValue(value)}`).join('\n') + '\n';
-   await writePrivateFile(current.path, text);
-  }
+  if (Object.keys(updates).length) await writePrivateFile(current.path, format === 'json' ? JSON.stringify(merged, null, 1) + '\n' : dotenvText(current.text, updates, options.file));
   return merged;
  }
 }
 
-// Setup on another port moves the checkout: only the saved origin changes.
+// Setup on another port or loopback host moves the checkout: the saved origin
+// changes here, and settings derived from it change with setup's answers.
 // The key is the one the CLI reads (the declared originKey, else AUTH_ORIGIN).
 async function moveSavedOrigin(context, options, values) {
  const key = options.originKey ?? 'AUTH_ORIGIN', origin = context.selectedOrigin;
@@ -135,10 +148,8 @@ function rewriteOrigin(root, options, values, origin) {
 }
 
 async function rewriteSetting(root, options, values, key, value) {
- const current = await readSettings(root, options), format = options.format ?? 'dotenv', merged = { ...values, [key]: value };
- const text = format === 'json' ? JSON.stringify(merged, null, 1) + '\n' : current.text.replace(new RegExp(`^${key}=.*$`, 'm'), `${key}=${dotenvValue(value)}`);
- if (format !== 'json' && localVariables(text)[key] !== value) throw new Error(`Could not change ${key} in ${options.file ?? '.dev.vars'}; put ${key}=${value} on its own line.`);
- await writePrivateFile(current.path, text);
+ const current = await readSettings(root, options), merged = { ...values, [key]: value };
+ await writePrivateFile(current.path, (options.format ?? 'dotenv') === 'json' ? JSON.stringify(merged, null, 1) + '\n' : dotenvText(current.text, { [key]: value }, options.file));
  return merged;
 }
 

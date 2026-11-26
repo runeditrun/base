@@ -3,7 +3,9 @@ import net from 'node:net';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { posix } from 'node:path';
 import { listen } from './listen.mjs';
-import { loopback } from './parse.mjs';
+import { bindAddress, loopback } from './parse.mjs';
+import { busyPortMessage } from './port.mjs';
+import { refuse } from './errors.mjs';
 import { fontResponseHeaders } from './font-cache.mjs';
 import { UpstreamAgent } from './upstream-agent.mjs';
 
@@ -105,8 +107,22 @@ export async function trafficProxy({host,port,target,activity,door,devKey,origin
   }
   upstream.on('error',()=>socket.destroy());socket.on('error',()=>upstream.destroy());socket.on('close',()=>upstream.destroy());upstream.on('close',()=>socket.destroy());
  });
- try{await listen(server,host,port);}catch(error){agent.destroy();throw error;}
- return {probe,port:server.address().port,setTarget(port){target=port;answered=false;},async close(){closing=true;agent.destroy();for(const socket of sockets)socket.destroy();await new Promise(resolve=>server.close(resolve));}};
+ try{await listen(server,bindAddress(host),port);}catch(error){agent.destroy();throw error;}
+ let twin;
+ try{if(host==='localhost')twin=await holdIPv6(server,server.address().port);}
+ catch(error){agent.destroy();await new Promise(resolve=>server.close(resolve));throw error;}
+ return {probe,port:server.address().port,setTarget(port){target=port;answered=false;},async close(){closing=true;agent.destroy();for(const socket of sockets)socket.destroy();await Promise.all([server,twin].filter(Boolean).map(listener=>new Promise(resolve=>listener.close(resolve))));}};
+}
+// A localhost origin also holds its port on ::1, where browsers may try first,
+// so no other process answers there; a system without IPv6 has no such side.
+async function holdIPv6(server,port){
+ const twin=net.createServer(socket=>server.emit('connection',socket));
+ try{await new Promise((resolve,reject)=>{twin.once('error',reject);twin.listen({host:'::1',port,exclusive:true},resolve);});return twin;}
+ catch(error){
+  if(['EADDRNOTAVAIL','EAFNOSUPPORT'].includes(error.code))return;
+  if(error.code==='EADDRINUSE')throw refuse(await busyPortMessage({port,host:'::1',root:process.cwd()}));
+  throw refuse(`Could not listen on ::1 port ${port}: ${error.code??'socket error'}. Check the address and permissions, then run ~/.local/bin/rer dev again.`);
+ }
 }
 function doorAdmits(req,door){
  const host=String(req.headers.host??'').toLowerCase(),given=Buffer.from(String(req.headers[door.header]??'')),secret=Buffer.from(door.secret);

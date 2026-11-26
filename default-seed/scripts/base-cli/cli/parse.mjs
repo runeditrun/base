@@ -13,6 +13,10 @@ export const loopback = host => host === '::1' || isLoopbackHost(host);
 // The addresses rer binds directly. A `*.localhost` name is reached through the
 // front door; binding one would give a `::1`-only listener on macOS.
 export const listenHost = host => ['127.0.0.1', 'localhost', '::1'].includes(host);
+// rer serves localhost on 127.0.0.1: every client resolving localhost reaches
+// it, while a socket bound by name can land on ::1 where Linux clients (with
+// AI_ADDRCONFIG) and WSL2's forwarding look only at 127.0.0.1.
+export const bindAddress = host => host === 'localhost' ? '127.0.0.1' : host;
 export const origin = (host, port) => `http://${host === '::1' ? '[::1]' : host}:${port}`;
 
 export function parse(argv, cwd = process.cwd(), { independent = false, deferTail = false } = {}) {

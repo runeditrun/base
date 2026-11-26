@@ -37,7 +37,8 @@ async function loopbackRefuses(host, port, context) {
 // finds no listener, retry the bind within the same inspection deadline.
 // A free-port search (`searching`) only needs to move on from a port in use:
 // it skips one on the failed bind alone, without the slow ownership check.
-export async function probePort(host, port, { context = inspectionContext({ port }), hosts = [host], anyAddress = false, searching = false } = {}) {
+// localhost is served on 127.0.0.1 and held on ::1 (where IPv6 exists): both must be free.
+export async function probePort(host, port, { context = inspectionContext({ port }), hosts = host === 'localhost' ? ['127.0.0.1', '::1'] : [host], anyAddress = false, searching = false } = {}) {
  const bindings = async () => {
   for (const address of hosts) { const result = await bind(address, port); if (!result.available) return result; }
   return { available: true };
