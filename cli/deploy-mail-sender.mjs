@@ -18,10 +18,10 @@ const RELAY = ['MAIL_PROVIDER', 'MAIL_FROM', 'MAIL_RELAY_URL', 'MAIL_API_KEY'];
 const CHOSEN = [...RELAY, 'SENDGRID_API_KEY', 'RESEND_API_KEY', 'MAIL_PROVIDER_API_KEY', 'MAIL_ACCOUNT_ID'];
 const present = value => typeof value === 'string' && Boolean(value.trim());
 
-/** Returns undefined when this is not rer's to decide, `{held: true}` when the Worker already holds the relay settings,
- * `{values, replace}` for a fresh sender (values by environment name; `replace` names the relay settings the Worker
- * already holds, such as MAIL_PROVIDER=none from a deploy with mail off, which the upload would keep), or `{off: reason}`
- * when no sender could be had. */
+/** Returns undefined when this is not rer's to decide (including a Worker that already holds mail: the sign-in preflight
+ * counts it through the same live secret names), `{values, replace}` for a fresh sender (values by environment name;
+ * `replace` names the relay settings the Worker already holds, such as MAIL_PROVIDER=none from a deploy with mail off,
+ * which the upload would keep), or `{off: reason}` when no sender could be had. */
 export async function deployMailSender({ root, declaration, declarationPath, env, options, name, ownerEmail, localOnlyKeys, report, addSecret }) {
  const secrets = Array.isArray(declaration.secrets) ? declaration.secrets : [];
  const relay = RELAY.map(binding => secrets.find(item => item?.binding === binding));
@@ -32,7 +32,7 @@ export async function deployMailSender({ root, declaration, declarationPath, env
  const environment = options.environment ?? 'production', state = await hookState(root, environment);
  const { origin, liveSecrets } = await owner(['address', '--declaration', declarationPath, '--environment', environment, ...(state ? ['--state', state] : [])], env, { cwd: root, localOnlyKeys });
  // Mail the person set up, or a sender an earlier deploy put on this Worker, stays: asking again would replace its key.
- if (liveSecrets.includes('MAIL_API_KEY')) return RELAY.every(binding => liveSecrets.includes(binding)) ? { held: true } : undefined;
+ if (liveSecrets.includes('MAIL_API_KEY')) return;
  const business = await loadState();
  if (!business?.origin || !business.businessId || !business.executorId) return { off: `this computer is not connected to a Business. Connect it with ${businessCommand('connect --business ID')} and deploy again` };
  if (business.revoked) return { off: `this computer's Business pairing was revoked` };

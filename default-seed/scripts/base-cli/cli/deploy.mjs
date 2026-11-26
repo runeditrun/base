@@ -63,8 +63,7 @@ export function ownerDeploy(declarationPath, lifecycle) {
    }
    Object.assign(relayMail, sender?.values);
    Object.assign(production.env, relayMail);
-   // Relay settings this Worker already holds are its mail: they were checked when rer set them.
-   if (!sender?.held) ({signIn, mailOff} = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed, adapter: lifecycle, declarationPath, options, mailOffSignIn }) ?? {});
+   ({signIn, mailOff} = await requireProductionAuth({ root, declaration, env: production.env, setupManifest, setupSeed, adapter: lifecycle, declarationPath, options, mailOffSignIn }) ?? {});
    if (!options.dryRun) committedSource(root, options);
    ownerInput = await deployOwnerInput({ root, adapter, setupSeed, options, signal, declaration, env: production.env });
    await withoutLocalSettings(root, { settings: lifecycle.settings, operationToken }, () => lifecycle.run(root, {}, store, () => {}, signal, { verb: 'build', operationToken }));

@@ -55,6 +55,19 @@ test('credentials-only deploy update uses declared live mail secrets with a vali
  await writeFile(join(f.root,'deploy.env'),'');
  const declarationPath=join(f.root,'deploy.json'),declaration=JSON.parse(await readFile(declarationPath,'utf8'));
  await rm(packagingPath);
+ // No private file and no public sender: the MAIL_FROM and provider key the Worker holds are the mail, as a redeploy with the same Cloudflare credentials needs.
+ const held=await run();
+ assert.equal(held.code,0,JSON.stringify(held.events));
+ assert.equal(f.provider.state.writes.length,writes,'a held sender makes no provider writes');
+ await writeFile(join(f.root,'deploy.env'),'PRODUCT_MAIL_FROM=invalid-sender\n');
+ assert.equal((await run()).code,4,'a supplied invalid sender still refuses over a held one');
+ await writeFile(join(f.root,'deploy.env'),'');
+ const bound=f.provider.state.secrets.slice();
+ f.provider.state.secrets=bound.filter(secret=>secret.name!=='MAIL_FROM');
+ assert.equal((await run()).code,4,'a Worker without MAIL_FROM still refuses');
+ f.provider.state.secrets=bound.filter(secret=>secret.name!=='SENDGRID_API_KEY');
+ assert.equal((await run()).code,4,'a Worker without the provider key still refuses');
+ f.provider.state.secrets=bound;
  declaration.secrets=declaration.secrets.filter(secret=>secret.binding!=='MAIL_FROM');
  await writeFile(declarationPath,JSON.stringify(declaration));
  assert.equal((await run()).code,4,'an undeclared live sender cannot satisfy the deployment contract');

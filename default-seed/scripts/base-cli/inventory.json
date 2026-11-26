@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.137-dev.g10378fe4",
+  "cliVersion": "0.2.137-dev.g6b480933",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -399,7 +399,7 @@
     },
     "cli/README.md": {
       "source": "cli/README.md",
-      "sha256": "d035a757343cc6ca693aa5776e4715d263f5ec006c271eee1005f58af904a0ac"
+      "sha256": "d72cbb6fb2d13c349c23cab8b0127c86df322216fb74c88ab9bd8ef06940904a"
     },
     "cli/adapter.mjs": {
       "source": "cli/adapter.mjs",
@@ -863,7 +863,7 @@
     },
     "cli/deploy-command.mjs": {
       "source": "cli/deploy-command.mjs",
-      "sha256": "266c09b4af796877b24cd3909da50f1c8f87c1c8e4890238d2db856df66696b2"
+      "sha256": "d22badac12e085d490759fe5d8d5338c332e4a54ad3c9e6665967b0d9a2763e2"
     },
     "cli/deploy-config.mjs": {
       "source": "cli/deploy-config.mjs",
@@ -887,7 +887,7 @@
     },
     "cli/deploy-mail-sender.mjs": {
       "source": "cli/deploy-mail-sender.mjs",
-      "sha256": "32bb9bf4e3fa4c8ed628fe5fa147688a70f069ee6443cdf232b9b575bd7d18cb"
+      "sha256": "3736cc3a322efdceaef8b6c020f372e304eb204d8cd7d0e04fd6918fe944c176"
     },
     "cli/deploy-needs.mjs": {
       "source": "cli/deploy-needs.mjs",
@@ -947,7 +947,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "361fea61b075c2726379c2b424986944266e9cf7c147030efc1cff4e7b345408"
+      "sha256": "e85afc6d28c78283e9f105b2db4b262f725dd1a6dd282089207921680c6cf983"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",
@@ -1071,7 +1071,7 @@
     },
     "cli/lifecycle.mjs": {
       "source": "cli/lifecycle.mjs",
-      "sha256": "f5bbc22d4678d2ef8c74d00695fbff95357ccca9e2ee3d1b4277fb6366f6f4b6"
+      "sha256": "46a7f9e899d29bfc640d0e94d51699a659905afa5c6257f78d9aabafe6ff6b7d"
     },
     "cli/listen.mjs": {
       "source": "cli/listen.mjs",
@@ -1131,7 +1131,7 @@
     },
     "cli/output.mjs": {
       "source": "cli/output.mjs",
-      "sha256": "415d14be62a59a2a37180216eb1c3d346c9918b0970664a9b63a3cefb375692f"
+      "sha256": "d42d86f91d09b80bc3dfa3af96cdf62afcde8fbcd7cd4d512c06d671aab4624d"
     },
     "cli/owner-entry-probe.mjs": {
       "source": "cli/owner-entry-probe.mjs",
@@ -1227,7 +1227,7 @@
     },
     "cli/production-mail.mjs": {
       "source": "cli/production-mail.mjs",
-      "sha256": "c8efbddc9efdb8bd92831e7568b87fd697e5a189fa64e5dae87b5f6869f0c34f"
+      "sha256": "ba8f58e8b9df5af7c68283a2bd496eb501b7c845de9e1c7421efb7bfc8b51be7"
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",

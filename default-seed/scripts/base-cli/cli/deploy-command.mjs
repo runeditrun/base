@@ -1,4 +1,5 @@
 import { requireProductionAuth, mailOffNotice } from './production-auth.mjs';
+import { mailOffSignInCommand } from './production-mail.mjs';
 import { enforceDeployPolicy } from './deploy-policy.mjs';
 import { observedReadiness } from '../modules/deploy-kit/readiness-window.mjs';
 import { readFile, readdir } from 'node:fs/promises';
@@ -60,7 +61,10 @@ export async function hostedDeployNeeds(project) {
  const { path, value: declaration } = await declarationFor(root, adapter);
  const options = { dryRun: true }, settings = adapter.hooks?.secrets ?? adapter.settings;
  const { env } = await deployEnvironment({ root, options, declaration, setupManifest, settings, localOnlyKeys: adapter.localOnlyKeys ?? [] });
- const { signIn } = await requireProductionAuth({ root, declaration, env, setupManifest, setupSeed, adapter, declarationPath: path, options }) ?? {};
+ // A seed that signs its owner in without mail accepts MAIL_PROVIDER=none, so mail is not a need unless the person chose some.
+ const auth = values => requireProductionAuth({ root, declaration, env: values, setupManifest, setupSeed, adapter, declarationPath: path, options });
+ const providerName = (declaration.secrets ?? []).find?.(item => item?.binding === 'MAIL_PROVIDER')?.environment ?? 'MAIL_PROVIDER';
+ const { signIn } = (mailOffSignInCommand(adapter) && !env.MAIL_PROVIDER?.trim() && !env[providerName]?.trim() ? await auth({ ...env, MAIL_PROVIDER: 'none', [providerName]: 'none' }).catch(() => undefined) : undefined) ?? await auth(env) ?? {};
  return neededForRealDeploy({ declaration, env, signIn });
 }
 

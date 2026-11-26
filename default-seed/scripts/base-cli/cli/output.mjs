@@ -1,11 +1,11 @@
-import { withCommandHelp } from './command-guidance.mjs';
+import { withCommandHelp, commandNotFoundHelp } from './command-guidance.mjs';
 import { humanError } from './human-error.mjs';
 import { handleBrokenPipes } from './stdio.mjs';
 import { exportSummary } from './export-summary.mjs';
 import { importSummary, importSafetySummary } from './import-summary.mjs';
 export function output(options) {
  handleBrokenPipes();
- let finished = false;
+ let finished = false, helped = false;
  // A bounded child retains the caller's human progress but sends its closing
  // outcome as data, so only the drained outer workflow renders the result.
  const structuredResult = options.json || process.env.RER_BOUNDED_OUTPUT === '1';
@@ -15,7 +15,12 @@ export function output(options) {
  const write = (fd, text) => { const stream = fd === 1 ? process.stdout : process.stderr; if (!stream.destroyed) stream.write(text); };
  return {
   event(event, details = {}) { write(1, JSON.stringify({ version: 1, verb: options.verb ?? 'unknown', event, ...details }) + '\n'); },
-  human(text) { write(1, (options.json || structuredResult || options.verb === 'describe' ? text : withCommandHelp(text)) + '\n'); },
+  // The command-not-found guidance closes a command's output once, however many lines name a command.
+  human(text) {
+   const plain = options.json || structuredResult || options.verb === 'describe' || helped, shown = plain ? text : withCommandHelp(text);
+   helped ||= shown.includes(commandNotFoundHelp);
+   write(1, shown + '\n');
+  },
   progress(text) { write(2, text); },
   result(ok, exitCode, details = {}) {
    if (finished) throw Error('Duplicate CLI result'); finished = true;

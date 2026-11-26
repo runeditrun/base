@@ -103,10 +103,14 @@ export async function productionMail(root, declaration, env, declarationPath = '
  if (present(bindings.MAIL_FROM) && (!sender(bindings.MAIL_FROM) || placeholderSender(bindings.MAIL_FROM))) {
   senderIssue = `MAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>). ${senderFix}, then run ~/.local/bin/rer deploy --dry-run again.`;
  }
+ // A declared MAIL_FROM secret the person did not supply may already be bound on the Worker: a redeploy needs no private file for it.
+ const senderBoundLive = secrets.has('MAIL_FROM') && !present(bindings.MAIL_FROM);
  const provider = bindings.MAIL_PROVIDER;
  const deferred = !provider || provider === 'later';
  const choices = new Set(declaredProviders);
  if (deferred) for (const [name, key] of Object.entries(nativeCredential)) if (secrets.has(key)) choices.add(name);
+ // A deployment that declares the relay's URL as a secret can send through the relay.
+ if (deferred && secrets.has('MAIL_RELAY_URL')) choices.add('rer');
  const selected = deferred ? [...choices] : providers.includes(provider) ? [provider] : [];
  const routes = selected.map(provider => {
   const credentialKeys = deferred && nativeCredential[provider] && !declaredProviders.has(provider) ? [nativeCredential[provider]]
@@ -121,11 +125,11 @@ export async function productionMail(root, declaration, env, declarationPath = '
     ? `${declaredCredentials.join(' or ')} (or ${providerKeys.join(' / ')})`
     : declaredCredentials.join(' or ') || credentialKeys.join(' or ');
   return live => {
-   let relaySelected = true;
-   if (provider === 'rer') try { validateRerConfig({ relayUrl: bindings.MAIL_RELAY_URL }); } catch { relaySelected = false; }
    const has = key => present(bindings[key]) || secrets.has(key) && live.includes(key);
+   let relaySelected = true;
+   if (provider === 'rer') try { validateRerConfig({ relayUrl: bindings.MAIL_RELAY_URL }); } catch { relaySelected = !present(bindings.MAIL_RELAY_URL) && has('MAIL_RELAY_URL'); }
    return [
-    ...(!sender(bindings.MAIL_FROM) || senderIssue ? [senderIssue ?? SENDER] : []),
+    ...(senderIssue || !sender(bindings.MAIL_FROM) && !(senderBoundLive && live.includes('MAIL_FROM')) ? [senderIssue ?? SENDER] : []),
     ...(!credentialKeys.some(has) ? [credentialText] : []),
     ...(provider === 'cloudflare' && !has('MAIL_ACCOUNT_ID') ? ['MAIL_ACCOUNT_ID'] : []),
     ...(!relaySelected ? ['MAIL_RELAY_URL (assigned HTTPS relay URL)'] : []),
@@ -140,7 +144,7 @@ export async function productionMail(root, declaration, env, declarationPath = '
   senderIssue,
   fixtureSender: fixtureSender(bindings.MAIL_FROM),
   configured: (live = []) => routes.some(missing => missing(live).length === 0),
-  canInspect: sender(bindings.MAIL_FROM) && !senderIssue && routes.length > 0,
+  canInspect: (sender(bindings.MAIL_FROM) || senderBoundLive) && !senderIssue && routes.length > 0,
   missing: routes.length ? routes.map(missing => missing([]).join(', ')).join(' or ') : [
    'MAIL_PROVIDER (resend, sendgrid, cloudflare or rer)',
    ...(!sender(bindings.MAIL_FROM) || senderIssue ? [senderIssue ?? SENDER] : []),

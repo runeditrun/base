@@ -354,7 +354,10 @@ Production deployment requires outbound email configured in the actual declared
 bindings (`MAIL_PROVIDER`, `MAIL_FROM`, `MAIL_API_KEY`, and `MAIL_ACCOUNT_ID` for
 Cloudflare), or an Auth SSO dependency selected through the setup manifest and
 approved through the existing link flow. A redeploy can retain existing mail
-secrets after the provider verifies the owned deployment. Local setup and demo
+secrets after the provider verifies the owned deployment: a declared `MAIL_FROM`,
+`MAIL_RELAY_URL` or provider key not supplied this run counts when the Worker
+already has it bound, so the same Cloudflare credentials redeploy with no private
+file; a supplied invalid `MAIL_FROM`, or a Worker missing one, still refuses. Local setup and demo
 do not require production mail credentials. Preview serves production output
 and prints its ready address without a captured-mail sign-in flow.
 
