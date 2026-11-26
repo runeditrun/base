@@ -124,6 +124,18 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  assert.equal((await fetch(repeated.url + '/health')).status, 200, 'an up-to-date database starts without reapplying SQL');
  await f.stop(restarted);
  assert.deepEqual(await readFile(join(f.root, '.dev.vars')), settings);
+ // Setup moves a saved 127.0.0.1 checkout to localhost (a passkey needs a
+ // domain name) as it moves a port: only the origin line changes, the data
+ // stays, a plain dev serves there, and moving back restores every byte.
+ const moved=events(await f.run(['setup','--host','localhost','--non-interactive','--json'])).find(event=>event.event==='port');
+ assert.equal(moved?.origin,`http://localhost:${new URL(repeated.url).port}`);
+ assert.equal(await readFile(settingsPath,'utf8'),settings.toString().replace(/^AUTH_ORIGIN=.*$/m,`AUTH_ORIGIN=${moved.origin}`));
+ const onLocalhost=f.start(['dev','--foreground','--json']);
+ assert.equal((await awaitReady(onLocalhost)).url,moved.origin);
+ assert.deepEqual((await f.sql('SELECT value FROM saved_before_upgrade'))[0].results, [{ value: 'owner content' }]);
+ await f.stop(onLocalhost);
+ await f.run(['setup','--host','127.0.0.1','--non-interactive','--json']);
+ assert.deepEqual(await readFile(settingsPath), settings);
 
  // Simulate a damaged installation with no active owner: ordinary writes
  // correctly refuse removing the last owner, so remove that guard in this fixture.

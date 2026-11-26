@@ -32,7 +32,7 @@ export async function startInstaller(root,{seed,port=0,answers,secretInput,noPre
  const uiRoot=fileURLToPath(new URL('./ui/',import.meta.url));
  if(resume&&noPrefill)throw Error('--resume cannot be combined with --no-prefill.');
  const store=await createState(root,seed),token=randomBytes(32).toString('hex'),cookie=randomBytes(32).toString('hex');let origin,work,connection,starting=false,mutations=0;const apps=createAppProcesses();const abort=new AbortController();let attemptAbort,attemptProcesses;
- store.setupManifest=seed.manifest;
+ store.setupManifest=seed.manifest;store.host=seed.host;
  const vault=createSecretVault(seed.model,store.addSecrets);store.addSecrets([token,cookie]);
  const invalidateSecrets=async draft=>{vault.invalidate(draft);await store.invalidateSecrets(vault.invalidated());};
  const saveDraft=async (draft,source,keys)=>{await invalidateSecrets(draft);await store.draft(draft,source,keys);};
