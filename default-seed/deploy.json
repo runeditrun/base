@@ -13,7 +13,8 @@
   "originVar": "AUTH_ORIGIN",
   "publicOriginSetting": "PUBLIC_ORIGIN",
   "vars": {
-    "AUTH_LOCAL": "false"
+    "AUTH_LOCAL": "false",
+    "MAIL_PROVIDER": "resend"
   },
   "publicSettings": ["MAIL_PROVIDER", "MAIL_FROM", "MAIL_RELAY_URL"],
   "secrets": [
@@ -41,8 +42,7 @@
     {
       "binding": "MAIL_PROVIDER",
       "environment": "MAIL_PROVIDER",
-      "optional": true,
-      "verifyStandIn": "resend"
+      "optional": true
     },
     {
       "binding": "MAIL_FROM",
