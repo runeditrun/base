@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.141
+
+Signed: Run Edit Run fleet, 2026-11-26.
+
+### Demo host
+
+- A native demo copy whose start is still running keeps its capacity place: the copy renews it a minute at a time while migrations, the owner claim and the seed's first request run, for up to five minutes. A seed whose first request takes longer than a minute (Purse's seeds in about 104 s) now becomes ready instead of failing with `start-reservation-expired`. A start that dies stops renewing and frees its place within a minute, as before, and a late renewal never shortens a ready demo's end.
+- Start timing is split into `migrationsMs`, `claimMs`, `seedMs` and `totalMs`, and a failed start keeps it too: in the `native-demo-start-failed` log and in the operator diagnostic, not only in `demo_ready`.
+
+### Seed export
+
+- The exported Run demo workflow (`export/run-demo.yml`) deploys on `release: published` and by dispatch, with no `RUN_DEMO_DEPLOY` gate, so an adopted seed's demo redeploys at each release. DEMO.md says so.
+
 ## 0.2.140
 
 Signed: Run Edit Run fleet, 2026-11-26.
