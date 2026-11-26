@@ -4459,7 +4459,7 @@
     },
     "modules/operator-auth/accounts/admin.mjs": {
       "source": "modules/operator-auth/accounts/admin.mjs",
-      "sha256": "ef68f9a24788ef0ac00bb0012d988c7661992926491a03b39783b529f6134017"
+      "sha256": "e38f8d3b2e4888a767dfd27f2042ad3ad76916e36748ceea9d77e006d151c25f"
     },
     "modules/operator-auth/accounts/audit.mjs": {
       "source": "modules/operator-auth/accounts/audit.mjs",
@@ -4615,7 +4615,7 @@
     },
     "modules/operator-auth/conformance/index.mjs": {
       "source": "modules/operator-auth/conformance/index.mjs",
-      "sha256": "60e925f31c3c927889aae0dfeb82809e3f325cb572d4c31efe591d5ddc0a5010"
+      "sha256": "6cbb458a7c153bf02ac2b65a4683b86b9754bddd611f102a1a292b510047cd33"
     },
     "modules/operator-auth/conformance/presentation.mjs": {
       "source": "modules/operator-auth/conformance/presentation.mjs",
@@ -4739,7 +4739,7 @@
     },
     "modules/operator-auth/identity/email-link/index.mjs": {
       "source": "modules/operator-auth/identity/email-link/index.mjs",
-      "sha256": "07f2d1f51a22e445179995ed3fecba155c954264f8738da1ba69afe2a1d39e2c"
+      "sha256": "9159a33de529821a383ae5aeb0a055ac64ac48b29c49a5e701b24f4f781633db"
     },
     "modules/operator-auth/identity/email-link/message.mjs": {
       "source": "modules/operator-auth/identity/email-link/message.mjs",
