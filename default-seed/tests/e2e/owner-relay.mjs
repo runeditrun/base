@@ -30,7 +30,7 @@ export async function ownerRelaySignIn() {
     assert.equal(refused.status, 503)
     assert.deepEqual(runtime.networkRequests, [])
 
-    assert.equal((await signIn(owner.toUpperCase())).status, 200)
+    assert.equal((await signIn(owner.toUpperCase())).status, 202)
     assert.equal(submissions.length, 1)
     const [mail] = submissions
     assert.equal(mail.to, owner)
