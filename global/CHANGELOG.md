@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.139
+
+Signed: Run Edit Run fleet, 2026-11-26.
+
+### Cloudflare Worker deploy and sign-in mail
+
+- A dead held relay key whose tool has a live sender at another address now closes with "Mail is off …" and the revoke command, not "Sign in by email at …".
+- A Worker that moved from workers.dev to its own origin recognises its own live sender at either address.
+- `rer deploy` keeps the id of the Business that issued a Worker's relay sender beside its deploy state, so a held key from another Business is not treated as dead.
+
+### Reference seed sign-in on the owner-only relay
+
+- With MAIL_PROVIDER=rer, `POST /auth/magic-link` answers a teammate's address the same 202 as an unknown address, with no token and no send. The sign-in page says email links reach only the owner, and the invite form is replaced by a line saying teammate mail is off.
+- On the relay, `POST /auth/invite` and a teammate's `/auth/step-up` are refused server-side with 403 `teammate_mail_off`.
+- The README relay paragraph says the owner signs in with OWNER_EMAIL.
+
+### Operator sign-in
+
+- A sign-in or invitation link whose send is uncertain (a timeout, a dropped connection, a provider 5xx) stays live, single-use, for its normal lifetime, and the request answers as sent: the mail may still arrive, and it no longer arrives with a dead link. A definite refusal (rejected, rate limited, thrown, no mail) still revokes the link.
+
 ## 0.2.138
 
 Signed: Run Edit Run fleet, 2026-11-26.
