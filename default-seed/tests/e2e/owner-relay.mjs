@@ -61,7 +61,7 @@ export async function ownerRelaySignIn() {
 
     for (const response of [
       () => Response.redirect('https://elsewhere.example.test/collect', 307),
-      () => Response.json({ error: key }),
+      () => Response.json({ error: key }, { status: 403 }),
     ]) {
       reply = response
       const failed = await signIn(owner)
