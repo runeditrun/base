@@ -387,9 +387,15 @@ the Worker's workers.dev address) and deploys with `MAIL_PROVIDER=rer`, the
 assigned `MAIL_FROM` and `MAIL_RELAY_URL`, and the key, which goes only into the
 Worker's `MAIL_API_KEY` secret. The relay mails only the Business owner's
 verified address, so the deploy's owner email must be that address. A redeploy
-keeps the sender the Worker holds; to replace its key, `--unset-secret
-MAIL_API_KEY` and deploy again, and `rer business call mail.sender.revoke --tool
-NAME` stops it. With no sender (no Business connected, or the Business refused),
+keeps the sender the Worker holds while the Business lists it as live for that
+tool and address; after a disconnect or `rer business call mail.sender.revoke
+--tool NAME` the held key is dead and the next connected deploy issues a new
+one. A tool's sender belongs to one address: a deploy never replaces a live
+sender that belongs to another Worker, and says to revoke it or to use another
+`--environment`. Mail the Worker holds in the person's own provider is left
+alone. A deploy that fails after the sender is issued but before the upload
+leaves a live sender no Worker holds; it counts toward the Business's sender
+cap and the next deploy for that tool replaces it. With no sender (no Business connected, or the Business refused),
 the deploy says why in one line: a seed with `mailOffSignIn` then deploys with
 `MAIL_PROVIDER=none`, and any other seed keeps the refusal above. A later deploy
 from a connected computer switches a held `MAIL_PROVIDER=none` to the relay.

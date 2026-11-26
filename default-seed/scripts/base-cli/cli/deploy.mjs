@@ -1,5 +1,5 @@
 import { requireProductionAuth, mailOffNotice } from './production-auth.mjs';
-import { mailOffSignInCommand, realSender, senderProblem } from './production-mail.mjs';
+import { mailOffSignInCommand, productionMail, realSender, senderProblem } from './production-mail.mjs';
 import { deployMailSender } from './deploy-mail-sender.mjs';
 import { readFile } from 'node:fs/promises';
 import { deployDiagnostic, migrationFailure, providerFailure, assetFailure, ownerTargetFailure } from '../modules/deploy-kit/diagnostics.mjs';
@@ -55,7 +55,8 @@ export function ownerDeploy(declarationPath, lifecycle) {
    // signs its owner in without mail deploys with MAIL_PROVIDER=none; any other is refused below, as before.
    const ownerField = declaration.secrets?.find?.(item => item?.binding === setupManifest?.steps?.find(step => step.type === 'owner-claim')?.emailField);
    sender = await deployMailSender({ root, declaration, declarationPath, env: production.env, options, localOnlyKeys,
-    name: adapter?.product ?? lifecycle.product ?? declaration.project.split('/').at(-1), ownerEmail: ownerField && production.env[ownerField.environment],
+    name: adapter?.product ?? lifecycle.product ?? declaration.project.split('/').at(-1), ownerEmail: ownerField ? production.env[ownerField.environment] ?? '' : undefined,
+    credentialNames: async () => (await productionMail(root, declaration, production.env, declarationPath, lifecycle)).credentialNames,
     report: line => store.report(line), addSecret: value => store.addSecrets?.([value]) });
    if (sender?.off) {
     store.report(`${mailOffSignIn ? 'Mail is off' : 'No mail sender from Run Edit Run'}: ${sender.off.replace(/[.\s]+$/, '')}.`);
@@ -153,7 +154,8 @@ export function ownerDeploy(declarationPath, lifecycle) {
    if (sender?.replace?.length) {
     // The upload kept what the Worker held (the kit never replaces a held secret): switch those to the sender's now.
     step = 'secrets';
-    await owner('secret', [...sender.replace.flatMap(binding => ['--set', binding]), ...(state ? ['--state', state] : [])]);
+    try { await owner('secret', [...sender.replace.flatMap(binding => ['--set', binding]), ...(state ? ['--state', state] : [])]); }
+    catch (error) { throw replaceFailure(error, { sender, environment, again }); }
     store.report(`Mail is on: set ${sender.replace.join(', ')} on this environment's Worker to the relay sender's settings as one new version.`, { names: sender.replace });
    }
    store.report(`Your application is live on your Cloudflare account at ${deployed.origin}.`);
@@ -171,6 +173,16 @@ export function ownerDeploy(declarationPath, lifecycle) {
     d1Import ? {d1Import} : {});
   }
  }, { declaration: declarationPath, managesHostedOwner: true });
+}
+
+// The replace step failed after the upload: say the exact command that finishes it. The relay's settings are public; the
+// key is not, so when the Worker's own key is among those to replace (a dead one) the way on is to revoke and deploy again.
+function replaceFailure(error, { sender, environment, again }) {
+ const { settings = {}, tool, replace } = sender, cause = error instanceof RerError ? error.message : 'the Worker secret change failed';
+ const finish = replace.includes('MAIL_API_KEY')
+  ? `Revoke the new sender with ~/.local/bin/rer business call mail.sender.revoke --tool "${tool}", then ${again} to issue another.`
+  : `Finish it with ${['MAIL_PROVIDER', 'MAIL_FROM', 'MAIL_RELAY_URL'].map(name => `${name}='${settings[name]}'`).join(' ')} ${again} --set-secret ${replace.join(',')}.`;
+ return new RerError('safety_refusal', `The deploy is live, but turning Run Edit Run's relay mail on did not finish (${cause}). ${finish} Until then mail stays off.`, 4);
 }
 
 // Every secret named in --set-secret or --unset-secret is declared, and each one set has its
