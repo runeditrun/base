@@ -10,7 +10,7 @@ import { cronMatches } from './cron.mjs';
 import { endedPage, clearCookie } from '../pages.mjs';
 import { report } from '../diagnostics.mjs';
 
-const IDLE = 15 * 60_000;
+const IDLE = 15 * 60_000, START_LIMIT = 5 * 60_000;
 const random = () => [...crypto.getRandomValues(new Uint8Array(32))].map(byte => byte.toString(16).padStart(2, '0')).join('');
 export class NativeDemo extends DurableObject {
   constructor(ctx, env) {
@@ -26,8 +26,8 @@ export class NativeDemo extends DurableObject {
       return { phase: 'failed', correlation: options.correlation };
     }
   }
-  async diagnostic(correlation, error) {
-    await this.env.CAPACITY.get(this.env.CAPACITY.idFromName('diagnostics')).record(correlation, { failure: String(error.message).slice(0, 1000) });
+  async diagnostic(correlation, error, timing) {
+    await this.env.CAPACITY.get(this.env.CAPACITY.idFromName('diagnostics')).record(correlation, { failure: String(error.message).slice(0, 1000), ...(timing ? { timing } : {}) });
   }
   async start({ origin, originVar, ends, endsLocal, settings, correlation, clientIp }) {
     if (this.state) return this.status();
@@ -41,39 +41,53 @@ export class NativeDemo extends DurableObject {
     this.state = { phase: 'starting', runtime, ends, seen: started, savedSeen: started, lastCron: Math.floor(started / 60_000), correlation };
     await this.save();
     await this.ctx.storage.setAlarm(Math.min(ends, started + IDLE));
+    // Each step's time is kept as it finishes, so a failed start says which
+    // step took it. While the start runs, its place is held a minute at a time:
+    // a start that dies stops renewing and frees its place within a minute, and
+    // a live one stops renewing at START_LIMIT.
+    const timing = {};
+    let mark = Date.now();
+    const lap = step => { const now = Date.now(); timing[`${step}Ms`] = now - mark; mark = now; };
+    const hold = setInterval(() => {
+      if (Date.now() - started < START_LIMIT) this.capacity().extend(id, Date.now() + 60_000).catch(() => {});
+    }, 20_000);
     try {
-      const at = Date.now();
       const app = application(this.env, this.ctx, id, runtime);
       for (const binding of bundle.bindings.databases) {
         const sql = { query: (...args) => this.database(binding, 'query', args), batch: (...args) => this.database(binding, 'batch', args), exec: (...args) => this.database(binding, 'exec', args) };
         await migrate(new DemoD1(sql), bundle.migrations[binding] ?? []);
       }
-      const migrated = Date.now();
+      lap('migrations');
       const token = await signClaim(keys, { origin, installationId: id, email: runtime.OWNER_EMAIL, now: Date.now() });
       const claimed = await app.fetch(new Request(origin + '/auth/owner-claim', { method: 'POST', redirect: 'manual', headers: { origin, 'cf-connecting-ip': clientIp, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }) }));
       if (claimed.status !== 303) throw new Error(`owner-claim-${claimed.status}: ${(await claimed.text()).slice(0, 500)}`);
       await claimed.body?.cancel();
+      lap('claim');
       const cookies = claimed.headers.getSetCookie();
       const seeded = await app.fetch(new Request(origin + '/health', { headers: { 'cf-connecting-ip': clientIp, cookie: cookies.map(cookie => cookie.split(';')[0]).join('; ') } }));
       await seeded.arrayBuffer();
+      lap('seed');
       if (!seeded.ok) throw new Error(`demo-seed-${seeded.status}`);
+      clearInterval(hold);
       if (!await this.capacity().extend(id, ends)) throw new Error('start-reservation-expired');
       // Checked after the extend, right before ready: an end that ran meanwhile
       // released this place, and the copy must not outlive it.
       if (this.state?.phase !== 'starting') throw new Error('demo-ended-during-start');
-      this.state = { ...this.state, phase: 'ready', cookies, location: claimed.headers.get('location'), timing: { migrationsMs: migrated - at, claimAndSeedMs: Date.now() - migrated, totalMs: Date.now() - started } };
+      timing.totalMs = Date.now() - started;
+      this.state = { ...this.state, phase: 'ready', cookies, location: claimed.headers.get('location'), timing };
       await this.save();
       // The one record that a copy started: same logger and shape as demo_admitted
       // and demo_failed, joined by correlation. Counts and timings only.
-      report(correlation, started, 'ready', { bundle: bundle.digest.slice(0, 12), timing: this.state.timing });
+      report(correlation, started, 'ready', { bundle: bundle.digest.slice(0, 12), timing });
       await this.schedule(await nextQueue(this));
       return this.status();
     } catch (error) {
-      console.error(JSON.stringify({ event: 'native-demo-start-failed', correlation, message: error.message }));
-      await this.diagnostic(correlation, error);
+      timing.totalMs = Date.now() - started;
+      console.error(JSON.stringify({ event: 'native-demo-start-failed', correlation, message: error.message, timing }));
+      await this.diagnostic(correlation, error, timing);
       await this.end();
       return { phase: 'failed', correlation };
-    }
+    } finally { clearInterval(hold); }
   }
   capacity() { return this.env.CAPACITY.get(this.env.CAPACITY.idFromName('capacity')); }
   async active() {

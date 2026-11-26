@@ -42,10 +42,13 @@ export class DemoCapacity extends DurableObject {
     });
   }
 
+  // Only lengthens a live place: a late renewal never shortens the demo's end,
+  // and a released or lapsed place stays free.
   async extend(id, ends) {
     return this.ctx.storage.transaction(async storage => {
-      if (!((await storage.get(id)) > Date.now())) return false;
-      await storage.put(id, ends);
+      const until = await storage.get(id);
+      if (!(until > Date.now())) return false;
+      if (ends > until) await storage.put(id, ends);
       return true;
     });
   }
