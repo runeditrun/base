@@ -125,7 +125,8 @@ ended page with "Start a new demo".
    demo settings. Secrets and front-owned settings cannot be supplied there.
 3. Copy `run-demo.yml` to `.github/workflows/run-demo.yml`. It installs the seed's
    locked dependencies and invokes `rer deploy --demo`; Docker is unnecessary.
-   Set `RUN_DEMO_DEPLOY=true` to deploy on pushes to main. The manual `test_only`
+   It deploys the demo at the release tag each time a release is published; a
+   manual run deploys the ref it is dispatched on. The manual `test_only`
    input targets `demo.test.<domain>` in the separate `demo-test` environment,
    using Turnstile's always-passing test keys. It moves the declaration's domain
    to `test.<domain>` and every `settings` host under `demo.<domain>` (such as
