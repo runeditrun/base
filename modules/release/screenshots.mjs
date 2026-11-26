@@ -30,15 +30,20 @@ function webpSize(bytes) {
 export function screenshotSet(source, id) {
   const screenshots = source.release?.screenshots;
   if (screenshots === undefined) return { shots: [], assets: [], identity: null };
-  if (!Array.isArray(screenshots) || screenshots.length < 1 || screenshots.length > 5) throw Error('RELEASE.json screenshots requires 1–5 images');
+  if (!Array.isArray(screenshots) || screenshots.length < 1 || screenshots.length > 5) throw Error('RELEASE.json screenshots must be 1–5 images');
   const paths = new Set(), assets = [];
-  const shots = screenshots.map(shot => {
-    if (!validRelativePath(shot?.path) || !shot.path.endsWith('.webp') || !['alt', 'caption'].every(key => typeof shot[key] === 'string' && shot[key].trim()) || shot.width !== 1600 || shot.height !== 1000)
-      throw Error('Each screenshot needs a WebP path, alt, caption, width 1600 and height 1000');
-    const bytes = source.bytes(shot.path), [width, height] = webpSize(bytes);
-    if (width !== 1600 || height !== 1000 || bytes.length > 300 * 1024) throw Error('Screenshot WebP must be 1600x1000 and at most 300 KiB');
+  const shots = screenshots.map((shot, index) => {
+    const at = field => `RELEASE.json screenshots[${index}].${field}`;
+    if (!validRelativePath(shot?.path) || !shot.path.endsWith('.webp')) throw Error(`${at('path')} must be a repository-relative WebP path`);
+    for (const key of ['alt', 'caption']) if (typeof shot[key] !== 'string' || !shot[key].trim()) throw Error(`${at(key)} must be nonempty text`);
+    if (shot.width !== 1600) throw Error(`${at('width')} must be 1600`);
+    if (shot.height !== 1000) throw Error(`${at('height')} must be 1000`);
+    let bytes, width, height;
+    try { bytes = source.bytes(shot.path); [width, height] = webpSize(bytes); }
+    catch (error) { throw Error(`${at('path')} ${shot.path}: ${error.message}`); }
+    if (width !== 1600 || height !== 1000 || bytes.length > 300 * 1024) throw Error(`${at('path')} ${shot.path}: WebP must be 1600x1000 and at most 300 KiB`);
     const path = `assets/seeds/${id}/${basename(shot.path)}`;
-    if (paths.has(path) || ['mark.svg', 'mark-light.svg'].includes(basename(shot.path))) throw Error('Screenshot bundle paths must be unique');
+    if (paths.has(path) || ['mark.svg', 'mark-light.svg'].includes(basename(shot.path))) throw Error(`${at('path')} must be unique and not a brand mark name`);
     paths.add(path); assets.push({ path, bytes });
     return { path, alt: shot.alt, caption: shot.caption, width, height };
   });

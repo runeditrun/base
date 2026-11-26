@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.139-dev.g03e70845",
+  "cliVersion": "0.2.139-dev.g46b50486",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -5191,7 +5191,7 @@
     },
     "modules/release/README.md": {
       "source": "modules/release/README.md",
-      "sha256": "9b06f7c21219ca322eba870f6d6b0cc509be90c16ad228658fc78045628fad39"
+      "sha256": "14eb3b01be88a9fdabbd39e2f7a6ac2267d9a1535517812e8d4a42abfea5029f"
     },
     "modules/release/archive-guard.mjs": {
       "source": "modules/release/archive-guard.mjs",
@@ -5227,7 +5227,7 @@
     },
     "modules/release/listing.mjs": {
       "source": "modules/release/listing.mjs",
-      "sha256": "d706be91ed6a01525892e2dbeeb1f66a35dcafa817cf72efa69d70520cde1e6d"
+      "sha256": "2d3acc801f7685e6549debc7ec271dc337ae6ff9fa88c60b6f67e264415e0296"
     },
     "modules/release/look.mjs": {
       "source": "modules/release/look.mjs",
@@ -5235,7 +5235,7 @@
     },
     "modules/release/previous-listing.mjs": {
       "source": "modules/release/previous-listing.mjs",
-      "sha256": "90a7a1a806720027bde0725da110610dd98f12858aa1877d30a5abc0b6981424"
+      "sha256": "f302c57ee7ac10b4376dc236f08c291cf9c94f62c67684e5acdc2d1857b8dfa0"
     },
     "modules/release/produce.mjs": {
       "source": "modules/release/produce.mjs",
@@ -5267,7 +5267,7 @@
     },
     "modules/release/screenshots.mjs": {
       "source": "modules/release/screenshots.mjs",
-      "sha256": "0de724eb4cbe27136a8c66fbdcfc9b569c59828911b8a4be6aa1be2049c9ec5c"
+      "sha256": "59375701031089b5f20225ec8603ce6d50915a0c0ea5a0d10504523c003ca75c"
     },
     "modules/release/sign.mjs": {
       "source": "modules/release/sign.mjs",

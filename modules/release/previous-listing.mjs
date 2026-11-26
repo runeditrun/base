@@ -38,7 +38,7 @@ export function previousListing(source, repository) {
     try { git(source.repo, 'cat-file', '-e', `${tag.commit}^{commit}`); }
     catch { git(source.repo, 'fetch', '--no-tags', '--filter=blob:none', remote, tag.oid); }
     const prior = committedSource(source.repo, tag.commit, { hydrateFrom: remote });
-    previous = listingContent(prior, repository, previous);
+    previous = listingContent(prior, repository, previous, message => console.warn(`Warning: tag ${tag.ref.slice('refs/tags/'.length)}: ${message}; kept as published, its screenshots are not carried forward`));
   }
   return previous;
 }

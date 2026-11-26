@@ -9,6 +9,12 @@ function projectFile(source) {
   return source.entries.has('rer-project.json') ? JSON.parse(source.bytes('rer-project.json')) : {};
 }
 
+function shotSet(source, id, onShotsRefused) {
+  if (!onShotsRefused) return screenshotSet(source, id);
+  try { return screenshotSet(source, id); }
+  catch (error) { onShotsRefused(error.message); return { shots: [], assets: [], identity: null }; }
+}
+
 export function listingRepository(source) {
   const declared = projectFile(source).sourceRepository;
   if (declared) return declared;
@@ -18,7 +24,10 @@ export function listingRepository(source) {
   return `https://github.com/${match[1]}`;
 }
 
-export function listingContent(source, repository, previous = null) {
+// `onShotsRefused` is given only for a historical tag: its published screenshot
+// metadata is immutable, so a failure there is reported and the tag counts as
+// having no pictures of its own. Without it (the release candidate) it refuses.
+export function listingContent(source, repository, previous = null, onShotsRefused = null) {
   const seed = source.seed, slug = repository.replace(/\.git$/, '').split('/').at(-1).toLowerCase().replace(/^run-/, '');
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(seed.id)) throw Error('Invalid listing slug or ID');
   const homepage = seed.homepage ?? `https://run-${slug}.com`;
@@ -41,7 +50,7 @@ export function listingContent(source, repository, previous = null) {
   const branding = source.entries.has('src/branding.json') ? JSON.parse(source.bytes('src/branding.json')) : {};
   const brand = { mark: mark('mark', 'public/brand/mark.svg', 'mark.svg'), markLight: mark('markLight', 'public/brand/mark-light.svg', 'mark-light.svg'),
     colours: { accent: branding.primaryColor ?? null, ink: token('text'), paper: token('page') } };
-  const look = lookFingerprints(source), current = screenshotSet(source, seed.id);
+  const look = lookFingerprints(source), current = shotSet(source, seed.id, onShotsRefused);
   const selected = previous?.listing.shots.length && (previous.listing.look.app === look.app || (current.identity && current.identity === previous.shotIdentity)) ? previous : null;
   const shots = selected ? selected.listing.shots : current.shots;
   assets.push(...(selected ? selected.shotAssets : current.assets));

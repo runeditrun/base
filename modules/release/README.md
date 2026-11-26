@@ -486,7 +486,10 @@ the set because the bundle keeps only each basename. The listing preserves
 Screenshots remain optional for legacy releases. Without screenshots or reused
 history, `shots` is `[]` and `look.shotsAt` is `null`. Missing screenshots and
 stale screenshots are not release gates; malformed declared screenshots fail
-input validation. A free-text screenshot note does not populate this array.
+input validation, but only on the release candidate. A published tag is
+immutable: when its own `RELEASE.json` screenshots fail today's rule, the reader
+prints `Warning: tag <tag>: RELEASE.json screenshots[i].<field> ...` and counts
+that tag as having no pictures of its own. A free-text screenshot note does not populate this array.
 
 For reuse, the producer reads publicly advertised version tags (`vX.Y.Z`, including prereleases) from the
 origin/destination remote, limited to versions at or below the selected version
