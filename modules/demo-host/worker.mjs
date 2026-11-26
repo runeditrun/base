@@ -99,8 +99,9 @@ async function start(request, env, ctx) {
     }
     const id = env.DEMO.newUniqueId(), ends = Date.now() + HOUR;
     const capacity = env.CAPACITY.get(env.CAPACITY.idFromName('capacity'));
-    // A lost handoff occupies a place for at most a minute. The object extends
-    // it to the demo's end only after health and owner admission succeed.
+    // A lost handoff occupies a place for at most a minute. The object renews
+    // it a minute at a time while its start runs, and extends it to the demo's
+    // end only after health and owner admission succeed.
     if (!await bounded(capacity.acquire(id.toString(), Date.now() + 60_000, Number(env.DEMO_MAX_INSTANCES), correlation), 2000)) {
       return refuse(503, 'Every demo is in use right now. Try again in a few minutes.');
     }
