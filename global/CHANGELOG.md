@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.143
+
+Signed: Run Edit Run fleet, 2026-11-27.
+
+### D1 pre-check
+
+- The D1 limit pre-check no longer reads a CTE materialization hint as a function call. `WITH part0 AS MATERIALIZED (SELECT ...)` and `AS NOT MATERIALIZED (...)` counted the subquery's select columns as function arguments, so a migration with a wide CTE (Nook's `0071_admin_audit.sql`, 37 columns) was refused with "SQL function arguments maximum 32, measured 37" although D1 accepts it. A real function call with more than 32 arguments is still refused.
+
 ## 0.2.142
 
 Signed: Run Edit Run fleet, 2026-11-26.
