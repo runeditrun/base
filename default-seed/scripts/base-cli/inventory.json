@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.136-dev.ge4392246",
+  "cliVersion": "0.2.136-dev.g785a29be",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -4187,7 +4187,7 @@
     },
     "modules/mail/README.md": {
       "source": "modules/mail/README.md",
-      "sha256": "00154803c5caf2fa952b4b1a26f849dc44fd9fbbc23db18a5715eb592f63fef9"
+      "sha256": "43f04ee71fb003affbe706640ef60d8a716ba48827a6eec1adfa1ec60145f3b0"
     },
     "modules/mail/doctor.mjs": {
       "source": "modules/mail/doctor.mjs",
@@ -4195,7 +4195,7 @@
     },
     "modules/mail/index.mjs": {
       "source": "modules/mail/index.mjs",
-      "sha256": "c0501b55f9ba53796926bed1abb22c8690ad2a66b03e09407a84a632c5a4a0c0"
+      "sha256": "1828d6ddff3456c49114498b722ae884da1736f6181858c1607568bf8b659bd0"
     },
     "modules/mail/live-proof/README.md": {
       "source": "modules/mail/live-proof/README.md",
@@ -4268,6 +4268,10 @@
     "modules/mail/src/adapters/rer/list-headers.mjs": {
       "source": "modules/mail/src/adapters/rer/list-headers.mjs",
       "sha256": "2ee80e4fa4e9185efebc5ce02fca2f777dfce7b423f31d6a1ede5a19f411195b"
+    },
+    "modules/mail/src/adapters/rer/owner.mjs": {
+      "source": "modules/mail/src/adapters/rer/owner.mjs",
+      "sha256": "2bc6966d74ea883f7b5f42616e8ec932f4166b1367d4c778e93b14b47dcfe6de"
     },
     "modules/mail/src/adapters/resend/README.md": {
       "source": "modules/mail/src/adapters/resend/README.md",
