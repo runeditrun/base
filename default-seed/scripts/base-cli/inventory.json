@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cliVersion": "0.2.138-dev.g321ba96f",
+  "cliVersion": "0.2.138-dev.g7d8c1203",
   "onboarding": "../base-onboarding",
   "onboardingFiles": {
     "README.md": {
@@ -885,9 +885,13 @@
       "source": "cli/deploy-installation-key.mjs",
       "sha256": "0f7dc0d733c59cfb812d10a620f34b1765401ffad72eabea97e4f07fc3a8ef04"
     },
+    "cli/deploy-mail-record.mjs": {
+      "source": "cli/deploy-mail-record.mjs",
+      "sha256": "8c1fd747d2ac11844d4b8ae340fedc4e6442b76ac1d725a731e08827e484df48"
+    },
     "cli/deploy-mail-sender.mjs": {
       "source": "cli/deploy-mail-sender.mjs",
-      "sha256": "cde69912db0fe8f25676ce62b7af97cf11a85124dcabf8c65da9be30597dfa79"
+      "sha256": "8be3949466c37bcd4eaeba9780835051cd23c829e30eb4a1b723e471f4d06929"
     },
     "cli/deploy-needs.mjs": {
       "source": "cli/deploy-needs.mjs",
@@ -947,7 +951,7 @@
     },
     "cli/deploy.mjs": {
       "source": "cli/deploy.mjs",
-      "sha256": "0bc7095a9a91abde22b2f2099462022560c06a5cd88769aa4433efc578bd9155"
+      "sha256": "f1bf7422d0cc2aa902bd7fc10f4540fdd14b2706d8e2824e4f3be4cf3f788ae5"
     },
     "cli/deployment-record.mjs": {
       "source": "cli/deployment-record.mjs",

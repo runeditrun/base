@@ -1,6 +1,7 @@
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { publicOrigin } from '../modules/deploy-kit/public-origin.mjs';
 import { hookState } from './deploy-hook-record.mjs';
+import { mailBusiness, rememberMailBusiness } from './deploy-mail-record.mjs';
 import { cloudflareCredentials } from './deploy-needs.mjs';
 import { loadState, deviceCredentialHandle } from './business/state.mjs';
 import { createCredentialStore } from './business/keychain.mjs';
@@ -43,6 +44,8 @@ export async function deployMailSender({ root, declaration, declarationPath, env
  const holdsKey = liveSecrets.includes('MAIL_API_KEY');
  if (holdsKey && !RELAY.every(binding => liveSecrets.includes(binding))) return;
  const business = await loadState();
+ // A key another Business issued is not dead because this computer is connected to a different one now.
+ if (holdsKey && business?.businessId) { const issuer = await mailBusiness(root, environment); if (issuer && issuer !== business.businessId) return; }
  const credential = business?.origin && business.businessId && business.executorId && !business.revoked ? await createCredentialStore().get(deviceCredentialHandle(business)) : undefined;
  // A Worker holding a sender stays as it is unless the Business says that sender is gone (below).
  if (holdsKey && !credential) return;
@@ -67,12 +70,14 @@ export async function deployMailSender({ root, declaration, declarationPath, env
  // The platform keys a sender by tool alone and a new one replaces the old: never replace a live sender that belongs to another address.
  const norm = value => String(value ?? '').trim().replace(/\s+/g, ' ');
  const live = Array.isArray(handover?.structuredContent?.mail_senders) ? handover.structuredContent.mail_senders.find(item => norm(item?.tool) === norm(tool)) : undefined;
- const elsewhere = live && live.address !== new URL(address).origin;
+ // The Worker's own sender may be at its workers.dev origin or at the public origin it moved to: the relay does not check the address.
+ const mine = new Set([address, origin].filter(Boolean).map(value => new URL(value).origin));
+ const elsewhere = live && !mine.has(live.address);
  if (holdsKey) {
   // The Worker's key works while the Business lists a live sender for this tool at this address. Otherwise it is dead
   // (the computer was disconnected or the sender revoked) and gets a new one, unless that would stop another Worker's.
   if (handover?.isError || !Array.isArray(handover?.structuredContent?.mail_senders) || live && !elsewhere) return;
-  if (elsewhere) { report(`Mail: this Worker's relay key is no longer live, and ${tool} has a live sender for ${live.address}, which a new one would stop. Revoke it with ${businessCommand(`call mail.sender.revoke --tool "${tool}"`)} or deploy this copy under another --environment, then deploy again.`); return; }
+  if (elsewhere) return { off: `this Worker's relay key is no longer live and ${tool} has a live sender for ${live.address}, which a new one would stop. Revoke it with ${businessCommand(`call mail.sender.revoke --tool "${tool}"`)} or deploy this copy under another --environment, then deploy again` };
  }
  if (handover?.isError || typeof verified !== 'string') return { off: refused(handover, 'the Business owner has no verified email address') };
  if (ownerEmail !== undefined && (!present(ownerEmail) || ownerEmail.trim().toLowerCase() !== verified.trim().toLowerCase())) return { off: `this app's owner email is not the Business owner's verified address, the only one Run Edit Run's relay mails. Set OWNER_EMAIL to that address and deploy again` };
@@ -87,6 +92,7 @@ export async function deployMailSender({ root, declaration, declarationPath, env
  if (answer?.isError || sender?.settings?.MAIL_PROVIDER !== 'rer' || !present(sender.secret?.MAIL_API_KEY)) return { off: refused(answer, 'the Business gave no sender') };
  const given = { ...sender.settings, MAIL_API_KEY: sender.secret.MAIL_API_KEY };
  addSecret(given.MAIL_API_KEY);
+ await rememberMailBusiness(root, environment, business.businessId);
  report(`Mail: ${tool} sends through Run Edit Run's relay, to the Business owner's verified address only. Its key goes to this Worker's MAIL_API_KEY secret and nowhere else.`);
  return { values: Object.fromEntries(relay.map(item => [item.environment, given[item.binding]])), replace: RELAY.filter(binding => liveSecrets.includes(binding)), tool, settings: sender.settings };
 }

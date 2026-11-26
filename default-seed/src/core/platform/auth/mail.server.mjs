@@ -23,13 +23,16 @@ export function ownerOnlyMail(env) {
   return env.MAIL_PROVIDER === 'rer' && env.RER_DEMO !== '1' && !localDevelopmentEnabled(env)
 }
 
+// The address the relay mails; an unreadable owner admits no one.
+export function relayOwnerEmail(env) {
+  try { return parseAddress(env.OWNER_EMAIL).email.toLowerCase() } catch { return null }
+}
+
 // On the relay a non-owner address is answered like an unknown one: no link, no
 // send, so the public response does not reveal who is a teammate.
 export function operatorMailHooks(env) {
   if (!ownerOnlyMail(env)) return {}
-  // The same comparison the relay sender makes; an unreadable owner admits no one.
-  const owner = () => { try { return parseAddress(env.OWNER_EMAIL).email.toLowerCase() } catch { return null } }
-  return { beforeMagicLink: ({ email }) => email === owner() }
+  return { beforeMagicLink: ({ email }) => email === relayOwnerEmail(env) }
 }
 
 // Construct only on a send: first-owner setup never depends on mail credentials.

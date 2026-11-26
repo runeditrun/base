@@ -1,18 +1,32 @@
 import { AuthError, createAuthHandler, createSignInHandler, securityHeaders } from '../../../../modules/operator-auth/index.mjs'
 import type { Bindings } from '../platform/bindings.server'
 import { operatorAuth } from '../platform/auth/session.server'
-import { ownerOnlyMail } from '../platform/auth/mail.server.mjs'
+import { ownerOnlyMail, relayOwnerEmail } from '../platform/auth/mail.server.mjs'
 import { signinPresentation } from '../platform/auth/signin-options.server.mjs'
 import { fontDocumentResponse } from '../../../../foundation/runtime/font-response'
 
 export async function authResponse(request: Request, bindings: Bindings, waitUntil?: (promise: Promise<unknown>) => void): Promise<Response> {
   try {
-    return await fontDocumentResponse(await createAuthHandler(operatorAuth(bindings, waitUntil))(request)) ?? new Response('Not found', { status: 404 })
+    const auth = operatorAuth(bindings, waitUntil)
+    await refuseTeammateMail(request, bindings, auth)
+    return await fontDocumentResponse(await createAuthHandler(auth)(request)) ?? new Response('Not found', { status: 404 })
   } catch (error) {
     const known = error instanceof AuthError
     return Response.json({ error: known ? error.code : 'auth_unavailable' }, {
       status: known ? error.status : 503, headers: securityHeaders(),
     })
+  }
+}
+
+// On the Business relay only the owner receives mail: an invitation, or a step-up link for a teammate, would be
+// rejected at the relay and answer 503 mail_unavailable. Refuse them here with a code that says why.
+async function refuseTeammateMail(request: Request, bindings: Bindings, auth: ReturnType<typeof operatorAuth>) {
+  if (request.method !== 'POST' || !ownerOnlyMail(bindings)) return
+  const path = new URL(request.url).pathname
+  if (path === '/auth/invite') throw new AuthError('teammate_mail_off', 403)
+  if (path === '/auth/step-up') {
+    const session = await auth.getSession(request)
+    if (session && session.operator.email.toLowerCase() !== relayOwnerEmail(bindings)) throw new AuthError('teammate_mail_off', 403)
   }
 }
 
