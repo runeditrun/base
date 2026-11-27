@@ -24,6 +24,7 @@ test('a Business token is refused before a policy envelope binds the Business, a
  assert.deepEqual(bound.result.tools, [])
  assert.equal(await pull(), 200)
  // An install with no settings row was never paired: a missing row is a stopped Business, not a running one.
+ // The token also loses its subject mapping (owner_id lives in that row); the signed relay pull proves the stop reader.
  await r.db.prepare('DELETE FROM bs_settings').run()
  const unpaired = await listed()
  assert.equal(unpaired.status, 401)

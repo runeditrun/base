@@ -230,6 +230,7 @@ Business owner is owner, Business team admin is editor, member has no policy
 role. The native role may differ. A custom adapter must expose `businessStopped()` according to the
 [Business stop contract](README.md#wire-and-authority): the shared runtime uses that one
 positive-false rule for token admission, Business references, held calls and relay pulls.
+Absent paired state is a stop: a reader that finds no settings record must return `true`, never `false`.
 Adopt the runtime update without a migration; `operatorAuthPeople` already supplies the reader.
 Keep `sponsor()` resolving subjects after a stop so signed policy naming Business people is still adopted.
 Local credentials return `sponsor: { id }`,
