@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.144
+
+Signed: Run Edit Run fleet, 2026-11-27.
+
+### Agent door sign-in
+
+- `operatorAuthPeople`'s `businessStopped()` answers `false` only for a present `bs_settings` singleton with `stopped=0`. Before, a missing row read as running, so an install that was never paired admitted Business authority: a signed relay pull on an install with an adopted envelope but no settings row was served the decision feed. A missing row now counts as stopped, as an explicit stop does. Custom `businessStopped()` readers must do the same: absent paired state returns `true` (ADOPTING.md).
+- A Business token is refused with 401 until a signed policy envelope binds the installation's Business. Before, the door compared the token's `business` claim only once an envelope existed, so before the first envelope a validly signed token naming any Business was admitted (to discovery and initialize; tools and calls answered `policy_unset`). Business should adopt an envelope, a `document: null` one if no policy is drafted yet, before its agents connect; until then their tokens get 401.
+- Conformance adds `BASE-AGENT-004.8.unbound` (CLAUSES BASE-AGENT-004 acceptance 8): a Business token before the first envelope gets 401, then the run binds the Business with a `document: null` envelope before discovery. A seed whose vendored door predates this release fails that point until it takes 0.2.144's `credentials.ts`.
+
 ## 0.2.143
 
 Signed: Run Edit Run fleet, 2026-11-27.
