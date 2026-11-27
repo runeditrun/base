@@ -22,7 +22,7 @@ export async function relayPhase(c) {
  for (let count = 0; ; count++) {
   const shaped = keys(page, ['cursor','decisions','head','more']) && Array.isArray(page.decisions) && page.decisions.length <= 200 &&
    Number.isSafeInteger(page.head) && page.head >= 0 && Number.isSafeInteger(page.cursor) && page.cursor >= after &&
-   page.cursor === (page.decisions.at(-1)?.seq ?? after) && page.more === (page.cursor < page.head) &&
+   page.cursor >= (page.decisions.at(-1)?.seq ?? after) && page.more === (page.cursor < page.head) &&
    Buffer.byteLength(JSON.stringify(page)) <= 65536 && page.decisions.every((row, index, rows) =>
     keys(row, row.erased === true ? erasedKeys : liveKeys) && Number.isSafeInteger(row.seq) && row.seq > (rows[index-1]?.seq ?? after));
   c.add(`BASE-AGENT-009.relay.page.${count}`, shaped, 'Decision page must be closed, ordered, bounded and carry its exact cursor and head.');

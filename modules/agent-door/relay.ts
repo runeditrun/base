@@ -82,7 +82,10 @@ export async function relayDecisions(rt: Runtime, request: Request): Promise<Res
   const head = records[0]!.head, decisions: ReturnType<typeof project>[] = []
   let cursor = Number(value.after), decisionBytes = 0
   for (const record of records) {
-    if (record.sequence === null || record.row === null) continue
+    if (record.sequence === null) continue
+    // A relay row whose audit row is gone (a restore that archived the audit) has nothing to serve but was
+    // scanned: pass it, or a page of them leaves the cursor still and `more` true forever.
+    if (record.row === null) { cursor = record.sequence; continue }
     const decision = project(record, now)
     const bytes = encoder.encode(JSON.stringify(decision)).byteLength
     // An empty envelope includes the brackets; each preceding decision adds one
