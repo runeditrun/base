@@ -7,14 +7,14 @@ import { createProtocol } from './protocol.mjs';
 import { autonomousPolicy, heldPolicy } from './crypto.mjs';
 import { discoverDoor, listedDoor } from './discovery.mjs';
 import { runJourney } from './journey.mjs';
-import { unsetPolicy, removalPhase, blockedPhases, pausePhase, consentRevocationPhase, agentRevocationPhase } from './policy-phases.mjs';
+import { unboundPhase, unsetPolicy, removalPhase, blockedPhases, pausePhase, consentRevocationPhase, agentRevocationPhase } from './policy-phases.mjs';
 import { unpairPhase } from './unpair.mjs';
 import { negativePhase } from './negative.mjs';
 import { replayAdmissionPhase } from './replay.mjs';
 import { webhookPhase } from './webhooks.mjs';
 import { recordSecurityPhase } from './security.mjs';
 import { crossSponsorPhase } from './sponsors.mjs';
-import { auditPhase, auditRows } from './audit.mjs';
+import { auditPhase } from './audit.mjs';
 import { relayPhase, relayStoppedPhase } from './relay.mjs';
 import { invocationPhase } from './invocation.mjs';
 
@@ -35,12 +35,9 @@ export async function runAgentDoorConformance({ fetch, invoke, origin, surface, 
    return { ok: false, points, capabilities };
   }
  }
+ await c.phase('BASE-AGENT-004.8', () => unboundPhase(c));
  await c.phase('BASE-AGENT-001.transport', () => discoverDoor(c));
- await c.phase('BASE-AGENT-007.phase0', async () => {
-  await unsetPolicy(c, true);
-  // No Business envelope existed for these audits, so they cannot be relayed.
-  c.unattributedAuditIds = new Set((await auditRows(c, { agents: [null], includeFixtures: true })).rows.map(row => row.id));
- });
+ await c.phase('BASE-AGENT-007.phase0', () => unsetPolicy(c, true));
  await c.phase('BASE-AGENT-007.phase1', () => removalPhase(c));
  await c.phase('BASE-AGENT-013.phase2', async () => { await c.adopt(autonomousPolicy()); await c.prepare('autonomous'); await listedDoor(c); await runJourney(c, 'autonomous', { injections: true, replay: true }); });
  await c.phase('BASE-AGENT-013.phase3', async () => { await c.prepare('held'); await c.adopt(heldPolicy()); await runJourney(c, 'held', { held: true }); });

@@ -317,16 +317,12 @@ test('CASE END distinguishes keyword identifiers from the expression terminator'
   assert.equal(db.prepare('SELECT value FROM audit').get().value, 3);
 });
 
-test('END after OVER names a window and cannot close an unfinished CASE', t => {
-  const db = database(t);
-  const sql = `CREATE TABLE source(value);
+test('END after OVER names a window: it cannot close an unfinished CASE, and with its own CASE terminator it executes', t => {
+  const unfinished = `CREATE TABLE source(value);
     CREATE TRIGGER tr AFTER INSERT ON source
       BEGIN SELECT CASE WHEN 1 THEN count(*) OVER end; END;`;
-  assert.throws(() => db.exec(sql), /near ";": syntax error/);
-  assert.throws(() => validate(sql), /unsafe-migration-control/);
-});
-
-test('a named END window and its separate CASE terminator execute in a trigger', t => {
+  assert.throws(() => database(t).exec(unfinished), /near ";": syntax error/);
+  assert.throws(() => validate(unfinished), /unsafe-migration-control/);
   const db = database(t);
   const query = 'SELECT CASE WHEN 1 THEN count(*) OVER end END WINDOW end AS ()';
   const sql = `CREATE TABLE source(value);

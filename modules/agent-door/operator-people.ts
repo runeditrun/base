@@ -12,7 +12,7 @@ export function operatorAuthPeople(options: { db: D1Database; allowList?: string
   const owner = () => options.db.prepare(`SELECT o.id FROM oa_operators o LEFT JOIN oa_bootstrap b ON b.claim_id=o.id
     WHERE o.role='owner' ORDER BY b.claim_id IS NULL,o.created_at,o.id LIMIT 1`).first<{ id: string }>()
   const ownerId = async () => (await options.db.prepare('SELECT owner_id FROM bs_settings WHERE singleton=1').first<{ owner_id: string | null }>())?.owner_id ?? null
-  const stopped = async () => !!await options.db.prepare('SELECT 1 FROM bs_settings WHERE singleton=1 AND stopped=1').first()
+  const stopped = async () => (await options.db.prepare('SELECT stopped FROM bs_settings WHERE singleton=1').first<{ stopped: number }>())?.stopped !== 0
   return {
     person: read,
     businessStopped: stopped,

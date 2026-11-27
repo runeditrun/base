@@ -83,7 +83,8 @@ export async function authenticate(
         !record(claims.act) || !nonempty(claims.act.sub) || !nonempty(claims.act.name) ||
         (claims.act.specialist !== undefined && claims.act.specialist !== null && !nonempty(claims.act.specialist)) ||
         !nonempty(claims.client_id) || !nonempty(claims.business) || !nonempty(claims.jti) ||
-        (business !== null && claims.business !== business) || typeof claims.scope !== 'string' ||
+        // Until a signed policy envelope binds this installation's Business, no Business token is admitted.
+        business === null || claims.business !== business || typeof claims.scope !== 'string' ||
         (claims.scope !== '' && !/^[\x21-\x7e]+(?: [\x21-\x7e]+)*$/.test(claims.scope)) ||
         !Number.isFinite(now) || typeof claims.iat !== 'number' || !Number.isFinite(claims.iat) ||
         typeof claims.exp !== 'number' || !Number.isFinite(claims.exp) || claims.iat > now + 30 ||

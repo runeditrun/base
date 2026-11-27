@@ -85,6 +85,7 @@ This clarification does not promote any clause judgment.
 5. A token in a query string is refused and not logged.
 6. Revoking consent in the seed or in Business refuses the next call within 60 seconds.
 7. After unpairing, Business tokens are refused and the seed's own sign-in still works.
+8. Before a signed policy envelope binds the installation's Business, or while no paired settings record shows that Business running, a Business token returns 401.
 
 #### BASE-AGENT-005 — An agent acts as a person in a role, never more
 

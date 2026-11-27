@@ -100,7 +100,11 @@ never gave a local credential one), so such an approval ends with its Business t
 `sponsor` refs, seed credentials, native sessions and embedded invocations are unchanged, and the subject mapping
 stays, so a validly signed envelope that names Business people is still adopted and its Pause and revoked lists apply.
 `PeopleAdapter.businessStopped()` is required; `operatorAuthPeople` reads `bs_settings.stopped`,
-including in Base's maintained seed. Business token admission, `person:`/`role:` reference resolution,
+including in Base's maintained seed, and answers `false` only for a present singleton row with `stopped=0`
+(an install with no settings row has never been paired and counts as stopped). A Business token is also
+refused with 401 until a signed policy envelope binds this installation's Business: before the first
+envelope there is no Business to compare the token's `business` claim with. Business should adopt an
+envelope (a `document: null` one leaves the policy unset) before its agents connect. Business token admission, `person:`/`role:` reference resolution,
 held Business calls and signed decision-relay pulls require this reader to positively return `false`.
 A missing or non-function method, thrown or rejected read, `true`, `undefined` or any nonboolean answer
 uses the same refusal as a stopped Business: token admission returns 401, references match nobody,

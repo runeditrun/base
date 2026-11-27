@@ -5,7 +5,17 @@ import { accessToken, autonomousPolicy, policyEnvelope, signJws, seconds } from 
 import { errorCode } from './protocol.mjs';
 import { nativeStepHook } from './step-hooks.mjs';
 import { erasedStep } from './erasure.mjs';
+import { auditRows } from './audit-rows.mjs';
 
+/** Before any signed envelope names this installation's Business, a Business token is refused; then bind it with no policy. */
+export async function unboundPhase(c) {
+ const listed = await c.mcp('tools/list');
+ c.add('BASE-AGENT-004.8.unbound', listed.status === 401 && /resource_metadata=/.test(listed.headers.get('www-authenticate') ?? ''),
+  'A Business token before the first signed policy envelope must receive 401: no Business is bound to compare its business claim with.');
+ // No Business envelope existed for these audits, so they cannot be relayed.
+ c.unattributedAuditIds = new Set((await auditRows(c, { agents: [null], includeFixtures: true })).rows.map(row => row.id));
+ await c.adopt(null);
+}
 export async function unsetPolicy(c, initial = false) {
  const listed = await c.mcp('tools/list');
  c.add(`BASE-AGENT-007.2.${initial ? 'initial' : 'removed'}.list`, isDeepStrictEqual(listed.result?.tools, []), 'An unanswered door must list no tools.');
