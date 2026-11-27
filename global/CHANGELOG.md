@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.146
+
+Signed: Run Edit Run fleet, 2026-11-27.
+
+### Cloudflare Worker deploy and sign-in mail
+
+- `rer deploy` refuses a `MAIL_PROVIDER` that resolves blank. Before, with a provider declared in packaging plus a valid `MAIL_FROM` and `MAIL_API_KEY`, the sign-in preflight passed when `MAIL_PROVIDER`'s public default was `""` or a blank value was supplied, and deploy-kit then bound that blank value, so the Worker had no sender and sign-in mail went nowhere. A real deploy now stops with exit 4 before anything is built or uploaded, names `MAIL_PROVIDER` and the accepted values (resend, sendgrid, cloudflare or rer, and none for a seed that declares a sign-in without mail), and says where to set it. A dry run lists it under "Needed for a real deploy".
+- The preflight judges the value deploy-kit binds, through deploy-kit's own per-secret rule (`secretBinding`: held, supplied, public default, or nothing), so a Worker that already holds `MAIL_PROVIDER` keeps it and its redeploy is not refused. Explicit `none`, real providers, held mail secrets, the relay sender and Auth SSO are unchanged.
+
 ## 0.2.145
 
 Signed: Run Edit Run fleet, 2026-11-27.
