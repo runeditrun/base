@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.145
+
+Signed: Run Edit Run fleet, 2026-11-27.
+
+### Agent door relay
+
+- A signed decision pull moves its cursor past every relay row it scanned, including rows whose audit row no longer exists. After a rollback restore (the audit is archived, the relay table is kept) such rows remained, and once `limit` of them sat after the cursor every pull answered `decisions: []` with the same cursor and `more: true` forever. A page of them now moves the cursor, and `more` is true only while rows remain. Which Business's rows are served and the projection are unchanged. A seed that copied `agent-door/relay.ts` takes the fixed file at its next need.
+- Conformance `BASE-AGENT-009.relay.page` accepts a page whose `cursor` is past its last decision's `seq`, which is what such a page now returns; it still requires `cursor >= after`, `more === (cursor < head)` and ordered decisions.
+
 ## 0.2.144
 
 Signed: Run Edit Run fleet, 2026-11-27.
