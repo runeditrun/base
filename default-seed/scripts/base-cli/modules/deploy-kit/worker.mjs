@@ -42,14 +42,23 @@ export function durableMigration(namespaces, current) {
   const old = current?.settings.migration_tag ?? '';
   return {old_tag:old,new_tag:`rer-${hash({old,classes:missing.map(x => x.className)}).slice(0,24)}`,new_sqlite_classes:missing.map(x => x.className)};
 }
+const supplied = (item, env) => typeof env[item.environment] === 'string' && Boolean(env[item.environment].trim());
+// What a deploy binds for one declared secret: the secret the Worker already holds, the supplied value,
+// an unset optional secret's public default, or nothing. The sign-in preflight reads MAIL_PROVIDER
+// through this same rule (cli/production-mail.mjs), so it judges the value this deploy will bind.
+export function secretBinding(item, env, held = []) {
+  if (held.includes(item.binding)) return {type:'inherit',name:item.binding};
+  if (supplied(item, env)) return {type:'secret_text',name:item.binding,text:env[item.environment]};
+  if (item.optional && item.publicDefault !== undefined) return {type:'plain_text',name:item.binding,text:item.publicDefault};
+  return undefined;
+}
 export async function secretBindings(api, worker, plan, env, exists) {
   const present = exists ? await api.request(`/workers/scripts/${worker}/secrets`) : [];
   assert(Array.isArray(present) && present.every(x => typeof x.name === 'string' && x.type === 'secret_text'),'invalid-secret-list');
   const bindings = []; const names = present.map(x => x.name);
-  const supplied = item => typeof env[item.environment] === 'string' && env[item.environment].trim();
   // An optional secret neither held nor supplied stays unbound; the app treats it as not connected.
-  const unset = plan.secrets.filter(item => item.optional && !names.includes(item.binding) && !supplied(item)).map(item => item.binding);
-  const missingSecrets = plan.secrets.filter(item => !item.optional && !names.includes(item.binding) && !supplied(item))
+  const unset = plan.secrets.filter(item => item.optional && !names.includes(item.binding) && !supplied(item, env)).map(item => item.binding);
+  const missingSecrets = plan.secrets.filter(item => !item.optional && !names.includes(item.binding) && !supplied(item, env))
     .map(({binding,environment}) => ({binding,environment}));
   if (missingSecrets.length) {
     const error = new Error(`missing-secret-${missingSecrets[0].environment}`);
@@ -57,11 +66,8 @@ export async function secretBindings(api, worker, plan, env, exists) {
     throw error;
   }
   for (const item of plan.secrets) {
-    if (names.includes(item.binding)) bindings.push({type:'inherit',name:item.binding});
-    else if (unset.includes(item.binding) && item.publicDefault !== undefined) bindings.push({type:'plain_text',name:item.binding,text:item.publicDefault});
-    else if (!unset.includes(item.binding)) {
-      bindings.push({type:'secret_text',name:item.binding,text:env[item.environment]});
-    }
+    const binding = secretBinding(item, env, names);
+    if (binding) bindings.push(binding);
   }
   return {bindings,names,unset,missing:plan.secrets.filter(x => !names.includes(x.binding) && !unset.includes(x.binding)).map(x => x.binding)};
 }

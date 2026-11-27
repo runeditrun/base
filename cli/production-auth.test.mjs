@@ -283,4 +283,18 @@ export const commandAdapter = {...seed${signIn ? `, mailOffSignIn: ${JSON.string
  await env('MAIL_PROVIDER=none\nMAIL_API_KEY=test-only-mail-credential\n');
  const conflict = await refusal();
  assert.match(conflict, /MAIL_PROVIDER=none/); assert.match(conflict, /MAIL_API_KEY/); assert.ok(!conflict.includes('test-only-mail-credential'));
+ // A MAIL_PROVIDER that resolves blank, by default or supplied, is what the deploy would bind: a Worker with no sender.
+ // It is refused even with a declared provider, a valid sender and a key; an explicit provider still passes.
+ const declarationPath = join(seed.root, 'deploy.json'), declaration = JSON.parse(await readFile(declarationPath, 'utf8'));
+ await writeFile(declarationPath, JSON.stringify({ ...declaration, vars: { ...declaration.vars, MAIL_PROVIDER: '' } }));
+ await writeFile(join(seed.root, 'rer-packaging.json'), JSON.stringify({ artifact: { specInputs: { mail: { providers: ['resend'] } } } }));
+ const mail = `MAIL_FROM=${productionSender}\nMAIL_API_KEY=test-only-mail-credential\n`;
+ for (const values of [mail, `MAIL_PROVIDER=\n${mail}`]) {
+  await env(values);
+  const blank = await refusal();
+  assert.match(blank, /MAIL_PROVIDER resolves to a blank value/); assert.match(blank, /resend, sendgrid, cloudflare or rer, or none/);
+  assert.ok(!blank.includes('test-only-mail-credential'));
+ }
+ await env(`MAIL_PROVIDER=resend\n${mail}`);
+ assert.match(await refusal(), /not committed/);
 });

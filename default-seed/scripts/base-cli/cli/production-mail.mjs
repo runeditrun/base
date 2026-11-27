@@ -7,6 +7,8 @@ import { mailCredentialSecretNames } from '../modules/delivery-producer/declarat
 import { validateRerConfig } from '../modules/mail/src/adapters/rer/contract.mjs';
 import { validateMailSenders } from '../modules/delivery-producer/mail.mjs';
 import { sourceMailSenders } from './deploy-variables.mjs';
+import { switchableDefaults } from './deploy-settings.mjs';
+import { secretBinding } from '../modules/deploy-kit/worker.mjs';
 
 const providers = ['resend', 'sendgrid', 'cloudflare', 'rer'];
 // Bindings that can send mail. MAIL_PROVIDER=none contradicts every one of them.
@@ -31,6 +33,8 @@ const placeholderSender = value => {
 };
 
 export const realSender = value => sender(value) && !placeholderSender(value);
+// The MAIL_PROVIDER values a deploy accepts, with `none` only for a seed that signs its owner in without mail.
+export const providerChoices = mailOffSignIn => `${providers.slice(0, -1).join(', ')} or ${providers.at(-1)}${mailOffSignIn ? ', or none to turn outbound email off' : ''}`;
 export const senderProblem = `MAIL_FROM is invalid or a placeholder sender. Replace it with a real sender address on your mail provider's verified domain (a bare address or Display Name <address>).`;
 
 // A seed that signs its owner in without mail declares the command on its adapter
@@ -107,6 +111,17 @@ export async function productionMail(root, declaration, env, declarationPath = '
  // A declared MAIL_FROM secret the person did not supply may already be bound on the Worker: a redeploy needs no private file for it.
  const senderBoundLive = secrets.has('MAIL_FROM') && !present(bindings.MAIL_FROM);
  const provider = bindings.MAIL_PROVIDER;
+ // The MAIL_PROVIDER this deploy binds, by deploy-kit's own rule (secretBinding over the plan's item): a held
+ // secret is inherited, a supplied value is sent, an unset switchable setting binds its public default, and an
+ // undeclared one stays a plain var. Blank means the Worker gets no sender, unless the Worker holds one (`live`).
+ const providerSecret = (declaration.secrets ?? []).find(item => item?.binding === 'MAIL_PROVIDER');
+ const publicDefaults = providerSecret ? await switchableDefaults(declaration) : {};
+ const providerItem = providerSecret && { ...providerSecret, ...(Object.hasOwn(publicDefaults, 'MAIL_PROVIDER') ? { publicDefault: publicDefaults.MAIL_PROVIDER } : {}) };
+ const blankProvider = (live = []) => {
+  const bound = providerItem && secretBinding(providerItem, env, live);
+  const value = bound ? bound.text : declaration.vars?.MAIL_PROVIDER;
+  return bound?.type !== 'inherit' && typeof value === 'string' && !value.trim();
+ };
  const deferred = !provider || provider === 'later';
  const choices = new Set(declaredProviders);
  if (deferred) for (const [name, key] of Object.entries(nativeCredential)) if (secrets.has(key)) choices.add(name);
@@ -138,6 +153,9 @@ export async function productionMail(root, declaration, env, declarationPath = '
  return {
   off,
   credentialNames,
+  blankProvider,
+  providerHeldPossible: Boolean(providerSecret),
+  providerEnvironment: providerSecret?.environment,
   offConflicts: off ? sendingBindings.filter(key => present(bindings[key])) : [],
   declared: 'MAIL_PROVIDER' in bindings || publicInputs.has('MAIL_PROVIDER') || secrets.has('MAIL_API_KEY') || selected.length > 0,
   senderIssue,
@@ -145,7 +163,7 @@ export async function productionMail(root, declaration, env, declarationPath = '
   configured: (live = []) => routes.some(missing => missing(live).length === 0),
   canInspect: (sender(bindings.MAIL_FROM) || senderBoundLive) && !senderIssue && routes.length > 0,
   missing: routes.length ? routes.map(missing => missing([]).join(', ')).join(' or ') : [
-   'MAIL_PROVIDER (resend, sendgrid, cloudflare or rer)',
+   `MAIL_PROVIDER (${providerChoices()})`,
    ...(!sender(bindings.MAIL_FROM) || senderIssue ? [senderIssue ?? SENDER] : []),
    'MAIL_API_KEY',
   ].join(', '),

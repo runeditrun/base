@@ -3,7 +3,7 @@ import { refuse } from './errors.mjs';
 import { main as owner } from '../modules/deploy-kit/owner-cli.mjs';
 import { hookState } from './deploy-hook-record.mjs';
 import { savedSetupAnswers } from './setup-answers.mjs';
-import { productionMail, mailOffSignInCommand } from './production-mail.mjs';
+import { productionMail, mailOffSignInCommand, providerChoices } from './production-mail.mjs';
 
 // What a deploy says when outbound email is deliberately off: the state and the way in. A seed that
 // declares its mail credential secrets (`mail.credentialSecretNames`) gets this line only when it is
@@ -35,17 +35,24 @@ export async function requireProductionAuth({ root, declaration, env, setupManif
   if (mail.offConflicts.length) throw refuse(`MAIL_PROVIDER=none turns outbound email off, and ${mail.offConflicts.join(', ')} would bind a way to send. Remove ${mail.offConflicts.length > 1 ? 'them' : 'it'} or choose a mail provider. Nothing was built or uploaded.`);
   return { mailOff: { signIn: mailOffSignIn, credentialNames: mail.credentialNames } };
  }
- if (mail.senderIssue && options.verb === 'deploy' && !(options.dryRun && mail.fixtureSender)) throw refuse(`${mail.senderIssue} Nothing was built or uploaded.`);
- if (mail.configured()) return;
- if (mail.canInspect && !options.dryRun && declarationPath) {
+ // The secret names this environment's Worker holds, read once; a first deploy holds none.
+ let held;
+ const liveSecrets = async () => held ??= await (async () => {
   try {
    const state = await hookState(root, options.environment ?? 'production');
-   const existing = await owner(['inspect', '--declaration', declarationPath, '--environment', options.environment ?? 'production', ...(state ? ['--state', state] : [])], env, { cwd: root, localOnlyKeys: adapter?.localOnlyKeys });
-   if (mail.configured(existing.liveSecrets)) return;
+   return (await owner(['inspect', '--declaration', declarationPath, '--environment', options.environment ?? 'production', ...(state ? ['--state', state] : [])], env, { cwd: root, localOnlyKeys: adapter?.localOnlyKeys })).liveSecrets;
   } catch (error) {
    if (!['missing-owner-receipt', 'missing-input'].includes(error.message)) throw refuse(`Production sign-in could not verify the existing deployment and its mail secrets${/^[a-z][a-z0-9-]{0,80}$/.test(error.message)?` (${error.message})`:''}. Restore provider access and the owned deployment record before retrying.`);
+   return [];
   }
- }
+ })();
+ const canReadLive = !options.dryRun && declarationPath;
+ if (mail.senderIssue && options.verb === 'deploy' && !(options.dryRun && mail.fixtureSender)) throw refuse(`${mail.senderIssue} Nothing was built or uploaded.`);
+ // A blank MAIL_PROVIDER is the value this deploy would bind, and the Worker would have no sender, so mail
+ // cannot sign anyone in: unless the Worker already holds the setting, which the deploy keeps.
+ const blank = mail.blankProvider() && !(mail.providerHeldPossible && canReadLive && !mail.blankProvider(await liveSecrets()));
+ if (!blank && mail.configured()) return;
+ if (!blank && mail.canInspect && canReadLive && mail.configured(await liveSecrets())) return;
  const answers = setupSeed ? await savedSetupAnswers({ root, adapter, setupManifest }, setupSeed.model) : undefined;
  // Link approval and live post-link status are checked by linkDependencies;
  // selecting an issuer never bypasses that existing setup requirement.
@@ -53,6 +60,8 @@ export async function requireProductionAuth({ root, declaration, env, setupManif
   try { const value = answers?.[item.address] ?? bindings[item.address], issuer = new URL(value); return issuer.protocol === 'https:' && issuer.origin === value && !issuer.username && !issuer.password; } catch { return false; }
  })) return;
  // A dry run goes ahead without the mail inputs and lists them as needed for a real deploy.
- if (options.dryRun) return { signIn: `${mail.missing}${dependencies.length ? ', or an approved Auth SSO install' : ''}` };
+ const choices = providerChoices(declaredSignIn);
+ if (options.dryRun) return { signIn: `${blank ? `MAIL_PROVIDER (it resolves blank; set it to ${choices})` : mail.missing}${dependencies.length ? ', or an approved Auth SSO install' : ''}` };
+ if (blank) throw refuse(`MAIL_PROVIDER resolves to a blank value, which this deploy would bind as the Worker's mail provider, leaving sign-in mail with no sender. Accepted values: ${choices}. Set ${mail.providerEnvironment ? `${mail.providerEnvironment} in your environment or --env-file, or ` : ''}vars.MAIL_PROVIDER in ${declarationPath ?? 'the deploy declaration'}. Nothing was built or uploaded.`);
  throw refuse(`Production sign-in is not configured. Configure outbound email; missing or invalid: ${mail.missing}. Or select and approve an Auth SSO install through the declared oidc-provider@1 setup dependency. Local dev and demo use automatic RER_OPEN sign-in. Nothing was built or uploaded.`);
 }

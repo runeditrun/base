@@ -1227,11 +1227,11 @@
     },
     "cli/production-auth.mjs": {
       "source": "cli/production-auth.mjs",
-      "sha256": "7c99727573a093dd19f3a4973267d7bb21847893de1cde3bf59b94cc5699f0df"
+      "sha256": "6fae7902596946b49a93cd70c4a4e93c7012cc308c07911509c1fb2ad1a389c8"
     },
     "cli/production-mail.mjs": {
       "source": "cli/production-mail.mjs",
-      "sha256": "330fb2bd178407f68ab722d1cf6ee5479e076eb80265b5ac3550eab81f079764"
+      "sha256": "e4837e16b926d45e9027560689beb65273a60f5f914766f42885a9b017f7d214"
     },
     "cli/project-pnpm.mjs": {
       "source": "cli/project-pnpm.mjs",
@@ -3131,7 +3131,7 @@
     },
     "modules/deploy-kit/worker.mjs": {
       "source": "modules/deploy-kit/worker.mjs",
-      "sha256": "dae21bc572e630be57496b9e73f6749429a5b5fcf0a9fba876b173818de230e7"
+      "sha256": "83e57a41bf142a8e6fbcfb05766c1d89faff067522b7165c255e96b87f39897c"
     },
     "modules/erasure/CONTRACT.md": {
       "source": "modules/erasure/CONTRACT.md",
