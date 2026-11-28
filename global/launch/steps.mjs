@@ -59,6 +59,7 @@ export async function startServer(entry, args, { root, env, logPath, children, s
   if (event?.event === 'ready') { ready = event; resolveReady(); }
   if (event?.event === 'error') error = event;
   if (event?.event === 'moved') note(`moved this checkout from ${event.from} to ${event.to}; its data is kept`);
+  if (event?.event === 'port' && event.busyPort) note(`port ${event.busyPort} is in use, so this run serves on ${event.url}; the checkout keeps port ${event.busyPort}`);
   if (event?.event === 'waiting' && event.phase === 'server-load') note(event.message);
   if (event?.event === 'migration-retry') note(waitingNote(event));
   if (!event) output = (output + line + '\n').slice(-8192);
