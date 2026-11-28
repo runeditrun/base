@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.148
+
+Signed: Run Edit Run fleet, 2026-11-28.
+
+### Local dev port
+
+- A plain `rer dev` prints which busy port it left. 0.2.147 moved a busy default port and printed the URL it bound, but `~/.local/bin/rer dev` starts through the detached launcher, which relayed only ready, waiting and warning events, so the line `Port 8790 is in use, so this run serves on http://127.0.0.1:8791 …` stayed in the server log. The launcher now prints it, or passes the `port` event (`port`, `busyPort`, `url`) under `--json`.
+
 ## 0.2.147
 
 Signed: Run Edit Run fleet, 2026-11-28.
