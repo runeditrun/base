@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.149
+
+Signed: Run Edit Run fleet, 2026-11-28.
+
+### Local dev port
+
+- The installed launcher says which busy port a plain `rer dev` left: `rer dev: port 8790 is in use, so this run serves on http://127.0.0.1:8791; the checkout keeps port 8790` (a `progress` event under `--json`). 0.2.148 relayed it only from the dispatcher's own `--detach` launcher; `~/.local/bin/rer dev` starts through the installed launcher's worker, which noted a checkout move but not a moved port. A checkout pinned to an `@runeditrun/rer` package runs that package's launcher, so it shows the line from a 0.2.149 pin.
+
 ## 0.2.148
 
 Signed: Run Edit Run fleet, 2026-11-28.
