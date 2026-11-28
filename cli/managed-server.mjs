@@ -23,6 +23,7 @@ import { readDevKey,requireDevKey,refuseManagedInstallation,resolvePersona,openU
 import { announceDoorRoute,claimSavedName,moveCheckout,routeRunning,verifyDoorFor } from './door-mode.mjs';
 import { warmDocumentRender } from './render-warmup.mjs';
 import { contained } from './project.mjs';
+import { origin } from './parse.mjs';
 
 const devStartReceipt = '.rer/local/dev-started';
 const ownerOpenReceipt = '.rer/local/open-url';
@@ -111,7 +112,16 @@ export async function managedServer(project,options,out,{clock={}}={}){
   const seed=project.adapter.setup?await loadInstallerSeed(project.root,project.adapter):undefined;project.setupManifest=seed?.manifest;
   const keys=localSettingKeys(project);
   selected=await selectedOrigin(project,options);
-  if(!selected.door)await availablePort(selected.host,selected.port,{root:project.root,saved:!selected.explicitPort&&selected.savedOrigin!==undefined,verb:options.verb});
+  if(!selected.door){
+   // Without --port, a busy port moves this run only; the saved origin stays.
+   const port=await availablePort(selected.host,selected.port,{root:project.root,saved:!selected.explicitPort&&selected.savedOrigin!==undefined,verb:options.verb,move:!selected.explicitPort});
+   if(port!==selected.port){
+    const url=origin(selected.host,port);
+    if(options.json)out.event('port',{port,busyPort:selected.port,url});
+    else out.human(`Port ${selected.port} is in use, so this run serves on ${url}. The checkout keeps port ${selected.port}; ~/.local/bin/rer setup --port ${port} moves it.`);
+    selected={...selected,port,url};
+   }
+  }
   if(!selected.vars[keys.email])throw missing(`Local prerequisite ${keys.email}: found unset; expected set; run ~/.local/bin/rer setup.`);
   if(devIdentity&&!devKey)devKey=await requireDevKey(project.root);
   if(devIdentity&&['dev','preview'].includes(options.verb))refuseManagedInstallation(selected.vars,process.env);

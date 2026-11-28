@@ -2,6 +2,8 @@ import { createServer, Socket } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import { inspectionContext, portListener, searchContext, uncheckedInspection } from './process-diagnostics.mjs';
 
+const loopbackHosts = ['127.0.0.1', 'localhost', '::1'];
+
 async function bind(host, port) {
  const socket = createServer();
  try {
@@ -15,9 +17,9 @@ async function bind(host, port) {
 
 async function loopbackRefuses(host, port, context) {
  // An IPv6 wildcard may appear in an IPv4 ownership check even when it is
- // v6-only. For IPv4 and localhost, require both loopbacks to refuse.
- if (!['127.0.0.1', 'localhost', '::1'].includes(host)) return false;
- const addresses = host === '::1' ? ['::1'] : ['127.0.0.1', '::1'];
+ // v6-only. For every loopback host, require both loopbacks to refuse.
+ if (!loopbackHosts.includes(host)) return false;
+ const addresses = ['127.0.0.1', '::1'];
  const timeout = Math.min(250, Math.floor(context.deadline - performance.now()));
  if (timeout <= 0) return false;
  const refused = await Promise.all(addresses.map(address => new Promise(resolve => {
@@ -37,8 +39,10 @@ async function loopbackRefuses(host, port, context) {
 // finds no listener, retry the bind within the same inspection deadline.
 // A free-port search (`searching`) only needs to move on from a port in use:
 // it skips one on the failed bind alone, without the slow ownership check.
-// localhost is served on 127.0.0.1 and held on ::1 (where IPv6 exists): both must be free.
-export async function probePort(host, port, { context = inspectionContext({ port }), hosts = host === 'localhost' ? ['127.0.0.1', '::1'] : [host], anyAddress = false, searching = false } = {}) {
+// A localhost URL can reach either loopback, so a loopback port is taken when
+// 127.0.0.1 or ::1 holds it; rer serves 127.0.0.1 and localhost on both. A
+// host without an IPv6 loopback counts as free on that side.
+export async function probePort(host, port, { context = inspectionContext({ port }), hosts = loopbackHosts.includes(host) ? ['127.0.0.1', '::1'] : [host], anyAddress = false, searching = false } = {}) {
  const bindings = async () => {
   for (const address of hosts) { const result = await bind(address, port); if (!result.available) return result; }
   return { available: true };
@@ -51,7 +55,7 @@ export async function probePort(host, port, { context = inspectionContext({ port
   bound = await bindings();
   if (bound.available || bound.code !== 'EADDRINUSE') return bound;
  }
- try { listener = await portListener(port, anyAddress ? undefined : host, context); }
+ try { listener = await portListener(port, anyAddress ? undefined : loopbackHosts.includes(host) ? 'localhost' : host, context); }
  catch (error) { if (!uncheckedInspection(error)) throw error; unchecked = error; }
  if (listener) return { available: false, listener };
  // Inspecting sockets may have taken seconds. Bind again against the current

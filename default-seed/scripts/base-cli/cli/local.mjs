@@ -44,13 +44,16 @@ export async function selectedOrigin(project, options, { setup = false } = {}) {
  return { url, host, port, vars, savedOrigin: previous?.origin, moved, explicitPort: options.port !== undefined, ...(taken ? { skipped: defaultPort } : {}) };
 }
 
-export async function availablePort(host, port, { root, saved = false, verb = 'dev' } = {}) {
+// The port to serve on. A port either loopback holds is busy; with `move` (no
+// --port given) a busy port moves this run to the next free one, else refuses.
+export async function availablePort(host, port, { root, saved = false, verb = 'dev', move = false } = {}) {
  const { inspectionContext } = await shared('process-diagnostics.mjs');
  const { probePort } = await shared('port-probe.mjs');
  const context = inspectionContext({port,verb});
  const result = await probePort(host, port, { context });
- if (result.available) return;
+ if (result.available) return port;
  if (result.code && result.code !== 'EADDRINUSE') throw refuse(`Port ${port} cannot be used on ${host}: ${result.code}. Check the address or use ~/.local/bin/rer setup --port PORT with a free port, then run ~/.local/bin/rer dev again.`);
+ if (move) return firstFreePort(host, port + 1);
  throw refuse(await busyPortMessage({ port, host, root, saved, context, listener: result.listener ?? null }));
 }
 

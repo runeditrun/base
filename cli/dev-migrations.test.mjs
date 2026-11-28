@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { fixture } from './fixtures/reference.mjs';
+import { createServer } from 'node:net';
+import { fixture, hostStatus } from './fixtures/reference.mjs';
 import { devEntryBrowser } from './fixtures/dev-entry-browser.mjs';
 
 const events = child => child.stdoutText.trim().split('\n').filter(Boolean).map(JSON.parse);
@@ -123,6 +124,27 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
  const repeated = await awaitReady(restarted);
  assert.equal((await fetch(repeated.url + '/health')).status, 200, 'an up-to-date database starts without reapplying SQL');
  await f.stop(restarted);
+ // Another program on [::1] alone takes the saved port: a localhost URL could
+ // reach it there. An explicit --port refuses by name; a plain dev moves this
+ // run to a free port, serves it on both loopbacks and keeps the saved origin.
+ // A host without an IPv6 loopback (a default container) holds 127.0.0.1 instead.
+ const savedPort=Number(new URL(repeated.url).port);
+ const stranger=createServer(socket=>socket.end('HTTP/1.1 200 OK\r\nContent-Length: 8\r\nConnection: close\r\n\r\nstranger'));
+ const hold=host=>new Promise((resolve,reject)=>{stranger.once('error',reject);stranger.listen({host,port:savedPort,exclusive:true},()=>resolve(host));});
+ const families=await hold('::1').then(()=>['127.0.0.1','::1'],error=>{if(!['EADDRNOTAVAIL','EAFNOSUPPORT'].includes(error.code))throw error;return hold('127.0.0.1').then(()=>['127.0.0.1']);});
+ t.diagnostic(`stranger holds ${families.length===2?'[::1]':'127.0.0.1'}:${savedPort}`);
+ try{
+  const explicit=events(await f.run(['dev','--port',String(savedPort),'--foreground','--json'],4)).find(event=>event.event==='error');
+  assert.equal(explicit?.code,'safety_refusal');
+  assert.ok(explicit.message.includes(String(savedPort)),'the refusal names the port');
+  const moving=f.start(['dev','--foreground','--json']);
+  const movedReady=await awaitReady(moving);
+  const movedPort=new URL(movedReady.url).port;
+  assert.notEqual(movedPort,String(savedPort));
+  assert.equal(events(moving).find(event=>event.event==='port')?.url,movedReady.url);
+  for(const family of families)assert.equal((await hostStatus(`http://${family==='::1'?'[::1]':family}:${movedPort}/health`,`127.0.0.1:${movedPort}`)),200,`served on ${family}`);
+  await f.stop(moving);
+ }finally{await new Promise(resolve=>stranger.close(resolve));}
  assert.deepEqual(await readFile(join(f.root, '.dev.vars')), settings);
  // Setup moves a saved 127.0.0.1 checkout to localhost (a passkey needs a
  // domain name) as it moves a port: only the origin line changes, the data

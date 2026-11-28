@@ -109,12 +109,13 @@ export async function trafficProxy({host,port,target,activity,door,devKey,origin
  });
  try{await listen(server,bindAddress(host),port);}catch(error){agent.destroy();throw error;}
  let twin;
- try{if(host==='localhost')twin=await holdIPv6(server,server.address().port);}
+ try{if(!door&&['localhost','127.0.0.1'].includes(host))twin=await holdIPv6(server,server.address().port);}
  catch(error){agent.destroy();await new Promise(resolve=>server.close(resolve));throw error;}
  return {probe,port:server.address().port,setTarget(port){target=port;answered=false;},async close(){closing=true;agent.destroy();for(const socket of sockets)socket.destroy();await Promise.all([server,twin].filter(Boolean).map(listener=>new Promise(resolve=>listener.close(resolve))));}};
 }
-// A localhost origin also holds its port on ::1, where browsers may try first,
-// so no other process answers there; a system without IPv6 has no such side.
+// A localhost or 127.0.0.1 origin also holds its port on ::1, where a browser
+// may resolve localhost first, so no other process answers a localhost URL
+// there; a system without IPv6 has no such side.
 async function holdIPv6(server,port){
  const twin=net.createServer(socket=>server.emit('connection',socket));
  try{await new Promise((resolve,reject)=>{twin.once('error',reject);twin.listen({host:'::1',port,exclusive:true},resolve);});return twin;}

@@ -24,7 +24,7 @@ export async function firstFreePort(host, from = defaultPort) {
 // command that stops it), else the process and its working directory.
 export async function portHolder(port, host, root, env = process.env, context, observed) {
  const { portListener } = await shared('process-diagnostics.mjs');
- const listener = observed !== undefined ? observed : await portListener(port, host, context);
+ const listener = observed !== undefined ? observed : await portListener(port, ['127.0.0.1', '::1'].includes(host) ? 'localhost' : host, context);
  if (!listener) return undefined;
  const state = await readJson(join(serversDirectory(env), 'state.json'), { running: [] }).catch(() => ({ running: [] }));
  const record = (state.running ?? []).find(item => item.owner?.pid === listener.pid && item.port === port);

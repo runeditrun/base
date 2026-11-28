@@ -209,7 +209,7 @@
     },
     "port-probe.mjs": {
       "source": "onboarding/port-probe.mjs",
-      "sha256": "45f32c4b569d2b28ef5f4ef45f401d0cab5f9dcfc3604ee79fa23a6ff6343433"
+      "sha256": "5ac3ff269a73aca92207ad6bf7c8a2f08d9d44b19361c38f701e99572bb72835"
     },
     "prefill.mjs": {
       "source": "onboarding/prefill.mjs",
@@ -1091,7 +1091,7 @@
     },
     "cli/local.mjs": {
       "source": "cli/local.mjs",
-      "sha256": "33e67ab38f65374c2710b957bcd559a217f519ffad4dda0281a8a0152654ade6"
+      "sha256": "b388cb973518b696ce3933eff7a0bc3f34a210755e9b90e614c759cdb102475c"
     },
     "cli/main.mjs": {
       "source": "cli/main.mjs",
@@ -1111,7 +1111,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "e00e3a27a455cbcf2ea5412f663d5b88dec1b05137dae9fdc86162b0a1692511"
+      "sha256": "d0db04b5a9d83228e82ecc3675812851445e21c2ce70e259f0b5d9b217ff21f4"
     },
     "cli/native-owner-entry.mjs": {
       "source": "cli/native-owner-entry.mjs",
@@ -1175,7 +1175,7 @@
     },
     "cli/port.mjs": {
       "source": "cli/port.mjs",
-      "sha256": "c8dd7a6d011d160ce251d3c05d89b63c5af577902629dcfe56a29a023b168f92"
+      "sha256": "0a42df0a530b9e40f83fedaa2e683283219f34bdfffecc83b9470772d5e7f254"
     },
     "cli/portability-empty.mjs": {
       "source": "cli/portability-empty.mjs",
@@ -1311,7 +1311,7 @@
     },
     "cli/server-proxy.mjs": {
       "source": "cli/server-proxy.mjs",
-      "sha256": "d709e6ae2ea9785b9fe8323fd40020f59fc593eb1f58df2d9314b0f8ffc93da1"
+      "sha256": "15977d6bda42a19bb9dd5c9288961e26090548673cdf114b33fddc5491650eb1"
     },
     "cli/server-registry.mjs": {
       "source": "cli/server-registry.mjs",
