@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.147
+
+Signed: Run Edit Run fleet, 2026-11-28.
+
+### Local dev port
+
+- `rer dev` treats a port as taken when either 127.0.0.1 or ::1 holds it. Before, a checkout on 127.0.0.1 checked only that address, so with another program on `[::1]:8790` Lamp bound `127.0.0.1:8790` and the documented `http://localhost:8790/` opened the other app. A host without an IPv6 loopback counts as free on that side. `rer setup`'s free-port search uses the same check.
+- Without `--port`, a busy saved or default port moves this run to the next free port, and dev prints the URL it bound (`Port 8790 is in use, so this run serves on http://127.0.0.1:8791 …`; a `port` event with `busyPort` under `--json`). The saved origin is unchanged; `rer setup --port N` still moves the checkout for good. An explicit `--port N` that either loopback holds still refuses, naming the port and its holder. `rer preview` follows the same rule.
+- A 127.0.0.1 checkout's public listener also holds its port on ::1, as a localhost checkout already did, so `localhost` cannot reach another program there.
+
 ## 0.2.146
 
 Signed: Run Edit Run fleet, 2026-11-27.
