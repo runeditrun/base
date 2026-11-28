@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { shared } from './shared.mjs';
-import { ready } from './managed-server.mjs';
+import { portMoved, ready } from './managed-server.mjs';
 import { RerError } from './errors.mjs';
 
 // The actual dispatcher owns the server, registry and shutdown. Only its
@@ -38,7 +38,8 @@ export async function detachedServer(options, argv, out) {
      ready(out,event.url,dev,options.json,event.siteUrl,event.demo);
      return 0;
     }
-    if (!options.json && (event.event==='migration-retry'||event.event==='waiting'&&event.phase==='server-load')) out.progress(event.message+'\n');
+    if (event.event==='port') portMoved(out,options.json,event);
+    else if (!options.json && (event.event==='migration-retry'||event.event==='waiting'&&event.phase==='server-load')) out.progress(event.message+'\n');
     else if (event.event==='waiting' || event.event==='warning' || event.event==='migration-retry') out.event(event.event,event);
    }
    if (exit!==undefined) throw new RerError(failure?.code ?? 'command_failed',failure?.message ?? `The ${options.verb} server stopped before readiness (${spawnError?.code ?? exit}); inspect ${log}.`,failure?.exitCode ?? (exit || 1));

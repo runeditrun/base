@@ -28,6 +28,12 @@ import { origin } from './parse.mjs';
 const devStartReceipt = '.rer/local/dev-started';
 const ownerOpenReceipt = '.rer/local/open-url';
 
+// A busy default port moved this run; the detached launcher relays the same line.
+export function portMoved(out,json,{port,busyPort,url}){
+ if(json)out.event('port',{port,busyPort,url});
+ else out.human(`Port ${busyPort} is in use, so this run serves on ${url}. The checkout keeps port ${busyPort}; ~/.local/bin/rer setup --port ${port} moves it.`);
+}
+
 // Dev opens through the local identity exchange. Preview serves production output.
 export async function ready(out,url,dev,json=false,siteUrl,demo,root,ownerOpenUrl){
  if(json){out.event('ready',{url,...(dev?{signedInAs:dev.signedInAs??null,openUrl:dev.openUrl}:{}),...(ownerOpenUrl?{ownerOpenUrl}:{}),...(siteUrl?{siteUrl}:{}),...(demo?{demo}:{})});return;}
@@ -117,8 +123,7 @@ export async function managedServer(project,options,out,{clock={}}={}){
    const port=await availablePort(selected.host,selected.port,{root:project.root,saved:!selected.explicitPort&&selected.savedOrigin!==undefined,verb:options.verb,move:!selected.explicitPort});
    if(port!==selected.port){
     const url=origin(selected.host,port);
-    if(options.json)out.event('port',{port,busyPort:selected.port,url});
-    else out.human(`Port ${selected.port} is in use, so this run serves on ${url}. The checkout keeps port ${selected.port}; ~/.local/bin/rer setup --port ${port} moves it.`);
+    portMoved(out,options.json,{port,busyPort:selected.port,url});
     selected={...selected,port,url};
    }
   }

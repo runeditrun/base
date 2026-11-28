@@ -959,7 +959,7 @@
     },
     "cli/detached-server.mjs": {
       "source": "cli/detached-server.mjs",
-      "sha256": "d77b84ebca3685eb05467fa534ec053ba8a7dbc05a1755d9bdf2d9ca3a522024"
+      "sha256": "f6fa9c25ca4dfba5dc4cfcf894a1e7ffbd657e98a756e5160699168fb807f441"
     },
     "cli/dev-identity.mjs": {
       "source": "cli/dev-identity.mjs",
@@ -1111,7 +1111,7 @@
     },
     "cli/managed-server.mjs": {
       "source": "cli/managed-server.mjs",
-      "sha256": "d0db04b5a9d83228e82ecc3675812851445e21c2ce70e259f0b5d9b217ff21f4"
+      "sha256": "29a39594bdf370a51c1e2f4623931db51390b2ed29e976d240737c634a6a9ec3"
     },
     "cli/native-owner-entry.mjs": {
       "source": "cli/native-owner-entry.mjs",

@@ -137,13 +137,14 @@ test('install fetches no browser, setup lists what hosting needs, and dev applie
   const explicit=events(await f.run(['dev','--port',String(savedPort),'--foreground','--json'],4)).find(event=>event.event==='error');
   assert.equal(explicit?.code,'safety_refusal');
   assert.ok(explicit.message.includes(String(savedPort)),'the refusal names the port');
-  const moving=f.start(['dev','--foreground','--json']);
-  const movedReady=await awaitReady(moving);
+  // Through the detached launcher, as a plain ~/.local/bin/rer dev runs.
+  const moving=events(await f.run(['dev','--detach','--json']));
+  const movedReady=moving.find(event=>event.event==='ready');
   const movedPort=new URL(movedReady.url).port;
   assert.notEqual(movedPort,String(savedPort));
-  assert.equal(events(moving).find(event=>event.event==='port')?.url,movedReady.url);
+  assert.equal(moving.find(event=>event.event==='port')?.url,movedReady.url);
   for(const family of families)assert.equal((await hostStatus(`http://${family==='::1'?'[::1]':family}:${movedPort}/health`,`127.0.0.1:${movedPort}`)),200,`served on ${family}`);
-  await f.stop(moving);
+  await f.run(['dev','--stop']);
  }finally{await new Promise(resolve=>stranger.close(resolve));}
  assert.deepEqual(await readFile(join(f.root, '.dev.vars')), settings);
  // Setup moves a saved 127.0.0.1 checkout to localhost (a passkey needs a
